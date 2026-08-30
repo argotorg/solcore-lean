@@ -99,6 +99,12 @@ changing execution. Both tables and arbitrary-list safety derive from the one
 registry, while explicit indexes 0 through 8, length 9, first-unbound index 9,
 and all public boundaries remain fixed. Parser and syntax proofs remain paused.
 
+[ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
+is accepted and in progress. It introduces a branch-complete internal parent
+result and resumes only retained exhaustion. The existing nested-`Option` API
+stays unchanged through an explicit compatibility erasure. Parser and syntax
+proofs remain paused.
+
 ## Completed foundation
 
 The current Core already has:
@@ -239,11 +245,12 @@ These results remain regression obligations for every extension.
 | 118 | Strict optional input-word BE observation | Complete | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
 | 119 | Resumable handled fuel slices | Complete | Resumes retained exhaustion under the same handler and exact inputs, with proved split/summed-budget equality, typed-result safety, and storage-preservation regressions |
 | 120 | Canonical host capability registry | Complete | Derives both nine-entry host tables and arbitrary-list safety from one order, with exact finite laws and compatibility/runtime regressions |
-| 121 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
-| 122 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
-| 123 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
-| 124 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
-| 125 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
+| 121 | Branch-complete resumable parent-indexed selected execution | In progress | Retains all five internal branches, resumes only exact exhaustion, and erases to the unchanged nested-`Option` API |
+| 122 | Further contract-entry input roles | Planned | Add current, callee, other wider loads, or kind only when an identified Core consumer and lifetime rule exist |
+| 123 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
+| 124 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
+| 125 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
+| 126 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
 
 This order can change when a prerequisite is discovered, but grammar work does
 not become a prerequisite for Core execution.
@@ -2114,6 +2121,20 @@ equality, and single production literal, with no P0-P3 issue. No custom axiom
 or `sorry` remains. It changes no request, response, fuel, fault, Store effect,
 Wire or Oracle format, source form, or ABI. Parser and syntax proofs remain
 paused while syntax-independent semantics is completed.
+
+## In-progress branch-complete parent execution result
+
+[ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
+adds a total internal result for storage absence, code absence, exhaustion,
+raw fault, and completion. Only exhaustion invokes the driver again, using its
+exact retained context and state under the same immutable inputs and completion
+policy. Split and summed budgets must agree exactly.
+
+An explicit lossy erasure recovers the existing nested-`Option` result, whose
+operation and theorems remain unchanged. The new boundary gives no resolution
+meaning to absence, exhaustion, or fault and adds no gas, persistence, nested
+invocation, transaction, parser, syntax, ABI, Wire, Oracle, or publication
+policy.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

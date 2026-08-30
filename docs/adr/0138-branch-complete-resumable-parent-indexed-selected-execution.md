@@ -1,8 +1,9 @@
 # ADR-0138: Branch-complete resumable parent-indexed selected execution
 
-- Status: Proposed
+- Status: Accepted
 - Decision date: 2026-08-29
 - Scope: retain and resume every internal branch of parent-indexed selected execution
+- Implementation: In progress
 
 ## Context
 

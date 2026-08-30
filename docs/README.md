@@ -173,6 +173,14 @@ remain registered, and the mapped tables are definitionally equal to the old
 literals. The independent audit found no P0-P3 issue. No new capability is
 published, and parser and syntax proofs remain paused.
 
+[ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
+is accepted and in progress. It keeps storage absence, code absence,
+exhaustion, raw fault, and completion distinct at the internal parent boundary.
+Only exhaustion resumes from its exact retained context and Core state; the
+existing nested-`Option` operation remains unchanged and is recovered by
+explicit erasure. This adds no gas, persistence, nested-call, transaction,
+parser, syntax, ABI, Wire, Oracle, or public-interface policy.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are

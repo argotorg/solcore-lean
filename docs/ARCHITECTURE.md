@@ -867,6 +867,16 @@ length 9, first-unbound index 9, runtime behavior, and public boundaries remain
 unchanged. The independent audit found no P0-P3 issue. Parser and syntax proofs
 remain paused.
 
+ADR-0138 is accepted and in progress above parent-indexed selected execution.
+Its internal five-way carrier preserves storage absence, code absence, exact
+exhaustion, raw fault, and completion without flattening them into nested
+options. Only exhaustion can resume, from its retained handler context and Core
+state, and split execution must equal one run with the summed budget. The
+existing nested-`Option` API remains unchanged and is an explicit erasure of
+the richer result. No frame meaning is assigned to exhaustion or fault, and no
+gas, persistence, nested-call, transaction, parser, ABI, or public-format rule
+is added.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

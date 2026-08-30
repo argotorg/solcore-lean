@@ -391,6 +391,14 @@ through 8, both tables retain length 9, and index 9 remains first unbound.
 Runtime behavior and public formats do not change. Parser and syntax proofs
 remain paused.
 
+[ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
+is accepted and in progress. It adds an internal five-way carrier that keeps
+storage absence, code absence, exhaustion, raw fault, and completion distinct.
+Only exhaustion resumes from its retained context and Core state. The existing
+three-`Option` parent API remains unchanged and is recovered by explicit
+erasure. Parser and syntax proofs remain paused while this syntax-independent
+boundary is completed.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -417,6 +425,7 @@ remain paused.
 | Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
 | Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
 | Canonical host capability registry | Complete | One canonical nine-entry registry derives both host tables and arbitrary-list safety; exact finite laws, all named compatibility facts, numeric boundaries, and runtime regressions are complete | Not published |
+| Branch-complete resumable parent-indexed selected execution | In progress | Adds an internal five-way result, compatibility erasure, and out-of-fuel-only resumption while preserving the existing parent API | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2564,6 +2573,21 @@ simplifier registrations,
 definitionally equal tables, and single production literal, and found no P0-P3
 issue. This adds no capability and publishes no registry or ABI. Parser and
 syntax proofs remain paused.
+
+## In-progress branch-complete parent execution result
+
+[ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
+retains every internal branch of parent-indexed selected execution in a total
+five-way result. Exhaustion keeps the exact mutable context and Core state so
+it can resume without repeating storage selection, code lookup, the executed
+prefix, or the last handled request. Absence, fault, and completion are
+terminal identities, and split execution must equal one run with the summed
+budget.
+
+The old nested-`Option` operation and all of its behavior remain unchanged;
+the new carrier erases back to it explicitly. Exhaustion and raw fault gain no
+frame-resolution meaning. This work adds no gas, persistence, nested calls,
+transaction policy, ABI, parser, syntax, Wire, Oracle, or public protocol.
 
 ## Meaning of completion
 
