@@ -109,6 +109,8 @@ import Solcore.Test.HostDriverCompleteness
 import Solcore.Test.HostDriverResumption
 import Solcore.Test.HostStorageDriverResumption
 import Solcore.Test.HostStorageInputData
+import Solcore.Test.Adr0145ContractContextExternalProperties
+import Solcore.Test.Adr0145ExecutionExternalProperties
 import Solcore.Test.TopLevelExecution
 import Solcore.Test.TopLevelObservation
 import Solcore.Test.FrameEffectJournal
