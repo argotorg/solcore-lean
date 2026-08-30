@@ -1,4 +1,5 @@
 import Solcore.Semantics.OneLevelNestedExecutionTransitions
+import Solcore.Semantics.BalanceTransferInstallationProperties
 
 /-! Reachability seal for scheduler states produced by checked execution. -/
 
@@ -25,6 +26,19 @@ inductive Reachable
           rootContract) :
       Reachable registry
         (Mode.initialRoot rootContract rootInvocation installed)
+  | balancedInitial
+      {workingWorld : WorldState}
+      (installed :
+        InstalledCheckedCoreContract initialWorld rootInvocation.target
+          rootContract)
+      (transferred :
+        initialWorld.transferBalance rootInvocation.caller
+            rootInvocation.target rootInvocation.callValue =
+          .ok workingWorld) :
+      Reachable registry
+        (Mode.preparedRoot rootContract rootInvocation
+          (WorldState.transferBalance_preserves_installed transferred
+            installed))
   | rootNext
       {frame : RootFrame initialWorld rootContract rootInvocation}
       {next : Core.State}

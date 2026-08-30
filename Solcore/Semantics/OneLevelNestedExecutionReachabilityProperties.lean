@@ -77,12 +77,12 @@ structure ChildAnchored
     frame.childContext.context.storageAddress = frame.childTarget
   childCheckpointState_eq :
     frame.childContext.context.values.checkpoint.state =
-      frame.suspendedRoot.parentContext.context.values.working.1
+      frame.childInitialWorld
   registryResolution_eq :
     registry.resolve?
         frame.suspendedRoot.parentContext.context.values.working.1
         frame.childTarget =
-      some ⟨frame.childContract, frame.installed⟩
+      some ⟨frame.childContract, frame.preTransferInstalled⟩
 
 /-- Mode-indexed form used for one induction over the transition closure. -/
 def Anchored
@@ -116,6 +116,16 @@ private theorem rootAfterSuspension_anchored
         · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
         · exact ⟨anchored.storageAddress_eq,
             anchored.checkpointState_eq, rfl, rfl, by assumption⟩
+  | callContractWordWithValue target value input =>
+      simp only [RootFrame.afterSuspension]
+      split
+      · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+      · split
+        · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+        · split
+          · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
+          · exact ⟨anchored.storageAddress_eq,
+              anchored.checkpointState_eq, rfl, rfl, by assumption⟩
   | storageRead slot =>
       exact ⟨anchored.storageAddress_eq,
         anchored.checkpointState_eq⟩
@@ -158,6 +168,8 @@ theorem Reachable.anchored
     Anchored registry mode := by
   induction reachable with
   | initial installed =>
+      exact ⟨rfl, rfl⟩
+  | balancedInitial installed transferred =>
       exact ⟨rfl, rfl⟩
   | rootNext prior advanced inductionHypothesis =>
       rcases inductionHypothesis with ⟨address, checkpoint⟩
@@ -269,7 +281,7 @@ theorem Reachable.child_checkpointState
     {frame : ChildFrame initialWorld rootContract rootInvocation}
     (reachable : Reachable registry (.child frame)) :
     frame.childContext.context.values.checkpoint.state =
-      frame.suspendedRoot.parentContext.context.values.working.1 :=
+      frame.childInitialWorld :=
   reachable.anchored.childCheckpointState_eq
 
 /-- A live child is exactly the contract resolved at its frozen call site. -/
@@ -283,7 +295,7 @@ theorem Reachable.child_registryResolution
     registry.resolve?
         frame.suspendedRoot.parentContext.context.values.working.1
         frame.childTarget =
-      some ⟨frame.childContract, frame.installed⟩ :=
+      some ⟨frame.childContract, frame.preTransferInstalled⟩ :=
   reachable.anchored.registryResolution_eq
 
 end Solcore.Semantics.OneLevelNestedExecution

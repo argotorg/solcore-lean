@@ -129,7 +129,8 @@ namespace ChildFrame
     (frame : ChildFrame initialWorld rootContract rootInvocation)
     (data : Core.Word) :
     (frame.resumeRoot (.returned data)).state =
-      frame.suspendedRoot.suspension.resume (.returned data) :=
+      frame.suspendedRoot.suspension.resume
+        (frame.suspendedRoot.call.response (.returned data)) :=
   rfl
 
 @[simp] theorem resumeRoot_reverted_response
@@ -139,7 +140,8 @@ namespace ChildFrame
     (frame : ChildFrame initialWorld rootContract rootInvocation)
     (data : Core.Word) :
     (frame.resumeRoot (.reverted data)).state =
-      frame.suspendedRoot.suspension.resume (.reverted data) :=
+      frame.suspendedRoot.suspension.resume
+        (frame.suspendedRoot.call.response (.reverted data)) :=
   rfl
 
 @[simp] theorem resumeRoot_trapped_response
@@ -149,7 +151,8 @@ namespace ChildFrame
     (frame : ChildFrame initialWorld rootContract rootInvocation)
     (reason : Core.Word) :
     (frame.resumeRoot (.trapped reason)).state =
-      frame.suspendedRoot.suspension.resume (.trapped reason) :=
+      frame.suspendedRoot.suspension.resume
+        (frame.suspendedRoot.call.response (.trapped reason)) :=
   rfl
 
 end ChildFrame

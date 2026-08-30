@@ -95,17 +95,20 @@ example (reason : Word) :
 
 example (data : Word) :
     (frame.resumeRoot (.returned data)).state =
-      frame.suspendedRoot.suspension.resume (.returned data) :=
+      frame.suspendedRoot.suspension.resume
+        (frame.suspendedRoot.call.response (.returned data)) :=
   ChildFrame.resumeRoot_returned_response frame data
 
 example (data : Word) :
     (frame.resumeRoot (.reverted data)).state =
-      frame.suspendedRoot.suspension.resume (.reverted data) :=
+      frame.suspendedRoot.suspension.resume
+        (frame.suspendedRoot.call.response (.reverted data)) :=
   ChildFrame.resumeRoot_reverted_response frame data
 
 example (reason : Word) :
     (frame.resumeRoot (.trapped reason)).state =
-      frame.suspendedRoot.suspension.resume (.trapped reason) :=
+      frame.suspendedRoot.suspension.resume
+        (frame.suspendedRoot.call.response (.trapped reason)) :=
   ChildFrame.resumeRoot_trapped_response frame reason
 
 end ChildResolution
@@ -168,14 +171,14 @@ example :
 
 example :
     frame.childContext.context.values.checkpoint.state =
-      frame.suspendedRoot.parentContext.context.values.working.1 :=
+      frame.childInitialWorld :=
   reachable.child_checkpointState
 
 example :
     registry.resolve?
         frame.suspendedRoot.parentContext.context.values.working.1
         frame.childTarget =
-      some ⟨frame.childContract, frame.installed⟩ :=
+      some ⟨frame.childContract, frame.preTransferInstalled⟩ :=
   reachable.child_registryResolution
 
 end ReachableChild

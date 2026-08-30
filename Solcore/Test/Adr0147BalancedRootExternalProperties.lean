@@ -1,4 +1,5 @@
 import Solcore.Semantics.OneLevelNestedExecutionBalancedRootProperties
+import Solcore.Semantics.OneLevelNestedExecutionReachability
 
 /-! External compile consumers for post-transfer root initialization laws. -/
 
@@ -46,5 +47,20 @@ example :
       rootInvocation installed).state =
         Core.State.initial rootContract.code.program.body Core.hostEnvironment :=
   RootFrame.prepared_state installed
+
+example (registry : CheckedContractRegistry)
+    (transferred :
+      checkpointWorld.transferBalance rootInvocation.caller
+          rootInvocation.target rootInvocation.callValue =
+        .ok workingWorld)
+    (initialInstalled :
+      InstalledCheckedCoreContract checkpointWorld rootInvocation.target
+        rootContract) :
+    Reachable registry
+      (Mode.preparedRoot (checkpointWorld := checkpointWorld)
+        rootContract rootInvocation
+        (WorldState.transferBalance_preserves_installed transferred
+          initialInstalled)) :=
+  .balancedInitial initialInstalled transferred
 
 end Tests
