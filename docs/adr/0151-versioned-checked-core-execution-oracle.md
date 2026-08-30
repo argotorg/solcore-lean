@@ -102,10 +102,17 @@ valid budget. Limit validation requires `calldataBytes < 2^256`; together with
 the actual-size preflight this constructs `InputData` without a fallback.
 
 Exceeding a declared budget is `inconclusive`, not a protocol error. After the
-existing strict JSON parser identifies v5, a generic JSON preflight counts even
-unknown subtrees, so they cannot bypass declared JSON budgets. This ADR
-does not change the raw NDJSON transport behavior of older versions.
-Capabilities reports every limit and count rule.
+existing strict JSON parser identifies v5, validation first recovers and checks
+the shallow schema, request ID, profile, and complete limits object. Generic
+JSON depth and node traversal then counts even unknown subtrees, so they cannot
+bypass declared JSON budgets. Exact Oracle structure and scalar decoding comes
+next. The Core decoder consumes one typed depth/node unit before validating each
+expected Program, DataDefinition, Type, or Expression node; a limit reached at
+the same node as a malformed Core value therefore wins as `inconclusive`.
+Scenario-entry, identifier-byte, and calldata-byte measurements follow complete
+structural decoding and precede semantic admission. This ADR does not change the
+raw NDJSON transport behavior of older versions. Capabilities reports every
+limit and count rule.
 
 A fixed shallow envelope decoder reads and validates the complete `limits`
 object before budgeted traversal. A missing, malformed, or out-of-range limit is
@@ -308,11 +315,13 @@ After scalar decoding, keyed input arrays are sorted by their full key before
 duplicate and reference validation, and the encoder emits that canonical order.
 Logs, created Addresses, and probes retain semantic/request order instead.
 
-Validation selects the first failure in this order: envelope and transport
-shape; declared resource preflight; Core wire decoding; contract identifiers
-and admission; account and sparse-storage validation; registry, template, and
-creation-policy validation; probe validation; root installation; then
-execution. This order is part of deterministic diagnostics.
+Validation selects the first failure in this order: strict transport and
+shallow schema/ID/profile/limits recovery; whole-tree JSON budgets; exact Oracle
+structure and scalars; budgeted Core wire decoding; scenario, identifier, and
+calldata measurements; contract identifiers and admission; account and
+sparse-storage validation; registry, template, and creation-policy validation;
+probe validation; root installation; then execution. This order is part of
+deterministic diagnostics.
 
 The NDJSON dispatcher selects v5 only by its exact schema discriminator. Add a
 `capabilities-v5` CLI command without changing the meaning or encoding of any
