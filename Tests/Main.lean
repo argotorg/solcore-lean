@@ -189,6 +189,7 @@ import Solcore.Test.BalanceTransfer
 import Solcore.Test.BalanceTransferProperties
 import Solcore.Test.BalanceTransferInstallationExternalProperties
 import Solcore.Test.WorldStateDeltaBalanceProperties
+import Solcore.Test.WorldStateDeltaCreationProperties
 import Solcore.Test.WorldStateCode
 import Solcore.Test.WorldStateStorageRead
 import Solcore.Test.WorldStateStorageReadWrite
@@ -5091,6 +5092,7 @@ def run : IO Unit := do
   Adr0148ExecutionEnvironment.testAdr0148ExecutionEnvironment
   testBalanceTransfer
   testWorldStateDeltaBalance
+  testWorldStateDeltaCreation
   testWorldStateCode
   testWorldStateStorageRead
   testWorldStateStorageWriteAlgebra

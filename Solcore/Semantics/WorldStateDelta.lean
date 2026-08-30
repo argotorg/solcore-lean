@@ -1,5 +1,7 @@
 import Solcore.Semantics.WorldStateStorageRead
 import Solcore.Semantics.WorldStateBalanceProperties
+import Solcore.Semantics.WorldStateNonceProperties
+import Solcore.Semantics.WorldStateCode
 
 /-! Exact, queryable endpoint observations for arbitrary WorldState transitions. -/
 
@@ -56,6 +58,30 @@ def balanceEndpoints
     (address : Address) : Option Core.Word × Option Core.Word :=
   (initialWorld.balance? address, finalWorld.balance? address)
 
+/-- Observe exact creation-nonce endpoints at one address. -/
+def nonceEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option Core.Word × Option Core.Word :=
+  (initialWorld.nonce? address, finalWorld.nonce? address)
+
+/-- Observe exact checked-code endpoints at one address. -/
+def codeEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) :
+    Option CheckedHostCoreProgram × Option CheckedHostCoreProgram :=
+  (initialWorld.code? address, finalWorld.code? address)
+
+/-- Report exactly an absent-to-present Account transition. -/
+def createdAccount?
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Bool :=
+  match initialWorld.account? address, finalWorld.account? address with
+  | none, some _ => true
+  | _, _ => false
+
 /-- Return exact old/new storage endpoints only when the observation changed. -/
 def slotChange?
     {initialWorld finalWorld : WorldState}
@@ -71,6 +97,14 @@ def balanceChange?
     (delta : WorldStateDelta initialWorld finalWorld)
     (address : Address) : Option (Option Core.Word × Option Core.Word) :=
   let endpoints := delta.balanceEndpoints address
+  if endpoints.1 = endpoints.2 then none else some endpoints
+
+/-- Return exact old/new nonce endpoints only when the observation changed. -/
+def nonceChange?
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option (Option Core.Word × Option Core.Word) :=
+  let endpoints := delta.nonceEndpoints address
   if endpoints.1 = endpoints.2 then none else some endpoints
 
 end WorldStateDelta

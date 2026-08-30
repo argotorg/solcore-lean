@@ -41,6 +41,32 @@ theorem unique
       (initialWorld.balance? address, finalWorld.balance? address) := by
   rfl
 
+@[simp] theorem nonceEndpoints_exact
+    (initialWorld finalWorld : WorldState)
+    (address : Address) :
+    (WorldStateDelta.exact (initialWorld := initialWorld)
+      (finalWorld := finalWorld)).nonceEndpoints address =
+      (initialWorld.nonce? address, finalWorld.nonce? address) := by
+  rfl
+
+@[simp] theorem codeEndpoints_exact
+    (initialWorld finalWorld : WorldState)
+    (address : Address) :
+    (WorldStateDelta.exact (initialWorld := initialWorld)
+      (finalWorld := finalWorld)).codeEndpoints address =
+      (initialWorld.code? address, finalWorld.code? address) := by
+  rfl
+
+@[simp] theorem createdAccount?_exact
+    (initialWorld finalWorld : WorldState)
+    (address : Address) :
+    (WorldStateDelta.exact (initialWorld := initialWorld)
+      (finalWorld := finalWorld)).createdAccount? address =
+      match initialWorld.account? address, finalWorld.account? address with
+      | none, some _ => true
+      | _, _ => false := by
+  rfl
+
 @[simp] theorem accountEndpoints_identity
     (world : WorldState)
     (address : Address) :
@@ -63,6 +89,27 @@ theorem unique
       (world.balance? address, world.balance? address) := by
   rfl
 
+@[simp] theorem nonceEndpoints_identity
+    (world : WorldState)
+    (address : Address) :
+    (identity world).nonceEndpoints address =
+      (world.nonce? address, world.nonce? address) := by
+  rfl
+
+@[simp] theorem codeEndpoints_identity
+    (world : WorldState)
+    (address : Address) :
+    (identity world).codeEndpoints address =
+      (world.code? address, world.code? address) := by
+  rfl
+
+@[simp] theorem createdAccount?_identity
+    (world : WorldState)
+    (address : Address) :
+    (identity world).createdAccount? address = false := by
+  unfold createdAccount?
+  cases present : world.account? address <;> rfl
+
 @[simp] theorem slotChange?_identity
     (world : WorldState)
     (address : Address)
@@ -75,6 +122,12 @@ theorem unique
     (address : Address) :
     (identity world).balanceChange? address = none := by
   simp [balanceChange?, balanceEndpoints]
+
+@[simp] theorem nonceChange?_identity
+    (world : WorldState)
+    (address : Address) :
+    (identity world).nonceChange? address = none := by
+  simp [nonceChange?, nonceEndpoints]
 
 theorem slotChange?_eq_none_iff
     {initialWorld finalWorld : WorldState}
@@ -154,6 +207,49 @@ theorem balanceChange?_eq_some_iff
         congrArg Prod.fst endpointsEq
       have afterEq :
           (delta.balanceEndpoints address).2 = after :=
+        congrArg Prod.snd endpointsEq
+      refine ⟨beforeEq, afterEq, ?_⟩
+      intro valuesEqual
+      apply same
+      exact beforeEq.trans (valuesEqual.trans afterEq.symm)
+    · rintro ⟨beforeEq, afterEq, _different⟩
+      apply Prod.ext
+      · exact beforeEq
+      · exact afterEq
+
+theorem nonceChange?_eq_none_iff
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) :
+    delta.nonceChange? address = none ↔
+      (delta.nonceEndpoints address).1 =
+        (delta.nonceEndpoints address).2 := by
+  simp [nonceChange?]
+
+theorem nonceChange?_eq_some_iff
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address)
+    (before after : Option Core.Word) :
+    delta.nonceChange? address = some (before, after) ↔
+      (delta.nonceEndpoints address).1 = before ∧
+      (delta.nonceEndpoints address).2 = after ∧
+      before ≠ after := by
+  unfold nonceChange?
+  by_cases same :
+      (delta.nonceEndpoints address).1 =
+        (delta.nonceEndpoints address).2
+  · simp [same]
+    intro beforeEq afterEq
+    exact beforeEq.symm.trans afterEq
+  · simp only [if_neg same, Option.some.injEq]
+    constructor
+    · intro endpointsEq
+      have beforeEq :
+          (delta.nonceEndpoints address).1 = before :=
+        congrArg Prod.fst endpointsEq
+      have afterEq :
+          (delta.nonceEndpoints address).2 = after :=
         congrArg Prod.snd endpointsEq
       refine ⟨beforeEq, afterEq, ?_⟩
       intro valuesEqual
