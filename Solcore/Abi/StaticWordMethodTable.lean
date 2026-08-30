@@ -50,7 +50,7 @@ def firstDuplicateSignature? :
     List IndexedMethod → Option (IndexedMethod × IndexedMethod)
   | [] => none
   | first :: rest =>
-      match rest.find? (fun later => later.signature == first.signature) with
+      match rest.find? (fun later => decide (later.signature = first.signature)) with
       | some later => some (first, later)
       | none => firstDuplicateSignature? rest
 
@@ -59,7 +59,7 @@ def firstSelectorCollision? :
     List IndexedMethod → Option (IndexedMethod × IndexedMethod)
   | [] => none
   | first :: rest =>
-      match rest.find? (fun later => later.selector == first.selector) with
+      match rest.find? (fun later => decide (later.selector = first.selector)) with
       | some later => some (first, later)
       | none => firstSelectorCollision? rest
 
