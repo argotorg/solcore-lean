@@ -111,6 +111,10 @@ import Solcore.Semantics.AccountBalanceProperties
 import Solcore.Semantics.WorldStateBalanceProperties
 import Solcore.Semantics.AccountNonceProperties
 import Solcore.Semantics.WorldStateNonceProperties
+import Solcore.Semantics.CreationAddressPolicy
+import Solcore.Semantics.AccountNonceIncrementProperties
+import Solcore.Semantics.CheckedCreationTemplateRegistryProperties
+import Solcore.Semantics.ExecutionEnvironmentProperties
 import Solcore.Semantics.BalanceTransfer
 import Solcore.Semantics.BalanceTransferProperties
 import Solcore.Semantics.BalanceTransferInstallationProperties

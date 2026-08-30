@@ -183,6 +183,8 @@ import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
 import Solcore.Test.WorldStateBalance
 import Solcore.Test.WorldStateNonce
+import Solcore.Test.AccountNonceIncrementProperties
+import Solcore.Test.Adr0148ExecutionEnvironment
 import Solcore.Test.BalanceTransfer
 import Solcore.Test.BalanceTransferProperties
 import Solcore.Test.BalanceTransferInstallationExternalProperties
@@ -5085,6 +5087,8 @@ def run : IO Unit := do
   testWorldState
   testWorldStateBalance
   testWorldStateNonce
+  AccountNonceIncrementProperties.testAccountNonceIncrement
+  Adr0148ExecutionEnvironment.testAdr0148ExecutionEnvironment
   testBalanceTransfer
   testWorldStateDeltaBalance
   testWorldStateCode
