@@ -91,12 +91,14 @@ private def decodeWordField
     (name : String) : DecodeResult Solcore.Core.Word := do
   decodeWordAt (path.field name) (← requireField path json name)
 
-private def oneCoreType
+private def decodeOneCoreType
     (path : Path)
-    (json : Lean.Json) : DecodeResult Lean.Json := do
+    (json : Lean.Json) :
+    DecodeResult (Solcore.Core.Wire.V3.Ty × Lean.Json) := do
   exactArguments path json ["actual"]
   let actual ← decodeCoreTypeField path json "actual"
-  pure (.mkObj [("actual", Solcore.Core.Wire.V3.encodeType actual)])
+  pure (actual,
+    .mkObj [("actual", Solcore.Core.Wire.V3.encodeType actual)])
 
 private def oneAddress
     (path : Path)
@@ -130,9 +132,20 @@ def decodeScenarioArgumentsAt
       exactArguments argumentsPath json ["id"]
       let id ← decodeContractIdField argumentsPath json "id"
       pure (.mkObj [("id", id)])
-  | "oracle.v5.contract.unsupported-entry-result-type"
-  | "oracle.v5.method.result-type-mismatch" =>
-      oneCoreType argumentsPath json
+  | "oracle.v5.contract.unsupported-entry-result-type" => do
+      let (actual, canonical) ← decodeOneCoreType argumentsPath json
+      if Diagnostic.entryResultTypeSupported actual then
+        invalidTagAt (argumentsPath.field "actual")
+          (Solcore.Core.Wire.V3.encodeType actual) <|
+          .mkObj [("constraint", "unsupported-contract-entry-result-type")]
+      pure canonical
+  | "oracle.v5.method.result-type-mismatch" => do
+      let (actual, canonical) ← decodeOneCoreType argumentsPath json
+      if Diagnostic.staticWordMethodResultTypeSupported actual then
+        invalidTagAt (argumentsPath.field "actual")
+          (Solcore.Core.Wire.V3.encodeType actual) <|
+          .mkObj [("constraint", "not-static-word-method-result-type")]
+      pure canonical
   | "oracle.v5.method.invalid-name" => do
       exactArguments argumentsPath json ["actual"]
       let actual ← decodeStringField argumentsPath json "actual"
@@ -173,9 +186,10 @@ def decodeScenarioArgumentsAt
         invalidTagAt (argumentsPath.field "firstSignature") first <|
           .mkObj [("constraint", "method(uint256)")]
       let second ← decodeStringField argumentsPath json "secondSignature"
-      unless canonicalMethodSignature second && second != first do
+      unless canonicalMethodSignature second &&
+          (compare first second).isLT do
         invalidTagAt (argumentsPath.field "secondSignature") second <|
-          .mkObj [("constraint", "distinct-method(uint256)")]
+          .mkObj [("constraint", "canonical-signature-after-firstSignature")]
       let selector ← decodeStringField argumentsPath json "selector"
       let firstSelector := Diagnostic.selectorTextForSignature first
       unless selector == firstSelector &&
@@ -189,9 +203,9 @@ def decodeScenarioArgumentsAt
       exactArguments argumentsPath json ["firstId", "secondId"]
       let first ← decodeContractIdField argumentsPath json "firstId"
       let second ← decodeContractIdField argumentsPath json "secondId"
-      unless second != first do
+      unless (compare first second).isLT do
         invalidTagAt (argumentsPath.field "secondId") second <|
-          .mkObj [("constraint", "distinct-contract-id")]
+          .mkObj [("constraint", "canonical-contract-id-after-firstId")]
       pure (.mkObj [("firstId", first), ("secondId", second)])
   | "oracle.v5.reference.dangling-contract" => do
       exactArguments argumentsPath json ["id"]

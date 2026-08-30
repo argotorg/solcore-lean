@@ -45,6 +45,17 @@ def selectorTextForSignature (signature : String) : String :=
   let selector := Solcore.Abi.V1.selectorFromSignatureBytes signature.toUTF8
   ((Solcore.Semantics.encodeBytesText selector.encode).drop 2).toString
 
+/-- The two checked-Core entry result types published by Oracle v5. -/
+def entryResultTypeSupported : Solcore.Core.Wire.V3.Ty → Bool
+  | .word
+  | .sum .word (.sum .word .word) => true
+  | _ => false
+
+/-- The only Static Word method result type published by Oracle v5. -/
+def staticWordMethodResultTypeSupported : Solcore.Core.Wire.V3.Ty → Bool
+  | .function .word .word => true
+  | _ => false
+
 private def exactStringField?
     (arguments : Lean.Json)
     (name : String) : Option String := do
@@ -79,6 +90,23 @@ private def exactThreeStrings?
     some (first, second, third)
   else
     none
+
+private def exactCanonicalCoreTypeField?
+    (arguments : Lean.Json)
+    (name : String) : Option Solcore.Core.Wire.V3.Ty := do
+  let value ← field? arguments name
+  if arguments != .mkObj [(name, value)] then
+    none
+  else
+    let demand := Wire.measureJson value
+    let limits : Solcore.Core.Wire.V3.CoreBudgetLimits := {
+      maxDepth := demand.depth + 1
+      maxNodes := demand.nodes + 1
+    }
+    match Solcore.Core.Wire.V3.decodeTypeWithBudget limits value with
+    | .ok type =>
+        if Solcore.Core.Wire.V3.encodeType type == value then some type else none
+    | .error _ => none
 
 private def validContractPath
     (path : List String)
@@ -115,8 +143,11 @@ private def validDuplicateContractId
 private def validEntryType
     (path : List String)
     (arguments : Lean.Json) : Bool :=
-  exactOne "actual" isCanonicalCoreType arguments &&
-    validContractPath path ["program", "resultType"]
+  match exactCanonicalCoreTypeField? arguments "actual" with
+  | some actual =>
+      !entryResultTypeSupported actual &&
+        validContractPath path ["program", "resultType"]
+  | none => false
 
 private def validInvalidMethodName
     (path : List String)
@@ -138,12 +169,12 @@ private def validMethodDefinitions
 private def validMethodResultType
     (path : List String)
     (arguments : Lean.Json) : Bool :=
-  match path with
-  | "contracts" :: contract :: "methods" :: method :: rest =>
-      exactOne "actual" isCanonicalCoreType arguments &&
+  match exactCanonicalCoreTypeField? arguments "actual", path with
+  | some actual, "contracts" :: contract :: "methods" :: method :: rest =>
+      !staticWordMethodResultTypeSupported actual &&
         validContractId contract && validMethodName method &&
         rest == ["implementation", "resultType"]
-  | _ => false
+  | _, _ => false
 
 private def validEmptyMethodTable
     (path : List String)
@@ -166,7 +197,7 @@ private def validSelectorCollision
   match exactThreeStrings? arguments
       "selector" "firstSignature" "secondSignature" with
   | some (selector, first, second) =>
-      validSelectorText selector && first != second &&
+      validSelectorText selector && (compare first second).isLT &&
         (methodNameFromSignature? first).isSome &&
         (methodNameFromSignature? second).isSome &&
         selectorTextForSignature first == selector &&
@@ -179,7 +210,8 @@ private def validDuplicateCode
     (arguments : Lean.Json) : Bool :=
   match exactTwoStrings? arguments "firstId" "secondId" with
   | some (first, second) =>
-      validContractId first && validContractId second && first != second &&
+      validContractId first && validContractId second &&
+        (compare first second).isLT &&
         path == ["contracts", second]
   | none => false
 
