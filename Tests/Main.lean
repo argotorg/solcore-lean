@@ -190,6 +190,7 @@ import Solcore.Test.WorldStateBalance
 import Solcore.Test.WorldStateNonce
 import Solcore.Test.AccountNonceIncrementProperties
 import Solcore.Test.Adr0148ExecutionEnvironment
+import Solcore.Test.ExecutionEnvironmentSeal
 import Solcore.Test.BalanceTransfer
 import Solcore.Test.BalanceTransferProperties
 import Solcore.Test.BalanceTransferInstallationExternalProperties
@@ -5101,6 +5102,7 @@ def run : IO Unit := do
   testWorldStateNonce
   AccountNonceIncrementProperties.testAccountNonceIncrement
   Adr0148ExecutionEnvironment.testAdr0148ExecutionEnvironment
+  ExecutionEnvironmentSeal.runExecutionEnvironmentSealTests
   testBalanceTransfer
   testWorldStateDeltaBalance
   testWorldStateDeltaCreation
