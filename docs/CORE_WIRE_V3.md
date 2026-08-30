@@ -120,3 +120,17 @@ indices `n` through `n + 13`; the first unbound free index is `n + 14`.
 - Static Word ABI metadata contains only a method name and a Wire v3
   implementation. Its `uint256` input/output shape, signature, and selector are
   derived during admission.
+
+## Deterministic decoding order
+
+At every expected Core position, the decoder consumes `coreDepth` and then
+`coreNodes` before inspecting that node. Demand equal to the limit is accepted.
+For an object node it then checks the union envelope for an unknown field or a
+missing common discriminator, decodes `tag`, and checks the selected variant's
+exact field set. Node-local non-Core metadata—natural identities, constructor
+identity fields, Boolean or Word literals, and operators—is decoded before any
+child Type or Expression. Multiple metadata fields and multiple child Core
+positions are visited in lexicographic field order; arrays retain increasing
+index order. Program fields follow the same rule, with its fixed `schema`
+identity checked before child Core positions. This ordering determines the
+single protocol error when several fields are invalid.
