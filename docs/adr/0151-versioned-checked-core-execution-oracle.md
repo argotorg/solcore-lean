@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: syntax-independent Core checking and contract execution
-- Implementation: Planned
+- Implementation: Complete
 
 ## Context
 
@@ -13,11 +13,12 @@ checked balance transfer, checked creation, rollback-aware logs, exact state
 queries, and fuel-only resumption. ADR-0150 adds a complete Static Word ABI and
 routes raw calldata through that same lifecycle.
 
-These APIs are proof-indexed Lean values. They cannot yet be used by an
-independent implementation for semantic differential testing. Existing Oracle
-v1 through v3 publish older closed Semantic Core profiles, and Oracle v4
-publishes the frozen Surface parser. Extending any of those schemas would break
-their closed-algebra guarantees.
+Before this decision, these APIs were available only as proof-indexed Lean
+values and could not be consumed by an independent semantic differential
+tester. Oracle v5 and Core Wire v3 now provide that syntax-independent public
+boundary. Existing Oracle v1 through v3 continue to publish older closed
+Semantic Core profiles, and Oracle v4 publishes the frozen Surface parser;
+none of those formats was widened or reinterpreted.
 
 Concrete Solcore syntax and source storage layout remain intentionally frozen.
 They are not prerequisites for publishing the checker and executor that already
@@ -103,7 +104,8 @@ the actual-size preflight this constructs `InputData` without a fallback.
 
 Exceeding a declared budget is `inconclusive`, not a protocol error. After the
 existing strict JSON parser identifies v5, validation first recovers and checks
-the shallow schema, request ID, profile, and complete limits object. Generic
+the shallow schema, request ID, profile, complete limits object, and query-kind
+discriminator. Generic
 JSON depth and node traversal then counts even unknown subtrees, so they cannot
 bypass declared JSON budgets. Exact Oracle structure and scalar decoding comes
 next. The Core decoder consumes one typed depth/node unit before validating each
@@ -117,8 +119,12 @@ raw NDJSON transport behavior of older versions. Capabilities reports every
 limit and count rule.
 
 A fixed shallow envelope decoder reads and validates the complete `limits`
-object before budgeted traversal. A missing, malformed, or out-of-range limit is
-a protocol error; there is no attacker-selected fallback to the defaults.
+object and the query-kind discriminator before budgeted traversal. Only the
+discriminator is read from the query at this point; its complete shape remains
+part of the later exact Oracle pass. This retained kind makes every budget
+result encodable as a query-compatible response. A missing, malformed, or
+out-of-range limit is a protocol error; there is no attacker-selected fallback
+to the defaults.
 
 Wire v1 and v2 remain unchanged and must continue to reject every constructor or
 operator outside their frozen profiles.
