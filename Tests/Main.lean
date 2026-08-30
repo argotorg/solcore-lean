@@ -111,6 +111,8 @@ import Solcore.Test.HostStorageDriverResumption
 import Solcore.Test.HostStorageInputData
 import Solcore.Test.Adr0145ContractContextExternalProperties
 import Solcore.Test.Adr0145ExecutionExternalProperties
+import Solcore.Test.Adr0146BoundaryExternalProperties
+import Solcore.Test.Adr0146SchedulerExternalProperties
 import Solcore.Test.TopLevelExecution
 import Solcore.Test.TopLevelObservation
 import Solcore.Test.ContractCallWordBoundary
@@ -5124,5 +5126,5 @@ end Tests
 
 def main : IO UInt32 := do
   Tests.run
-  IO.println "solcore-lean M0/M1a/M1b/M1c/M2a/M2b/M2c workspace, lexer, and structural tests passed"
+  IO.println "solcore-lean tests passed"
   return 0
