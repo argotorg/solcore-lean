@@ -1,6 +1,6 @@
 import Solcore.Semantics.CheckedCoreContract
 import Solcore.Semantics.HostDriverProperties
-import Solcore.Semantics.HostStorageContext
+import Solcore.Semantics.TransactionHostStorageContext
 import Solcore.Semantics.TopLevelStorageDelta
 
 /-! Total results for one bounded checked-Core top-level execution. -/
@@ -13,11 +13,15 @@ namespace Solcore.Semantics
 structure TopLevelTerminalResult
     (initialWorld : WorldState)
     (target : Address) where
-  terminalContext : HostStorageDriver.Context Unit Unit
+  terminalContext : TransactionHostStorageDriver.Context
   coreValue : Core.Value
   coreStore : Core.Store
   outcome : FrameOutcome Core.Word
   finalWorld : WorldState
+  /-- All rollback-scoped observations produced by speculative execution. -/
+  workingJournal : TransactionJournal
+  /-- Root-selected observations: committed on return, checkpoint on failure. -/
+  committedJournal : TransactionJournal
   workingDelta :
     TopLevelStorageDelta initialWorld
       terminalContext.context.values.working.1 target
@@ -36,7 +40,7 @@ inductive TopLevelRunResult
       (result :
         TopLevelTerminalResult initialWorld invocation.target)
   | outOfFuel
-      (context : HostStorageDriver.Context Unit Unit)
+      (context : TransactionHostStorageDriver.Context)
       (state : Core.State)
       (storageAddress_eq :
         context.context.storageAddress = invocation.target)

@@ -1,7 +1,6 @@
-import Solcore.Semantics.HostStorageDriverProperties
-import Solcore.Semantics.HostStorageDriverSafetyProperties
 import Solcore.Semantics.TopLevelExecutionContextProperties
 import Solcore.Semantics.TopLevelExecutionResult
+import Solcore.Semantics.TransactionHostStorageDriverProperties
 
 /-! Executable checked-Core top-level run and terminal state selection. -/
 
@@ -19,9 +18,9 @@ def rawRun
     (installed :
       InstalledCheckedCoreContract initialWorld invocation.target contract)
     (fuel : Nat) :
-    HostDriverResult (HostStorageDriver.Context Unit Unit) :=
-  contract.code.runWithStorage
-    (initialContext installed) invocation.executionInputs fuel
+    HostDriverResult TransactionHostStorageDriver.Context :=
+  contract.code.runWithTransactionStorage
+    (initialTransactionContext installed) invocation.executionInputs fuel
 
 /-- Build the speculative delta from the already evaluated raw run. -/
 def workingDeltaOfRawRun
@@ -31,7 +30,7 @@ def workingDeltaOfRawRun
     (installed :
       InstalledCheckedCoreContract initialWorld invocation.target contract)
     (fuel : Nat)
-    (result : HostDriverResult (HostStorageDriver.Context Unit Unit))
+    (result : HostDriverResult TransactionHostStorageDriver.Context)
     (result_eq : rawRun contract invocation installed fuel = result) :
     TopLevelStorageDelta initialWorld
       result.context.context.values.working.1
@@ -41,7 +40,7 @@ def workingDeltaOfRawRun
   initialAccount_present := installed.account_present
   finalAccount_present := by
     subst result
-    simpa [rawRun, CheckedHostCoreProgram.runWithStorage] using
+    simpa [rawRun, CheckedHostCoreProgram.runWithTransactionStorage] using
       (rawRun contract invocation installed fuel).context.storageAccount_present
   code_preserved := by
     subst result
@@ -49,10 +48,10 @@ def workingDeltaOfRawRun
         (rawRun contract invocation installed fuel).context.context.values.working.1.account?
             invocation.target =
           some (rawRun contract invocation installed fuel).context.storageAccount := by
-      simpa [rawRun, CheckedHostCoreProgram.runWithStorage] using
+      simpa [rawRun, CheckedHostCoreProgram.runWithTransactionStorage] using
         (rawRun contract invocation installed fuel).context.storageAccount_present
-    have preserved := HostStorageDriver.run_workingCode?
-      (initialContext installed) invocation.executionInputs fuel
+    have preserved := TransactionHostStorageDriver.run_workingCode?
+      (initialTransactionContext installed) invocation.executionInputs fuel
       (Core.State.initial contract.code.program.body Core.hostEnvironment)
       invocation.target
     change
@@ -65,11 +64,13 @@ def workingDeltaOfRawRun
   otherAccounts_preserved := by
     subst result
     intro address different
-    have preserved := HostStorageDriver.run_workingAccount?_of_ne_storageAddress
-      (initialContext installed) invocation.executionInputs fuel
+    have preserved :=
+      TransactionHostStorageDriver.run_workingAccount?_of_ne_storageAddress
+      (initialTransactionContext installed) invocation.executionInputs fuel
       (Core.State.initial contract.code.program.body Core.hostEnvironment)
       address (by simpa using different)
-    simpa [rawRun, CheckedHostCoreProgram.runWithStorage] using preserved
+    simpa [rawRun, CheckedHostCoreProgram.runWithTransactionStorage] using
+      preserved
 }
 
 /-- Every initial run has an exact queryable delta for its speculative world. -/
@@ -91,7 +92,7 @@ structure ValidatedRawResult
     (initialWorld : WorldState)
     (contract : CheckedCoreContract)
     (invocation : TopLevelInvocation) where
-  result : HostDriverResult (HostStorageDriver.Context Unit Unit)
+  result : HostDriverResult TransactionHostStorageDriver.Context
   resultTyping :
     result.outcome.HasType contract.code.program.resultType
       contract.code.program.dataDefinitions
@@ -114,12 +115,12 @@ def validatedRawRun
   have resultTyping :
       result.outcome.HasType contract.code.program.resultType
         contract.code.program.dataDefinitions := by
-    exact contract.code.runWithStorage_hasType
-      (initialContext installed) invocation.executionInputs fuel
+    exact contract.code.runWithTransactionStorage_hasType
+      (initialTransactionContext installed) invocation.executionInputs fuel
   have storageAddress_eq :
       result.context.context.storageAddress = invocation.target := by
-    have preserved := HostStorageDriver.run_storageAddress
-      (initialContext installed) invocation.executionInputs fuel
+    have preserved := TransactionHostStorageDriver.run_storageAddress
+      (initialTransactionContext installed) invocation.executionInputs fuel
       (Core.State.initial contract.code.program.body Core.hostEnvironment)
     change result.context.context.storageAddress = invocation.target at preserved
     exact preserved
@@ -138,7 +139,7 @@ def finalize
     (installedAccount : Account)
     (installedAccount_present :
       initialWorld.account? invocation.target = some installedAccount)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (value : Core.Value)
     (store : Core.Store)
     (outcome : FrameOutcome Core.Word)
@@ -153,6 +154,8 @@ def finalize
       coreStore := store
       outcome := .returned data
       finalWorld := context.context.values.working.1
+      workingJournal := context.workingJournal
+      committedJournal := context.workingJournal
       workingDelta := workingDelta
       committedDelta := workingDelta
     }
@@ -162,6 +165,9 @@ def finalize
       coreStore := store
       outcome := .reverted data
       finalWorld := initialWorld
+      workingJournal := context.workingJournal
+      committedJournal :=
+        context.context.values.checkpoint.effects.rollback
       workingDelta := workingDelta
       committedDelta :=
         TopLevelStorageDelta.identity initialWorld invocation.target
@@ -173,6 +179,9 @@ def finalize
       coreStore := store
       outcome := .trapped reason
       finalWorld := initialWorld
+      workingJournal := context.workingJournal
+      committedJournal :=
+        context.context.values.checkpoint.effects.rollback
       workingDelta := workingDelta
       committedDelta :=
         TopLevelStorageDelta.identity initialWorld invocation.target

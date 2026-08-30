@@ -13,7 +13,7 @@ namespace Solcore.Semantics.TopLevelExecution
     (installedAccount : Account)
     (installedAccount_present :
       initialWorld.account? invocation.target = some installedAccount)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (value : Core.Value)
     (store : Core.Store)
     (outcome : FrameOutcome Core.Word)
@@ -30,7 +30,7 @@ namespace Solcore.Semantics.TopLevelExecution
     (installedAccount : Account)
     (installedAccount_present :
       initialWorld.account? invocation.target = some installedAccount)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (value : Core.Value)
     (store : Core.Store)
     (outcome : FrameOutcome Core.Word)
@@ -41,13 +41,79 @@ namespace Solcore.Semantics.TopLevelExecution
       context value store outcome delta).terminalContext = context := by
   cases outcome <;> rfl
 
+@[simp] theorem workingJournal_finalize
+    {initialWorld : WorldState}
+    (invocation : TopLevelInvocation)
+    (installedAccount : Account)
+    (installedAccount_present :
+      initialWorld.account? invocation.target = some installedAccount)
+    (context : TransactionHostStorageDriver.Context)
+    (value : Core.Value)
+    (store : Core.Store)
+    (outcome : FrameOutcome Core.Word)
+    (delta :
+      TopLevelStorageDelta initialWorld
+        context.context.values.working.1 invocation.target) :
+    (finalize invocation installedAccount installedAccount_present
+      context value store outcome delta).workingJournal =
+        context.workingJournal := by
+  cases outcome <;> rfl
+
+@[simp] theorem committedJournal_finalize_returned
+    {initialWorld : WorldState}
+    (invocation : TopLevelInvocation)
+    (installedAccount : Account)
+    (installedAccount_present :
+      initialWorld.account? invocation.target = some installedAccount)
+    (context : TransactionHostStorageDriver.Context)
+    (value : Core.Value) (store : Core.Store) (data : Bytes)
+    (delta :
+      TopLevelStorageDelta initialWorld
+        context.context.values.working.1 invocation.target) :
+    (finalize invocation installedAccount installedAccount_present
+      context value store (.returned data) delta).committedJournal =
+        context.workingJournal := by
+  rfl
+
+@[simp] theorem committedJournal_finalize_reverted
+    {initialWorld : WorldState}
+    (invocation : TopLevelInvocation)
+    (installedAccount : Account)
+    (installedAccount_present :
+      initialWorld.account? invocation.target = some installedAccount)
+    (context : TransactionHostStorageDriver.Context)
+    (value : Core.Value) (store : Core.Store) (data : Bytes)
+    (delta :
+      TopLevelStorageDelta initialWorld
+        context.context.values.working.1 invocation.target) :
+    (finalize invocation installedAccount installedAccount_present
+      context value store (.reverted data) delta).committedJournal =
+        context.context.values.checkpoint.effects.rollback := by
+  rfl
+
+@[simp] theorem committedJournal_finalize_trapped
+    {initialWorld : WorldState}
+    (invocation : TopLevelInvocation)
+    (installedAccount : Account)
+    (installedAccount_present :
+      initialWorld.account? invocation.target = some installedAccount)
+    (context : TransactionHostStorageDriver.Context)
+    (value : Core.Value) (store : Core.Store) (reason : Core.Word)
+    (delta :
+      TopLevelStorageDelta initialWorld
+        context.context.values.working.1 invocation.target) :
+    (finalize invocation installedAccount installedAccount_present
+      context value store (.trapped reason) delta).committedJournal =
+        context.context.values.checkpoint.effects.rollback := by
+  rfl
+
 @[simp] theorem finalWorld_finalize_returned
     {initialWorld : WorldState}
     (invocation : TopLevelInvocation)
     (installedAccount : Account)
     (installedAccount_present :
       initialWorld.account? invocation.target = some installedAccount)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (value : Core.Value)
     (store : Core.Store)
     (data : Bytes)
@@ -65,7 +131,7 @@ namespace Solcore.Semantics.TopLevelExecution
     (installedAccount : Account)
     (installedAccount_present :
       initialWorld.account? invocation.target = some installedAccount)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (value : Core.Value)
     (store : Core.Store)
     (data : Bytes)
@@ -82,7 +148,7 @@ namespace Solcore.Semantics.TopLevelExecution
     (installedAccount : Account)
     (installedAccount_present :
       initialWorld.account? invocation.target = some installedAccount)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (value : Core.Value)
     (store : Core.Store)
     (reason : Core.Word)
@@ -99,7 +165,7 @@ namespace Solcore.Semantics.TopLevelExecution
     (installedAccount : Account)
     (installedAccount_present :
       initialWorld.account? invocation.target = some installedAccount)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (value : Core.Value) (store : Core.Store) (data : Bytes)
     (delta :
       TopLevelStorageDelta initialWorld
@@ -116,7 +182,7 @@ namespace Solcore.Semantics.TopLevelExecution
     (installedAccount : Account)
     (installedAccount_present :
       initialWorld.account? invocation.target = some installedAccount)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (value : Core.Value) (store : Core.Store) (data : Bytes)
     (delta :
       TopLevelStorageDelta initialWorld
@@ -133,7 +199,7 @@ namespace Solcore.Semantics.TopLevelExecution
     (installedAccount : Account)
     (installedAccount_present :
       initialWorld.account? invocation.target = some installedAccount)
-    (context : HostStorageDriver.Context Unit Unit)
+    (context : TransactionHostStorageDriver.Context)
     (value : Core.Value) (store : Core.Store) (reason : Core.Word)
     (delta :
       TopLevelStorageDelta initialWorld
@@ -157,6 +223,17 @@ theorem rawRun_working_code?
     (workingDelta contract invocation installed fuel).finalWorld_code?_target.trans
       (initialWorld_code? installed)
 
+@[simp] theorem rawRun_checkpointJournal
+    {initialWorld : WorldState}
+    (contract : CheckedCoreContract)
+    (invocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld invocation.target contract)
+    (fuel : Nat) :
+    (rawRun contract invocation installed fuel).context.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty := by
+  simp [rawRun, CheckedHostCoreProgram.runWithTransactionStorage]
+
 /-- The checked raw execution hidden by the total runner cannot fault. -/
 theorem rawRun_ne_fault
     {initialWorld : WorldState}
@@ -170,8 +247,8 @@ theorem rawRun_ne_fault
     (rawRun contract invocation installed fuel).outcome ≠
       .fault error faultState := by
   simpa [rawRun] using
-    contract.code.runWithStorage_ne_fault
-      (initialContext installed) invocation.executionInputs fuel
+    contract.code.runWithTransactionStorage_ne_fault
+      (initialTransactionContext installed) invocation.executionInputs fuel
       error faultState
 
 end Solcore.Semantics.TopLevelExecution
