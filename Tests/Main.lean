@@ -123,6 +123,7 @@ import Solcore.Test.ContractCallWordBoundary
 import Solcore.Test.OneLevelNestedExecution
 import Solcore.Test.OneLevelNestedExecutionExtended
 import Solcore.Test.OneLevelNestedExecutionResumption
+import Solcore.Test.Adr0147NestedValueExecution
 import Solcore.Test.FrameEffectJournal
 import Solcore.Test.FrameCheckpointSnapshot
 import Solcore.Test.FrameCheckpointedWorkingPair
@@ -5076,6 +5077,7 @@ def run : IO Unit := do
   testOneLevelNestedExecution
   testOneLevelNestedExecutionExtended
   testOneLevelNestedExecutionResumption
+  testAdr0147NestedValueExecution
   testRuntimeScalars
   testWorldState
   testWorldStateBalance
