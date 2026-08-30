@@ -652,6 +652,49 @@ assert(
     v4Capabilities.report.defaultLimits?.sourceBytes === 1048576,
   "capabilities-v4 returned an incompatible query set or default limit",
 );
+const v5Capabilities = readCapabilityOutput("capabilities-v5");
+verifyCapabilityProfile(
+  "capabilities-v5",
+  "contract-m3a-v1",
+  v5Capabilities.response,
+  v5Capabilities.report,
+);
+assert(
+  v5Capabilities.response.schema === "solcore-oracle/v5" &&
+    v5Capabilities.report.schema === "solcore-capabilities/v5" &&
+    v5Capabilities.report.coreSchema === "solcore-semantic-core/v3" &&
+    v5Capabilities.report.checkResultSchema ===
+      "solcore-core-check-result/v3" &&
+    v5Capabilities.report.executionSchema ===
+      "solcore-contract-execution/v1" &&
+    v5Capabilities.report.stateObservationSchema ===
+      "solcore-world-state-observation/v1",
+  "capabilities-v5 returned incompatible publication identities",
+);
+assert(
+  JSON.stringify(v5Capabilities.report.implementedQueries) ===
+      JSON.stringify(["capabilities", "coreCheck", "execute"]) &&
+    JSON.stringify(v5Capabilities.report.contractProfiles) ===
+      JSON.stringify(["returnWord", "wordOutcomeV1"]) &&
+    JSON.stringify(v5Capabilities.report.abiProfiles) ===
+      JSON.stringify(["staticWordAbiV1"]) &&
+    v5Capabilities.report.maxNestedCallDepth === 1,
+  "capabilities-v5 returned an incompatible execution surface",
+);
+assert(
+  JSON.stringify(sortedObject(v5Capabilities.report.defaultLimits)) ===
+    JSON.stringify(sortedObject({
+      jsonDepth: 2048,
+      jsonNodes: 2000000,
+      coreDepth: 1024,
+      coreNodes: 1000000,
+      scenarioEntries: 100000,
+      identifierBytes: 256,
+      calldataBytes: 1048576,
+      evaluationSteps: 1000000,
+    })),
+  "capabilities-v5 default limits changed",
+);
 const report = v1Capabilities.report;
 
 const expectedStandardLibrary = {
@@ -672,6 +715,7 @@ for (const capability of [
   v2Capabilities,
   v3Capabilities,
   v4Capabilities,
+  v5Capabilities,
 ]) {
   for (const feature of capability.report.features) {
     if (feature.adr !== null) {
@@ -689,6 +733,11 @@ const implementationMetadata = new Map(
 assert(
   report.baselines.length === implementationMetadata.size,
   "oracle and metadata contain different baseline sets",
+);
+assert(
+  JSON.stringify(sortedObject(v5Capabilities.report.baselines)) ===
+    JSON.stringify(sortedObject(report.baselines)),
+  "Oracle v5 baselines differ from the legacy metadata-backed report",
 );
 for (const baseline of report.baselines) {
   const metadata = implementationMetadata.get(baseline.implementation);

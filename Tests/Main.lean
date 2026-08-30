@@ -3764,6 +3764,7 @@ def testSchemaJson : IO Unit := do
         "profiles/solcore-0.1.0-draft.2-core-m1a.json",
         "profiles/solcore-0.1.0-draft.3-core-m1c.json",
         "profiles/solcore-0.1.0-draft.4-frontend-m2b.json",
+        "profiles/solcore-0.1.0-draft.5-contract-m3a.json",
         "Tests/golden/wire-manifest.json"] do
     let text ← IO.FS.readFile path
     match Lean.Json.parse text with
