@@ -82,6 +82,19 @@ private def executionReturned : Bool :=
         observation.value.state.probes.length == 1
   | _ => false
 
+private def repeatedExecutionIsExact : Bool :=
+  let limits := { Limits.default with evaluationSteps := 128 }
+  let input := Wire.encodeRequest (requestWith (.execute scenario) limits)
+  match handleJson input, handleJson input with
+  | .ok first, .ok second =>
+      match first.body, second.body with
+      | .execute (.executed _), .execute (.executed _) =>
+          first == second &&
+            Wire.encodeResponse first == Wire.encodeResponse second &&
+            Wire.encodeResponseText first == Wire.encodeResponseText second
+      | _, _ => false
+  | _, _ => false
+
 private def setField
     (json : Lean.Json)
     (name : String)
@@ -111,7 +124,8 @@ private def totalJsonPartition : Bool :=
 
 private def allChecks : Bool :=
   capabilitiesAccepted && jsonBudgetKeepsEnvelope && coreCheckAccepted &&
-    executionReturned && protocolFailureRetainsId && totalJsonPartition
+    executionReturned && repeatedExecutionIsExact &&
+    protocolFailureRetainsId && totalJsonPartition
 
 private theorem allChecks_exact : allChecks = true := by
   native_decide
