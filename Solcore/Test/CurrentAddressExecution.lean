@@ -59,12 +59,66 @@ private def completionFromSecondRequest : Result :=
 private def completedResumed : Result :=
   resumeWith completionOneShot executionInputs returnedPolicy 100
 
+private def directState : State :=
+  State.initial
+    (.apply (.var HostFunction.currentAddress.index) .unit)
+    hostEnvironment
+
+private theorem directRunExact
+    (context : HostStorageDriver.Context Nat (FrameTrace Nat))
+    (inputs : HostStorageDriver.ExecutionInputs) :
+    HostStorageDriver.run context inputs 5 directState =
+      ⟨context,
+        .done (.word (addressToWord inputs.currentAddress)) []⟩ := by
+  rw [HostStorageDriver.run_of_suspended_currentAddress
+    context inputs 5 0 directState [] [] (by rfl)]
+  apply HostStorageDriver.run_of_done
+  rfl
+
+private theorem directCurrentOnlyVariationExact
+    (context : HostStorageDriver.Context Nat (FrameTrace Nat)) :
+    HostStorageDriver.run context executionInputs 5 directState =
+        ⟨context, .done (.word (expectedWord currentAddress)) []⟩ ∧
+      HostStorageDriver.run context alternateExecutionInputs 5 directState =
+        ⟨context,
+          .done (.word (expectedWord alternateCurrentAddress)) []⟩ := by
+  exact ⟨directRunExact context executionInputs,
+    directRunExact context alternateExecutionInputs⟩
+
 private def contextHasTarget
     (context : HostStorageDriver.Context Nat (FrameTrace Nat))
     (expected : Word) : Bool :=
   context.readStorage targetSlot == expected &&
     storageValueAt? context.context.values.working.1
       storageAddress targetSlot == some expected
+
+private def directObservationPasses : Bool :=
+  match initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
+      storageAddress with
+  | none => false
+  | some context =>
+      match HostStorageDriver.run context executionInputs 4 directState,
+          HostStorageDriver.run context executionInputs 5 directState,
+          HostStorageDriver.run context executionInputs 64 directState,
+          HostStorageDriver.run context alternateExecutionInputs 5 directState with
+      | ⟨beforeContext, .outOfFuel beforeState⟩,
+          ⟨completedContext, .done value store⟩,
+          ⟨largerContext, .done largerValue largerStore⟩,
+          ⟨alternateContext, .done alternateValue alternateStore⟩ =>
+          contextPreserved beforeContext &&
+            contextPreserved completedContext && contextPreserved largerContext &&
+            contextPreserved alternateContext &&
+            contextHasTarget beforeContext oldValue &&
+            contextHasTarget completedContext oldValue &&
+            contextHasTarget largerContext oldValue &&
+            contextHasTarget alternateContext oldValue &&
+            currentAddressRequestReady beforeState &&
+            value == .word (expectedWord currentAddress) && store == [] &&
+            largerValue == value && largerStore == store &&
+            alternateValue ==
+              .word (expectedWord alternateCurrentAddress) &&
+            alternateValue != value && alternateStore == store
+      | _, _, _, _ => false
 
 private def exhaustedAt
     (result : Result) (expected : Word)
@@ -149,6 +203,8 @@ def testCurrentAddressExecution : IO Unit := do
     "the host checker rejected current-observe/write/observe"
   assertTrue sentinelsAreDistinct
     "the current-address fixture cannot detect an input projection swap"
+  assertTrue directObservationPasses
+    "the direct current observation moved its 4/5 boundary or changed context"
 
   assertTrue
     (exhaustedAt writeBoundary oldValue
