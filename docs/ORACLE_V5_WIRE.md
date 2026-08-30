@@ -262,3 +262,242 @@ Route keys `(creator, nonce)` are unique. Lookup returns the route Address on an
 exact key match and `defaultAddress` otherwise. This is a total injected policy,
 not an EVM CREATE-address formula.
 
+## Invocation and probes
+
+`invocation` has exactly `target`, `caller`, `callValue`, `calldata`, and
+`probes`. The first three fields build the corresponding
+`TopLevelInvocation`; `calldata` becomes its exact `InputData.bytes`.
+
+A probe is one of these five exact variants:
+
+```json
+{ "kind": "accountPresence", "address": "0x0000000000000000000000000000000000000001" }
+```
+
+```json
+{ "kind": "storage", "address": "0x0000000000000000000000000000000000000001", "slot": "0x0000000000000000000000000000000000000000000000000000000000000002" }
+```
+
+```json
+{ "kind": "balance", "address": "0x0000000000000000000000000000000000000001" }
+```
+
+```json
+{ "kind": "nonce", "address": "0x0000000000000000000000000000000000000001" }
+```
+
+```json
+{ "kind": "code", "address": "0x0000000000000000000000000000000000000001" }
+```
+
+Probe order is semantic and is echoed by the observation. Duplicate probes
+mean equal complete tagged values, so different kinds at the same Address are
+not duplicates.
+
+## Response envelope
+
+Every non-protocol response is this exact object:
+
+```json
+{
+  "schema": "solcore-oracle/v5",
+  "id": "request-id",
+  "spec": "solcore/0.1.0-draft.5",
+  "profile": {
+    "id": "contract-m3a-v1",
+    "digest": "sha256:615de959ac8cb6c7e9b91fe6b45ec578a7143d5f74ec092316901cf76431cf46"
+  },
+  "query": "coreCheck",
+  "verdict": {}
+}
+```
+
+`id` repeats the validated request ID. `query` is exactly `capabilities`,
+`coreCheck`, or `execute` and must agree with the verdict family below.
+
+### Phase and resource strings
+
+Phase is one of:
+
+```text
+protocol
+requestPreflight
+coreDecoding
+coreChecking
+contractAdmission
+worldValidation
+environmentValidation
+probeValidation
+rootInstallation
+contractExecution
+observationEncoding
+```
+
+Resource is one of the eight limit field names:
+
+```text
+jsonDepth jsonNodes coreDepth coreNodes scenarioEntries identifierBytes
+calldataBytes evaluationSteps
+```
+
+The resource-to-phase mapping is fixed:
+
+| Resource | Phase |
+| --- | --- |
+| `jsonDepth`, `jsonNodes`, `scenarioEntries`, `identifierBytes`, `calldataBytes` | `requestPreflight` |
+| `coreDepth`, `coreNodes` | `coreDecoding` |
+| `evaluationSteps` | `contractExecution` |
+
+### Accepted verdict
+
+```json
+{
+  "kind": "accepted",
+  "phase": "coreChecking",
+  "result": { "schema": "solcore-core-check-result/v3", "value": {} }
+}
+```
+
+Only `capabilities` and `coreCheck` return `accepted`. Their phases are
+`protocol` and `coreChecking`, respectively, and their result schemas must be
+the matching fixed schema.
+
+### Rejected verdict
+
+```json
+{
+  "kind": "rejected",
+  "phase": "rootInstallation",
+  "diagnostics": [
+    {
+      "code": "oracle.v5.root.target-absent",
+      "severity": "error",
+      "phase": "rootInstallation",
+      "path": ["world", "accounts"],
+      "arguments": { "target": "0x0000000000000000000000000000000000000001" },
+      "display": null
+    }
+  ]
+}
+```
+
+`diagnostics` is exactly a singleton in v5. Its phase equals the verdict phase.
+`path` is an array of semantic path strings; `arguments` is always an object;
+and canonical responses set `display` to `null`. Rejection is available to
+`coreCheck` and `execute`, not `capabilities`.
+
+### Inconclusive verdict
+
+```json
+{
+  "kind": "inconclusive",
+  "phase": "contractExecution",
+  "resource": "evaluationSteps",
+  "limit": 12,
+  "consumed": 12
+}
+```
+
+For pre-execution resources, `consumed` is the exact measured demand and is
+strictly greater than `limit`. For fuel exhaustion, `limit` and `consumed` are
+both the supplied `evaluationSteps`. Only `coreCheck` and `execute` may be
+inconclusive. `coreCheck` uses only the seven pre-execution resources;
+`execute` may additionally use `evaluationSteps`.
+
+### Executed verdict
+
+```json
+{
+  "kind": "executed",
+  "observation": {
+    "schema": "solcore-contract-execution/v1",
+    "value": {}
+  }
+}
+```
+
+Only `execute` returns `executed`, and only after a terminal result exists.
+Fuel exhaustion is the inconclusive shape above and never fabricates this
+observation.
+
+### Internal-error verdict
+
+```json
+{
+  "kind": "internalError",
+  "phase": "observationEncoding",
+  "code": "oracle-response-invariant"
+}
+```
+
+`phase` is a Phase or `null`. The closed defensive codes are
+`core-wire-projection-failed`, `world-code-reference-invariant`, and
+`oracle-response-invariant`. They are not substitutes for a listed rejection
+or inconclusive case.
+
+### Query/verdict compatibility
+
+| Query | Allowed verdicts |
+| --- | --- |
+| `capabilities` | `accepted`, `internalError` |
+| `coreCheck` | `accepted`, `rejected`, `inconclusive`, `internalError` |
+| `execute` | `rejected`, `inconclusive`, `executed`, `internalError` |
+
+## Capability result
+
+The accepted capability result uses schema `solcore-capabilities/v5`. Its
+`value` has exactly these fields:
+
+| Field | Exact value |
+| --- | --- |
+| `schema` | `solcore-capabilities/v5` |
+| `spec` | `solcore/0.1.0-draft.5` |
+| `profile` | complete canonical `contract-m3a-v1` SpecProfile object |
+| `profileDigest` | the fixed digest above |
+| `coreSchema` | `solcore-semantic-core/v3` |
+| `checkResultSchema` | `solcore-core-check-result/v3` |
+| `executionSchema` | `solcore-contract-execution/v1` |
+| `stateObservationSchema` | `solcore-world-state-observation/v1` |
+| `contractProfiles` | `["returnWord", "wordOutcomeV1"]` |
+| `abiProfiles` | `["staticWordAbiV1"]` |
+| `implementedQueries` | `["capabilities", "coreCheck", "execute"]` |
+| `maxNestedCallDepth` | `1` |
+| `observationKinds` | `["accountPresence", "storage", "balance", "nonce", "code"]` |
+| `defaultLimits` | the eight-field default Limits object |
+| `baselines` | canonical existing `implementationBaselines` array |
+| `features` | canonical `m3aContractFeatureMatrix` array |
+
+The complete profile object, baseline object shape, and FeatureRow object shape
+are the existing canonical metadata encodings; v5 does not introduce aliases
+for them. The capability report is a singleton: decoding accepts only values
+equal to this derived canonical object.
+
+## Core-check result and diagnostics
+
+The accepted check-result `value` is exactly:
+
+```json
+{ "resultType": "word" }
+```
+
+`resultType` is the complete Core Wire v3 Type and equals the Program's declared
+result type. No checker witness or inferred environment is serialized.
+
+Checker diagnostic paths start with `program` for `coreCheck`, or with
+`contracts`, the canonical contract ID, and `program` for `checkedCore`. A
+Static Word implementation uses `contracts`, its contract ID, `methods`, its
+method name, and `implementation`. Remaining elements preserve these exact
+`Core.CheckPathStep` strings:
+
+```text
+pairLeft pairRight firstOperand secondOperand lambdaBody applyFunction
+applyArgument inLeftPayload inRightPayload caseScrutinee caseLeftBranch
+caseRightBranch newCellInitializer loadCellReference storeCellReference
+storeCellValue constructPayload matchScrutinee unaryOperand binaryLeft
+binaryRight ternaryFirst ternarySecond ternaryThird letValue letBody
+ifCondition ifThen ifElse
+```
+
+A match branch step is the single string `matchBranch[N]`, where `N` is its
+natural decimal index.
+
