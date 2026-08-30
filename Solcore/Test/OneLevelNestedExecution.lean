@@ -55,7 +55,7 @@ private def terminalMatches
         rootStorageValue?
           terminal.terminalContext.context.values.working.1 == none &&
         rootStorageValue? terminal.finalWorld == none
-  | .outOfFuel _ _ => false
+  | .outOfFuel _ _ _ => false
 
 private def childReturnCommits : Bool :=
   terminalMatches
@@ -112,12 +112,12 @@ private def initialRegistryResolvesChild : Bool :=
 
 private def rootOutOfFuelVisible : Bool :=
   match runScenario rootCommitContract childReturnContract 0 with
-  | .outOfFuel _ (.root _) => true
+  | .outOfFuel _ (.root _) _ => true
   | _ => false
 
 private def childOutOfFuelAt (fuel : Nat) : Bool :=
   match runScenario rootCommitContract childReturnContract fuel with
-  | .outOfFuel _ (.child _) => true
+  | .outOfFuel _ (.child _) _ => true
   | _ => false
 
 private def childOutOfFuelVisible : Bool :=
