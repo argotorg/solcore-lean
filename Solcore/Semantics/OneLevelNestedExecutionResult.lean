@@ -26,11 +26,8 @@ structure TerminalResult
       terminalContext.context.values.working.1
   committedDelta : WorldStateDelta initialWorld finalWorld
 
-/--
-One bounded scheduler run either completes the root or retains the exact active
-typed machine needed to continue with additional shared fuel.
--/
-inductive Result
+/-- Observable classification of one sealed nested execution result. -/
+inductive ResultView
     (initialWorld : WorldState)
     (rootContract : CheckedCoreContract)
     (rootInvocation : TopLevelInvocation) where

@@ -22,34 +22,31 @@ theorem resumeWithFuel_runMode
   | case1 fuel frame reachable value stepEq active =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
-      have prefixEq :
-          runMode registry fuel (.root frame) reachable =
+      have prefixView :
+          (runMode registry fuel (.root frame) reachable).view =
             .completed (frame.finalizeDone value stepEq) := by
         rw [runMode.eq_1]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
-      have summedEq :
-          runMode registry (fuel + additional) (.root frame) reachable =
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      have summedView :
+          (runMode registry (fuel + additional) (.root frame) reachable).view =
             .completed (frame.finalizeDone value stepEq) := by
         rw [runMode.eq_1]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
-      rw [prefixEq, summedEq]
-      rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      apply Result.eq_of_view_eq
+      simp [resumeWithFuel, prefixView, summedView]
   | case2 frame reachable next stepEq active =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
-      have prefixEq :
-          runMode registry 0 (.root frame) reachable =
+      have prefixView :
+          (runMode registry 0 (.root frame) reachable).view =
             .outOfFuel registry (.root frame) reachable := by
         rw [runMode.eq_1]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
-      rw [prefixEq]
-      simp only [resumeWithFuel, Nat.zero_add]
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      apply Result.eq_of_view_eq
+      simp [resumeWithFuel, prefixView]
   | case3 frame reachable next stepEq remaining active ih =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
@@ -58,10 +55,10 @@ theorem resumeWithFuel_runMode
             runMode registry remaining
               (.root (frame.afterNext next stepEq))
               (.rootNext reachable stepEq) := by
+        apply Result.eq_of_view_eq
         rw [runMode.eq_1]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       have summedEq :
           runMode registry (remaining.succ + additional) (.root frame)
               reachable =
@@ -69,24 +66,23 @@ theorem resumeWithFuel_runMode
               (.root (frame.afterNext next stepEq))
               (.rootNext reachable stepEq) := by
         rw [Nat.succ_add]
+        apply Result.eq_of_view_eq
         rw [runMode.eq_1]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       rw [prefixEq, summedEq]
       exact ih additional
   | case4 frame reachable suspension stepEq active =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
-      have prefixEq :
-          runMode registry 0 (.root frame) reachable =
+      have prefixView :
+          (runMode registry 0 (.root frame) reachable).view =
             .outOfFuel registry (.root frame) reachable := by
         rw [runMode.eq_1]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
-      rw [prefixEq]
-      simp only [resumeWithFuel, Nat.zero_add]
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      apply Result.eq_of_view_eq
+      simp [resumeWithFuel, prefixView]
   | case5 frame reachable suspension stepEq remaining active ih =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
@@ -95,10 +91,10 @@ theorem resumeWithFuel_runMode
             runMode registry remaining
               (frame.afterSuspension registry suspension stepEq)
               (.rootSuspended reachable stepEq) := by
+        apply Result.eq_of_view_eq
         rw [runMode.eq_1]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       have summedEq :
           runMode registry (remaining.succ + additional) (.root frame)
               reachable =
@@ -106,10 +102,10 @@ theorem resumeWithFuel_runMode
               (frame.afterSuspension registry suspension stepEq)
               (.rootSuspended reachable stepEq) := by
         rw [Nat.succ_add]
+        apply Result.eq_of_view_eq
         rw [runMode.eq_1]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       rw [prefixEq, summedEq]
       exact ih additional
   | case6 fuel frame reachable value stepEq active ih =>
@@ -120,33 +116,32 @@ theorem resumeWithFuel_runMode
             runMode registry fuel
               (.root (frame.resumeRoot (frame.outcomeDone value stepEq)))
               (.childDone reachable stepEq) := by
+        apply Result.eq_of_view_eq
         rw [runMode.eq_2]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       have summedEq :
           runMode registry (fuel + additional) (.child frame) reachable =
             runMode registry (fuel + additional)
               (.root (frame.resumeRoot (frame.outcomeDone value stepEq)))
               (.childDone reachable stepEq) := by
+        apply Result.eq_of_view_eq
         rw [runMode.eq_2]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       rw [prefixEq, summedEq]
       exact ih additional
   | case7 frame reachable next stepEq active =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
-      have prefixEq :
-          runMode registry 0 (.child frame) reachable =
+      have prefixView :
+          (runMode registry 0 (.child frame) reachable).view =
             .outOfFuel registry (.child frame) reachable := by
         rw [runMode.eq_2]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
-      rw [prefixEq]
-      simp only [resumeWithFuel, Nat.zero_add]
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      apply Result.eq_of_view_eq
+      simp [resumeWithFuel, prefixView]
   | case8 frame reachable next stepEq remaining active ih =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
@@ -155,10 +150,10 @@ theorem resumeWithFuel_runMode
             runMode registry remaining
               (.child (frame.afterNext next stepEq))
               (.childNext reachable stepEq) := by
+        apply Result.eq_of_view_eq
         rw [runMode.eq_2]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       have summedEq :
           runMode registry (remaining.succ + additional) (.child frame)
               reachable =
@@ -166,24 +161,23 @@ theorem resumeWithFuel_runMode
               (.child (frame.afterNext next stepEq))
               (.childNext reachable stepEq) := by
         rw [Nat.succ_add]
+        apply Result.eq_of_view_eq
         rw [runMode.eq_2]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       rw [prefixEq, summedEq]
       exact ih additional
   | case9 frame reachable suspension stepEq active =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
-      have prefixEq :
-          runMode registry 0 (.child frame) reachable =
+      have prefixView :
+          (runMode registry 0 (.child frame) reachable).view =
             .outOfFuel registry (.child frame) reachable := by
         rw [runMode.eq_2]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
-      rw [prefixEq]
-      simp only [resumeWithFuel, Nat.zero_add]
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      apply Result.eq_of_view_eq
+      simp [resumeWithFuel, prefixView]
   | case10 frame reachable suspension stepEq remaining active ih =>
       have active_eq : active = reachable := Subsingleton.elim _ _
       subst active
@@ -192,10 +186,10 @@ theorem resumeWithFuel_runMode
             runMode registry remaining
               (.child (frame.afterHandledSuspension suspension stepEq))
               (.childSuspended reachable stepEq) := by
+        apply Result.eq_of_view_eq
         rw [runMode.eq_2]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       have summedEq :
           runMode registry (remaining.succ + additional) (.child frame)
               reachable =
@@ -203,10 +197,10 @@ theorem resumeWithFuel_runMode
               (.child (frame.afterHandledSuspension suspension stepEq))
               (.childSuspended reachable stepEq) := by
         rw [Nat.succ_add]
+        apply Result.eq_of_view_eq
         rw [runMode.eq_2]
         split <;> rename_i _ branchEq
-        all_goals
-          cases branchEq.symm.trans stepEq <;> rfl
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
       rw [prefixEq, summedEq]
       exact ih additional
 
@@ -215,10 +209,12 @@ theorem resumeWithFuel_runMode
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
     (terminal : TerminalResult initialWorld rootContract rootInvocation)
+    (completed : result.view = .completed terminal)
     (additional : Nat) :
-    resumeWithFuel (.completed terminal) additional = .completed terminal :=
-  rfl
+    resumeWithFuel result additional = result := by
+  simp [resumeWithFuel, completed]
 
 /-- An exhausted result resumes with its retained registry and active mode. -/
 @[simp] theorem resumeWithFuel_outOfFuel
@@ -228,10 +224,12 @@ theorem resumeWithFuel_runMode
     (registry : CheckedContractRegistry)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode)
+    (result : Result initialWorld rootContract rootInvocation)
+    (exhausted : result.view = .outOfFuel registry mode reachable)
     (additional : Nat) :
-    resumeWithFuel (.outOfFuel registry mode reachable) additional =
-      runMode registry additional mode reachable :=
-  rfl
+    resumeWithFuel result additional =
+      runMode registry additional mode reachable := by
+  simp [resumeWithFuel, exhausted]
 
 /-- Zero additional fuel is an identity for every actual scheduler run. -/
 @[simp] theorem resumeWithFuel_runMode_zero
@@ -256,9 +254,12 @@ theorem resumeWithFuel_add
     (first second : Nat) :
     resumeWithFuel (resumeWithFuel result first) second =
       resumeWithFuel result (first + second) := by
-  cases result with
-  | completed terminal => rfl
+  cases observed : result.view with
+  | completed terminal =>
+      simp [resumeWithFuel, observed]
   | outOfFuel registry mode reachable =>
+      rw [resumeWithFuel_outOfFuel registry mode reachable result observed]
+      rw [resumeWithFuel_outOfFuel registry mode reachable result observed]
       exact resumeWithFuel_runMode registry first second mode reachable
 
 /-- Two additions after an actual run equal one run at the total budget. -/

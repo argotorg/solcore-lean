@@ -17,8 +17,8 @@ def resumeWithFuel
     (result : Result initialWorld rootContract rootInvocation)
     (additional : Nat) :
     Result initialWorld rootContract rootInvocation :=
-  match result with
-  | .completed terminal => .completed terminal
+  match result.view with
+  | .completed _terminal => result
   | .outOfFuel registry mode reachable =>
       runMode registry additional mode reachable
 

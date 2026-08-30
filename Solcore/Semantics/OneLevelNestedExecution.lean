@@ -80,6 +80,30 @@ theorem Mode.rank_le_one
     mode.rank ≤ 1 := by
   cases mode <;> simp [Mode.rank]
 
+/--
+One bounded execution result. The private constructor makes `run` and
+`resumeWithFuel` the only production paths; callers can inspect `view` but
+cannot wrap an arbitrary terminal value or replace a retained registry.
+-/
+structure Result
+    (initialWorld : WorldState)
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation) where
+  private mk ::
+  view : ResultView initialWorld rootContract rootInvocation
+
+/-- The observable view determines a sealed result without exposing its constructor. -/
+theorem Result.eq_of_view_eq
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {left right : Result initialWorld rootContract rootInvocation}
+    (equal : left.view = right.view) : left = right := by
+  cases left
+  cases right
+  cases equal
+  rfl
+
 /-- Run both modes with one budget; no child-local fuel is hidden. -/
 def runMode
     {initialWorld : WorldState}
@@ -92,21 +116,21 @@ def runMode
     Result initialWorld rootContract rootInvocation
   | fuel, .root frame, reachable =>
       match advanced : Core.hostAdvance frame.state with
-      | .done value => .completed (frame.finalizeDone value advanced)
+      | .done value => ⟨.completed (frame.finalizeDone value advanced)⟩
       | .fault error =>
           False.elim
             (Core.well_typed_host_state_never_faults
               frame.stateTyping advanced)
       | .next next =>
           match fuel with
-          | 0 => .outOfFuel registry (.root frame) reachable
+          | 0 => ⟨.outOfFuel registry (.root frame) reachable⟩
           | remaining + 1 =>
               runMode registry remaining
                 (.root (frame.afterNext next advanced))
                 (.rootNext reachable advanced)
       | .suspended suspension =>
           match fuel with
-          | 0 => .outOfFuel registry (.root frame) reachable
+          | 0 => ⟨.outOfFuel registry (.root frame) reachable⟩
           | remaining + 1 =>
               runMode registry remaining
                 (frame.afterSuspension registry suspension advanced)
@@ -123,14 +147,14 @@ def runMode
               frame.childStateTyping advanced)
       | .next next =>
           match fuel with
-          | 0 => .outOfFuel registry (.child frame) reachable
+          | 0 => ⟨.outOfFuel registry (.child frame) reachable⟩
           | remaining + 1 =>
               runMode registry remaining
                 (.child (frame.afterNext next advanced))
                 (.childNext reachable advanced)
       | .suspended suspension =>
           match fuel with
-          | 0 => .outOfFuel registry (.child frame) reachable
+          | 0 => ⟨.outOfFuel registry (.child frame) reachable⟩
           | remaining + 1 =>
               runMode registry remaining
                 (.child (frame.afterHandledSuspension suspension advanced))
