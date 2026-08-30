@@ -200,6 +200,10 @@ def afterSuspension
                       suspended.parentContext.selectedPresence
                   exact .child (suspended.startChild address addressEq resolved.1 resolved.2
                     childWorld installed parentPresence)
+  | createContractWord templateId value input =>
+      exact .root (frame.afterHandledSuspension
+        ⟨.createContractWord templateId value input,
+          continuation, store⟩ advanced)
   | storageRead slot =>
       exact .root (frame.afterHandledSuspension
         ⟨.storageRead slot, continuation, store⟩ advanced)

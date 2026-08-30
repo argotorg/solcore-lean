@@ -37,6 +37,8 @@ def handleRequest
       (context, ContractCallFailure.depthExceeded.result)
   | .callContractWordWithValue _ _ _ =>
       (context, ContractCallFailure.depthExceeded.result)
+  | .createContractWord _ _ _ =>
+      (context, ContractCallFailure.depthExceeded.result)
 
 /-- Current combined handler indexed by the complete run-fixed input. -/
 def handler

@@ -126,6 +126,9 @@ private theorem rootAfterSuspension_anchored
           · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
           · exact ⟨anchored.storageAddress_eq,
               anchored.checkpointState_eq, rfl, rfl, by assumption⟩
+  | createContractWord templateId value input =>
+      exact ⟨anchored.storageAddress_eq,
+        anchored.checkpointState_eq⟩
   | storageRead slot =>
       exact ⟨anchored.storageAddress_eq,
         anchored.checkpointState_eq⟩

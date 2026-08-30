@@ -499,6 +499,8 @@ theorem run_of_suspended_inputDataWordBE?_some
           | callContractWord target input =>
               simp [handler, handleRequest]
           | callContractWordWithValue target value input =>
+              simp [handler, handleRequest]
+          | createContractWord templateId value input =>
               simp [handler, handleRequest])
         context fuel state
   simpa only [run_storageAddress, if_neg different] using preserved

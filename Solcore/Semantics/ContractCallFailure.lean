@@ -13,6 +13,8 @@ inductive ContractCallFailure where
   | depthExceeded
   | insufficientBalance
   | balanceOverflow
+  | nonceOverflow
+  | addressCollision
   deriving Repr, BEq, DecidableEq
 
 namespace ContractCallFailure
@@ -24,6 +26,8 @@ def code : ContractCallFailure → Core.Word
   | .depthExceeded => ⟨2, by decide⟩
   | .insufficientBalance => ⟨3, by decide⟩
   | .balanceOverflow => ⟨4, by decide⟩
+  | .nonceOverflow => ⟨5, by decide⟩
+  | .addressCollision => ⟨6, by decide⟩
 
 /-- Convert a dispatch failure into the dedicated Core call-result branch. -/
 def result (failure : ContractCallFailure) : Core.ContractCallWordResult :=

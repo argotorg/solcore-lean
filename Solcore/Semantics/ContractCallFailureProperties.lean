@@ -27,6 +27,14 @@ theorem result_injective : Function.Injective result := by
     balanceOverflow.code = ⟨4, by decide⟩ :=
   rfl
 
+@[simp] theorem code_nonceOverflow :
+    nonceOverflow.code = ⟨5, by decide⟩ :=
+  rfl
+
+@[simp] theorem code_addressCollision :
+    addressCollision.code = ⟨6, by decide⟩ :=
+  rfl
+
 @[simp] theorem result_value (failure : ContractCallFailure) :
     failure.result.value =
       .inRight .word
