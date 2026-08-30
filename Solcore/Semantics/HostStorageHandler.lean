@@ -14,7 +14,12 @@ namespace Solcore.Semantics.HostStorageDriver
 
 universe u v
 
-/-- Handle one host request using storage state or the run-fixed input. -/
+/--
+Total response function used by the legacy storage policy. The `emitLogWord`
+arm exists only because `HostHandler.handle` is request-total; `handler` marks
+that request unsupported, so `HostDriver.run` never invokes the arm. Observable
+execution must use `TransactionHostStorageDriver`.
+-/
 def handleRequest
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)

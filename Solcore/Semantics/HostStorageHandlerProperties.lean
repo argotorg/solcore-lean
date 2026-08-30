@@ -13,6 +13,23 @@ namespace Solcore.Semantics.HostStorageDriver
 
 universe u v
 
+@[simp] theorem handler_supports_emitLogWord
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (topic payload : Core.Word) :
+    (@handler RollbackState TraceState inputs).supports
+        (.emitLogWord topic payload) = false :=
+  rfl
+
+/-- The legacy policy cannot claim that an effect-dropping log is supported. -/
+theorem handler_not_supports_emitLogWord
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (topic payload : Core.Word) :
+    (@handler RollbackState TraceState inputs).supports
+        (.emitLogWord topic payload) ≠ true := by
+  simp
+
 @[simp] theorem handleRequest_storageRead
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)

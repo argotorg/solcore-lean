@@ -69,10 +69,14 @@ theorem run_of_suspended
     (execution :
       Core.hostRun fuel state = .suspended suspension remainingFuel) :
     run context inputs fuel state =
-      run
-        (handleSuspension inputs context suspension).1 inputs
-        remainingFuel
-        (handleSuspension inputs context suspension).2 := by
+      if (@handler RollbackState TraceState inputs).supports
+          suspension.request then
+        run
+          (handleSuspension inputs context suspension).1 inputs
+          remainingFuel
+          (handleSuspension inputs context suspension).2
+      else
+        ⟨context, .unsupported suspension remainingFuel⟩ := by
   simpa only [run, handleSuspension] using
     HostDriver.run_of_suspended
       (@handler RollbackState TraceState inputs)
@@ -381,18 +385,13 @@ theorem run_of_suspended_emitLogWord
         .suspended
           ⟨.emitLogWord topic payload, continuation, store⟩ remainingFuel) :
     run context inputs fuel state =
-      run context inputs remainingFuel
-        ⟨.ret .unit, continuation, store⟩ := by
-  calc
-    run context inputs fuel state =
-        run
-          (handleSuspension inputs context
-            ⟨.emitLogWord topic payload, continuation, store⟩).1
-          inputs remainingFuel
-          (handleSuspension inputs context
-            ⟨.emitLogWord topic payload, continuation, store⟩).2 :=
-      run_of_suspended context inputs fuel remainingFuel state _ execution
-    _ = _ := by rw [handleSuspension_emitLogWord]
+      ⟨context,
+        .unsupported
+          ⟨.emitLogWord topic payload, continuation, store⟩
+          remainingFuel⟩ := by
+  simpa [run, handler] using
+    HostDriver.run_of_unsupported (handler inputs) context fuel remainingFuel
+      state ⟨.emitLogWord topic payload, continuation, store⟩ execution rfl
 
 @[simp] theorem run_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
