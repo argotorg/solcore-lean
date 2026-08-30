@@ -102,6 +102,9 @@ def afterHandleRequest
   | createContractWord templateId value input =>
       exact ⟨presence.account, by
         simpa [HostStorageDriver.handleRequest] using presence.present⟩
+  | emitLogWord topic payload =>
+      exact ⟨presence.account, by
+        simpa [HostStorageDriver.handleRequest] using presence.present⟩
 
 end PresentAccountAt
 

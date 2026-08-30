@@ -367,6 +367,33 @@ theorem run_of_suspended_inputDataWordBE?_some
     offset continuation store execution, present]
   rfl
 
+theorem run_of_suspended_emitLogWord
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : Context RollbackState TraceState)
+    (inputs : ExecutionInputs)
+    (fuel remainingFuel : Nat)
+    (state : Core.State)
+    (topic payload : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store)
+    (execution :
+      Core.hostRun fuel state =
+        .suspended
+          ⟨.emitLogWord topic payload, continuation, store⟩ remainingFuel) :
+    run context inputs fuel state =
+      run context inputs remainingFuel
+        ⟨.ret .unit, continuation, store⟩ := by
+  calc
+    run context inputs fuel state =
+        run
+          (handleSuspension inputs context
+            ⟨.emitLogWord topic payload, continuation, store⟩).1
+          inputs remainingFuel
+          (handleSuspension inputs context
+            ⟨.emitLogWord topic payload, continuation, store⟩).2 :=
+      run_of_suspended context inputs fuel remainingFuel state _ execution
+    _ = _ := by rw [handleSuspension_emitLogWord]
+
 @[simp] theorem run_storageAddress
     {RollbackState : Type u} {TraceState : Type v}
     (context : Context RollbackState TraceState)
@@ -501,6 +528,8 @@ theorem run_of_suspended_inputDataWordBE?_some
           | callContractWordWithValue target value input =>
               simp [handler, handleRequest]
           | createContractWord templateId value input =>
+              simp [handler, handleRequest]
+          | emitLogWord topic payload =>
               simp [handler, handleRequest])
         context fuel state
   simpa only [run_storageAddress, if_neg different] using preserved

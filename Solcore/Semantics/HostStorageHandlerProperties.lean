@@ -287,6 +287,27 @@ theorem handleSuspension_inputDataWordBE?_some
           continuation, store⟩) :=
   rfl
 
+@[simp] theorem handleRequest_emitLogWord
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (topic payload : Core.Word) :
+    handleRequest inputs context (.emitLogWord topic payload) =
+      (context, ()) :=
+  rfl
+
+@[simp] theorem handleSuspension_emitLogWord
+    {RollbackState : Type u} {TraceState : Type v}
+    (inputs : ExecutionInputs)
+    (context : Context RollbackState TraceState)
+    (topic payload : Core.Word)
+    (continuation : List Core.Frame)
+    (store : Core.Store) :
+    handleSuspension inputs context
+        ⟨.emitLogWord topic payload, continuation, store⟩ =
+      (context, ⟨.ret .unit, continuation, store⟩) :=
+  rfl
+
 @[simp] theorem handleSuspension_storageRead_context
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs)

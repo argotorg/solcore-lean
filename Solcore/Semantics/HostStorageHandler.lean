@@ -39,6 +39,7 @@ def handleRequest
       (context, ContractCallFailure.depthExceeded.result)
   | .createContractWord _ _ _ =>
       (context, ContractCallFailure.depthExceeded.result)
+  | .emitLogWord _ _ => (context, ())
 
 /-- Current combined handler indexed by the complete run-fixed input. -/
 def handler

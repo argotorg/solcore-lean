@@ -48,6 +48,7 @@ private def countingHandler : HostHandler Nat where
     | .callContractWord _ _ => (count + 1, .failed returned)
     | .callContractWordWithValue _ _ _ => (count + 1, .failed returned)
     | .createContractWord _ _ _ => (count + 1, .failed returned)
+    | .emitLogWord _ _ => (count + 1, ())
 
 /-- A request followed by exactly two ordinary Core transitions. -/
 private def requestReady : State :=

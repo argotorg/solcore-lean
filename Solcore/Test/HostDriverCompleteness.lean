@@ -149,6 +149,7 @@ private def changingHandler : Solcore.Semantics.HostHandler Nat where
         (context + 1, .failed Core.returned)
     | .createContractWord _ _ _ =>
         (context + 1, .failed Core.returned)
+    | .emitLogWord _ _ => (context + 1, ())
 
 private theorem handled :
     changingHandler.handleSuspension 0 Core.suspension =
