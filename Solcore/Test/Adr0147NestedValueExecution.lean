@@ -113,6 +113,48 @@ private def balanceDeltasAreExact : Bool :=
         (some untouchedBalance, some untouchedBalance) &&
       terminal.committedDelta.balanceChange? untouchedAddress == none
 
+private def childPrefixFuel : Nat := 14
+
+private def valueScenario (fuel : Nat) :=
+  runValueScenario .commit returningChild rootInitialBalance
+    childInitialBalance fuel
+
+private def childOutOfFuelRetainsOneTransfer : Bool :=
+  match (valueScenario childPrefixFuel).view with
+  | .outOfFuel _ (.child frame) _ =>
+      balance? frame.childContext.context.values.working.1 rootAddress ==
+          some rootFinalBalance &&
+        balance? frame.childContext.context.values.working.1 childAddress ==
+          some childFinalBalance &&
+        valueStored? frame.childContext.context.values.working.1 == none
+  | _ => false
+
+private abbrev ResumedObservation :=
+  FrameOutcome Word × Option Word × Option Word × Option Word ×
+    (Option Word × Option Word) × Option (Option Word × Option Word)
+
+private def resumedObservation? (result := valueScenario completionFuel) :
+    Option ResumedObservation :=
+  match result.view with
+  | .completed terminal => some
+      (terminal.outcome,
+        balance? terminal.finalWorld rootAddress,
+        balance? terminal.finalWorld childAddress,
+        valueStored? terminal.finalWorld,
+        terminal.committedDelta.balanceEndpoints childAddress,
+        terminal.committedDelta.slotChange? childAddress valueSlot)
+  | .outOfFuel _ _ _ => none
+
+private def childOutOfFuelResumesWithoutDoubleTransfer : Bool :=
+  let split := resumeWithFuel (valueScenario childPrefixFuel) completionFuel
+  let oneShot := valueScenario (childPrefixFuel + completionFuel)
+  resumedObservation? split == resumedObservation? oneShot &&
+    resumedObservation? split == some
+      (.returned (encodeWordBytesBE transferValue),
+        some rootFinalBalance, some childFinalBalance, some transferValue,
+        (some childInitialBalance, some childFinalBalance),
+        some (some Word.zero, some transferValue))
+
 private def consumeSelfValueCall (call : Expr) : Expr :=
   .caseE call
     (returnedExpr
@@ -171,7 +213,9 @@ private theorem compileTimeNestedValueCalls :
       successfulChildThenRootTrapRollsBack &&
       insufficientFailsWithoutChildExecution &&
       overflowFailsWithoutChildExecution && legacyZeroCallPreservesBalances &&
-      selfValueCallCommitsWithoutBalanceMovement && balanceDeltasAreExact = true := by
+      selfValueCallCommitsWithoutBalanceMovement && balanceDeltasAreExact &&
+      childOutOfFuelRetainsOneTransfer &&
+      childOutOfFuelResumesWithoutDoubleTransfer = true := by
   native_decide
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
@@ -193,5 +237,9 @@ def testAdr0147NestedValueExecution : IO Unit := do
   assertTrue selfValueCallCommitsWithoutBalanceMovement
     "self value call changed balance or lost child storage"
   assertTrue balanceDeltasAreExact "nested value-call balance deltas were inexact"
+  assertTrue childOutOfFuelRetainsOneTransfer
+    "child out-of-fuel state did not retain exactly one transfer"
+  assertTrue childOutOfFuelResumesWithoutDoubleTransfer
+    "resumed child value call diverged or applied transfer/effects twice"
 
 end Tests
