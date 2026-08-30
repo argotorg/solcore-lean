@@ -76,6 +76,8 @@ import Solcore.Test.AddressSelectedHostInputWordBEParent
 import Solcore.Test.AddressSelectedHostInputWordBEStorage
 import Solcore.Test.AddressSelectedHostStorage
 import Solcore.Test.AddressSelectedHostStorageProperties
+import Solcore.Test.CurrentAddressObservationProperties
+import Solcore.Test.CurrentAddressExecution
 import Solcore.Test.CheckedCoreProgram
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextTrapReasonMap
@@ -4994,6 +4996,7 @@ def run : IO Unit := do
   testAddressSelectedHostInputWordBEParent
   testAddressSelectedHostInputWordBEStorage
   testAddressSelectedHostStorage
+  testCurrentAddressExecution
   testCheckedCoreProgram
   testFrameContinuationContext
   testFrameContinuationContextTrapReasonMap
