@@ -82,6 +82,8 @@ import Solcore.Test.CurrentAddressExecutionSession
 import Solcore.Test.CheckedCoreProgram
 import Solcore.Test.WordReturnedFrameCompletionProperties
 import Solcore.Test.CheckedHostCoreWordProgramExecution
+import Solcore.Test.CheckedHostCoreWordCodeSelectionProperties
+import Solcore.Test.CheckedHostCoreWordCodeSelection
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextTrapReasonMap
 import Solcore.Test.FrameContinuationContextResolveTrapReasonMap
@@ -5005,6 +5007,7 @@ def run : IO Unit := do
   testCurrentAddressExecutionSession
   testCheckedCoreProgram
   testCheckedHostCoreWordProgramExecution
+  testCheckedHostCoreWordCodeSelection
   testFrameContinuationContext
   testFrameContinuationContextTrapReasonMap
   testFrameResolutionResult

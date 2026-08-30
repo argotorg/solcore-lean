@@ -75,6 +75,8 @@ import Solcore.Semantics.CheckedHostCoreWordProgram
 import Solcore.Semantics.CheckedHostCoreWordProgramProperties
 import Solcore.Semantics.CheckedHostCoreWordProgramExecution
 import Solcore.Semantics.CheckedHostCoreWordProgramExecutionProperties
+import Solcore.Semantics.CheckedHostCoreWordCodeSelection
+import Solcore.Semantics.CheckedHostCoreWordCodeSelectionProperties
 import Solcore.Semantics.CheckedCoreProgramHostPromotion
 import Solcore.Semantics.HostStorageInputData
 import Solcore.Semantics.HostStorageInputDataProperties
@@ -106,6 +108,8 @@ import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCo
 import Solcore.Semantics.WorldState
 import Solcore.Semantics.AccountCodeProperties
 import Solcore.Semantics.WorldStateCode
+import Solcore.Semantics.WorldStateWordCodeSelection
+import Solcore.Semantics.WorldStateWordCodeSelectionProperties
 import Solcore.Semantics.WorldStateCodeExecution
 import Solcore.Semantics.WorldStateCodeProperties
 import Solcore.Semantics.WorldStateStorageRead
