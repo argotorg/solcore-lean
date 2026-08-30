@@ -18,9 +18,11 @@ def decodeWordTextAt
   match Solcore.Semantics.decodeWordText? text with
   | some value => pure value
   | none =>
-      failAt path .invalidWord (.mkObj [
-        ("expected", "0x followed by exactly 64 lowercase hexadecimal digits")
-      ])
+      let reason :=
+        if !(text.startsWith "0x") then "prefix"
+        else if text.toList.length != 66 then "length"
+        else "lowercase-hex"
+      failAt path .invalidWord (.mkObj [("reason", reason)])
 
 def decodeWordText (text : String) : DecodeResult Solcore.Core.Word :=
   decodeWordTextAt .root text

@@ -1,6 +1,7 @@
+import Solcore.Core.Wire.V3.Codec.Budget
 import Solcore.Core.Wire.V3.Codec.Operator
 
-/-! Strict, depth-bounded type codecs for Semantic Core Wire v3. -/
+/-! Strict, budgeted type codecs for Semantic Core Wire v3. -/
 
 set_option autoImplicit false
 
@@ -46,94 +47,128 @@ def typeDepth : Ty → Nat
       Nat.max (typeDepth left) (typeDepth right) + 1
   | .cell elementType => typeDepth elementType + 1
 
-def defaultTypeDepth : Nat := 1024
+def typeNodes : Ty → Nat
+  | .unit | .bool | .word | .namedData _ => 1
+  | .product left right | .function left right | .sum left right =>
+      1 + typeNodes left + typeNodes right
+  | .cell elementType => 1 + typeNodes elementType
 
-def decodeTypeAtWithDepth :
-    Nat → DecodePath → Lean.Json → DecodeResult Ty
-  | 0, path, _ =>
-      failAt path .depthLimitExceeded (.mkObj [("limit", 0)])
-  | depth + 1, path, json =>
+private def decodeTypeAtFuel :
+    (fuel : Nat) → (limits : CoreBudgetLimits) → CoreBudgetState → (depth : Nat) →
+      fuel = limits.maxDepth + 1 - depth →
+      DecodePath → Lean.Json → CoreDecodeResult (Ty × CoreBudgetState)
+  | 0, limits, _, depth, exactFuel, _, _ =>
+      .error (.exhausted {
+        resource := .depth
+        limit := limits.maxDepth
+        consumed := depth
+        exceeded := by
+          have zeroSub : limits.maxDepth + 1 - depth = 0 := exactFuel.symm
+          have bound := Nat.sub_eq_zero_iff_le.mp zeroSub
+          omega
+      })
+  | fuel + 1, limits, state, depth, exactFuel, path, json => do
+      have childFuel : fuel = limits.maxDepth + 1 - (depth + 1) := by
+        omega
+      let state ← consumeCoreNode limits state depth
       match json with
       | .str name =>
           match name with
-          | "unit" => pure .unit
-          | "bool" => pure .bool
-          | "word" => pure .word
-          | _ =>
-              failAt path .invalidType (.mkObj [
+          | "unit" => pure (.unit, state)
+          | "bool" => pure (.bool, state)
+          | "word" => pure (.word, state)
+          | _ => throw (.protocol {
+              path
+              code := .invalidType
+              arguments := .mkObj [
                 ("actual", name),
                 ("allowed", .arr #["unit", "bool", "word"])
-              ])
+              ]
+            })
       | .obj _ => do
-          ensureExactObject path json
+          liftProtocol <| ensureExactObject path json
             ["tag", "left", "right", "parameter", "result", "elementType",
-              "dataType"]
-            ["tag"]
+              "dataType"] ["tag"]
           let tagPath := path.field "tag"
-          let tag ← decodeStringAt tagPath (← requireField path json "tag")
+          let tag ← liftProtocol <| decodeStringAt tagPath
+            (← liftProtocol <| requireField path json "tag")
           match tag with
-          | "product" =>
-              ensureExactObject path json ["tag", "left", "right"]
+          | "product" | "sum" =>
+              liftProtocol <| ensureExactObject path json ["tag", "left", "right"]
                 ["tag", "left", "right"]
-              let left ← decodeTypeAtWithDepth depth (path.field "left")
-                (← requireField path json "left")
-              let right ← decodeTypeAtWithDepth depth (path.field "right")
-                (← requireField path json "right")
-              pure (.product left right)
+              let (left, state) ← decodeTypeAtFuel fuel limits state (depth + 1) childFuel
+                (path.field "left")
+                (← liftProtocol <| requireField path json "left")
+              let (right, state) ← decodeTypeAtFuel fuel limits state (depth + 1) childFuel
+                (path.field "right")
+                (← liftProtocol <| requireField path json "right")
+              if tag == "product" then pure (.product left right, state)
+              else pure (.sum left right, state)
           | "function" =>
-              ensureExactObject path json ["tag", "parameter", "result"]
-                ["tag", "parameter", "result"]
-              let parameter ← decodeTypeAtWithDepth depth (path.field "parameter")
-                (← requireField path json "parameter")
-              let result ← decodeTypeAtWithDepth depth (path.field "result")
-                (← requireField path json "result")
-              pure (.function parameter result)
-          | "sum" =>
-              ensureExactObject path json ["tag", "left", "right"]
-                ["tag", "left", "right"]
-              let left ← decodeTypeAtWithDepth depth (path.field "left")
-                (← requireField path json "left")
-              let right ← decodeTypeAtWithDepth depth (path.field "right")
-                (← requireField path json "right")
-              pure (.sum left right)
+              liftProtocol <| ensureExactObject path json
+                ["tag", "parameter", "result"] ["tag", "parameter", "result"]
+              let (parameter, state) ← decodeTypeAtFuel fuel limits state (depth + 1) childFuel
+                (path.field "parameter")
+                (← liftProtocol <| requireField path json "parameter")
+              let (result, state) ← decodeTypeAtFuel fuel limits state (depth + 1) childFuel
+                (path.field "result")
+                (← liftProtocol <| requireField path json "result")
+              pure (.function parameter result, state)
           | "cell" =>
-              ensureExactObject path json ["tag", "elementType"]
+              liftProtocol <| ensureExactObject path json ["tag", "elementType"]
                 ["tag", "elementType"]
-              let elementType ←
-                decodeTypeAtWithDepth depth (path.field "elementType")
-                  (← requireField path json "elementType")
-              pure (.cell elementType)
+              let (elementType, state) ← decodeTypeAtFuel fuel limits state (depth + 1) childFuel
+                (path.field "elementType")
+                (← liftProtocol <| requireField path json "elementType")
+              pure (.cell elementType, state)
           | "namedData" =>
-              ensureExactObject path json ["tag", "dataType"]
+              liftProtocol <| ensureExactObject path json ["tag", "dataType"]
                 ["tag", "dataType"]
-              let dataType ← decodeDataTypeIdAt (path.field "dataType")
-                (← requireField path json "dataType")
-              pure (.namedData dataType)
-          | _ =>
-              failAt tagPath .invalidTag (.mkObj [
+              let dataType ← liftProtocol <| decodeDataTypeIdAt (path.field "dataType")
+                (← liftProtocol <| requireField path json "dataType")
+              pure (.namedData dataType, state)
+          | _ => throw (.protocol {
+              path := tagPath
+              code := .invalidTag
+              arguments := .mkObj [
                 ("actual", tag),
-                ("allowed", .arr #[
+                ("expected", .arr #[
                   "product", "function", "sum", "cell", "namedData"
                 ])
-              ])
-      | _ =>
-          failAt path .invalidType (.mkObj [
-            ("expected", "scalar type string or composite type object")
-          ])
+              ]
+            })
+      | _ => throw (.protocol {
+          path
+          code := .invalidType
+          arguments := .mkObj [
+            ("actual", match json with
+              | .null => "null" | .bool _ => "boolean" | .num _ => "number"
+              | .str _ => "string" | .arr _ => "array" | .obj _ => "object"),
+            ("allowed", .arr #["string", "object"])
+          ]
+        })
 
-def decodeTypeWithDepth
-    (maxDepth : Nat)
+def decodeTypeAtWithBudget
+    (limits : CoreBudgetLimits)
+    (state : CoreBudgetState)
+    (depth : Nat)
+    (path : DecodePath)
     (json : Lean.Json) :
-    DecodeResult Ty :=
-  decodeTypeAtWithDepth maxDepth .root json
+    CoreDecodeResult (Ty × CoreBudgetState) :=
+  decodeTypeAtFuel (limits.maxDepth + 1 - depth) limits state depth rfl path json
 
-def decodeType (json : Lean.Json) : DecodeResult Ty :=
-  decodeTypeWithDepth defaultTypeDepth json
+def decodeTypeWithBudget
+    (limits : CoreBudgetLimits)
+    (json : Lean.Json) : CoreDecodeResult Ty := do
+  let (type, _) ← decodeTypeAtWithBudget limits .initial 1 .root json
+  pure type
 
-def canonicalizeTypeWithDepth
-    (maxDepth : Nat)
-    (json : Lean.Json) :
-    DecodeResult Lean.Json :=
-  (decodeTypeWithDepth maxDepth json).map encodeType
+def decodeType (json : Lean.Json) : CoreDecodeResult Ty :=
+  decodeTypeWithBudget .default json
+
+def canonicalizeTypeWithBudget
+    (limits : CoreBudgetLimits)
+    (json : Lean.Json) : CoreDecodeResult Lean.Json :=
+  encodeType <$> decodeTypeWithBudget limits json
 
 end Solcore.Core.Wire.V3

@@ -23,7 +23,7 @@ def decodeUnaryOpAt
   | _ =>
       failAt path .invalidTag (.mkObj [
         ("actual", name),
-        ("allowed", .arr #["boolNot", "wordNot", "wordClz"])
+        ("expected", .arr #["boolNot", "wordNot", "wordClz"])
       ])
 
 def decodeUnaryOp (json : Lean.Json) : DecodeResult UnaryOp :=
@@ -88,7 +88,7 @@ def decodeBinaryOpAt
   | _ =>
       failAt path .invalidTag (.mkObj [
         ("actual", name),
-        ("allowed", .arr #[
+        ("expected", .arr #[
           "wordAdd", "wordSub", "wordMul", "wordDiv", "wordMod",
           "wordEq", "wordGt", "wordSgt", "wordAnd", "wordOr", "wordXor",
           "wordShl", "wordShr", "wordByte", "wordSar", "wordPow",
@@ -124,7 +124,7 @@ def decodeTernaryOpAt
   | _ =>
       failAt path .invalidTag (.mkObj [
         ("actual", name),
-        ("allowed", .arr #["wordAddMod", "wordMulMod"])
+        ("expected", .arr #["wordAddMod", "wordMulMod"])
       ])
 
 def decodeTernaryOp (json : Lean.Json) : DecodeResult TernaryOp :=

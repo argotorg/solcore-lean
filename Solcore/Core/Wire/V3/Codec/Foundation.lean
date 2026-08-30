@@ -43,6 +43,7 @@ inductive DecodeErrorCode where
   | expectedObject
   | expectedArray
   | expectedString
+  | expectedBool
   | expectedNatural
   | missingField
   | unknownField
@@ -50,7 +51,6 @@ inductive DecodeErrorCode where
   | invalidTag
   | invalidType
   | invalidWord
-  | depthLimitExceeded
   deriving Repr, BEq, DecidableEq
 
 namespace DecodeErrorCode
@@ -59,6 +59,7 @@ def wireName : DecodeErrorCode → String
   | .expectedObject => "expected-object"
   | .expectedArray => "expected-array"
   | .expectedString => "expected-string"
+  | .expectedBool => "expected-bool"
   | .expectedNatural => "expected-natural"
   | .missingField => "missing-field"
   | .unknownField => "unknown-field"
@@ -66,7 +67,6 @@ def wireName : DecodeErrorCode → String
   | .invalidTag => "invalid-tag"
   | .invalidType => "invalid-type"
   | .invalidWord => "invalid-word"
-  | .depthLimitExceeded => "depth-limit-exceeded"
 
 end DecodeErrorCode
 
@@ -153,6 +153,14 @@ def decodeStringAt
   match json with
   | .str value => pure value
   | _ => failAt path .expectedString (expectedArguments "string" json)
+
+def decodeBoolAt
+    (path : DecodePath)
+    (json : Lean.Json) :
+    DecodeResult Bool :=
+  match json with
+  | .bool value => pure value
+  | _ => failAt path .expectedBool (expectedArguments "boolean" json)
 
 def decodeNatAt
     (path : DecodePath)
