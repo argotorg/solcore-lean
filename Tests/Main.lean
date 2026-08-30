@@ -104,6 +104,9 @@ import Solcore.Test.ParentIndexedFrameInitialization
 import Solcore.Test.ParentIndexedFrameInitializationStorageAddress
 import Solcore.Test.ParentIndexedFrameInitializationPresentStorageAccount
 import Solcore.Test.ParentIndexedSelectedExecutionContinuation
+import Solcore.Test.ParentIndexedSelectedExecutionProperties
+import Solcore.Test.ParentIndexedSelectedExecutionResumption
+import Solcore.Test.ParentIndexedSelectedExecutionFold
 import Solcore.Test.ParentIndexedFrameResolutionView
 import Solcore.Test.ParentIndexedFrameResolutionViewTrapReasonMap
 import Solcore.Test.ParentIndexedFrameResolutionFold
@@ -5018,6 +5021,8 @@ def run : IO Unit := do
   testFrameStateResolution
   testParentIndexedFrameContinuationContext
   testParentIndexedFrameContinuationConstruction
+  testParentIndexedSelectedExecutionResumption
+  testParentIndexedSelectedExecutionFold
   testParentIndexedFrameResolutionFold
   testParentIndexedFrameTrapRollback
   testParentIndexedFrameTrapPropagationPayload
