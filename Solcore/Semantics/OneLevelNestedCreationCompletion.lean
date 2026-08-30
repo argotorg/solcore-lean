@@ -35,6 +35,10 @@ structure DeployedInitializerResult
   resumedRoot_checkpointState_eq :
     resumedRoot.context.context.values.checkpoint.state =
       frame.suspendedRoot.parentContext.context.values.checkpoint.state
+  resumedRoot_workingJournal_eq :
+    resumedRoot.context.workingJournal =
+      frame.initializerContext.workingJournal.recordCreatedContract
+        frame.prepared.createdAddress
   resumedRoot_response_eq :
     resumedRoot.state = frame.suspendedRoot.suspension.resume
       (frame.suspendedRoot.profile.response
@@ -164,8 +168,14 @@ def completeReturned
         some frame.parentAccount := by
     rw [frame.postNonce_storageAddress_eq]
     exact parentPresent
-  let parentContext := frame.postNonceParentContext.rebaseWorking deployedWorld
-    frame.parentAccount parentPresentAtPostNonceSelector
+  let completedJournal :=
+    frame.initializerContext.workingJournal.recordCreatedContract
+      frame.prepared.createdAddress
+  let completedEffects : FrameEffectJournal TransactionJournal Unit :=
+    ⟨completedJournal, ()⟩
+  let parentContext := frame.postNonceParentContext.rebaseWorkingWithEffects
+    deployedWorld completedEffects frame.parentAccount
+      parentPresentAtPostNonceSelector
   let root := frame.suspendedRoot.resumeWith parentContext
     (.returned (addressToWord frame.prepared.createdAddress))
   exact {
@@ -181,6 +191,7 @@ def completeReturned
     resumedRoot_storageAddress_eq := frame.postNonce_storageAddress_eq
     resumedRoot_checkpointState_eq :=
       congrArg FrameCheckpointSnapshot.state frame.postNonce_checkpoint_eq
+    resumedRoot_workingJournal_eq := rfl
     resumedRoot_response_eq := rfl
   }
 

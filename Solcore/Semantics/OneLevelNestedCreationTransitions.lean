@@ -5,6 +5,7 @@ import Solcore.Semantics.BalanceTransferPresenceProperties
 import Solcore.Semantics.CheckedAccountCreationProperties
 import Solcore.Semantics.HostStorageAccountPresence
 import Solcore.Semantics.OneLevelNestedCreationState
+import Solcore.Semantics.TransactionHostStorageHandler
 import Solcore.Semantics.WorldStateCodeWriteProperties
 
 /-! Lifecycle helpers for one prepared checked contract initializer. -/
@@ -14,22 +15,69 @@ set_option autoImplicit false
 namespace Solcore.Semantics.OneLevelNestedExecution
 
 private theorem handleRequest_storageAddress
-    {RollbackState TraceState : Type}
     (inputs : HostStorageDriver.ExecutionInputs)
-    (context : HostStorageDriver.Context RollbackState TraceState)
+    (context : TransactionHostStorageDriver.Context)
     (request : Core.HostRequest) :
-    (HostStorageDriver.handleRequest inputs context request).1.context.storageAddress =
+    (TransactionHostStorageDriver.handleRequest inputs context request).1.context.storageAddress =
       context.context.storageAddress := by
   cases request <;> rfl
 
 private theorem handleRequest_checkpointState
-    {RollbackState TraceState : Type}
     (inputs : HostStorageDriver.ExecutionInputs)
-    (context : HostStorageDriver.Context RollbackState TraceState)
+    (context : TransactionHostStorageDriver.Context)
     (request : Core.HostRequest) :
-    (HostStorageDriver.handleRequest inputs context request).1.context.values.checkpoint.state =
+    (TransactionHostStorageDriver.handleRequest inputs context request).1.context.values.checkpoint.state =
       context.context.values.checkpoint.state := by
   cases request <;> rfl
+
+private def afterTransactionHandleRequestPresence
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (context : TransactionHostStorageDriver.Context)
+    (request : Core.HostRequest)
+    (address : Address)
+    (presence : PresentAccountAt context.context.values.working.1 address) :
+    PresentAccountAt
+      (TransactionHostStorageDriver.handleRequest inputs context request).1.context.values.working.1
+      address := by
+  cases request with
+  | storageRead slot =>
+      exact presence.afterHandleRequest inputs context (.storageRead slot) address
+  | storageWrite slot value =>
+      exact presence.afterHandleRequest inputs context
+        (.storageWrite slot value) address
+  | storageAddress =>
+      exact presence.afterHandleRequest inputs context .storageAddress address
+  | codeAddress =>
+      exact presence.afterHandleRequest inputs context .codeAddress address
+  | callValue =>
+      exact presence.afterHandleRequest inputs context .callValue address
+  | callerAddress =>
+      exact presence.afterHandleRequest inputs context .callerAddress address
+  | inputDataByte? offset =>
+      exact presence.afterHandleRequest inputs context
+        (.inputDataByte? offset) address
+  | inputDataSize =>
+      exact presence.afterHandleRequest inputs context .inputDataSize address
+  | inputDataWordBE? offset =>
+      exact presence.afterHandleRequest inputs context
+        (.inputDataWordBE? offset) address
+  | currentAddress =>
+      exact presence.afterHandleRequest inputs context .currentAddress address
+  | callContractWord target input =>
+      exact presence.afterHandleRequest inputs context
+        (.callContractWord target input) address
+  | callContractWordWithValue target value input =>
+      exact presence.afterHandleRequest inputs context
+        (.callContractWordWithValue target value input) address
+  | createContractWord templateId value input =>
+      exact presence.afterHandleRequest inputs context
+        (.createContractWord templateId value input) address
+  | emitLogWord topic payload =>
+      exact ⟨presence.account, by
+        simpa [TransactionHostStorageDriver.handleRequest,
+          TransactionHostStorageDriver.Context.recordLog,
+          TransactionHostStorageDriver.Context.withWorkingJournal] using
+            presence.present⟩
 
 namespace RootFrame
 
@@ -114,9 +162,11 @@ def startInitializer
       provisionalPresence
   let invocation := root.profile.initializerInvocation
     rootInvocation.executionInputs prepared.createdAddress
-  let initializerContext := TopLevelExecution.preparedTransactionContext
-    (checkpointWorld := statePreparation.postNonceWorld)
-    statePreparation.initializerInstalled
+  let inheritedJournal := root.parentContext.workingJournal
+  let initializerContext :=
+    TopLevelExecution.preparedTransactionContextWithJournals
+      (checkpointWorld := statePreparation.postNonceWorld)
+      inheritedJournal inheritedJournal statePreparation.initializerInstalled
   exact {
     suspendedRoot := root
     environment := environment
@@ -131,8 +181,8 @@ def startInitializer
     initializerContext := initializerContext
     initializer_storageAddress_eq := by
       simpa [initializerContext,
-        TopLevelExecution.preparedTransactionContext,
-        TopLevelExecution.preparedTransactionValues] using
+        TopLevelExecution.preparedTransactionContextWithJournals,
+        TopLevelExecution.preparedTransactionValuesWithJournals] using
         prepared.preparation_address_eq
     initializer_checkpointState_eq := rfl
     initializerState := Core.State.initial
@@ -143,8 +193,7 @@ def startInitializer
     parentAccount_present := by
       rw [← creatorAddress_eq]
       simpa [initializerContext,
-        TopLevelExecution.preparedTransactionContext,
-        TopLevelExecution.preparedTransactionValues,
+        TopLevelExecution.preparedTransactionContextWithJournals,
         TopLevelExecution.preparedTransactionValuesWithJournals] using
           initializerParentPresence.present
   }
@@ -174,7 +223,7 @@ def afterHandledSuspension
     (suspension : Core.HostSuspension)
     (advanced : Core.hostAdvance frame.initializerState = .suspended suspension) :
     PreparedInitializerFrame initialWorld rootContract rootInvocation :=
-  let requestResult := HostStorageDriver.handleRequest
+  let requestResult := TransactionHostStorageDriver.handleRequest
     frame.initializerInvocation.executionInputs frame.initializerContext
       suspension.request
   let typing := Core.hostAdvance_suspended_hasType
@@ -183,10 +232,11 @@ def afterHandledSuspension
       frame.initializerContext.context.values.working.1
       frame.suspendedRoot.parentContext.context.storageAddress :=
     ⟨frame.parentAccount, frame.parentAccount_present⟩
-  let nextPresence := parentPresence.afterHandleRequest
+  let nextPresence := afterTransactionHandleRequestPresence
     frame.initializerInvocation.executionInputs frame.initializerContext
       suspension.request
       frame.suspendedRoot.parentContext.context.storageAddress
+      parentPresence
   {
     frame with
     initializerContext := requestResult.1
