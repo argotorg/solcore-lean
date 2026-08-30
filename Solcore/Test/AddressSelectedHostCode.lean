@@ -168,11 +168,15 @@ private theorem compileTimeRemainingFuelRegression
     (execution :
       hostRun fuel state = .suspended suspension remainingFuel) :
     HostStorageDriver.run context inputs fuel state =
-      HostStorageDriver.run
-        (HostStorageDriver.handleSuspension
-          inputs context suspension).1 inputs remainingFuel
-        (HostStorageDriver.handleSuspension
-          inputs context suspension).2 :=
+      if (@HostStorageDriver.handler Nat (List Nat) inputs).supports
+          suspension.request then
+        HostStorageDriver.run
+          (HostStorageDriver.handleSuspension
+            inputs context suspension).1 inputs remainingFuel
+          (HostStorageDriver.handleSuspension
+            inputs context suspension).2
+      else
+        ⟨context, .unsupported suspension remainingFuel⟩ :=
   HostStorageDriver.run_of_suspended
     context inputs fuel remainingFuel state suspension execution
 

@@ -162,7 +162,7 @@ private theorem one_request_path :
       0 Core.requestState 1 Core.finalState := by
   exact .handle
     (Solcore.Core.HostSteps.refl (state := Core.requestState))
-    Core.request_emission handled
+    Core.request_emission rfl handled
     (.core (Solcore.Core.HostSteps.refl (state := Core.finalState)))
 
 private theorem handled_path_preserves_type :
@@ -253,7 +253,7 @@ private theorem one_request_outOfFuel_path :
       0 Core.transitionRequestState 1 Core.resumedTransitionState := by
   exact .handle
     (Solcore.Core.HostSteps.refl (state := Core.transitionRequestState))
-    Core.transition_request_emission handled_before_transition
+    Core.transition_request_emission rfl handled_before_transition
     (.core
       (Solcore.Core.HostSteps.refl (state := Core.resumedTransitionState)))
 

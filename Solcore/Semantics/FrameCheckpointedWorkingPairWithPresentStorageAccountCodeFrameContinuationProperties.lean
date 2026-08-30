@@ -24,9 +24,12 @@ theorem runWithStorage_toFrameContinuationContext?_eq_none_iff
         Core.Value → Core.Store → FrameOutcome TrapReason) :
     (code.runWithStorage context inputs fuel).toFrameContinuationContext?
           (fun current => current.context.values) doneOutcome = none ↔
-      ∃ finalContext exhausted,
+      (∃ finalContext exhausted,
         code.runWithStorage context inputs fuel =
-          ⟨finalContext, .outOfFuel exhausted⟩ := by
+          ⟨finalContext, .outOfFuel exhausted⟩) ∨
+      ∃ finalContext suspension remainingFuel,
+        code.runWithStorage context inputs fuel =
+          ⟨finalContext, .unsupported suspension remainingFuel⟩ := by
   cases execution : code.runWithStorage context inputs fuel with
   | mk finalContext outcome =>
       cases outcome with
@@ -38,6 +41,7 @@ theorem runWithStorage_toFrameContinuationContext?_eq_none_iff
               context inputs fuel error faultState
           rw [execution] at contradiction
           simp at contradiction
+      | unsupported suspension remainingFuel => simp
 
 theorem runWithStorage_toFrameContinuationContext?_some_stable
     {RollbackState : Type u} {TraceState : Type v} {TrapReason : Type w}
@@ -72,6 +76,9 @@ theorem runWithStorage_toFrameContinuationContext?_some_stable
           rw [execution] at completed
           simp at completed
       | fault error faultState =>
+          rw [execution] at completed
+          simp at completed
+      | unsupported suspension remainingFuel =>
           rw [execution] at completed
           simp at completed
 
@@ -109,9 +116,12 @@ theorem
         Core.Value → Core.Store → FrameOutcome TrapReason) :
     context.runCodeWithStorageContinuationContext?
           inputs fuel doneOutcome = some none ↔
-      ∃ resultContext exhausted,
+      (∃ resultContext exhausted,
         context.runCodeWithStorage? inputs fuel =
-          some ⟨resultContext, .outOfFuel exhausted⟩ := by
+          some ⟨resultContext, .outOfFuel exhausted⟩) ∨
+      ∃ resultContext suspension remainingFuel,
+        context.runCodeWithStorage? inputs fuel =
+          some ⟨resultContext, .unsupported suspension remainingFuel⟩ := by
   unfold runCodeWithStorageContinuationContext?
   cases execution : context.runCodeWithStorage? inputs fuel with
   | none => simp
@@ -125,6 +135,7 @@ theorem
               exact False.elim
                 (runCodeWithStorage?_ne_some_fault
                   context inputs fuel resultContext error faultState execution)
+          | unsupported suspension remainingFuel => simp
 
 theorem
     runCodeWithStorageContinuationContext?_some_some_stable
@@ -160,6 +171,7 @@ theorem
           exact False.elim
             (runCodeWithStorage?_ne_some_fault
               context inputs fuel resultContext error faultState execution)
+      | unsupported suspension remainingFuel => simp at resultCompleted
 
 end FrameCheckpointedWorkingPairWithPresentStorageAccount
 

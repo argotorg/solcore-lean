@@ -47,6 +47,15 @@ theorem toWordReturnedFrameCompletion?_done_eq_none_iff
       (.fault error state)).toWordReturnedFrameCompletion? = none :=
   rfl
 
+@[simp] theorem toWordReturnedFrameCompletion?_unsupported
+    {RollbackState : Type u} {TraceState : Type v}
+    (context : HostStorageDriver.Context RollbackState TraceState)
+    (suspension : Core.HostSuspension) (remainingFuel : Nat) :
+    (HostDriverResult.mk context
+      (.unsupported suspension remainingFuel)).toWordReturnedFrameCompletion? =
+        none :=
+  rfl
+
 /-- Successful projection is exactly inverse to reconstructing the raw result. -/
 theorem toWordReturnedFrameCompletion?_eq_some_iff
     {RollbackState : Type u} {TraceState : Type v}
@@ -67,6 +76,10 @@ theorem toWordReturnedFrameCompletion?_eq_some_iff
           simp [toWordReturnedFrameCompletion?,
             WordReturnedFrameCompletion.toHostDriverResult]
       | fault error state =>
+          cases completion
+          simp [toWordReturnedFrameCompletion?,
+            WordReturnedFrameCompletion.toHostDriverResult]
+      | unsupported suspension remainingFuel =>
           cases completion
           simp [toWordReturnedFrameCompletion?,
             WordReturnedFrameCompletion.toHostDriverResult]
