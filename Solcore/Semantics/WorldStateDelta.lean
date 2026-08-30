@@ -1,0 +1,57 @@
+import Solcore.Semantics.WorldStateStorageRead
+
+/-! Exact, queryable endpoint observations for arbitrary WorldState transitions. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Semantics
+
+/--
+An exact observation of one transition between two WorldState endpoints.
+
+WorldState is function-valued, so this carrier deliberately exposes pointwise
+queries instead of claiming that changed accounts or slots can be enumerated.
+-/
+inductive WorldStateDelta (initialWorld finalWorld : WorldState) : Type where
+  /-- The canonical exact observation for the indexed endpoint worlds. -/
+  | exact : WorldStateDelta initialWorld finalWorld
+
+namespace WorldStateDelta
+
+/-- The unchanged transition, represented by the same canonical observation. -/
+def identity (world : WorldState) : WorldStateDelta world world :=
+  .exact
+
+/-- Observe exact account presence and contents at one address. -/
+def accountEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address) : Option Account × Option Account :=
+  (initialWorld.account? address, finalWorld.account? address)
+
+/--
+Observe exact storage reads at one address and slot.
+
+Each endpoint remains optional: `none` means that the account is absent, while
+`some Core.Word.zero` means that the account is present and the slot reads zero.
+-/
+def storageEndpoints
+    {initialWorld finalWorld : WorldState}
+    (_delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address)
+    (slot : Core.Word) : Option Core.Word × Option Core.Word :=
+  (initialWorld.readStorage? address slot,
+    finalWorld.readStorage? address slot)
+
+/-- Return exact old/new storage endpoints only when the observation changed. -/
+def slotChange?
+    {initialWorld finalWorld : WorldState}
+    (delta : WorldStateDelta initialWorld finalWorld)
+    (address : Address)
+    (slot : Core.Word) : Option (Option Core.Word × Option Core.Word) :=
+  let endpoints := delta.storageEndpoints address slot
+  if endpoints.1 = endpoints.2 then none else some endpoints
+
+end WorldStateDelta
+
+end Solcore.Semantics
