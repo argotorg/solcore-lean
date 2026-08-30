@@ -2,6 +2,9 @@ import Solcore.Core.HostRunnerProperties
 import Solcore.Core.HostTransitionSafety
 import Solcore.Semantics.CheckedCoreWordOutcomeProperties
 import Solcore.Semantics.CheckedContractRegistry
+import Solcore.Semantics.BalanceTransferCallFailure
+import Solcore.Semantics.BalanceTransferInstallationProperties
+import Solcore.Semantics.BalanceTransferPresenceProperties
 import Solcore.Semantics.ContractCallFailure
 import Solcore.Semantics.HostStorageAccountPresence
 import Solcore.Semantics.OneLevelNestedExecutionState
@@ -55,17 +58,16 @@ def suspendCall
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
     (frame : RootFrame initialWorld rootContract rootInvocation)
-    (target input : Core.Word)
+    (call : CallProfile)
     (continuation : List Core.Frame)
     (store : Core.Store)
     (advanced :
       Core.hostAdvance frame.state =
         .suspended
-          ⟨.callContractWord target input, continuation, store⟩) :
+          ⟨call.request, continuation, store⟩) :
     SuspendedRoot initialWorld rootContract rootInvocation := {
   parentContext := frame.context
-  callTarget := target
-  callInput := input
+  call := call
   continuation := continuation
   store := store
   suspensionTyping :=
@@ -86,8 +88,8 @@ def resumeWith
     (response : Core.ContractCallWordResult) :
     RootFrame initialWorld rootContract rootInvocation := {
   context := context
-  state := root.suspension.resume response
-  stateTyping := root.suspensionTyping.resume response
+  state := root.suspension.resume (root.call.response response)
+  stateTyping := root.suspensionTyping.resume (root.call.response response)
 }
 
 /-- Start the exact resolved child at the root's current working world. -/
@@ -97,32 +99,36 @@ def startChild
     {rootInvocation : TopLevelInvocation}
     (root : SuspendedRoot initialWorld rootContract rootInvocation)
     (target : Address)
-    (targetAddress_eq : wordToAddress? root.callTarget = some target)
-    (resolved :
-      CheckedContractRegistry.Resolution
-        root.parentContext.context.values.working.1 target) :
+    (targetAddress_eq : wordToAddress? root.call.target = some target)
+    (childContract : CheckedCoreContract)
+    (preTransferInstalled : InstalledCheckedCoreContract
+      root.parentContext.context.values.working.1 target childContract)
+    (childInitialWorld : WorldState)
+    (installed : InstalledCheckedCoreContract childInitialWorld target childContract)
+    (parentPresence : PresentAccountAt childInitialWorld
+      root.parentContext.context.storageAddress) :
     ChildFrame initialWorld rootContract rootInvocation :=
-  let invocation :=
-    TopLevelInvocation.childWord rootInvocation.executionInputs target
-      root.callInput
-  let childContext := TopLevelExecution.initialContext resolved.2
+  let invocation := root.call.invocation rootInvocation.executionInputs target
+  let childContext := TopLevelExecution.initialContext installed
   {
     suspendedRoot := root
     childTarget := target
     targetAddress_eq := targetAddress_eq
-    childContract := resolved.1
+    childContract := childContract
+    preTransferInstalled := preTransferInstalled
+    childInitialWorld := childInitialWorld
     childInvocation := invocation
-    installed := resolved.2
+    installed := installed
     childInvocation_eq := rfl
     childContext := childContext
     childState :=
-      Core.State.initial resolved.1.code.program.body Core.hostEnvironment
-    childStateTyping := resolved.1.code.initialState_hasType
-    parentStorageAccount := root.parentContext.storageAccount
+      Core.State.initial childContract.code.program.body Core.hostEnvironment
+    childStateTyping := childContract.code.initialState_hasType
+    parentStorageAccount := parentPresence.account
     parentStorageAccount_present := by
       simpa [childContext, TopLevelExecution.initialContext,
         TopLevelExecution.initialValues] using
-          root.parentContext.storageAccount_present
+          parentPresence.present
   }
 
 end SuspendedRoot
@@ -143,7 +149,7 @@ def afterSuspension
   cases request with
   | callContractWord target input =>
       let suspended :=
-        frame.suspendCall target input continuation store advanced
+        frame.suspendCall (.legacy target input) continuation store advanced
       match addressEq : wordToAddress? target with
       | none =>
           exact .root
@@ -158,7 +164,42 @@ def afterSuspension
                 (suspended.resumeWith suspended.parentContext
                   ContractCallFailure.unavailable.result)
           | some resolved =>
-              exact .child (suspended.startChild address addressEq resolved)
+              exact .child (suspended.startChild address addressEq resolved.1 resolved.2
+                suspended.parentContext.context.values.working.1 resolved.2
+                suspended.parentContext.selectedPresence)
+  | callContractWordWithValue target value input =>
+      let suspended :=
+        frame.suspendCall (.withValue target value input)
+          continuation store advanced
+      match addressEq : wordToAddress? target with
+      | none =>
+          exact .root
+            (suspended.resumeWith suspended.parentContext
+              ContractCallFailure.invalidAddress.result)
+      | some address =>
+          match resolvedEq : registry.resolve?
+              suspended.parentContext.context.values.working.1 address with
+          | none =>
+              exact .root
+                (suspended.resumeWith suspended.parentContext
+                  ContractCallFailure.unavailable.result)
+          | some resolved =>
+              match transferred :
+                  suspended.parentContext.context.values.working.1.transferBalance
+                    suspended.parentContext.context.storageAddress address value with
+              | .error failure =>
+                  exact .root
+                    (suspended.resumeWith suspended.parentContext
+                      failure.toContractCallResult)
+              | .ok childWorld =>
+                  let installed :=
+                    WorldState.transferBalance_preserves_installed transferred
+                      resolved.2
+                  let parentPresence :=
+                    WorldState.transferBalance_preserves_present transferred
+                      suspended.parentContext.selectedPresence
+                  exact .child (suspended.startChild address addressEq resolved.1 resolved.2
+                    childWorld installed parentPresence)
   | storageRead slot =>
       exact .root (frame.afterHandledSuspension
         ⟨.storageRead slot, continuation, store⟩ advanced)

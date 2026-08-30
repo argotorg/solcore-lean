@@ -57,6 +57,42 @@ def prepared
 
 end RootFrame
 
+/-- The two root requests intercepted by the depth-one scheduler. -/
+inductive CallProfile where
+  | legacy (target input : Core.Word)
+  | withValue (target value input : Core.Word)
+
+namespace CallProfile
+
+def request : CallProfile → Core.HostRequest
+  | .legacy target input => .callContractWord target input
+  | .withValue target value input =>
+      .callContractWordWithValue target value input
+
+def response
+    (profile : CallProfile)
+    (result : Core.ContractCallWordResult) : profile.request.Response := by
+  cases profile <;> exact result
+
+def target : CallProfile → Core.Word
+  | .legacy target _ => target
+  | .withValue target _ _ => target
+
+def input : CallProfile → Core.Word
+  | .legacy _ input => input
+  | .withValue _ _ input => input
+
+def invocation
+    (profile : CallProfile)
+    (parentInputs : HostStorageDriver.ExecutionInputs)
+    (target : Address) : TopLevelInvocation :=
+  match profile with
+  | .legacy _ input => TopLevelInvocation.childWord parentInputs target input
+  | .withValue _ value input =>
+      TopLevelInvocation.childWordWithValue parentInputs target value input
+
+end CallProfile
+
 /--
 The exact root call suspension retained while its selected child is running.
 No response has yet been injected into this continuation.
@@ -66,13 +102,12 @@ structure SuspendedRoot
     (rootContract : CheckedCoreContract)
     (rootInvocation : TopLevelInvocation) where
   parentContext : HostStorageDriver.Context Unit Unit
-  callTarget : Core.Word
-  callInput : Core.Word
+  call : CallProfile
   continuation : List Core.Frame
   store : Core.Store
   suspensionTyping :
     Core.HostSuspensionHasType
-      ⟨.callContractWord callTarget callInput, continuation, store⟩
+      ⟨call.request, continuation, store⟩
       rootContract.code.program.resultType
       rootContract.code.program.dataDefinitions
 
@@ -85,8 +120,7 @@ def suspension
     {rootInvocation : TopLevelInvocation}
     (root : SuspendedRoot initialWorld rootContract rootInvocation) :
     Core.HostSuspension :=
-  ⟨.callContractWord root.callTarget root.callInput,
-    root.continuation, root.store⟩
+  ⟨root.call.request, root.continuation, root.store⟩
 
 end SuspendedRoot
 
@@ -102,17 +136,21 @@ structure ChildFrame
   suspendedRoot : SuspendedRoot initialWorld rootContract rootInvocation
   childTarget : Address
   targetAddress_eq :
-    wordToAddress? suspendedRoot.callTarget = some childTarget
+    wordToAddress? suspendedRoot.call.target = some childTarget
   childContract : CheckedCoreContract
-  childInvocation : TopLevelInvocation
-  installed :
+  preTransferInstalled :
     InstalledCheckedCoreContract
       suspendedRoot.parentContext.context.values.working.1 childTarget
       childContract
+  childInitialWorld : WorldState
+  childInvocation : TopLevelInvocation
+  installed :
+    InstalledCheckedCoreContract
+      childInitialWorld childTarget
+      childContract
   childInvocation_eq :
     childInvocation =
-      TopLevelInvocation.childWord rootInvocation.executionInputs childTarget
-        suspendedRoot.callInput
+      suspendedRoot.call.invocation rootInvocation.executionInputs childTarget
   childContext : HostStorageDriver.Context Unit Unit
   childState : Core.State
   childStateTyping :
