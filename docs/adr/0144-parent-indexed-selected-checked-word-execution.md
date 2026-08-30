@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: add storage-presence provenance and canonical parent return to ADR-0143
-- Implementation: Planned
+- Implementation: In progress
 
 ## Context
 

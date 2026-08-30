@@ -2769,9 +2769,12 @@ calls, ABI, parser work, and public formats remain separate.
 ## Active parent-indexed selected checked Word execution
 
 [ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
-Accepted with implementation planned. It adds exactly one outer optional
-boundary to ADR-0143: `none` means that the parent initialization cannot refine
-the chosen storage Address to a present Account. A present value carries that
+Accepted with implementation in progress. The parent provenance carrier and
+its exact storage-refined `start?` producer are implemented; the proof,
+resumption, parent-return, and regression layers are being completed. The
+slice adds exactly one outer optional boundary to ADR-0143: `none` means that
+the parent initialization cannot refine the chosen storage Address to a
+present Account. A present value carries that
 exact context-refinement proof and the unchanged ADR-0143 execution, so code
 absence, non-Word selection, exhaustion, raw results, and completion are not
 re-enumerated.

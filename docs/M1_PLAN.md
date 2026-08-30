@@ -291,7 +291,7 @@ These results remain regression obligations for every extension.
 | 124 | Checked Word completion to canonical return bytes | Complete | Refines checked Word results, retains exact successful context/Word/Core Store, and produces the canonical 32-byte big-endian returned frame without inventing fallback branches |
 | 125 | Branch-complete selected Word-code classification | Complete | Preserves existing checked-code lookup while separating absent, non-Word, and Word branches before execution |
 | 126 | Proof-refined selected checked Word execution | Complete | Executes only the selected Word branch, retains exact non-execution reasons, and proves fixed-input fuel resumption and canonical Word completion |
-| 127 | Parent-indexed selected checked Word execution | Accepted / Planned | Adds exact storage-presence provenance and canonical returned-parent projection without duplicating inner branches |
+| 127 | Parent-indexed selected checked Word execution | In progress | Adds exact storage-presence provenance and canonical returned-parent projection without duplicating inner branches |
 | 128 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 129 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 130 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -2307,8 +2307,10 @@ parser work, and publication remain deferred.
 ## Active parent-indexed selected checked Word execution
 
 [ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
-Accepted with implementation planned. It refines parent initialization at one
-storage Address before reusing ADR-0143 unchanged. The outer option means only
+Accepted with implementation in progress. Its parent provenance carrier and
+exact storage-refined producer are implemented. It refines parent
+initialization at one storage Address before reusing ADR-0143 unchanged. The
+outer option means only
 storage absence; every present result contains the exact refinement proof and
 the inner selected execution. Non-Word and raw execution branches are not
 copied into a second carrier.
