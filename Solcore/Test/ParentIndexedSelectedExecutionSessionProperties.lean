@@ -135,6 +135,7 @@ example : (session.resumeWithFuel first).resumeWithFuel second =
 
 variable (finalContext : Context) (state faultState : Core.State)
 variable (error : Core.MachineFault)
+variable (suspension : Core.HostSuspension) (remainingFuel : Nat)
 variable (value : Core.Value) (store : Core.Store)
 variable (continuation : ParentIndexedFrameContinuationContext
   RollbackState Event TrapReason parentWorking)
@@ -167,6 +168,16 @@ example : session.result = .fault finalContext error faultState ↔
         some ⟨finalContext, .fault error faultState⟩ :=
   ParentIndexedSelectedExecutionSession.result_eq_fault_iff
     session finalContext error faultState
+
+example : session.result =
+      .unsupported finalContext suspension remainingFuel ↔
+    ∃ context,
+      session.initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
+          session.storageAddress = some context ∧
+      context.runCodeWithStorage? session.inputs session.providedFuel =
+        some ⟨finalContext, .unsupported suspension remainingFuel⟩ :=
+  ParentIndexedSelectedExecutionSession.result_eq_unsupported_iff
+    session finalContext suspension remainingFuel
 
 example : session.result =
       .completed finalContext value store continuation ↔

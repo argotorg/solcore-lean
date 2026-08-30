@@ -161,6 +161,41 @@ theorem runCodeWithStorageParentIndexedResult_eq_fault_iff
           | mk resultContext outcome =>
               cases outcome <;> simp [classify, execution]
 
+theorem runCodeWithStorageParentIndexedResult_eq_unsupported_iff
+    (initialization : ParentIndexedFrameInitialization
+      RollbackState Event parentWorking)
+    (storageAddress : Address)
+    (inputs : HostStorageDriver.ExecutionInputs)
+    (fuel : Nat)
+    (doneOutcome :
+      HostStorageDriver.Context RollbackState (FrameTrace Event) →
+        Core.Value → Core.Store → FrameOutcome TrapReason)
+    (finalContext :
+      HostStorageDriver.Context RollbackState (FrameTrace Event))
+    (suspension : Core.HostSuspension)
+    (remainingFuel : Nat) :
+    initialization.runCodeWithStorageParentIndexedResult
+        storageAddress inputs fuel doneOutcome =
+      .unsupported finalContext suspension remainingFuel ↔
+    ∃ context,
+      initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
+          storageAddress = some context ∧
+      context.runCodeWithStorage? inputs fuel =
+        some ⟨finalContext, .unsupported suspension remainingFuel⟩ := by
+  unfold runCodeWithStorageParentIndexedResult
+  cases refined :
+      initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
+        storageAddress with
+  | none => simp
+  | some context =>
+      simp only
+      cases execution : context.runCodeWithStorage? inputs fuel with
+      | none => simp [execution]
+      | some result =>
+          cases result with
+          | mk resultContext outcome =>
+              cases outcome <;> simp [classify, execution]
+
 theorem runCodeWithStorageParentIndexedResult_eq_completed_iff
     (initialization : ParentIndexedFrameInitialization
       RollbackState Event parentWorking)

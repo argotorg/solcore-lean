@@ -33,6 +33,7 @@ variable (doneOutcome : Context →
 variable (context finalContext : Context)
 variable (state faultState : Core.State)
 variable (error : Core.MachineFault)
+variable (suspension : Core.HostSuspension) (remainingFuel : Nat)
 variable (value : Core.Value) (store : Core.Store)
 variable (continuation resumedContinuation :
   ParentIndexedFrameContinuationContext
@@ -91,6 +92,19 @@ example :
 example :
     initialization.runCodeWithStorageParentIndexedResult
         storageAddress inputs fuel doneOutcome =
+      .unsupported finalContext suspension remainingFuel ↔
+    ∃ selected,
+      initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
+          storageAddress = some selected ∧
+      selected.runCodeWithStorage? inputs fuel =
+        some ⟨finalContext, .unsupported suspension remainingFuel⟩ := by
+  exact ParentIndexedFrameInitialization.runCodeWithStorageParentIndexedResult_eq_unsupported_iff
+      initialization storageAddress inputs fuel doneOutcome
+      finalContext suspension remainingFuel
+
+example :
+    initialization.runCodeWithStorageParentIndexedResult
+        storageAddress inputs fuel doneOutcome =
       .completed finalContext value store continuation ↔
     ∃ selected,
       initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
@@ -138,6 +152,13 @@ example : resumeWithFuel (.fault context error faultState : Result)
     .fault context error faultState := by
   exact resumeWithFuel_fault context error faultState initialization inputs
     doneOutcome additional
+
+example : resumeWithFuel
+      (.unsupported context suspension remainingFuel : Result)
+      initialization inputs doneOutcome additional =
+    .unsupported context suspension (remainingFuel + additional) := by
+  exact resumeWithFuel_unsupported context suspension remainingFuel
+    initialization inputs doneOutcome additional
 
 example : resumeWithFuel
       (.completed context value store continuation : Result)

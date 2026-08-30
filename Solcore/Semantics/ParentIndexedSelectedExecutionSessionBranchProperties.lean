@@ -79,6 +79,26 @@ theorem result_eq_fault_iff
       session.initialization session.storageAddress session.inputs
       session.providedFuel session.doneOutcome finalContext error state
 
+theorem result_eq_unsupported_iff
+    (session : ParentIndexedSelectedExecutionSession
+      RollbackState Event TrapReason parentWorking)
+    (finalContext :
+      HostStorageDriver.Context RollbackState (FrameTrace Event))
+    (suspension : Core.HostSuspension)
+    (remainingFuel : Nat) :
+    session.result = .unsupported finalContext suspension remainingFuel ↔
+      ∃ context,
+        session.initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
+            session.storageAddress = some context ∧
+        context.runCodeWithStorage? session.inputs session.providedFuel =
+          some ⟨finalContext, .unsupported suspension remainingFuel⟩ := by
+  rw [session.result_eq_run]
+  exact
+    ParentIndexedFrameInitialization.runCodeWithStorageParentIndexedResult_eq_unsupported_iff
+      session.initialization session.storageAddress session.inputs
+      session.providedFuel session.doneOutcome finalContext suspension
+      remainingFuel
+
 theorem result_eq_completed_iff
     (session : ParentIndexedSelectedExecutionSession
       RollbackState Event TrapReason parentWorking)
