@@ -52,6 +52,8 @@ private def committedCreationChecks : Bool :=
       let delta := terminal.committedDelta
       terminal.outcome ==
           .returned (encodeWordBytesBE (addressToWord created)) &&
+        (delta.accountEndpoints creator).1.isSome &&
+        (delta.accountEndpoints creator).2.isSome &&
         world.nonce? creator == some ⟨8, by decide⟩ &&
         world.balance? creator == some ⟨8, by decide⟩ &&
         world.balance? created == some creationValue &&
@@ -72,14 +74,27 @@ private def committedCreationChecks : Bool :=
           (some oldNonce, some ⟨8, by decide⟩) &&
         delta.balanceEndpoints creator ==
           (some creatorBalance, some ⟨8, by decide⟩) &&
+        delta.storageEndpoints creator callerSlot ==
+          (some Word.zero, some Word.zero) &&
+        codeProgramsMatch (delta.codeEndpoints creator)
+          (some commitRoot.code.program) (some commitRoot.code.program) &&
+        !delta.createdAccount? creator &&
+        !(delta.accountEndpoints created).1.isSome &&
+        (delta.accountEndpoints created).2.isSome &&
         delta.createdAccount? created &&
+        delta.nonceEndpoints created == (none, some Word.zero) &&
         delta.balanceEndpoints created == (none, some creationValue) &&
         delta.storageEndpoints created callerSlot ==
           (none, some (addressToWord creator)) &&
         codeProgramsMatch (delta.codeEndpoints created)
           none (some runtime.code.program) &&
-        delta.nonceChange? unrelated == none &&
-        delta.balanceChange? unrelated == none &&
+        (delta.accountEndpoints unrelated).1.isSome &&
+        (delta.accountEndpoints unrelated).2.isSome &&
+        !delta.createdAccount? unrelated &&
+        delta.nonceEndpoints unrelated ==
+          (some Word.zero, some Word.zero) &&
+        delta.balanceEndpoints unrelated ==
+          (some unrelatedBalance, some unrelatedBalance) &&
         codeProgramsMatch (delta.codeEndpoints unrelated) none none &&
         delta.storageEndpoints unrelated callerSlot ==
           (some Word.zero, some Word.zero)
