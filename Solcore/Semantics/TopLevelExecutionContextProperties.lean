@@ -114,6 +114,75 @@ theorem initialWorld_code?
       initialEffects := by
   rfl
 
+@[simp] theorem initialTransactionContext_storageAddress
+    {initialWorld : WorldState} {target : Address}
+    {contract : CheckedCoreContract}
+    (installed : InstalledCheckedCoreContract initialWorld target contract) :
+    (initialTransactionContext installed).context.storageAddress = target := by
+  rfl
+
+@[simp] theorem initialTransactionContext_storageAccount
+    {initialWorld : WorldState} {target : Address}
+    {contract : CheckedCoreContract}
+    (installed : InstalledCheckedCoreContract initialWorld target contract) :
+    (initialTransactionContext installed).storageAccount = installed.account := by
+  rfl
+
+@[simp] theorem initialTransactionContext_checkpointState
+    {initialWorld : WorldState} {target : Address}
+    {contract : CheckedCoreContract}
+    (installed : InstalledCheckedCoreContract initialWorld target contract) :
+    (initialTransactionContext installed).context.values.checkpoint.state =
+      initialWorld := by
+  rfl
+
+@[simp] theorem initialTransactionContext_workingState
+    {initialWorld : WorldState} {target : Address}
+    {contract : CheckedCoreContract}
+    (installed : InstalledCheckedCoreContract initialWorld target contract) :
+    (initialTransactionContext installed).context.values.working.1 =
+      initialWorld := by
+  rfl
+
+@[simp] theorem initialTransactionContext_checkpointJournal
+    {initialWorld : WorldState} {target : Address}
+    {contract : CheckedCoreContract}
+    (installed : InstalledCheckedCoreContract initialWorld target contract) :
+    (initialTransactionContext installed).context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty := by
+  rfl
+
+@[simp] theorem initialTransactionContext_workingJournal
+    {initialWorld : WorldState} {target : Address}
+    {contract : CheckedCoreContract}
+    (installed : InstalledCheckedCoreContract initialWorld target contract) :
+    (initialTransactionContext installed).workingJournal =
+      TransactionJournal.empty := by
+  rfl
+
+@[simp] theorem preparedTransactionContextWithJournals_checkpointJournal
+    {checkpointWorld workingWorld : WorldState}
+    {target : Address} {contract : CheckedCoreContract}
+    (checkpointJournal workingJournal : TransactionJournal)
+    (installed :
+      InstalledCheckedCoreContract workingWorld target contract) :
+    (preparedTransactionContextWithJournals
+      (checkpointWorld := checkpointWorld) checkpointJournal workingJournal
+      installed).context.values.checkpoint.effects.rollback =
+        checkpointJournal := by
+  rfl
+
+@[simp] theorem preparedTransactionContextWithJournals_workingJournal
+    {checkpointWorld workingWorld : WorldState}
+    {target : Address} {contract : CheckedCoreContract}
+    (checkpointJournal workingJournal : TransactionJournal)
+    (installed :
+      InstalledCheckedCoreContract workingWorld target contract) :
+    (preparedTransactionContextWithJournals
+      (checkpointWorld := checkpointWorld) checkpointJournal workingJournal
+      installed).workingJournal = workingJournal := by
+  rfl
+
 end TopLevelExecution
 
 namespace TopLevelInvocation
