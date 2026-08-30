@@ -56,7 +56,7 @@ example : Core.HostFunction.currentAddress ∈ Core.HostFunction.all :=
 example : Core.HostFunction.currentAddress.index = 9 :=
   Core.HostFunction.index_currentAddress
 
-example : Core.HostFunction.all.length = 12 :=
+example : Core.HostFunction.all.length = 13 :=
   Core.HostFunction.all_length
 
 example : Core.HostFunction.all[9]? = some .currentAddress := by
@@ -70,16 +70,16 @@ example : Core.hostEnvironment[9]? =
     some (.hostFunction .currentAddress) := by
   simpa using Core.hostEnvironment_currentAddress
 
-example : Core.hostContext.length = 12 :=
+example : Core.hostContext.length = 13 :=
   Core.hostContext_length
 
-example : Core.hostEnvironment.length = 12 :=
+example : Core.hostEnvironment.length = 13 :=
   Core.hostEnvironment_length
 
-example : Core.hostContext[12]? = none :=
+example : Core.hostContext[13]? = none :=
   Core.hostContext_firstUnbound
 
-example : Core.hostEnvironment[12]? = none :=
+example : Core.hostEnvironment[13]? = none :=
   Core.hostEnvironment_firstUnbound
 
 variable (response : Core.Word)

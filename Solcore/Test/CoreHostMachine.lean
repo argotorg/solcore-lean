@@ -34,6 +34,7 @@ private def responseFor : (request : HostRequest) → request.Response
   | .currentAddress => response
   | .callContractWord _ _ => .returned response
   | .callContractWordWithValue _ _ _ => .returned response
+  | .createContractWord _ _ _ => .returned response
 
 private def storageReadProgram : Program := {
   resultType := .word
@@ -485,9 +486,19 @@ private theorem compileTimeCallContractWordWithValueEnvironmentIndexRegression :
       some (.hostFunction .callContractWordWithValue) :=
   hostEnvironment_callContractWordWithValue
 
+private theorem compileTimeCreateContractWordContextIndexRegression :
+    hostContext[HostFunction.createContractWord.index]? =
+      some (HostFunction.functionType .createContractWord) :=
+  hostContext_createContractWord
+
+private theorem compileTimeCreateContractWordEnvironmentIndexRegression :
+    hostEnvironment[HostFunction.createContractWord.index]? =
+      some (.hostFunction .createContractWord) :=
+  hostEnvironment_createContractWord
+
 private theorem compileTimeHostCapabilityLengths :
-    HostFunction.all.length = 12 ∧
-      hostContext.length = 12 ∧ hostEnvironment.length = 12 :=
+    HostFunction.all.length = 13 ∧
+      hostContext.length = 13 ∧ hostEnvironment.length = 13 :=
   ⟨HostFunction.all_length, hostContext_length, hostEnvironment_length⟩
 
 private theorem compileTimeFirstUnboundHostIndex :
@@ -1095,7 +1106,7 @@ def testCoreHostMachine : IO Unit := do
         [.storageRead, .storageWrite, .storageAddress, .codeAddress,
           .callValue, .callerAddress, .inputDataByte?, .inputDataSize,
           .inputDataWordBE?, .currentAddress, .callContractWord,
-          .callContractWordWithValue] &&
+          .callContractWordWithValue, .createContractWord] &&
       HostFunction.all.all (fun function =>
         HostFunction.all[function.index]? == some function) &&
       HostFunction.all.all (fun function =>
@@ -1114,8 +1125,9 @@ def testCoreHostMachine : IO Unit := do
       HostFunction.currentAddress.index == 9 &&
       HostFunction.callContractWord.index == 10 &&
       HostFunction.callContractWordWithValue.index == 11 &&
-      HostFunction.all.length == 12 &&
-      hostContext.length == 12 && hostEnvironment.length == 12)
+      HostFunction.createContractWord.index == 12 &&
+      HostFunction.all.length == 13 &&
+      hostContext.length == 13 && hostEnvironment.length == 13)
     "the append-only host capability layout changed"
   assertTrue
     (hostContext[HostFunction.storageAddress.index]? ==
