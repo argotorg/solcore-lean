@@ -38,11 +38,33 @@ private def completionAt (fuel : Nat) :=
   wordCode.runWithStorageReturnedFrameCompletion?
     context executionInputs fuel
 
+private def postWriteResult :=
+  wordCode.runWithStorage context executionInputs postWriteFuel
+
 private def resumedCompletion :=
   ((wordCode.runWithStorage context executionInputs writeRequestFuel)
     |>.resumeWithFuel
       (@HostStorageDriver.handler Nat (FrameTrace Nat) executionInputs) 7)
     |>.toWordReturnedFrameCompletion?
+
+private def postWriteResumedCompletion :=
+  (postWriteResult.resumeWithFuel
+      (@HostStorageDriver.handler Nat (FrameTrace Nat) executionInputs) 6)
+    |>.toWordReturnedFrameCompletion?
+
+private theorem resumedCompletion_exact :
+    resumedCompletion = completionAt completionFuel := by
+  simpa [resumedCompletion, completionAt, writeRequestFuel,
+    completionFuel] using
+    wordCode.toWordReturnedFrameCompletion?_resumeWithFuel_runWithStorage
+      context executionInputs writeRequestFuel 7
+
+private theorem postWriteResumedCompletion_exact :
+    postWriteResumedCompletion = completionAt completionFuel := by
+  simpa [postWriteResumedCompletion, postWriteResult, completionAt,
+    postWriteFuel, completionFuel] using
+    wordCode.toWordReturnedFrameCompletion?_resumeWithFuel_runWithStorage
+      context executionInputs postWriteFuel 6
 
 private def exactReturnedResolution
     (completion : WordReturnedFrameCompletion Nat (FrameTrace Nat))
@@ -135,6 +157,17 @@ def testCheckedHostCoreWordProgramExecution : IO Unit := do
   | _ =>
       throw (IO.userError "fuel 9 unexpectedly completed or faulted")
 
+  match postWriteResult with
+  | ⟨exhaustedContext, .outOfFuel exhausted⟩ =>
+      assertTrue
+        (contextHasTarget exhaustedContext writtenValue &&
+          contextPreserved exhaustedContext &&
+          beforeInputSuffix exhausted && !writeRequestReady exhausted &&
+          (completionAt postWriteFuel).isNone)
+        "fuel 10 did not retain the exact post-write continuation"
+  | _ =>
+      throw (IO.userError "fuel 10 unexpectedly completed or faulted")
+
   match wordCode.runWithStorage context executionInputs inputRequestFuel with
   | ⟨exhaustedContext, .outOfFuel exhausted⟩ =>
       assertTrue
@@ -158,6 +191,8 @@ def testCheckedHostCoreWordProgramExecution : IO Unit := do
   assertTrue
     (sameCompletionObservations resumedCompletion
       (completionAt completionFuel) &&
+      sameCompletionObservations postWriteResumedCompletion
+        (completionAt completionFuel) &&
       sameCompletionObservations (completionAt 64)
         (completionAt completionFuel))
     "split or larger fuel changed the completed Word observation"
