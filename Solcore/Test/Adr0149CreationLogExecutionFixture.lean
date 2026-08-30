@@ -162,8 +162,10 @@ def successfulInitializerOutcome : CheckedCoreWordOutcome :=
   .returned initializerInput
 
 def sequentialCreationEnvironment : ExecutionEnvironment := {
-  callRegistry := (environmentFor
-    (initializerContract successfulInitializerOutcome)).callRegistry
+  callRegistry := {
+    lookup := fun address =>
+      if address = created ∨ address = secondCreated then some runtime else none
+  }
   creationTemplates := (environmentFor
     (initializerContract successfulInitializerOutcome)).creationTemplates
   creationAddressPolicy := {
