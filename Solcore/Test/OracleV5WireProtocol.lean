@@ -36,7 +36,7 @@ private def coreWireError : Solcore.Oracle.V5.Wire.ProtocolError :=
     path := ((Path.root.field "query").field "program").field "resultType"
     code := .invalidType
     arguments := .mkObj [
-      ("actual", "future"),
+      ("actual", "null"),
       ("allowed", .arr #["string", "object"])
     ]
   }
@@ -47,7 +47,7 @@ private def coreOwnershipExact : Bool :=
     exposed.code == "core.wire.invalid-type" &&
     exposed.path == "/query/program/resultType" &&
     exposed.arguments == .mkObj [
-      ("actual", "future"),
+      ("actual", "null"),
       ("allowed", .arr #["string", "object"])
     ] &&
     exposed.display == "invalid Semantic Core v3 program"

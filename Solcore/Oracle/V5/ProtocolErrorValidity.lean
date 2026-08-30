@@ -19,39 +19,53 @@ private def isJsonKind (json : Lean.Json) : Bool :=
       ["null", "boolean", "number", "string", "array", "object"].contains value
   | none => false
 
-private def exactFour
-    (firstName : String)
-    (firstValid : Lean.Json → Bool)
-    (secondName : String)
-    (secondValid : Lean.Json → Bool)
-    (thirdName : String)
-    (thirdValid : Lean.Json → Bool)
-    (fourthName : String)
-    (fourthValid : Lean.Json → Bool)
-    (json : Lean.Json) : Bool :=
-  match field? json firstName, field? json secondName,
-      field? json thirdName, field? json fourthName with
-  | some first, some second, some third, some fourth =>
-      firstValid first && secondValid second && thirdValid third &&
-        fourthValid fourth && json == .mkObj [
-          (firstName, first), (secondName, second), (thirdName, third),
-          (fourthName, fourth)]
-  | _, _, _, _ => false
-
 private def validExpectedArguments
     (expected : String)
     (arguments : Lean.Json) : Bool :=
-  exactTwo "expected" (isLiteral expected) "actual" isJsonKind arguments
+  match stringField? arguments "expected", stringField? arguments "actual" with
+  | some actualExpected, some actual =>
+      actualExpected == expected && actual != expected &&
+        isJsonKind actual && arguments == .mkObj [
+          ("expected", actualExpected), ("actual", actual)]
+  | _, _ => false
 
-private def validFieldArguments (arguments : Lean.Json) : Bool :=
-  exactOne "field" isString arguments
+private def escapePointerToken (value : String) : String :=
+  (value.replace "~" "~0").replace "/" "~1"
 
-private def validIdentityArguments (arguments : Lean.Json) : Bool :=
-  exactTwo "expected" isString "actual" isString arguments
+private def pointerEndsWithField (path field : String) : Bool :=
+  path.endsWith ("/" ++ escapePointerToken field)
+
+private def validFieldArguments
+    (path : String)
+    (arguments : Lean.Json) : Bool :=
+  match stringField? arguments "field" with
+  | some field =>
+      pointerEndsWithField path field &&
+        arguments == .mkObj [("field", field)]
+  | none => false
+
+private def validIdentityArguments
+    (allowedExpected : List String)
+    (arguments : Lean.Json) : Bool :=
+  match stringField? arguments "expected", stringField? arguments "actual" with
+  | some expected, some actual =>
+      allowedExpected.contains expected && actual != expected &&
+        arguments == .mkObj [("expected", expected), ("actual", actual)]
+  | _, _ => false
 
 private def validProfileArguments (arguments : Lean.Json) : Bool :=
-  exactFour "expectedId" isString "expectedDigest" isString
-    "actualId" isString "actualDigest" isString arguments
+  match stringField? arguments "expectedId",
+      stringField? arguments "expectedDigest",
+      stringField? arguments "actualId",
+      stringField? arguments "actualDigest" with
+  | some expectedId, some expectedDigest, some actualId, some actualDigest =>
+      let expected := ProfileRef.canonical
+      expectedId == expected.id && expectedDigest == expected.digest &&
+        (actualId != expectedId || actualDigest != expectedDigest) &&
+        arguments == .mkObj [
+          ("expectedId", expectedId), ("expectedDigest", expectedDigest),
+          ("actualId", actualId), ("actualDigest", actualDigest)]
+  | _, _, _, _ => false
 
 private def validTagArguments (arguments : Lean.Json) : Bool :=
   exactTwo "actual" (fun _ => true) "expected" (fun _ => true) arguments
@@ -75,12 +89,15 @@ private def validCoreTypeArguments (arguments : Lean.Json) : Bool :=
   match stringField? arguments "actual", field? arguments "allowed" with
   | some actual, some allowed =>
       arguments == .mkObj [("actual", actual), ("allowed", allowed)] &&
-        (allowed == .arr #["unit", "bool", "word"] ||
-          allowed == .arr #["string", "object"])
+        ((allowed == .arr #["unit", "bool", "word"] &&
+            !["unit", "bool", "word"].contains actual) ||
+          (allowed == .arr #["string", "object"] &&
+            ["null", "boolean", "number", "array"].contains actual))
   | _, _ => false
 
 private def validOracleArguments
     (code : String)
+    (path : String)
     (arguments : Lean.Json) : Bool :=
   match code with
   | "oracle.wire.expected-object" => validExpectedArguments "object" arguments
@@ -89,10 +106,16 @@ private def validOracleArguments
   | "oracle.wire.expected-bool" => validExpectedArguments "boolean" arguments
   | "oracle.wire.expected-natural" => validExpectedArguments "number" arguments
   | "oracle.wire.missing-field"
-  | "oracle.wire.unknown-field" => validFieldArguments arguments
-  | "oracle.wire.invalid-schema"
-  | "oracle.wire.invalid-spec" => validIdentityArguments arguments
-  | "oracle.wire.invalid-profile" => validProfileArguments arguments
+  | "oracle.wire.unknown-field" => validFieldArguments path arguments
+  | "oracle.wire.invalid-schema" =>
+      pointerEndsWithField path "schema" && validIdentityArguments [
+        schemaVersion, capabilitiesSchema, checkResultSchema,
+        executionSchema, stateObservationSchema] arguments
+  | "oracle.wire.invalid-spec" =>
+      pointerEndsWithField path "spec" &&
+        validIdentityArguments [Solcore.m3aLanguage.id] arguments
+  | "oracle.wire.invalid-profile" =>
+      path == "/profile" && validProfileArguments arguments
   | "oracle.wire.invalid-tag" => validTagArguments arguments
   | "oracle.wire.invalid-word" =>
       validReasonArguments ["prefix", "length", "lowercase-hex"] arguments
@@ -101,12 +124,15 @@ private def validOracleArguments
   | "oracle.wire.invalid-bytes" =>
       validReasonArguments
         ["prefix", "odd-length", "lowercase-hex"] arguments
-  | "oracle.wire.invalid-request-id" => validRequestIdArguments arguments
-  | "oracle.wire.invalid-limit" => validLimitArguments arguments
+  | "oracle.wire.invalid-request-id" =>
+      path == "/id" && validRequestIdArguments arguments
+  | "oracle.wire.invalid-limit" =>
+      path == "/limits/calldataBytes" && validLimitArguments arguments
   | _ => false
 
 private def validCoreArguments
     (code : String)
+    (path : String)
     (arguments : Lean.Json) : Bool :=
   match code with
   | "core.wire.expected-object" => validExpectedArguments "object" arguments
@@ -115,8 +141,10 @@ private def validCoreArguments
   | "core.wire.expected-bool" => validExpectedArguments "boolean" arguments
   | "core.wire.expected-natural" => validExpectedArguments "number" arguments
   | "core.wire.missing-field"
-  | "core.wire.unknown-field" => validFieldArguments arguments
-  | "core.wire.invalid-schema" => validIdentityArguments arguments
+  | "core.wire.unknown-field" => validFieldArguments path arguments
+  | "core.wire.invalid-schema" =>
+      pointerEndsWithField path "schema" &&
+        validIdentityArguments [Solcore.Core.Wire.V3.schemaVersion] arguments
   | "core.wire.invalid-tag" => validTagArguments arguments
   | "core.wire.invalid-type" => validCoreTypeArguments arguments
   | "core.wire.invalid-word" =>
@@ -125,6 +153,7 @@ private def validCoreArguments
 
 private def validPointerTail : List Char → Bool
   | [] => true
+  | ['~'] => false
   | '~' :: escape :: rest =>
       (escape == '0' || escape == '1') && validPointerTail rest
   | _ :: rest => validPointerTail rest
@@ -139,9 +168,9 @@ def canonicalPointer (path : String) : Bool :=
 private def isValidTyped (error : ProtocolError) : Bool :=
   canonicalPointer error.path &&
     ((error.display == "invalid Oracle v5 value" &&
-        validOracleArguments error.code error.arguments) ||
+        validOracleArguments error.code error.path error.arguments) ||
       (error.display == "invalid Semantic Core v3 program" &&
-        validCoreArguments error.code error.arguments))
+        validCoreArguments error.code error.path error.arguments))
 
 /-- Full closed validity of one raw protocol-error value. -/
 def isValid (error : ProtocolError) : Bool :=
