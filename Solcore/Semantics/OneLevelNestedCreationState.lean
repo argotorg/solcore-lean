@@ -139,16 +139,12 @@ structure PreparedInitializerFrame
     postNonceParentContext.context.values.checkpoint =
       suspendedRoot.parentContext.context.values.checkpoint
   initializerContext : HostStorageDriver.Context Unit Unit
-  initializerContext_eq :
-    initializerContext =
-      TopLevelExecution.preparedContext
-        (checkpointWorld := prepared.statePreparation.postNonceWorld)
-        prepared.statePreparation.initializerInstalled
+  initializer_storageAddress_eq :
+    initializerContext.context.storageAddress = prepared.createdAddress
+  initializer_checkpointState_eq :
+    initializerContext.context.values.checkpoint.state =
+      prepared.statePreparation.postNonceWorld
   initializerState : Core.State
-  initializerState_eq :
-    initializerState =
-      Core.State.initial prepared.template.initializer.code.program.body
-        Core.hostEnvironment
   initializerStateTyping :
     Core.HostStateHasType initializerState
       prepared.template.initializer.code.program.resultType
