@@ -18,7 +18,23 @@ now frozen because the concrete Solcore syntax may change.
 Active development has moved to Semantic Core vNext. The goal is to define
 types, evaluation, state, and observations independently of concrete source
 spelling, then connect a stabilized future Surface language through a separate
-adapter. The explicit local-cell store accepted by ADR-0022 and the
+adapter.
+
+The authoritative internal executor now accepts an explicit initial
+`WorldState`, a checker-accepted Core contract, invocation inputs, and fuel. It
+executes a root call, depth-one checked calls, value transfer, checked creation,
+and simple word logs. A total terminal result reports return, revert, or trap;
+return data; the selected final world and queryable state delta; and an ordered,
+duplicate-preserving journal of logs and successful creations. Child and
+initializer failure rolls back their journal entries, root failure rolls back
+the whole journal, and fuel-only resumption neither drops nor replays entries.
+
+This executable semantics remains internal. Frozen Wire v1/v2 reject the new
+log capability, and no existing Oracle or parser protocol changes. ABI support
+and then a versioned public Oracle execution interface are the next planned
+vertical milestones.
+
+The explicit local-cell store accepted by ADR-0022 and the
 program-local named algebraic data and normalized constructor matching accepted
 by ADR-0023 are complete internal slices. The derived `boolToWord` and `wordToBool`
 conversions accepted by ADR-0024 are also complete without adding a new Core
@@ -403,8 +419,9 @@ semantics continues.
 explicitly supplied `currentAddress` is fixed in the immutable run input and
 exposed losslessly through internal host index 9. ADR-0146 later appended the
 typed call at index 10, and ADR-0147 appended its value-bearing counterpart at
-index 11. ADR-0148 appends checked creation at index 12. Both canonical tables
-now have length 13 and index 13 is first unbound. The current-address role
+index 11. ADR-0148 appended checked creation at index 12, and ADR-0149 appended
+word-log emission at index 13. Both canonical tables now have length 14 and
+index 14 is first unbound. The current-address role
 neither selects code or storage
 nor derives from the caller, a callee, an Account, or a call kind.
 
@@ -470,6 +487,20 @@ runtime code on return, and applies call-site and root-wide rollback on failure.
 Exact nonce, code, account-creation, storage, and balance endpoints remain
 queryable without publishing an enumerable state-diff schema.
 
+[ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md) is
+complete. Internal `emitLogWord : (word × word) -> unit` is host index 13.
+The transaction-aware executor attributes each log to the active contract,
+preserves order and duplicates, and returns both speculative and committed
+journals. Child and initializer return adopt their journal; their revert or
+trap restores the parent journal. Successful runtime installation appends one
+created Address. Root return commits the journal, while root revert or trap
+selects its proved-empty checkpoint. Balance and creation preflight rejection
+leave the journal unchanged. Exhaustion retains the journal-bearing scheduler
+mode and exact resumption does not repeat an observation. The generic storage
+policy advertises log emission as unsupported; its driver stops before the
+generic handler and returns that unsupported result. The transaction handler
+supports and records the same request.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -495,7 +526,7 @@ queryable without publishing an enumerable state-diff schema.
 | Run-fixed input-size observation | Complete | Exact bounded-size derivation, byte-boundary coherence, append-only `unit -> word` capability, total response, request/resume safety, full context identity, size-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
 | Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
-| Canonical host capability registry | Complete | One canonical registry derives both 13-entry host tables and arbitrary-list safety; indexes 0 through 9 remain unchanged, checked call is index 10, value-bearing checked call is index 11, checked creation is index 12, and index 13 is first unbound | Not published |
+| Canonical host capability registry | Complete | One canonical registry derives both 14-entry host tables and arbitrary-list safety; indexes 0 through 12 retain their meanings, word-log emission is index 13, and index 14 is first unbound | Not published |
 | Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
 | Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, stable index-9 capability, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
 | Proof-refined parent-indexed selected-execution session | Complete | Fixed-configuration carrier, closed fuel-only resumption, one-shot invariant, whole-session algebra, exact branches, no-fault, compatibility, folds, and measured regressions are complete | Not published |
@@ -507,6 +538,7 @@ queryable without publishing an enumerable state-diff schema.
 | One-level nested checked-Core invocation | Complete | Typed call results, dynamic checked-code resolution, shared fuel, sealed resumable modes, child checkpoint handling, root commit/rollback, global delta queries, and executable regressions are complete | Not published |
 | Balance semantics | Complete | [ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) implements explicit balances, checked atomic transfer, balance deltas, installation preservation, prepared root checkpoints, an append-only value-call boundary, nested and top-level rollback, sealed rejection, and exact resumption. Actual checked-Core regressions cover all transfer branches and replay-free root, child, and post-child fuel splits | Not published |
 | Checked contract creation | Complete | [ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) implements checked non-wrapping nonce consumption, explicit address policy, checked initializer/runtime templates, provisional creation state, runtime installation, call-site and root rollback, full-environment sealed resumption, and exact nonce/code/creation delta queries | Not published |
+| Rollback-aware transaction observations | Complete | [ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md) implements ordered duplicate-preserving word logs and successful-creation enumeration; exact root, child, and initializer commit/rollback; identity on balance and creation preflight rejection; journal-bearing total results; and exactly-once fuel resumption. The append-only capability is index 13, both host tables have length 14, index 14 is unbound, and frozen Wire v1/v2 reject it | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -640,9 +672,9 @@ language. The following remain:
   address-and-word bridge;
 - resolved-name and typed intermediate representations;
 - polymorphism, class evidence, and staging;
-- complete contract-entry and call semantics;
-- commit/rollback lifecycle for the implemented working storage, plus balances,
-  logs, and creation;
+- deeper and recursive calls, additional call kinds, and complete contract-entry
+  policy;
+- authorization, receipts, gas, and other transaction-environment semantics;
 - ABI admissibility, encoding, decoding, and dispatch; and
 - versioned contract observations and EVM-revision policy.
 
@@ -2875,15 +2907,17 @@ checked runtime on return, and preserves both call-site and transaction-wide
 rollback. Out-of-fuel retains the complete execution environment, so resumed
 execution cannot replace its call registry, templates, or address policy.
 
-The full 836-job build, 1,556-job test build, and runtime suite pass. All 80
-changed Lean roots pass warnings-as-errors and trust-zero validation; metadata,
-semantic-kernel, and diff checks pass. Axiom reports contain only `propext`,
-`Quot.sound`, and, in some execution and resumption proofs,
-`Classical.choice`; there is no `sorry`, `admit`, or `unsafe` declaration.
+[ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md) is
+complete. Its transaction journal records ordered, duplicate-preserving logs
+and successful creation Addresses. Direct, nested, initializer, balanced, and
+preflight checked-program regressions cover commit, rollback, identity, and
+exactly-once fuel resumption. Frozen Wire formats reject the internal
+capability. Full builds, tests, strict Lean validation, metadata,
+semantic-kernel, and diff checks pass.
 
-Logs and transaction observations are the next runtime milestone; ABI and
-public Oracle exposure follow as separate slices. The paused parser-proof path
-does not become an intermediate semantics milestone.
+ABI and storage-layout work is the next runtime milestone; public Oracle
+exposure follows as a separate slice. The paused parser-proof path does not
+become an intermediate semantics milestone.
 
 ## Meaning of completion
 

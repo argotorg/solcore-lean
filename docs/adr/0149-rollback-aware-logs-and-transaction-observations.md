@@ -84,10 +84,12 @@ The journal is the rollback component. The existing revert-surviving `trace`
 component remains `Unit`; this milestone does not silently redefine diagnostic
 trace policy as contract-log policy.
 
-The generic storage driver remains available for legacy proof infrastructure
-over code refined to the earlier 13 capabilities. Every production checked
-execution path uses the transaction-aware handler. No authoritative executor
-acknowledges `emitLogWord` while silently discarding it.
+The generic storage policy remains available for legacy proof infrastructure,
+but advertises `emitLogWord` as unsupported. Its driver stops before calling
+the generic handler and returns an explicit unsupported result. Every
+production checked execution path uses the transaction-aware handler, which
+supports and records the request. No executor acknowledges `emitLogWord` while
+silently discarding it.
 
 ### Frame rules
 

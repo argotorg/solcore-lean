@@ -111,8 +111,8 @@ resumptions, observed losslessly by Core at append-only host index 9, and kept
 independent from storage, code, caller, and future callee or call-kind roles.
 ADR-0146 has since appended the typed call at index 10, and ADR-0147 appends
 its value-bearing counterpart at index 11. ADR-0148 appends checked creation at
-index 12. The canonical host tables now have length 13 and index 13 is first
-unbound.
+index 12, and ADR-0149 appends word-log emission at index 13. The canonical
+host tables now have length 14 and index 14 is first unbound.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
 is complete. It binds the existing selected-run configuration to a
@@ -159,9 +159,13 @@ shared resumable budget, scheduler-reachability sealing, child checkpoint
 handling, root commit/rollback, and arbitrary-address state-delta queries.
 [ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is complete. It
 adds checked balances and value transfer to top-level and depth-one execution,
-including rollback, exact deltas, and replay-free resumption. Contract creation
-is the next runtime milestone. Proof-only extensions of the older
-selected-execution path are not separate milestones.
+including rollback, exact deltas, and replay-free resumption.
+[ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) completes checked
+creation, initializer execution, runtime installation, and creation rollback.
+[ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md)
+completes ordered rollback-aware logs and successful-creation observations in
+the total execution result. ABI and storage layout are next. Proof-only
+extensions of the older selected-execution path are not separate milestones.
 
 ## Completed foundation
 
@@ -315,7 +319,7 @@ These results remain regression obligations for every extension.
 | 130 | Nested checked-Core invocation | Complete | Adds typed child inputs/results, dynamic resolution, shared-fuel scheduling and resumption, sealed state provenance, child checkpoints, root commit/rollback, and global delta observations |
 | 131 | Balance semantics | Complete | Connects value-bearing calls to checked Account balance availability, atomic transfer, rollback, exact deltas, and replay-free resumption through ADR-0147 |
 | 132 | Contract creation | Complete | [ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) adds checked nonce consumption, explicit address derivation, checked initializer/runtime templates, runtime installation, rollback, and fixed-environment resumption |
-| 133 | Logs and transaction observations | Planned | Adds ordered rollback-aware events and transaction-wide results |
+| 133 | Logs and transaction observations | Complete | [ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md) adds ordered duplicate-preserving word logs, successful-creation enumeration, frame/root rollback, and exactly-once resumption |
 | 134 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
 | 135 | Public Oracle execution | Planned | Publishes a versioned checked-Core execution request and total result only after internal semantics stabilizes |
 | 136 | Resolved static semantics and elaboration adapters | Planned | Connects stabilized source syntax last |
@@ -2389,16 +2393,17 @@ provisional insertion, or value transfer. Actual delta regressions cover the
 creator, created, and untouched Accounts across nonce, code, storage, and
 balance endpoints.
 
-The full 836-job build, 1,556-job test build, and runtime suite pass. All 80
-changed Lean roots pass warnings-as-errors and trust-zero validation; metadata,
-semantic-kernel, and diff checks pass. Axiom reports contain only `propext`,
-`Quot.sound`, and limited `Classical.choice`, with no `sorry`, `admit`, or
-`unsafe` declaration.
+[ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md) is
+complete. The transaction-aware executor records ordered duplicate-preserving
+word logs and successful creation Addresses, commits or rolls them back at
+root, child, and initializer boundaries, preserves identity on balance and
+creation preflight rejection, and resumes without replay. Frozen Wire formats
+reject the internal capability. Full builds, tests, strict Lean validation,
+metadata, semantic-kernel, and diff checks pass.
 
-Logs and transaction observations are the active next implementation
-milestone; ABI and Oracle publication follow later. Parser proofs remain
-paused, and the older proof-only selected-execution path is not resumed as an
-intermediate step.
+ABI and storage layout are the active next implementation milestone; Oracle
+publication follows later. Parser proofs remain paused, and the older
+proof-only selected-execution path is not resumed as an intermediate step.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

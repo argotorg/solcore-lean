@@ -1137,6 +1137,46 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0123](adr/0123-handled-execution-relational-metatheory.md)
   fixes handled-path composition, direct type safety, and terminal result
   uniqueness while keeping out-of-fuel budget-relative.
+- [ADR-0124](adr/0124-completed-handled-execution-frame-continuation.md)
+  connects normal handled completion to a caller-owned frame continuation.
+- [ADR-0125](adr/0125-parent-indexed-selected-execution-continuation.md)
+  retains parent provenance across selected execution and completion.
+- [ADR-0126](adr/0126-selected-code-address-observation.md)
+  exposes the selected code Address through the internal host boundary.
+- [ADR-0127](adr/0127-parent-indexed-resolution-view.md) through
+  [ADR-0130](adr/0130-parent-indexed-resolution-fold-trap-reason-mapping-naturality.md)
+  complete frame-local result selection and trap-reason mapping laws.
+- [ADR-0131](adr/0131-end-to-end-call-value-observation.md) through
+  [ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) complete
+  immutable call value, caller, input byte, input size, and strict input-word
+  observations.
+- [ADR-0136](adr/0136-resumable-handled-fuel-slices.md) fixes exact fuel-only
+  resumption for handled execution.
+- [ADR-0137](adr/0137-canonical-host-capability-registry.md) fixes one
+  append-only production order for internal host capabilities.
+- [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
+  retains every selected-execution branch and resumes only exhaustion.
+- [ADR-0139](adr/0139-run-fixed-current-address-observation.md) exposes one
+  immutable active-contract Address to internal Core.
+- [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
+  seals one selected execution configuration across fuel resumption.
+- [ADR-0141](adr/0141-checked-word-completion-to-canonical-return-bytes.md)
+  converts successful checked Word completion to canonical return bytes.
+- [ADR-0142](adr/0142-branch-complete-selected-word-code-classification.md)
+  separates unavailable, non-Word, and Word checked code before execution.
+- [ADR-0143](adr/0143-proof-refined-selected-checked-word-execution.md) and
+  [ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md)
+  complete the proof-refined selected Word execution and parent integration.
+- [ADR-0145](adr/0145-executable-checked-core-top-level-lifecycle.md) fixes the
+  total direct top-level checked-Core execution boundary.
+- [ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) fixes
+  depth-one checked child execution under one shared fuel budget.
+- [ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) fixes
+  checked balance transfer and value-bearing calls.
+- [ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) fixes checked
+  initializer/runtime creation and account lifetime.
+- [ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md)
+  fixes ordered rollback-aware word logs and successful-creation observations.
 
 Historical ADRs are retained even when their implementation is no longer the
 active priority.

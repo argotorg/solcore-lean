@@ -998,9 +998,23 @@ ADR-0148 now adds root checked creation under the same scheduler. One fixed
 `ExecutionEnvironment` retains the call registry, checked initializer/runtime
 templates, and explicit address policy across exhaustion. Creation consumes a
 checked nonce, prepares a fresh initializer Account, installs checked runtime
-code on return, and preserves call-site and root-wide rollback. The current
-host table has 13 entries: checked creation is index 12 and index 13 is first
-unbound. Logs, ABI, and public Oracle schemas remain separate layers.
+code on return, and preserves call-site and root-wide rollback.
+
+ADR-0149 completes the internal transaction-observation layer. A
+`TransactionJournal` is the rollback-scoped effect value carried beside the
+working world. Its two chronological traces contain simple word logs and
+successfully installed contract Addresses; both preserve duplicates. Returned
+children and initializers pass their working journal to the parent. Their
+revert or trap restores the parent's suspension-time journal, and root revert
+or trap selects the proved-empty root checkpoint. Returned root execution
+commits its working journal. World and journal rebasing occur together.
+
+`emitLogWord : (word × word) -> unit` is append-only host index 13. The current
+canonical host tables have 14 entries and index 14 is first unbound. The
+generic storage policy reports this request as unsupported before handling;
+the transaction-aware policy supports it and attributes the log to the active
+`currentAddress`. Frozen Wire v1/v2 still reject the host value. ABI event
+encoding and public Oracle schemas remain separate layers.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
