@@ -1,4 +1,7 @@
 import Solcore.Test.Adr0149TopLevelLogsFixture
+import Solcore.Core.HostRunner
+import Solcore.Semantics.HostDriverResumption
+import Solcore.Semantics.HostStorageDriver
 
 /-! Executable root commit/rollback and resumption tests for ADR-0149 logs. -/
 
@@ -65,6 +68,77 @@ private def testTrappedLogs : IO Unit := do
       assertTrue (result.committedJournal.logList == [])
         "trap must select the empty root checkpoint journal"
 
+private def legacyFuel : Nat := 256
+private def resumedFuel : Nat := 37
+
+private def sameJournal
+    (left right : TransactionJournal) : Bool :=
+  left.logList == right.logList &&
+    left.createdContractList == right.createdContractList
+
+private def testLegacyLogIsExplicitlyUnsupported : IO Unit := do
+  let initialContext := TopLevelExecution.initialTransactionContext installed
+  let inputs := (invocationWith returnSelector).executionInputs
+  let initialState := State.initial code.program.body hostEnvironment
+  let coreResult := hostRun legacyFuel initialState
+  let legacyResult := code.runWithStorage initialContext inputs legacyFuel
+  match coreResult, legacyResult with
+  | .suspended emitted emittedRemainingFuel,
+      ⟨rejectedContext, .unsupported rejected rejectedRemainingFuel⟩ =>
+      assertTrue (emitted == rejected)
+        "legacy rejection must preserve the exact Core suspension"
+      assertTrue (rejected.request == .emitLogWord firstTopic firstPayload)
+        "legacy rejection must expose the exact log request"
+      assertTrue (emittedRemainingFuel == rejectedRemainingFuel)
+        "legacy rejection must preserve Core's remaining fuel"
+      assertTrue
+        (rejectedContext.context.storageAddress ==
+          initialContext.context.storageAddress)
+        "legacy rejection must preserve the selected storage address"
+      assertTrue
+        (sameJournal
+          (TransactionHostStorageDriver.Context.workingJournal rejectedContext)
+          initialContext.workingJournal)
+        "legacy rejection must leave the working journal unchanged"
+      assertTrue
+        (sameJournal
+          rejectedContext.context.values.checkpoint.effects.rollback
+          initialContext.context.values.checkpoint.effects.rollback)
+        "legacy rejection must leave the checkpoint journal unchanged"
+      let resumed := legacyResult.resumeWithFuel
+        (TransactionHostStorageDriver.handler inputs) resumedFuel
+      match resumed with
+      | ⟨resumedContext,
+          .unsupported resumedSuspension resumedRemainingFuel⟩ =>
+          assertTrue (resumedSuspension == rejected)
+            "resumption must retain the unsupported suspension"
+          assertTrue
+            (resumedRemainingFuel == rejectedRemainingFuel + resumedFuel)
+            "resumption must retain and extend the unused fuel exactly"
+          assertTrue
+            (sameJournal
+              (TransactionHostStorageDriver.Context.workingJournal
+                resumedContext)
+              initialContext.workingJournal)
+            "resumption must not invoke even a log-capable handler"
+      | _ =>
+          throw (IO.userError
+            "resumption must not cross an unsupported legacy boundary")
+  | _, _ =>
+      throw (IO.userError
+        "legacy checked execution must stop explicitly at its first log")
+
+private def testSameCodeRecordsLogsTransactionally : IO Unit := do
+  let initialContext := TopLevelExecution.initialTransactionContext installed
+  let inputs := (invocationWith returnSelector).executionInputs
+  match code.runWithTransactionStorage initialContext inputs legacyFuel with
+  | ⟨finalContext, .done _ _⟩ =>
+      assertTrue (finalContext.workingJournal.logList == expectedLogs)
+        "transaction execution must record every log from the same code"
+  | _ =>
+      throw (IO.userError
+        "transaction execution of the checked log program must complete")
+
 /-- Find a genuine exhaustion point after exactly the first log was handled. -/
 private def findOneLogSplit : Nat → Nat → Option Nat
   | _, 0 => none
@@ -111,6 +185,8 @@ private def testOutOfFuelExactlyOnce : IO Unit := do
                 "split and one-shot log executions must be observationally exact"
 
 def testAdr0149TopLevelLogs : IO Unit := do
+  testLegacyLogIsExplicitlyUnsupported
+  testSameCodeRecordsLogsTransactionally
   testReturnedLogs
   testRevertedLogs
   testTrappedLogs
