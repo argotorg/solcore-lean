@@ -52,10 +52,16 @@ private def assertProtocol {α : Type}
 
 def testCoreWireV3CodecFoundation : IO Unit := do
   for type in types do
-    match decodeTypeWithBudget limits (encodeType type) with
-    | .ok decoded =>
-        assertTrue (encodeType decoded == encodeType type)
+    let exact : CoreBudgetLimits := {
+      maxDepth := typeDepth type
+      maxNodes := typeNodes type
+    }
+    match decodeTypeAtWithBudget exact .initial 1 .root (encodeType type) with
+    | .ok (decoded, state) =>
+      assertTrue (encodeType decoded == encodeType type)
           s!"Core Wire v3 type did not round-trip: {reprStr type}"
+      assertTrue (state.consumedNodes == typeNodes type)
+        s!"Core Wire v3 type demand drifted: {reprStr type}"
     | .error _ => throw (IO.userError s!"encoded type failed: {reprStr type}")
   for op in unaryOps do
     assertTrue ((decodeUnaryOp (encodeUnaryOp op)).toOption == some op)
@@ -66,6 +72,12 @@ def testCoreWireV3CodecFoundation : IO Unit := do
   for op in ternaryOps do
     assertTrue ((decodeTernaryOp (encodeTernaryOp op)).toOption == some op)
       s!"ternary operator did not round-trip: {reprStr op}"
+  match decodeBinaryOp "future" with
+  | .error error =>
+      assertTrue
+        (error.arguments.getObjVal? "expected").isOk
+        "invalid operator tag does not expose the closed expected catalog"
+  | .ok _ => throw (IO.userError "unknown binary operator unexpectedly decoded")
 
   let constructor : ConstructorId := ⟨dataType, 3⟩
   assertTrue

@@ -97,10 +97,16 @@ private def programJsonWith
 
 def testCoreWireV3Codec : IO Unit := do
   for expression in expressions do
-    match decodeExprWithBudget limits (encodeExpr expression) with
-    | .ok decoded =>
-        assertTrue (encodeExpr decoded == encodeExpr expression)
+    let exact : CoreBudgetLimits := {
+      maxDepth := exprDepth expression
+      maxNodes := exprNodes expression
+    }
+    match decodeExprAtWithBudget exact .initial 1 .root (encodeExpr expression) with
+    | .ok (decoded, state) =>
+      assertTrue (encodeExpr decoded == encodeExpr expression)
           s!"expression did not round-trip: {reprStr expression}"
+      assertTrue (state.consumedNodes == exprNodes expression)
+        s!"expression demand drifted: {reprStr expression}"
     | .error _ =>
         throw (IO.userError s!"encoded expression failed: {reprStr expression}")
   match decodeProgramWithBudget limits (encodeProgram program) with
@@ -108,6 +114,15 @@ def testCoreWireV3Codec : IO Unit := do
       assertTrue (encodeProgram decoded == encodeProgram program)
         "complete Program did not round-trip"
   | .error _ => throw (IO.userError "encoded complete Program failed")
+  let exactProgram : CoreBudgetLimits := {
+    maxDepth := programDepth program
+    maxNodes := programNodes program
+  }
+  match decodeProgramAtWithBudget exactProgram .initial .root (encodeProgram program) with
+  | .ok (_, state) =>
+      assertTrue (state.consumedNodes == programNodes program)
+        "complete Program demand drifted from its decoder"
+  | .error _ => throw (IO.userError "exact complete Program budget failed")
 
   let noncanonicalVar : Lean.Json := .mkObj [
     ("index", .num { mantissa := 10, exponent := 1 }), ("tag", "var")
