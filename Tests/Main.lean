@@ -78,6 +78,7 @@ import Solcore.Test.AddressSelectedHostStorage
 import Solcore.Test.AddressSelectedHostStorageProperties
 import Solcore.Test.CurrentAddressObservationProperties
 import Solcore.Test.CurrentAddressExecution
+import Solcore.Test.CurrentAddressExecutionSession
 import Solcore.Test.CheckedCoreProgram
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextTrapReasonMap
@@ -109,6 +110,8 @@ import Solcore.Test.ParentIndexedSelectedExecutionContinuation
 import Solcore.Test.ParentIndexedSelectedExecutionProperties
 import Solcore.Test.ParentIndexedSelectedExecutionResumption
 import Solcore.Test.ParentIndexedSelectedExecutionFold
+import Solcore.Test.ParentIndexedSelectedExecutionSessionProperties
+import Solcore.Test.ParentIndexedSelectedExecutionSession
 import Solcore.Test.ParentIndexedFrameResolutionView
 import Solcore.Test.ParentIndexedFrameResolutionViewTrapReasonMap
 import Solcore.Test.ParentIndexedFrameResolutionFold
@@ -4997,6 +5000,7 @@ def run : IO Unit := do
   testAddressSelectedHostInputWordBEStorage
   testAddressSelectedHostStorage
   testCurrentAddressExecution
+  testCurrentAddressExecutionSession
   testCheckedCoreProgram
   testFrameContinuationContext
   testFrameContinuationContextTrapReasonMap
@@ -5026,6 +5030,7 @@ def run : IO Unit := do
   testParentIndexedFrameContinuationConstruction
   testParentIndexedSelectedExecutionResumption
   testParentIndexedSelectedExecutionFold
+  testParentIndexedSelectedExecutionSession
   testParentIndexedFrameResolutionFold
   testParentIndexedFrameTrapRollback
   testParentIndexedFrameTrapPropagationPayload
