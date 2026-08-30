@@ -165,6 +165,62 @@ private theorem compileTimeRegistryCodeMismatch :
     registryCodeMismatchFails = true := by
   native_decide
 
+private def missingAccountRoot : CheckedCoreContract :=
+  rootContract .commit unavailableTargetWord
+
+private def missingAccountRegistry : CheckedContractRegistry := {
+  lookup := fun address =>
+    if address = rootAddress then some missingAccountRoot
+    else if address = unavailableAddress then some childReturnContract
+    else none
+}
+
+private def missingAccountRun :=
+  OneLevelNestedExecution.run missingAccountRoot invocation
+    (installedRoot missingAccountRoot childReturnContract)
+    missingAccountRegistry completionFuel
+
+private def registeredMissingAccountFails : Bool :=
+  match missingAccountRun with
+  | .completed terminal =>
+      terminal.outcome ==
+        FrameOutcome.trapped ContractCallFailure.unavailable.code
+  | .outOfFuel _ _ _ => false
+
+private theorem compileTimeRegisteredMissingAccount :
+    registeredMissingAccountFails = true := by
+  native_decide
+
+private def missingCodeRoot : CheckedCoreContract :=
+  rootContract .commit childTargetWord
+
+private def missingCodeWorld : WorldState :=
+  WorldState.empty
+    |>.putAccount rootAddress (rootAccount missingCodeRoot)
+    |>.putAccount childAddress Account.empty
+
+private def missingCodeInstalled :
+    InstalledCheckedCoreContract missingCodeWorld rootAddress missingCodeRoot := {
+  account := rootAccount missingCodeRoot
+  account_present := by rfl
+  code_present := by rfl
+}
+
+private def missingCodeRun :=
+  OneLevelNestedExecution.run missingCodeRoot invocation missingCodeInstalled
+    (registry missingCodeRoot childReturnContract) completionFuel
+
+private def registeredMissingCodeFails : Bool :=
+  match missingCodeRun with
+  | .completed terminal =>
+      terminal.outcome ==
+        FrameOutcome.trapped ContractCallFailure.unavailable.code
+  | .outOfFuel _ _ _ => false
+
+private theorem compileTimeRegisteredMissingCode :
+    registeredMissingCodeFails = true := by
+  native_decide
+
 /-! Write root storage, commit a child write speculatively, then root-revert. -/
 private def rollbackRootProgram : Program := {
   resultType := CoreContractEntryProfile.wordOutcomeV1.resultType
@@ -224,6 +280,10 @@ def testOneLevelNestedExecutionExtended : IO Unit := do
     "sequential child calls did not share the committed working world"
   assertTrue registryCodeMismatchFails
     "registry/world code mismatch did not produce unavailable"
+  assertTrue registeredMissingAccountFails
+    "registered target with no Account did not produce unavailable"
+  assertTrue registeredMissingCodeFails
+    "registered Account with no code did not produce unavailable"
   assertTrue rollbackDeltaQueriesExact
     "root rollback did not expose exact root/child/untouched delta queries"
 
