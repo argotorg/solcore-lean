@@ -34,9 +34,15 @@ checkpoint. Root return commits the accumulated world, while root revert or
 trap restores the original world. Checked non-wrapping balances follow those
 same rules for zero-, self-, top-level, and nested-value transfers. Terminal
 results expose exact state queries for arbitrary Addresses, storage slots, and
-balances. This runtime is proved and tested but not published through Wire or
-the Oracle. Creation, logs, ABI, gas, and public execution commands remain
-later work.
+balances. Checked creation runs an initializer, installs runtime code only on
+success, and reports successful creation Addresses. Contracts can emit simple
+word logs; logs and creation observations retain order and duplicates and use
+the same child, initializer, and root rollback rules as state. Fuel resumption
+does not replay them.
+
+This runtime is proved and tested but not published through Wire or the
+Oracle. ABI encoding and dispatch, gas, deeper call forms, and a versioned
+public execution command remain later work.
 
 ## Historical implementation notes
 
@@ -279,8 +285,11 @@ transaction-wide commit/rollback.
 [ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) completes
 checked balances and value transfer in that lifecycle, including total
 preflight rejection, nested rollback, exact balance deltas, and replay-free
-resumption. Creation, logs, ABI, and a versioned public Oracle execution
-command remain later decisions.
+resumption. [ADR-0148](adr/0148-checked-contract-creation-lifecycle.md)
+completes checked creation and initializer/runtime installation.
+[ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md)
+completes ordered rollback-aware logs and successful-creation observations.
+ABI and a versioned public Oracle execution command remain later decisions.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor

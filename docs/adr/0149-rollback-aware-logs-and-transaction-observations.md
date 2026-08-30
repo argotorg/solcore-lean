@@ -3,16 +3,17 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: ordered contract logs and successful-creation observations in executable checked-Core runs
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
 ADR-0145 through ADR-0148 provide an executable checked-Core lifecycle with an
 explicit initial `WorldState`, total return/revert/trap results, nested calls,
 checked balance transfer, checked creation, and sealed fuel resumption. The
-remaining result is still incomplete for semantic differential testing: a
-contract cannot emit an observable log, and a successful creation cannot be
-enumerated without already knowing its derived Address.
+Before this milestone, the result was still incomplete for semantic
+differential testing: a contract could not emit an observable log, and a
+successful creation could not be enumerated without already knowing its
+derived Address.
 
 The repository already has two useful generic foundations. `FrameTrace`
 records a finite chronological sequence, preserves duplicates, and exposes
@@ -83,10 +84,10 @@ The journal is the rollback component. The existing revert-surviving `trace`
 component remains `Unit`; this milestone does not silently redefine diagnostic
 trace policy as contract-log policy.
 
-The generic storage driver remains available for generic proof infrastructure,
-but every production checked execution path uses a transaction-aware handler.
-No authoritative executor may acknowledge `emitLogWord` while silently
-discarding it.
+The generic storage driver remains available for legacy proof infrastructure
+over code refined to the earlier 13 capabilities. Every production checked
+execution path uses the transaction-aware handler. No authoritative executor
+acknowledges `emitLogWord` while silently discarding it.
 
 ### Frame rules
 
@@ -208,3 +209,22 @@ less: decision record; journal carrier and algebra; Core host boundary;
 transaction-aware handler and contexts; top-level integration; child and
 initializer integration; terminal observation API; executable regressions;
 proof/audit closure; and documentation completion.
+
+## Implementation outcome
+
+The implementation now follows this decision end to end. `emitLogWord` is the
+append-only capability at index 13; both canonical host tables have 14 entries
+and index 14 is unbound. Frozen Wire v1 and v2 reject the internal host value.
+
+Terminal execution returns ordered, duplicate-preserving logs and successful
+creation Addresses alongside the existing state result. A returned root
+commits its working journal. Root revert or trap selects the empty root
+checkpoint. Returned children and initializers contribute their observations;
+reverted or trapped ones do not. Initializer failure still retains the creator
+nonce consumption fixed by ADR-0148, while failed balance and creation
+preflights leave the journal unchanged.
+
+Fuel exhaustion retains the exact journal-bearing scheduler mode. Zero-fuel,
+split-fuel, and one-shot executions agree without repeating a log or successful
+creation observation. Full builds, executable tests, strict Lean validation,
+metadata checks, semantic-kernel checks, and diff hygiene pass.

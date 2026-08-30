@@ -233,8 +233,9 @@ remain unchanged.
 WorldState is function-valued, so this milestone does not claim to enumerate
 all changed addresses. The returned created Address and fixed derivation inputs
 identify the new Account for exact delta queries. Enumerable transaction-wide
-creation observations belong with the later logs and transaction-observation
-milestone.
+creation observations are now supplied by the rollback-aware transaction
+journal completed in
+[ADR-0149](0149-rollback-aware-logs-and-transaction-observations.md).
 
 ## Acceptance boundary
 
