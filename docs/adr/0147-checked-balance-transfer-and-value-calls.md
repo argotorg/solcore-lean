@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: add non-wrapping balances to the executable checked-Core lifecycle
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -262,3 +262,15 @@ checked contract execution. Rollback and fuel resumption cover balances rather
 than treating them as an external precondition. The append-only host boundary
 keeps all existing checked Core programs compatible, and account creation stays
 separate instead of being hidden inside a transfer failure branch.
+
+## Validation
+
+The acceptance boundary is implemented and independently audited. Executable
+checked-Core regressions cover top-level and nested value transfer, every
+transfer rejection, child and root rollback, depth rejection, invalid and
+unavailable targets, and exact arbitrary-address deltas. Split execution is
+tested while the root is running, while the child is running, and immediately
+after child completion; each resumed result matches one-shot execution without
+replaying a transfer or child effect. Full build, tests, trust-zero checks,
+metadata validation, semantic-kernel policy, public-constructor rejection, and
+diff hygiene pass.

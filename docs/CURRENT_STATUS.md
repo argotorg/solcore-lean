@@ -456,9 +456,9 @@ Accounts now carry explicit balances; checked transfer rejects absence,
 underflow, and overflow without wrapping or implicit creation. Exact balance
 deltas, transfer preservation laws, installation transport, a distinct
 checkpoint/working root context, and the append-only value-call capability at
-index 11 are implemented. Nested transfer commit/rollback, sealed top-level
-preflight rejection, and exact split-fuel resumption are connected. End-to-end
-checked-program regressions and final acceptance validation are active work.
+index 11 are implemented. Nested and top-level transfer commit/rollback,
+sealed preflight rejection, exact balance deltas, and replay-free split-fuel
+resumption are complete and covered by end-to-end checked-program regressions.
 
 ## Implementation status
 
@@ -485,9 +485,9 @@ checked-program regressions and final acceptance validation are active work.
 | Run-fixed input-size observation | Complete | Exact bounded-size derivation, byte-boundary coherence, append-only `unit -> word` capability, total response, request/resume safety, full context identity, size-derived storage, parent completion, fuel boundaries, and frozen-Wire rejection are complete | Not published |
 | Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
 | Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
-| Canonical host capability registry | Complete | One canonical registry now derives both ten-entry host tables and arbitrary-list safety; the original indexes 0 through 8 and appended current-address index 9 have exact finite laws | Not published |
+| Canonical host capability registry | Complete | One canonical registry derives both 12-entry host tables and arbitrary-list safety; indexes 0 through 9 remain unchanged, checked call is index 10, value-bearing checked call is index 11, and index 12 is first unbound | Not published |
 | Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
-| Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, index-9 capability, length-10 tables, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
+| Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, stable index-9 capability, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
 | Proof-refined parent-indexed selected-execution session | Complete | Fixed-configuration carrier, closed fuel-only resumption, one-shot invariant, whole-session algebra, exact branches, no-fault, compatibility, folds, and measured regressions are complete | Not published |
 | Checked Word completion to canonical return bytes | Complete | Word refinement, success witness, exact raw projection/retraction, canonical returned frame, typed branch laws, stability, split fuel, and regressions are complete | Not published |
 | Branch-complete selected Word-code classification | Complete | Three-way classifier, bidirectional erasure round trips, injectivity, exact checked-code and Word projections, WorldState coherence, storage preservation, and regressions are complete | Not published |
@@ -495,7 +495,7 @@ checked-program regressions and final acceptance validation are active work.
 | Parent-indexed selected checked Word execution | Complete | Exact storage and parent provenance, delegated resumption, proof-linked canonical returned continuation, plain and conditional legacy coherence, consumers, and regressions are complete | Not published |
 | Executable checked-Core top-level lifecycle | Complete | Explicit initial state, checked root installation, total return/revert/trap result, exact resumption, commit/rollback, and state-delta observations are complete | Not published |
 | One-level nested checked-Core invocation | Complete | Typed call results, dynamic checked-code resolution, shared fuel, sealed resumable modes, child checkpoint handling, root commit/rollback, global delta queries, and executable regressions are complete | Not published |
-| Balance semantics | In progress | [ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) implements explicit balances, checked atomic transfer, balance deltas, installation preservation, prepared root checkpoints, an append-only value-call boundary, nested rollback, sealed top-level rejection, and exact resumption. End-to-end checked-program regressions and acceptance validation are active | Not published |
+| Balance semantics | Complete | [ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) implements explicit balances, checked atomic transfer, balance deltas, installation preservation, prepared root checkpoints, an append-only value-call boundary, nested and top-level rollback, sealed rejection, and exact resumption. Actual checked-Core regressions cover all transfer branches and replay-free root, child, and post-child fuel splits | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2849,10 +2849,16 @@ Tests cover return/revert/trap, dispatch failure, self-call and cross-account
 rebasing, sequential calls, exact split fuel, root rollback, and global state
 queries.
 
-[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is the active
-balance milestone. Creation, logs, ABI, and public Oracle exposure remain
-separate later slices. The paused parser-proof path does not become an
-intermediate semantics milestone.
+[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is complete.
+Balances use checked non-wrapping transfer and participate in the same
+top-level and nested commit, rollback, delta, and exact fuel-resumption rules
+as storage. Actual checked-Core programs cover transfer failures, successful
+value calls, child and root rollback, depth rejection, invalid and unavailable
+targets, and root, child, and post-child exhaustion without replaying effects.
+
+Contract creation is the next runtime milestone. Logs, ABI, and public Oracle
+exposure follow as separate slices. The paused parser-proof path does not
+become an intermediate semantics milestone.
 
 ## Meaning of completion
 

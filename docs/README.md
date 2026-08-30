@@ -31,10 +31,12 @@ current working world. Root and child share one resumable fuel budget.
 
 Child return keeps its working changes; child revert or trap restores the call
 checkpoint. Root return commits the accumulated world, while root revert or
-trap restores the original world. Terminal results expose exact state queries
-for arbitrary Addresses and storage slots. This runtime is proved and tested
-but not published through Wire or the Oracle. Balances, creation, logs, ABI,
-gas, and public execution commands remain later work.
+trap restores the original world. Checked non-wrapping balances follow those
+same rules for zero-, self-, top-level, and nested-value transfers. Terminal
+results expose exact state queries for arbitrary Addresses, storage slots, and
+balances. This runtime is proved and tested but not published through Wire or
+the Oracle. Creation, logs, ABI, gas, and public execution commands remain
+later work.
 
 ## Historical implementation notes
 
@@ -274,10 +276,11 @@ mutation, rollback, no-write execution, and direct host-input observations.
 [ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) completes
 depth-one nested checked-Core invocation with shared-fuel resumption and
 transaction-wide commit/rollback.
-[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) connects
-checked balances and value transfer to that lifecycle; its end-to-end
-acceptance work is in progress. Creation, logs, ABI, and a versioned public
-Oracle execution command remain later decisions.
+[ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) completes
+checked balances and value transfer in that lifecycle, including total
+preflight rejection, nested rollback, exact balance deltas, and replay-free
+resumption. Creation, logs, ABI, and a versioned public Oracle execution
+command remain later decisions.
 
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
