@@ -23,6 +23,9 @@ private def assertExactWorkingLogs
     "terminal context and exposed speculative logs must agree exactly"
   assertTrue (result.workingJournal.createdContractList == [])
     "word-log execution must not invent contract-creation observations"
+  assertTrue
+    (result.workingJournal.logList.length == 2 && firstLog == secondLog)
+    "two identical emissions must remain two ordered journal entries"
 
 private def testReturnedLogs : IO Unit := do
   match runWith returnSelector 256 with

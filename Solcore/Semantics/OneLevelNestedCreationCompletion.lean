@@ -36,6 +36,9 @@ structure DeployedInitializerResult
   resumedRoot_checkpointState_eq :
     resumedRoot.context.context.values.checkpoint.state =
       frame.suspendedRoot.parentContext.context.values.checkpoint.state
+  resumedRoot_checkpoint_eq :
+    resumedRoot.context.context.values.checkpoint =
+      frame.suspendedRoot.parentContext.context.values.checkpoint
   resumedRoot_workingJournal_eq :
     resumedRoot.context.workingJournal =
       frame.initializerContext.workingJournal.recordCreatedContract
@@ -192,6 +195,7 @@ def completeReturned
     resumedRoot_storageAddress_eq := frame.postNonce_storageAddress_eq
     resumedRoot_checkpointState_eq :=
       congrArg FrameCheckpointSnapshot.state frame.postNonce_checkpoint_eq
+    resumedRoot_checkpoint_eq := frame.postNonce_checkpoint_eq
     resumedRoot_workingJournal_eq := rfl
     resumedRoot_response_eq := rfl
   }
@@ -282,6 +286,26 @@ namespace InitializerCompletionResult
       simp only [root]
       rw [context_eq]
       exact congrArg FrameCheckpointSnapshot.state frame.postNonce_checkpoint_eq
+
+@[simp] theorem root_checkpoint
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+    (result :
+      InitializerCompletionResult initialWorld rootContract rootInvocation frame) :
+    result.root.context.context.values.checkpoint =
+      frame.suspendedRoot.parentContext.context.values.checkpoint := by
+  cases result with
+  | returned deployed =>
+      exact deployed.resumedRoot_checkpoint_eq
+  | reverted data resumed context_eq response_eq =>
+      simp only [root]
+      rw [context_eq]
+      exact frame.postNonce_checkpoint_eq
+  | trapped reason resumed context_eq response_eq =>
+      simp only [root]
+      rw [context_eq]
+      exact frame.postNonce_checkpoint_eq
 
 end InitializerCompletionResult
 end Solcore.Semantics.OneLevelNestedExecution

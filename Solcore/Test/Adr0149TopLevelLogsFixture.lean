@@ -19,8 +19,9 @@ def trapSelector : Word := ⟨2, by decide⟩
 
 def firstTopic : Word := ⟨0x11, by decide⟩
 def firstPayload : Word := ⟨0xa1, by decide⟩
-def secondTopic : Word := ⟨0x22, by decide⟩
-def secondPayload : Word := ⟨0xb2, by decide⟩
+/-- Deliberately duplicate the first entry to make multiplicity observable. -/
+def secondTopic : Word := firstTopic
+def secondPayload : Word := firstPayload
 
 def returnPayload : Word := ⟨0xc3, by decide⟩
 def revertPayload : Word := ⟨0xd4, by decide⟩
