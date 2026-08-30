@@ -202,6 +202,7 @@ private def zeroFuelRetainsSingleTransfer : Bool :=
             working.balance? callerAddress == some nine &&
               working.balance? targetAddress == some four
         | .outOfFuel _ (.child _) _ => false
+        | .outOfFuel _ (.initializer _) _ => false
 
 private def resumedMatchesOneShotWithoutDoubleTransfer : Bool :=
   terminalObservation resumed == terminalObservation oneShot &&

@@ -93,6 +93,7 @@ def Anchored
     Mode initialWorld rootContract rootInvocation → Prop
   | .root frame => RootAnchored frame
   | .child frame => ChildAnchored registry frame
+  | .initializer _ => False
 
 private theorem rootAfterSuspension_anchored
     {initialWorld : WorldState}
@@ -223,6 +224,12 @@ theorem Reachable.anchored
           (ChildFrame.afterHandledSuspension_checkpoint _ _ advanced)).trans
           childCheckpoint,
         registryResolution⟩
+  | initializerDone prior advanced inductionHypothesis =>
+      exact False.elim inductionHypothesis
+  | initializerNext prior advanced inductionHypothesis =>
+      exact inductionHypothesis
+  | initializerSuspended prior advanced inductionHypothesis =>
+      exact inductionHypothesis
 
 theorem Reachable.root_storageAddress
     {initialWorld : WorldState}

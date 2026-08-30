@@ -1,3 +1,4 @@
+import Solcore.Semantics.OneLevelNestedCreationCompletion
 import Solcore.Semantics.OneLevelNestedExecutionTransitions
 import Solcore.Semantics.BalanceTransferInstallationProperties
 
@@ -72,5 +73,27 @@ inductive Reachable
       (advanced : Core.hostAdvance frame.childState = .suspended suspension) :
       Reachable environment
         (.child (frame.afterHandledSuspension suspension advanced))
+  | initializerDone
+      {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+      {value : Core.Value}
+      (prior : Reachable environment (.initializer frame))
+      (advanced : Core.hostAdvance frame.initializerState = .done value) :
+      Reachable environment
+        (.root
+          ((frame.complete (frame.outcomeDone value advanced)).root))
+  | initializerNext
+      {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+      {next : Core.State}
+      (prior : Reachable environment (.initializer frame))
+      (advanced : Core.hostAdvance frame.initializerState = .next next) :
+      Reachable environment (.initializer (frame.afterNext next advanced))
+  | initializerSuspended
+      {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation}
+      {suspension : Core.HostSuspension}
+      (prior : Reachable environment (.initializer frame))
+      (advanced :
+        Core.hostAdvance frame.initializerState = .suspended suspension) :
+      Reachable environment
+        (.initializer (frame.afterHandledSuspension suspension advanced))
 
 end Solcore.Semantics.OneLevelNestedExecution

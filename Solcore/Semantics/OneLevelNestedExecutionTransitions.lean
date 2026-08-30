@@ -8,7 +8,7 @@ import Solcore.Semantics.BalanceTransferPresenceProperties
 import Solcore.Semantics.ContractCallFailure
 import Solcore.Semantics.ExecutionEnvironment
 import Solcore.Semantics.HostStorageAccountPresence
-import Solcore.Semantics.OneLevelNestedExecutionState
+import Solcore.Semantics.OneLevelNestedExecutionMode
 
 /-! Proof-preserving local transitions for the one-level nested scheduler. -/
 

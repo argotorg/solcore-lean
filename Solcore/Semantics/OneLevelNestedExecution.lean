@@ -63,23 +63,6 @@ def finalizeDone
 
 end RootFrame
 
-/-- Administrative rank used with shared fuel to justify mode switching. -/
-def Mode.rank
-    {initialWorld : WorldState}
-    {rootContract : CheckedCoreContract}
-    {rootInvocation : TopLevelInvocation} :
-    Mode initialWorld rootContract rootInvocation → Nat
-  | .root _ => 0
-  | .child _ => 1
-
-theorem Mode.rank_le_one
-    {initialWorld : WorldState}
-    {rootContract : CheckedCoreContract}
-    {rootInvocation : TopLevelInvocation}
-    (mode : Mode initialWorld rootContract rootInvocation) :
-    mode.rank ≤ 1 := by
-  cases mode <;> simp [Mode.rank]
-
 /--
 One bounded execution result. The private constructor makes `run` and
 `resumeWithFuel` the only production paths; callers can inspect `view` but
@@ -159,6 +142,31 @@ def runMode
               runMode environment remaining
                 (.child (frame.afterHandledSuspension suspension advanced))
                 (.childSuspended reachable advanced)
+  | fuel, .initializer frame, reachable =>
+      match advanced : Core.hostAdvance frame.initializerState with
+      | .done value =>
+          let completion := frame.complete (frame.outcomeDone value advanced)
+          runMode environment fuel (.root completion.root)
+            (.initializerDone reachable advanced)
+      | .fault error =>
+          False.elim
+            (Core.well_typed_host_state_never_faults
+              frame.initializerStateTyping advanced)
+      | .next next =>
+          match fuel with
+          | 0 => ⟨.outOfFuel environment (.initializer frame) reachable⟩
+          | remaining + 1 =>
+              runMode environment remaining
+                (.initializer (frame.afterNext next advanced))
+                (.initializerNext reachable advanced)
+      | .suspended suspension =>
+          match fuel with
+          | 0 => ⟨.outOfFuel environment (.initializer frame) reachable⟩
+          | remaining + 1 =>
+              runMode environment remaining
+                (.initializer
+                  (frame.afterHandledSuspension suspension advanced))
+                (.initializerSuspended reachable advanced)
 termination_by fuel mode _ => fuel * 2 + mode.rank
 decreasing_by
   · simp [Mode.rank]
@@ -167,6 +175,9 @@ decreasing_by
         (frame.afterSuspensionWithEnvironment environment suspension advanced)
     simp [Mode.rank] at bounded ⊢
     omega
+  · simp [Mode.rank]
+  · simp [Mode.rank]
+  · simp [Mode.rank]
   · simp [Mode.rank]
   · simp [Mode.rank]
   · simp [Mode.rank]

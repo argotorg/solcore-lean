@@ -203,6 +203,99 @@ theorem resumeWithFuel_runMode
         all_goals cases branchEq.symm.trans stepEq <;> rfl
       rw [prefixEq, summedEq]
       exact ih additional
+  | case11 fuel frame reachable value stepEq completion active ih =>
+      have active_eq : active = reachable := Subsingleton.elim _ _
+      subst active
+      have prefixEq :
+          runMode registry fuel (.initializer frame) reachable =
+            runMode registry fuel (.root completion.root)
+              (.initializerDone reachable stepEq) := by
+        apply Result.eq_of_view_eq
+        rw [runMode.eq_3]
+        split <;> rename_i _ branchEq
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      have summedEq :
+          runMode registry (fuel + additional) (.initializer frame) reachable =
+            runMode registry (fuel + additional) (.root completion.root)
+              (.initializerDone reachable stepEq) := by
+        apply Result.eq_of_view_eq
+        rw [runMode.eq_3]
+        split <;> rename_i _ branchEq
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      rw [prefixEq, summedEq]
+      exact ih additional
+  | case12 frame reachable next stepEq active =>
+      have active_eq : active = reachable := Subsingleton.elim _ _
+      subst active
+      have prefixView :
+          (runMode registry 0 (.initializer frame) reachable).view =
+            .outOfFuel registry (.initializer frame) reachable := by
+        rw [runMode.eq_3]
+        split <;> rename_i _ branchEq
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      apply Result.eq_of_view_eq
+      simp [resumeWithFuel, prefixView]
+  | case13 frame reachable next stepEq remaining active ih =>
+      have active_eq : active = reachable := Subsingleton.elim _ _
+      subst active
+      have prefixEq :
+          runMode registry remaining.succ (.initializer frame) reachable =
+            runMode registry remaining
+              (.initializer (frame.afterNext next stepEq))
+              (.initializerNext reachable stepEq) := by
+        apply Result.eq_of_view_eq
+        rw [runMode.eq_3]
+        split <;> rename_i _ branchEq
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      have summedEq :
+          runMode registry (remaining.succ + additional)
+              (.initializer frame) reachable =
+            runMode registry (remaining + additional)
+              (.initializer (frame.afterNext next stepEq))
+              (.initializerNext reachable stepEq) := by
+        rw [Nat.succ_add]
+        apply Result.eq_of_view_eq
+        rw [runMode.eq_3]
+        split <;> rename_i _ branchEq
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      rw [prefixEq, summedEq]
+      exact ih additional
+  | case14 frame reachable suspension stepEq active =>
+      have active_eq : active = reachable := Subsingleton.elim _ _
+      subst active
+      have prefixView :
+          (runMode registry 0 (.initializer frame) reachable).view =
+            .outOfFuel registry (.initializer frame) reachable := by
+        rw [runMode.eq_3]
+        split <;> rename_i _ branchEq
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      apply Result.eq_of_view_eq
+      simp [resumeWithFuel, prefixView]
+  | case15 frame reachable suspension stepEq remaining active ih =>
+      have active_eq : active = reachable := Subsingleton.elim _ _
+      subst active
+      have prefixEq :
+          runMode registry remaining.succ (.initializer frame) reachable =
+            runMode registry remaining
+              (.initializer (frame.afterHandledSuspension suspension stepEq))
+              (.initializerSuspended reachable stepEq) := by
+        apply Result.eq_of_view_eq
+        rw [runMode.eq_3]
+        split <;> rename_i _ branchEq
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      have summedEq :
+          runMode registry (remaining.succ + additional)
+              (.initializer frame) reachable =
+            runMode registry (remaining + additional)
+              (.initializer (frame.afterHandledSuspension suspension stepEq))
+              (.initializerSuspended reachable stepEq) := by
+        rw [Nat.succ_add]
+        apply Result.eq_of_view_eq
+        rw [runMode.eq_3]
+        split <;> rename_i _ branchEq
+        all_goals cases branchEq.symm.trans stepEq <;> rfl
+      rw [prefixEq, summedEq]
+      exact ih additional
 
 /-- Explicitly named form of the fixed-environment split-fuel law. -/
 theorem resumeWithFuel_runModeWithEnvironment

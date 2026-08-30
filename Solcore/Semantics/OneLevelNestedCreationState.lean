@@ -103,8 +103,8 @@ end SuspendedCreationRoot
 /--
 Prepared initializer execution with one immutable environment and exact links
 to the parent call site, post-nonce checkpoint, and initializer working world.
-This carrier is intentionally separate from `Mode` until creation transitions
-and terminal deployment policy are connected.
+The scheduler's active-mode type is defined separately so this carrier stays
+independent of the execution dispatcher.
 -/
 structure PreparedInitializerFrame
     (initialWorld : WorldState)

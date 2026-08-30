@@ -52,6 +52,21 @@ inductive InitializerCompletionResult
       (response_eq : root.state = frame.suspendedRoot.suspension.resume
         (frame.suspendedRoot.profile.response (.trapped reason)))
 
+namespace InitializerCompletionResult
+
+/-- The resumed parent root selected by every initializer outcome. -/
+def root
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {frame : PreparedInitializerFrame initialWorld rootContract rootInvocation} :
+    InitializerCompletionResult initialWorld rootContract rootInvocation frame →
+      RootFrame initialWorld rootContract rootInvocation
+  | .returned deployed => deployed.resumedRoot
+  | .reverted _ root _ _ => root
+  | .trapped _ root _ _ => root
+
+end InitializerCompletionResult
+
 namespace DeployedInitializerResult
 
 @[simp] theorem deployed_code
