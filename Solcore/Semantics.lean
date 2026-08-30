@@ -71,6 +71,10 @@ import Solcore.Semantics.CheckedCoreProgramProperties
 import Solcore.Semantics.CheckedHostCoreProgram
 import Solcore.Semantics.CheckedHostCoreProgramExecution
 import Solcore.Semantics.CheckedHostCoreProgramProperties
+import Solcore.Semantics.CheckedHostCoreWordProgram
+import Solcore.Semantics.CheckedHostCoreWordProgramProperties
+import Solcore.Semantics.CheckedHostCoreWordProgramExecution
+import Solcore.Semantics.CheckedHostCoreWordProgramExecutionProperties
 import Solcore.Semantics.CheckedCoreProgramHostPromotion
 import Solcore.Semantics.HostStorageInputData
 import Solcore.Semantics.HostStorageInputDataProperties
@@ -85,6 +89,9 @@ import Solcore.Semantics.HostDriverResumption
 import Solcore.Semantics.HostDriverResumptionProperties
 import Solcore.Semantics.HostDriverFrameContinuation
 import Solcore.Semantics.HostDriverFrameContinuationProperties
+import Solcore.Semantics.WordReturnedFrameCompletion
+import Solcore.Semantics.WordReturnedFrameCompletionProperties
+import Solcore.Semantics.WordReturnedFrameCompletionSafetyProperties
 import Solcore.Semantics.HostStorageHandler
 import Solcore.Semantics.HostStorageHandlerProperties
 import Solcore.Semantics.HostStorageDriver

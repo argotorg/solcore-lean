@@ -80,6 +80,8 @@ import Solcore.Test.CurrentAddressObservationProperties
 import Solcore.Test.CurrentAddressExecution
 import Solcore.Test.CurrentAddressExecutionSession
 import Solcore.Test.CheckedCoreProgram
+import Solcore.Test.WordReturnedFrameCompletionProperties
+import Solcore.Test.CheckedHostCoreWordProgramExecution
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextTrapReasonMap
 import Solcore.Test.FrameContinuationContextResolveTrapReasonMap
@@ -5002,6 +5004,7 @@ def run : IO Unit := do
   testCurrentAddressExecution
   testCurrentAddressExecutionSession
   testCheckedCoreProgram
+  testCheckedHostCoreWordProgramExecution
   testFrameContinuationContext
   testFrameContinuationContextTrapReasonMap
   testFrameResolutionResult
