@@ -47,7 +47,7 @@ private def terminalMatches
     (result : OneLevelNestedExecution.Result initialWorld root invocation)
     (expectedOutcome : FrameOutcome Word)
     (expectedWorkingChild expectedFinalChild : Option Word) : Bool :=
-  match result with
+  match result.view with
   | .completed terminal =>
       terminal.outcome == expectedOutcome &&
         childValueAtWorking terminal == expectedWorkingChild &&
@@ -111,12 +111,12 @@ private def initialRegistryResolvesChild : Bool :=
     childAddress).isSome
 
 private def rootOutOfFuelVisible : Bool :=
-  match runScenario rootCommitContract childReturnContract 0 with
+  match (runScenario rootCommitContract childReturnContract 0).view with
   | .outOfFuel _ (.root _) _ => true
   | _ => false
 
 private def childOutOfFuelAt (fuel : Nat) : Bool :=
-  match runScenario rootCommitContract childReturnContract fuel with
+  match (runScenario rootCommitContract childReturnContract fuel).view with
   | .outOfFuel _ (.child _) _ => true
   | _ => false
 

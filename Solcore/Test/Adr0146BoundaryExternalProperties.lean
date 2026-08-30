@@ -56,6 +56,10 @@ example :=
   Solcore.Semantics.CoreContractEntryProfile.decodeTyped_eq_toFrameOutcome_decodeWordOutcome
 example :=
   Solcore.Semantics.CoreContractEntryProfile.decodeWordOutcome?_eq_some_decodeWordOutcome
+example :=
+  @Solcore.Semantics.CoreContractEntryProfile.decodeWordOutcome?_ne_none_of_hasType
+example :=
+  @Solcore.Semantics.CoreContractEntryProfile.decodeWordOutcome?_isSome_of_hasType
 
 example :=
   Solcore.Semantics.CheckedCoreContract.decodeCompletion?_eq_map_decodeWordOutcome?

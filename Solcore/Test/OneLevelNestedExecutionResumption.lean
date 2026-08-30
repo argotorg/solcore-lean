@@ -60,7 +60,7 @@ private abbrev TerminalObservation :=
 
 private def terminalObservation? (result := scenario additionalFuel) :
     Option TerminalObservation :=
-  match result with
+  match result.view with
   | .completed terminal =>
       some
         (terminal.outcome,
@@ -84,7 +84,7 @@ private def splitMatchesOneShot (prefixFuel : Nat) : Bool :=
 
 private def rootOutOfFuelAt
     (fuel : Nat) (expectedChild : Option Word) : Bool :=
-  match scenario fuel with
+  match (scenario fuel).view with
   | .outOfFuel _ (.root frame) _ =>
       childStorageValue?
           frame.context.context.values.working.1 == expectedChild
@@ -92,7 +92,7 @@ private def rootOutOfFuelAt
 
 private def childOutOfFuelAt
     (fuel : Nat) (expectedChild : Option Word) : Bool :=
-  match scenario fuel with
+  match (scenario fuel).view with
   | .outOfFuel _ (.child frame) _ =>
       childStorageValue?
           frame.childContext.context.values.working.1 == expectedChild
@@ -189,10 +189,12 @@ example
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
     (terminal : TerminalResult initialWorld rootContract rootInvocation)
+    (completed : result.view = .completed terminal)
     (additional : Nat) :
-    resumeWithFuel (.completed terminal) additional = .completed terminal :=
-  resumeWithFuel_completed terminal additional
+    resumeWithFuel result additional = result :=
+  resumeWithFuel_completed result terminal completed additional
 
 example
     {initialWorld : WorldState}
@@ -201,10 +203,12 @@ example
     (registry : CheckedContractRegistry)
     (mode : Mode initialWorld rootContract rootInvocation)
     (reachable : Reachable registry mode)
+    (result : Result initialWorld rootContract rootInvocation)
+    (exhausted : result.view = .outOfFuel registry mode reachable)
     (additional : Nat) :
-    resumeWithFuel (.outOfFuel registry mode reachable) additional =
+    resumeWithFuel result additional =
       runMode registry additional mode reachable :=
-  resumeWithFuel_outOfFuel registry mode reachable additional
+  resumeWithFuel_outOfFuel registry mode reachable result exhausted additional
 
 example
     {initialWorld : WorldState}

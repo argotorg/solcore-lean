@@ -61,7 +61,7 @@ private def selfCallContract : CheckedCoreContract :=
     ⟨selfCallProgram, selfCallProgram_checked⟩ rfl
 
 private def selfCallRebasesStorage : Bool :=
-  match runScenario selfCallContract selfCallContract completionFuel with
+  match (runScenario selfCallContract selfCallContract completionFuel).view with
   | .completed terminal =>
       terminal.outcome ==
           FrameOutcome.returned (encodeWordBytesBE selfWrittenValue) &&
@@ -118,8 +118,8 @@ private def sequentialRootContract : CheckedCoreContract :=
     ⟨sequentialRootProgram, sequentialRootProgram_checked⟩ rfl
 
 private def sequentialCallsShareWorkingWorld : Bool :=
-  match runScenario sequentialRootContract incrementChildContract
-      completionFuel with
+  match (runScenario sequentialRootContract incrementChildContract
+      completionFuel).view with
   | .completed terminal =>
       terminal.outcome == FrameOutcome.returned (encodeWordBytesBE two) &&
         terminal.finalWorld.readStorage? childAddress sequentialSlot ==
@@ -154,7 +154,7 @@ private def mismatchRun :
 
 private def registryCodeMismatchFails : Bool :=
   (mismatchRegistry.resolve? mismatchWorld childAddress).isNone &&
-    match mismatchRun with
+    match mismatchRun.view with
     | .completed terminal =>
         terminal.outcome ==
             FrameOutcome.trapped ContractCallFailure.unavailable.code &&
@@ -181,7 +181,7 @@ private def missingAccountRun :=
     missingAccountRegistry completionFuel
 
 private def registeredMissingAccountFails : Bool :=
-  match missingAccountRun with
+  match missingAccountRun.view with
   | .completed terminal =>
       terminal.outcome ==
         FrameOutcome.trapped ContractCallFailure.unavailable.code
@@ -211,7 +211,7 @@ private def missingCodeRun :=
     (registry missingCodeRoot childReturnContract) completionFuel
 
 private def registeredMissingCodeFails : Bool :=
-  match missingCodeRun with
+  match missingCodeRun.view with
   | .completed terminal =>
       terminal.outcome ==
         FrameOutcome.trapped ContractCallFailure.unavailable.code
@@ -242,7 +242,7 @@ private def rollbackRootContract : CheckedCoreContract :=
     ⟨rollbackRootProgram, rollbackRootProgram_checked⟩ rfl
 
 private def rollbackDeltaQueriesExact : Bool :=
-  match runScenario rollbackRootContract childReturnContract completionFuel with
+  match (runScenario rollbackRootContract childReturnContract completionFuel).view with
   | .completed terminal =>
       terminal.outcome ==
           FrameOutcome.reverted (encodeWordBytesBE rootRevertPayload) &&

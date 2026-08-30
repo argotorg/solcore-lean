@@ -11,6 +11,8 @@ open Solcore.Core
 open Solcore.Semantics
 open OneLevelNestedExecution
 
+example := @Result.eq_of_view_eq
+
 example
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
