@@ -16,7 +16,7 @@ Examples are pretty-printed for readability; canonical encoding is compact.
 | Oracle schema | `solcore-oracle/v5` |
 | Specification | `solcore/0.1.0-draft.5` |
 | Profile ID | `contract-m3a-v1` |
-| Profile digest | `sha256:615de959ac8cb6c7e9b91fe6b45ec578a7143d5f74ec092316901cf76431cf46` |
+| Profile digest | `sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5` |
 | Capability schema | `solcore-capabilities/v5` |
 | Core schema | `solcore-semantic-core/v3` |
 | Check-result schema | `solcore-core-check-result/v3` |
@@ -54,7 +54,7 @@ Every request is this exact object:
   "spec": "solcore/0.1.0-draft.5",
   "profile": {
     "id": "contract-m3a-v1",
-    "digest": "sha256:615de959ac8cb6c7e9b91fe6b45ec578a7143d5f74ec092316901cf76431cf46"
+    "digest": "sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5"
   },
   "limits": {
     "jsonDepth": 2048,
@@ -71,20 +71,25 @@ Every request is this exact object:
 ```
 
 All eight limit fields are required. The numbers above are the advertised
-defaults, not decoder fallbacks. A missing, malformed, or out-of-range limit is
-a protocol error. `calldataBytes` must be strictly less than `2^256`. Zero is a
-valid value for every limit.
+defaults, not decoder fallbacks. Every field is an otherwise-unbounded natural;
+the sole additional range constraint is `calldataBytes < 2^256`. A missing or
+malformed natural is `oracle.wire.missing-field` or
+`oracle.wire.expected-natural`; violation of that sole range constraint is
+`oracle.wire.invalid-limit`. Zero is valid for every limit.
 
 ### Counting rules
 
 - A JSON node is one object, array, string, number, Boolean, or `null`. The root
   has depth one; every contained value increases depth by one. `jsonNodes` and
   `jsonDepth` measure the complete parsed request, including unknown subtrees.
-- A Core node is one Program, DataDefinition, Type, or Expression from Core
-  Wire v3. Embedded Types count recursively. Operator strings, tags, natural
-  identities, and array containers add no Core node. `coreNodes` is the sum for
-  every Program in the request. `coreDepth` is the greatest Program-to-Core-node
-  nesting depth among them, with the Program at depth one.
+- A Core node is one expected Program, DataDefinition, Type, or Expression
+  position from Core Wire v3. Embedded Types count recursively. Operator
+  strings, tags, natural identities, and array containers add no Core node.
+  `coreNodes` is the sum for every Program in the request. `coreDepth` is the
+  greatest Program-to-Core-node nesting depth among them, with the Program at
+  depth one. The Core decoder consumes the depth and node budget before
+  validating the node at that position. Thus a malformed node exactly at a
+  budget boundary selects `inconclusive`, not a protocol error.
 - `scenarioEntries` is the sum of the lengths of `contracts`, every
   `staticWordAbi.methods`, `world.accounts`, every account's `storage`,
   `callRegistry`, `creationTemplates`, `creationAddressPolicy.routes`, and
@@ -93,9 +98,21 @@ valid value for every limit.
 - `calldataBytes` measures the decoded byte length, not hexadecimal source
   characters. `evaluationSteps` is passed unchanged as executor fuel.
 
-The first exceeded resource in this order is reported: `jsonDepth`,
-`jsonNodes`, `coreDepth`, `coreNodes`, `scenarioEntries`, `identifierBytes`,
-then `calldataBytes`. Execution fuel is considered only after admission.
+Resource and structural selection is ordered as follows:
+
+1. recover and validate the shallow schema, request ID, and complete Limits;
+2. measure whole-tree `jsonDepth`, then `jsonNodes`, including unknown subtrees;
+3. decode exact Oracle envelope/scenario structure and non-Core scalars, treating
+   each embedded Program subtree as opaque;
+4. decode Programs in canonical package order, consuming `coreDepth` and then
+   `coreNodes` before validating each expected Core node;
+5. after structural decoding, measure `scenarioEntries`, `identifierBytes`, then
+   `calldataBytes`; and
+6. perform semantic checking, admission, materialization, and execution.
+
+Execution fuel is considered only after admission. A structural error found in
+step 3 precedes the later typed-size measurements; a Core budget exhausted at
+the same node as a Core structural error precedes that error.
 
 ## Queries
 
@@ -305,7 +322,7 @@ Every non-protocol response is this exact object:
   "spec": "solcore/0.1.0-draft.5",
   "profile": {
     "id": "contract-m3a-v1",
-    "digest": "sha256:615de959ac8cb6c7e9b91fe6b45ec578a7143d5f74ec092316901cf76431cf46"
+    "digest": "sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5"
   },
   "query": "coreCheck",
   "verdict": {}
@@ -354,7 +371,10 @@ The resource-to-phase mapping is fixed:
 {
   "kind": "accepted",
   "phase": "coreChecking",
-  "result": { "schema": "solcore-core-check-result/v3", "value": {} }
+  "result": {
+    "schema": "solcore-core-check-result/v3",
+    "value": { "resultType": "word" }
+  }
 }
 ```
 
@@ -373,7 +393,7 @@ the matching fixed schema.
       "code": "oracle.v5.root.target-absent",
       "severity": "error",
       "phase": "rootInstallation",
-      "path": ["world", "accounts"],
+      "path": ["world", "accounts", "0x0000000000000000000000000000000000000001"],
       "arguments": { "target": "0x0000000000000000000000000000000000000001" },
       "display": null
     }
@@ -381,10 +401,11 @@ the matching fixed schema.
 }
 ```
 
-`diagnostics` is exactly a singleton in v5. Its phase equals the verdict phase.
-`path` is an array of semantic path strings; `arguments` is always an object;
-and canonical responses set `display` to `null`. Rejection is available to
-`coreCheck` and `execute`, not `capabilities`.
+`diagnostics` is exactly a singleton in v5. Its phase equals the verdict phase,
+its `severity` is exactly `error`, and canonical responses set `display` to
+`null`. `path` is an array of semantic path strings and `arguments` is always an
+object. Rejection is available to `coreCheck` and `execute`, not
+`capabilities`.
 
 ### Inconclusive verdict
 
@@ -399,10 +420,10 @@ and canonical responses set `display` to `null`. Rejection is available to
 ```
 
 For pre-execution resources, `consumed` is the exact measured demand and is
-strictly greater than `limit`. For fuel exhaustion, `limit` and `consumed` are
-both the supplied `evaluationSteps`. Only `coreCheck` and `execute` may be
-inconclusive. `coreCheck` uses only the seven pre-execution resources;
-`execute` may additionally use `evaluationSteps`.
+strictly greater than `limit`. All three queries may return such an
+`inconclusive` verdict because their complete envelopes are budgeted. For fuel
+exhaustion, `limit` and `consumed` are both the supplied `evaluationSteps`;
+this case is available only to `execute`.
 
 ### Executed verdict
 
@@ -411,7 +432,14 @@ inconclusive. `coreCheck` uses only the seven pre-execution resources;
   "kind": "executed",
   "observation": {
     "schema": "solcore-contract-execution/v1",
-    "value": {}
+    "value": {
+      "outcome": { "kind": "preflightRejected", "reason": "senderAbsent" },
+      "journal": { "logs": [], "createdAddresses": [] },
+      "state": {
+        "schema": "solcore-world-state-observation/v1",
+        "probes": []
+      }
+    }
   }
 }
 ```
@@ -425,21 +453,27 @@ observation.
 ```json
 {
   "kind": "internalError",
-  "phase": "observationEncoding",
+  "phase": null,
   "code": "oracle-response-invariant"
 }
 ```
 
-`phase` is a Phase or `null`. The closed defensive codes are
-`core-wire-projection-failed`, `world-code-reference-invariant`, and
-`oracle-response-invariant`. They are not substitutes for a listed rejection
-or inconclusive case.
+The defensive code-to-phase mapping is closed:
+
+| Code | Phase |
+| --- | --- |
+| `core-wire-projection-failed` | `observationEncoding` |
+| `world-code-reference-invariant` | `observationEncoding` |
+| `oracle-response-invariant` | `null` |
+
+These failures are not substitutes for a listed rejection or inconclusive
+case.
 
 ### Query/verdict compatibility
 
 | Query | Allowed verdicts |
 | --- | --- |
-| `capabilities` | `accepted`, `internalError` |
+| `capabilities` | `accepted`, `inconclusive`, `internalError` |
 | `coreCheck` | `accepted`, `rejected`, `inconclusive`, `internalError` |
 | `execute` | `rejected`, `inconclusive`, `executed`, `internalError` |
 
@@ -467,10 +501,119 @@ The accepted capability result uses schema `solcore-capabilities/v5`. Its
 | `baselines` | canonical existing `implementationBaselines` array |
 | `features` | canonical `m3aContractFeatureMatrix` array |
 
-The complete profile object, baseline object shape, and FeatureRow object shape
-are the existing canonical metadata encodings; v5 does not introduce aliases
-for them. The capability report is a singleton: decoding accepts only values
-equal to this derived canonical object.
+The exact `baselines` value is:
+
+```json
+[
+  {
+    "implementation": "solcore-haskell",
+    "nativeSettings": {
+      "bytecodeRuntime": "prague",
+      "externalYulCompilerTarget": null,
+      "generatedDispatch": true,
+      "nativeBackendTarget": null,
+      "primitiveSurface": "osaka",
+      "solver": "legacy"
+    },
+    "notes": "Defaults are evidence only. The external Yul compiler target is not pinned.",
+    "repository": "https://github.com/argotorg/solcore",
+    "revision": "1d490d8bb5f374356f06e0720655496482eb1fb4",
+    "role": "upstreamEvidence",
+    "standardLibraryBundle": "canonical-haskell-1d490d8"
+  },
+  {
+    "implementation": "solcore-rs",
+    "nativeSettings": {
+      "bytecodeRuntime": "osaka",
+      "externalYulCompilerTarget": null,
+      "generatedDispatch": true,
+      "nativeBackendTarget": "osaka",
+      "primitiveSurface": "osaka",
+      "solver": "tabled"
+    },
+    "notes": "The vendored std is older, and the external Yul compiler target is not pinned.",
+    "repository": "https://github.com/argotorg/solcore-rs",
+    "revision": "38f4778ea461edfe59106bdb1f9f08c3307b0fc0",
+    "role": "comparisonImplementation",
+    "standardLibraryBundle": "rust-compatibility-ac6f8957"
+  }
+]
+```
+
+The exact `features` value is:
+
+```json
+[
+  {
+    "adr": "0151",
+    "feature": "coreProductsV1",
+    "leanStatus": "implemented",
+    "leanTarget": "M3a",
+    "note": "Checked Core products and projections are published by Core Wire v3.",
+    "specStatus": "normative"
+  },
+  {
+    "adr": "0151",
+    "feature": "coreFunctionsV1",
+    "leanStatus": "implemented",
+    "leanTarget": "M3a",
+    "note": "Checked Core lambdas, application, and lexical closures are published.",
+    "specStatus": "normative"
+  },
+  {
+    "adr": "0151",
+    "feature": "coreSumsV1",
+    "leanStatus": "implemented",
+    "leanTarget": "M3a",
+    "note": "Checked Core sums, injections, and case analysis are published.",
+    "specStatus": "normative"
+  },
+  {
+    "adr": "0151",
+    "feature": "coreLocalCellsV1",
+    "leanStatus": "implemented",
+    "leanTarget": "M3a",
+    "note": "Checked Core local cell allocation, reads, and writes are published.",
+    "specStatus": "normative"
+  },
+  {
+    "adr": "0151",
+    "feature": "coreNamedDataV1",
+    "leanStatus": "implemented",
+    "leanTarget": "M3a",
+    "note": "Checked named data construction and matching are published.",
+    "specStatus": "normative"
+  },
+  {
+    "adr": "0151",
+    "feature": "coreExtendedWordOperationsV1",
+    "leanStatus": "implemented",
+    "leanTarget": "M3a",
+    "note": "The complete current checked Word operator algebra is published.",
+    "specStatus": "normative"
+  },
+  {
+    "adr": "0151",
+    "feature": "checkedContractExecutionV1",
+    "leanStatus": "implemented",
+    "leanTarget": "M3a",
+    "note": "Checked contracts execute through the balanced state lifecycle.",
+    "specStatus": "normative"
+  },
+  {
+    "adr": "0151",
+    "feature": "staticWordAbiV1",
+    "leanStatus": "implemented",
+    "leanTarget": "M3a",
+    "note": "Static uint256-to-uint256 ABI dispatch is published.",
+    "specStatus": "normative"
+  }
+]
+```
+
+The complete profile object is the linked canonical profile JSON. The capability
+report is a singleton: decoding accepts only a value equal to these exact
+derived fields and arrays.
 
 ## Core-check result and diagnostics
 
@@ -680,10 +823,10 @@ A protocol error is outside the response union and has exactly:
   "kind": "protocolError",
   "schema": "solcore-oracle/v5",
   "id": null,
-  "code": "unknown-field",
+  "code": "oracle.wire.unknown-field",
   "path": "/query/future",
   "arguments": { "field": "future" },
-  "display": "unknown field: future"
+  "display": "invalid Oracle v5 value"
 }
 ```
 
@@ -729,13 +872,30 @@ Each invalid Word, Address, or Bytes value uses exactly `{"reason": <string>}`;
 the closed reason strings are `prefix`, `length`, `lowercase-hex`, and, only for
 Bytes, `odd-length`. `invalid-request-id` uses
 `{"constraint":"nonempty-utf8"}`. `invalid-limit` uses exactly `field` and
-`constraint` strings.
+`constraint` strings. Its only v5 instance is
+`{"field":"calldataBytes","constraint":"strictly-less-than-2^256"}`.
+
+Shape decoding precedes scalar constraints at a field: for example, a negative
+or fractional limit is `oracle.wire.expected-natural`, while a natural
+`calldataBytes >= 2^256` is `oracle.wire.invalid-limit`. Dedicated
+`invalid-schema`, `invalid-spec`, and `invalid-profile` take precedence over
+generic `invalid-tag`; `invalid-tag` owns all other closed-enum or literal
+mismatches. Lexicographic structural traversal and the resource rules above
+select the path when more than one failure exists.
 
 An `oracle.wire.*` error has display `invalid Oracle v5 value`; a
 `core.wire.*` error has display `invalid Semantic Core v3 program`. Declared
 budget excess is never a protocol code: it is the outer `inconclusive` verdict.
 Duplicate entries in keyed arrays are typed scenario rejections, not protocol
 errors.
+
+This catalog also closes the direct v5 text codec. The compatible NDJSON
+dispatcher first parses enough JSON to select an exact schema discriminator;
+malformed text or a missing/non-v5 discriminator therefore follows the existing
+dispatcher error path and cannot produce a v5 `malformed-json` or
+`oracle.wire.invalid-schema`. Those two codes remain reachable through the
+direct codec. Once NDJSON has selected exact v5, all later failures use this v5
+catalog. No v1-v4 dispatch or error encoding changes.
 
 ## Canonical ordering and validation
 
