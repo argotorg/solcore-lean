@@ -275,4 +275,56 @@ theorem resumeWithFuel_runMode_add
       runMode registry (fuel + first + second) mode reachable := by
   rw [resumeWithFuel_runMode, resumeWithFuel_runMode]
 
+/-- Splitting fuel at the installed-root API is exactly one larger run. -/
+theorem resumeWithFuel_run
+    {initialWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (registry : CheckedContractRegistry)
+    (fuel additional : Nat) :
+    resumeWithFuel
+        (run rootContract rootInvocation installed registry fuel) additional =
+      run rootContract rootInvocation installed registry
+        (fuel + additional) := by
+  exact resumeWithFuel_runMode registry fuel additional
+    (Mode.initialRoot rootContract rootInvocation installed)
+    (.initial installed)
+
+/-- Zero additional fuel is an identity for every installed-root run. -/
+@[simp] theorem resumeWithFuel_run_zero
+    {initialWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (registry : CheckedContractRegistry)
+    (fuel : Nat) :
+    resumeWithFuel
+        (run rootContract rootInvocation installed registry fuel) 0 =
+      run rootContract rootInvocation installed registry fuel := by
+  rw [resumeWithFuel_run]
+  simp only [Nat.add_zero]
+
+/-- Sequential resumption at the public API uses the summed shared budget. -/
+theorem resumeWithFuel_run_add
+    {initialWorld : WorldState}
+    (rootContract : CheckedCoreContract)
+    (rootInvocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld rootInvocation.target
+        rootContract)
+    (registry : CheckedContractRegistry)
+    (fuel first second : Nat) :
+    resumeWithFuel
+        (resumeWithFuel
+          (run rootContract rootInvocation installed registry fuel) first)
+        second =
+      run rootContract rootInvocation installed registry
+        (fuel + first + second) := by
+  rw [resumeWithFuel_run, resumeWithFuel_run]
+
 end Solcore.Semantics.OneLevelNestedExecution
