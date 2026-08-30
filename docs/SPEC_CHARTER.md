@@ -2,7 +2,7 @@
 
 - Status: Active
 - Adopted: 2026-07-23
-- Development policy amended: 2026-08-27
+- Development policy amended: 2026-08-30
 
 This charter defines what counts as Solcore specification work. Revision-local
 progress belongs in [Current status](CURRENT_STATUS.md), not in this document.
@@ -46,20 +46,22 @@ define Semantic Core meaning.
 
 | Protocol | Closed purpose | Input |
 | --- | --- | --- |
+| Oracle v1 | Legacy compatibility and capability discovery | Legacy request envelope |
 | Oracle v2 | Historical Core checking and evaluation | Semantic Core v1 |
-| Oracle v3 | Current Core checking and evaluation | Semantic Core v2 |
+| Oracle v3 | Frozen Core checking and evaluation | Semantic Core v2 |
 | Oracle v4 | Restricted single-file parsing | Surface v1 |
+| Oracle v5 | Core checking and checked-contract execution | Semantic Core v3 and an explicit scenario |
 
 Publication is immutable and additive. A new internal Core constructor does
-not change Semantic Core v1 or v2. A future public Core requires a new schema,
-profile, capabilities document, Oracle boundary, resource contract, and golden
-corpus.
+not change Semantic Core v1, v2, or v3. A later public Core extension requires
+a new schema, profile, capabilities document, Oracle boundary, resource
+contract, and conformance corpus.
 
 ## Development direction
 
-ADR-0018 pauses new grammar-dependent proof work while concrete syntax is
-unstable. Active implementation targets a syntax-independent Core vNext and
-explicit runtime semantics.
+New grammar-dependent proof work is paused while concrete syntax is unstable.
+The current completed boundary is syntax-independent Semantic Core v3,
+explicit checked-contract runtime semantics, and Oracle v5 publication.
 
 This is an implementation-order decision. It does not deprecate or change any
 published parser, Core language, profile, or result.
@@ -110,13 +112,15 @@ divergence boundary before weakening that theorem.
 
 ## Contract observation
 
-Future contract execution makes the initial state, transaction sequence, and
-EVM revision explicit. Standard observations may include halt status,
-returndata, storage and balance deltas, logs, external calls, and created
-contracts.
+Oracle v5 contract execution makes its initial world, immutable environment,
+invocation, resource limits, and requested state probes explicit. Its standard
+observation contains terminal status and data, initial/committed state
+endpoints, committed Word logs, and successfully created addresses.
 
 Bytecode identity, optimizer traces, generated names, and wall-clock time are
-not standard semantic observations. Gas requires its own fork-pinned profile.
+not standard semantic observations. The current model does not claim EVM
+equivalence. Gas and EVM-revision-sensitive behavior require separate,
+fork-pinned profiles.
 
 ## Trust and audit
 

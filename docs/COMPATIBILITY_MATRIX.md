@@ -22,24 +22,23 @@ settings, or different EVM revisions do not belong to this baseline.
 | Lean boundary | Adapter state | Valid claim |
 | --- | --- | --- |
 | Semantic Core v2 / Oracle v3 | Neither compiler consumes the Core wire | Lean supplies closed semantic fixtures, not source-level three-way conformance |
+| Semantic Core v3 / Oracle v5 `coreCheck` | Neither compiler consumes Core Wire v3 | Lean can check closed current-Core fixtures; no cross-compiler acceptance claim follows |
 | Surface v1 / Oracle v4 | Parser fixtures can share source text | Restricted parser outcomes can be compared |
 | Workspace identity | Internal Lean values | Logical identity behavior is specified but has no external adapter |
 | Frozen Multi frontend | Internal certified one-file API | Frozen lexical, parse, structural, location, and token behavior can be investigated |
 | Resolution and elaboration | No Lean implementation | No source semantic comparison exists |
-| Contract runtime | Internal storage/frame carriers, input-indexed handled storage, call-value observation, and explicit caller-address observation; no compiler adapter | Lean can test exact internal working-state and parent-resolution behavior, but no end-to-end compiler conformance claim exists |
+| Checked-contract runtime / Oracle v5 `execute` | Public Core/scenario and normalized observation; no external compiler adapter | Lean execution is reproducible, but no end-to-end or cross-compiler conformance claim exists |
 
-The internal runtime row includes typed Core requests, a generic fuel-preserving
-host driver, and a combined handler for one separately selected working-storage
-Account. One immutable execution input supplies the selected code Address, a
-caller-chosen Word, and one explicit caller Address. Internal `callValue` and
-`callerAddress : unit -> word` observe those values; caller observation is a
-weak explicit input, needs no Account, and does not alter the completed driver
-context. Caller-only variation, fuel boundaries, parent-indexed completion, and
-resolution-fold consumption are checked internally. This boundary is complete
-and unpublished. Frozen Core Wire v1/v2 reject the host-function values, and no
-Oracle or compiler adapter exposes the driver. Neither the caller Address nor
-the call-value Word defines provenance, authority, balance movement,
-transaction commit, or rollback.
+Oracle v5 publishes the checked-contract model: a finite package, initial
+world, call and creation environment, invocation, limits, probes, and total
+result. It makes Lean runs reproducible and gives future adapters a comparison
+target. The Haskell and Rust compilers do not currently consume Core Wire v3 or
+emit the v5 observation format, so publication alone establishes no agreement
+with either compiler.
+
+The v5 runtime defines its own checked Core, depth-one calls, balances,
+creation, logs, commit, and rollback behavior. It does not assert that those
+rules are equivalent to compiler-generated EVM bytecode or to any EVM revision.
 
 ## Evidence rules
 
@@ -79,10 +78,11 @@ is classified.
 
 ## Current limitations
 
-The Haskell and Rust compilers do not consume Semantic Core v1 or v2, so Core
-results cannot yet establish end-to-end source conformance. Oracle v4 stops at
-parsing. The internal Multi frontend now includes structural certification,
-but it still performs no name resolution, source typing, or elaboration.
+The Haskell and Rust compilers do not consume Semantic Core v1, v2, or v3, so
+Core results cannot establish end-to-end source conformance. Oracle v4 stops at
+parsing, while Oracle v5 starts from already structured Core and a scenario.
+There is no Lean resolution, source-typing, or source-to-Core elaboration path
+connecting those interfaces.
 
 Consequently there is currently no valid three-way claim about:
 
@@ -90,24 +90,23 @@ Consequently there is currently no valid three-way claim about:
 - polymorphism or class resolution;
 - comptime staging;
 - source-to-Core meaning;
-- contract dispatch;
-- ABI behavior;
-- source-level storage, transaction commit, or rollback; or
+- cross-compiler contract dispatch or ABI behavior;
+- cross-compiler source-level storage, transaction commit, or rollback; or
 - EVM execution observations.
 
 ## Semantics-first comparison plan
 
-During Core vNext development, tests should isolate semantic choices as closed
-Core fixtures. Compiler comparisons resume at source level only after a
-stabilized Surface adapter elaborates those fixtures into the same Core
-meaning.
+Core v3 fixtures can isolate semantic choices at the checked Core boundary.
+Compiler comparisons can resume at source level only after a stabilized source
+frontend resolves, types, and elaborates programs into the same Core meaning,
+and after each external implementation has an adapter to normalized results.
 
 For contract execution, every comparison must align:
 
 - language and feature profile;
 - exact source and standard-library bytes;
 - initial state and transaction sequence;
-- EVM revision;
+- execution model and, for EVM comparisons, EVM revision;
 - resource limits; and
 - observation schema.
 
