@@ -48,11 +48,12 @@ Semantic Core is the executable language definition. It owns:
 - correspondence between relations and executors; and
 - progress, preservation, and fault-exclusion results.
 
-The existing Core v2 fragment is closed and published. New features extend the
-internal Core additively. Old wire languages remain projections and must
-reject new constructors.
+Semantic Core v1 and v2 remain closed historical languages. Semantic Core v3
+publishes the current checked language through Core Wire v3 and Oracle v5.
+Later internal extensions are additive, and every older wire must reject
+constructors outside its own closed algebra.
 
-Core vNext includes local mutation through explicit typed cells. Cell
+Core v3 includes local mutation through explicit typed cells. Cell
 references are ordinary internal values, while the local store is a separate
 component of evaluation and machine state. Closures capture references in
 their lexical environments; they do not copy the store. This makes sharing
@@ -1015,8 +1016,9 @@ commits its working journal. World and journal rebasing occur together.
 canonical host tables have 14 entries and index 14 is first unbound. The
 generic storage policy reports this request as unsupported before handling;
 the transaction-aware policy supports it and attributes the log to the active
-`currentAddress`. Frozen Wire v1/v2 still reject the host value. ABI event
-encoding and public Oracle schemas remain separate layers.
+`currentAddress`. Frozen Wire v1/v2 still reject the host value. Oracle v5
+exposes committed Word logs; general ABI event encoding remains a separate
+layer.
 
 ADR-0150 adds a parser-independent ABI layer above this executor. A Static Word
 contract pairs validated `uint256 -> uint256` metadata with checked Core
@@ -1031,10 +1033,20 @@ The ABI profile accepts exactly 36 required bytes plus an ignored suffix and
 returns exactly one 32-byte Word. Short input and unknown selectors are stable
 reverts, hence select the same root checkpoint as any other revert. Successful
 selected methods use the existing storage, nested-call, balance, creation, log,
-delta, and resumption rules. The next boundary serializes these inputs and
-total observations through a new Oracle version; frozen Oracle v1-v4 remain
+delta, and resumption rules. Oracle v5 serializes this contract package together
+with an explicit initial world, environment, invocation, limits, and probes. It
+returns a total verdict and, for terminal execution, canonical outcome, journal,
+and requested initial/committed state observations. Frozen Oracle v1-v4 remain
 unchanged. Source field-to-slot layout is a later elaboration concern, not a
 prerequisite for executing or publishing exact Word-slot semantics.
+
+Core Wire v3 is the corresponding closed program representation. Its strict
+decoder checks canonical scalar forms and explicit Core depth/node budgets
+before checking a Program against the frozen host context. Oracle v5 then
+admits only checked programs, validates finite scenario references, installs
+the selected root, and invokes the balanced executor. Protocol errors,
+pre-execution resource exhaustion, semantic rejection, execution, and internal
+invariant failure remain distinct result classes.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
@@ -1094,13 +1106,14 @@ An executable function is not used as its own specification.
 | Boundary | Role | Change policy |
 | --- | --- | --- |
 | Semantic Core v1 / Oracle v2 | Frozen historical Core | No reinterpretation |
-| Semantic Core v2 / Oracle v3 | Current published Core | No reinterpretation |
+| Semantic Core v2 / Oracle v3 | Frozen Core predecessor | No reinterpretation |
 | Surface v1 / Oracle v4 | Current published parser | No reinterpretation |
 | Internal Multi frontend | Frozen grammar reference | No active grammar proof expansion |
-| Core vNext | Active internal semantics | Additive and unpublished |
+| Semantic Core v3 / Oracle v5 | Current checked Core and contract execution | No reinterpretation |
+| Later Core/runtime extensions | Outside the current public boundary | Additive publication only |
 
-A future publication receives a new schema, profile, capability report, limits,
-golden corpus, and Oracle version. Internal progress never changes an existing
+A later publication receives a new schema, profile, capability report, limits,
+conformance corpus, and Oracle version. Internal work never changes an existing
 profile.
 
 ## Dependency policy

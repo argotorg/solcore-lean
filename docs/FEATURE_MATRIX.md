@@ -18,17 +18,25 @@ Status meanings:
 | --- | --- | --- | --- | --- |
 | Version and profile separation | Normative | Complete | Oracle v1 and later | None |
 | Verdict categories | Normative | Complete | Oracle v1 and later | None |
-| Core unit, bool, word | Normative | Complete | Oracle v2/v3 | None |
-| Immutable Core binding | Normative | Complete | Oracle v2/v3 | None |
-| Core conditional | Normative | Complete | Oracle v2/v3 | None |
-| M1c primitive subset | Normative | Complete | Oracle v3 | None |
+| Core unit, bool, word | Normative | Complete | Oracle v2/v3/v5 | None |
+| Immutable Core binding | Normative | Complete | Oracle v2/v3/v5 | None |
+| Core conditional | Normative | Complete | Oracle v2/v3/v5 | None |
+| M1c primitive subset | Normative | Complete | Oracle v3/v5 | None |
+| Core v3 extended algebra | Normative | Complete | Core Wire v3 / Oracle v5 | None |
+| Checked-contract execution | Normative | Complete | Oracle v5 | None |
+| Canonical execution observations | Normative | Complete | Oracle v5 | None |
+| Static Word ABI profile | Normative | Complete | Oracle v5 `staticWordAbiV1` | None |
 | Surface v1 parser | Normative | Complete | Oracle v4 | High; frozen |
 
 The M1c primitive subset contains boolean and word negation, modular word
 addition/subtraction/multiplication, total unsigned division/modulo, word
 equality and greater-than, bitwise operations, and bounded logical shifts.
 
-## Internal Semantic Core roadmap
+## Semantic Core v3 feature inventory
+
+Rows marked Complete in this section are included in the closed Core Wire v3
+language. Planned and Blocked rows are not part of that public algebra. Core
+Wire v1 and v2 remain frozen and reject their later forms.
 
 | Feature | Decision | Lean status | Required proof boundary | Syntax coupling |
 | --- | --- | --- | --- | --- |
@@ -186,8 +194,9 @@ equality and greater-than, bitwise operations, and bounded logical shifts.
 | Rollback-aware transaction observations | Complete | [ADR-0149](adr/0149-rollback-aware-logs-and-transaction-observations.md) adds ordered duplicate-preserving word logs and successful-creation enumeration to total results. Root, child, and initializer commit/rollback, balance and creation preflight identity, and exactly-once fuel resumption are proved and tested. Frozen Wire v1/v2 reject the append-only index-13 host value | None |
 | Source storage layout and declaration mapping | Blocked | A layout/elaboration ADR is still required; this is separate from the completed internal Core slot read/write runtime | Low |
 | Additional call kinds | Planned | Recursive depth and delegate/static-call policy remain later work | None |
-| ABI-level logs and canonical public observations | Planned | Event signatures, multiple topics, byte payloads, normalization, and public result schemas follow the completed internal word-log journal | None |
-| Static Word ABI support rule | Complete | Explicit `uint256` metadata, canonical signature, Ethereum Keccak selector, calldata decode, returndata encode, checked implementation admission, and lifecycle connection are complete; no public Wire profile yet | None |
+| Canonical public execution observations | Complete | Oracle v5 publishes terminal outcomes, requested initial/committed state endpoints, committed Word logs, and successful creation addresses | None |
+| General ABI events and logs | Planned | Event signatures, multiple topics, arbitrary byte payloads, and source-level event declarations are not part of the Word-log profile | Medium |
+| Static Word ABI support rule | Complete | Oracle v5 profile `staticWordAbiV1` publishes explicit `uint256 -> uint256` methods, derived selectors, checked admission, calldata routing, and lifecycle execution | None |
 | Selector collision rejection | Complete | Duplicate signatures and distinct-signature four-byte collisions are rejected before dispatcher generation, with canonical error selection and permutation-invariant acceptance/rejection class | None |
 | EVM revision policy | Direction accepted | execution implementation absent | None |
 | Gas observation | Deferred | fork and gas schedule | None |
@@ -213,11 +222,12 @@ next Surface version.
 
 ## Public compatibility rule
 
-Semantic Core v1, Semantic Core v2, and Surface v1 are closed algebras. New Core
-vNext constructors outside those algebras must fail their old wire projection.
-This includes the cell forms accepted by ADR-0022 and every named-data form or
-nonempty definition table accepted by ADR-0023. ADR-0024 adds no constructor:
-its conversions expand into existing expressions, so each projection treats
-them exactly like the corresponding handwritten expansion. Publication of any
-new tag still requires a new additive version. ADR-0025 likewise adds no tag:
-wire v1 rejects its primitive expansion and wire v2 projects existing forms.
+Semantic Core v1, Semantic Core v2, Semantic Core v3, and Surface v1 are closed
+algebras. Core Wire v3 and Oracle v5 publish the current checked language and
+contract runtime without reinterpreting v1-v4. A later Core constructor outside
+v3 must fail projection to every older wire that does not contain it. Any new
+public tag or behavior requires an additive Core and Oracle version.
+
+The public v5 boundary does not provide the frozen source frontend's missing
+resolution, source typing, or elaboration stages. It also does not expand the
+Static Word ABI into a general ABI; those remain separate rows above.
