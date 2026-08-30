@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.Observation
+import Solcore.Oracle.V5.ObservationValidity
 import Solcore.Oracle.V5.Wire.Scalar
 
 /-! Canonical JSON encoding for total Oracle v5 execution observations. -/
@@ -110,7 +110,7 @@ def encodeStateObservation (state : StateObservation) : Lean.Json :=
     ("probes", .arr <| state.probes.toArray.map encodeProbeObservation)
   ]
 
-def encodeExecutionObservationValue
+private def encodeExecutionObservationValue
     (observation : ExecutionObservation) : Lean.Json :=
   .mkObj [
     ("outcome", encodeTerminalOutcome observation.outcome),
@@ -120,10 +120,10 @@ def encodeExecutionObservationValue
 
 /-- Encode the complete value beneath an `executed` verdict. -/
 def encodeExecutionObservation
-    (observation : ExecutionObservation) : Lean.Json :=
+    (observation : ValidExecutionObservation) : Lean.Json :=
   .mkObj [
     ("schema", executionSchema),
-    ("value", encodeExecutionObservationValue observation)
+    ("value", encodeExecutionObservationValue observation.value)
   ]
 
 end Solcore.Oracle.V5

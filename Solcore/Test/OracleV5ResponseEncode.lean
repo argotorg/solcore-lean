@@ -138,8 +138,13 @@ private def emptyObservation : ExecutionObservation := {
   state := { probes := [] }
 }
 
+private def validEmptyObservation : ValidExecutionObservation :=
+  ⟨emptyObservation, by
+    simp [ExecutionObservation.Valid, JournalObservation.Empty,
+      StateObservation.RollbackExact, emptyObservation]⟩
+
 private def executedObservationExact : Bool :=
-  (encodeExecuteVerdict (.executed emptyObservation)).compress ==
+  (encodeExecuteVerdict (.executed validEmptyObservation)).compress ==
     "{\"kind\":\"executed\",\"observation\":{" ++
     "\"schema\":\"solcore-contract-execution/v1\",\"value\":{" ++
     "\"journal\":{\"createdAddresses\":[],\"logs\":[]}," ++

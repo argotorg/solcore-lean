@@ -90,6 +90,9 @@ private def observation : ExecutionObservation := {
   state := { probes }
 }
 
+private def validObservation : ValidExecutionObservation :=
+  ⟨observation, by simp [ExecutionObservation.Valid, observation]⟩
+
 private def stateSchemaAndOrderExact : Bool :=
   let encoded := encodeStateObservation observation.state
   match encoded.getObjValAs? String "schema",
@@ -99,7 +102,7 @@ private def stateSchemaAndOrderExact : Bool :=
   | _, _ => false
 
 private def executionSchemaAndFieldsExact : Bool :=
-  let encoded := encodeExecutionObservation observation
+  let encoded := encodeExecutionObservation validObservation
   match encoded.getObjValAs? String "schema",
       encoded.getObjVal? "value" with
   | .ok schema, .ok value =>
