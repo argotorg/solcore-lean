@@ -27,6 +27,19 @@ namespace RejectedResult
     (ofFailure initialWorld failure).committedDelta = .exact := by
   rfl
 
+@[simp] theorem ofFailure_committedJournal
+    (initialWorld : WorldState)
+    (failure : BalanceTransferFailure) :
+    (ofFailure initialWorld failure).committedJournal =
+      TransactionJournal.empty := by
+  rfl
+
+@[simp] theorem committedJournal_eq_empty
+    {initialWorld : WorldState}
+    (rejected : RejectedResult initialWorld) :
+    rejected.committedJournal = TransactionJournal.empty :=
+  rejected.committedJournal_empty
+
 theorem committedDelta_accountEndpoints_identity
     {initialWorld : WorldState}
     (rejected : RejectedResult initialWorld)
@@ -93,6 +106,24 @@ theorem committedWorld?_rejected
       some ⟨rejected.finalWorld, rejected.committedDelta⟩ := by
   simp [committedWorld?, observed]
 
+theorem workingJournal?_rejected
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (rejected : RejectedResult initialWorld)
+    (observed : result.view = .rejected rejected) :
+    result.workingJournal? = some TransactionJournal.empty := by
+  simp [workingJournal?, observed]
+
+theorem committedJournal?_rejected
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (rejected : RejectedResult initialWorld)
+    (observed : result.view = .rejected rejected) :
+    result.committedJournal? = some TransactionJournal.empty := by
+  simp [committedJournal?, observed]
+
 theorem finalWorld?_completed
     {initialWorld : WorldState} {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
@@ -126,6 +157,28 @@ theorem committedWorld?_completed
     result.committedWorld? = some ⟨terminal.finalWorld, terminal.committedDelta⟩ := by
   simp [committedWorld?, outer, inner]
 
+theorem workingJournal?_completed
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (execution : OneLevelNestedExecution.Result initialWorld rootContract rootInvocation)
+    (terminal : OneLevelNestedExecution.TerminalResult initialWorld rootContract rootInvocation)
+    (outer : result.view = .execution execution)
+    (inner : execution.view = .completed terminal) :
+    result.workingJournal? = some terminal.workingJournal := by
+  simp [workingJournal?, outer, inner]
+
+theorem committedJournal?_completed
+    {initialWorld : WorldState} {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation)
+    (execution : OneLevelNestedExecution.Result initialWorld rootContract rootInvocation)
+    (terminal : OneLevelNestedExecution.TerminalResult initialWorld rootContract rootInvocation)
+    (outer : result.view = .execution execution)
+    (inner : execution.view = .completed terminal) :
+    result.committedJournal? = some terminal.committedJournal := by
+  simp [committedJournal?, outer, inner]
+
 theorem observations_outOfFuel
     {initialWorld : WorldState} {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
@@ -137,8 +190,10 @@ theorem observations_outOfFuel
     (outer : result.view = .execution execution)
     (inner : execution.view = .outOfFuel registry mode reachable) :
     result.finalWorld? = none ∧ result.terminalStatus? = none ∧
-      result.committedWorld? = none := by
-  simp [finalWorld?, terminalStatus?, committedWorld?, outer, inner]
+      result.committedWorld? = none ∧ result.workingJournal? = none ∧
+      result.committedJournal? = none := by
+  simp [finalWorld?, terminalStatus?, committedWorld?, workingJournal?,
+    committedJournal?, outer, inner]
 
 end Result
 

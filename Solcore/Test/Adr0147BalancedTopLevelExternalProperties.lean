@@ -12,6 +12,8 @@ open BalancedTopLevelExecution
 example := @RejectedResult.ofFailure_failure
 example := @RejectedResult.ofFailure_finalWorld
 example := @RejectedResult.ofFailure_committedDelta
+example := @RejectedResult.ofFailure_committedJournal
+example := @RejectedResult.committedJournal_eq_empty
 example := @RejectedResult.committedDelta_accountEndpoints_identity
 example := @RejectedResult.committedDelta_storageEndpoints_identity
 example := @RejectedResult.committedDelta_balanceEndpoints_identity
@@ -21,9 +23,13 @@ example := @Result.eq_of_view_eq
 example := @Result.finalWorld?_rejected
 example := @Result.terminalStatus?_rejected
 example := @Result.committedWorld?_rejected
+example := @Result.workingJournal?_rejected
+example := @Result.committedJournal?_rejected
 example := @Result.finalWorld?_completed
 example := @Result.terminalStatus?_completed
 example := @Result.committedWorld?_completed
+example := @Result.workingJournal?_completed
+example := @Result.committedJournal?_completed
 example := @Result.observations_outOfFuel
 
 example := @run_of_zero_value

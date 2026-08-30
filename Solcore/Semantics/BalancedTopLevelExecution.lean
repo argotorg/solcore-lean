@@ -14,6 +14,9 @@ structure RejectedResult (initialWorld : WorldState) where
   finalWorld : WorldState
   finalWorld_eq : finalWorld = initialWorld
   committedDelta : WorldStateDelta initialWorld finalWorld
+  /-- A rejected preflight commits no rollback-scoped observations. -/
+  committedJournal : TransactionJournal
+  committedJournal_empty : committedJournal = TransactionJournal.empty
 
 namespace RejectedResult
 
@@ -25,6 +28,8 @@ def ofFailure
   finalWorld := initialWorld
   finalWorld_eq := rfl
   committedDelta := .exact
+  committedJournal := .empty
+  committedJournal_empty := rfl
 }
 
 end RejectedResult
@@ -123,6 +128,34 @@ def committedWorld?
       | .completed terminal =>
           some ⟨terminal.finalWorld, terminal.committedDelta⟩
       | .outOfFuel _registry _mode _reachable => none
+
+/-- Observe the speculative journal whenever execution is terminal. -/
+def workingJournal?
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation) :
+    Option TransactionJournal :=
+  match result.view with
+  | .rejected rejected => some rejected.committedJournal
+  | .execution execution =>
+      match execution.view with
+      | .completed terminal => some terminal.workingJournal
+      | .outOfFuel _environment _mode _reachable => none
+
+/-- Observe the root-selected journal whenever the result is terminal. -/
+def committedJournal?
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (result : Result initialWorld rootContract rootInvocation) :
+    Option TransactionJournal :=
+  match result.view with
+  | .rejected rejected => some rejected.committedJournal
+  | .execution execution =>
+      match execution.view with
+      | .completed terminal => some terminal.committedJournal
+      | .outOfFuel _environment _mode _reachable => none
 
 end Result
 
