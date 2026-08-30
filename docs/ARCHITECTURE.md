@@ -1073,6 +1073,27 @@ the selected root, and invokes the balanced executor. Protocol errors,
 pre-execution resource exhaustion, semantic rejection, execution, and internal
 invariant failure remain distinct result classes.
 
+ADR-0152 adds a syntax-independent synthesis layer above these two public
+boundaries. `Solcore.Synthesis.CoreV3` generates Wire v3 directly from an
+explicit 64-bit replay seed and Program-node bound. Its initial pure fragment
+contains Word/Boolean literals, Word `let` locals, conditionals, and every
+current Word primitive, but no host reference, recursion, named data, or cell.
+The existing frozen checker remains the typing authority: a private carrier is
+the only value exposed as a checked generated or shrunk Program.
+
+Generation provenance is kept separate from checker evidence. Shrinking can
+therefore return a new checked Program without falsely claiming that it is the
+original output of a seed. Binder removal lowers De Bruijn indices explicitly
+and refuses removal when the deleted binder is used. Every public candidate is
+rechecked and strictly smaller under the fixed node/literal order.
+
+A generated execution case installs one checked contract into one explicit
+Account and uses the existing Oracle v5 request encoder, strict text handler,
+and command-line record dispatcher. The fixed corpus is a replay and coverage
+regression for the Lean reference path; it is not an independent semantic
+implementation. Cross-implementation differential testing still requires an
+external adapter that consumes the same canonical Core v3 requests.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

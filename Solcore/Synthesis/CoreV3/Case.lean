@@ -18,7 +18,7 @@ private def target : Solcore.Semantics.Address :=
 private def caller : Solcore.Semantics.Address :=
   ⟨2, by decide⟩
 
-/-- Largest generated Program admitted by the fixed default Oracle budgets. -/
+/-- Conservative public Program cap for cases using fixed default Oracle budgets. -/
 def maximumCaseProgramNodes : Nat :=
   Solcore.Oracle.V5.Limits.default.coreDepth
 

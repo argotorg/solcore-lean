@@ -27,7 +27,7 @@ settings, or different EVM revisions do not belong to this baseline.
 | Workspace identity | Internal Lean values | Logical identity behavior is specified but has no external adapter |
 | Frozen Multi frontend | Internal certified one-file API | Frozen lexical, parse, structural, location, and token behavior can be investigated |
 | Resolution and elaboration | No Lean implementation | No source semantic comparison exists |
-| Checked-contract runtime / Oracle v5 `execute` | Public Core/scenario and normalized observation; no external compiler adapter | Lean execution is reproducible, but no end-to-end or cross-compiler conformance claim exists |
+| Checked-contract runtime / Oracle v5 `execute` | Public Core/scenario, normalized observation, and reproducible pure-Core fixture generation; no external compiler adapter | Lean execution is reproducible, but no end-to-end or cross-compiler conformance claim exists |
 
 Oracle v5 publishes the checked-contract model: a finite package, initial
 world, call and creation environment, invocation, limits, probes, and total
@@ -35,6 +35,11 @@ result. It makes Lean runs reproducible and gives future adapters a comparison
 target. The Haskell and Rust compilers do not currently consume Core Wire v3 or
 emit the v5 observation format, so publication alone establishes no agreement
 with either compiler.
+
+The Lean synthesis library can generate and shrink a checked pure Core subset
+into canonical v5 requests. That removes manual fixture construction from the
+Lean side, but replaying those requests twice through the same Lean semantics
+is not differential evidence.
 
 The v5 runtime defines its own checked Core, depth-one calls, balances,
 creation, logs, commit, and rollback behavior. It does not assert that those

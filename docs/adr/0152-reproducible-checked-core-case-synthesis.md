@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-30
 - Scope: syntax-independent generation, replay, execution, and shrinking
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -133,6 +133,13 @@ the strict text handler, and returns the existing typed `Response`. A regression
 also passes that same line through the public one-record Oracle dispatcher used
 by the command-line executable. G0 does not call an internal evaluator directly
 as its conformance endpoint.
+
+Generated Oracle cases accept Program bounds up to 1024 nodes. The standalone
+generator remains more general, but the case boundary rejects a larger bound
+and verifies the realized Core node/depth demand before using fixed Oracle v5
+defaults. This prevents a successfully generated case from silently becoming a
+default-budget preflight exhaustion. Generation and case-configuration failures
+are returned explicitly as `CaseError` before the total Oracle response path.
 
 ## Coverage and replay
 

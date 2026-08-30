@@ -11,6 +11,7 @@ The repository provides:
 - Oracle v5 execution of checked contracts from an explicit initial world;
 - commit on return and rollback on balance-preflight rejection, revert, or trap;
 - observable state, return data, logs, balances, and contract creation;
+- reproducible generation and shrinking of a checked, pure Core v3 subset;
 - versioned command-line interfaces for older Core languages and the supported
   single-file Surface parser; and
 - Lean proofs and executable tests for the modeled rules.
@@ -102,6 +103,25 @@ Or import the checked-contract Oracle directly:
 ```lean
 import Solcore.Oracle.V5
 ```
+
+To generate a reproducible checked Core program, import the synthesis library:
+
+```lean
+import Solcore.Synthesis
+
+open Solcore.Synthesis.CoreV3
+
+def generatedNodeCount : Except GenerationError Nat := do
+  let generated ← generate {
+    seed := Seed.ofNat 0
+    maxProgramNodes := 64
+  }
+  pure generated.nodeCount
+```
+
+`make` packages the same generated program as a minimal Oracle v5 execution
+case. `shrink` returns only checker-sealed, strictly smaller candidates. The
+generator targets Semantic Core directly and does not parse Solcore source.
 
 ## Protocol documentation
 

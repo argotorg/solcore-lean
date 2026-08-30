@@ -10,6 +10,7 @@ background material, not a progress log.
 | If you want to… | Start here |
 | --- | --- |
 | Build the repository or run the Oracle | [Root README](../README.md) |
+| Generate reproducible checked Core inputs | [Root README](../README.md#use-as-a-lean-library) |
 | See exactly what works today | [Current status](CURRENT_STATUS.md) |
 | Send checked-contract requests | [Oracle v5 wire catalog](ORACLE_V5_WIRE.md) |
 | Produce or consume Semantic Core | [Core Wire v3 catalog](CORE_WIRE_V3.md) |

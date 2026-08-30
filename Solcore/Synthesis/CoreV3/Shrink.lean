@@ -129,8 +129,8 @@ private def dropLocalAt (cutoff : Nat) : V3.Expr → Option V3.Expr
       pure (.ternary op first second third)
   | _ => none
 
-/-- Raw role-directed candidates. Invalid binder lifting is intentional here:
-the sole public sealing pass rejects it through `CheckedWordProgram.ofProgram?`. -/
+/-- Raw role-directed candidates. Binder lifting is capture-avoiding, and the
+sole public sealing pass remains the final fragment and typing authority. -/
 private def shrinkAt
     (localWordDepth : Nat)
     (target : Target)

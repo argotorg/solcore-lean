@@ -16,6 +16,10 @@ Checked-in command-line fixtures cover both Core checking and contract
 execution, and the aggregate test and metadata checks protect those public
 bytes.
 
+A public Lean library can also generate reproducible, checker-sealed programs
+from a pure Word/Boolean subset of Core Wire v3, package them as minimal Oracle
+v5 scenarios, and enumerate type-preserving shrink candidates.
+
 Standalone JSON Schema files have not been published for Core Wire v3 or
 Oracle v5. Their closed wire catalogs and strict Lean codecs are the current
 normative format definitions. Producing additional schema files is a packaging
@@ -44,6 +48,27 @@ and duplicate JSON keys are rejected deterministically.
 Well-typedness is mandatory. Oracle v5 checks each Wire v3 program against the
 frozen host context and admits it only on success. Unchecked Core cannot enter
 the contract executor through the public boundary.
+
+### Reproducible checked-Core inputs
+
+`Solcore.Synthesis.CoreV3` provides a syntax-independent input source for
+semantic testing. A caller supplies a 64-bit seed and a Program-node bound. The
+versioned generator builds Core Wire v3 directly, restricts variables to Word
+locals introduced by generated `let` expressions, and seals every result with
+the frozen v3 checker.
+
+The initial generated subset contains Word and Boolean literals, Word locals,
+`let`, `if`, every current Word unary, binary, and ternary operation, and no
+host effects or recursion. Its shrinker preserves binder scope, rechecks every
+candidate, and returns only candidates that are strictly smaller by the fixed
+node/literal order.
+
+Generated cases use one explicit account and checked contract, then execute
+through both the strict Oracle v5 text handler and the same one-record
+dispatcher used by the command-line service. A fixed 256-seed corpus reaches
+all 29 tracked forms and operators, returns normally at the declared regression
+fuel, and freezes its request bytes and final generator states with a replay
+fingerprint.
 
 ### Checked-contract execution
 
@@ -154,13 +179,15 @@ Solcore source text. In particular, it does not yet provide:
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;
-- systematic generation of arbitrary well-typed Core or Solcore programs; or
+- generation beyond the current pure Word/Boolean Core subset, including
+  functions, data, cells, and host effects; or
 - an automated semantic differential-testing harness against other Solcore
   implementations.
 
 The intended longer-term direction remains aligned with those last two items:
-generate well-typed programs, run the same programs through independent
-implementations, and compare normalized semantic observations. Oracle v5 is
+expand generation to more well-typed programs, run the same programs through
+independent implementations, and compare normalized semantic observations.
+Oracle v5 is
 the execution and observation boundary needed for that work, not the completed
 differential-testing system itself.
 
@@ -177,6 +204,9 @@ The repository checks different kinds of claims at different layers:
   return, revert, trap, nested calls, balances, creation, logs, and encoding;
 - a public-handler regression repeats the same execution request with the same
   fuel and checks identical typed, canonical JSON, and canonical text results;
+- the synthesis regressions check all tracked constructors and operators,
+  exact corpus replay, normal public execution, and type-preserving strict
+  shrinking;
 - strict wire tests fix canonical JSON shapes and deterministic error priority;
 - metadata validation checks published profiles, digests, and capability output;
   and
