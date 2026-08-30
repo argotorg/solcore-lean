@@ -21,6 +21,20 @@ def initialValues
   let working := (initialWorld, initialEffects)
   ⟨FrameCheckpointSnapshot.fromWorkingPair working, working⟩
 
+/--
+Pair an original transaction checkpoint with a separately prepared working
+world. This is the root context shape used after a successful call-value
+transfer: execution sees the transferred world, while rollback retains the
+exact caller-supplied world.
+-/
+def preparedValues
+    (checkpointWorld workingWorld : WorldState) :
+    FrameCheckpointedWorkingPair Unit Unit :=
+  let checkpoint :=
+    FrameCheckpointSnapshot.fromWorkingPair
+      (checkpointWorld, initialEffects)
+  ⟨checkpoint, (workingWorld, initialEffects)⟩
+
 /-- Build the exact root storage context certified by contract installation. -/
 def initialContext
     {initialWorld : WorldState}
@@ -32,6 +46,22 @@ def initialContext
   context := {
     storageAddress := target
     values := initialValues initialWorld
+  }
+  storageAccount := installed.account
+  storageAccount_present := installed.account_present
+}
+
+/-- Build a root context with distinct checkpoint and working worlds. -/
+def preparedContext
+    {checkpointWorld workingWorld : WorldState}
+    {target : Address}
+    {contract : CheckedCoreContract}
+    (installed :
+      InstalledCheckedCoreContract workingWorld target contract) :
+    HostStorageDriver.Context Unit Unit := {
+  context := {
+    storageAddress := target
+    values := preparedValues checkpointWorld workingWorld
   }
   storageAccount := installed.account
   storageAccount_present := installed.account_present

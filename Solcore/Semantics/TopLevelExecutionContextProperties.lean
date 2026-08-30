@@ -60,6 +60,60 @@ theorem initialWorld_code?
     initialWorld.code? target = some contract.code := by
   simp [WorldState.code?, installed.account_present, installed.code_present]
 
+@[simp] theorem preparedContext_storageAddress
+    {checkpointWorld workingWorld : WorldState}
+    {target : Address} {contract : CheckedCoreContract}
+    (installed :
+      InstalledCheckedCoreContract workingWorld target contract) :
+    (preparedContext (checkpointWorld := checkpointWorld) installed).context.storageAddress =
+      target := by
+  rfl
+
+@[simp] theorem preparedContext_storageAccount
+    {checkpointWorld workingWorld : WorldState}
+    {target : Address} {contract : CheckedCoreContract}
+    (installed :
+      InstalledCheckedCoreContract workingWorld target contract) :
+    (preparedContext (checkpointWorld := checkpointWorld) installed).storageAccount =
+      installed.account := by
+  rfl
+
+@[simp] theorem preparedContext_checkpointState
+    {checkpointWorld workingWorld : WorldState}
+    {target : Address} {contract : CheckedCoreContract}
+    (installed :
+      InstalledCheckedCoreContract workingWorld target contract) :
+    (preparedContext (checkpointWorld := checkpointWorld) installed).context.values.checkpoint.state =
+      checkpointWorld := by
+  rfl
+
+@[simp] theorem preparedContext_workingState
+    {checkpointWorld workingWorld : WorldState}
+    {target : Address} {contract : CheckedCoreContract}
+    (installed :
+      InstalledCheckedCoreContract workingWorld target contract) :
+    (preparedContext (checkpointWorld := checkpointWorld) installed).context.values.working.1 =
+      workingWorld := by
+  rfl
+
+@[simp] theorem preparedContext_checkpointEffects
+    {checkpointWorld workingWorld : WorldState}
+    {target : Address} {contract : CheckedCoreContract}
+    (installed :
+      InstalledCheckedCoreContract workingWorld target contract) :
+    (preparedContext (checkpointWorld := checkpointWorld) installed).context.values.checkpoint.effects =
+      initialEffects := by
+  rfl
+
+@[simp] theorem preparedContext_workingEffects
+    {checkpointWorld workingWorld : WorldState}
+    {target : Address} {contract : CheckedCoreContract}
+    (installed :
+      InstalledCheckedCoreContract workingWorld target contract) :
+    (preparedContext (checkpointWorld := checkpointWorld) installed).context.values.working.2 =
+      initialEffects := by
+  rfl
+
 end TopLevelExecution
 
 namespace TopLevelInvocation
