@@ -105,7 +105,7 @@ private def nestedSet
   | .error _ => json
 
 private def errorCodePath
-    (result : Except Solcore.Oracle.V5.ProtocolError DecodeOutcome) :
+    (result : Except Solcore.Oracle.V5.ValidProtocolError DecodeOutcome) :
     Option (String × String) :=
   match result with
   | .error error => some (error.code, error.path)

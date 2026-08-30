@@ -155,19 +155,22 @@ private def executedObservationExact : Bool :=
     "\"state\":{\"probes\":[],\"schema\":\"solcore-world-state-observation/v1\"}}}}"
 
 private def protocolErrorsExact : Bool :=
-  let error : Solcore.Oracle.V5.ProtocolError := {
+  let raw : Solcore.Oracle.V5.ProtocolError := {
     code := "oracle.wire.unknown-field"
     path := "/query/future"
     arguments := .mkObj [("field", "future")]
     display := "invalid Oracle v5 value"
   }
+  let error := (ValidProtocolError.of? raw).get (by native_decide)
+  let identified := (ValidProtocolError.of? { raw with
+    id := some requestId }).get (by native_decide)
   encodeProtocolErrorText error ==
     "{\"arguments\":{\"field\":\"future\"}," ++
     "\"code\":\"oracle.wire.unknown-field\"," ++
     "\"display\":\"invalid Oracle v5 value\",\"id\":null," ++
     "\"kind\":\"protocolError\",\"path\":\"/query/future\"," ++
     "\"schema\":\"solcore-oracle/v5\"}" &&
-  encodeProtocolErrorText { error with id := some requestId } ==
+  encodeProtocolErrorText identified ==
     "{\"arguments\":{\"field\":\"future\"}," ++
     "\"code\":\"oracle.wire.unknown-field\"," ++
     "\"display\":\"invalid Oracle v5 value\",\"id\":\"request-id\"," ++
