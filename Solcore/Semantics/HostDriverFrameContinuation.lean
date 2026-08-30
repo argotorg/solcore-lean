@@ -31,5 +31,6 @@ def toFrameContinuationContext?
         (doneOutcome result.context value store))
   | .outOfFuel _ => none
   | .fault _ _ => none
+  | .unsupported _ _ => none
 
 end Solcore.Semantics.HostDriverResult

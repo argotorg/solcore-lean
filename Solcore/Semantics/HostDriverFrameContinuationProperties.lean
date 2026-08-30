@@ -61,6 +61,24 @@ universe u v w x
         values doneOutcome = none := by
   rfl
 
+/-- A policy-rejected request is not a completed frame. -/
+@[simp] theorem toFrameContinuationContext?_unsupported
+    {Context : Type x}
+    {RollbackState : Type u} {TraceState : Type v}
+    {TrapReason : Type w}
+    (context : Context)
+    (suspension : Core.HostSuspension)
+    (remainingFuel : Nat)
+    (values :
+      Context → FrameCheckpointedWorkingPair RollbackState TraceState)
+    (doneOutcome :
+      Context → Core.Value → Core.Store → FrameOutcome TrapReason) :
+    toFrameContinuationContext?
+        (HostDriverResult.mk context
+          (.unsupported suspension remainingFuel))
+        values doneOutcome = none := by
+  rfl
+
 /-- Completed construction retains the terminal checkpoint state exactly. -/
 @[simp] theorem stateCheckpoint_toFrameContinuationContext?_done
     {Context : Type x}
