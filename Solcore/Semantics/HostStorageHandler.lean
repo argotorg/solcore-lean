@@ -46,6 +46,9 @@ def handler
     {RollbackState : Type u} {TraceState : Type v}
     (inputs : ExecutionInputs) :
     HostHandler (Context RollbackState TraceState) where
+  supports
+    | .emitLogWord _ _ => false
+    | _ => true
   handle := handleRequest inputs
 
 /-- Handle one suspension using the complete run-fixed input. -/

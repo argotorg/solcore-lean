@@ -23,6 +23,7 @@ def handleRequest
 /-- The transaction-aware handler for one immutable execution input. -/
 def handler
     (inputs : HostStorageDriver.ExecutionInputs) : HostHandler Context where
+  supports := fun _ => true
   handle := handleRequest inputs
 
 /-- Handle and resume one suspension under the transaction-aware policy. -/

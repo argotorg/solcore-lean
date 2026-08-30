@@ -131,6 +131,7 @@ end Core
 namespace Driver
 
 private def changingHandler : Solcore.Semantics.HostHandler Nat where
+  supports := fun _ => true
   handle context request :=
     match request with
     | .storageRead _ => (context + 1, Core.returned)

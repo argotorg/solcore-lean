@@ -33,6 +33,7 @@ private def retainedStore : Store := [.word retained]
 
 /-- Every handled request increments the context, making calls observable. -/
 private def countingHandler : HostHandler Nat where
+  supports := fun _ => true
   handle count request :=
     match request with
     | .storageRead _ => (count + 1, returned)

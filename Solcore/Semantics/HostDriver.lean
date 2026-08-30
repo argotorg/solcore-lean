@@ -13,6 +13,7 @@ inductive HostDriverOutcome where
   | done (value : Core.Value) (store : Core.Store)
   | outOfFuel (state : Core.State)
   | fault (error : Core.MachineFault) (state : Core.State)
+  | unsupported (suspension : Core.HostSuspension) (remainingFuel : Nat)
   deriving Repr, BEq, DecidableEq
 
 /-- The latest host context together with the terminal Core outcome. -/
@@ -22,6 +23,8 @@ structure HostDriverResult (Context : Type u) where
 
 /-- A total interpreter for Core's indexed host-request interface. -/
 structure HostHandler (Context : Type u) where
+  /-- Whether this policy can interpret a request without losing effects. -/
+  supports : Core.HostRequest → Bool
   handle :
     Context → (request : Core.HostRequest) →
       Context × request.Response
@@ -58,8 +61,11 @@ def run
   | .outOfFuel exhausted => ⟨context, .outOfFuel exhausted⟩
   | .fault error faultState => ⟨context, .fault error faultState⟩
   | .suspended suspension remainingFuel =>
-      let handled := handler.handleSuspension context suspension
-      run handler handled.1 remainingFuel handled.2
+      if handler.supports suspension.request then
+        let handled := handler.handleSuspension context suspension
+        run handler handled.1 remainingFuel handled.2
+      else
+        ⟨context, .unsupported suspension remainingFuel⟩
 termination_by fuel
 decreasing_by
   exact Core.HostRunResult.remainingFuel_lt _execution
