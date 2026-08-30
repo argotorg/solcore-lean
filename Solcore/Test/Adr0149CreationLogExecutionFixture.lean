@@ -129,6 +129,32 @@ def runWithSelectedEnvironment
   runWithEnvironment (rootContract disposition) invocation
     (installedRoot disposition) environment fuel
 
+def insufficientCreatorBalance : Word := ⟨2, by decide⟩
+
+def insufficientRootAccount (disposition : RootDisposition) : Account :=
+  Account.empty.withBalance insufficientCreatorBalance |>.withNonce oldNonce
+    |>.withCode (rootContract disposition).code
+
+def insufficientCreationWorld (disposition : RootDisposition) : WorldState :=
+  WorldState.empty
+    |>.putAccount unrelated unrelatedAccount
+    |>.putAccount creator (insufficientRootAccount disposition)
+
+def insufficientRootInstalled (disposition : RootDisposition) :
+    InstalledCheckedCoreContract (insufficientCreationWorld disposition)
+      creator (rootContract disposition) := {
+  account := insufficientRootAccount disposition
+  account_present := by rfl
+  code_present := by rfl
+}
+
+def runWithInsufficientBalance (fuel : Nat) :
+    Result (insufficientCreationWorld .catchFailure)
+      (rootContract .catchFailure) invocation :=
+  runWithEnvironment (rootContract .catchFailure) invocation
+    (insufficientRootInstalled .catchFailure)
+    (creationEnvironment (.returned initializerInput)) fuel
+
 def unavailableCreationEnvironment : ExecutionEnvironment :=
   .callsOnly { lookup := fun _ => none }
 

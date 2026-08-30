@@ -167,6 +167,19 @@ private def checkedPreflightFailuresLeaveJournalIdentity : Bool :=
   [unavailableCreationEnvironment, collisionCreationEnvironment].all
     preflightFailureLeavesJournalIdentity
 
+private def insufficientBalanceLeavesJournalIdentity : Bool :=
+  match (runWithInsufficientBalance completionFuel).view with
+  | .outOfFuel _ _ _ => false
+  | .completed terminal =>
+      terminal.workingJournal.logList == failedInitializerLogs &&
+        terminal.committedJournal.logList == failedInitializerLogs &&
+        terminal.workingJournal.createdContractList == [] &&
+        terminal.committedJournal.createdContractList == [] &&
+        terminal.finalWorld.nonce? creator == some oldNonce &&
+        terminal.finalWorld.balance? creator ==
+          some insufficientCreatorBalance &&
+        (terminal.finalWorld.account? created).isNone
+
 private theorem compileTimeCreationJournals :
     successfulCreationJournals && revertedInitializerRollsBack &&
       trappedInitializerRollsBack && laterRootRevertRollsBack &&
@@ -182,7 +195,8 @@ private theorem compileTimeSequentialCreationOrder :
   native_decide
 
 private theorem compileTimePreflightJournalIdentity :
-    checkedPreflightFailuresLeaveJournalIdentity = true := by
+    checkedPreflightFailuresLeaveJournalIdentity &&
+      insufficientBalanceLeavesJournalIdentity = true := by
   native_decide
 
 def testAdr0149CreationLogExecution : IO Unit := do
@@ -204,5 +218,7 @@ def testAdr0149CreationLogExecution : IO Unit := do
     "sequential creations lost completion-order logs or created addresses"
   assertTrue checkedPreflightFailuresLeaveJournalIdentity
     "a checked creation preflight failure changed transaction observations"
+  assertTrue insufficientBalanceLeavesJournalIdentity
+    "insufficient creation balance changed journal, nonce, or world state"
 
 end Tests
