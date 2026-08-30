@@ -179,9 +179,10 @@ lookup interfaces, runtime behavior, and public formats remain compatible.
 Parser and syntax proofs remain paused.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
-is complete. It keeps storage absence, code absence,
-exhaustion, raw fault, and completion distinct at the internal parent boundary.
-Only exhaustion resumes from its exact retained context and Core state; the
+is complete. It keeps storage absence, code absence, exhaustion, raw fault,
+unsupported policy, and completion distinct at the internal parent boundary.
+Exhaustion resumes from its exact retained context and Core state; unsupported
+remains suspended while newly offered fuel is accumulated. The
 existing nested-`Option` operation remains unchanged and is recovered by
 explicit whole-result erasure. Exact split, zero, addition, completion
 inversion, plain-continuation, and existing return/revert/trap fold coherence
@@ -1155,7 +1156,8 @@ The [ADR directory](adr/) contains durable decisions and rationale.
 - [ADR-0137](adr/0137-canonical-host-capability-registry.md) fixes one
   append-only production order for internal host capabilities.
 - [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
-  retains every selected-execution branch and resumes only exhaustion.
+  retains every selected-execution branch, resumes exhaustion, and preserves
+  unsupported suspensions.
 - [ADR-0139](adr/0139-run-fixed-current-address-observation.md) exposes one
   immutable active-contract Address to internal Core.
 - [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)

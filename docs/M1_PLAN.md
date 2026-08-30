@@ -307,7 +307,7 @@ These results remain regression obligations for every extension.
 | 118 | Strict optional input-word BE observation | Complete | Reuses the run-fixed input, exact size boundary, and canonical Word codec for full 32-byte windows at Core host index 8 without padding |
 | 119 | Resumable handled fuel slices | Complete | Resumes retained exhaustion under the same handler and exact inputs, with proved split/summed-budget equality, typed-result safety, and storage-preservation regressions |
 | 120 | Canonical host capability registry | Complete | Derives both host tables and arbitrary-list safety from one extensible order, with exact finite laws and compatibility/runtime regressions |
-| 121 | Branch-complete resumable parent-indexed selected execution | Complete | Retains all five exact branches, resumes only exhaustion with split/zero/add laws, and preserves the unchanged nested-`Option` and fold APIs |
+| 121 | Branch-complete resumable parent-indexed selected execution | Complete | Retains all six exact branches, resumes exhaustion with split/zero/add laws, preserves unsupported suspension, and keeps the unchanged nested-`Option` and fold APIs |
 | 122 | Run-fixed current-address observation | Complete | Adds the identified Core consumer and one-run lifetime without deriving storage, code, caller, callee, or call-kind relationships |
 | 123 | Proof-refined parent-indexed selected-execution session | Complete | Binds fixed run configuration to each result and preserves exact one-shot equality through closed fuel-only resumption, whole-session algebra, every branch, compatibility, and folds |
 | 124 | Checked Word completion to canonical return bytes | Complete | Refines checked Word results, retains exact successful context/Word/Core Store, and produces the canonical 32-byte big-endian returned frame without inventing fallback branches |
@@ -2199,9 +2199,10 @@ remains, and no registry, Wire, Oracle, source, or ABI format is published.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
 adds a total internal result for storage absence, code absence, exhaustion,
-raw fault, and completion. Only exhaustion invokes the driver again, using its
-exact retained context and state under the same immutable inputs and completion
-policy. Split and summed budgets must agree exactly.
+raw fault, unsupported policy, and completion. Only exhaustion invokes the
+driver again, using its exact retained context and state under the same
+immutable inputs and completion policy. Split and summed budgets must agree
+exactly.
 
 An explicit lossy erasure recovers the existing nested-`Option` result, whose
 operation and theorems remain unchanged. The new boundary gives no resolution
@@ -2209,7 +2210,7 @@ meaning to absence, exhaustion, or fault and adds no gas, persistence, nested
 invocation, transaction, parser, syntax, ABI, Wire, Oracle, or publication
 policy.
 
-The proof interface includes five exact branch equivalences, checked no-fault,
+The proof interface includes six exact branch equivalences, checked no-fault,
 whole legacy equality, split/zero/add resumption and completion inversion, plus
 exact plain-continuation, legacy, return/revert/trap fold, and completed-fold
 identity laws. Fuel 9/10/15/16 regressions cover absence, retained write
@@ -2279,10 +2280,10 @@ pure projection and retraction reuse the existing branch-complete
 
 Successful projection constructs the existing returned-frame continuation
 with exactly 32 canonical big-endian bytes. In the checked Word specialization,
-`none` means exactly fuel exhaustion; the retained raw result remains the
-resumption path. Arbitrary non-Word completion receives no fallback, and this
-slice adds no ABI, selected-code refinement, parser work, or public-format
-change.
+`none` means exactly fuel exhaustion or unsupported policy; the retained raw
+result preserves either boundary. Arbitrary non-Word completion receives no
+fallback, and this slice adds no ABI, selected-code refinement, parser work, or
+public-format change.
 
 Regressions retain exact exhaustion at fuel 9, 10, and 15, complete at fuel 16,
 preserve the write, and prove exact 9+7 and 10+6 splits and larger-fuel

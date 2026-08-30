@@ -408,9 +408,10 @@ unbound. ADR-0139 has since appended a tenth entry without changing those
 historical positions. Runtime behavior and public formats do not change.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
-is complete. It adds an internal five-way carrier that keeps
-storage absence, code absence, exhaustion, raw fault, and completion distinct.
-Only exhaustion resumes from its retained context and Core state. The existing
+is complete. Its internal six-way carrier keeps storage absence, code absence,
+exhaustion, raw fault, unsupported policy, and completion distinct. Exhaustion
+continues from its retained context and Core state; unsupported remains
+suspended and only accumulates newly offered fuel. The existing
 three-`Option` parent API remains unchanged and is recovered by explicit
 erasure. Parser and syntax proofs remain paused while syntax-independent
 semantics continues.
@@ -447,7 +448,7 @@ Word without rerunning the checker or changing the existing
 [ADR-0143](adr/0143-proof-refined-selected-checked-word-execution.md) is
 complete. It executes only the checked Word branch, retains the exact raw
 result and fixed inputs, and supports fuel-only resumption without collapsing
-code absence, non-Word selection, or exhaustion.
+code absence, non-Word selection, exhaustion, or unsupported policy.
 
 [ADR-0144](adr/0144-parent-indexed-selected-checked-word-execution.md) is
 complete. It connects that execution to an exact parent/storage provenance and
@@ -527,7 +528,7 @@ supports and records the same request.
 | Strict optional input-word BE observation | Complete | Exact natural-number full-window and big-endian codec coherence, append-only index-8 capability, optional request safety, full handler context identity, direct, storage, parent, measured-fuel, and frozen-Wire regressions are complete | Not published |
 | Resumable handled fuel slices | Complete | Same-handler one-shot/split coherence, terminal identity, arbitrary-result addition, actual-run zero identity, typed-result safety, exact same-`ExecutionInputs` storage specialization, and executable regressions are complete | Not published |
 | Canonical host capability registry | Complete | One canonical registry derives both 14-entry host tables and arbitrary-list safety; indexes 0 through 12 retain their meanings, word-log emission is index 13, and index 14 is first unbound | Not published |
-| Branch-complete resumable parent-indexed selected execution | Complete | Exact five-way branch laws, checked no-fault, whole legacy equality, out-of-fuel-only split/zero/add resumption, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
+| Branch-complete resumable parent-indexed selected execution | Complete | Exact six-way branch laws, checked no-fault, whole legacy equality, exhaustion split/zero/add resumption, unsupported suspension preservation, completion inversion, and existing plain/fold coherence are proved and tested | Not published |
 | Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, stable index-9 capability, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
 | Proof-refined parent-indexed selected-execution session | Complete | Fixed-configuration carrier, closed fuel-only resumption, one-shot invariant, whole-session algebra, exact branches, no-fault, compatibility, folds, and measured regressions are complete | Not published |
 | Checked Word completion to canonical return bytes | Complete | Word refinement, success witness, exact raw projection/retraction, canonical returned frame, typed branch laws, stability, split fuel, and regressions are complete | Not published |
@@ -2692,18 +2693,19 @@ No registry or ABI is published. Parser and syntax proofs remain paused.
 
 [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md)
 retains every internal branch of parent-indexed selected execution in a total
-five-way result. Exhaustion keeps the exact mutable context and Core state so
+six-way result. Exhaustion keeps the exact mutable context and Core state so
 it can resume without repeating storage selection, code lookup, the executed
-prefix, or the last handled request. Absence, fault, and completion are
-terminal identities, and split execution must equal one run with the summed
-budget.
+prefix, or the last handled request. Unsupported policy retains the exact
+suspension and accumulates offered fuel without invoking the rejecting handler.
+Absence, fault, and completion are identities, and split execution must equal
+one run with the summed budget.
 
 The old nested-`Option` operation and all of its behavior remain unchanged;
 the new carrier erases back to it explicitly. Exhaustion and raw fault gain no
 frame-resolution meaning. This work adds no gas, persistence, nested calls,
 transaction policy, ABI, parser, syntax, Wire, Oracle, or public protocol.
 
-Five exact branch equivalences and checked no-fault preserve every carried
+Six exact branch equivalences and checked no-fault preserve every carried
 field. Whole-result erasure equals the old API, while resumption proves exact
 split, actual-run zero, arbitrary sequential addition, and retained completion
 inversion. Completed producers recover the exact old plain and legacy contexts;
@@ -2754,7 +2756,7 @@ exact branch-complete result. `start` creates the certificate, while
 policies are not parameters. Every stored result is exactly the fixed
 configuration's one-shot run at `providedFuel`.
 
-Whole-session canonicalization, zero, and addition are proved. All five exact
+Whole-session canonicalization, zero, and addition are proved. All six exact
 branches, checked no-fault, legacy erasure, plain continuation, and completed
 return/revert/trap folds remain coherent. The ADR-0138 fixture follows exact
 fuel boundaries 9/10/15/16, detects write non-replay, and keeps a completed
@@ -2782,11 +2784,12 @@ completion from the existing branch-complete `HostDriverResult`. Its success
 witness retains the exact terminal host context, Word, and complete Core-local
 Store.
 
-That witness builds an existing frame continuation with exactly the
-canonical 32-byte big-endian Word encoding. For the checked Word specialization,
-projection is `none` exactly when execution exhausts its fuel; the raw result
-continues to carry the resumable state. No fallback meaning is assigned to a
-non-Word completion, fault, or arbitrary raw projection failure.
+That witness builds an existing frame continuation with exactly the canonical
+32-byte big-endian Word encoding. For the checked Word specialization,
+projection is `none` exactly when execution exhausts its fuel or reaches an
+unsupported-policy suspension. The raw result retains either boundary. No
+fallback meaning is assigned to a non-Word completion, fault, or arbitrary raw
+projection failure.
 
 Fuel 9, 10, and 15 retain the exact pre-write, post-write, and input-request
 exhaustion states; fuel 16 completes, and exact 9+7 and 10+6 splits and larger

@@ -865,11 +865,12 @@ same derived tables to ten entries without changing indexes 0 through 8 or any
 public boundary. Parser and syntax proofs remain paused.
 
 ADR-0138 is complete above parent-indexed selected execution.
-Its internal five-way carrier preserves storage absence, code absence, exact
-exhaustion, raw fault, and completion without flattening them into nested
-options. Only exhaustion can resume, from its retained handler context and Core
-state. Exact split, actual-run zero, sequential addition, and completion
-inversion laws fix that boundary. The existing nested-`Option` API remains
+Its internal six-way carrier preserves storage absence, code absence, exact
+exhaustion, raw fault, unsupported policy, and completion without flattening
+them into nested options. Exhaustion continues from its retained handler
+context and Core state; unsupported remains suspended while newly offered fuel
+is accumulated. Exact split, actual-run zero, sequential addition, and
+completion inversion laws fix that boundary. The existing nested-`Option` API remains
 unchanged and is an explicit whole-result erasure of the richer result.
 
 Completed results recover the exact existing plain continuation and reuse the
@@ -901,7 +902,7 @@ result. Its certificate equates that result with one execution of the fixed
 configuration at the cumulative budget. Closed resumption accepts only an
 additional `Nat`, advances the retained result, and cannot substitute another
 configuration. Whole-session canonicalization, zero, and addition preserve the
-certificate; all five branches, no-fault, legacy/plain views, and completed
+certificate; all six branches, no-fault, legacy/plain views, and completed
 return/revert/trap folds remain exact.
 
 Measured regressions cover ADR-0138 fuel 9/10/15/16 with write non-replay and
@@ -919,12 +920,13 @@ ADR-0141 completes the bridge from checked Word completion to the existing
 frame layer. A checked refinement identifies programs whose declared result is
 Word. Successful projection from the existing `HostDriverResult` retains the
 terminal host context, exact Word, and complete Core Store; it does not replace
-the raw carrier or its exhaustion and fault branches.
+the raw carrier or its exhaustion, fault, and unsupported branches.
 
 The projected success constructs a returned frame using the existing canonical
 32-byte big-endian Word encoding. For checked Word execution, absence of that
-success is exactly exhaustion, whose raw state remains resumable. A lower-level
-non-Word result receives no return, revert, trap, or default-byte fallback.
+success is exactly exhaustion or an unsupported-policy suspension; the raw
+result retains either boundary. A lower-level non-Word result receives no
+return, revert, trap, or default-byte fallback.
 This is not an ABI, selected-code refinement, parser dependency, or public
 format change.
 

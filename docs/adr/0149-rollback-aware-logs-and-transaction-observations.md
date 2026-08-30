@@ -9,8 +9,8 @@
 
 ADR-0145 through ADR-0148 provide an executable checked-Core lifecycle with an
 explicit initial `WorldState`, total return/revert/trap results, nested calls,
-checked balance transfer, checked creation, and sealed fuel resumption. The
-Before this milestone, the result was still incomplete for semantic
+checked balance transfer, checked creation, and sealed fuel resumption. Before
+this milestone, the result was still incomplete for semantic
 differential testing: a contract could not emit an observable log, and a
 successful creation could not be enumerated without already knowing its
 derived Address.

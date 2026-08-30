@@ -105,9 +105,10 @@ budget. Storage refinement, code lookup, initial Core-state construction, and
 the immediately preceding handled request are not replayed by the executable
 resumption path.
 
-The four terminal result constructors remain exact result identities. Their
-session budget still records the newly offered amount, and the invariant is
-maintained by the corresponding one-shot stability theorem.
+The absence, fault, and completion constructors remain exact result
+identities. Unsupported requests remain suspended while their retained fuel
+increases by the newly offered amount. In every case the session budget records
+the new offer, and the invariant is maintained by one-shot coherence.
 
 ## Exact proof interface
 
@@ -146,7 +147,7 @@ Compile-time consumers must instantiate the carrier and apply:
 - the stored one-shot invariant;
 - whole-session zero and addition;
 - checked no-fault and legacy-erasure coherence;
-- all five existing exact branch characterizations through the invariant; and
+- all six exact branch characterizations through the invariant; and
 - completed plain-continuation and return/revert/trap fold coherence through
   the invariant.
 
@@ -230,7 +231,7 @@ accepts only an additional `Nat`; the initialization, storage Address, complete
 execution inputs, completion policy, and parent index remain fixed. Every
 session certifies that its exact result is the stored configuration run once at
 `providedFuel`. Whole-session canonicalization, zero, and sequential-addition
-laws preserve that invariant, and all five result branches, checked no-fault,
+laws preserve that invariant, and all six result branches, checked no-fault,
 legacy and plain continuation views, and return/revert/trap folds are covered.
 
 The ADR-0138 regression starts at fuel 9, resumes through exact one-shot

@@ -8,7 +8,8 @@
 ## Context
 
 Handled Core execution already retains a branch-complete `HostDriverResult`.
-It distinguishes completion, exhaustion, and raw machine fault and preserves
+It distinguishes completion, exhaustion, raw machine fault, and unsupported
+policy and preserves
 the exact terminal host context, Core value, Core-local Store, and exhausted
 state. The checked host runner proves that its completed value has the
 program's declared result type and that a raw fault is unreachable.
@@ -60,6 +61,7 @@ done (word value) store -> some { context, value, store }
 done otherValue store  -> none
 outOfFuel state        -> none
 fault error state      -> none
+unsupported suspension remainingFuel -> none
 ```
 
 The projection is intentionally syntactic and may be applied to an arbitrary
@@ -114,13 +116,14 @@ prove:
 - completion projection equals `some completion` iff the raw run is exactly
   `completion.toHostDriverResult`;
 - completion projection equals `none` iff the raw run is exactly exhausted at
-  some retained terminal context and Core state; and
+  some retained context and Core state or stopped at an unsupported-policy
+  suspension; and
 - once projection succeeds, it returns the same exact completion for every
   larger fuel budget.
 
 The `none` equivalence is a theorem only for the checked Word specialization.
-For the lower-level projection, `none` still also covers non-Word completion
-and raw fault. This distinction must be visible in names and documentation.
+For the lower-level projection, `none` also covers non-Word completion and raw
+fault. This distinction must be visible in names and documentation.
 
 Resumption continues to use the raw result and the existing exact
 `HostDriverResult.resumeWithFuel`/storage-driver split law. The successful
@@ -135,7 +138,7 @@ Expose laws for:
 - all checked Word wrapper projections and optional-constructor branches;
 - all completion carrier projections;
 - exact raw projection for Word completion, non-Word completion, exhaustion,
-  and fault;
+  fault, and unsupported policy;
 - projection/retraction equality and exact `some` inversion;
 - exact continuation checkpoint state, checkpoint effects, working effects,
   working WorldState, and returned outcome;
@@ -143,7 +146,8 @@ Expose laws for:
 - exact returned `FrameResolutionResult` selecting the terminal working state,
   effects, and bytes;
 - checked Word raw typing, completed Word shape, and no-fault;
-- checked Word `some`/raw-completion and `none`/raw-exhaustion equivalences;
+- checked Word `some`/raw-completion and
+  `none`/raw-exhaustion-or-unsupported equivalences;
 - larger-fuel completion stability; and
 - wrapper same-input split-fuel coherence through the existing driver law.
 
@@ -209,7 +213,7 @@ This ADR does not define or prove:
   tuples, arrays, strings, named data, or arbitrary Core-value serialization;
 - conversion, erasure, serialization, or frame meaning for Core-local Store;
 - implicit revert, trap, default bytes, or recovery for non-Word completion,
-  exhaustion, or raw fault;
+  exhaustion, raw fault, or unsupported policy;
 - parent Core resumption, child-result delivery, invocation, call kind, call
   stack, scheduling, recursion, or reentrancy;
 - code selection refinement, Account mutation, balance transfer, gas charging,

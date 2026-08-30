@@ -43,6 +43,10 @@ inductive ParentIndexedSelectedExecutionResult
       (context : HostStorageDriver.Context RollbackState (FrameTrace Event))
       (error : Core.MachineFault)
       (state : Core.State)
+  | unsupported
+      (context : HostStorageDriver.Context RollbackState (FrameTrace Event))
+      (suspension : Core.HostSuspension)
+      (remainingFuel : Nat)
   | completed
       (context : HostStorageDriver.Context RollbackState (FrameTrace Event))
       (value : Core.Value)
@@ -51,17 +55,19 @@ inductive ParentIndexedSelectedExecutionResult
         RollbackState Event TrapReason parentWorking)
 ```
 
-The two absence constructors contain no invented state. The other three carry
-the exact terminal handler context and every field of the corresponding
+The two absence constructors contain no invented state. The other four carry
+the exact handler context and every field of the corresponding
 `HostDriverOutcome`. Completion additionally carries the canonical existing
-parent-indexed continuation.
+parent-indexed continuation. ADR-0149 added `unsupported` when generic host
+policies began rejecting requests explicitly instead of silently handling
+them.
 
 Add a total operation on `ParentIndexedFrameInitialization`, provisionally
 named `runCodeWithStorageParentIndexedResult`. It takes the same
 `storageAddress`, immutable `HostStorageDriver.ExecutionInputs`, fuel, and
 `doneOutcome` policy as the existing nested-option operation. It performs the
-same storage refinement and code selection, then matches all three driver
-outcomes. It returns one of the five constructors and never returns `Option`.
+same storage refinement and code selection, then matches all four driver
+outcomes. It returns one of the six constructors and never returns `Option`.
 
 The completed continuation is built with
 `ParentIndexedFrameContinuationContext.fromTraceExtension`, using the same
@@ -83,8 +89,11 @@ the run equation then uses that same context:
    selected context and `runCodeWithStorage? inputs fuel` returns exactly
    `some ⟨finalContext, .outOfFuel state⟩`;
 4. `fault finalContext error state` iff the same selected run returns exactly
-   `some ⟨finalContext, .fault error state⟩`; and
-5. `completed finalContext value store continuation` iff the selected run
+   `some ⟨finalContext, .fault error state⟩`;
+5. `unsupported finalContext suspension remainingFuel` iff the selected run
+   returns exactly
+   `some ⟨finalContext, .unsupported suspension remainingFuel⟩`; and
+6. `completed finalContext value store continuation` iff the selected run
    returns exactly `some ⟨finalContext, .done value store⟩` and `continuation`
    is the canonical parent-indexed reconstruction described above.
 
@@ -111,6 +120,8 @@ storageAbsent                 -> none
 codeAbsent                    -> some none
 outOfFuel context state       -> some (some none)
 fault context error state     -> some (some none)
+unsupported context suspension remainingFuel
+                              -> some (some none)
 completed context value store continuation
                               -> some (some (some continuation))
 ```
@@ -136,9 +147,9 @@ the actual-run laws fix the selector of the originating and one-shot runs.
 
 Only `outOfFuel context state` executes. That branch runs
 `HostStorageDriver.run context inputs additional state` and classifies its
-exact result as `outOfFuel`, `fault`, or `completed`. It uses the original
-initialization and `doneOutcome` only to reconstruct a later completed parent
-continuation. The suffix must not:
+exact result as `outOfFuel`, `fault`, `unsupported`, or `completed`. It uses
+the original initialization and `doneOutcome` only to reconstruct a later
+completed parent continuation. The suffix must not:
 
 - repeat storage refinement or inspect `storageAddress` again;
 - repeat code lookup or rebuild `Core.State.initial`;
@@ -147,15 +158,17 @@ continuation. The suffix must not:
 - replace any field of the retained mutable context or immutable inputs.
 
 `storageAbsent`, `codeAbsent`, `fault`, and `completed` are exact identities
-for every additional budget. In particular, a raw fault stays a raw fault
-with the same context, error, and state, and completion retains the same
-context, value, Store, and continuation.
+for every additional budget. An `unsupported` request remains suspended with
+the same context and suspension while its retained fuel increases by the newly
+offered amount; the rejecting handler is not invoked. In particular, a raw
+fault stays a raw fault with the same context, error, and state, and completion
+retains the same context, value, Store, and continuation.
 
 ## Resumption laws
 
 The proof interface must include:
 
-- constructor equations for all five branches;
+- constructor equations for all six branches;
 - exact split/summed coherence for an actual top-level run:
   resuming the result at `fuel` by `additional` equals the result of running
   once at `fuel + additional`;
@@ -198,13 +211,14 @@ The plain-context claim is an inversion of the named producer, not a theorem
 about an arbitrarily constructed `completed` value whose continuation field
 could have been chosen independently.
 
-Do not add a second resolution fold over the five-way carrier. Absence,
-exhaustion, and raw fault have no justified frame-resolution meaning.
+Do not add a second resolution fold over the six-way carrier. Absence,
+exhaustion, raw fault, and unsupported policy have no justified
+frame-resolution meaning.
 
 ## Required regressions
 
 Add compile-time consumers that apply every branch equivalence, checked
-no-fault theorem, erasure-coherence theorem, five resumption equations,
+no-fault theorem, erasure-coherence theorem, six resumption equations,
 split/summed law, actual-run zero law, sequential law, and completed
 plain-context and fold coherence.
 
@@ -239,7 +253,7 @@ Core must not import frame or WorldState semantics.
 Acceptance requires focused and full builds, the complete executable test
 suite, trust-zero and warning-as-error checks for every changed Lean root,
 metadata and semantic-kernel checks, whitespace and diff checks, and an axiom
-audit of the five branch laws, erasure coherence, split/summed resumption,
+audit of the six branch laws, erasure coherence, split/summed resumption,
 sequential resumption, and completed coherence. No placeholder, custom axiom,
 trust increase, new noncomputable dependency, or accidental simp rule is
 accepted.
@@ -258,11 +272,10 @@ branch laws, resumption definitions/equations, algebraic laws, and compile-time
 and runtime regressions when necessary:
 
 1. record and activate this decision without changing execution;
-2. add the five-way carrier, total classifier, and exact branch laws;
+2. add the six-way carrier, total classifier, and exact branch laws;
 3. add explicit compatibility erasure and whole-result coherence with the
    existing nested-option API;
-4. add out-of-fuel-only resumption and split, zero, sequential, and identity
-   laws;
+4. add fuel continuation and split, zero, sequential, and identity laws;
 5. add completed plain-context and existing-fold coherence;
 6. add focused compile-time and executable regressions;
 7. run validation and independent P0-P3 audits; and
@@ -270,10 +283,11 @@ and runtime regressions when necessary:
 
 ## Implementation evidence
 
-The implementation provides the exact five-way carrier, five whole-branch
+The implementation provides the exact six-way carrier, six whole-branch
 equivalences, and the checked no-fault theorem. Explicit compatibility erasure
 equals the unchanged nested-`Option` producer as a whole. Resumption invokes
-the driver only for `outOfFuel`; exact split/summed-budget, actual-run zero,
+the driver only for `outOfFuel`; unsupported requests remain suspended while
+offered fuel accumulates. Exact split/summed-budget, actual-run zero,
 sequential addition, and completed-result inversion laws retain the same
 initialization, immutable inputs, and completion policy.
 

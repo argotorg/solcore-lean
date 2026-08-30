@@ -18,7 +18,8 @@ and distinguish an unavailable or unsupported program from a Word execution
 that has merely exhausted its current fuel.
 
 This integration must not introduce another enumeration of raw execution
-outcomes. `HostDriverResult` already owns completion, exhaustion, and fault;
+outcomes. `HostDriverResult` already owns completion, exhaustion, fault, and
+unsupported policy;
 `WordReturnedFrameCompletion` already owns the successful Word projection.
 
 ## Decision
@@ -91,15 +92,16 @@ It binds `execution?` and applies the existing
 `HostDriverResult.toWordReturnedFrameCompletion?` to the retained raw result.
 It does not copy the context, Word, Store, byte encoder, or frame adapter.
 
-For the whole selected execution, `completion? = none` has two fundamentally
-different causes:
+For the whole selected execution, `completion? = none` has three distinct
+causes:
 
 1. `execution? = none`, meaning `codeAbsent` or `nonWord`; or
-2. a Word execution exists and its checked raw result is exactly exhausted.
+2. a Word execution exists and its checked raw result is exactly exhausted; or
+3. a Word execution exists and stops at an unsupported-policy suspension.
 
 No global theorem may state that missing completion means only exhaustion.
 Under an explicit `word code` selection, the existing ADR-0141 theorem does
-give the exact exhaustion equivalence.
+give the exact exhaustion-or-unsupported equivalence.
 
 ## Fixed-input resumption
 
@@ -155,7 +157,7 @@ Expose laws for:
 - exact successful completion/reconstruction through
   `WordReturnedFrameCompletion.toHostDriverResult`;
 - the global missing-completion disjunction;
-- the Word-branch missing-completion/exhaustion equivalence;
+- the Word-branch missing-completion/exhaustion-or-unsupported equivalence;
 - all resumption field projections, summed-run equality, zero identity,
   addition, and terminal-completion stability.
 
@@ -207,7 +209,8 @@ This ADR does not define or prove:
 - storage-Account absence or parent-indexed initialization;
 - changes to `runCodeWithStorage?`, `ParentIndexedSelectedExecutionResult`, or
   `ParentIndexedSelectedExecutionSession`;
-- a new raw completion, exhaustion, fault, frame, or resolution branch;
+- a new raw completion, exhaustion, fault, unsupported, frame, or resolution
+  branch;
 - execution, rejection, or trapping policy for selected non-Word code;
 - replacement context or execution inputs during resumption;
 - parent continuation, child-result delivery, call kind, scheduling,
