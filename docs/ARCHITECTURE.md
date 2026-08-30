@@ -87,9 +87,12 @@ theorems, and tests rather than parallel semantics. Dedicated typing, inference,
 evaluation, store-threading, and weakening results, plus effect, exact-fuel, and
 wire regressions, are complete.
 
-This conversion layer is not an ABI layer. Total nonzero truthiness and strict
-ABI zero-or-one admissibility are separate rules. ABI byte layout, validation,
-decoding, and rejection remain in the future contract boundary.
+This conversion layer is not itself an ABI layer. Total nonzero truthiness and
+strict ABI zero-or-one admissibility remain separate rules. Oracle v5 now
+publishes a separate Static Word ABI profile with a four-byte selector, one
+32-byte Word argument, and one 32-byte Word result. Dynamic values, Boolean ABI
+rules, fallback and receive dispatch, event encoding, and source-level ABI
+elaboration remain outside that deliberately narrow profile.
 
 The completed `wordIsZero` slice follows the same derived-expression boundary.
 It has type `word -> word`, returning word one for zero and word zero for every
@@ -346,11 +349,14 @@ issue.
 
 ### Contract runtime
 
-Contract runtime semantics are being built as explicit, independent layers.
-The current internal path can select checked Core code from a working
-WorldState and read or update one separately selected working-storage Account.
-Balances, calls, transaction inputs, logs, created contracts, authorization,
-commit, and rollback remain outside that execution path.
+Contract runtime semantics are explicit, independent layers. The public Oracle
+v5 path starts from an explicit `WorldState`, a checked Core v3 contract
+package, an immutable execution environment, and one invocation. It supports
+storage, balances and value transfer, depth-one checked calls, checked
+creation, rollback-aware Word logs, resumable fuel, return commit, and
+revert/trap rollback. Unbounded nested execution, general ABI, source
+elaboration and authorization, gas, and EVM equivalence remain outside this
+runtime boundary.
 
 WorldState is distinct from the Core-local cell store. Local cells use
 transient locations owned by one Core execution; storage requests use 256-bit
@@ -733,9 +739,10 @@ no stability theorem because a larger budget can continue execution and apply
 more effects. These additions are proofs and regressions only: the driver,
 runtime behavior, and read/write request kinds are unchanged.
 
-ADR-0121 adds one read-only observation to that existing driver. The append-only
-Core capability table now ends with `storageAddress : unit -> word` at index 2;
-the established storage read and write capabilities remain at indexes 0 and 1.
+ADR-0121 adds one read-only observation to that existing driver. At that slice,
+the append-only Core capability table ended with
+`storageAddress : unit -> word` at index 2; the established storage read and
+write capabilities remain at indexes 0 and 1.
 Core still knows only Unit and Word. The combined Semantics handler losslessly
 widens the retained 160-bit Address to a 256-bit Word and returns it without
 changing the handler context. This request is read-only, but the driver as a
@@ -747,17 +754,20 @@ It is not defined as the code address, current contract, `self`, caller, owner,
 origin, or an authorized principal. Those roles may differ and require their
 own lifetime and authority decisions. Additional fuel can still move an
 out-of-fuel execution forward, so ADR-0121 adds no out-of-fuel stability claim.
-The capability remains internal: Wire and runtime-publication formats still
-reject host values, and Oracle, Surface, Parser, and public runtime schemas are
-unchanged.
+At the time of this slice the capability remained internal. Core Wire v1 and
+v2 still reject the host value, while Core Wire v3 now freezes
+`storageAddress` at index 2 and Oracle v5 supplies it to checked execution.
+Surface and parser formats remain unchanged; publication did not merge this
+role with code, caller, or current address.
 
 ADR-0126 specifies the next observation from an existing input rather than
 inventing a call-frame role. The selected `codeAddress` becomes a static
-parameter of the combined handler and is returned by a fourth internal
-`unit -> word` capability. The high-level selected runner uses that same
-Address for checked-code lookup and handler execution, so observation cannot
-drift from selection. It remains distinct from the storage selector and does
-not imply current-contract, caller, callee, or authority identity.
+parameter of the combined handler and is returned by the fourth
+`unit -> word` capability. Core Wire v3 now freezes `codeAddress` at index 3,
+and Oracle v5 supplies the invocation target. The high-level selected runner
+uses that same Address for checked-code lookup and handler execution, so
+observation cannot drift from selection. It remains distinct from the storage
+selector and does not imply caller or authority identity.
 
 The implementation keeps that selector out of mutable WorldState. It is fixed
 for one handled run, indexes the run's fuel evidence, and is threaded through
@@ -799,16 +809,21 @@ storage context. Checked Core code observes the exact Word through the
 append-only `callValue : unit -> word` capability at index 4. The same input is
 threaded through request handling, fuel evidence, selected completion, and
 parent-indexed continuation construction. Tests carry its value-derived
-working state and terminal bytes into the existing resolution fold. The
-capability remains internal, frozen Wire v1 and v2 reject its host value, and
-the Word does not mean that any balance transfer occurred.
+working state and terminal bytes into the existing resolution fold. Core Wire
+v1 and v2 still reject this host value. Core Wire v3 freezes
+`callValue` at index 4, and Oracle v5 supplies the invocation's exact value.
+Observation alone does not mean that a balance transfer occurred; the v5
+lifecycle applies its separate explicit transfer preflight and atomic state
+transition.
 
 ADR-0132 completes one equally narrow extension. `callerAddress : Address` is
-an explicit, immutable execution input, and internal Core observes its lossless
-Word through append-only `callerAddress : unit -> word` at index 5. Host tables
-therefore contain six entries. The exact handler and completed-driver laws show
-that caller observation does not change the complete mutable host context; it
-also performs no Account lookup. Tests vary only this input, cover caller
+an explicit, immutable execution input, and Core observes its lossless Word
+through append-only `callerAddress : unit -> word` at index 5. At that slice the
+host tables therefore reached six entries. Core Wire v3 now freezes this entry
+inside the current 14-entry host table, and Oracle v5 supplies the invocation's
+caller. The exact handler and completed-driver laws show that caller
+observation does not change the complete mutable host context; it also performs
+no Account lookup. Tests vary only this input, cover caller
 Account absence and fuel 4/5/23/29/30/32, and carry a caller-derived write
 through parent-indexed completion and the resolution fold. The supplied Address
 does not identify a parent frame, authenticate a principal, define origin or
@@ -816,32 +831,37 @@ current/callee identity, or determine how a nested call supplies its caller.
 
 ADR-0133 completes the bounded optional input-byte observation. One bounded
 `InputData` value is fixed for the whole handled run, separately from mutable
-storage.
-Internal Core receives append-only
-`inputDataByte? : word -> sum unit word` at index 6. The result uses Unit for an
-absent index and Word for a present byte, so a present input byte whose value is
-zero cannot be mistaken for absence. ADR-0133 itself adds no size observation,
-multi-byte or Word load, endianness, padding, ABI, calldata, parser, Wire, or
-public-runtime rule.
+storage. Core receives append-only
+`inputDataByte? : word -> sum unit word` at index 6.
+The result uses Unit for an absent index and Word for a present byte, so a
+present input byte whose value is zero cannot be mistaken for absence. Core
+Wire v3 now freezes this entry and Oracle v5 supplies the invocation calldata;
+v1 and v2 still reject it. The request itself does not choose an ABI, padding,
+multi-byte load, parser rule, or source representation.
 
 ADR-0134 completes exact-size observation over that same immutable input.
 `InputData.sizeWord` uses the retained strict bound to represent the
-natural byte length without truncation, and internal
-`inputDataSize : unit -> word` is appended at index 7. Exact coherence makes
+natural byte length without truncation, and `inputDataSize : unit -> word` is
+appended at index 7. Exact coherence makes
 `inputDataByte?` present precisely below `sizeWord` and absent at or above it.
-This adds no ABI or calldata meaning, multi-byte decoding, nested-call input
-derivation, parser dependency, Wire tag, or public interface.
+Core Wire v3 now freezes this entry and Oracle v5 reports the exact supplied
+calldata length. The observation itself adds no ABI meaning, multi-byte
+decoding, nested-call input derivation, parser dependency, or source rule; the
+Static Word ABI profile interprets it separately under its fixed layout.
 
 ADR-0135 completes a strict observation over the same immutable input.
 Semantics exposes `InputData.wordBE?` only for a complete 32-byte window,
 decoded with the existing big-endian Word codec; incomplete windows are absent
 without padding or offset wrap. Core owns only the optional
 `inputDataWordBE? : word -> sum unit word` capability at append-only index 8,
-with table length 9 and first-unbound index 9. Its `Option Word` response, Core
-safety, handler context identity, direct present/zero/absent behavior, storage
-fuel 23/31/32/64, parent fuel 29/30 and 11/12, triple-option and fold recovery,
-terminal bytes, and frozen-Wire rejection are proved and tested. ABI, calldata,
-memory, nested calls, parser work, and publication remain outside the slice.
+which made the table length 9 and index 9 first unbound at that slice. Its
+`Option Word` response, Core safety, handler context identity, direct
+present/zero/absent behavior, storage fuel 23/31/32/64, parent fuel 29/30 and
+11/12, triple-option and fold recovery, and terminal bytes are proved and
+tested. Core Wire v3 now freezes the entry inside its 14-entry table and Oracle
+v5 supplies the calldata; v1 and v2 still reject it. Incomplete windows remain
+absent without padding. General memory, dynamic ABI, source integration, and
+unbounded nested calls remain outside this observation.
 
 ADR-0136 is complete above the existing handled driver. A total result consumer
 executes again only for `outOfFuel`, using its exact retained context and Core
@@ -883,10 +903,12 @@ transaction, parser, ABI, or public-format rule is added.
 
 ADR-0139 completes the next immutable execution-input extension. One explicitly
 supplied `currentAddress` lasts for one handled run and every same-input
-resumption of that run. Internal Core observes its exact widened Word through
-the tenth capability at index 9; both canonical tables have length 10 and index
-10 is first unbound. The read-only request preserves handler context,
-continuation, and Core Store, and strict narrowing recovers the Address.
+resumption of that run. Core observes its exact widened Word through the tenth
+capability at index 9; at that slice both canonical tables had length 10 and
+index 10 was first unbound. Core Wire v3 now freezes the entry inside its
+14-entry table, and Oracle v5 derives it from the active invocation. The
+read-only request preserves handler context, continuation, and Core Store, and
+strict narrowing recovers the Address.
 
 Measured direct fuel is 4/5; the observe/write/observe path measures
 16/17/23/29/30, with 17+13 and 23+7 agreeing with one-shot fuel 30. Tests keep
@@ -913,9 +935,12 @@ terminal additional 7. A different current Address requires a distinct
 repository audits pass; one P3 documentation typo was corrected.
 
 The cumulative number describes budget offered, not fuel consumed, remaining
-gas, or a charging policy. The carrier adds no invocation transition, parent
-delivery, stack, scheduler, transaction, ABI conversion, parser dependency, or
-public format. Those layers still require independent decisions.
+gas, or a charging policy. The carrier itself adds no invocation transition,
+parent delivery, stack, scheduler, transaction, ABI conversion, parser
+dependency, or public format. Later layers now provide direct and depth-one
+invocation, scheduling, transaction lifecycle, Static Word ABI conversion, and
+Oracle v5 publication. Unbounded nesting, general ABI, gas, and source/parser
+integration remain separate decisions.
 
 ADR-0141 completes the bridge from checked Word completion to the existing
 frame layer. A checked refinement identifies programs whose declared result is
@@ -1067,19 +1092,23 @@ layer is introduced.
 
 ### Observation
 
-Observations are canonical, versioned semantic results. Contract observations
-will record normative state effects rather than bytecode layout, optimizer
-traces, generated names, or wall-clock behavior. Gas belongs to a separate
-fork-pinned profile.
+Observations are canonical, versioned semantic results. Oracle v5 publishes a
+terminal outcome and data, requested initial and committed state endpoints,
+committed Word logs, and successfully created addresses. It deliberately does
+not expose bytecode layout, optimizer traces, generated names, or wall-clock
+behavior. Gas belongs to a separate fork-pinned profile, and the observation
+does not claim EVM equivalence.
 
-ADR-0051 provides the completed initial internal observation foundation without
-publishing a profile. `Bytes`, 160-bit addresses, and existing 256-bit words
-receive strict lowercase `0x` text; words also receive an exact 32-byte
-big-endian view that agrees with Core byte selection. Exactly sixteen focused
-theorems and executable boundary, rejection, canonicality, and compatibility
-tests fix this representation behavior. The frozen Wire codecs remain separate
-and unchanged. This layer defines representation only, not contract state, ABI
-conversion, hashing, rollback, or EVM behavior.
+ADR-0051 began the scalar observation foundation before a public contract
+profile existed. `Bytes`, 160-bit addresses, and 256-bit words receive strict
+lowercase `0x` text; words also receive an exact 32-byte big-endian view that
+agrees with Core byte selection. Exactly sixteen focused theorems and
+executable boundary, rejection, canonicality, and compatibility tests fix this
+representation behavior. Core Wire v3 and Oracle v5 now use these canonical
+representations, while frozen v1/v2 codecs remain separate and unchanged. The
+scalar layer alone still defines neither contract state, ABI conversion,
+hashing, rollback, nor EVM behavior; those meanings belong to their respective
+published runtime layers or remain explicitly outside scope.
 
 ## Proof pattern
 

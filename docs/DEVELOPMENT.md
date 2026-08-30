@@ -26,10 +26,11 @@ To verify canonical standard-library bytes against an upstream checkout:
     lake exe solcoreOracle --version
     lake exe solcoreOracle capabilities-v3
     lake exe solcoreOracle capabilities-v4
+    lake exe solcoreOracle capabilities-v5
 
 With no command, the Oracle consumes and produces one NDJSON object per line.
-The request schema selects the protocol. Do not infer a protocol from the
-newest internal implementation.
+The request schema selects the protocol. Do not infer a protocol from request
+shape or internal implementation details.
 
 ## Semantic feature workflow
 
@@ -83,12 +84,13 @@ name the missing direction.
 
 ## Published compatibility
 
-Do not add new constructors to Semantic Core wire v1 or v2. Their conversion
-from the internal Core is intentionally a projection. New internal constructs
-must produce no old-wire representation.
+Do not add new constructors to Semantic Core wire v1, v2, or v3. Conversion
+from a later internal Core is intentionally a partial projection. New internal
+constructs must produce no representation in an older closed wire.
 
-Similarly, do not reinterpret Surface v1 or Oracle v4. Publication requires a
-new version and a separate decision.
+Similarly, do not reinterpret Surface v1 or any published Oracle v1-v5
+contract. Publication of different behavior requires a new additive version
+and a separate decision.
 
 The following files are compatibility artifacts and change only as part of an
 explicit publication:
