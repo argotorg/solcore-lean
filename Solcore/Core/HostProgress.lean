@@ -191,6 +191,28 @@ theorem typed_callContractWord_emits
     ⟨⟨.callContractWord target input, continuation, store⟩,
       .callContractWord⟩
 
+/-- A well-typed target/value/input tuple emits one value-bearing call. -/
+theorem typed_callContractWordWithValue_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.callContractWordWithValue.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value,
+          .hostApply .callContractWordWithValue :: continuation, store⟩
+        suspension := by
+  have tupleTyping :
+      HostRuntimeValueHasType world value
+        (.product .word (.product .word .word)) definitions := by
+    simpa using valueTyping
+  obtain ⟨target, transferredValue, input, rfl⟩ :=
+    tupleTyping.wordTriple_shape
+  exact
+    ⟨⟨.callContractWordWithValue target transferredValue input,
+        continuation, store⟩,
+      .callContractWordWithValue⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -214,6 +236,8 @@ theorem typed_hostApplication_emits
   | inputDataWordBE? => exact typed_inputDataWordBE?_emits valueTyping
   | currentAddress => exact typed_currentAddress_emits valueTyping
   | callContractWord => exact typed_callContractWord_emits valueTyping
+  | callContractWordWithValue =>
+      exact typed_callContractWordWithValue_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}

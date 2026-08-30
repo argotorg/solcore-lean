@@ -160,10 +160,20 @@ theorem hostEnvironment_lookup_isSome_iff (position : Nat) :
       some (.hostFunction .callContractWord) :=
   hostEnvironment_lookup .callContractWord
 
-@[simp] theorem hostContext_length : hostContext.length = 11 :=
+@[simp] theorem hostContext_callContractWordWithValue :
+    hostContext[HostFunction.callContractWordWithValue.index]? =
+      some (HostFunction.functionType .callContractWordWithValue) :=
+  hostContext_lookup .callContractWordWithValue
+
+@[simp] theorem hostEnvironment_callContractWordWithValue :
+    hostEnvironment[HostFunction.callContractWordWithValue.index]? =
+      some (.hostFunction .callContractWordWithValue) :=
+  hostEnvironment_lookup .callContractWordWithValue
+
+@[simp] theorem hostContext_length : hostContext.length = 12 :=
   hostContext_length_all.trans HostFunction.all_length
 
-@[simp] theorem hostEnvironment_length : hostEnvironment.length = 11 :=
+@[simp] theorem hostEnvironment_length : hostEnvironment.length = 12 :=
   hostEnvironment_length_all.trans HostFunction.all_length
 
 namespace Program

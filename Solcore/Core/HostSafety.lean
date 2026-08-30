@@ -152,6 +152,20 @@ theorem HostRuntimeValueHasType.wordPair_shape
       obtain ⟨right, rfl⟩ := rightTyping.word_shape
       exact ⟨left, right, rfl⟩
 
+/-- A value typed as a target/value/input tuple has exactly three Word leaves. -/
+theorem HostRuntimeValueHasType.wordTriple_shape
+    {definitions : DataEnvironment}
+    {world : StoreTyping} {value : Value}
+    (typing : HostRuntimeValueHasType world value
+      (.product .word (.product .word .word)) definitions) :
+    ∃ first second third,
+      value = .pair (.word first) (.pair (.word second) (.word third)) := by
+  cases typing with
+  | pair firstTyping restTyping =>
+      obtain ⟨first, rfl⟩ := firstTyping.word_shape
+      obtain ⟨second, third, rfl⟩ := restTyping.wordPair_shape
+      exact ⟨first, second, third, rfl⟩
+
 theorem HostRuntimeValueHasType.function_shape
     {definitions : DataEnvironment}
     {world : StoreTyping} {value : Value} {parameterType resultType : Ty}
