@@ -94,6 +94,9 @@ structure ChildAnchored
   childCheckpointState_eq :
     frame.childContext.context.values.checkpoint.state =
       frame.childInitialWorld
+  childCheckpointJournal_eq :
+    frame.childContext.context.values.checkpoint.effects.rollback =
+      frame.suspendedRoot.parentContext.workingJournal
   registryResolution_eq :
     registry.callRegistry.resolve?
         frame.suspendedRoot.parentContext.context.values.working.1
@@ -160,7 +163,7 @@ private theorem rootAfterSuspension_anchored
         split
         · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
         · exact ⟨anchored.storageAddress_eq,
-            anchored.checkpointState_eq, rfl, rfl, by assumption⟩
+            anchored.checkpointState_eq, rfl, rfl, rfl, by assumption⟩
   | callContractWordWithValue target value input =>
       simp only [RootFrame.afterSuspensionWithEnvironment]
       split
@@ -170,7 +173,7 @@ private theorem rootAfterSuspension_anchored
         · split
           · exact ⟨anchored.storageAddress_eq, anchored.checkpointState_eq⟩
           · exact ⟨anchored.storageAddress_eq,
-              anchored.checkpointState_eq, rfl, rfl, by assumption⟩
+              anchored.checkpointState_eq, rfl, rfl, rfl, by assumption⟩
   | createContractWord templateId value input =>
       simp only [RootFrame.afterSuspensionWithEnvironment]
       split
@@ -241,7 +244,7 @@ theorem Reachable.anchored
   | childDone prior advanced inductionHypothesis =>
       rcases inductionHypothesis with
         ⟨parentAddress, parentCheckpoint, childAddress, childCheckpoint,
-          registryResolution⟩
+          childJournalCheckpoint, registryResolution⟩
       cases outcome : ChildFrame.outcomeDone _ _ advanced with
       | returned data =>
           exact ⟨by simpa [Anchored, ChildFrame.resumeRoot,
@@ -267,19 +270,24 @@ theorem Reachable.anchored
   | childNext prior advanced inductionHypothesis =>
       rcases inductionHypothesis with
         ⟨parentAddress, parentCheckpoint, childAddress, childCheckpoint,
-          registryResolution⟩
+          childJournalCheckpoint, registryResolution⟩
       exact ⟨parentAddress, parentCheckpoint,
-        childAddress, childCheckpoint, registryResolution⟩
+        childAddress, childCheckpoint, childJournalCheckpoint,
+        registryResolution⟩
   | childSuspended prior advanced inductionHypothesis =>
       rcases inductionHypothesis with
         ⟨parentAddress, parentCheckpoint, childAddress, childCheckpoint,
-          registryResolution⟩
+          childJournalCheckpoint, registryResolution⟩
       exact ⟨parentAddress, parentCheckpoint,
         (ChildFrame.afterHandledSuspension_storageAddress _ _ advanced).trans
           childAddress,
         (congrArg FrameCheckpointSnapshot.state
           (ChildFrame.afterHandledSuspension_checkpoint _ _ advanced)).trans
           childCheckpoint,
+        (congrArg
+          (fun checkpoint => checkpoint.effects.rollback)
+          (ChildFrame.afterHandledSuspension_checkpoint _ _ advanced)).trans
+          childJournalCheckpoint,
         registryResolution⟩
   | initializerDone prior advanced inductionHypothesis =>
       exact ⟨InitializerCompletionResult.root_storageAddress _ |>.trans
@@ -291,11 +299,11 @@ theorem Reachable.anchored
   | initializerSuspended prior advanced inductionHypothesis =>
       exact { inductionHypothesis with
         initializerStorageAddress_eq :=
-          (genericHandleRequest_storageAddress _ _ _).trans
+          (transactionHandleRequest_storageAddress _ _ _).trans
             inductionHypothesis.initializerStorageAddress_eq
         initializerCheckpointState_eq :=
           (congrArg FrameCheckpointSnapshot.state
-            (genericHandleRequest_checkpoint _ _ _)).trans
+            (transactionHandleRequest_checkpoint _ _ _)).trans
             inductionHypothesis.initializerCheckpointState_eq }
 
 theorem Reachable.root_storageAddress
@@ -360,6 +368,18 @@ theorem Reachable.child_checkpointState
     frame.childContext.context.values.checkpoint.state =
       frame.childInitialWorld :=
   reachable.anchored.childCheckpointState_eq
+
+/-- A live child's rollback journal is the exact parent prefix at its call site. -/
+theorem Reachable.child_checkpointJournal
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    {registry : ExecutionEnvironment}
+    {frame : ChildFrame initialWorld rootContract rootInvocation}
+    (reachable : Reachable registry (.child frame)) :
+    frame.childContext.context.values.checkpoint.effects.rollback =
+      frame.suspendedRoot.parentContext.workingJournal :=
+  reachable.anchored.childCheckpointJournal_eq
 
 /-- A live child is exactly the contract resolved at its frozen call site. -/
 theorem Reachable.child_registryResolution
