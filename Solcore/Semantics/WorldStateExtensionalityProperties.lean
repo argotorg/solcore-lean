@@ -8,12 +8,14 @@ namespace Solcore.Semantics
     {left right : Account}
     (sameStorage : ∀ slot,
       left.storageValue? slot = right.storageValue? slot)
-    (sameCode : left.code? = right.code?) :
+    (sameCode : left.code? = right.code?)
+    (sameBalance : left.balance = right.balance) :
     left = right := by
   cases left
   cases right
   simp only [Account.storageValue?] at sameStorage
   simp only [Account.code?] at sameCode
+  simp only [Account.balance] at sameBalance
   congr
   funext slot
   exact sameStorage slot

@@ -13,9 +13,10 @@ private theorem compileTimeExtRegression_account
     {left right : Account}
     (sameStorage : ∀ slot,
       left.storageValue? slot = right.storageValue? slot)
-    (sameCode : left.code? = right.code?) :
+    (sameCode : left.code? = right.code?)
+    (sameBalance : left.balance = right.balance) :
     left = right :=
-  Account.ext sameStorage sameCode
+  Account.ext sameStorage sameCode sameBalance
 
 private theorem compileTimeExtRegression_worldState
     {left right : WorldState}

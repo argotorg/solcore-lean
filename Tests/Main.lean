@@ -175,6 +175,7 @@ import Solcore.Test.ParentIndexedFrameTrapPropagationPayload
 import Solcore.Test.ParentIndexedFrameTrapPropagationPayloadCoherence
 import Solcore.Test.RuntimeScalars
 import Solcore.Test.WorldState
+import Solcore.Test.WorldStateBalance
 import Solcore.Test.WorldStateCode
 import Solcore.Test.WorldStateStorageRead
 import Solcore.Test.WorldStateStorageReadWrite
@@ -5068,6 +5069,7 @@ def run : IO Unit := do
   testOneLevelNestedExecutionResumption
   testRuntimeScalars
   testWorldState
+  testWorldStateBalance
   testWorldStateCode
   testWorldStateStorageRead
   testWorldStateStorageWriteAlgebra

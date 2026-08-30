@@ -19,6 +19,9 @@ namespace Solcore.Semantics
   · by_cases firstZero : first = Core.Word.zero
     <;> by_cases secondZero : second = Core.Word.zero
     <;> simp [Account.storageWrite, Account.code?, firstZero, secondZero]
+  · by_cases firstZero : first = Core.Word.zero
+    <;> by_cases secondZero : second = Core.Word.zero
+    <;> simp [Account.storageWrite, Account.balance, firstZero, secondZero]
 
 theorem Account.storageWrite_commute
     (account : Account)
@@ -40,6 +43,9 @@ theorem Account.storageWrite_commute
   · by_cases leftZero : leftValue = Core.Word.zero
     <;> by_cases rightZero : rightValue = Core.Word.zero
     <;> simp [Account.storageWrite, Account.code?, leftZero, rightZero]
+  · by_cases leftZero : leftValue = Core.Word.zero
+    <;> by_cases rightZero : rightValue = Core.Word.zero
+    <;> simp [Account.storageWrite, Account.balance, leftZero, rightZero]
 
 @[simp] theorem WorldState.putAccount_overwrite
     (state : WorldState)
