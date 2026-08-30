@@ -83,6 +83,14 @@ def testCoreWireV3CodecFoundation : IO Unit := do
   assertTrue
     ((decodeConstructorId (encodeConstructorId constructor)).toOption ==
       some constructor) "constructor identity did not round-trip"
+  match decodeConstructorId (.mkObj [
+      ("index", "not-a-natural"), ("owner", "not-a-natural")
+    ]) with
+  | .error error =>
+      assertTrue
+        (error.code == .expectedNatural && error.path.toPointer == "/index")
+        "constructor identity fields are not decoded in canonical key order"
+  | .ok _ => throw (IO.userError "invalid constructor identity unexpectedly decoded")
   match decodeDataDefinitionWithBudget limits (encodeDataDefinition definition) with
   | .ok decoded =>
       assertTrue (encodeDataDefinition decoded == encodeDataDefinition definition)

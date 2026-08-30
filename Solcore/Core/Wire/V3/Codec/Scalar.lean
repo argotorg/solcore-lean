@@ -125,10 +125,10 @@ def decodeConstructorIdAt
     (json : Lean.Json) :
     DecodeResult ConstructorId := do
   ensureExactObject path json ["index", "owner"] ["index", "owner"]
-  let owner ← decodeDataTypeIdAt (path.field "owner")
-    (← requireField path json "owner")
   let index ← decodeNatAt (path.field "index")
     (← requireField path json "index")
+  let owner ← decodeDataTypeIdAt (path.field "owner")
+    (← requireField path json "owner")
   pure { owner, index }
 
 def decodeConstructorId (json : Lean.Json) : DecodeResult ConstructorId :=
@@ -146,12 +146,12 @@ def decodeConstructorId (json : Lean.Json) : DecodeResult ConstructorId :=
         rw [Foundation.jsonNatural_toJson]
         rfl
       change (do
+        let decodedIndex ← decodeNatAt (path.field "index") (Lean.toJson index)
         let decodedOwner ←
           decodeDataTypeIdAt (path.field "owner") (encodeDataTypeId owner)
-        let decodedIndex ← decodeNatAt (path.field "index") (Lean.toJson index)
         pure (ConstructorId.mk decodedOwner decodedIndex)) =
           .ok (ConstructorId.mk owner index)
-      rw [decodeDataTypeIdAt_encodeDataTypeId, decoded]
+      rw [decoded, decodeDataTypeIdAt_encodeDataTypeId]
       rfl
 
 @[simp] theorem decodeConstructorId_encodeConstructorId

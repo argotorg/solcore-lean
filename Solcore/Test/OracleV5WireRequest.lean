@@ -111,6 +111,12 @@ private def errorCodePath
   | .error error => some (error.code, error.path)
   | .ok _ => none
 
+private def rawErrorCodePath {alpha : Type}
+    (result : DecodeResult alpha) : Option (String × String) :=
+  match result with
+  | .error error => some (error.code, error.path.toPointer)
+  | .ok _ => none
+
 private def rootIdentityFailures : Bool :=
   let base := encodeRequest (requestWith (query := .capabilities))
   errorCodePath (decodeJson (setField base "schema" "future")) ==
@@ -165,6 +171,33 @@ private def scalarReasons : Bool :=
         bytesArgs == Lean.Json.mkObj [("reason", "odd-length")]
   | _, _, _ => false
 
+private def taggedBroadPrepassExact : Bool :=
+  let contractPath := Path.root.field "contract"
+  let queryPath := Path.root.field "query"
+  let probePath := Path.root.field "probe"
+  let invalidContract := .mkObj [
+    ("id", "raw"), ("kind", "future"), ("zzz", .null)
+  ]
+  let missingContractId := .mkObj [("kind", "future")]
+  let invalidQuery := .mkObj [
+    ("kind", "future"), ("zzz", .null)
+  ]
+  let invalidProbe := .mkObj [
+    ("address", encodeAddress addressA), ("kind", "future"),
+    ("zzz", .null)
+  ]
+  let missingProbeAddress := .mkObj [("kind", "future")]
+  rawErrorCodePath (decodeRawContractAt contractPath invalidContract) ==
+      some ("oracle.wire.unknown-field", "/contract/zzz") &&
+    rawErrorCodePath (decodeRawContractAt contractPath missingContractId) ==
+      some ("oracle.wire.missing-field", "/contract/id") &&
+    rawErrorCodePath (decodeRawQueryAt queryPath invalidQuery) ==
+      some ("oracle.wire.unknown-field", "/query/zzz") &&
+    rawErrorCodePath (decodeProbeAt probePath invalidProbe) ==
+      some ("oracle.wire.unknown-field", "/probe/zzz") &&
+    rawErrorCodePath (decodeProbeAt probePath missingProbeAddress) ==
+      some ("oracle.wire.missing-field", "/probe/address")
+
 private def coreBudgetInconclusive : Bool :=
   let limits := { Limits.default with coreNodes := 0 }
   match decodeJson (encodeRequest (requestWith limits (.coreCheck rawProgram))) with
@@ -197,6 +230,7 @@ private theorem compileTimeWireRequestRegressions :
       coreOwnershipFailure = true ∧
       malformedDuplicateKey = true ∧
       scalarReasons = true ∧
+      taggedBroadPrepassExact = true ∧
       jsonBudgetInconclusive = true ∧
       coreBudgetInconclusive = true ∧
       typedBudgetInconclusive = true := by
@@ -211,6 +245,8 @@ def testOracleV5WireRequest : IO Unit := do
     "Oracle v5 shallow identity or Limits errors changed"
   assertTrue (coreOwnershipFailure && malformedDuplicateKey && scalarReasons)
     "Oracle/Core wire ownership, strict parsing, or scalar reasons changed"
+  assertTrue taggedBroadPrepassExact
+    "Oracle v5 tagged-object broad structural precedence changed"
   assertTrue (jsonBudgetInconclusive && coreBudgetInconclusive &&
     typedBudgetInconclusive)
     "Oracle v5 preflight resource ordering changed"

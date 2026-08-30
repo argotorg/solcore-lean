@@ -147,6 +147,7 @@ def decodeEnvironmentAt
 def decodeProbeAt
     (path : Path)
     (json : Lean.Json) : DecodeResult Probe := do
+  ensureExactObject path json ["address", "kind", "slot"] ["address", "kind"]
   let kindPath := path.field "kind"
   let kind ← decodeStringAt kindPath (← requireField path json "kind")
   let probe ← match kind with

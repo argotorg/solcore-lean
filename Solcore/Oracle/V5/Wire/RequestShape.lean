@@ -153,6 +153,8 @@ def decodeRawStaticMethodAt
 def decodeRawContractAt
     (path : Path)
     (json : Lean.Json) : DecodeResult RawContract := do
+  ensureExactObject path json
+    ["id", "kind", "methods", "program"] ["id", "kind"]
   let kindPath := path.field "kind"
   let kind ← decodeStringAt kindPath (← requireField path json "kind")
   let (id, spec) ← match kind with
@@ -195,6 +197,9 @@ def decodeRawScenarioAt
 def decodeRawQueryAt
     (path : Path)
     (json : Lean.Json) : DecodeResult RawQuery := do
+  ensureExactObject path json
+    ["contracts", "environment", "invocation", "kind", "program", "world"]
+    ["kind"]
   let kindPath := path.field "kind"
   let kind ← decodeStringAt kindPath (← requireField path json "kind")
   match kind with
