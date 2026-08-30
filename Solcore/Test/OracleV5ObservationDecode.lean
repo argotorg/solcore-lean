@@ -33,28 +33,46 @@ private def journal : JournalObservation := {
   createdAddresses := [addressTwo, addressOne, addressOne]
 }
 
-private def observation (outcome : TerminalOutcome) : ExecutionObservation := {
+private def returnedObservation (outcome : TerminalOutcome) : ExecutionObservation := {
   outcome
   journal
   state := { probes }
 }
 
+private def rollbackProbes : List ProbeObservation := [
+  .accountPresence addressOne true true,
+  .storage addressOne two none none,
+  .balance addressOne (some zero) (some zero),
+  .nonce addressOne none none,
+  .code addressOne (some runtimeId) (some runtimeId)
+]
+
+private def rollbackObservation
+    (outcome : TerminalOutcome) : ExecutionObservation := {
+  outcome
+  journal := { logs := [], createdAddresses := [] }
+  state := { probes := rollbackProbes }
+}
+
 private def observations : List ExecutionObservation := [
-  observation (.preflightRejected .senderAbsent),
-  observation (.preflightRejected .recipientAbsent),
-  observation (.preflightRejected .insufficientBalance),
-  observation (.preflightRejected .recipientOverflow),
-  observation (.returned (ByteArray.mk #[0, 15, 255])),
-  observation (.reverted ByteArray.empty),
-  observation (.trapped two)
+  rollbackObservation (.preflightRejected .senderAbsent),
+  rollbackObservation (.preflightRejected .recipientAbsent),
+  rollbackObservation (.preflightRejected .insufficientBalance),
+  rollbackObservation (.preflightRejected .recipientOverflow),
+  returnedObservation (.returned (ByteArray.mk #[0, 15, 255])),
+  rollbackObservation (.reverted ByteArray.empty),
+  rollbackObservation (.trapped two)
 ]
 
 private def roundTripsExact : Bool :=
   observations.all fun expected =>
-    match decodeExecutionObservation
-        (Solcore.Oracle.V5.encodeExecutionObservation expected) with
-    | .ok actual => actual == expected
-    | .error _ => false
+    match ValidExecutionObservation.of? expected with
+    | none => false
+    | some sealed =>
+        match decodeExecutionObservation
+            (Solcore.Oracle.V5.encodeExecutionObservation sealed) with
+        | .ok actual => actual.value == expected
+        | .error _ => false
 
 private def errorIs {α : Type}
     (result : DecodeResult α)
@@ -180,11 +198,73 @@ private def invalidOutcomeTagExact : Bool :=
       ])
     ])
 
+private def preflightOutcomeJson : Lean.Json :=
+  .mkObj [("kind", "preflightRejected"), ("reason", "senderAbsent")]
+
+private def logJson : Lean.Json :=
+  Solcore.Oracle.V5.encodeLogObservation {
+    emitter := addressOne, topic := one, payload := two
+  }
+
+private def mismatchedProbeJson : Lean.Json :=
+  .mkObj [
+    ("kind", "accountPresence"),
+    ("address", Solcore.Oracle.V5.Wire.encodeAddress addressOne),
+    ("initial", true), ("committed", false)
+  ]
+
+private def createdAddressesPrecedeLogsAndProbes : Bool :=
+  let badJournal := .mkObj [
+    ("createdAddresses", .arr #[
+      Solcore.Oracle.V5.Wire.encodeAddress addressOne
+    ]),
+    ("logs", .arr #[logJson])
+  ]
+  errorIs (decodeExecutionObservation <| executionJson preflightOutcomeJson
+      (journal := badJournal) (state := stateJson #[mismatchedProbeJson]))
+    "oracle.wire.invalid-tag" "/value/journal/createdAddresses"
+    (.mkObj [
+      ("actual", .arr #[Solcore.Oracle.V5.Wire.encodeAddress addressOne]),
+      ("expected", .arr #[])
+    ])
+
+private def logsPrecedeProbeMismatches : Bool :=
+  let badJournal := .mkObj [
+    ("createdAddresses", .arr #[]), ("logs", .arr #[logJson])
+  ]
+  errorIs (decodeExecutionObservation <| executionJson preflightOutcomeJson
+      (journal := badJournal) (state := stateJson #[mismatchedProbeJson]))
+    "oracle.wire.invalid-tag" "/value/journal/logs"
+    (.mkObj [
+      ("actual", .arr #[logJson]), ("expected", .arr #[])
+    ])
+
+private def firstMismatchedProbeExact : Bool :=
+  let equalProbe := .mkObj [
+    ("kind", "accountPresence"),
+    ("address", Solcore.Oracle.V5.Wire.encodeAddress addressOne),
+    ("initial", true), ("committed", true)
+  ]
+  errorIs (decodeExecutionObservation <| executionJson preflightOutcomeJson
+      (state := stateJson #[equalProbe, mismatchedProbeJson]))
+    "oracle.wire.invalid-tag" "/value/state/probes/1/committed"
+    (.mkObj [("actual", false), ("expected", true)])
+
+private def invalidObservationCannotBeSealed : Bool :=
+  let invalid : ExecutionObservation := {
+    outcome := .reverted ByteArray.empty
+    journal := { logs := [], createdAddresses := [addressOne] }
+    state := { probes := rollbackProbes }
+  }
+  (ValidExecutionObservation.of? invalid).isNone
+
 private def allChecks : Bool :=
   roundTripsExact && unknownOutcomeFieldExact && invalidBytesPathExact &&
     invalidStateSchemaExact && invalidExecutionSchemaExact && invalidContractIdExact &&
     missingLogFieldExact && committedEndpointPrecedesInitial &&
-    invalidOutcomeTagExact
+    invalidOutcomeTagExact && createdAddressesPrecedeLogsAndProbes &&
+    logsPrecedeProbeMismatches && firstMismatchedProbeExact &&
+    invalidObservationCannotBeSealed
 
 private theorem allChecks_exact : allChecks = true := by
   native_decide

@@ -1,4 +1,5 @@
 import Solcore.Oracle.V5.ObservationCodec
+import Solcore.Oracle.V5.ObservationValidity
 import Solcore.Oracle.V5.Wire.Scalar
 
 /-! Strict JSON decoding for total Oracle v5 execution observations. -/
@@ -42,6 +43,8 @@ def decodeBalanceTransferFailureAt
 def decodeTerminalOutcomeAt
     (path : Path)
     (json : Lean.Json) : DecodeResult TerminalOutcome := do
+  ensureExactObject path json
+    ["kind", "reason", "returndata", "revertdata"] ["kind"]
   let kindPath := path.field "kind"
   let kind ← decodeStringAt kindPath (← requireField path json "kind")
   match kind with
@@ -99,6 +102,9 @@ def decodeJournalObservationAt
 def decodeProbeObservationAt
     (path : Path)
     (json : Lean.Json) : DecodeResult ProbeObservation := do
+  ensureExactObject path json
+    ["address", "committed", "initial", "kind", "slot"]
+    ["address", "committed", "initial", "kind"]
   let kindPath := path.field "kind"
   let kind ← decodeStringAt kindPath (← requireField path json "kind")
   match kind with
@@ -169,7 +175,7 @@ def decodeStateObservationAt
     ])
   pure { probes }
 
-def decodeExecutionObservationValueAt
+private def decodeExecutionObservationValueAt
     (path : Path)
     (json : Lean.Json) : DecodeResult ExecutionObservation := do
   ensureExactObject path json
@@ -182,9 +188,62 @@ def decodeExecutionObservationValueAt
     (← requireField path json "state")
   pure { outcome, journal, state }
 
+private def encodeOptionalEndpoint {α : Type}
+    (encode : α → Lean.Json) : Option α → Lean.Json
+  | none => .null
+  | some value => encode value
+
+private def probeEndpointJson
+    (probe : ProbeObservation) : Lean.Json × Lean.Json :=
+  match probe with
+  | .accountPresence _ initial committed =>
+      (.bool initial, .bool committed)
+  | .storage _ _ initial committed
+  | .balance _ initial committed
+  | .nonce _ initial committed =>
+      (encodeOptionalEndpoint Solcore.Oracle.V5.encodeWord initial,
+        encodeOptionalEndpoint Solcore.Oracle.V5.encodeWord committed)
+  | .code _ initial committed =>
+      (encodeOptionalEndpoint Solcore.Oracle.V5.encodeContractId initial,
+        encodeOptionalEndpoint Solcore.Oracle.V5.encodeContractId committed)
+
+private def validateRollbackProbesAt
+    (path : Path) : Nat → List ProbeObservation → DecodeResult Unit
+  | _, [] => pure ()
+  | index, probe :: rest =>
+      if probe.endpointsEqual then
+        validateRollbackProbesAt path (index + 1) rest
+      else
+        let endpoints := probeEndpointJson probe
+        invalidTagAt (((path.field "state").field "probes").index index |>.field
+          "committed") endpoints.2 endpoints.1
+
+/-- Select the first rollback invariant violation in the published order. -/
+private def validateExecutionObservationAt
+    (path : Path)
+    (observation : ExecutionObservation) : DecodeResult Unit :=
+  match observation.outcome with
+  | .returned _ => pure ()
+  | .preflightRejected _
+  | .reverted _
+  | .trapped _ =>
+      if observation.journal.createdAddresses.isEmpty then
+        if observation.journal.logs.isEmpty then
+          validateRollbackProbesAt path 0 observation.state.probes
+        else
+          invalidTagAt ((path.field "journal").field "logs")
+            (.arr <| observation.journal.logs.toArray.map
+              Solcore.Oracle.V5.encodeLogObservation)
+            (.arr #[])
+      else
+        invalidTagAt ((path.field "journal").field "createdAddresses")
+          (.arr <| observation.journal.createdAddresses.toArray.map
+            Solcore.Oracle.V5.encodeAddress)
+          (.arr #[])
+
 def decodeExecutionObservationAt
     (path : Path)
-    (json : Lean.Json) : DecodeResult ExecutionObservation := do
+    (json : Lean.Json) : DecodeResult ValidExecutionObservation := do
   ensureExactObject path json ["schema", "value"] ["schema", "value"]
   let schemaPath := path.field "schema"
   let schema ← decodeStringAt schemaPath (← requireField path json "schema")
@@ -192,11 +251,19 @@ def decodeExecutionObservationAt
     failAt schemaPath .invalidSchema (.mkObj [
       ("expected", executionSchema), ("actual", schema)
     ])
-  decodeExecutionObservationValueAt (path.field "value")
+  let valuePath := path.field "value"
+  let observation ← decodeExecutionObservationValueAt valuePath
     (← requireField path json "value")
+  match validateExecutionObservationAt valuePath observation with
+  | .error error => throw error
+  | .ok _ =>
+      match ValidExecutionObservation.of? observation with
+      | some valid => pure valid
+      | none => invalidTagAt valuePath Lean.Json.null (Lean.Json.mkObj
+          [("constraint", "valid-execution-observation")])
 
 def decodeExecutionObservation
-    (json : Lean.Json) : DecodeResult ExecutionObservation :=
+    (json : Lean.Json) : DecodeResult ValidExecutionObservation :=
   decodeExecutionObservationAt .root json
 
 end Solcore.Oracle.V5.Wire
