@@ -9,24 +9,6 @@ set_option autoImplicit false
 
 namespace Solcore.Semantics.OneLevelNestedExecution
 
-private theorem genericHandleRequest_storageAddress
-    {RollbackState TraceState : Type}
-    (inputs : HostStorageDriver.ExecutionInputs)
-    (context : HostStorageDriver.Context RollbackState TraceState)
-    (request : Core.HostRequest) :
-    (HostStorageDriver.handleRequest inputs context request).1.context.storageAddress =
-      context.context.storageAddress := by
-  cases request <;> rfl
-
-private theorem genericHandleRequest_checkpoint
-    {RollbackState TraceState : Type}
-    (inputs : HostStorageDriver.ExecutionInputs)
-    (context : HostStorageDriver.Context RollbackState TraceState)
-    (request : Core.HostRequest) :
-    (HostStorageDriver.handleRequest inputs context request).1.context.values.checkpoint =
-      context.context.values.checkpoint := by
-  cases request <;> rfl
-
 private theorem transactionHandleRequest_storageAddress
     (inputs : HostStorageDriver.ExecutionInputs)
     (context : TransactionHostStorageDriver.Context)
