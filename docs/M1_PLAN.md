@@ -110,8 +110,9 @@ explicit `currentAddress` is fixed for a handled run and its same-input
 resumptions, observed losslessly by Core at append-only host index 9, and kept
 independent from storage, code, caller, and future callee or call-kind roles.
 ADR-0146 has since appended the typed call at index 10, and ADR-0147 appends
-its value-bearing counterpart at index 11. The canonical host tables now have
-length 12 and index 12 is first unbound.
+its value-bearing counterpart at index 11. ADR-0148 appends checked creation at
+index 12. The canonical host tables now have length 13 and index 13 is first
+unbound.
 
 [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md)
 is complete. It binds the existing selected-run configuration to a
@@ -313,7 +314,7 @@ These results remain regression obligations for every extension.
 | 129 | Executable checked-Core top-level lifecycle | Complete | Runs an installed checked contract from explicit state and makes return commit and revert/trap rollback observable in one total result |
 | 130 | Nested checked-Core invocation | Complete | Adds typed child inputs/results, dynamic resolution, shared-fuel scheduling and resumption, sealed state provenance, child checkpoints, root commit/rollback, and global delta observations |
 | 131 | Balance semantics | Complete | Connects value-bearing calls to checked Account balance availability, atomic transfer, rollback, exact deltas, and replay-free resumption through ADR-0147 |
-| 132 | Contract creation | Planned | Adds nonce, address derivation, initialization, and rollback policy |
+| 132 | Contract creation | Complete | [ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) adds checked nonce consumption, explicit address derivation, checked initializer/runtime templates, runtime installation, rollback, and fixed-environment resumption |
 | 133 | Logs and transaction observations | Planned | Adds ordered rollback-aware events and transaction-wide results |
 | 134 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
 | 135 | Public Oracle execution | Planned | Publishes a versioned checked-Core execution request and total result only after internal semantics stabilizes |
@@ -2367,8 +2368,9 @@ ABI, and Oracle publication remain separate vertical slices.
 [ADR-0146](adr/0146-one-level-nested-checked-core-execution.md) is complete.
 The append-only typed Word call resolves child code against the current working
 world and runs one active root or child under a shared budget. An exhausted
-result retains its registry, exact mode, and scheduler-generated `Reachable`
-proof, so resumption cannot restart a child or switch its resolution source.
+result retains its fixed execution environment, exact mode, and
+scheduler-generated `Reachable` proof, so resumption cannot restart a child or
+switch its call registry, creation templates, or address policy.
 
 Child return rebases the parent's speculative world; child revert and trap use
 the call checkpoint. Root return commits all accumulated changes, while root
@@ -2377,9 +2379,26 @@ checked-program tests cover cross-account calls, self-calls, sequential calls,
 dispatch failures, rollback, and split-fuel resumption.
 
 [ADR-0147](adr/0147-checked-balance-transfer-and-value-calls.md) is complete.
-Contract creation is the active next implementation milestone; logs, ABI, and
-Oracle publication follow later. Parser proofs remain paused, and the older
-proof-only selected-execution path is not resumed as an intermediate step.
+
+[ADR-0148](adr/0148-checked-contract-creation-lifecycle.md) is complete. Root
+creation uses checked initializer/runtime templates, an explicit fixed address
+policy, non-wrapping nonce consumption, shared scheduler fuel, runtime
+installation, and both call-site and root-wide rollback. Exhaustion retains the
+complete environment and resumes without repeating derivation, nonce update,
+provisional insertion, or value transfer. Actual delta regressions cover the
+creator, created, and untouched Accounts across nonce, code, storage, and
+balance endpoints.
+
+The full 836-job build, 1,556-job test build, and runtime suite pass. All 80
+changed Lean roots pass warnings-as-errors and trust-zero validation; metadata,
+semantic-kernel, and diff checks pass. Axiom reports contain only `propext`,
+`Quot.sound`, and limited `Classical.choice`, with no `sorry`, `admit`, or
+`unsafe` declaration.
+
+Logs and transaction observations are the active next implementation
+milestone; ABI and Oracle publication follow later. Parser proofs remain
+paused, and the older proof-only selected-execution path is not resumed as an
+intermediate step.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

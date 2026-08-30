@@ -197,6 +197,13 @@ views may inspect completion or exhaustion, but callers cannot manufacture a
 completed creation, substitute an environment, or attach an unrelated world to
 a retained machine state.
 
+Initializer mode is defined in `OneLevelNestedExecutionMode`, separate from the
+base state carriers, to keep the creation-state import graph acyclic. Semantic
+names, high-level run APIs, and the `Solcore.Semantics` umbrella remain stable.
+Direct imports of the internal `OneLevelNestedExecutionState` module are not a
+published compatibility boundary; internal users that need active scheduler
+modes import `OneLevelNestedExecutionMode`.
+
 ## Failures and stable codes
 
 Creation preserves the existing call failure codes and appends new ones:

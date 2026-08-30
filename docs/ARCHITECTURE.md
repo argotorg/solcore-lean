@@ -991,8 +991,16 @@ state for resumption. ADR-0147 completes explicit balances, non-wrapping
 atomic transfer, a value-bearing call at append-only host index 11, and a root
 context whose original checkpoint is distinct from its post-transfer working
 world. The same sealed result handles transfer rejection and replay-free root,
-child, and post-child resumption. Creation, logs, ABI, and public Oracle schemas
-remain separate layers.
+child, and post-child resumption. At that milestone creation, logs, ABI, and
+public Oracle schemas remained separate layers.
+
+ADR-0148 now adds root checked creation under the same scheduler. One fixed
+`ExecutionEnvironment` retains the call registry, checked initializer/runtime
+templates, and explicit address policy across exhaustion. Creation consumes a
+checked nonce, prepares a fresh initializer Account, installs checked runtime
+code on return, and preserves call-site and root-wide rollback. The current
+host table has 13 entries: checked creation is index 12 and index 13 is first
+unbound. Logs, ABI, and public Oracle schemas remain separate layers.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

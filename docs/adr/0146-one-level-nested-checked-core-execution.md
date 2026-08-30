@@ -156,6 +156,11 @@ Each retained result also carries the registry used by the run and a
 transitions. Resumption therefore cannot accept an unrelated registry or an
 arbitrarily assembled root or child frame.
 
+ADR-0148 strengthens this retained capability boundary to the complete fixed
+`ExecutionEnvironment`. Call resolution still uses its `callRegistry`
+projection, while exhaustion also retains the creation-template registry and
+address policy. Resumption accepts no replacement environment.
+
 The implementation proves the split-budget law against a one-shot scheduler
 run:
 

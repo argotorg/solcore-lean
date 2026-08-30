@@ -199,6 +199,11 @@ The view distinguishes preflight rejection from the sealed ADR-0146 execution
 result. Callers cannot manufacture a completed result, replace the registry of
 an out-of-fuel result, or supply an unrelated prepared frame.
 
+ADR-0148 strengthens the retained registry described here to the full fixed
+`ExecutionEnvironment`: checked call registry, creation templates, and address
+policy. Balanced resumption still accepts only additional fuel and cannot
+replace any of those capabilities.
+
 Rejected results are stable under additional fuel. Successful runs reuse the
 shared root/child budget and satisfy the same split law:
 
