@@ -235,6 +235,12 @@ import Solcore.Test.CoreWireV3CodecFoundation
 import Solcore.Test.CoreWireV3Conversions
 import Solcore.Test.CoreWireV3Host
 import Solcore.Test.CoreWireV3Public
+import Solcore.Test.CoreV3SynthesisCase
+import Solcore.Test.CoreV3SynthesisCorpus
+import Solcore.Test.CoreV3SynthesisFragment
+import Solcore.Test.CoreV3SynthesisGenerator
+import Solcore.Test.CoreV3SynthesisSeed
+import Solcore.Test.CoreV3SynthesisShrink
 import Solcore.Test.OracleV5Capabilities
 import Solcore.Test.OracleV5CheckDiagnostic
 import Solcore.Test.OracleV5ContractAdmission
@@ -5214,6 +5220,12 @@ def run : IO Unit := do
   testCoreWireV3Conversions
   testCoreWireV3Host
   CoreWireV3Public.testCoreWireV3Public
+  CoreV3SynthesisSeed.testCoreV3SynthesisSeed
+  testCoreV3SynthesisFragment
+  CoreV3SynthesisGenerator.testCoreV3SynthesisGenerator
+  CoreV3SynthesisShrink.testCoreV3SynthesisShrink
+  CoreV3SynthesisCase.testCoreV3SynthesisCase
+  CoreV3SynthesisCorpus.testCoreV3SynthesisCorpus
   testDetailedCoreChecker
   testOracle
   testOracleV2
