@@ -45,15 +45,14 @@ end IndexedMethod
 def canonicalMethodEntries (methods : List Method) : List IndexedMethod :=
   (methods.map Method.index).mergeSort IndexedMethod.signatureLE
 
-/-- The first equal-signature pair in canonical order. -/
+/-- The lexicographically first pair sharing a canonical signature. -/
 def firstDuplicateSignature? :
     List IndexedMethod → Option (IndexedMethod × IndexedMethod)
-  | first :: second :: rest =>
-      if first.signature == second.signature then
-        some (first, second)
-      else
-        firstDuplicateSignature? (second :: rest)
-  | _ => none
+  | [] => none
+  | first :: rest =>
+      match rest.find? (fun later => later.signature == first.signature) with
+      | some later => some (first, later)
+      | none => firstDuplicateSignature? rest
 
 /-- The lexicographically first pair sharing a selector. -/
 def firstSelectorCollision? :
