@@ -134,6 +134,22 @@ private def criticalBoundariesAreVisible : Bool :=
   (List.range 180).any initializerPrefixVisible &&
     (List.range 180).any completedCreationVisibleBeforeRootLog
 
+private def sequentialCreationsPreserveCompletionOrder : Bool :=
+  match (runSequentialCreations completionFuel).view with
+  | .outOfFuel _ _ _ => false
+  | .completed terminal =>
+      terminal.outcome ==
+          .returned (encodeWordBytesBE (addressToWord secondCreated)) &&
+        terminal.workingJournal.logList == sequentialInitializerLogs &&
+        terminal.committedJournal.logList == sequentialInitializerLogs &&
+        terminal.workingJournal.createdContractList ==
+          [created, secondCreated] &&
+        terminal.committedJournal.createdContractList ==
+          [created, secondCreated] &&
+        terminal.finalWorld.nonce? creator == some ⟨9, by decide⟩ &&
+        (terminal.finalWorld.code? created).isSome &&
+        (terminal.finalWorld.code? secondCreated).isSome
+
 private theorem compileTimeCreationJournals :
     successfulCreationJournals && revertedInitializerRollsBack &&
       trappedInitializerRollsBack && laterRootRevertRollsBack &&
@@ -142,6 +158,10 @@ private theorem compileTimeCreationJournals :
 
 private theorem compileTimeCreationResumption :
     everyOutOfFuelBoundaryIsExactlyOnce && criticalBoundariesAreVisible = true := by
+  native_decide
+
+private theorem compileTimeSequentialCreationOrder :
+    sequentialCreationsPreserveCompletionOrder = true := by
   native_decide
 
 def testAdr0149CreationLogExecution : IO Unit := do
@@ -159,5 +179,7 @@ def testAdr0149CreationLogExecution : IO Unit := do
     "creation resumption duplicated, lost, or reordered transaction observations"
   assertTrue criticalBoundariesAreVisible
     "initializer/completion boundaries did not expose their retained journal"
+  assertTrue sequentialCreationsPreserveCompletionOrder
+    "sequential creations lost completion-order logs or created addresses"
 
 end Tests
