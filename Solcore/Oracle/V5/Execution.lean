@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.Observation
+import Solcore.Oracle.V5.ObservationValidity
 import Solcore.Oracle.V5.RootInstallation
 import Solcore.Oracle.V5.ScenarioPreparation
 import Solcore.Semantics.BalancedTopLevelExecution
@@ -22,7 +22,7 @@ inductive ScenarioExecutionResult where
   | preparationRejected (error : ScenarioPreparationError)
   | rootRejected (reason : RootInstallationRejection)
   | outOfFuel
-  | executed (observation : ExecutionObservation)
+  | executed (observation : ValidExecutionObservation)
   | internalError (error : InternalError)
 
 namespace Execution
@@ -60,7 +60,10 @@ def execute
           match runReady { prepared, root } fuel with
           | .outOfFuel => .outOfFuel
           | .internalError error => .internalError error
-          | .executed observation => .executed observation
+          | .executed observation =>
+              match ValidExecutionObservation.of? observation with
+              | some valid => .executed valid
+              | none => .internalError .oracleResponseInvariant
 
 end Execution
 

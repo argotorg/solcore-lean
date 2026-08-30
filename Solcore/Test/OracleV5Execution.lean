@@ -87,7 +87,7 @@ private def expectedObservation : ExecutionObservation := {
 
 private def returnCommitsAndObserves : Bool :=
   match execute validScenario 128 with
-  | .executed observation => observation == expectedObservation
+  | .executed observation => observation.value == expectedObservation
   | _ => false
 
 private def zeroFuelHasNoObservation : Bool :=

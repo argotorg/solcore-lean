@@ -1,5 +1,5 @@
 import Lean.Data.Json
-import Solcore.Oracle.V5.Observation
+import Solcore.Oracle.V5.ObservationValidity
 
 /-! Typed, query-indexed response values for Oracle v5. -/
 
@@ -91,7 +91,7 @@ end CoreCheckVerdict
 inductive ExecuteVerdict where
   | rejected (diagnostic : Diagnostic)
   | inconclusive (exhaustion : Exhaustion)
-  | executed (observation : ExecutionObservation)
+  | executed (observation : ValidExecutionObservation)
   | internalError (error : InternalError)
   deriving BEq
 

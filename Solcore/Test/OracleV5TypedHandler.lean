@@ -101,9 +101,9 @@ private def executionAccepted : Bool :=
     defaultValid
   match response.body with
   | .execute (.executed observation) =>
-      observation.outcome == .returned (encodeWordBytesBE seven) &&
-        observation.journal == { logs := [], createdAddresses := [] } &&
-        observation.state.probes.isEmpty
+      observation.value.outcome == .returned (encodeWordBytesBE seven) &&
+        observation.value.journal == { logs := [], createdAddresses := [] } &&
+        observation.value.state.probes.isEmpty
   | _ => false
 
 private def allChecks : Bool :=
