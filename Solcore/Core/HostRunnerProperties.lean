@@ -113,6 +113,22 @@ theorem hostAdvance_done_iff
                   | unit | bool | word | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
+              | createContractWord =>
+                  cases returned with
+                  | pair templateId rest =>
+                      cases templateId <;>
+                        try simp [hostAdvance] at advanced
+                      case word =>
+                        cases rest with
+                        | pair transferredValue input =>
+                            cases transferredValue <;> cases input <;>
+                              simp at advanced
+                        | unit | bool | word | hostFunction | closure | inLeft |
+                            inRight | cellRef | constructed =>
+                            simp at advanced
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp [hostAdvance] at advanced
   · rintro ⟨store, rfl⟩
     simp [hostAdvance, State.final, advance]
 

@@ -114,6 +114,16 @@ inductive HostRequestEmission : State → HostSuspension → Prop where
           .hostApply .callContractWordWithValue :: continuation, store⟩
         ⟨.callContractWordWithValue target value input,
           continuation, store⟩
+  | createContractWord
+      {templateId value input : Word}
+      {continuation : List Frame}
+      {store : Store} :
+      HostRequestEmission
+        ⟨.ret
+            (.pair (.word templateId) (.pair (.word value) (.word input))),
+          .hostApply .createContractWord :: continuation, store⟩
+        ⟨.createContractWord templateId value input,
+          continuation, store⟩
 
 theorem hostTransition_iff
     {state next : State} :
@@ -202,7 +212,7 @@ theorem hostRequestEmission_iff
                               suspension =
                                 ⟨.callContractWord target input, continuation,
                                   store⟩) ∨
-                            ∃ target value input continuation store,
+                            (∃ target value input continuation store,
                               state =
                                 ⟨.ret
                                     (.pair (.word target)
@@ -211,7 +221,17 @@ theorem hostRequestEmission_iff
                                     continuation, store⟩ ∧
                               suspension =
                                 ⟨.callContractWordWithValue target value input,
-                                  continuation, store⟩ := by
+                                  continuation, store⟩) ∨
+                              ∃ templateId value input continuation store,
+                                state =
+                                  ⟨.ret
+                                      (.pair (.word templateId)
+                                        (.pair (.word value) (.word input))),
+                                    .hostApply .createContractWord ::
+                                      continuation, store⟩ ∧
+                                suspension =
+                                  ⟨.createContractWord templateId value input,
+                                    continuation, store⟩ := by
   constructor
   · intro emission
     cases emission with
@@ -246,7 +266,12 @@ theorem hostRequestEmission_iff
         exact
           .inr (.inr (.inr (.inr (.inr (.inr (.inr
             (.inr (.inr (.inr (.inr
-              ⟨_, _, _, _, _, rfl, rfl⟩))))))))))
+              (.inl ⟨_, _, _, _, _, rfl, rfl⟩)))))))))))
+    | createContractWord =>
+        exact
+          .inr (.inr (.inr (.inr (.inr (.inr (.inr
+            (.inr (.inr (.inr (.inr
+              (.inr ⟨_, _, _, _, _, rfl, rfl⟩)))))))))))
   · rintro (⟨slot, continuation, store, rfl, rfl⟩ |
         ⟨slot, value, continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
@@ -258,7 +283,8 @@ theorem hostRequestEmission_iff
         ⟨offset, continuation, store, rfl, rfl⟩ |
         ⟨continuation, store, rfl, rfl⟩ |
         ⟨target, input, continuation, store, rfl, rfl⟩ |
-        ⟨target, value, input, continuation, store, rfl, rfl⟩)
+        ⟨target, value, input, continuation, store, rfl, rfl⟩ |
+        ⟨templateId, value, input, continuation, store, rfl, rfl⟩)
     · exact .storageRead
     · exact .storageWrite
     · exact .storageAddress
@@ -271,6 +297,7 @@ theorem hostRequestEmission_iff
     · exact .currentAddress
     · exact .callContractWord
     · exact .callContractWordWithValue
+    · exact .createContractWord
 
 @[simp] theorem HostAdvanceResult.ofAdvance_eq_next_iff
     {result : AdvanceResult}
@@ -353,6 +380,24 @@ theorem hostAdvance_next_iff
                   | pair left right =>
                       cases left with
                       | word target =>
+                          cases right with
+                          | pair middle last =>
+                              cases middle <;> cases last <;>
+                                simp [hostAdvance] at advanced
+                          | unit | bool | word | hostFunction | closure |
+                              inLeft | inRight | cellRef | constructed =>
+                              simp [hostAdvance] at advanced
+                      | unit | bool | hostFunction | pair | closure | inLeft |
+                          inRight | cellRef | constructed =>
+                          simp [hostAdvance] at advanced
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp [hostAdvance] at advanced
+              | createContractWord =>
+                  cases value with
+                  | pair left right =>
+                      cases left with
+                      | word templateId =>
                           cases right with
                           | pair middle last =>
                               cases middle <;> cases last <;>
@@ -502,6 +547,27 @@ theorem hostAdvance_suspended_iff
                               case word.word value input =>
                                 cases advanced
                                 exact .callContractWordWithValue
+                          | unit | bool | word | hostFunction | closure |
+                              inLeft | inRight | cellRef | constructed =>
+                              simp at advanced
+                      | unit | bool | hostFunction | pair | closure | inLeft |
+                          inRight | cellRef | constructed =>
+                          simp at advanced
+                  | unit | bool | word | hostFunction | closure | inLeft |
+                      inRight | cellRef | constructed =>
+                      simp at advanced
+              | createContractWord =>
+                  cases value with
+                  | pair left right =>
+                      cases left with
+                      | word templateId =>
+                          cases right with
+                          | pair middle last =>
+                              cases middle <;> cases last <;>
+                                simp at advanced
+                              case word.word value input =>
+                                cases advanced
+                                exact .createContractWord
                           | unit | bool | word | hostFunction | closure |
                               inLeft | inRight | cellRef | constructed =>
                               simp at advanced

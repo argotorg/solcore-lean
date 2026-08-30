@@ -123,6 +123,7 @@ inductive HostFunction where
   | currentAddress
   | callContractWord
   | callContractWordWithValue
+  | createContractWord
   deriving Repr, BEq, DecidableEq
 
 namespace HostFunction
@@ -141,6 +142,8 @@ def parameterType : HostFunction → Ty
   | .callContractWord => .product .word .word
   | .callContractWordWithValue =>
       .product .word (.product .word .word)
+  | .createContractWord =>
+      .product .word (.product .word .word)
 
 def resultType : HostFunction → Ty
   | .storageRead => .word
@@ -156,6 +159,8 @@ def resultType : HostFunction → Ty
   | .callContractWord =>
       .sum .word (.sum .word (.sum .word .word))
   | .callContractWordWithValue =>
+      .sum .word (.sum .word (.sum .word .word))
+  | .createContractWord =>
       .sum .word (.sum .word (.sum .word .word))
 
 @[simp] def functionType (function : HostFunction) : Ty :=
@@ -260,14 +265,24 @@ def resultType : HostFunction → Ty
       .sum .word (.sum .word (.sum .word .word)) :=
   rfl
 
+@[simp] theorem parameterType_createContractWord :
+    parameterType .createContractWord =
+      .product .word (.product .word .word) :=
+  rfl
+
+@[simp] theorem resultType_createContractWord :
+    resultType .createContractWord =
+      .sum .word (.sum .word (.sum .word .word)) :=
+  rfl
+
 /-- Canonical append-only order of internal host capabilities. -/
 def all : List HostFunction :=
   [.storageRead, .storageWrite, .storageAddress, .codeAddress,
     .callValue, .callerAddress, .inputDataByte?, .inputDataSize,
     .inputDataWordBE?, .currentAddress, .callContractWord,
-    .callContractWordWithValue]
+    .callContractWordWithValue, .createContractWord]
 
-@[simp] theorem all_length : all.length = 12 :=
+@[simp] theorem all_length : all.length = 13 :=
   rfl
 
 theorem mem_all (function : HostFunction) : function ∈ all := by
@@ -290,6 +305,7 @@ def index : HostFunction → Nat
   | .currentAddress => 9
   | .callContractWord => 10
   | .callContractWordWithValue => 11
+  | .createContractWord => 12
 
 @[simp] theorem index_storageRead : index .storageRead = 0 :=
   rfl
@@ -326,6 +342,10 @@ def index : HostFunction → Nat
 
 @[simp] theorem index_callContractWordWithValue :
     index .callContractWordWithValue = 11 :=
+  rfl
+
+@[simp] theorem index_createContractWord :
+    index .createContractWord = 12 :=
   rfl
 
 @[simp] theorem getElem?_all_index (function : HostFunction) :

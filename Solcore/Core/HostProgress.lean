@@ -213,6 +213,28 @@ theorem typed_callContractWordWithValue_emits
         continuation, store⟩,
       .callContractWordWithValue⟩
 
+/-- A well-typed template/value/input tuple emits one creation request. -/
+theorem typed_createContractWord_emits
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {value : Value} {continuation : List Frame} {store : Store}
+    (valueTyping : HostRuntimeValueHasType world value
+      HostFunction.createContractWord.parameterType definitions) :
+    ∃ suspension,
+      HostRequestEmission
+        ⟨.ret value,
+          .hostApply .createContractWord :: continuation, store⟩
+        suspension := by
+  have tupleTyping :
+      HostRuntimeValueHasType world value
+        (.product .word (.product .word .word)) definitions := by
+    simpa using valueTyping
+  obtain ⟨templateId, transferredValue, input, rfl⟩ :=
+    tupleTyping.wordTriple_shape
+  exact
+    ⟨⟨.createContractWord templateId transferredValue input,
+        continuation, store⟩,
+      .createContractWord⟩
+
 /-- Capability dispatch is kept separate from the general CEK progress proof. -/
 theorem typed_hostApplication_emits
     {definitions : DataEnvironment} {world : StoreTyping}
@@ -238,6 +260,8 @@ theorem typed_hostApplication_emits
   | callContractWord => exact typed_callContractWord_emits valueTyping
   | callContractWordWithValue =>
       exact typed_callContractWordWithValue_emits valueTyping
+  | createContractWord =>
+      exact typed_createContractWord_emits valueTyping
 
 theorem host_state_progress
     {definitions : DataEnvironment}
