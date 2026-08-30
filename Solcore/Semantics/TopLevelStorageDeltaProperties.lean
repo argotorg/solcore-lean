@@ -6,6 +6,22 @@ set_option autoImplicit false
 
 namespace Solcore.Semantics.TopLevelStorageDelta
 
+/-- The endpoint worlds and target determine the storage-delta witness. -/
+theorem unique
+    {initialWorld finalWorld : WorldState}
+    {target : Address}
+    (left right : TopLevelStorageDelta initialWorld finalWorld target) :
+    left = right := by
+  have initialAccount_eq : left.initialAccount = right.initialAccount := by
+    apply Option.some.inj
+    exact left.initialAccount_present.symm.trans right.initialAccount_present
+  have finalAccount_eq : left.finalAccount = right.finalAccount := by
+    apply Option.some.inj
+    exact left.finalAccount_present.symm.trans right.finalAccount_present
+  cases left
+  cases right
+  simp_all
+
 theorem slotChange?_eq_none_iff
     {initialWorld finalWorld : WorldState}
     {target : Address}

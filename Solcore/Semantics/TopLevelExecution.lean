@@ -86,6 +86,51 @@ def workingDelta
   workingDeltaOfRawRun contract invocation installed fuel
     (rawRun contract invocation installed fuel) rfl
 
+/-- A raw driver result together with all evidence needed for total decoding. -/
+structure ValidatedRawResult
+    (initialWorld : WorldState)
+    (contract : CheckedCoreContract)
+    (invocation : TopLevelInvocation) where
+  result : HostDriverResult (HostStorageDriver.Context Unit Unit)
+  resultTyping :
+    result.outcome.HasType contract.code.program.resultType
+      contract.code.program.dataDefinitions
+  storageAddress_eq :
+    result.context.context.storageAddress = invocation.target
+  workingDelta :
+    TopLevelStorageDelta initialWorld
+      result.context.context.values.working.1 invocation.target
+
+/-- Package one initial raw run with its checked invariants and exact delta. -/
+def validatedRawRun
+    {initialWorld : WorldState}
+    (contract : CheckedCoreContract)
+    (invocation : TopLevelInvocation)
+    (installed :
+      InstalledCheckedCoreContract initialWorld invocation.target contract)
+    (fuel : Nat) :
+    ValidatedRawResult initialWorld contract invocation :=
+  let result := rawRun contract invocation installed fuel
+  have resultTyping :
+      result.outcome.HasType contract.code.program.resultType
+        contract.code.program.dataDefinitions := by
+    exact contract.code.runWithStorage_hasType
+      (initialContext installed) invocation.executionInputs fuel
+  have storageAddress_eq :
+      result.context.context.storageAddress = invocation.target := by
+    have preserved := HostStorageDriver.run_storageAddress
+      (initialContext installed) invocation.executionInputs fuel
+      (Core.State.initial contract.code.program.body Core.hostEnvironment)
+    change result.context.context.storageAddress = invocation.target at preserved
+    exact preserved
+  {
+    result := result
+    resultTyping := resultTyping
+    storageAddress_eq := storageAddress_eq
+    workingDelta :=
+      workingDeltaOfRawRun contract invocation installed fuel result rfl
+  }
+
 /-- Select the committed or rolled-back world from a decoded terminal outcome. -/
 def finalize
     {initialWorld : WorldState}
@@ -134,6 +179,47 @@ def finalize
           installedAccount installedAccount_present
     }
 
+/-- Classify one typed raw result with its exact root-relative working delta. -/
+def classifyRawResult
+    {initialWorld : WorldState}
+    (contract : CheckedCoreContract)
+    (invocation : TopLevelInvocation)
+    (raw : ValidatedRawResult initialWorld contract invocation) :
+    TopLevelRunResult initialWorld contract invocation :=
+  match outcomeEq : raw.result.outcome with
+  | .done value store =>
+      have decodedNeNone :
+          contract.decodeCompletion? value ≠ none := by
+        have resultTyping := raw.resultTyping
+        rw [outcomeEq] at resultTyping
+        obtain ⟨world, _storeTyping, valueTyping⟩ := resultTyping
+        apply contract.entryProfile.decode?_ne_none_of_hasType
+        rw [← contract.resultType_eq]
+        exact valueTyping
+      match decodedEq : contract.decodeCompletion? value with
+      | some outcome =>
+          .completed
+            (finalize invocation raw.workingDelta.initialAccount
+              raw.workingDelta.initialAccount_present
+              raw.result.context value store outcome
+              raw.workingDelta)
+      | none => False.elim (decodedNeNone decodedEq)
+  | .outOfFuel state =>
+      have stateTyping :
+          Core.HostStateHasType state contract.code.program.resultType
+            contract.code.program.dataDefinitions := by
+        have resultTyping := raw.resultTyping
+        rw [outcomeEq] at resultTyping
+        exact resultTyping
+      .outOfFuel raw.result.context state raw.storageAddress_eq stateTyping
+        raw.workingDelta
+  | .fault _error _state =>
+      have impossible : False := by
+        have resultTyping := raw.resultTyping
+        rw [outcomeEq] at resultTyping
+        exact resultTyping
+      False.elim impossible
+
 /-- Run one installed checked Core contract with a bounded fuel budget. -/
 def run
     {initialWorld : WorldState}
@@ -143,44 +229,8 @@ def run
       InstalledCheckedCoreContract initialWorld invocation.target contract)
     (fuel : Nat) :
     TopLevelRunResult initialWorld contract invocation :=
-  let result := rawRun contract invocation installed fuel
-  let delta := workingDeltaOfRawRun contract invocation installed fuel result rfl
-  match outcomeEq : result.outcome with
-  | .done value store =>
-      have typed := contract.code.runWithStorage_done_hasType
-        (initialContext installed) invocation.executionInputs (by
-          simpa [result, rawRun] using outcomeEq)
-      have decodedNeNone :
-          contract.decodeCompletion? value ≠ none := by
-        obtain ⟨world, _storeTyping, valueTyping⟩ := typed
-        apply contract.entryProfile.decode?_ne_none_of_hasType
-        rw [← contract.resultType_eq]
-        exact valueTyping
-      match decodedEq : contract.decodeCompletion? value with
-      | some outcome =>
-          .completed
-            (finalize invocation installed.account installed.account_present
-              result.context value store outcome
-              delta)
-      | none => False.elim (decodedNeNone decodedEq)
-  | .outOfFuel state =>
-      have stateTyping := contract.code.runWithStorage_outOfFuel_hasType
-        (initialContext installed) invocation.executionInputs (by
-          simpa [result, rawRun] using outcomeEq)
-      have storageAddress_eq :
-          result.context.context.storageAddress = invocation.target := by
-        have preserved := HostStorageDriver.run_storageAddress
-          (initialContext installed) invocation.executionInputs fuel
-          (Core.State.initial contract.code.program.body Core.hostEnvironment)
-        change result.context.context.storageAddress = invocation.target at preserved
-        exact preserved
-      .outOfFuel result.context state storageAddress_eq stateTyping
-        delta
-  | .fault error state =>
-      False.elim
-        (contract.code.runWithStorage_ne_fault
-          (initialContext installed) invocation.executionInputs fuel error state
-          (by simpa [result, rawRun] using outcomeEq))
+  classifyRawResult contract invocation
+    (validatedRawRun contract invocation installed fuel)
 
 end TopLevelExecution
 

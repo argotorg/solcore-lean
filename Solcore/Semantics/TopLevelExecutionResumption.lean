@@ -75,6 +75,39 @@ def extendWorkingDelta
         (delta.otherAccounts_preserved address different)
 }
 
+/-- Package one resumed suffix with the invariants retained by exhaustion. -/
+def validatedResumedRawResult
+    {initialWorld : WorldState}
+    {contract : CheckedCoreContract}
+    {invocation : TopLevelInvocation}
+    (context : HostStorageDriver.Context Unit Unit)
+    (state : Core.State)
+    (storageAddress_eq : context.context.storageAddress = invocation.target)
+    (stateTyping :
+      Core.HostStateHasType state contract.code.program.resultType
+        contract.code.program.dataDefinitions)
+    (delta :
+      TopLevelStorageDelta initialWorld
+        context.context.values.working.1 invocation.target)
+    (additional : Nat) :
+    ValidatedRawResult initialWorld contract invocation :=
+  let result :=
+    HostStorageDriver.run context invocation.executionInputs additional state
+  {
+    result := result
+    resultTyping := by
+      exact HostStorageDriver.run_hasType
+        context invocation.executionInputs additional state stateTyping
+    storageAddress_eq := by
+      have preserved := HostStorageDriver.run_storageAddress
+        context invocation.executionInputs additional state
+      change result.context.context.storageAddress = invocation.target
+      exact preserved.trans storageAddress_eq
+    workingDelta :=
+      extendWorkingDelta context storageAddress_eq delta
+        invocation.executionInputs additional state
+  }
+
 /-- Resume only the out-of-fuel branch under the same contract invocation. -/
 def resumeWithFuel
     {initialWorld : WorldState}
@@ -86,48 +119,8 @@ def resumeWithFuel
   match execution with
   | .completed result => .completed result
   | .outOfFuel context state storageAddress_eq stateTyping delta =>
-      let result :=
-        HostStorageDriver.run context invocation.executionInputs additional state
-      let nextDelta := extendWorkingDelta context storageAddress_eq delta
-        invocation.executionInputs additional state
-      match outcomeEq : result.outcome with
-      | .done value store =>
-          have typed := HostStorageDriver.run_hasType
-            context invocation.executionInputs additional state stateTyping
-          have decodedNeNone :
-              contract.decodeCompletion? value ≠ none := by
-            rw [outcomeEq] at typed
-            obtain ⟨world, _storeTyping, valueTyping⟩ := typed
-            apply contract.entryProfile.decode?_ne_none_of_hasType
-            rw [← contract.resultType_eq]
-            exact valueTyping
-          match decodedEq : contract.decodeCompletion? value with
-          | some outcome =>
-              .completed
-                (finalize invocation delta.initialAccount
-                  delta.initialAccount_present result.context value store outcome
-                  nextDelta)
-          | none => False.elim (decodedNeNone decodedEq)
-      | .outOfFuel exhausted =>
-          have typed :
-              Core.HostStateHasType exhausted
-                contract.code.program.resultType
-                contract.code.program.dataDefinitions := by
-            have resultTyping := HostStorageDriver.run_hasType
-              context invocation.executionInputs additional state stateTyping
-            rw [outcomeEq] at resultTyping
-            exact resultTyping
-          have nextStorageAddress_eq :
-              result.context.context.storageAddress = invocation.target := by
-            have preserved := HostStorageDriver.run_storageAddress
-              context invocation.executionInputs additional state
-            change result.context.context.storageAddress = invocation.target
-            exact preserved.trans storageAddress_eq
-          .outOfFuel result.context exhausted nextStorageAddress_eq typed nextDelta
-      | .fault error faultState =>
-          False.elim
-            (HostStorageDriver.run_ne_fault
-              context invocation.executionInputs additional state faultState error
-              stateTyping (by simpa [result] using outcomeEq))
+      classifyRawResult contract invocation
+        (validatedResumedRawResult context state storageAddress_eq stateTyping
+          delta additional)
 
 end Solcore.Semantics.TopLevelExecution
