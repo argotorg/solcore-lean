@@ -95,6 +95,10 @@ private def padding (input : Bytes) : Bytes :=
       |>.append ((List.replicate (remaining - 2) 0).toByteArray)
       |>.push 0x80
 
+/-- The exact byte length consumed by the Keccak absorber after padding. -/
+def paddedSize (input : Bytes) : Nat :=
+  (padding input).size
+
 private theorem padding_size_of_remaining_eq_one
     (input : Bytes)
     (remainingEq : rateBytes - input.size % rateBytes = 1) :
@@ -117,9 +121,21 @@ private theorem padding_size_eq_rate_mul (input : Bytes) :
   · rw [padding_size_of_remaining_eq_one input remainingEq]
     simp only [rateBytes] at remainderLt reconstruction remainingEq ⊢
     omega
+
   · rw [padding_size_of_remaining_ne_one input remainingEq]
     simp only [rateBytes] at remainderLt reconstruction remainingEq ⊢
     omega
+
+/-- Padding always adds one complete Keccak rate block boundary. -/
+@[simp] theorem paddedSize_eq_rate_mul (input : Bytes) :
+    paddedSize input = rateBytes * (input.size / rateBytes + 1) := by
+  exact padding_size_eq_rate_mul input
+
+/-- The padded input can always be partitioned into complete absorber blocks. -/
+@[simp] theorem paddedSize_mod_rateBytes_eq_zero (input : Bytes) :
+    paddedSize input % rateBytes = 0 := by
+  rw [paddedSize_eq_rate_mul]
+  simp
 
 private theorem padding_size_mod_rateBytes_eq_zero_of_remaining_eq_one
     (input : Bytes)
@@ -152,6 +168,16 @@ private theorem padding_absorb_read_inBounds
   rw [padding_size_eq_rate_mul] at blockLt ⊢
   simp only [rateBytes] at blockLt ⊢
   omega
+
+/-- Every byte read by a scheduled absorber block is inside the padded input. -/
+theorem absorbReadInBounds
+    (input : Bytes) (block lane index : Nat)
+    (blockLt : block < paddedSize input / rateBytes)
+    (laneLt : lane < 17)
+    (indexLt : index < 8) :
+    block * rateBytes + 8 * lane + index < paddedSize input := by
+  simpa [paddedSize] using
+    padding_absorb_read_inBounds input block lane index blockLt laneLt indexLt
 
 private def absorb (input : Bytes) : State :=
   let padded := padding input

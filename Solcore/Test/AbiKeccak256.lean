@@ -28,6 +28,30 @@ private def assertTextDigest
 private def sequentialBytes (count : Nat) : Bytes :=
   ((List.range count).map UInt8.ofNat).toByteArray
 
+-- Compile-only consumers keep the total padding, absorption, and squeeze
+-- boundaries usable outside the implementation module.
+private example (input : Bytes) :
+    Keccak256.paddedSize input =
+      Keccak256.rateBytes * (input.size / Keccak256.rateBytes + 1) := by
+  exact Keccak256.paddedSize_eq_rate_mul input
+
+private example (input : Bytes) :
+    Keccak256.paddedSize input % Keccak256.rateBytes = 0 := by
+  exact Keccak256.paddedSize_mod_rateBytes_eq_zero input
+
+private example
+    (input : Bytes) (block lane index : Nat)
+    (blockLt : block < Keccak256.paddedSize input / Keccak256.rateBytes)
+    (laneLt : lane < 17)
+    (indexLt : index < 8) :
+    block * Keccak256.rateBytes + 8 * lane + index <
+      Keccak256.paddedSize input := by
+  exact Keccak256.absorbReadInBounds input block lane index
+    blockLt laneLt indexLt
+
+private example (input : Bytes) : (Keccak256.hash input).size = 32 := by
+  exact Keccak256.hash_size input
+
 def testAbiKeccak256 : IO Unit := do
   assertTextDigest ""
     "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
