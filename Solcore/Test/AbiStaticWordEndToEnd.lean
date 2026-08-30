@@ -1,4 +1,5 @@
 import Solcore.Test.AbiStaticWordEndToEndFixture
+import Solcore.Semantics.BalancedTopLevelExecutionProperties
 
 /-! Executable vertical checks for Static Word ABI routing and finalization. -/
 
@@ -182,16 +183,80 @@ private def findSplit
 private def zeroFuelIsGenuine : Bool :=
   (observeRootOutOfFuel? (runCanonical 0)).isSome
 
+/-- Recognize the exact scheduler boundary after selector routing has entered
+the selected method but before its first storage effect is handled.  The
+result itself must be root fuel exhaustion; the retained Core control must be
+ready to emit the fixture's first `storageWrite` suspension. -/
+def beforeFirstMethodEffect (fuel : Nat) : Bool :=
+  let result := runCanonical fuel
+  match result.view with
+  | .rejected _ => false
+  | .execution execution =>
+      match execution.view with
+      | .completed _ => false
+      | .outOfFuel _ (.root frame) _ =>
+          match frame.state.control, frame.state.continuation,
+              hostAdvance frame.state with
+          | .ret (.pair (.word slot) (.word value)),
+              .hostApply .storageWrite :: _,
+              HostAdvanceResult.suspended suspension =>
+              match suspension.request with
+              | .storageWrite requestedSlot requestedValue =>
+                  slot == storageSlot && value == argument &&
+                    requestedSlot == storageSlot &&
+                    requestedValue == argument &&
+                    observeRootOutOfFuel? result ==
+                      some transferredBeforeMethod
+              | _ => false
+          | _, _, _ => false
+      | .outOfFuel _ (.child _) _ => false
+      | .outOfFuel _ (.initializer _) _ => false
+
+private def findBeforeFirstMethodEffect : Nat → Nat → Option Nat
+  | _, 0 => none
+  | fuel, remaining + 1 =>
+      if beforeFirstMethodEffect fuel then
+        some fuel
+      else
+        findBeforeFirstMethodEffect (fuel + 1) remaining
+
+def beforeFirstMethodEffectFound : Bool :=
+  match findBeforeFirstMethodEffect 1 512 with
+  | some fuel => beforeFirstMethodEffect fuel
+  | none => false
+
+/-- Kernel-checkable evidence that the bounded fixture reaches precisely the
+post-dispatch/pre-effect boundary, rather than merely sharing its world-state
+observation with an earlier Core control point. -/
+theorem beforeFirstMethodEffect_found_exact :
+    beforeFirstMethodEffectFound = true := by
+  native_decide
+
+/-- The ABI wrapper consumes, without weakening, the balanced runner's exact
+split-fuel equality.  In particular the value-transfer preflight and every
+dispatcher or method effect occur exactly once. -/
+theorem runCanonical_split_fuel (fuel additional : Nat) :
+    BalancedTopLevelExecution.resumeWithFuel (runCanonical fuel) additional =
+      runCanonical (fuel + additional) := by
+  simpa [runCanonical, StaticWordContract.run, StaticWordContract.runRaw,
+    StaticWordContract.callInvocation,
+    Tests.AbiStaticWordEndToEndFixture.runRaw] using
+    BalancedTopLevelExecution.resumeWithFuel_runWithEnvironment
+      contract.checkedCore
+      (StaticWordContract.callInvocation target caller callValue selected
+        argument)
+      installed environment fuel additional
+
 private def resumedMatchesOneShot (splitFuel : Nat) : Bool :=
   let prefixRun := runCanonical splitFuel
   let resumed :=
     BalancedTopLevelExecution.resumeWithFuel prefixRun completionFuel
-  let oneShot := runCanonical completionFuel
+  let oneShot := runCanonical (splitFuel + completionFuel)
   successChecksFor resumed &&
     observeTerminal? resumed == observeTerminal? oneShot
 
 private def dispatchAndLogResumption : Bool :=
-  match findSplit transferredBeforeMethod 1 512,
+  match findBeforeFirstMethodEffect 1 512,
       findSplit afterSingleLog 1 512 with
   | some dispatchFuel, some logFuel =>
       dispatchFuel < logFuel &&
@@ -215,6 +280,8 @@ def testAbiStaticWordEndToEnd : IO Unit := do
     "malformed or unknown ABI routing did not roll value and state back"
   assertTrue zeroFuelIsGenuine
     "zero fuel did not retain a resumable ABI execution"
+  assertTrue beforeFirstMethodEffectFound
+    "ABI execution did not expose the exact post-dispatch/pre-effect boundary"
   assertTrue dispatchAndLogResumption
     "ABI resumption replayed dispatch, balance, storage, or the emitted log"
 
