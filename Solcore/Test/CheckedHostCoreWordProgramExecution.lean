@@ -83,6 +83,10 @@ private def arbitraryUnitProjectionIsNone : Bool :=
     ⟨context, .done .unit []⟩
   result.toWordReturnedFrameCompletion?.isNone
 
+private def syntheticFrameBridgeIsCanonical (word : Word) : Bool :=
+  exactReturnedResolution
+    ⟨context, word, [.unit]⟩ oldValue word [.unit]
+
 private def storeIndependentReturn
     (completion : WordReturnedFrameCompletion Nat (FrameTrace Nat)) : Bool :=
   let withoutStore : WordReturnedFrameCompletion Nat (FrameTrace Nat) :=
@@ -131,6 +135,17 @@ def testCheckedHostCoreWordProgramExecution : IO Unit := do
   | _ =>
       throw (IO.userError "fuel 9 unexpectedly completed or faulted")
 
+  match wordCode.runWithStorage context executionInputs inputRequestFuel with
+  | ⟨exhaustedContext, .outOfFuel exhausted⟩ =>
+      assertTrue
+        (contextHasTarget exhaustedContext writtenValue &&
+          contextPreserved exhaustedContext &&
+          inputSizeRequestReady exhausted &&
+          (completionAt inputRequestFuel).isNone)
+        "fuel 15 was not retained at the exact input-size request"
+  | _ =>
+      throw (IO.userError "fuel 15 unexpectedly completed or faulted")
+
   match completionAt completionFuel with
   | none =>
       throw (IO.userError "fuel 16 did not project a Word completion")
@@ -146,6 +161,12 @@ def testCheckedHostCoreWordProgramExecution : IO Unit := do
       sameCompletionObservations (completionAt 64)
         (completionAt completionFuel))
     "split or larger fuel changed the completed Word observation"
+
+  assertTrue
+    (syntheticFrameBridgeIsCanonical Word.zero &&
+      syntheticFrameBridgeIsCanonical cellWord &&
+      syntheticFrameBridgeIsCanonical Word.maximum)
+    "zero, nontrivial, or maximum Word failed the canonical frame bridge"
 
   match cellCode.runWithStorageReturnedFrameCompletion?
       context executionInputs 6 with
