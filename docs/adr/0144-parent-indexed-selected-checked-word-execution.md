@@ -98,6 +98,19 @@ cumulative provided fuel. The initial-context refinement proof must also expose
 that its checkpointed values equal
 `initialization.toCheckpointedWorkingPair`.
 
+Provide a simple dependent-pair erasure and prove the whole producer equation:
+
+```text
+(start? initialization storageAddress inputs fuel).map toExecutionSigma =
+  (initialization
+    |>.toCheckpointedWorkingPairWithPresentStorageAccount? storageAddress).map
+      (fun context =>
+        ⟨context, SelectedCheckedWordExecution.start context inputs fuel⟩)
+```
+
+This equation makes explicit that the carrier refines the existing storage
+selection rather than implementing a second selector.
+
 ## Closed fuel resumption
 
 Define `resumeWithFuel` on a present provenance carrier. It preserves
@@ -210,6 +223,7 @@ Expose laws for:
 
 - `start?` storage-absent and exact present-context branches;
 - provenance-carrier extensionality and canonical start;
+- dependent-pair erasure and whole-producer storage-refinement coherence;
 - exact initial values, parent checkpoint, working rollback, and parent trace;
 - inner selection, raw execution, completion, and missing-completion delegation;
 - present-carrier resumption projections, one-shot equality, zero, addition,
