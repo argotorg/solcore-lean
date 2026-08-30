@@ -150,6 +150,23 @@ private def sequentialCreationsPreserveCompletionOrder : Bool :=
         (terminal.finalWorld.code? created).isSome &&
         (terminal.finalWorld.code? secondCreated).isSome
 
+private def preflightFailureLeavesJournalIdentity
+    (environment : ExecutionEnvironment) : Bool :=
+  match (runWithSelectedEnvironment .catchFailure environment
+      completionFuel).view with
+  | .outOfFuel _ _ _ => false
+  | .completed terminal =>
+      terminal.workingJournal.logList == failedInitializerLogs &&
+        terminal.committedJournal.logList == failedInitializerLogs &&
+        terminal.workingJournal.createdContractList == [] &&
+        terminal.committedJournal.createdContractList == [] &&
+        terminal.finalWorld.nonce? creator == some oldNonce &&
+        (terminal.finalWorld.account? created).isNone
+
+private def checkedPreflightFailuresLeaveJournalIdentity : Bool :=
+  [unavailableCreationEnvironment, collisionCreationEnvironment].all
+    preflightFailureLeavesJournalIdentity
+
 private theorem compileTimeCreationJournals :
     successfulCreationJournals && revertedInitializerRollsBack &&
       trappedInitializerRollsBack && laterRootRevertRollsBack &&
@@ -162,6 +179,10 @@ private theorem compileTimeCreationResumption :
 
 private theorem compileTimeSequentialCreationOrder :
     sequentialCreationsPreserveCompletionOrder = true := by
+  native_decide
+
+private theorem compileTimePreflightJournalIdentity :
+    checkedPreflightFailuresLeaveJournalIdentity = true := by
   native_decide
 
 def testAdr0149CreationLogExecution : IO Unit := do
@@ -181,5 +202,7 @@ def testAdr0149CreationLogExecution : IO Unit := do
     "initializer/completion boundaries did not expose their retained journal"
   assertTrue sequentialCreationsPreserveCompletionOrder
     "sequential creations lost completion-order logs or created addresses"
+  assertTrue checkedPreflightFailuresLeaveJournalIdentity
+    "a checked creation preflight failure changed transaction observations"
 
 end Tests
