@@ -21,6 +21,14 @@ private def evaluationSteps : Nat := Limits.default.evaluationSteps
 
 private def replaySeed : Nat := 37
 
+private def fingerprintOffset : UInt64 := 14695981039346656037
+
+private def fingerprintPrime : UInt64 := 1099511628211
+
+private def fingerprintText (state : UInt64) (text : String) : UInt64 :=
+  text.toUTF8.foldl
+    (fun hash byte => (hash ^^^ byte.toUInt64) * fingerprintPrime) state
+
 private def request (seedValue bound : Nat) : GenerationRequest := {
   seed := Seed.ofNat seedValue
   maxProgramNodes := bound
@@ -125,7 +133,8 @@ private def checkReplay
 
 private def checkSeed
     (seedValue : Nat)
-    (seen : List Feature) : IO (List Feature) := do
+    (seen : List Feature)
+    (fingerprint : UInt64) : IO (List Feature × UInt64) := do
   let seedLabel := toString seedValue
   match make (request seedValue nodeBound) evaluationSteps with
   | .error error =>
@@ -151,7 +160,11 @@ private def checkSeed
           checkResponseCanonical seedLabel generatedCase direct
           if seedValue == replaySeed then
             checkReplay seedValue generatedCase direct dispatched
-          pure (addFeatures seen generated.features)
+          let record := toString seedValue ++ ":" ++
+            toString generated.finalSeed.toNat ++ ":" ++
+            generatedCase.requestText ++ "\n"
+          pure (addFeatures seen generated.features,
+            fingerprintText fingerprint record)
       | .error error, _ =>
           fail ("direct Oracle execution failed: " ++
               Wire.encodeProtocolErrorText error)
@@ -161,11 +174,12 @@ private def checkSeed
               Wire.encodeProtocolErrorText error)
             seedLabel nodeBound evaluationSteps generatedCase.requestText
 
-private def checkCorpus : List Nat → List Feature → IO (List Feature)
-  | [], seen => pure seen
-  | seedValue :: remaining, seen => do
-      let seen ← checkSeed seedValue seen
-      checkCorpus remaining seen
+private def checkCorpus :
+    List Nat → List Feature → UInt64 → IO (List Feature × UInt64)
+  | [], seen, fingerprint => pure (seen, fingerprint)
+  | seedValue :: remaining, seen, fingerprint => do
+      let (seen, fingerprint) ← checkSeed seedValue seen fingerprint
+      checkCorpus remaining seen fingerprint
 
 private def goldenProgramText : String :=
   "{\"body\":{\"tag\":\"word\",\"value\":\"0x1a08ee1184ba6d329af678222e72811966b61ae97f2099b462354cda6226d1f3\"},\"dataDefinitions\":[],\"resultType\":\"word\",\"schema\":\"solcore-semantic-core/v3\"}"
@@ -189,11 +203,15 @@ private def checkMinimumGolden : IO Unit := do
 
 def testCoreV3SynthesisCorpus : IO Unit := do
   checkMinimumGolden
-  let seen ← checkCorpus (List.range 256) []
+  let (seen, fingerprint) ←
+    checkCorpus (List.range 256) [] fingerprintOffset
   let missing := Feature.catalog.toList.filter fun feature =>
     !seen.contains feature
   require (Feature.catalog.size == 29 && missing.isEmpty)
     ("fixed corpus missed synthesis features: " ++ reprStr missing)
+    "0..255" nodeBound evaluationSteps "<corpus aggregate>"
+  require (fingerprint == 10085897417714098247)
+    ("fixed corpus replay fingerprint changed: " ++ toString fingerprint)
     "0..255" nodeBound evaluationSteps "<corpus aggregate>"
 
 end Tests.CoreV3SynthesisCorpus

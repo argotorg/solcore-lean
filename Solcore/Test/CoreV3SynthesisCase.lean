@@ -113,11 +113,24 @@ private def allChecks : Bool :=
       scenarioIsExact generatedCase && requestRoundTrips generatedCase &&
         executionsAgree generatedCase && replayIsExact generatedCase
 
+private def oversizedCaseIsRejected : Bool :=
+  match make {
+      seed := Seed.ofNat 0
+      maxProgramNodes := maximumCaseProgramNodes + 1
+    } Limits.default.evaluationSteps with
+  | .error .programBudgetTooLarge => true
+  | _ => false
+
 private theorem allChecks_exact : allChecks = true := by
+  native_decide
+
+example : oversizedCaseIsRejected = true := by
   native_decide
 
 def testCoreV3SynthesisCase : IO Unit := do
   unless allChecks do
     throw (IO.userError "generated Core v3 Oracle case changed")
+  unless oversizedCaseIsRejected do
+    throw (IO.userError "an oversized generated Oracle case was admitted")
 
 end Tests.CoreV3SynthesisCase

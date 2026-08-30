@@ -96,6 +96,39 @@ private def canonical : Target → V3.Expr
   | .word => .word Solcore.Core.Word.zero
   | .bool => .bool false
 
+/-- Remove one surrounding Word binder without capturing another variable.
+
+`cutoff` counts binders introduced inside the expression. A reference to the
+removed binder fails; references beyond it are shifted down by one. -/
+private def dropLocalAt (cutoff : Nat) : V3.Expr → Option V3.Expr
+  | .word value => some (.word value)
+  | .bool value => some (.bool value)
+  | .var index =>
+      if index < cutoff then some (.var index)
+      else if index = cutoff then none
+      else some (.var (index - 1))
+  | .letE initializer body => do
+      let initializer ← dropLocalAt cutoff initializer
+      let body ← dropLocalAt (cutoff + 1) body
+      pure (.letE initializer body)
+  | .ifE condition thenBranch elseBranch => do
+      let condition ← dropLocalAt cutoff condition
+      let thenBranch ← dropLocalAt cutoff thenBranch
+      let elseBranch ← dropLocalAt cutoff elseBranch
+      pure (.ifE condition thenBranch elseBranch)
+  | .unary op operand =>
+      .unary op <$> dropLocalAt cutoff operand
+  | .binary op left right => do
+      let left ← dropLocalAt cutoff left
+      let right ← dropLocalAt cutoff right
+      pure (.binary op left right)
+  | .ternary op first second third => do
+      let first ← dropLocalAt cutoff first
+      let second ← dropLocalAt cutoff second
+      let third ← dropLocalAt cutoff third
+      pure (.ternary op first second third)
+  | _ => none
+
 /-- Raw role-directed candidates. Invalid binder lifting is intentional here:
 the sole public sealing pass rejects it through `CheckedWordProgram.ofProgram?`. -/
 private def shrinkAt
@@ -106,10 +139,11 @@ private def shrinkAt
   match expression with
   | .word _ | .bool _ | .var _ => [simplest]
   | .letE initializer body =>
+      let liftedBody := (dropLocalAt 0 body).toList
       let direct :=
         match target with
-        | .word => [initializer, body]
-        | .bool => [body]
+        | .word => initializer :: liftedBody
+        | .bool => liftedBody
       [simplest] ++ direct ++
         (shrinkAt localWordDepth .word initializer).map
           (fun candidate => .letE candidate body) ++

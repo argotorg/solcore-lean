@@ -18,6 +18,17 @@ private def target : Solcore.Semantics.Address :=
 private def caller : Solcore.Semantics.Address :=
   ⟨2, by decide⟩
 
+/-- Largest generated Program admitted by the fixed default Oracle budgets. -/
+def maximumCaseProgramNodes : Nat :=
+  Solcore.Oracle.V5.Limits.default.coreDepth
+
+/-- Failures that can occur before a generated case reaches the total Oracle. -/
+inductive CaseError where
+  | generation (error : GenerationError)
+  | programBudgetTooLarge
+  | generatedProgramExceedsDefaultCoreLimits
+  deriving Repr, BEq, DecidableEq
+
 /-- Build the fixed minimal scenario for any checker-sealed G0 Word program. -/
 def minimalScenario (checkedProgram : CheckedWordProgram) :
     Solcore.Oracle.V5.Scenario := {
@@ -58,6 +69,25 @@ def executionRequest
   query := .execute (minimalScenario checkedProgram)
 }
 
+/-- Execute any sealed G0 Word program through the strict v5 text boundary. -/
+def runCheckedDirect
+    (checkedProgram : CheckedWordProgram)
+    (evaluationSteps : Nat) :
+    Except Solcore.Oracle.V5.ValidProtocolError Solcore.Oracle.V5.Response :=
+  Solcore.Oracle.V5.handleText <|
+    Solcore.Oracle.V5.Wire.encodeRequestText <|
+      executionRequest checkedProgram evaluationSteps
+
+/-- Execute the same sealed Program through the command-line record dispatcher. -/
+def runCheckedDispatched
+    (checkedProgram : CheckedWordProgram)
+    (evaluationSteps : Nat) :
+    Except Solcore.Oracle.V5.ValidProtocolError Solcore.Oracle.V5.Response :=
+  let requestText := Solcore.Oracle.V5.Wire.encodeRequestText <|
+    executionRequest checkedProgram evaluationSteps
+  Solcore.Oracle.V5.Wire.decodeResponseText
+    (Solcore.Oracle.processJsonLine requestText).compress
+
 /-- A generated checked program and its canonical executable Oracle request. -/
 structure GeneratedCase where
   private mk ::
@@ -69,8 +99,14 @@ structure GeneratedCase where
 /-- Generate a checked program and package it in the fixed minimal scenario. -/
 def make
     (generation : GenerationRequest)
-    (evaluationSteps : Nat) : Except GenerationError GeneratedCase := do
-  let generated ← generate generation
+    (evaluationSteps : Nat) : Except CaseError GeneratedCase := do
+  if generation.maxProgramNodes > maximumCaseProgramNodes then
+    throw .programBudgetTooLarge
+  let generated ← (generate generation).mapError .generation
+  if generated.nodeCount > Solcore.Oracle.V5.Limits.default.coreNodes ||
+      Solcore.Core.Wire.V3.programDepth generated.program >
+        Solcore.Oracle.V5.Limits.default.coreDepth then
+    throw .generatedProgramExceedsDefaultCoreLimits
   let request := executionRequest generated.checkedProgram evaluationSteps
   pure ⟨generated, evaluationSteps, request,
     Solcore.Oracle.V5.Wire.encodeRequestText request⟩
