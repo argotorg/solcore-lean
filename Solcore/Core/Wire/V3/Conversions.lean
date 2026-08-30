@@ -1,6 +1,6 @@
 import Solcore.Core.Wire.V3.Syntax
 
-/-! Total v3-to-Core maps and closed, partial Core-to-v3 projections. -/
+/-! Total v3-to-Core maps and closed, selectively defined Core-to-v3 projections. -/
 
 set_option autoImplicit false
 
