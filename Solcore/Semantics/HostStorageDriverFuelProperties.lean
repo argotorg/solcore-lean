@@ -44,6 +44,9 @@ theorem prependRequest
     {suspension : Core.HostSuspension}
     (prefixPath : Core.HostSteps prefixSteps start requestState)
     (emission : Core.HostRequestEmission requestState suspension)
+    (supported :
+      (@handler RollbackState TraceState inputs).supports
+        suspension.request = true)
     (handled :
       handleSuspension inputs context suspension =
         (nextContext, resumed))
@@ -54,7 +57,7 @@ theorem prependRequest
     HostStorageDriver.FuelSound
       result inputs fuel context start := by
   apply HostDriverResult.FuelSoundWith.prependRequest
-    prefixPath emission (accounting := accounting)
+    prefixPath emission supported (accounting := accounting)
   · simpa only [handleSuspension] using handled
   · exact suffixSound
 
