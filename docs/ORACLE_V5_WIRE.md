@@ -102,7 +102,8 @@ malformed natural is `oracle.wire.missing-field` or
 
 Resource and structural selection is ordered as follows:
 
-1. recover and validate the shallow schema, request ID, and complete Limits;
+1. recover and validate the shallow schema, request ID, profile, complete
+   Limits, and query-kind discriminator;
 2. measure whole-tree `jsonDepth`, then `jsonNodes`, including unknown subtrees;
 3. decode exact Oracle envelope/scenario structure and non-Core scalars, treating
    each embedded Program subtree as opaque;
@@ -111,6 +112,11 @@ Resource and structural selection is ordered as follows:
 5. after structural decoding, measure `scenarioEntries`, `identifierBytes`, then
    `calldataBytes`; and
 6. perform semantic checking, admission, materialization, and execution.
+
+Only the query's `kind` field is read in the shallow pass. Its remaining exact
+object shape is still validated in step 3. Retaining the validated kind before
+resource traversal is what makes a JSON-budget `inconclusive` response carry
+the required query-compatible response envelope.
 
 Execution fuel is considered only after admission. A structural error found in
 step 3 precedes the later typed-size measurements; a Core budget overrun at the
@@ -479,6 +485,23 @@ case.
 | `coreCheck` | `accepted`, `rejected`, `inconclusive`, `internalError` |
 | `execute` | `rejected`, `inconclusive`, `executed`, `internalError` |
 
+The strict response decoder first checks the exact six-field envelope, then
+decodes `id`, `profile`, `query`, `schema`, `spec`, and `verdict` in that
+order. A verdict first admits only fields from the selected query's complete
+variant union. `kind` and `phase` are common required fields for
+`capabilities` and `coreCheck`; only `kind` is common to every `execute`
+variant because `executed` carries no separate phase. The decoder then selects
+the variant, checks its exact field set, and validates the remaining fields in
+lexicographic order.
+
+This reconstruction is query-indexed: a verdict from a different query family
+cannot be decoded and re-labeled. Diagnostic arguments are decoded by their
+closed code, an embedded Core Type or constructor identity retains Core wire
+error ownership, and a rejected verdict's outer phase must equal its sealed
+diagnostic phase. Inconclusive values validate their limit/consumed relation,
+resource, and phase; executed observations validate the rollback constraints
+described below before they enter the typed response.
+
 ## Capability result
 
 The accepted capability result uses schema `solcore-capabilities/v5`. Its
@@ -700,6 +723,15 @@ listed fields.
 | `oracle.v5.root.target-absent` | `rootInstallation` | `target` Address |
 | `oracle.v5.root.target-code-absent` | `rootInstallation` | `target` Address |
 
+`unsupported-entry-result-type.actual` must be different from both published
+checked-contract result types. `method.result-type-mismatch.actual` must be
+different from `word -> word`. For selector collisions, `firstSignature` is
+strictly byte-lexicographically smaller than `secondSignature`; both signatures
+must derive the reported selector. For duplicate underlying code, `firstId` is
+strictly byte-lexicographically smaller than `secondId`. These relations match
+the canonical package and method order and prevent a response from admitting a
+reversed or otherwise producer-impossible conflict.
+
 Diagnostic paths are the following exact semantic string arrays. Placeholders
 denote their canonical wire spelling: `C` contract ID, `M` method name, `A`
 Address, `W` Word, and `N` natural decimal index.
@@ -816,6 +848,14 @@ The committed endpoint is the working world only for `returned`. Preflight
 rejection, `reverted`, and `trapped` use the original checkpoint, so every probe
 has equal endpoints and the committed journal is empty.
 
+After ordinary shape and scalar decoding, the observation decoder enforces
+that rollback invariant in this fixed order: a nonempty `createdAddresses`
+array, then a nonempty `logs` array, then the first probe whose endpoints
+differ. Each failure is `oracle.wire.invalid-tag`. Journal failures point to the
+offending array and expect `[]`; a probe failure points to that probe's
+`committed` field, reports the committed endpoint as `actual`, and the initial
+endpoint as `expected`.
+
 ## Protocol errors
 
 A protocol error is outside the response union and has exactly:
@@ -837,6 +877,15 @@ Pointer, with the empty string denoting the root. `display` is deterministic
 human-readable text but has no semantic information beyond `code`, `path`, and
 `arguments`.
 
+The public encoder accepts only a protocol error that has passed the complete
+closed validity check. The strict decoder checks the exact envelope and then
+visits `arguments`, `code`, `display`, `id`, `kind`, `path`, and `schema` in
+lexicographic order. A non-failing read of raw `code` directs argument checking
+without moving a code error ahead of an earlier argument error. The final value
+is sealed only after ownership display, fixed identities, request-ID shape,
+canonical pointer syntax, and code-specific pointer/argument relationships all
+agree. Decoding and re-encoding therefore produces one canonical spelling.
+
 Malformed JSON, including duplicate object keys, has the unprefixed code
 `malformed-json`, `arguments: null`, and the strict parser's deterministic
 message as `display`. All typed decoder codes retain the existing ownership
@@ -845,7 +894,10 @@ prefix:
 - `oracle.wire.<suffix>` owns request/response envelopes, profile references,
   scenario values, observations, and their scalar forms; and
 - `core.wire.<suffix>` owns a failure strictly inside an embedded Core Wire v3
-  Program. Its pointer still starts at the containing Oracle field.
+  value. This includes Programs and the standalone Types or constructor
+  identities carried by results and diagnostic arguments. Its pointer still
+  starts at the containing Oracle field; the surrounding Oracle object remains
+  owned by `oracle.wire.*`.
 
 The closed Oracle suffixes are:
 
@@ -870,23 +922,44 @@ For both prefixes, `expected-*` uses exactly `{"expected": <kind>, "actual":
 `actual`; `invalid-profile` uses `expectedId`, `expectedDigest`, `actualId`, and
 `actualDigest`. `invalid-tag` uses the existing v4 shape with arbitrary JSON
 fields `actual` and `expected`. Core `invalid-type` uses `actual` and `allowed`.
-Each invalid Word, Address, or Bytes value uses exactly `{"reason": <string>}`;
-the closed reason strings are `prefix`, `length`, `lowercase-hex`, and, only for
-Bytes, `odd-length`. `invalid-request-id` uses
+Each invalid Word, Address, or Bytes value uses exactly `{"reason": <string>}`.
+Word and Address use `prefix`, `length`, or `lowercase-hex`; Bytes use
+`prefix`, `odd-length`, or `lowercase-hex`. `invalid-request-id` uses
 `{"constraint":"nonempty-utf8"}`. `invalid-limit` uses exactly `field` and
 `constraint` strings. Its only v5 instance is
 `{"field":"calldataBytes","constraint":"strictly-less-than-2^256"}`.
+
+For every `expected-*` code except `expected-natural`, `actual` differs from
+`expected`. A negative or fractional JSON number is still a JSON `number`, so
+the valid `expected-natural` producer shape is
+`{"expected":"number","actual":"number"}`. Missing/unknown `field` must
+equal the final decoded JSON-Pointer token. Schema/spec/profile errors carry
+the fixed v5 identities, and invalid request-ID and limit errors use `/id` and
+`/limits/calldataBytes`, respectively.
 
 Shape decoding precedes scalar constraints at a field: for example, a negative
 or fractional limit is `oracle.wire.expected-natural`, while a natural
 `calldataBytes >= 2^256` is `oracle.wire.invalid-limit`. Dedicated
 `invalid-schema`, `invalid-spec`, and `invalid-profile` take precedence over
 generic `invalid-tag`; `invalid-tag` owns all other closed-enum or literal
-mismatches. Lexicographic structural traversal and the resource rules above
-select the path when more than one failure exists.
+mismatches. During the exact structural pass in step 3, every object first
+performs an exact field-set pass; an unknown or missing field found there
+precedes errors in field values, and competing unknown/missing fields are
+selected by lexicographic field name. The request root and query discriminator
+have the explicitly earlier shallow reads described in steps 1–2; their full
+field-set checks still occur in step 3. A tagged object applies the structural
+pass to its union envelope and fields common to every variant, then decodes
+`kind` or `tag`, then checks the selected variant's exact field set. Remaining
+scalar fields use lexicographic order.
+Embedded Core nodes additionally validate node-local metadata such as an
+operator or constructor identity before descending into child Core nodes; child
+positions use lexicographic field order. These rules and the resource order
+above select one path when more than one failure exists.
 
 An `oracle.wire.*` error has display `invalid Oracle v5 value`; a
-`core.wire.*` error has display `invalid Semantic Core v3 program`. Declared
+`core.wire.*` error retains the compatibility display `invalid Semantic Core v3
+program`, including when the embedded value is a Type or constructor identity.
+Declared
 budget excess is never a protocol code: it is the outer `inconclusive` verdict.
 Duplicate entries in keyed arrays are typed scenario rejections, not protocol
 errors.
@@ -933,13 +1006,15 @@ selects one result in this order:
 5. root target presence, then root code presence; and
 6. exactly one balanced execution.
 
-Objects are structurally visited by lexicographic field name and arrays by
-increasing index. After structure and scalar decoding, keyed arrays use the
-canonical sorting table above. Duplicate validation precedes other semantic
-validation for the same collection; a duplicate pair is the first and second
-equal entry in canonical order. These rules select duplicate storage before a
-zero value at the same key, and duplicate IDs before either contract's admission
-failure. They make repeated execution and input permutations agree after
+After the exact field-set pass, ordinary object values and array entries are
+visited in lexicographic and increasing-index order, respectively; tagged
+objects and Core nodes use the discriminator and node-local-metadata rule
+above. After structure and scalar decoding, keyed arrays use the canonical
+sorting table. Duplicate validation precedes other semantic validation for the
+same collection; a duplicate pair is the first and second equal entry in
+canonical order. These rules select duplicate storage before a zero value at
+the same key, and duplicate IDs before either contract's admission failure.
+They make repeated execution and input permutations agree after
 canonicalization.
 
 ## Compact examples
