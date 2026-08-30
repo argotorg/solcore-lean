@@ -156,4 +156,58 @@ structure ExecutionObservation where
   state : StateObservation
   deriving BEq, DecidableEq
 
+/--
+Total projection of a sealed balanced run. Fuel exhaustion deliberately has no
+fabricated terminal observation, while an impossible package/code mismatch is
+kept distinct from semantic execution.
+-/
+inductive ExecutionProjection where
+  | executed (observation : ExecutionObservation)
+  | outOfFuel
+  | internalError (error : InternalError)
+  deriving BEq, DecidableEq
+
+namespace ExecutionProjection
+
+private def ofTerminal
+    {initialWorld finalWorld : WorldState}
+    (resolveCode : CodeIdResolver)
+    (probes : List Probe)
+    (status : Except BalanceTransferFailure (FrameOutcome Solcore.Core.Word))
+    (journal : TransactionJournal)
+    (delta : WorldStateDelta initialWorld finalWorld) : ExecutionProjection :=
+  match StateObservation.ofDelta resolveCode delta probes with
+  | .error error => .internalError error
+  | .ok state => .executed {
+      outcome := TerminalOutcome.ofStatus status
+      journal := JournalObservation.ofSemantic journal
+      state := state
+    }
+
+/--
+Project every constructor of the sealed balanced executor without inspecting
+or reconstructing its private proof payloads.
+-/
+def ofBalancedResult
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (resolveCode : CodeIdResolver)
+    (probes : List Probe)
+    (result :
+      BalancedTopLevelExecution.Result initialWorld rootContract
+        rootInvocation) : ExecutionProjection :=
+  match result.view with
+  | .rejected rejected =>
+      ofTerminal resolveCode probes (.error rejected.failure)
+        rejected.committedJournal rejected.committedDelta
+  | .execution execution =>
+      match execution.view with
+      | .completed terminal =>
+          ofTerminal resolveCode probes (.ok terminal.outcome)
+            terminal.committedJournal terminal.committedDelta
+      | .outOfFuel _environment _mode _reachable => .outOfFuel
+
+end ExecutionProjection
+
 end Solcore.Oracle.V5
