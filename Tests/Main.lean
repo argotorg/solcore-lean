@@ -86,6 +86,9 @@ import Solcore.Test.CheckedHostCoreWordCodeSelectionProperties
 import Solcore.Test.CheckedHostCoreWordCodeSelection
 import Solcore.Test.SelectedCheckedWordExecutionProperties
 import Solcore.Test.SelectedCheckedWordExecution
+import Solcore.Test.ParentIndexedSelectedCheckedWordExecutionProperties
+import Solcore.Test.ParentIndexedSelectedCheckedWordExecutionContinuationProperties
+import Solcore.Test.ParentIndexedSelectedCheckedWordExecution
 import Solcore.Test.FrameContinuationContext
 import Solcore.Test.FrameContinuationContextTrapReasonMap
 import Solcore.Test.FrameContinuationContextResolveTrapReasonMap
@@ -5011,6 +5014,7 @@ def run : IO Unit := do
   testCheckedHostCoreWordProgramExecution
   testCheckedHostCoreWordCodeSelection
   testSelectedCheckedWordExecution
+  testParentIndexedSelectedCheckedWordExecution
   testFrameContinuationContext
   testFrameContinuationContextTrapReasonMap
   testFrameResolutionResult
