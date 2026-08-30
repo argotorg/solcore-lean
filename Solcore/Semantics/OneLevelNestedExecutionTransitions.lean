@@ -6,6 +6,7 @@ import Solcore.Semantics.BalanceTransferCallFailure
 import Solcore.Semantics.BalanceTransferInstallationProperties
 import Solcore.Semantics.BalanceTransferPresenceProperties
 import Solcore.Semantics.ContractCallFailure
+import Solcore.Semantics.ExecutionEnvironment
 import Solcore.Semantics.HostStorageAccountPresence
 import Solcore.Semantics.OneLevelNestedExecutionState
 
@@ -136,11 +137,11 @@ end SuspendedRoot
 namespace RootFrame
 
 /-- Intercept a root call, or delegate every other request to the flat handler. -/
-def afterSuspension
+def afterSuspensionWithEnvironment
     {initialWorld : WorldState}
     {rootContract : CheckedCoreContract}
     {rootInvocation : TopLevelInvocation}
-    (registry : CheckedContractRegistry)
+    (environment : ExecutionEnvironment)
     (frame : RootFrame initialWorld rootContract rootInvocation)
     (suspension : Core.HostSuspension)
     (advanced : Core.hostAdvance frame.state = .suspended suspension) :
@@ -157,7 +158,7 @@ def afterSuspension
               ContractCallFailure.invalidAddress.result)
       | some address =>
           match resolvedEq :
-              registry.resolve?
+              environment.callRegistry.resolve?
                 suspended.parentContext.context.values.working.1 address with
           | none =>
               exact .root
@@ -177,7 +178,7 @@ def afterSuspension
             (suspended.resumeWith suspended.parentContext
               ContractCallFailure.invalidAddress.result)
       | some address =>
-          match resolvedEq : registry.resolve?
+          match resolvedEq : environment.callRegistry.resolve?
               suspended.parentContext.context.values.working.1 address with
           | none =>
               exact .root
@@ -234,6 +235,18 @@ def afterSuspension
   | currentAddress =>
       exact .root (frame.afterHandledSuspension
         ⟨.currentAddress, continuation, store⟩ advanced)
+
+/-- Preserve the calls-only registry boundary while environments are adopted. -/
+def afterSuspension
+    {initialWorld : WorldState}
+    {rootContract : CheckedCoreContract}
+    {rootInvocation : TopLevelInvocation}
+    (registry : CheckedContractRegistry)
+    (frame : RootFrame initialWorld rootContract rootInvocation)
+    (suspension : Core.HostSuspension)
+    (advanced : Core.hostAdvance frame.state = .suspended suspension) :
+    Mode initialWorld rootContract rootInvocation :=
+  frame.afterSuspensionWithEnvironment (.callsOnly registry) suspension advanced
 
 end RootFrame
 
