@@ -96,6 +96,9 @@ structure ValidatedRawResult
   resultTyping :
     result.outcome.HasType contract.code.program.resultType
       contract.code.program.dataDefinitions
+  resultSupported :
+    ∀ suspension remainingFuel,
+      result.outcome ≠ .unsupported suspension remainingFuel
   storageAddress_eq :
     result.context.context.storageAddress = invocation.target
   workingDelta :
@@ -130,6 +133,11 @@ def validatedRawRun
   {
     result := result
     resultTyping := resultTyping
+    resultSupported := by
+      intro suspension remainingFuel
+      exact contract.code.runWithTransactionStorage_ne_unsupported
+        (initialTransactionContext installed) invocation.executionInputs fuel
+        suspension remainingFuel
     storageAddress_eq := storageAddress_eq
     workingDelta :=
       workingDeltaOfRawRun contract invocation installed fuel result rfl
@@ -253,6 +261,8 @@ def classifyRawResult
         rw [outcomeEq] at resultTyping
         exact resultTyping
       False.elim impossible
+  | .unsupported suspension remainingFuel =>
+      False.elim (raw.resultSupported suspension remainingFuel outcomeEq)
 
 /-- Run one installed checked Core contract with a bounded fuel budget. -/
 def run

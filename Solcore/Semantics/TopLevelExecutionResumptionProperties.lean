@@ -19,9 +19,11 @@ theorem eq_of_result_eq
     (result_eq : left.result = right.result) :
     left = right := by
   cases left with
-  | mk leftResult leftTyping leftAddress leftDelta leftCheckpointJournal =>
+  | mk leftResult leftTyping leftSupported leftAddress leftDelta
+      leftCheckpointJournal =>
       cases right with
-      | mk rightResult rightTyping rightAddress rightDelta rightCheckpointJournal =>
+      | mk rightResult rightTyping rightSupported rightAddress rightDelta
+          rightCheckpointJournal =>
           dsimp only at result_eq
           subst rightResult
           have delta_eq := TopLevelStorageDelta.unique leftDelta rightDelta
@@ -67,7 +69,8 @@ theorem resumeWithFuel_run
     resumeWithFuel (run contract invocation installed fuel) additional =
       run contract invocation installed (fuel + additional) := by
   cases prefixEq : validatedRawRun contract invocation installed fuel with
-  | mk result resultTyping storageAddress_eq delta checkpointJournal_eq =>
+  | mk result resultTyping resultSupported storageAddress_eq delta
+      checkpointJournal_eq =>
       cases result with
       | mk context outcome =>
           cases outcome with
@@ -150,6 +153,9 @@ theorem resumeWithFuel_run
               rw [resumedEq]
           | fault error faultState =>
               exact False.elim resultTyping
+          | unsupported suspension remainingFuel =>
+              exact False.elim
+                (resultSupported suspension remainingFuel rfl)
 
 /-- Adding zero fuel to an actual initial run leaves its total result unchanged. -/
 @[simp] theorem resumeWithFuel_run_zero

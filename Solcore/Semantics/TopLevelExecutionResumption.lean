@@ -100,6 +100,11 @@ def validatedResumedRawResult
     resultTyping := by
       exact TransactionHostStorageDriver.run_hasType
         context invocation.executionInputs additional state stateTyping
+    resultSupported := by
+      intro suspension remainingFuel
+      exact TransactionHostStorageDriver.run_ne_unsupported
+        context invocation.executionInputs additional state suspension
+        remainingFuel
     storageAddress_eq := by
       have preserved := TransactionHostStorageDriver.run_storageAddress
         context invocation.executionInputs additional state
