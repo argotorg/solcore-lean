@@ -75,7 +75,7 @@ private def firstDuplicateId? :
     List IdentifiedInput → Option ContractId
   | [] => none
   | first :: rest =>
-      match rest.find? (fun later => later.id == first.id) with
+      match rest.find? (fun later => decide (later.id = first.id)) with
       | some _ => some first.id
       | none => firstDuplicateId? rest
 
@@ -280,3 +280,131 @@ private def admitAll :
       let admitted ← admitOne input
       let tail ← admitAll rest
       .ok (admitted :: tail)
+
+/-- Select the first duplicate identifier pair in canonical package order. -/
+def firstDuplicateEntryId? :
+    List AdmittedEntry → Option ContractId
+  | [] => none
+  | first :: rest =>
+      match rest.find? (fun later => decide (later.id = first.id)) with
+      | some _ => some first.id
+      | none => firstDuplicateEntryId? rest
+
+/-- Select the first equal checked Program pair in canonical package order. -/
+def firstDuplicateProgram? :
+    List AdmittedEntry → Option (ContractId × ContractId)
+  | [] => none
+  | first :: rest =>
+      match rest.find? (fun later => decide (later.program = first.program)) with
+      | some later => some (first.id, later.id)
+      | none => firstDuplicateProgram? rest
+
+/--
+A finite, canonically ordered package whose identifier and underlying checked
+Program uniqueness checks both succeeded. The private constructor keeps raw
+input from bypassing admission.
+-/
+structure ContractPackage where
+  private mk ::
+  entries : List AdmittedEntry
+  identifiersUnique : firstDuplicateEntryId? entries = none
+  programsUnique : firstDuplicateProgram? entries = none
+
+namespace ContractPackage
+
+/-- Find one admitted entry by its validated, byte-exact identifier. -/
+def lookupEntry?
+    (package : ContractPackage)
+    (id : ContractId) : Option AdmittedEntry :=
+  package.entries.find? (fun entry => decide (entry.id = id))
+
+/-- Resolve one validated identifier to its runnable checked contract. -/
+def lookup?
+    (package : ContractPackage)
+    (id : ContractId) : Option CheckedCoreContract :=
+  (package.lookupEntry? id).map AdmittedEntry.contract
+
+/-- Reject invalid raw identifiers before attempting package resolution. -/
+def lookupRaw?
+    (package : ContractPackage)
+    (rawId : String) : Option CheckedCoreContract := do
+  let id ← ContractId.ofString? rawId
+  package.lookup? id
+
+/-- Map installed checked code back to its unique canonical package ID. -/
+def idByProgram?
+    (package : ContractPackage)
+    (program : Solcore.Core.Program) : Option ContractId :=
+  (package.entries.find? (fun entry => decide (entry.program = program))).map
+    (fun entry => entry.id)
+
+/-- Checked-code view of `idByProgram?`, suitable for world-state probes. -/
+def idByCode?
+    (package : ContractPackage)
+    (code : CheckedHostCoreProgram) : Option ContractId :=
+  package.idByProgram? code.program
+
+theorem mem_of_lookupEntry?_eq_some
+    {package : ContractPackage}
+    {id : ContractId}
+    {entry : AdmittedEntry}
+    (found : package.lookupEntry? id = some entry) :
+    entry ∈ package.entries := by
+  exact List.mem_of_find?_eq_some found
+
+theorem id_eq_of_lookupEntry?_eq_some
+    {package : ContractPackage}
+    {id : ContractId}
+    {entry : AdmittedEntry}
+    (found : package.lookupEntry? id = some entry) :
+    entry.id = id := by
+  unfold lookupEntry? at found
+  have accepted : decide (entry.id = id) :=
+    @List.find?_some AdmittedEntry
+      (fun candidate => decide (candidate.id = id)) entry _ found
+  exact of_decide_eq_true accepted
+
+theorem program_eq_of_idByProgram?_eq_some
+    {package : ContractPackage}
+    {program : Solcore.Core.Program}
+    {id : ContractId}
+    (found : package.idByProgram? program = some id) :
+    ∃ entry ∈ package.entries,
+      entry.id = id ∧ entry.program = program := by
+  unfold idByProgram? at found
+  rcases Option.map_eq_some_iff.mp found with ⟨entry, selected, idEq⟩
+  refine ⟨entry, List.mem_of_find?_eq_some selected, idEq, ?_⟩
+  have accepted : decide (entry.program = program) :=
+    @List.find?_some AdmittedEntry
+      (fun candidate => decide (candidate.program = program)) entry _ selected
+  exact of_decide_eq_true accepted
+
+end ContractPackage
+
+/--
+Canonicalize, validate, check, refine, and de-alias a complete contract package.
+Identifier duplicates are rejected before either duplicate entry is checked.
+-/
+def admit
+    (contracts : List ContractInput) :
+    Except ContractAdmissionError ContractPackage := do
+  let identified ← validateIds (canonicalInputs contracts)
+  match firstDuplicateId? identified with
+  | some duplicate => .error (.duplicateContractId duplicate)
+  | none =>
+      let entries ← admitAll identified
+      match idCheck : firstDuplicateEntryId? entries with
+      | some duplicate => .error (.duplicateContractId duplicate)
+      | none =>
+          match codeCheck : firstDuplicateProgram? entries with
+          | some duplicate =>
+              .error (.duplicateCode duplicate.1 duplicate.2)
+          | none => .ok {
+              entries
+              identifiersUnique := idCheck
+              programsUnique := codeCheck
+            }
+
+end ContractAdmission
+
+end Solcore.Oracle.V5
