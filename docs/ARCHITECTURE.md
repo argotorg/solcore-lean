@@ -941,12 +941,13 @@ continues to combine a missing Account with a present Account without code.
 Execution, parent continuation, and unsupported-result policy remain outside
 this completed slice.
 
-ADR-0143 is the active integration boundary above those two completed layers.
-A proof-refined value retains ADR-0142's exact three-way selection and carries
-an optional raw execution derived from it: absent and non-Word selections do
-not execute, while the Word selection runs ADR-0141's checked storage path.
-The initial context and execution inputs are fixed for the value's lifetime;
-resumption can add fuel but cannot replace either.
+ADR-0143 completes the integration boundary above those two layers. A
+proof-refined value retains ADR-0142's exact three-way selection and carries an
+optional raw execution derived from it: absent and non-Word selections do not
+execute, while the Word selection runs ADR-0141's checked storage path. The
+initial context and execution inputs are fixed for the value's lifetime;
+resumption can add fuel but cannot replace either. Exact split and associative
+resumption agree with one-shot execution and preserve terminal results.
 
 The raw branch remains `HostDriverResult`, and successful Word completion still
 uses `WordReturnedFrameCompletion` and its canonical 32-byte frame adapter.
@@ -954,6 +955,12 @@ Consequently, no new execution-outcome or frame hierarchy is introduced.
 Selection also remains present when completion is absent, so non-execution is
 not confused with Word fuel exhaustion. Storage-presence and parent-indexed
 integration are deliberately deferred to a later layer.
+
+All 32 public proof contracts and their consumers pass. Runtime boundaries,
+Store/context retention, canonical bytes, decoding, and frame projection are
+covered; full validation and independent coverage and contract audits pass.
+The next candidate integrates storage-presence and the parent-indexed boundary
+without duplicating this selection or execution layer.
 
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked

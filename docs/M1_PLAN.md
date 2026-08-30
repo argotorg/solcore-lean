@@ -128,12 +128,14 @@ complete. It separates unavailable selected code from available checked
 non-Word and Word code before execution.
 
 [ADR-0143](adr/0143-proof-refined-selected-checked-word-execution.md) is
-Accepted and is the active implementation slice. It keeps that three-way
-selection, runs only the Word branch through the checked storage runner, and
-certifies the optional raw result at a cumulative provided-fuel budget.
+complete. It keeps that three-way selection, runs only the Word branch through
+the checked storage runner, and certifies the optional raw result at a
+cumulative provided-fuel budget.
 Resumption is restricted to more fuel under the same initial context and
 immutable inputs. Completion reuses the existing canonical Word return frame;
-parent integration and non-Word fallback remain separate work.
+all proof consumers, runtime boundaries, validation, and audits pass.
+Storage-presence and parent-indexed integration are the next candidate;
+non-Word fallback remains separate work.
 
 ## Completed foundation
 
@@ -280,7 +282,7 @@ These results remain regression obligations for every extension.
 | 123 | Proof-refined parent-indexed selected-execution session | Complete | Binds fixed run configuration to each result and preserves exact one-shot equality through closed fuel-only resumption, whole-session algebra, every branch, compatibility, and folds |
 | 124 | Checked Word completion to canonical return bytes | Complete | Refines checked Word results, retains exact successful context/Word/Core Store, and produces the canonical 32-byte big-endian returned frame without inventing fallback branches |
 | 125 | Branch-complete selected Word-code classification | Complete | Preserves existing checked-code lookup while separating absent, non-Word, and Word branches before execution |
-| 126 | Proof-refined selected checked Word execution | In progress | Executes only the selected Word branch, retains exact non-execution reasons, and supports fixed-input fuel resumption |
+| 126 | Proof-refined selected checked Word execution | Complete | Executes only the selected Word branch, retains exact non-execution reasons, and proves fixed-input fuel resumption and canonical Word completion |
 | 127 | Recursion and divergence | Blocked | Requires a deliberate change to termination and resource claims |
 | 128 | Nested invocation, transaction, and external observations | Planned | Needs ownership/lifetime, further active-frame transitions, scheduling, diagnostics, and transaction atomicity decisions |
 | 129 | ABI and storage layout | Planned | Follows accepted layout and admissibility decisions |
@@ -2273,21 +2275,25 @@ runtime regressions pass. The 701-job build, 1,290-job test build, full test
 run, eight-root trust-zero sweep, metadata, kernel, diff, axiom, and independent
 P0-P3 audits pass across 31 public theorems and 31 consumers.
 
-## Active proof-refined selected checked Word execution
+## Completed proof-refined selected checked Word execution
 
 [ADR-0143](adr/0143-proof-refined-selected-checked-word-execution.md) is
-Accepted with implementation in progress. It connects ADR-0142 selection to
-ADR-0141 execution without introducing another outcome hierarchy. The selected
-branch remains visible: absent and non-Word code do not run, while Word code
-retains its exact `HostDriverResult` and existing success projection.
+complete. It connects ADR-0142 selection to ADR-0141 execution without
+introducing another outcome hierarchy. The selected branch remains visible:
+absent and non-Word code do not run, while Word code retains its exact
+`HostDriverResult` and existing success projection.
 
 The carrier fixes the initial storage context and immutable execution inputs,
 records cumulative provided fuel, and allows resumption only by adding fuel.
-The required proof boundary covers exact branch and raw-run equations, checked
-Word safety, completion reconstruction, global missing-completion causes, and
-one-shot, zero, and addition resumption laws. Parent-indexed integration,
-non-Word fallback, nested invocation, ABI, parser work, and publication are
-explicitly deferred.
+The 32-theorem proof boundary covers exact branches, raw runs, checked Word
+safety, completion reconstruction, global missing-completion causes, and
+one-shot, zero, addition, associativity, and terminal resumption laws. Runtime
+tests cover absent/non-Word 0/64, Word 9/10/15/16, exact splits, Store/context,
+and canonical byte/decode/frame recovery. The 709-job build, 1,306-job test
+build, full tests, 10-root trust sweep, repository checks, theorem consumers,
+axiom reports, and independent audits pass. Storage-presence and parent-indexed
+integration are the next candidate; non-Word fallback, nested invocation, ABI,
+parser work, and publication remain deferred.
 
 ## Completed Core vNext slice: derived-builder renaming laws
 

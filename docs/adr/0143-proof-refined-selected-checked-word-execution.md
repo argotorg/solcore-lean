@@ -1,9 +1,9 @@
 # ADR-0143: Proof-refined selected checked Word execution
 
-- Status: Accepted
+- Status: Complete
 - Decision date: 2026-08-30
 - Scope: connect branch-complete selected Word code to checked storage execution
-- Implementation: In progress
+- Implementation: Complete
 
 ## Context
 
@@ -217,14 +217,26 @@ This ADR does not define or prove:
 - Solidity ABI encoding, arbitrary Core-value serialization, a public byte
   contract, external compatibility promise, or concrete syntax.
 
-## Planned sequence
+## Completed implementation
 
-1. record and activate this selected Word execution contract;
-2. implement the proof-refined carrier, canonical start, and completion view;
-3. prove exact selection, execution, safety, and projection laws;
-4. implement fixed-input resumption and prove its algebra;
-5. add compile-time consumers and executable branch/fuel regressions; and
-6. complete full validation, independent audit, and documentation sync.
+The completed slice includes the proof-refined carrier, canonical start,
+completion view, exact selection and execution laws, safety and projection
+proofs, fixed-input resumption algebra, compile-time consumers, executable
+branch and fuel regressions, full validation, independent audits, and
+documentation synchronization.
+
+The implementation exposes 32 public theorems with 32 external compile-time
+consumers. Runtime regressions cover absent and non-Word selections at fuel 0
+and 64, zero resumption, Word exhaustion at 9, 10, and 15, completion at 16,
+exact 9+7, 10+6, and 15+1 splits, associative `(9+3)+4 = 9+(3+4) = 16`
+resumption, and terminal stability. Successful tests retain the exact Store and
+host context and verify canonical 32-byte data, decoding, and frame projection.
+
+The full 709-job build, 1,306-job test-executable build, and test suite pass.
+All 10 changed Lean roots pass trust-zero and warning-as-error checks; metadata,
+semantic-kernel, and diff checks pass. Public theorem axiom reports are exactly
+`[propext, Quot.sound]`. Independent coverage and contract audits found no
+P0-P3 issue.
 
 ## Consequences
 
