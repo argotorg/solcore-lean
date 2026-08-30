@@ -122,6 +122,7 @@ import Solcore.Test.Adr0148CreateContractWordBoundary
 import Solcore.Test.Adr0148CheckedAccountCreation
 import Solcore.Test.Adr0148CheckedCreationPreflight
 import Solcore.Test.Adr0148CreationFailureBoundary
+import Solcore.Test.Adr0148NestedCreationLifecycle
 import Solcore.Test.TopLevelExecution
 import Solcore.Test.TopLevelObservation
 import Solcore.Test.ContractCallWordBoundary
@@ -5089,6 +5090,7 @@ def run : IO Unit := do
   testAdr0148CheckedAccountCreation
   testAdr0148CheckedCreationPreflight
   Adr0148CreationFailureBoundary.testAdr0148CreationFailureBoundary
+  testAdr0148NestedCreationLifecycle
   testOneLevelNestedExecution
   testOneLevelNestedExecutionExtended
   testOneLevelNestedExecutionResumption
