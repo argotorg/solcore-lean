@@ -42,7 +42,17 @@ private def revertingChildRollsBack : Bool :=
       balance? terminal.terminalContext.context.values.working.1 rootAddress ==
         some rootInitialBalance &&
       balance? terminal.finalWorld childAddress == some childInitialBalance &&
-      valueStored? terminal.finalWorld == none
+      valueStored? terminal.finalWorld == none &&
+      terminal.committedDelta.balanceEndpoints rootAddress ==
+        (some rootInitialBalance, some rootInitialBalance) &&
+      terminal.committedDelta.balanceEndpoints childAddress ==
+        (some childInitialBalance, some childInitialBalance) &&
+      terminal.committedDelta.balanceEndpoints untouchedAddress ==
+        (some untouchedBalance, some untouchedBalance) &&
+      terminal.committedDelta.balanceChange? rootAddress == none &&
+      terminal.committedDelta.balanceChange? childAddress == none &&
+      terminal.committedDelta.balanceChange? untouchedAddress == none &&
+      terminal.committedDelta.slotChange? childAddress valueSlot == none
 
 private def trappingChildRollsBack : Bool :=
   terminalSatisfies
@@ -52,7 +62,17 @@ private def trappingChildRollsBack : Bool :=
       balance? terminal.terminalContext.context.values.working.1 childAddress ==
         some childInitialBalance &&
       balance? terminal.finalWorld rootAddress == some rootInitialBalance &&
-      valueStored? terminal.finalWorld == none
+      valueStored? terminal.finalWorld == none &&
+      terminal.committedDelta.balanceEndpoints rootAddress ==
+        (some rootInitialBalance, some rootInitialBalance) &&
+      terminal.committedDelta.balanceEndpoints childAddress ==
+        (some childInitialBalance, some childInitialBalance) &&
+      terminal.committedDelta.balanceEndpoints untouchedAddress ==
+        (some untouchedBalance, some untouchedBalance) &&
+      terminal.committedDelta.balanceChange? rootAddress == none &&
+      terminal.committedDelta.balanceChange? childAddress == none &&
+      terminal.committedDelta.balanceChange? untouchedAddress == none &&
+      terminal.committedDelta.slotChange? childAddress valueSlot == none
 
 private def successfulChildThenRootRevertRollsBack : Bool :=
   terminalSatisfies
@@ -65,7 +85,13 @@ private def successfulChildThenRootRevertRollsBack : Bool :=
         some transferValue &&
       balance? terminal.finalWorld rootAddress == some rootInitialBalance &&
       balance? terminal.finalWorld childAddress == some childInitialBalance &&
-      valueStored? terminal.finalWorld == none
+      valueStored? terminal.finalWorld == none &&
+      terminal.committedDelta.balanceEndpoints rootAddress ==
+        (some rootInitialBalance, some rootInitialBalance) &&
+      terminal.committedDelta.balanceEndpoints childAddress ==
+        (some childInitialBalance, some childInitialBalance) &&
+      terminal.committedDelta.balanceChange? rootAddress == none &&
+      terminal.committedDelta.balanceChange? childAddress == none
 
 private def successfulChildThenRootTrapRollsBack : Bool :=
   terminalSatisfies
@@ -75,7 +101,13 @@ private def successfulChildThenRootTrapRollsBack : Bool :=
       balance? terminal.terminalContext.context.values.working.1 childAddress ==
         some childFinalBalance &&
       balance? terminal.finalWorld rootAddress == some rootInitialBalance &&
-      balance? terminal.finalWorld childAddress == some childInitialBalance
+      balance? terminal.finalWorld childAddress == some childInitialBalance &&
+      terminal.committedDelta.balanceEndpoints rootAddress ==
+        (some rootInitialBalance, some rootInitialBalance) &&
+      terminal.committedDelta.balanceEndpoints childAddress ==
+        (some childInitialBalance, some childInitialBalance) &&
+      terminal.committedDelta.balanceChange? rootAddress == none &&
+      terminal.committedDelta.balanceChange? childAddress == none
 
 private def insufficientFailsWithoutChildExecution : Bool :=
   terminalSatisfies
@@ -155,6 +187,65 @@ private def childOutOfFuelResumesWithoutDoubleTransfer : Bool :=
         (some childInitialBalance, some childFinalBalance),
         some (some Word.zero, some transferValue))
 
+private def resumedRootPrefixFuel : Nat := 35
+
+private def completedChildRootOutOfFuelRetainsEffects : Bool :=
+  match (valueScenario resumedRootPrefixFuel).view with
+  | .outOfFuel _ (.root frame) _ =>
+      balance? frame.context.context.values.working.1 rootAddress ==
+          some rootFinalBalance &&
+        balance? frame.context.context.values.working.1 childAddress ==
+          some childFinalBalance &&
+        valueStored? frame.context.context.values.working.1 == some transferValue
+  | _ => false
+
+private def completedChildRootOutOfFuelResumesExactly : Bool :=
+  let split := resumeWithFuel (valueScenario resumedRootPrefixFuel) completionFuel
+  let oneShot := valueScenario (resumedRootPrefixFuel + completionFuel)
+  resumedObservation? split == resumedObservation? oneShot &&
+    resumedObservation? split == some
+      (.returned (encodeWordBytesBE transferValue),
+        some rootFinalBalance, some childFinalBalance, some transferValue,
+        (some childInitialBalance, some childFinalBalance),
+        some (some Word.zero, some transferValue))
+
+private def childValueCallDepthFailsWithoutTransfer : Bool :=
+  terminalSatisfies
+    (runValueScenario .commit valueDepthChild rootInitialBalance
+      childInitialBalance completionFuel) fun terminal =>
+    terminal.outcome ==
+        .returned (encodeWordBytesBE ContractCallFailure.depthExceeded.code) &&
+      balance? terminal.finalWorld rootAddress == some rootFinalBalance &&
+      balance? terminal.finalWorld childAddress == some childFinalBalance &&
+      terminal.committedDelta.balanceEndpoints rootAddress ==
+        (some rootInitialBalance, some rootFinalBalance) &&
+      terminal.committedDelta.balanceEndpoints childAddress ==
+        (some childInitialBalance, some childFinalBalance)
+
+private def dispatchFailureIsIdentity
+    (target : Word) (failure : ContractCallFailure) : Bool :=
+  terminalSatisfies (runTargetScenario target completionFuel) fun terminal =>
+    terminal.outcome == .trapped failure.code &&
+      balance? terminal.finalWorld rootAddress == some rootInitialBalance &&
+      balance? terminal.finalWorld childAddress == some childInitialBalance &&
+      valueStored? terminal.finalWorld == none &&
+      terminal.committedDelta.balanceEndpoints rootAddress ==
+        (some rootInitialBalance, some rootInitialBalance) &&
+      terminal.committedDelta.balanceEndpoints childAddress ==
+        (some childInitialBalance, some childInitialBalance) &&
+      terminal.committedDelta.balanceEndpoints untouchedAddress ==
+        (some untouchedBalance, some untouchedBalance) &&
+      terminal.committedDelta.balanceChange? rootAddress == none &&
+      terminal.committedDelta.balanceChange? childAddress == none &&
+      terminal.committedDelta.balanceChange? untouchedAddress == none &&
+      terminal.committedDelta.slotChange? childAddress valueSlot == none
+
+private def invalidValueCallIsIdentity : Bool :=
+  dispatchFailureIsIdentity invalidTargetWord .invalidAddress
+
+private def unavailableValueCallIsIdentity : Bool :=
+  dispatchFailureIsIdentity unavailableTargetWord .unavailable
+
 private def consumeSelfValueCall (call : Expr) : Expr :=
   .caseE call
     (returnedExpr
@@ -215,7 +306,11 @@ private theorem compileTimeNestedValueCalls :
       overflowFailsWithoutChildExecution && legacyZeroCallPreservesBalances &&
       selfValueCallCommitsWithoutBalanceMovement && balanceDeltasAreExact &&
       childOutOfFuelRetainsOneTransfer &&
-      childOutOfFuelResumesWithoutDoubleTransfer = true := by
+      childOutOfFuelResumesWithoutDoubleTransfer &&
+      completedChildRootOutOfFuelRetainsEffects &&
+      completedChildRootOutOfFuelResumesExactly &&
+      childValueCallDepthFailsWithoutTransfer && invalidValueCallIsIdentity &&
+      unavailableValueCallIsIdentity = true := by
   native_decide
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
@@ -241,5 +336,15 @@ def testAdr0147NestedValueExecution : IO Unit := do
     "child out-of-fuel state did not retain exactly one transfer"
   assertTrue childOutOfFuelResumesWithoutDoubleTransfer
     "resumed child value call diverged or applied transfer/effects twice"
+  assertTrue completedChildRootOutOfFuelRetainsEffects
+    "root out-of-fuel after child completion lost transfer/effects"
+  assertTrue completedChildRootOutOfFuelResumesExactly
+    "resumed root after child completion diverged or replayed the child"
+  assertTrue childValueCallDepthFailsWithoutTransfer
+    "leaf value call did not return depth failure without a second transfer"
+  assertTrue invalidValueCallIsIdentity
+    "invalid value-call target changed world or committed delta"
+  assertTrue unavailableValueCallIsIdentity
+    "unavailable value-call target changed world or committed delta"
 
 end Tests

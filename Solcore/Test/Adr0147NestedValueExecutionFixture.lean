@@ -72,6 +72,20 @@ def revertingChild : CheckedCoreContract :=
 def trappingChild : CheckedCoreContract :=
   valueChildContract (.trapped childTrapReason)
 
+/-- A leaf value-call is handled flat and returns the depth failure code. -/
+def valueDepthChildProgram : Program := {
+  resultType := CoreContractEntryProfile.wordOutcomeV1.resultType
+  body := consumeDepthProbe
+    (valueCallExpr rootTargetWord transferValue callInput)
+}
+
+theorem valueDepthChildProgram_checked :
+    valueDepthChildProgram.checkHost = true := by decide
+
+def valueDepthChild : CheckedCoreContract :=
+  CheckedCoreContract.wordOutcomeV1
+    ⟨valueDepthChildProgram, valueDepthChildProgram_checked⟩ rfl
+
 def accountWithBalance (contract : CheckedCoreContract) (balance : Word) : Account :=
   (Account.empty.withCode contract.code).withBalance balance
 
@@ -97,6 +111,13 @@ def runValueScenario (policy : RootReturnPolicy) (child : CheckedCoreContract)
   OneLevelNestedExecution.run root invocation
     (scenarioInstalled root child rootBalance childBalance)
     (registry root child) fuel
+
+def runTargetScenario (target : Word) (fuel : Nat) :=
+  let root := valueRootContract .commit target transferValue
+  OneLevelNestedExecution.run root invocation
+    (scenarioInstalled root returningChild rootInitialBalance
+      childInitialBalance)
+    (registry root returningChild) fuel
 
 def legacyWorld (root child : CheckedCoreContract) : WorldState :=
   scenarioWorld root child rootInitialBalance childInitialBalance
