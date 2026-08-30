@@ -144,6 +144,11 @@ example :
     frame.context.context.values.checkpoint.state = initialWorld :=
   reachable.root_checkpointState
 
+example :
+    frame.context.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty :=
+  reachable.root_checkpointJournal
+
 end ReachableRoot
 
 section ReachableChild
@@ -164,6 +169,11 @@ example :
     frame.suspendedRoot.parentContext.context.values.checkpoint.state =
       initialWorld :=
   reachable.child_parentCheckpointState
+
+example :
+    frame.suspendedRoot.parentContext.context.values.checkpoint.effects.rollback =
+      TransactionJournal.empty :=
+  reachable.child_parentCheckpointJournal
 
 example :
     frame.childContext.context.storageAddress = frame.childTarget :=
