@@ -1,3 +1,4 @@
+import Solcore.Abi.StaticWordMetadata
 import Solcore.Core.Wire.V3.Codec
 import Solcore.Foundation.Json
 import Solcore.Oracle.V5.Schema
@@ -194,9 +195,10 @@ def validCoreCheckPath : List String → Bool
 def validContractCheckPath : List String → Bool
   | "contracts" :: contract :: "program" :: rest =>
       contractIdValid contract && rest.all validCheckPathStep
-  | "contracts" :: contract :: "methods" :: _method ::
+  | "contracts" :: contract :: "methods" :: method ::
       "implementation" :: rest =>
-      contractIdValid contract && rest.all validCheckPathStep
+      contractIdValid contract && Solcore.Abi.V1.isValidMethodName method &&
+        rest.all validCheckPathStep
   | _ => false
 
 end Catalog

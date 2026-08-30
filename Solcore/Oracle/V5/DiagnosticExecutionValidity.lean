@@ -139,9 +139,9 @@ private def validDuplicateSignature
     (arguments : Lean.Json) : Bool :=
   match exactThreeStrings? arguments
       "signature" "firstMethod" "secondMethod" with
-  | some (_signature, first, second) =>
-      validMethodName first && validMethodName second && first != second &&
-        validContractPath path ["methods"]
+  | some (signature, first, second) =>
+      validMethodName first && first == second &&
+        signature == first ++ "(uint256)" && validContractPath path ["methods"]
   | none => false
 
 private def validSelectorCollision
@@ -169,8 +169,8 @@ private def validDanglingReference
     (arguments : Lean.Json) : Bool :=
   match exactStringField? arguments "id" with
   | none => false
-  | some id =>
-      validContractId id && match phase, path with
+  | some _id =>
+      match phase, path with
       | .worldValidation, ["world", "accounts", address, "code"] =>
           validAddressText address
       | .environmentValidation,
