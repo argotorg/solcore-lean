@@ -419,6 +419,11 @@ successful context, Word, and Core Store, and maps that success to the canonical
 32-byte big-endian returned frame. The branch-complete raw result remains the
 existing `HostDriverResult`.
 
+[ADR-0142](adr/0142-branch-complete-selected-word-code-classification.md) is
+accepted and active, with implementation planned next. It will classify
+address-selected checked code as absent, non-Word, or Word without rerunning
+the checker or changing the existing `WorldState.code?` lookup.
+
 ## Implementation status
 
 | Area | Implementation | Proof | Publication |
@@ -449,6 +454,7 @@ existing `HostDriverResult`.
 | Run-fixed current-address observation | Complete | Exact input lifetime, independent address roles, index-9 capability, length-10 tables, context identity, fuel/resumption, parent, fold, and frozen-Wire proofs and regressions are complete | Not published |
 | Proof-refined parent-indexed selected-execution session | Complete | Fixed-configuration carrier, closed fuel-only resumption, one-shot invariant, whole-session algebra, exact branches, no-fault, compatibility, folds, and measured regressions are complete | Not published |
 | Checked Word completion to canonical return bytes | Complete | Word refinement, success witness, exact raw projection/retraction, canonical returned frame, typed branch laws, stability, split fuel, and regressions are complete | Not published |
+| Branch-complete selected Word-code classification | Active | Accepted three-way classifier, exact checked-code and Word projections, WorldState adapter, coherence laws, and regressions are planned | Not published |
 | Internal named algebraic data | Complete | Complete, including recursive-data safety and totality | Not published |
 | Internal boolean/word conversions | Complete | Complete | Not published |
 | Internal word zero test | Complete | Complete | Not published |
@@ -2708,6 +2714,24 @@ diff, and axiom checks pass.
 This is not Solidity ABI encoding and does not refine selected Account code,
 resume a parent, add parser or syntax work, or change Wire, Oracle, schemas,
 profiles, metadata capabilities, or any other public boundary.
+
+## Active selected Word-code classification
+
+[ADR-0142](adr/0142-branch-complete-selected-word-code-classification.md) is
+accepted, with implementation planned next. One pure classifier will preserve
+all information from the existing optional checked-code lookup while making
+three cases explicit: no available code, available checked non-Word code, and
+available checked Word code.
+
+The absent branch deliberately continues to cover both a missing Account and a
+present Account without code. The non-Word branch retains the exact checked
+program and its result-type evidence. The Word branch retains ADR-0141's exact
+checked Word refinement. Erasing the classification must recover
+`WorldState.code?`; projecting Word code must agree with applying the existing
+optional Word refinement.
+
+This slice classifies only. It adds no selected execution, fuel behavior,
+parent result, fallback for non-Word code, ABI, parser work, or public format.
 
 ## Meaning of completion
 

@@ -928,6 +928,19 @@ non-Word result receives no return, revert, trap, or default-byte fallback.
 This is not an ABI, selected-code refinement, parser dependency, or public
 format change.
 
+ADR-0142 accepts the next selection-layer refinement. The existing
+`WorldState.code?` remains the canonical address lookup. A pure classifier will
+turn its optional result into three explicit branches: absent, checked non-Word
+code, or checked Word code. Erasing the classifier must reproduce the original
+lookup exactly, while its Word projection must equal ADR-0141's optional
+refinement.
+
+This adapter belongs beside WorldState code selection. It is not stored in an
+Account and does not depend on the storage-host Context. The absent branch
+continues to combine a missing Account with a present Account without code.
+Execution, parent continuation, and unsupported-result policy remain outside
+this active slice.
+
 ADR-0122 completes the optional selection boundary above that driver. A
 successful address-selected result is equivalent to the exact selected checked
 code and its fuel-indexed handled-step evidence; the evidence also replays to

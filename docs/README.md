@@ -224,6 +224,18 @@ Thirty-five public theorems have matching compile consumers. The 695-job build,
 diff, and axiom checks pass. Non-Word fallback, selected-code refinement, ABI,
 parser work, and public-format changes remain out of scope.
 
+[ADR-0142](adr/0142-branch-complete-selected-word-code-classification.md) is
+Accepted and active, with implementation planned next. It will classify the
+existing address-selected checked-code lookup into three explicit cases:
+unavailable code, available non-Word code, and available Word code. Both present
+branches retain the exact checked program, and the Word branch reuses ADR-0141's
+refinement.
+
+Erasing the classifier will recover `WorldState.code?` exactly. The unavailable
+branch still treats a missing Account and a present Account without code alike.
+This adds no execution result, non-Word fallback, parent continuation, ABI,
+parser work, or public-format change.
+
 First-order local cells from
 ADR-0022 and the program-local named algebraic data and normalized constructor
 matching from [ADR-0023](adr/0023-core-vnext-named-algebraic-data.md) are
