@@ -28,6 +28,7 @@ inductive HandledSteps
       {suspension : Core.HostSuspension}
       (prefixPath : Core.HostSteps prefixSteps start requestState)
       (emission : Core.HostRequestEmission requestState suspension)
+      (supported : handler.supports suspension.request = true)
       (handled :
         handler.handleSuspension context suspension =
           (nextContext, resumed))
@@ -59,17 +60,17 @@ theorem HandledSteps.trans
           exact .core (leftPath.trans rightPath)
       | @handle prefixSteps suffixSteps context nextContext finalContext
           start requestState resumed finish suspension prefixPath emission
-          handled suffix =>
+          supported handled suffix =>
           have combinedPrefix := leftPath.trans prefixPath
           have combined :=
-            HandledSteps.handle combinedPrefix emission handled suffix
+            HandledSteps.handle combinedPrefix emission supported handled suffix
           simpa [Nat.add_assoc] using combined
   | @handle prefixSteps suffixSteps context nextContext middleContext
       start requestState resumed middle suspension prefixPath emission
-      handled suffix suffixIH =>
+      supported handled suffix suffixIH =>
       have combinedSuffix := suffixIH right
       have combined :=
-        HandledSteps.handle prefixPath emission handled combinedSuffix
+        HandledSteps.handle prefixPath emission supported handled combinedSuffix
       simpa [Nat.add_assoc] using combined
 
 /-- A typed Core state remains typed across every handled request boundary. -/
@@ -92,7 +93,7 @@ theorem HandledSteps.preserve
       exact corePath.preserve typing
   | @handle prefixSteps suffixSteps context nextContext finalContext
       start requestState resumed finish suspension prefixPath emission
-      handled suffix suffixIH =>
+      supported handled suffix suffixIH =>
       have requestStateTyping := prefixPath.preserve typing
       have suspensionTyping :=
         Core.hostRequestEmission_hasType requestStateTyping emission
@@ -134,6 +135,13 @@ def FuelSoundWith
           HostDriver.HandledSteps handler spent startContext start
             result.context faultState ∧
           Core.hostAdvance faultState = .fault error
+  | .unsupported suspension remainingFuel =>
+      ∃ spent requestState,
+        spent + remainingFuel + 1 = fuel ∧
+          HostDriver.HandledSteps handler spent startContext start
+            result.context requestState ∧
+          Core.HostRequestEmission requestState suspension ∧
+          handler.supports suspension.request = false
 
 namespace FuelSoundWith
 
@@ -148,6 +156,7 @@ theorem prependRequest
     {suspension : Core.HostSuspension}
     (prefixPath : Core.HostSteps prefixSteps start requestState)
     (emission : Core.HostRequestEmission requestState suspension)
+    (supported : handler.supports suspension.request = true)
     (handled :
       handler.handleSuspension context suspension =
         (nextContext, resumed))
@@ -163,7 +172,7 @@ theorem prependRequest
           change ∃ spent, spent ≤ fuel ∧ _
           obtain ⟨suffixSteps, suffixBound, suffix⟩ := suffixSound
           exact ⟨prefixSteps + 1 + suffixSteps, by omega,
-            .handle prefixPath emission handled suffix⟩
+            .handle prefixPath emission supported handled suffix⟩
       | outOfFuel exhausted =>
           change
             HostDriver.HandledSteps handler remainingFuel nextContext
@@ -174,7 +183,7 @@ theorem prependRequest
           obtain ⟨suffix, ready⟩ := suffixSound
           have combined :=
             HostDriver.HandledSteps.handle
-              prefixPath emission handled suffix
+              prefixPath emission supported handled suffix
           have countEq : prefixSteps + 1 + remainingFuel = fuel := by
             omega
           exact ⟨countEq ▸ combined, ready⟩
@@ -193,7 +202,25 @@ theorem prependRequest
                 Core.hostAdvance faultState = .fault error
           obtain ⟨suffixSteps, suffixBound, suffix, terminal⟩ := suffixSound
           exact ⟨prefixSteps + 1 + suffixSteps, by omega,
-            .handle prefixPath emission handled suffix, terminal⟩
+            .handle prefixPath emission supported handled suffix, terminal⟩
+      | unsupported suspension unsupportedRemainingFuel =>
+          change ∃ spent requestState,
+            spent + unsupportedRemainingFuel + 1 = remainingFuel ∧
+              HostDriver.HandledSteps handler spent nextContext resumed
+                finalContext requestState ∧
+              Core.HostRequestEmission requestState suspension ∧
+              handler.supports suspension.request = false at suffixSound
+          change ∃ spent requestState,
+            spent + unsupportedRemainingFuel + 1 = fuel ∧
+              HostDriver.HandledSteps handler spent context start
+                finalContext requestState ∧
+              Core.HostRequestEmission requestState suspension ∧
+              handler.supports suspension.request = false
+          obtain ⟨suffixSteps, requestState, suffixAccounting, suffix,
+            requestEmission, requestUnsupported⟩ := suffixSound
+          exact ⟨prefixSteps + 1 + suffixSteps, requestState, by omega,
+            .handle prefixPath emission supported handled suffix,
+            requestEmission, requestUnsupported⟩
 
 /-- Fuel-sound relational evidence directly preserves outcome typing. -/
 theorem hasType
@@ -232,6 +259,12 @@ theorem hasType
           obtain ⟨spent, bound, path, terminal⟩ := sound
           exact Core.well_typed_host_state_never_faults
             (path.preserve typing) terminal
+      | unsupported suspension remainingFuel =>
+          change ∃ spent requestState, _ at sound
+          change Core.HostSuspensionHasType suspension resultType definitions
+          obtain ⟨spent, requestState, accounting, path, emission,
+            unsupported⟩ := sound
+          exact Core.hostRequestEmission_hasType (path.preserve typing) emission
 
 end FuelSoundWith
 
@@ -266,23 +299,31 @@ theorem run_fuelSound
             Core.hostRun_fault_sound execution
           exact ⟨steps, bound, .core path, terminal⟩
       | suspended suspension remainingFuel =>
-          rw [run, execution]
           obtain ⟨prefixSteps, requestState, prefixPath, emission, accounting⟩ :=
             Core.hostRun_suspended_sound execution
-          apply HostDriverResult.FuelSoundWith.prependRequest
-            prefixPath emission
-            (nextContext :=
-              (handler.handleSuspension context suspension).1)
-            (resumed :=
-              (handler.handleSuspension context suspension).2)
-          · exact
-              (Prod.eta
-                (handler.handleSuspension context suspension)).symm
-          · exact accounting
-          · exact ih remainingFuel
-              (Core.HostRunResult.remainingFuel_lt execution)
-              (handler.handleSuspension context suspension).1
-              (handler.handleSuspension context suspension).2
+          cases supported : handler.supports suspension.request with
+          | false =>
+              rw [HostDriver.run_of_unsupported handler context fuel remainingFuel
+                state suspension execution supported]
+              exact ⟨prefixSteps, requestState, accounting, .core prefixPath,
+                emission, supported⟩
+          | true =>
+              rw [HostDriver.run_of_suspended handler context fuel remainingFuel
+                state suspension execution, supported]
+              apply HostDriverResult.FuelSoundWith.prependRequest
+                prefixPath emission supported
+                (nextContext :=
+                  (handler.handleSuspension context suspension).1)
+                (resumed :=
+                  (handler.handleSuspension context suspension).2)
+              · exact
+                  (Prod.eta
+                    (handler.handleSuspension context suspension)).symm
+              · exact accounting
+              · exact ih remainingFuel
+                  (Core.HostRunResult.remainingFuel_lt execution)
+                  (handler.handleSuspension context suspension).1
+                  (handler.handleSuspension context suspension).2
 
 end HostDriver
 
