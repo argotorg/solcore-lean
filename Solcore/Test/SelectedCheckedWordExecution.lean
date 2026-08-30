@@ -112,6 +112,7 @@ private theorem split_15_1_exact :
 def testSelectedCheckedWordExecution : IO Unit := do
   assertTrue
     (absentRunDoesNotRun (absentExecution 0) 0 &&
+      absentRunDoesNotRun ((absentExecution 0).resumeWithFuel 0) 0 &&
       absentRunDoesNotRun (absentExecution 64) 64 &&
       absentRunDoesNotRun
         ((absentExecution 0).resumeWithFuel 64) 64)
@@ -119,6 +120,7 @@ def testSelectedCheckedWordExecution : IO Unit := do
 
   assertTrue
     (nonWordRunDoesNotRun (nonWordExecution 0) 0 &&
+      nonWordRunDoesNotRun ((nonWordExecution 0).resumeWithFuel 0) 0 &&
       nonWordRunDoesNotRun (nonWordExecution 64) 64 &&
       nonWordRunDoesNotRun
         ((nonWordExecution 0).resumeWithFuel 64) 64)
@@ -142,11 +144,20 @@ def testSelectedCheckedWordExecution : IO Unit := do
     ((wordExecution inputRequestFuel).resumeWithFuel 1).completion?
   let terminal :=
     ((wordExecution completionFuel).resumeWithFuel 48).completion?
+  let zero :=
+    ((wordExecution completionFuel).resumeWithFuel 0).completion?
+  let added :=
+    (((wordExecution writeRequestFuel).resumeWithFuel 3)
+      |>.resumeWithFuel 4).completion?
+  let combined :=
+    ((wordExecution writeRequestFuel).resumeWithFuel (3 + 4)).completion?
   assertTrue
     (sameCompletion split9 completion &&
       sameCompletion split10 completion &&
       sameCompletion split15 completion &&
       sameCompletion terminal completion &&
+      sameCompletion zero completion &&
+      sameCompletion added combined && sameCompletion combined completion &&
       ((wordExecution completionFuel).resumeWithFuel 48).providedFuel == 64)
     "split, summed, or terminal resumption changed the selected completion"
 
