@@ -137,6 +137,21 @@
       "stdin": "Tests/golden/mixed-v1-v2-v3-v4-request.ndjson",
       "expected": "Tests/golden/mixed-v1-v2-v3-v4-response.ndjson",
       "sha256": "e8bfd9e09bd90b0fcc1959b2c918493d82a5d65295d08b508d255413e2e0d7ce"
+    },
+    {
+      "id": "capabilities-v5",
+      "arguments": [
+        "capabilities-v5"
+      ],
+      "stdin": null,
+      "sha256": "bca25c67ddf155fc297bfe85051b3ae0195f2e6ae38090e9eb602fe7890f0581"
+    },
+    {
+      "id": "v5-core-check",
+      "arguments": [],
+      "stdin": "Tests/golden/v5-core-check-request.ndjson",
+      "expected": "Tests/golden/v5-core-check-response.ndjson",
+      "sha256": "f0963c526314562f6e603d23a790339fe28eff978116170246119c8968dd4831"
     }
   ]
 }

@@ -3805,7 +3805,9 @@ def testSchemaJson : IO Unit := do
     ("Tests/golden/m1c-wire-invalid-request.ndjson",
       "Tests/golden/m1c-wire-invalid-response.ndjson"),
     ("Tests/golden/mixed-v1-v2-v3-request.ndjson",
-      "Tests/golden/mixed-v1-v2-v3-response.ndjson")
+      "Tests/golden/mixed-v1-v2-v3-response.ndjson"),
+    ("Tests/golden/v5-core-check-request.ndjson",
+      "Tests/golden/v5-core-check-response.ndjson")
   ]
   for (requestPath, responsePath) in coreGoldenPairs do
     let coreRequestText ← IO.FS.readFile requestPath
