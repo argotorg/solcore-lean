@@ -91,7 +91,7 @@ def decodeDiagnosticAt
     (← requireField path json "severity") "error"
   pure { code, phase, path := semanticPath, arguments }
 
-private def decodeCoreTypeAt
+def decodeCoreTypeAt
     (path : Path)
     (json : Lean.Json) : DecodeResult Solcore.Core.Wire.V3.Ty :=
   let limits : Solcore.Core.Wire.V3.CoreBudgetLimits := {
