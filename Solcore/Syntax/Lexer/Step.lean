@@ -1,4 +1,4 @@
-import Solcore.Syntax.Lexer.State
+import Solcore.Syntax.Lexer.StateOrder
 import Solcore.Syntax.Lexer.ScanProperties
 
 set_option autoImplicit false
@@ -602,5 +602,273 @@ theorem step_validFor (file : SourceFile) (state : State)
   case case19 => apply recoverCharacter_validFor valid <;> assumption
   case case20 => apply emitSingleSymbol_validFor valid <;> assumption
   case case21 => apply recoverCharacter_validFor valid <;> assumption
+
+private theorem emitTextToken_orderedValidFor
+    {file : SourceFile} {state : State}
+    (ordered : state.OrderedValidFor file) (kind : TokenKind)
+    (remaining : List Char)
+    (progress : Advances state.cursor state.remaining
+      (state.cursor + kind.spelling.utf8ByteSize) remaining)
+    (shorter : remaining.length < state.remaining.length) :
+    (emitTextToken file state kind remaining).OrderedValidFor file := by
+  unfold emitTextToken
+  exact ordered.emitToken _ _ _ progress
+    (progress.startByte_lt_endByte_of_remaining_length_lt shorter)
+
+private theorem emitSymbol_orderedValidFor
+    {file : SourceFile} {state : State}
+    (ordered : state.OrderedValidFor file) (symbol : Symbol)
+    (consumed remaining : List Char)
+    (inputEq : state.remaining = consumed ++ remaining)
+    (spelling : symbol.spelling = String.ofList consumed)
+    (nonempty : consumed ≠ []) :
+    (emitSymbol file state symbol remaining).OrderedValidFor file := by
+  unfold emitSymbol
+  apply emitTextToken_orderedValidFor ordered
+  · exact ⟨consumed, inputEq, by
+      simp [byteSize, TokenKind.spelling, spelling]⟩
+  · rw [inputEq, List.length_append]
+    have positive := List.length_pos_iff.mpr nonempty
+    omega
+
+private theorem recoverCharacter_orderedValidFor
+    {file : SourceFile} {state : State}
+    (ordered : state.OrderedValidFor file) (character : Char)
+    (remaining : List Char)
+    (inputEq : state.remaining = character :: remaining) :
+    State.OrderedValidFor
+      (state.recover file state.cursor (state.cursor + character.utf8Size)
+        (state.cursor + character.utf8Size) remaining .invalidToken)
+      file := by
+  have progress : Advances state.cursor state.remaining
+      (state.cursor + character.utf8Size) remaining := by
+    rw [inputEq]
+    exact Advances.single character state.cursor remaining
+  exact ordered.recover _ _ _ _ _ progress
+    (ordered.validFor.cursorSuffix.sourceSpan_validFor progress)
+
+private theorem emitMultiSymbol_orderedValidFor
+    {file : SourceFile} {state : State}
+    (ordered : state.OrderedValidFor file) (left right : Char)
+    (after : List Char) (symbol : Symbol)
+    (inputEq : state.remaining = left :: right :: after)
+    (found : multiSymbol? left right = some symbol) :
+    (emitSymbol file state symbol after).OrderedValidFor file :=
+  emitSymbol_orderedValidFor ordered symbol [left, right] after
+    (by simpa using inputEq) (multiSymbol?_spelling left right symbol found)
+    (by simp)
+
+private theorem emitSingleSymbol_orderedValidFor
+    {file : SourceFile} {state : State}
+    (ordered : state.OrderedValidFor file) (character : Char)
+    (after : List Char) (symbol : Symbol)
+    (inputEq : state.remaining = character :: after)
+    (found : singleSymbol? character = some symbol) :
+    (emitSymbol file state symbol after).OrderedValidFor file :=
+  emitSymbol_orderedValidFor ordered symbol [character] after
+    (by simpa using inputEq) (singleSymbol?_spelling character symbol found)
+    (by simp)
+
+private theorem emitUnderscore_orderedValidFor
+    {file : SourceFile} {state : State}
+    (ordered : state.OrderedValidFor file) (after : List Char)
+    (inputEq : state.remaining = '_' :: after) :
+    (emitSymbol file state .underscore after).OrderedValidFor file :=
+  emitSingleSymbol_orderedValidFor ordered '_' after .underscore inputEq rfl
+
+/-- Every canonical lexer step preserves reverse-accumulator source order. -/
+theorem step_orderedValidFor (file : SourceFile) (state : State)
+    (ordered : state.OrderedValidFor file) :
+    (step file state).OrderedValidFor file := by
+  fun_cases step file state
+  case case1 => exact ordered
+  case case2 first rest inputEq _ =>
+    apply ordered.skipTo
+    rw [inputEq]
+    exact Advances.single first state.cursor rest
+  case case3 tail _ inputEq =>
+    unfold scanLine
+    let scan := scanLineComment (state.cursor + 2) tail
+    have progress : Advances state.cursor state.remaining
+        scan.endByte scan.remaining := by
+      rw [inputEq]
+      have inner := scanLineComment_advances (state.cursor + 2) tail
+      simpa [scan, byteSize_cons] using
+        (Advances.prependPrefix ['/', '/'] inner)
+    apply ordered.emitComment _ _ _ _ progress
+    apply progress.startByte_lt_endByte_of_remaining_length_lt
+    rw [inputEq]
+    exact scanLine_remaining_length_lt file state tail
+  case case4 tail _ inputEq =>
+    unfold scanBlock
+    cases result : scanBlockComment (state.cursor + 2) 1 tail [] with
+    | closed endByte body rest =>
+        have inner := scanBlockComment_closed_advances
+          (state.cursor + 2) 1 tail [] endByte body rest result
+        have progress : Advances state.cursor state.remaining endByte rest := by
+          rw [inputEq]
+          simpa [byteSize_cons] using
+            (Advances.prependPrefix ['/', '*'] inner)
+        apply ordered.emitComment _ _ _ _ progress
+        apply progress.startByte_lt_endByte_of_remaining_length_lt
+        rw [inputEq]
+        exact Advances.remaining_length_lt_prepend
+          (leading := ['/', '*']) inner (by simp)
+    | unterminated =>
+        have progress := ordered.validFor.advanceToEnd
+        exact ordered.recover _ _ _ _ _ progress
+          (ordered.validFor.cursorSuffix.sourceSpan_validFor progress)
+  case case5 tail _ inputEq =>
+    unfold scanBacktick
+    cases result :
+        scanDelimitedMeta '`' (state.cursor + 1) tail ['`'] with
+    | none =>
+        have progress := ordered.validFor.advanceToEnd
+        exact ordered.recover _ _ _ _ _ progress
+          (ordered.validFor.cursorSuffix.sourceSpan_validFor progress)
+    | some scan =>
+        have inner := scanDelimitedMeta_some_advances '`'
+          (state.cursor + 1) tail ['`'] scan result
+        have progress : Advances state.cursor state.remaining
+            scan.endByte scan.remaining := by
+          rw [inputEq]
+          simpa [byteSize_cons] using
+            (Advances.prependPrefix ['`'] inner)
+        apply ordered.emitToken _ _ _ progress
+        apply progress.startByte_lt_endByte_of_remaining_length_lt
+        rw [inputEq]
+        exact Advances.remaining_length_lt_prepend
+          (leading := ['`']) inner (by simp)
+  case case6 tail _ inputEq =>
+    unfold scanQuoted
+    cases result : scanQuotedString state.cursor tail with
+    | closed endByte spelling decoded rest =>
+        have progress : Advances state.cursor state.remaining endByte rest := by
+          rw [inputEq]
+          exact scanQuotedString_closed_advances state.cursor tail endByte
+            spelling decoded rest result
+        apply ordered.emitToken _ _ _ progress
+        apply progress.startByte_lt_endByte_of_remaining_length_lt
+        rw [inputEq]
+        have shorter := scanQuoted_remaining_length_lt file state tail
+        simpa [scanQuoted, result, State.emitToken] using shorter
+    | invalidEscape escapeStart escapeEnd escape tokenEndByte rest =>
+        have progress : Advances state.cursor state.remaining tokenEndByte rest := by
+          rw [inputEq]
+          exact scanQuotedString_invalidEscape_advances state.cursor tail
+            escapeStart escapeEnd escape tokenEndByte rest result
+        exact ordered.recover _ _ _ _ _ progress
+          (ordered.validFor.cursorSuffix.sourceSpan_validFor progress)
+    | invalidPrefix endByte rest =>
+        have progress : Advances state.cursor state.remaining endByte rest := by
+          rw [inputEq]
+          exact scanQuotedString_invalidPrefix_advances state.cursor tail
+            endByte rest result
+        exact ordered.recover _ _ _ _ _ progress
+          (ordered.validFor.cursorSuffix.sourceSpan_validFor progress)
+    | unterminated =>
+        have progress := ordered.validFor.advanceToEnd
+        exact ordered.recover _ _ _ _ _ progress
+          (ordered.validFor.cursorSuffix.sourceSpan_validFor progress)
+  case case7 tail next result _ inputEq =>
+    unfold scanInterpolation at result
+    cases scanResult :
+        scanDelimitedMeta '}' (state.cursor + 2) tail ['{', '$'] with
+    | none => simp [scanResult] at result
+    | some scan =>
+        simp only [scanResult, Option.some.injEq] at result
+        subst next
+        have inner := scanDelimitedMeta_some_advances '}'
+          (state.cursor + 2) tail ['{', '$'] scan scanResult
+        have progress : Advances state.cursor state.remaining
+            scan.endByte scan.remaining := by
+          rw [inputEq]
+          simpa [byteSize_cons] using
+            (Advances.prependPrefix ['$', '{'] inner)
+        apply ordered.emitToken _ _ _ progress
+        apply progress.startByte_lt_endByte_of_remaining_length_lt
+        rw [inputEq]
+        exact Advances.remaining_length_lt_prepend
+          (leading := ['$', '{']) inner (by simp)
+  case case8 tail _ _ inputEq =>
+    unfold scanMarkedName
+    let scan := scanMarkedYulIdentifier '$' ('{' :: tail)
+    apply emitTextToken_orderedValidFor ordered
+    · rw [inputEq]
+      exact scanMarkedYulIdentifier_advances state.cursor '$' ('{' :: tail)
+    · rw [inputEq]
+      exact scanMarkedYulIdentifier_remaining_length_lt '$' ('{' :: tail)
+  case case9 tail next result _ inputEq =>
+    fun_cases scanHexadecimal? file state tail with
+    | case1 digit rest isHex scan spelling =>
+        simp only [scanHexadecimal?, isHex, if_true,
+          Option.some.injEq] at result
+        subst next
+        have inner := takeWhile_advances isAsciiHexDigit
+          (state.cursor + byteSize ['0', 'x', digit]) rest
+        have progress : Advances state.cursor state.remaining
+            (state.cursor +
+              (TokenKind.hexadecimalLiteral spelling).spelling.utf8ByteSize)
+            scan.remaining := by
+          rw [inputEq]
+          simpa [scan, spelling, byteSize, TokenKind.spelling,
+            Nat.add_assoc] using
+              (Advances.prependPrefix ['0', 'x', digit] inner)
+        apply emitTextToken_orderedValidFor ordered _ _ progress
+        rw [inputEq]
+        exact Advances.remaining_length_lt_prepend
+          (leading := ['0', 'x', digit]) inner (by simp)
+    | case2 => simp_all [scanHexadecimal?]
+    | case3 => simp_all [scanHexadecimal?]
+  case case10 tail _ _ inputEq =>
+    unfold scanDecimal
+    let scan := takeWhile isAsciiDigit ('0' :: tail)
+    apply emitTextToken_orderedValidFor ordered
+    · rw [inputEq]
+      simpa [scan, byteSize, TokenKind.spelling] using
+        takeWhile_advances isAsciiDigit state.cursor ('0' :: tail)
+    · rw [inputEq]
+      exact takeWhile_remaining_length_lt_of_true
+        isAsciiDigit '0' tail (by decide)
+  case case11 digit tail _ _ _ _ _ _ accepted _ inputEq =>
+    unfold scanDecimal
+    let scan := takeWhile isAsciiDigit (digit :: tail)
+    apply emitTextToken_orderedValidFor ordered
+    · rw [inputEq]
+      simpa [scan, byteSize, TokenKind.spelling] using
+        takeWhile_advances isAsciiDigit state.cursor (digit :: tail)
+    · rw [inputEq]
+      exact takeWhile_remaining_length_lt_of_true
+        isAsciiDigit digit tail accepted
+  case case12 first tail _ _ _ _ _ _ _ _ _ inputEq =>
+    unfold scanLetterName
+    apply emitTextToken_orderedValidFor ordered
+    · rw [inputEq]
+      exact scanLetterIdentifier_advances state.cursor first tail
+    · rw [inputEq]
+      exact scanLetterIdentifier_remaining_length_lt first tail
+  case case13 next after _ _ _ _ _ _ _ _ _ _ inputEq =>
+    unfold scanMarkedName
+    apply emitTextToken_orderedValidFor ordered
+    · rw [inputEq]
+      exact scanMarkedYulIdentifier_advances state.cursor '_'
+        (next :: after)
+    · rw [inputEq]
+      exact scanMarkedYulIdentifier_remaining_length_lt '_'
+        (next :: after)
+  case case14 => apply emitUnderscore_orderedValidFor ordered <;> assumption
+  case case15 => apply emitUnderscore_orderedValidFor ordered <;> assumption
+  case case16 after _ _ _ _ _ _ _ _ _ inputEq =>
+    unfold scanMarkedName
+    apply emitTextToken_orderedValidFor ordered
+    · rw [inputEq]
+      exact scanMarkedYulIdentifier_advances state.cursor '$' after
+    · rw [inputEq]
+      exact scanMarkedYulIdentifier_remaining_length_lt '$' after
+  case case17 => apply emitMultiSymbol_orderedValidFor ordered <;> assumption
+  case case18 => apply emitSingleSymbol_orderedValidFor ordered <;> assumption
+  case case19 => apply recoverCharacter_orderedValidFor ordered <;> assumption
+  case case20 => apply emitSingleSymbol_orderedValidFor ordered <;> assumption
+  case case21 => apply recoverCharacter_orderedValidFor ordered <;> assumption
 
 end Solcore.Syntax.Lexer

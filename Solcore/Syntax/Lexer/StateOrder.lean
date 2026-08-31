@@ -17,6 +17,28 @@ theorem startByte_le_endByte {startByte endByte : Nat}
   rw [endEq]
   omega
 
+/-- Strict suffix shortening forces exact scanner progress to advance bytes. -/
+theorem startByte_lt_endByte_of_remaining_length_lt
+    {startByte endByte : Nat} {input remaining : List Char}
+    (progress : Advances startByte input endByte remaining)
+    (shorter : remaining.length < input.length) :
+    startByte < endByte := by
+  rcases progress with ⟨consumed, partition, endEq⟩
+  have consumedNonempty : consumed ≠ [] := by
+    intro empty
+    subst consumed
+    simp only [List.nil_append] at partition
+    rw [partition] at shorter
+    exact (Nat.lt_irrefl _ shorter)
+  have consumedBytesPositive : 0 < byteSize consumed := by
+    cases consumed with
+    | nil => contradiction
+    | cons character rest =>
+        rw [byteSize_cons]
+        exact Nat.add_pos_left character.utf8Size_pos _
+  rw [endEq]
+  omega
+
 end Advances
 
 namespace State

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Lexer.StateOrder
+import Solcore.Syntax.Lexer.Step
 
 /-! External compile consumers for reverse-accumulator source ordering. -/
 
@@ -12,6 +12,11 @@ open Solcore.Syntax.Lexer
 example (file : SourceFile) :
     (State.initial file).OrderedValidFor file :=
   State.initial_orderedValidFor file
+
+example (file : SourceFile) (state : State)
+    (ordered : state.OrderedValidFor file) :
+    (step file state).OrderedValidFor file :=
+  step_orderedValidFor file state ordered
 
 example (file : SourceFile) (state : State)
     (ordered : state.OrderedValidFor file) :
