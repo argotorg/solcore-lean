@@ -14,7 +14,10 @@ def unaryOp? : TokenKind → Option UnaryOp
 
 end ExpressionInternals
 
-private def binaryOp? : TokenKind → Option BinaryOp
+namespace ExpressionInternals
+
+/-- Recognize one canonical binary operator token. -/
+def binaryOp? : TokenKind → Option BinaryOp
   | .symbol .star => some .multiply
   | .symbol .slash => some .divide
   | .symbol .percent => some .modulo
@@ -32,6 +35,8 @@ private def binaryOp? : TokenKind → Option BinaryOp
   | .symbol .logicalAnd => some .logicalAnd
   | .symbol .logicalOr => some .logicalOr
   | _ => none
+
+end ExpressionInternals
 
 namespace ExpressionInternals
 
@@ -51,6 +56,14 @@ def unaryOperators :
 
 end ExpressionInternals
 
+/-- Wrap a postfix expression in its source-ordered prefix unary operators. -/
+def ExpressionInternals.applyUnaryOperators
+    (operators : List (Located UnaryOp)) (base : Expr) : Expr :=
+  operators.foldr (fun operator operand => {
+    span := SourceSpan.cover operator.span operand.span
+    value := .unary operator operand
+  }) base
+
 private def expressionUnary (nested : Parser Expr)
     (block : Parser Block) : Parser Expr := fun state =>
   match ExpressionInternals.unaryOperators
@@ -58,20 +71,19 @@ private def expressionUnary (nested : Parser Expr)
   | .ok operators afterOperators =>
       match expressionPostfix nested block afterOperators with
       | .ok base next =>
-          let value := operators.foldr (fun operator operand => {
-            span := SourceSpan.cover operator.span operand.span
-            value := .unary operator operand
-          }) base
-          .ok value next
+          .ok (ExpressionInternals.applyUnaryOperators operators base) next
       | .reject failure next => .reject failure next
       | .invariant error => .invariant error
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
-private def binaryAtPrecedence? (state : State)
+namespace ExpressionInternals
+
+/-- Inspect the current token for a binary operator at one precedence. -/
+def binaryAtPrecedence? (state : State)
     (precedence : Nat) : Option (Located BinaryOp) :=
   match state.peek? with
-  | some token => match binaryOp? token.value with
+  | some token => match ExpressionInternals.binaryOp? token.value with
     | some operator =>
         if operator.precedence == precedence then
           some { span := token.span, value := operator }
@@ -80,28 +92,32 @@ private def binaryAtPrecedence? (state : State)
     | none => none
   | none => none
 
-private def consumeBinary (_operator : Located BinaryOp) : Parser Unit :=
+/-- Advance over a binary operator already recognized at the current token. -/
+def consumeBinary (_operator : Located BinaryOp) : Parser Unit :=
   modifyState fun state => { state with cursor := state.cursor + 1 }
 
-private def binaryNode (left : Expr) (operator : Located BinaryOp)
+/-- Construct the source cover for one binary-expression node. -/
+def binaryNode (left : Expr) (operator : Located BinaryOp)
     (right : Expr) : Expr := {
   span := SourceSpan.cover left.span right.span
   value := .binary left operator right
 }
 
+end ExpressionInternals
+
 private def leftAssociativeTail (operand : Parser Expr)
     (precedence : Nat) : Nat → Expr → State → Reply Expr
   | 0, _, state => .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1, left, state =>
-      match binaryAtPrecedence? state precedence with
+      match ExpressionInternals.binaryAtPrecedence? state precedence with
       | none => .ok left state
       | some operator =>
-          match consumeBinary operator state with
+          match ExpressionInternals.consumeBinary operator state with
           | .ok _ afterOperator =>
               match operand afterOperator with
               | .ok right next =>
                   leftAssociativeTail operand precedence fuel
-                    (binaryNode left operator right) next
+                    (ExpressionInternals.binaryNode left operator right) next
               | .reject failure next => .reject failure next
               | .invariant error => .invariant error
           | .reject failure next => .reject failure next
@@ -120,13 +136,14 @@ private def nonAssociative (operand : Parser Expr)
     (precedence : Nat) : Parser Expr := fun state =>
   match operand state with
   | .ok left next =>
-      match binaryAtPrecedence? next precedence with
+      match ExpressionInternals.binaryAtPrecedence? next precedence with
       | none => .ok left next
       | some operator =>
-          match consumeBinary operator next with
+          match ExpressionInternals.consumeBinary operator next with
           | .ok _ afterOperator =>
               match operand afterOperator with
-              | .ok right final => .ok (binaryNode left operator right) final
+              | .ok right final =>
+                  .ok (ExpressionInternals.binaryNode left operator right) final
               | .reject failure failed => .reject failure failed
               | .invariant error => .invariant error
           | .reject failure failed => .reject failure failed

@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Expression
 import Solcore.Syntax.CollectionValidity
+import Solcore.Syntax.ExpressionValidity
 
 /-! Provenance and state contracts for canonical Core expression layers. -/
 
@@ -112,6 +113,145 @@ theorem unaryOperators_cursorMonotoneOnSuccess (fuel : Nat)
                 (inductionHypothesis
                   ({ span := token.span, value := operator } :: operatorsRev)
                   { input with cursor := input.cursor + 1 } parsed)
+
+/-- Unary wrapping preserves the final operand's source end. -/
+theorem applyUnaryOperators_preservesBaseEnd
+    (operators : List (Located UnaryOp)) (base : Expr) :
+    (applyUnaryOperators operators base).span.endByte =
+      base.span.endByte := by
+  induction operators with
+  | nil => rfl
+  | cons operator rest inductionHypothesis =>
+      simpa only [applyUnaryOperators, List.foldr, SourceSpan.cover] using
+        inductionHypothesis
+
+/-- Unary wrapping retains every operator and operand source range. -/
+theorem applyUnaryOperators_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (file : SourceFile) (operators : List (Located UnaryOp)) (base : Expr)
+    (operatorsValid : List.ValidFor Located.ValidFor file operators)
+    (baseValid : Expr.ValidFor statementValid file base)
+    (ordered : ∀ operator ∈ operators,
+      operator.span.startByte ≤ base.span.endByte) :
+    Expr.ValidFor statementValid file
+      (applyUnaryOperators operators base) := by
+  induction operators with
+  | nil => simpa only [applyUnaryOperators, List.foldr] using baseValid
+  | cons operator rest inductionHypothesis =>
+      have operatorValid : operator.span.ValidFor file := by
+        simpa only [Located.ValidFor] using
+          operatorsValid operator (by simp)
+      have restValid : List.ValidFor Located.ValidFor file rest := by
+        intro retained member
+        exact operatorsValid retained (by simp [member])
+      have restOrdered : ∀ retained ∈ rest,
+          retained.span.startByte ≤ base.span.endByte := by
+        intro retained member
+        exact ordered retained (by simp [member])
+      have operandValid := inductionHypothesis restValid restOrdered
+      have outerValid := SourceSpan.cover_validFor operatorValid
+        operandValid.span_valid (by
+          rw [applyUnaryOperators_preservesBaseEnd]
+          exact ordered operator (by simp))
+      simpa only [applyUnaryOperators, List.foldr] using
+        (Expr.ValidFor.unary outerValid operatorValid operandValid)
+
+/-- Successful precedence lookup identifies the current token exactly. -/
+theorem binaryAtPrecedence?_some_state_shape {input : State}
+    {precedence : Nat} {operator : Located BinaryOp}
+    (result : binaryAtPrecedence? input precedence = some operator) :
+    ∃ token, input.peek? = some token ∧
+      binaryOp? token.value = some operator.value ∧
+      token.span = operator.span := by
+  unfold binaryAtPrecedence? at result
+  cases found : input.peek? with
+  | none => simp [found] at result
+  | some token =>
+      simp only [found] at result
+      cases decoded : binaryOp? token.value with
+      | none => simp [decoded] at result
+      | some value =>
+          simp only [decoded] at result
+          split at result
+          · cases result
+            exact ⟨token, rfl, by simpa using decoded, rfl⟩
+          · contradiction
+
+/-- Every recognized binary operator belongs to the active source. -/
+theorem binaryAtPrecedence?_validFor {input : State}
+    {precedence : Nat} {operator : Located BinaryOp}
+    (inputValid : input.ValidFor)
+    (result : binaryAtPrecedence? input precedence = some operator) :
+    Located.ValidFor input.file operator := by
+  rcases binaryAtPrecedence?_some_state_shape result with
+    ⟨token, found, _decoded, span⟩
+  simpa only [Located.ValidFor, ← span] using
+    inputValid.peek?_span_validFor found
+
+/-- Binary consumption is the exact one-token cursor update. -/
+theorem consumeBinary_ok_state_shape (operator : Located BinaryOp)
+    (input : State) :
+    consumeBinary operator input =
+      .ok () { input with cursor := input.cursor + 1 } := rfl
+
+/-- Consuming a recognized current token preserves state validity. -/
+theorem consumeBinary_reply_validFor (operator : Located BinaryOp)
+    {input : State} (inputValid : input.ValidFor) {token : Token}
+    (found : input.peek? = some token) :
+    (consumeBinary operator input).ValidFor input (fun _ _ => True) := by
+  unfold consumeBinary modifyState Reply.ValidFor
+  refine ⟨trivial, ?_, rfl⟩
+  apply inputValid.advance?_validFor (token := token)
+  unfold State.advance?
+  rw [found]
+  rfl
+
+/-- Binary consumption preserves the immutable token window. -/
+theorem consumeBinary_preservesTokenWindow (operator : Located BinaryOp) :
+    Parser.PreservesTokenWindow (consumeBinary operator) :=
+  modifyState_preservesTokenWindow _ (fun _ => ⟨rfl, rfl⟩)
+
+theorem consumeBinary_preservesTokensOnSuccess
+    (operator : Located BinaryOp) :
+    Parser.PreservesTokensOnSuccess (consumeBinary operator) :=
+  (consumeBinary_preservesTokenWindow operator).preservesTokensOnSuccess
+
+/-- Binary consumption advances the cursor by exactly one. -/
+theorem consumeBinary_cursor_lt_onSuccess (operator : Located BinaryOp)
+    {input final : State} {value : Unit}
+    (result : consumeBinary operator input = .ok value final) :
+    input.cursor < final.cursor := by
+  unfold consumeBinary modifyState at result
+  cases result
+  simp
+
+theorem consumeBinary_cursorMonotoneOnSuccess
+    (operator : Located BinaryOp) :
+    Parser.CursorMonotoneOnSuccess (consumeBinary operator) := by
+  intro input value final result
+  exact Nat.le_of_lt (consumeBinary_cursor_lt_onSuccess operator result)
+
+/-- A binary node retains its two operands and operator provenance. -/
+theorem binaryNode_validFor
+    (statementValid : SourceFile → Statement → Prop) (file : SourceFile)
+    (left : Expr) (operator : Located BinaryOp) (right : Expr)
+    (leftValid : Expr.ValidFor statementValid file left)
+    (operatorValid : Located.ValidFor file operator)
+    (rightValid : Expr.ValidFor statementValid file right)
+    (ordered : left.span.startByte ≤ right.span.endByte) :
+    Expr.ValidFor statementValid file (binaryNode left operator right) := by
+  unfold binaryNode
+  exact Expr.ValidFor.binary
+    (SourceSpan.cover_validFor leftValid.span_valid rightValid.span_valid ordered)
+    leftValid (by simpa only [Located.ValidFor] using operatorValid) rightValid
+
+@[simp] theorem binaryNode_startByte (left : Expr)
+    (operator : Located BinaryOp) (right : Expr) :
+    (binaryNode left operator right).span.startByte = left.span.startByte := rfl
+
+@[simp] theorem binaryNode_endByte (left : Expr)
+    (operator : Located BinaryOp) (right : Expr) :
+    (binaryNode left operator right).span.endByte = right.span.endByte := rfl
 
 end ExpressionInternals
 end Solcore.Syntax.Parser
