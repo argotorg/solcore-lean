@@ -20,6 +20,9 @@ example (file : SourceFile) (value : DeriveAttribute)
 example : deriveAttribute.ValidFor DeriveAttribute.ValidFor :=
   deriveAttribute_validFor
 
+example : Parser.PreservesTokenWindow deriveAttribute :=
+  deriveAttribute_preservesTokenWindow
+
 example : Parser.PreservesTokensOnSuccess deriveAttribute :=
   deriveAttribute_preservesTokensOnSuccess
 
@@ -36,10 +39,12 @@ example : Parser.CursorMonotoneOnSuccess deriveAttribute :=
 
 example :
     deriveAttribute.ValidFor DeriveAttribute.ValidFor ∧
+      Parser.PreservesTokenWindow deriveAttribute ∧
       Parser.PreservesTokensOnSuccess deriveAttribute ∧
       Parser.CursorMonotoneOnSuccess deriveAttribute ∧
       Parser.StartsAtCurrentTokenOnSuccess deriveAttribute (·.span) :=
-  ⟨deriveAttribute_validFor, deriveAttribute_preservesTokensOnSuccess,
+  ⟨deriveAttribute_validFor, deriveAttribute_preservesTokenWindow,
+    deriveAttribute_preservesTokensOnSuccess,
     deriveAttribute_cursorMonotoneOnSuccess,
     deriveAttribute_startsAtCurrentTokenOnSuccess⟩
 

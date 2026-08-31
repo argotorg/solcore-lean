@@ -6,6 +6,130 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+private theorem emitDiagnostic_preservesTokenWindowForDerive
+    (diagnostic : ParseDiagnostic) :
+    Parser.PreservesTokenWindow (emitDiagnostic diagnostic) := by
+  intro input
+  unfold emitDiagnostic modifyState Reply.PreservesTokenWindow
+  exact ⟨rfl, rfl⟩
+
+private theorem deriveAdvance_state_shape {input next : State}
+    {token : Token} (advanced : input.advance? = some (token, next)) :
+    input.peek? = some token ∧
+      next = { input with cursor := input.cursor + 1 } := by
+  unfold State.advance? at advanced
+  cases found : input.peek? with
+  | none => simp [found] at advanced
+  | some current =>
+      simp only [found, Option.map_some] at advanced
+      cases advanced
+      exact ⟨rfl, rfl⟩
+
+private theorem validPath_preservesTokenWindow :
+    Parser.PreservesTokenWindow DeriveAttributeInternals.valid := by
+  unfold DeriveAttributeInternals.valid
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .hash .topItem)
+  intro hash
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .leftBracket .topItem)
+  intro opening
+  apply Parser.bind_preservesTokenWindow
+    (contextual_preservesTokenWindow .derive .topItem)
+  intro deriveKeyword
+  apply Parser.bind_preservesTokenWindow
+    (delimitedWithPolicy_preservesTokenWindow .leftParen .rightParen true
+      false deriveTarget .topItem .topLevel deriveTarget_preservesTokenWindow)
+  intro targets
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .rightBracket .topItem)
+  intro closing
+  split
+  · apply Parser.bind_preservesTokenWindow
+      (emitDiagnostic_preservesTokenWindowForDerive _)
+    intro emitted
+    exact Parser.pure_preservesTokenWindow _
+  · exact Parser.pure_preservesTokenWindow _
+
+private theorem finishRecovered_preservesTokenWindow
+    (hash last : SourceSpan) (constraint : ParseConstraint) :
+    Parser.PreservesTokenWindow
+      (DeriveAttributeInternals.finishRecovered hash last constraint) := by
+  intro input
+  unfold DeriveAttributeInternals.finishRecovered Reply.PreservesTokenWindow
+  exact ⟨rfl, rfl⟩
+
+private theorem recoverTail_preservesTokenWindow (hash : SourceSpan) :
+    ∀ fuel last,
+      Parser.PreservesTokenWindow
+        (DeriveAttributeInternals.recoverTail hash last fuel) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro last input
+      trivial
+  | succ fuel inductionHypothesis =>
+      intro last input
+      unfold DeriveAttributeInternals.recoverTail
+      split
+      · have closingShape :=
+          symbol_preservesTokenWindow .rightBracket .topItem input
+        cases closingResult : symbol .rightBracket .topItem input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [closingResult] at closingShape
+            exact closingShape
+        | ok closing afterClosing =>
+            rw [closingResult] at closingShape
+            exact (finishRecovered_preservesTokenWindow hash closing.span
+              .malformedDeriveAttribute afterClosing).trans closingShape
+      · split
+        · exact finishRecovered_preservesTokenWindow hash last
+            .unclosedDeriveAttribute input
+        · cases advanced : input.advance? with
+          | some pair =>
+              rcases pair with ⟨token, next⟩
+              exact (inductionHypothesis token.span next).trans (by
+                simp [(deriveAdvance_state_shape advanced).2])
+          | none =>
+              exact finishRecovered_preservesTokenWindow hash last
+                .unclosedDeriveAttribute input
+
+private theorem recoveredPath_preservesTokenWindow :
+    Parser.PreservesTokenWindow DeriveAttributeInternals.recovered := by
+  intro input
+  unfold DeriveAttributeInternals.recovered
+  have hashShape := symbol_preservesTokenWindow .hash .topItem input
+  cases hashResult : symbol .hash .topItem input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [hashResult] at hashShape
+      exact hashShape
+  | ok hash afterHash =>
+      rw [hashResult] at hashShape
+      simp only
+      have openingShape :=
+        symbol_preservesTokenWindow .leftBracket .topItem afterHash
+      cases openingResult : symbol .leftBracket .topItem afterHash with
+      | invariant error =>
+          simp only [Reply.PreservesTokenWindow]
+      | reject failure rejected =>
+          simp only
+          rw [openingResult] at openingShape
+          exact openingShape.trans hashShape
+      | ok opening afterOpening =>
+          simp only
+          rw [openingResult] at openingShape
+          exact (recoverTail_preservesTokenWindow hash.span
+            (afterOpening.remainingCount + 1) opening.span afterOpening).trans
+              (openingShape.trans hashShape)
+
+/-- Derive attributes preserve every ordinary token window. -/
+theorem deriveAttribute_preservesTokenWindow :
+    Parser.PreservesTokenWindow deriveAttribute :=
+  Parser.orElse_preservesTokenWindow validPath_preservesTokenWindow
+    recoveredPath_preservesTokenWindow
+
 private theorem validPath_ok_state_shape {input next : State}
     {value : DeriveAttribute}
     (result : DeriveAttributeInternals.valid input = .ok value next) :
