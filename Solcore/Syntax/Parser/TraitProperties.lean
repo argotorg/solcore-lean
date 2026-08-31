@@ -576,4 +576,69 @@ theorem traitDecl_startsAtCurrentTokenOnSuccess :
   cases finished
   rfl
 
+/-- A successful signature-only trait method consumes its signature. -/
+theorem TraitInternals.traitMethod_cursor_lt_onSuccess
+    {input final : State} {method : TraitMethod}
+    (parsed : traitMethod input = .ok method final) :
+    input.cursor < final.cursor := by
+  have stages := parsed
+  unfold traitMethod at stages
+  rcases traitBind_ok_components stages with
+    ⟨signature, afterSignature, signatureResult, rest⟩
+  rcases traitBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+  cases finished
+  exact Nat.lt_of_lt_of_le
+    (FunctionInternals.functionSignature_cursor_lt_onSuccess .module
+      signatureResult)
+    (symbol_cursorMonotoneOnSuccess .semicolon .topItem afterSignature
+      semicolon final semicolonResult)
+
+/-- A successful trait body consumes its opening brace. -/
+theorem TraitInternals.traitBody_cursor_lt_onSuccess
+    {input final : State} {body : TraitBody}
+    (parsed : traitBody input = .ok body final) :
+    input.cursor < final.cursor := by
+  unfold traitBody at parsed
+  cases openingResult : symbol .leftBrace .topItem input with
+  | invariant error => simp [openingResult] at parsed
+  | reject failure rejected => simp [openingResult] at parsed
+  | ok opening next =>
+      simp only [openingResult] at parsed
+      exact Nat.lt_of_lt_of_le
+        (acceptToken_cursor_lt_onSuccess (.symbol .leftBrace) .topItem
+          (· == .symbol .leftBrace) openingResult)
+        (traitMethods_cursorMonotoneOnSuccess opening
+          (next.remainingCount + 1) [] next body final parsed)
+
+/-- A successful trait declaration consumes its `trait` marker. -/
+theorem traitDecl_cursor_lt_onSuccess
+    {input final : State} {declaration : TraitDecl}
+    (parsed : traitDecl input = .ok declaration final) :
+    input.cursor < final.cursor := by
+  have stages := parsed
+  unfold traitDecl at stages
+  rcases traitBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases traitBind_ok_components rest with
+    ⟨name, afterName, nameResult, rest⟩
+  rcases traitBind_ok_components rest with
+    ⟨genericParameters, afterParameters, parametersResult, rest⟩
+  rcases traitBind_ok_components rest with
+    ⟨parsedWhereClause, afterWhere, whereResult, rest⟩
+  rcases traitBind_ok_components rest with
+    ⟨body, afterBody, bodyResult, finished⟩
+  cases finished
+  exact Nat.lt_of_lt_of_le
+    (acceptToken_cursor_lt_onSuccess (.contextual .trait) .topItem
+      (·.isContextual .trait) markerResult)
+    (Nat.le_trans (identifier_cursorMonotoneOnSuccess .topItem afterMarker
+      name afterName nameResult)
+      (Nat.le_trans (genericParameters_cursorMonotoneOnSuccess afterName
+        genericParameters afterParameters parametersResult)
+        (Nat.le_trans (whereClause_cursorMonotoneOnSuccess afterParameters
+          parsedWhereClause afterWhere whereResult)
+          (TraitInternals.traitBody_cursorMonotoneOnSuccess afterWhere body
+            final bodyResult))))
+
 end Solcore.Syntax.Parser
