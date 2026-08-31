@@ -1,0 +1,30 @@
+import Solcore.Syntax.TypeDeclarationValidity
+
+/-! External consumers for type and enum declaration validity. -/
+
+set_option autoImplicit false
+
+namespace Tests
+
+open Solcore.Syntax
+
+example := @TypeAliasDecl.ValidFor
+example := @EnumConstructor.ValidFor
+example := @EnumDecl.ValidFor
+
+example (file : SourceFile) (declaration : TypeAliasDecl)
+    (valid : TypeAliasDecl.ValidFor file declaration) :
+    declaration.span.ValidFor file ∧
+      declaration.value.name.span.ValidFor file ∧
+      TypeExpr.ValidFor file declaration.value.value :=
+  ⟨valid.1, valid.2.1, valid.2.2.2.2⟩
+
+example (file : SourceFile) (declaration : EnumDecl)
+    (valid : EnumDecl.ValidFor file declaration)
+    (constructor : EnumConstructor)
+    (member : constructor ∈ declaration.value.constructors) :
+    declaration.value.bodySpan.ValidFor file ∧
+      EnumConstructor.ValidFor file constructor :=
+  ⟨valid.2.2.2.2.2.1, valid.2.2.2.2.2.2 constructor member⟩
+
+end Tests
