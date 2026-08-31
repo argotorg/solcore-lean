@@ -70,18 +70,17 @@ def implBody : Parser ImplBody := fun state =>
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
-end ImplInternals
-
-open ImplInternals
-
-/-- Parse a canonical optional-default trait implementation. -/
-def implDecl : Parser ImplDecl := do
+/-- Parse an optional leading `default` marker. -/
+def implDefaultMarker : Parser (Option SourceSpan) := do
   let state ← getState
-  let defaultMarker ←
-    if isKeyword state .defaultKw then
-      pure (some (← keyword .defaultKw .topItem).span)
-    else
-      pure none
+  if isKeyword state .defaultKw then
+    pure (some (← keyword .defaultKw .topItem).span)
+  else
+    pure none
+
+/-- Parse the declaration suffix following its optional default marker. -/
+def implDeclAfterDefault (defaultMarker : Option SourceSpan) :
+    Parser ImplDecl := do
   let marker ← contextual .impl .topItem
   let genericParameters ← optionalGenericParameters
   let traitName ← identifier .topItem
@@ -103,5 +102,14 @@ def implDecl : Parser ImplDecl := do
       methods := body.methods
     }
   }
+
+end ImplInternals
+
+open ImplInternals
+
+/-- Parse a canonical optional-default trait implementation. -/
+def implDecl : Parser ImplDecl := do
+  let defaultMarker ← implDefaultMarker
+  implDeclAfterDefault defaultMarker
 
 end Solcore.Syntax.Parser
