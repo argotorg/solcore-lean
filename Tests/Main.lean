@@ -10,6 +10,7 @@ import Solcore.Test.SyntaxCallableDeclarationValidity
 import Solcore.Test.SyntaxContractDeclarationValidity
 import Solcore.Test.SyntaxIdentifier
 import Solcore.Test.SyntaxExpressionValidity
+import Solcore.Test.SyntaxFileValidity
 import Solcore.Test.SyntaxDiagnosticFilterProperties
 import Solcore.Test.SyntaxLexer
 import Solcore.Test.SyntaxLexerContractProperties
