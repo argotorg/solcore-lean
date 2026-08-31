@@ -2,6 +2,7 @@ import Solcore.Syntax.Parser.ParameterProperties
 import Solcore.Syntax.Parser.Predicate
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.TypeRecursiveProperties
+import Solcore.Syntax.Parser.WhereClauseProperties
 import Solcore.Syntax.SignatureValidity
 
 set_option autoImplicit false
@@ -937,7 +938,7 @@ theorem functionSignature_validFor_of_span (location : FunctionLocation)
             exact genericValidInput.2 parameter parameterMember
 
 /-- Complete signatures preserve token windows when `where` parsing does. -/
-theorem functionSignature_preservesTokenWindow (location : FunctionLocation)
+theorem functionSignature_preservesTokenWindow_of_where (location : FunctionLocation)
     (whereWindow : Parser.PreservesTokenWindow whereClause) :
     Parser.PreservesTokenWindow (functionSignature location) := by
   unfold functionSignature
@@ -961,15 +962,15 @@ theorem functionSignature_preservesTokenWindow (location : FunctionLocation)
   intro parsedWhereClause
   exact Parser.pure_preservesTokenWindow _
 
-theorem functionSignature_preservesTokensOnSuccess
+theorem functionSignature_preservesTokensOnSuccess_of_where
     (location : FunctionLocation)
     (whereWindow : Parser.PreservesTokenWindow whereClause) :
     Parser.PreservesTokensOnSuccess (functionSignature location) :=
-  (functionSignature_preservesTokenWindow location whereWindow
+  (functionSignature_preservesTokenWindow_of_where location whereWindow
     ).preservesTokensOnSuccess
 
 /-- Complete signatures never rewind when `where` parsing is monotone. -/
-theorem functionSignature_cursorMonotoneOnSuccess
+theorem functionSignature_cursorMonotoneOnSuccess_of_where
     (location : FunctionLocation)
     (whereCursor : Parser.CursorMonotoneOnSuccess whereClause) :
     Parser.CursorMonotoneOnSuccess (functionSignature location) := by
@@ -995,6 +996,24 @@ theorem functionSignature_cursorMonotoneOnSuccess
   apply Parser.bind_cursorMonotoneOnSuccess whereCursor
   intro parsedWhereClause
   exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- Complete signatures preserve token windows. -/
+theorem functionSignature_preservesTokenWindow (location : FunctionLocation) :
+    Parser.PreservesTokenWindow (functionSignature location) :=
+  functionSignature_preservesTokenWindow_of_where location
+    whereClause_preservesTokenWindow
+
+theorem functionSignature_preservesTokensOnSuccess
+    (location : FunctionLocation) :
+    Parser.PreservesTokensOnSuccess (functionSignature location) :=
+  (functionSignature_preservesTokenWindow location).preservesTokensOnSuccess
+
+/-- Complete signatures never rewind. -/
+theorem functionSignature_cursorMonotoneOnSuccess
+    (location : FunctionLocation) :
+    Parser.CursorMonotoneOnSuccess (functionSignature location) :=
+  functionSignature_cursorMonotoneOnSuccess_of_where location
+    whereClause_cursorMonotoneOnSuccess
 
 /-- Complete signatures start at their `function` keyword. -/
 theorem functionSignature_startsAtCurrentTokenOnSuccess
