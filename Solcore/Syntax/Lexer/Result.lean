@@ -88,6 +88,26 @@ theorem Advances.single (character : Char)
   refine ⟨[character], by simp, ?_⟩
   simp [byteSize_cons]
 
+/-- An exact scanner transition never lengthens its unconsumed suffix. -/
+theorem Advances.remaining_length_le {startByte endByte : Nat}
+    {input remaining : List Char}
+    (progress : Advances startByte input endByte remaining) :
+    remaining.length ≤ input.length := by
+  rcases progress with ⟨consumed, partition, _endEq⟩
+  rw [partition, List.length_append]
+  omega
+
+/-- Prefixing a nonempty slice before an exact scan gives strict progress. -/
+theorem Advances.remaining_length_lt_prepend {startByte endByte : Nat}
+    {input remaining leading : List Char}
+    (progress : Advances startByte input endByte remaining)
+    (nonempty : leading ≠ []) :
+    remaining.length < (leading ++ input).length := by
+  rw [List.length_append]
+  have leadingPositive : 0 < leading.length := List.length_pos_iff.mpr nonempty
+  have suffixBound := progress.remaining_length_le
+  omega
+
 /-- The executable lexer performs at most one main transition per character. -/
 def fuelBound (file : SourceFile) : Nat :=
   file.content.length + 1

@@ -69,6 +69,16 @@ private theorem takeWhileRev_partition (predicate : Char → Bool)
         simp [List.reverse_cons, List.append_assoc]
       · simp
 
+private theorem takeWhileRev_remaining_length_le (predicate : Char → Bool)
+    (characters consumedRev : List Char) :
+    (takeWhileRev predicate characters consumedRev).remaining.length ≤
+      characters.length := by
+  fun_induction takeWhileRev predicate characters consumedRev with
+  | case1 => simp
+  | case2 _ _ _ _ inductionHypothesis =>
+      simpa using Nat.le_trans inductionHypothesis (Nat.le_succ _)
+  | case3 => simp
+
 theorem takeWhile_partition (predicate : Char → Bool)
     (characters : List Char) :
     characters =
@@ -83,6 +93,18 @@ theorem takeWhile_advances (predicate : Char → Bool)
       (startByte + byteSize scan.consumed) scan.remaining := by
   refine ⟨(takeWhile predicate characters).consumed, ?_, rfl⟩
   exact takeWhile_partition predicate characters
+
+/-- An accepted leading character makes longest-prefix selection strict. -/
+theorem takeWhile_remaining_length_lt_of_true (predicate : Char → Bool)
+    (first : Char) (remaining : List Char)
+    (accepted : predicate first = true) :
+    (takeWhile predicate (first :: remaining)).remaining.length <
+      (first :: remaining).length := by
+  simp only [takeWhile, takeWhileRev, accepted, if_true]
+  have bound :=
+    takeWhileRev_remaining_length_le predicate remaining [first]
+  simp only [List.length_cons]
+  omega
 
 /-- Result of either the Core or Yul identifier regular expression. -/
 structure IdentifierScan where
@@ -139,6 +161,19 @@ private theorem scanHyphenGroups_partition
   | case3 => simp
   | case4 => simp
 
+private theorem scanHyphenGroups_consumed_nonempty
+    (fuel : Nat) (consumedRev remaining : List Char)
+    (nonempty : consumedRev ≠ []) :
+    (scanHyphenGroups fuel consumedRev remaining).consumed ≠ [] := by
+  fun_induction scanHyphenGroups fuel consumedRev remaining with
+  | case1 => simpa using nonempty
+  | case2 fuel consumedRev next rest plain nextRev _isStart
+      inductionHypothesis =>
+      apply inductionHypothesis
+      simp [_isStart]
+  | case3 => simpa using nonempty
+  | case4 => simpa using nonempty
+
 /-- Scan a name whose first Unicode Letter has already been consumed. -/
 def scanLetterIdentifier (first : Char) (remaining : List Char) : IdentifierScan :=
   let plain := takeWhile isCoreIdentifierContinue remaining
@@ -178,11 +213,13 @@ private theorem scanLetterIdentifier_exact (first : Char)
     let scan := scanLetterIdentifier first remaining
     ∃ consumed,
       first :: remaining = consumed ++ scan.remaining ∧
-        scan.kind.spelling = String.ofList consumed := by
+        scan.kind.spelling = String.ofList consumed ∧
+        consumed ≠ [] := by
   fun_cases scanLetterIdentifier first remaining with
   | case1 plain rest plainRemaining tail text =>
       dsimp only
-      refine ⟨first :: plain.consumed ++ '$' :: tail.consumed, ?_, rfl⟩
+      refine ⟨first :: plain.consumed ++ '$' :: tail.consumed, ?_, rfl,
+        by simp⟩
       have plainPartition :
           remaining = plain.consumed ++ plain.remaining := by
         simpa only [plain] using
@@ -196,7 +233,7 @@ private theorem scanLetterIdentifier_exact (first : Char)
       simp [List.append_assoc]
   | case2 plain _notYul full text kind =>
       dsimp only
-      refine ⟨full.consumed, ?_, ?_⟩
+      refine ⟨full.consumed, ?_, ?_, ?_⟩
       · calc
           first :: remaining =
               (first :: plain.consumed) ++ plain.remaining := by
@@ -218,17 +255,20 @@ private theorem scanLetterIdentifier_exact (first : Char)
             text keyword recognized
         · change text = String.ofList full.consumed
           rfl
+      · apply scanHyphenGroups_consumed_nonempty
+        simp
 
 private theorem scanMarkedYulIdentifier_exact (first : Char)
     (remaining : List Char) :
     let scan := scanMarkedYulIdentifier first remaining
     ∃ consumed,
       first :: remaining = consumed ++ scan.remaining ∧
-        scan.kind.spelling = String.ofList consumed := by
+        scan.kind.spelling = String.ofList consumed ∧
+        consumed ≠ [] := by
   unfold scanMarkedYulIdentifier
   dsimp only
   refine ⟨first :: (takeWhile isYulIdentifierContinue remaining).consumed,
-    ?_, rfl⟩
+    ?_, rfl, by simp⟩
   exact congrArg (List.cons first)
     (takeWhile_partition isYulIdentifierContinue remaining)
 
@@ -242,7 +282,7 @@ theorem scanLetterIdentifier_advances (cursor : Nat) (first : Char)
     Advances cursor (first :: remaining)
       (cursor + scan.kind.spelling.utf8ByteSize) scan.remaining := by
   rcases scanLetterIdentifier_exact first remaining with
-    ⟨consumed, partition, spelling⟩
+    ⟨consumed, partition, spelling, _nonempty⟩
   refine ⟨consumed, partition, ?_⟩
   simp [byteSize, spelling]
 
@@ -256,9 +296,29 @@ theorem scanMarkedYulIdentifier_advances (cursor : Nat) (first : Char)
     Advances cursor (first :: remaining)
       (cursor + scan.kind.spelling.utf8ByteSize) scan.remaining := by
   rcases scanMarkedYulIdentifier_exact first remaining with
-    ⟨consumed, partition, spelling⟩
+    ⟨consumed, partition, spelling, _nonempty⟩
   refine ⟨consumed, partition, ?_⟩
   simp [byteSize, spelling]
+
+/-- A letter-led identifier scan always consumes at least its first letter. -/
+theorem scanLetterIdentifier_remaining_length_lt (first : Char)
+    (remaining : List Char) :
+    (scanLetterIdentifier first remaining).remaining.length <
+      (first :: remaining).length := by
+  rcases scanLetterIdentifier_exact first remaining with
+    ⟨consumed, partition, _spelling, nonempty⟩
+  rw [partition, List.length_append]
+  exact Nat.lt_add_of_pos_left (List.length_pos_iff.mpr nonempty)
+
+/-- A marked Yul identifier scan always consumes its leading marker. -/
+theorem scanMarkedYulIdentifier_remaining_length_lt (first : Char)
+    (remaining : List Char) :
+    (scanMarkedYulIdentifier first remaining).remaining.length <
+      (first :: remaining).length := by
+  rcases scanMarkedYulIdentifier_exact first remaining with
+    ⟨consumed, partition, _spelling, nonempty⟩
+  rw [partition, List.length_append]
+  exact Nat.lt_add_of_pos_left (List.length_pos_iff.mpr nonempty)
 
 /-- Recognize every two-character symbol before its one-character prefix. -/
 def multiSymbol? (first second : Char) : Option Symbol :=

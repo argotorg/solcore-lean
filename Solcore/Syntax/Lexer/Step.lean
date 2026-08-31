@@ -392,6 +392,190 @@ def step (file : SourceFile) (state : State) : State :=
                         (state.cursor + character.utf8Size) []
                         .invalidToken
 
+private theorem scanLine_remaining_length_lt (file : SourceFile)
+    (state : State) (remaining : List Char) :
+    (scanLine file state remaining).remaining.length <
+      ('/' :: '/' :: remaining).length := by
+  have strict := Advances.remaining_length_lt_prepend
+    (leading := ['/', '/'])
+    (scanLineComment_advances (state.cursor + 2) remaining) (by simp)
+  simpa [scanLine, State.emitComment] using strict
+
+private theorem scanBlock_remaining_length_lt (file : SourceFile)
+    (state : State) (remaining : List Char) :
+    (scanBlock file state remaining).remaining.length <
+      ('/' :: '*' :: remaining).length := by
+  unfold scanBlock
+  cases result : scanBlockComment (state.cursor + 2) 1 remaining [] with
+  | closed endByte body rest =>
+      have progress := scanBlockComment_closed_advances
+        (state.cursor + 2) 1 remaining [] endByte body rest result
+      have strict := Advances.remaining_length_lt_prepend
+        (leading := ['/', '*']) progress (by simp)
+      simpa [result, State.emitComment] using strict
+  | unterminated => simp [State.recover]
+
+private theorem scanBacktick_remaining_length_lt (file : SourceFile)
+    (state : State) (remaining : List Char) :
+    (scanBacktick file state remaining).remaining.length <
+      ('`' :: remaining).length := by
+  unfold scanBacktick
+  cases result :
+      scanDelimitedMeta '`' (state.cursor + 1) remaining ['`'] with
+  | none => simp [State.recover]
+  | some scan =>
+      have progress := scanDelimitedMeta_some_advances '`'
+        (state.cursor + 1) remaining ['`'] scan result
+      have strict := Advances.remaining_length_lt_prepend
+        (leading := ['`']) progress (by simp)
+      simpa [result, State.emitToken] using strict
+
+private theorem scanInterpolation_some_remaining_length_lt
+    (file : SourceFile) (state next : State) (remaining : List Char)
+    (result : scanInterpolation file state remaining = some next) :
+    next.remaining.length < ('$' :: '{' :: remaining).length := by
+  unfold scanInterpolation at result
+  cases scanResult :
+      scanDelimitedMeta '}' (state.cursor + 2) remaining ['{', '$'] with
+  | none => simp [scanResult] at result
+  | some scan =>
+      simp only [scanResult, Option.some.injEq] at result
+      subst next
+      have progress := scanDelimitedMeta_some_advances '}'
+        (state.cursor + 2) remaining ['{', '$'] scan scanResult
+      have strict := Advances.remaining_length_lt_prepend
+        (leading := ['$', '{']) progress (by simp)
+      simpa [State.emitToken] using strict
+
+private theorem scanQuoted_remaining_length_lt (file : SourceFile)
+    (state : State) (remaining : List Char) :
+    (scanQuoted file state remaining).remaining.length <
+      ('"' :: remaining).length := by
+  unfold scanQuoted
+  cases result : scanQuotedString state.cursor remaining with
+  | closed endByte spelling decoded rest =>
+      unfold scanQuotedString at result
+      have progress :=
+        scanString_progress (state.cursor + 1) remaining ['"'] [] none
+      rw [result] at progress
+      have strict := Advances.remaining_length_lt_prepend
+        (leading := ['"']) progress (by simp)
+      simpa [result, State.emitToken] using strict
+  | invalidEscape escapeStart escapeEnd escape tokenEndByte rest =>
+      unfold scanQuotedString at result
+      have progress :=
+        scanString_progress (state.cursor + 1) remaining ['"'] [] none
+      rw [result] at progress
+      have strict := Advances.remaining_length_lt_prepend
+        (leading := ['"']) progress (by simp)
+      simpa [result, State.recover] using strict
+  | invalidPrefix endByte rest =>
+      unfold scanQuotedString at result
+      have progress :=
+        scanString_progress (state.cursor + 1) remaining ['"'] [] none
+      rw [result] at progress
+      have strict := Advances.remaining_length_lt_prepend
+        (leading := ['"']) progress (by simp)
+      simpa [result, State.recover] using strict
+  | unterminated => simp [State.recover]
+
+private theorem scanDecimal_remaining_length_lt (file : SourceFile)
+    (state : State) (first : Char) (remaining : List Char)
+    (accepted : isAsciiDigit first = true) :
+    (scanDecimal file state (first :: remaining)).remaining.length <
+      (first :: remaining).length := by
+  simpa [scanDecimal, emitTextToken, State.emitToken] using
+    takeWhile_remaining_length_lt_of_true isAsciiDigit first remaining accepted
+
+private theorem scanHexadecimal?_some_remaining_length_lt
+    (file : SourceFile) (state next : State) (remaining : List Char)
+    (result : scanHexadecimal? file state remaining = some next) :
+    next.remaining.length < ('0' :: remaining).length := by
+  fun_cases scanHexadecimal? file state remaining with
+  | case1 digit rest isHex tail spelling =>
+      simp only [scanHexadecimal?, isHex, if_true, Option.some.injEq] at result
+      subst next
+      have progress := takeWhile_advances isAsciiHexDigit
+        (state.cursor + byteSize ['0', 'x', digit]) rest
+      have strict := Advances.remaining_length_lt_prepend
+        (leading := ['0', 'x', digit]) progress (by simp)
+      simpa [tail, emitTextToken, State.emitToken] using strict
+  | case2 => simp_all [scanHexadecimal?]
+  | case3 => simp_all [scanHexadecimal?]
+
+private theorem scanLetterName_remaining_length_lt (file : SourceFile)
+    (state : State) (first : Char) (remaining : List Char) :
+    (scanLetterName file state first remaining).remaining.length <
+      (first :: remaining).length := by
+  simpa [scanLetterName, emitTextToken, State.emitToken] using
+    scanLetterIdentifier_remaining_length_lt first remaining
+
+private theorem scanMarkedName_remaining_length_lt (file : SourceFile)
+    (state : State) (first : Char) (remaining : List Char) :
+    (scanMarkedName file state first remaining).remaining.length <
+      (first :: remaining).length := by
+  simpa [scanMarkedName, emitTextToken, State.emitToken] using
+    scanMarkedYulIdentifier_remaining_length_lt first remaining
+
+/-- Every lexer step on nonempty input strictly shortens its input suffix. -/
+theorem step_remaining_length_lt (file : SourceFile) {state : State}
+    (nonempty : state.remaining ≠ []) :
+    (step file state).remaining.length < state.remaining.length := by
+  fun_cases step file state
+  case case1 => contradiction
+  case case2 => simp_all [State.skipTo]
+  case case3 tail _ inputEq =>
+    rw [inputEq]
+    exact scanLine_remaining_length_lt file state tail
+  case case4 tail _ inputEq =>
+    rw [inputEq]
+    exact scanBlock_remaining_length_lt file state tail
+  case case5 tail _ inputEq =>
+    rw [inputEq]
+    exact scanBacktick_remaining_length_lt file state tail
+  case case6 tail _ inputEq =>
+    rw [inputEq]
+    exact scanQuoted_remaining_length_lt file state tail
+  case case7 tail next result _ inputEq =>
+    rw [inputEq]
+    exact scanInterpolation_some_remaining_length_lt
+      file state next tail result
+  case case8 tail _result _ inputEq =>
+    rw [inputEq]
+    exact scanMarkedName_remaining_length_lt file state '$' ('{' :: tail)
+  case case9 tail next result _ inputEq =>
+    rw [inputEq]
+    exact scanHexadecimal?_some_remaining_length_lt
+      file state next tail result
+  case case10 tail _result _ inputEq =>
+    rw [inputEq]
+    exact scanDecimal_remaining_length_lt file state '0' tail (by decide)
+  case case11 digit tail _ _ _ _ _ _ accepted _ inputEq =>
+    rw [inputEq]
+    exact scanDecimal_remaining_length_lt file state digit tail accepted
+  case case12 digit tail _ _ _ _ _ _ _ _ _ inputEq =>
+    rw [inputEq]
+    exact scanLetterName_remaining_length_lt file state digit tail
+  case case13 next after _ _ _ _ _ _ _ _ _ _ inputEq =>
+    rw [inputEq]
+    exact scanMarkedName_remaining_length_lt file state '_'
+      (next :: after)
+  case case14 =>
+    simp_all [emitSymbol, emitTextToken, State.emitToken]
+  case case15 => simp_all [emitSymbol, emitTextToken, State.emitToken]
+  case case16 after _ _ _ _ _ _ _ _ _ inputEq =>
+    rw [inputEq]
+    exact scanMarkedName_remaining_length_lt file state '$' after
+  case case17 =>
+    simp_all [emitSymbol, emitTextToken, State.emitToken]
+    omega
+  case case18 =>
+    simp_all [emitSymbol, emitTextToken, State.emitToken]
+  case case19 =>
+    simp_all [State.recover]
+  case case20 => simp_all [emitSymbol, emitTextToken, State.emitToken]
+  case case21 => simp_all [State.recover]
+
 /-- Every canonical lexer step preserves source and carrier provenance. -/
 theorem step_validFor (file : SourceFile) (state : State)
     (valid : state.ValidFor file) :
