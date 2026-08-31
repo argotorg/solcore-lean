@@ -343,4 +343,119 @@ theorem whileStatement_startsAtCurrentTokenOnSuccess
   cases finished
   exact ⟨token, found, starts⟩
 
+namespace ControlInternals
+
+/-- An optional `else` body retains its complete recursive block validity. -/
+theorem optionalElseBody_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop)
+    (statement : Parser Statement)
+    (statementValid : statement.ValidFor
+      (Statement.ValidFor expressionValueValid patternValueValid
+        yulValueValid))
+    (statementTokens : Parser.PreservesTokensOnSuccess statement) :
+    (optionalElseBody statement).ValidFor
+      (Option.ValidFor (Block.ValidFor
+        (Statement.ValidFor expressionValueValid patternValueValid
+          yulValueValid))) := by
+  have bodyValid := coreBlock_validFor
+    (Statement.ValidFor expressionValueValid patternValueValid yulValueValid)
+    statement .require statementValid statementTokens
+    (fun _ _ valid => valid.span_valid)
+  unfold optionalElseBody
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isKeyword observed .elseKw
+  · simp only [present, if_true]
+    apply Parser.bind_validFor (keyword_validFor .elseKw .statement)
+    intro marker
+    apply Parser.bind_validFor_of_value bodyValid
+    intro body next nextValid retainedValid
+    exact ⟨by simpa only [Option.ValidFor] using retainedValid,
+      nextValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional `else` parsing preserves every ordinary token window. -/
+theorem optionalElseBody_preservesTokenWindow
+    (statement : Parser Statement)
+    (statementWindow : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (optionalElseBody statement) := by
+  unfold optionalElseBody
+  have getWindow : Parser.PreservesTokenWindow getState := by
+    intro input
+    exact ⟨rfl, rfl⟩
+  apply Parser.bind_preservesTokenWindow
+    getWindow
+  intro observed
+  by_cases present : isKeyword observed .elseKw
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (keyword_preservesTokenWindow .elseKw .statement)
+    intro marker
+    apply Parser.bind_preservesTokenWindow
+      (coreBlock_preservesTokenWindow statement .require statementWindow)
+    intro body
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
+/-- Present or absent `else` bodies preserve the immutable token carrier. -/
+theorem optionalElseBody_preservesTokensOnSuccess
+    (statement : Parser Statement)
+    (statementWindow : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokensOnSuccess (optionalElseBody statement) :=
+  (optionalElseBody_preservesTokenWindow statement
+    statementWindow).preservesTokensOnSuccess
+
+/-- Optional `else` parsing never rewinds the token cursor. -/
+theorem optionalElseBody_cursorMonotoneOnSuccess
+    (statement : Parser Statement) :
+    Parser.CursorMonotoneOnSuccess (optionalElseBody statement) := by
+  unfold optionalElseBody
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isKeyword observed .elseKw
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (keyword_cursorMonotoneOnSuccess .elseKw .statement)
+    intro marker
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (coreBlock_cursorMonotoneOnSuccess statement .require)
+    intro body
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
+/-- A present `else` body starts at the brace following its keyword. -/
+theorem optionalElseBody_some_startsAfterKeyword
+    (statement : Parser Statement) {input final : State} {body : Block}
+    (parsed : optionalElseBody statement input = .ok (some body) final) :
+    ∃ marker afterMarker opening,
+      keyword .elseKw .statement input = .ok marker afterMarker ∧
+      afterMarker.peek? = some opening ∧
+      opening.span.startByte = body.span.startByte := by
+  unfold optionalElseBody getState at parsed
+  simp only [bind] at parsed
+  by_cases present : isKeyword input .elseKw
+  · simp only [present, if_true] at parsed
+    rcases controlBind_ok_components parsed with
+      ⟨marker, afterMarker, markerResult, rest⟩
+    rcases controlBind_ok_components rest with
+      ⟨parsedBody, afterBody, bodyResult, finished⟩
+    have bodyEq : parsedBody = body := by
+      cases finished
+      rfl
+    subst parsedBody
+    rcases coreBlock_startsAtCurrentTokenOnSuccess statement .require
+        afterMarker body afterBody bodyResult with
+      ⟨opening, found, starts⟩
+    exact ⟨marker, afterMarker, opening, markerResult, found, starts⟩
+  · simp only [present] at parsed
+    change Reply.ok none input = .ok (some body) final at parsed
+    cases parsed
+
+end ControlInternals
+
 end Solcore.Syntax.Parser

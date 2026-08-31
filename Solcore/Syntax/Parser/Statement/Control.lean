@@ -69,6 +69,20 @@ def whileStatement (statement : Parser Statement)
     value := .whileLoop condition body
   }
 
+namespace ControlInternals
+
+/-- Parse the optional `else` keyword and its required braced body. -/
+def optionalElseBody (statement : Parser Statement) :
+    Parser (Option Block) := do
+  let state ← getState
+  if isKeyword state .elseKw then
+    let _ ← keyword .elseKw .statement
+    pure (some (← coreBlock statement .require))
+  else
+    pure none
+
+end ControlInternals
+
 def ifStatement (statement : Parser Statement)
     (expression : Parser Expr) : Parser Statement := do
   let marker ← keyword .ifKw .statement
@@ -76,13 +90,7 @@ def ifStatement (statement : Parser Statement)
   let condition ← expression
   let _ ← symbol .rightParen .statement
   let thenBody ← coreBlock statement .require
-  let state ← getState
-  let elseBody ←
-    if isKeyword state .elseKw then
-      let _ ← keyword .elseKw .statement
-      pure (some (← coreBlock statement .require))
-    else
-      pure none
+  let elseBody ← ControlInternals.optionalElseBody statement
   let endSpan := elseBody.map (fun body => body.span) |>.getD thenBody.span
   pure {
     span := SourceSpan.cover marker.span endSpan

@@ -20,5 +20,10 @@ example := @whileStatement_preservesTokenWindow
 example := @whileStatement_preservesTokensOnSuccess
 example := @whileStatement_cursorMonotoneOnSuccess
 example := @whileStatement_startsAtCurrentTokenOnSuccess
+example := @ControlInternals.optionalElseBody_validFor
+example := @ControlInternals.optionalElseBody_preservesTokenWindow
+example := @ControlInternals.optionalElseBody_preservesTokensOnSuccess
+example := @ControlInternals.optionalElseBody_cursorMonotoneOnSuccess
+example := @ControlInternals.optionalElseBody_some_startsAfterKeyword
 
 end Tests
