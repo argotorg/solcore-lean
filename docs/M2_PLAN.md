@@ -60,9 +60,12 @@ are complete. Exact-prefix scanner proofs feed a preservation theorem for every
 lexer step, and successful public lexer results expose valid spans for all
 tokens, comments, and lexical diagnostics. Parser state, cursor/lookahead laws,
 and primitive consumers preserve span validity, source ownership, and token
-order. The remaining proof boundary is deep AST-span validity, parser-generated
-diagnostic validity, invariant-branch unreachability, public resource bounds,
-and parser success soundness against a declarative grammar.
+order. Strict decrease of the remaining character suffix proves the public
+lexer fuel bound sufficient and makes its exceptional branch unreachable.
+Qualified names also preserve their covering and component spans. The
+remaining proof boundary is deeper AST-span validity, parser-generated
+diagnostic validity, parser invariant-branch unreachability and resource
+bounds, and parser success soundness against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the

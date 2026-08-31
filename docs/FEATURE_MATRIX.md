@@ -42,9 +42,9 @@ published through Oracle v4.
 | Source identity and UTF-8 byte spans | Complete executable carrier with public lexer/parser carrier proofs | Deep AST spans and workspace admission policy | High |
 | Token and parsed AST catalog | Complete executable representation | Contextual well-formedness layer | High |
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
-| Canonical lexer | Complete executable boundary; every step and successful output preserves valid carrier spans | Cross-carrier order and public resource proofs | High |
+| Canonical lexer | Complete executable boundary; every step preserves valid carrier spans and strict progress, the public fuel bound succeeds, and the exceptional branch is unreachable | Cross-carrier order | High |
 | Canonical parser | Complete executable source-to-AST boundary | Declarative grammar soundness and deeper output invariants | High |
-| Canonical frontend proofs | Active | Source, carrier spans, token/comment order, cursor order, and exact lexer-carrier retention are proved; deep AST spans, parser diagnostics, bounds, invariant unreachability, and grammar soundness remain | High |
+| Canonical frontend proofs | Active | Lexer totality, source/carrier spans, token/comment and cursor order, exact retention, and qualified-name spans are proved; deeper AST spans, parser diagnostics, parser bounds/invariants, and grammar soundness remain | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 

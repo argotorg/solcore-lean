@@ -199,11 +199,16 @@ carrier spans, and those guarantees lift to every successful public lexer
 result. Parser state and primitive token consumers preserve valid spans and
 file ownership; cursor and lookahead laws also expose the source order between
 consumed and remaining tokens. Diagnostic filtering can only remove
-diagnostics and preserves span validity.
+diagnostics and preserves span validity. The character-count fuel bound is now
+proved sufficient, so the public lexer always returns a successful carrier and
+its exceptional `internalFuelExhausted` branch is unreachable. Qualified names
+are the first deep parsed form with a proved covering span and valid component
+spans.
 
-Deep AST-span validity, validity of every parser-generated diagnostic,
-unreachability of the lexer/parser invariant branches, public resource bounds,
-and soundness against a declarative grammar remain active proof work.
+Deep AST-span validity beyond qualified names, validity of every
+parser-generated diagnostic, parser invariant-branch unreachability and
+resource bounds, and soundness against a declarative grammar remain active
+proof work.
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.

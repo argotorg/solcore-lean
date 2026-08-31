@@ -171,11 +171,12 @@ meaning.
 The implemented proof boundary currently establishes exact source ownership,
 full-file provenance, retained carrier identity, token/comment source order,
 UTF-8-valid lexical spans, all-branch lexer-step preservation, successful public
-lexer carrier validity, exact-prefix scanner progress, parser-state cursor and
-lookahead order, primitive token-consumer preservation, and diagnostic-filter
-span preservation. Deep AST spans, all parser-produced diagnostics,
-invariant-branch unreachability, public resource bounds, and declarative grammar
-soundness remain intentionally separate follow-up proofs.
+lexer carrier validity, strict lexer progress and public fuel sufficiency,
+exact-prefix scanner progress, parser-state cursor and lookahead order,
+primitive token-consumer preservation, qualified-name spans, and
+diagnostic-filter span preservation. Deeper AST spans, all parser-produced
+diagnostics, parser invariant-branch unreachability and resource bounds, and
+declarative grammar soundness remain intentionally separate follow-up proofs.
 
 ## Consequences
 
