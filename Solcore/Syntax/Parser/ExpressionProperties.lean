@@ -819,6 +819,74 @@ theorem unaryOperators_endBeforeCurrentOnSuccess :
                 { input with cursor := input.cursor + 1 } operators next
                   nextValid nextAccumulated parsed
 
+/-- Scanning retains the reversed accumulator as an output prefix. -/
+theorem unaryOperators_retainsAccumulatorPrefixOnSuccess :
+    ∀ fuel operatorsRev input operators next,
+      unaryOperators fuel operatorsRev input = .ok operators next →
+      ∃ suffix, operators = operatorsRev.reverse ++ suffix := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro operatorsRev input operators next parsed
+      unfold unaryOperators at parsed
+      cases found : input.peek? with
+      | none =>
+          simp only [found] at parsed
+          cases parsed
+          exact ⟨[], by simp⟩
+      | some current =>
+          simp only [found] at parsed
+          cases decoded : unaryOp? current.value with
+          | none =>
+              simp only [decoded] at parsed
+              cases parsed
+              exact ⟨[], by simp⟩
+          | some operator =>
+              simp only [decoded] at parsed
+              rcases inductionHypothesis
+                  ({ span := current.span, value := operator } :: operatorsRev)
+                  { input with cursor := input.cursor + 1 } operators next
+                    parsed with
+                ⟨suffix, output⟩
+              exact ⟨{ span := current.span, value := operator } :: suffix,
+                by simpa [List.reverse_cons, List.append_assoc] using output⟩
+
+/-- An initial scan either stays put or retains its first token first. -/
+theorem unaryOperators_initialShapeOnSuccess
+    (fuel : Nat) (input : State) (operators : List (Located UnaryOp))
+    (next : State)
+    (parsed : unaryOperators fuel [] input = .ok operators next) :
+    (operators = [] ∧ next = input) ∨
+      ∃ first rest token,
+        input.peek? = some token ∧ first.span = token.span ∧
+          operators = first :: rest := by
+  cases fuel with
+  | zero => contradiction
+  | succ fuel =>
+      unfold unaryOperators at parsed
+      cases found : input.peek? with
+      | none =>
+          simp only [found] at parsed
+          cases parsed
+          exact Or.inl ⟨rfl, rfl⟩
+      | some current =>
+          simp only [found] at parsed
+          cases decoded : unaryOp? current.value with
+          | none =>
+              simp only [decoded] at parsed
+              cases parsed
+              exact Or.inl ⟨rfl, rfl⟩
+          | some operator =>
+              simp only [decoded] at parsed
+              rcases unaryOperators_retainsAccumulatorPrefixOnSuccess fuel
+                  [{ span := current.span, value := operator }]
+                  { input with cursor := input.cursor + 1 } operators next
+                    parsed with
+                ⟨suffix, output⟩
+              exact Or.inr ⟨{ span := current.span, value := operator },
+                suffix, current, rfl, rfl, by simpa using output⟩
+
 /-- Unary wrapping preserves the final operand's source end. -/
 theorem applyUnaryOperators_preservesBaseEnd
     (operators : List (Located UnaryOp)) (base : Expr) :
@@ -829,6 +897,12 @@ theorem applyUnaryOperators_preservesBaseEnd
   | cons operator rest inductionHypothesis =>
       simpa only [applyUnaryOperators, List.foldr, SourceSpan.cover] using
         inductionHypothesis
+
+@[simp] theorem applyUnaryOperators_startByte
+    (operator : Located UnaryOp) (rest : List (Located UnaryOp))
+    (base : Expr) :
+    (applyUnaryOperators (operator :: rest) base).span.startByte =
+      operator.span.startByte := rfl
 
 /-- Unary wrapping retains every operator and operand source range. -/
 theorem applyUnaryOperators_validFor
@@ -980,6 +1054,41 @@ theorem expressionUnary_cursorMonotoneOnSuccess
               (input.remainingCount + 1) [] input operators afterOperators
                 operatorsResult)
             postfixMonotone
+
+/-- A unary expression starts at its first operator or postfix token. -/
+theorem expressionUnary_startsAtCurrentTokenOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (postfixStarts : Parser.StartsAtCurrentTokenOnSuccess
+      (expressionPostfix nested block) (·.span)) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (expressionUnary nested block) (·.span) := by
+  intro input expression final parsed
+  unfold expressionUnary at parsed
+  cases operatorsResult : unaryOperators (input.remainingCount + 1) [] input with
+  | invariant error => simp [operatorsResult] at parsed
+  | reject failure rejected => simp [operatorsResult] at parsed
+  | ok operators afterOperators =>
+      simp only [operatorsResult] at parsed
+      cases postfixResult : expressionPostfix nested block afterOperators with
+      | invariant error => simp [postfixResult] at parsed
+      | reject failure rejected => simp [postfixResult] at parsed
+      | ok base next =>
+          simp only [postfixResult] at parsed
+          rcases unaryOperators_initialShapeOnSuccess
+              (input.remainingCount + 1) input operators afterOperators
+                operatorsResult with
+            ⟨operatorsEmpty, stateEq⟩ | ⟨first, rest, token, found,
+              firstSpan, operatorsEq⟩
+          · subst operators
+            subst afterOperators
+            rcases postfixStarts input base next postfixResult with
+              ⟨token, tokenFound, starts⟩
+            cases parsed
+            exact ⟨token, tokenFound, starts⟩
+          · subst operators
+            cases parsed
+            exact ⟨token, found, by
+              simp only [applyUnaryOperators_startByte, firstSpan]⟩
 
 /-- A unary result retains the endpoint of its parsed postfix base. -/
 theorem expressionUnary_retainsPostfixEndOnSuccess
