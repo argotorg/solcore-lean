@@ -1,4 +1,6 @@
+import Solcore.Syntax.Parser.Export
 import Solcore.Syntax.Parser.Import
+import Solcore.Syntax.Parser.Pragma
 import Solcore.Syntax.Parser.TopLevel
 import Solcore.Syntax.Parser.TypeAlias
 
@@ -18,11 +20,33 @@ private def wrapImport (declaration : ImportDecl) : TopItem := {
   value := .importDecl declaration
 }
 
+private def wrapExport (declaration : ExportDecl) : TopItem := {
+  span := declaration.span
+  leadingComments := []
+  value := .exportDecl declaration
+}
+
+private def wrapPragma (declaration : PragmaDecl) : TopItem := {
+  span := declaration.span
+  leadingComments := []
+  value := .pragmaDecl declaration
+}
+
 /-- Parse the top-level forms implemented by the current vertical slice. -/
 private def topItem : Parser TopItem := fun state =>
   if isKeyword state .importKw then
     match importDecl state with
     | .ok declaration next => .ok (wrapImport declaration) next
+    | .reject failure next => .reject failure next
+    | .invariant error => .invariant error
+  else if isKeyword state .exportKw then
+    match exportDecl state with
+    | .ok declaration next => .ok (wrapExport declaration) next
+    | .reject failure next => .reject failure next
+    | .invariant error => .invariant error
+  else if isKeyword state .pragmaKw then
+    match pragmaDecl state with
+    | .ok declaration next => .ok (wrapPragma declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isKeyword state .typeKw then
