@@ -4,7 +4,11 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def requireImplArguments (values : DelimitedList TypeExpr) :
+/- Proof-visible implementation-body parser components. -/
+namespace ImplInternals
+
+/-- Require at least one implementation head argument. -/
+def requireImplArguments (values : DelimitedList TypeExpr) :
     Parser (NonemptyDelimitedList TypeExpr) :=
   match values.elements with
   | head :: tail => pure {
@@ -13,18 +17,21 @@ private def requireImplArguments (values : DelimitedList TypeExpr) :
     }
   | [] => fun _ => .invariant (.noProgress .topLevel values.span)
 
-private def implMethod : Parser ImplMethod := do
+/-- Parse one function member of an implementation body. -/
+def implMethod : Parser ImplMethod := do
   let declaration ← functionDecl .module
   pure {
     span := declaration.span
     value := { leadingComments := [], declaration }
   }
 
-private structure ImplBody where
+/-- The brace range and methods accumulated by implementation-body parsing. -/
+structure ImplBody where
   span : SourceSpan
   methods : List ImplMethod
 
-private def closeImplBody (opening : Token)
+/-- Close an implementation body and restore source order. -/
+def closeImplBody (opening : Token)
     (methodsRev : List ImplMethod) : Parser ImplBody := do
   let closing ← symbol .rightBrace .topItem
   pure {
@@ -32,7 +39,8 @@ private def closeImplBody (opening : Token)
     methods := methodsRev.reverse
   }
 
-private def implMethods (opening : Token) :
+/-- Parse implementation methods with explicit fuel and progress checks. -/
+def implMethods (opening : Token) :
     Nat → List ImplMethod → State → Reply ImplBody
   | 0, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, methodsRev, state =>
@@ -54,12 +62,17 @@ private def implMethods (opening : Token) :
           tail := [.symbol .rightBrace]
         } .topItem
 
-private def implBody : Parser ImplBody := fun state =>
+/-- Parse a complete brace-delimited implementation body. -/
+def implBody : Parser ImplBody := fun state =>
   match symbol .leftBrace .topItem state with
   | .ok opening next =>
       implMethods opening (next.remainingCount + 1) [] next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+end ImplInternals
+
+open ImplInternals
 
 /-- Parse a canonical optional-default trait implementation. -/
 def implDecl : Parser ImplDecl := do
