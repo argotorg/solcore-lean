@@ -4,6 +4,9 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+/-- Canonical parser guard applied before recursive token grammar. -/
+def maxSyntaxNesting : Nat := 128
+
 private def validateTokens (file : SourceFile) :
     Nat → Nat → List Token → Except ParserInvariantError Unit
   | _, _, [] => .ok ()
@@ -42,5 +45,70 @@ def validateLexed (file : SourceFile)
   validateTokens file 0 0 lexed.tokens
   validateComments file 0 lexed.comments
   validateLexicalDiagnostics file 0 lexed.diagnostics
+
+private structure NestingState where
+  delimiterDepth : Nat := 0
+  conditionalDepth : Nat := 0
+  conditionalBases : List Nat := []
+
+private def nestingError (kind : NestingKind)
+    (token : Token) : ParseDiagnostic := {
+  span := token.span
+  kind := .nestingExceeded kind maxSyntaxNesting
+}
+
+private def closeDelimiter (state : NestingState) : NestingState := {
+  delimiterDepth := state.delimiterDepth - 1
+  conditionalDepth := state.conditionalBases.head?.getD 0
+  conditionalBases := state.conditionalBases.tail
+}
+
+private def resetConditional (state : NestingState) : NestingState := {
+  state with
+  conditionalDepth := state.conditionalBases.head?.getD 0
+}
+
+private def checkNestingAux :
+    NestingState → List Token → Option ParseDiagnostic
+  | _, [] => none
+  | state, token :: rest =>
+      match token.value with
+      | .keyword .ifKw =>
+          let depth := state.conditionalDepth + 1
+          if depth > maxSyntaxNesting then
+            some (nestingError .conditional token)
+          else
+            checkNestingAux { state with conditionalDepth := depth } rest
+      | .symbol .leftParen | .symbol .leftBracket =>
+          let depth := state.delimiterDepth + 1
+          if depth > maxSyntaxNesting then
+            some (nestingError .delimiter token)
+          else
+            checkNestingAux {
+              delimiterDepth := depth
+              conditionalDepth := state.conditionalDepth
+              conditionalBases := state.conditionalDepth ::
+                state.conditionalBases
+            } rest
+      | .symbol .leftBrace =>
+          let depth := state.delimiterDepth + 1
+          if depth > maxSyntaxNesting then
+            some (nestingError .delimiter token)
+          else
+            checkNestingAux {
+              delimiterDepth := depth
+              conditionalDepth := 0
+              conditionalBases := 0 :: state.conditionalBases
+            } rest
+      | .symbol .rightParen | .symbol .rightBracket |
+          .symbol .rightBrace =>
+            checkNestingAux (closeDelimiter state) rest
+      | .symbol .comma | .symbol .semicolon =>
+          checkNestingAux (resetConditional state) rest
+      | _ => checkNestingAux state rest
+
+/-- First delimiter or conditional nesting violation, if one exists. -/
+def checkNesting (tokens : List Token) : Option ParseDiagnostic :=
+  checkNestingAux {} tokens
 
 end Solcore.Syntax.Parser
