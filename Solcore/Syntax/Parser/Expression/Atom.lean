@@ -172,7 +172,9 @@ def lambdaExpression (block : Parser Block) : Parser Expr := do
 
 end ExpressionAtomInternals
 
-private def expressionAtomCore (nested : Parser Expr)
+namespace ExpressionAtomInternals
+
+def expressionAtomCore (nested : Parser Expr)
     (block : Parser Block) : Parser Expr := fun state =>
   if isCoreLiteral state then
     ExpressionAtomInternals.literalExpression state
@@ -190,13 +192,13 @@ private def expressionAtomCore (nested : Parser Expr)
     ExpressionAtomInternals.lambdaExpression block state
   else rejectAt state { head := .expression, tail := [] } .expression
 
-private def isAtomBoundary (state : State) : Bool :=
+def isAtomBoundary (state : State) : Bool :=
   state.atEnd ||
     [.semicolon, .comma, .rightParen, .rightBracket, .rightBrace,
       .question, .colon, .fatArrow, .pipe].any (isSymbol state) ||
     isKeyword state .elseKw
 
-private def finishRecoveredAtom (first last : SourceSpan)
+def finishRecoveredAtom (first last : SourceSpan)
     (state : State) : Reply Expr :=
   let span := SourceSpan.cover first last
   .ok { span, value := .error } (state.emit {
@@ -204,7 +206,7 @@ private def finishRecoveredAtom (first last : SourceSpan)
     kind := .recovered .expressionAtom
   })
 
-private def recoverAtomAux (first last : SourceSpan) :
+def recoverAtomAux (first last : SourceSpan) :
     Nat → State → Reply Expr
   | 0, state => .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1, state =>
@@ -215,23 +217,26 @@ private def recoverAtomAux (first last : SourceSpan) :
         | some (token, next) => recoverAtomAux first token.span fuel next
         | none => finishRecoveredAtom first last state
 
-private def recoverAtom (state : State) : Reply Expr :=
+def recoverAtom (state : State) : Reply Expr :=
   match state.advance? with
   | some (token, next) =>
       recoverAtomAux token.span token.span (next.remainingCount + 1) next
   | none => rejectAt state { head := .expression, tail := [] } .expression
 
+end ExpressionAtomInternals
+
 /-- Parse one recoverable expression atom. -/
 def expressionAtom (nested : Parser Expr)
     (block : Parser Block) : Parser Expr := fun state =>
-  match expressionAtomCore nested block state with
+  match ExpressionAtomInternals.expressionAtomCore nested block state with
   | .ok value next => .ok value next
   | .reject failure failedState =>
       let rewound := { failedState with cursor := state.cursor }
-      if isAtomBoundary rewound then
+      if ExpressionAtomInternals.isAtomBoundary rewound then
         .reject failure rewound
       else
-        recoverAtom (rewound.emit failure.toDiagnostic)
+        ExpressionAtomInternals.recoverAtom
+          (rewound.emit failure.toDiagnostic)
   | .invariant error => .invariant error
 
 namespace ExpressionAtomInternals

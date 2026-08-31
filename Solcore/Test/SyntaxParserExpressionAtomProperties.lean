@@ -70,5 +70,9 @@ example := @ExpressionAtomInternals.lambdaExpression_preservesTokensOnSuccess
 example := @ExpressionAtomInternals.lambdaExpression_cursorMonotoneOnSuccess
 example := @ExpressionAtomInternals.lambdaExpression_startsAtCurrentTokenOnSuccess
 example := @ExpressionAtomInternals.lambdaExpression_retainsBodyEndOnSuccess
+example := @ExpressionAtomInternals.expressionAtom_preservesTokenWindow
+example := @ExpressionAtomInternals.expressionAtom_preservesTokensOnSuccess
+example := @ExpressionAtomInternals.expressionAtom_cursorMonotoneOnSuccess
+example := @ExpressionAtomInternals.expressionAtom_startsAtCurrentTokenOnSuccess
 
 end Tests

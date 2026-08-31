@@ -9,6 +9,18 @@ set_option autoImplicit false
 namespace Solcore.Syntax.Parser
 namespace ExpressionAtomInternals
 
+private theorem advance?_state_shape {input next : State} {token : Token}
+    (advanced : input.advance? = some (token, next)) :
+    input.peek? = some token ∧
+      next = { input with cursor := input.cursor + 1 } := by
+  unfold State.advance? at advanced
+  cases found : input.peek? with
+  | none => simp [found] at advanced
+  | some current =>
+      simp only [found, Option.map_some] at advanced
+      cases advanced
+      exact ⟨rfl, rfl⟩
+
 private theorem atomBind_ok_components {alpha beta : Type}
     {first : Parser alpha} {next : alpha → Parser beta}
     {input final : State} {value : beta}
@@ -1353,6 +1365,268 @@ theorem lambdaExpression_retainsBodyEndOnSuccess (block : Parser Block)
     ⟨body, afterBody, _bodyResult, finished⟩
   cases finished
   exact ⟨marker, parameters, returnType, body, rfl, rfl⟩
+
+/-- Atom dispatch preserves token windows when its recursive leaves do. -/
+theorem expressionAtomCore_preservesTokenWindow
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (blockWindow : Parser.PreservesTokenWindow block) :
+    Parser.PreservesTokenWindow (expressionAtomCore nested block) := by
+  intro input
+  unfold expressionAtomCore
+  split
+  · exact literalExpression_preservesTokenWindow input
+  · split
+    · exact identifierExpression_preservesTokenWindow input
+    · split
+      · exact dotConstructor_preservesTokenWindow nested nestedWindow input
+      · split
+        · exact proxyExpression_preservesTokenWindow input
+        · split
+          · exact parenthesized_preservesTokenWindow nested nestedWindow input
+          · split
+            · exact arrayLiteral_preservesTokenWindow nested nestedWindow input
+            · split
+              · exact lambdaExpression_preservesTokenWindow block
+                  lambdaParameter_preservesTokenWindow blockWindow input
+              · exact rejectAt_preservesTokenWindow input _ _
+
+/-- Successful atom dispatch never rewinds recursive leaves. -/
+theorem expressionAtomCore_cursorMonotoneOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block) :
+    Parser.CursorMonotoneOnSuccess (expressionAtomCore nested block) := by
+  intro input value next result
+  unfold expressionAtomCore at result
+  split at result
+  · exact literalExpression_cursorMonotoneOnSuccess input value next result
+  · split at result
+    · exact identifierExpression_cursorMonotoneOnSuccess input value next result
+    · split at result
+      · exact dotConstructor_cursorMonotoneOnSuccess nested
+          input value next result
+      · split at result
+        · exact proxyExpression_cursorMonotoneOnSuccess input value next result
+        · split at result
+          · exact parenthesized_cursorMonotoneOnSuccess nested nestedCursor
+              input value next result
+          · split at result
+            · exact arrayLiteral_cursorMonotoneOnSuccess nested
+                input value next result
+            · split at result
+              · exact lambdaExpression_cursorMonotoneOnSuccess block blockCursor
+                  input value next result
+              · simp [rejectAt] at result
+
+/-- Every successful atom branch starts at the dispatch input token. -/
+theorem expressionAtomCore_startsAtCurrentTokenOnSuccess
+    (nested : Parser Expr) (block : Parser Block) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (expressionAtomCore nested block) (·.span) := by
+  intro input value next result
+  unfold expressionAtomCore at result
+  split at result
+  · exact literalExpression_startsAtCurrentTokenOnSuccess input value next result
+  · split at result
+    · exact identifierExpression_startsAtCurrentTokenOnSuccess
+        input value next result
+    · split at result
+      · exact dotConstructor_startsAtCurrentTokenOnSuccess nested
+          input value next result
+      · split at result
+        · exact proxyExpression_startsAtCurrentTokenOnSuccess
+            input value next result
+        · split at result
+          · exact parenthesized_startsAtCurrentTokenOnSuccess nested
+              input value next result
+          · split at result
+            · exact arrayLiteral_startsAtCurrentTokenOnSuccess nested
+                input value next result
+            · split at result
+              · exact lambdaExpression_startsAtCurrentTokenOnSuccess block
+                  input value next result
+              · simp [rejectAt] at result
+
+/-- Fuel-bounded atom recovery preserves every ordinary token window. -/
+theorem recoverAtomAux_preservesTokenWindow (first last : SourceSpan)
+    (fuel : Nat) :
+    Parser.PreservesTokenWindow (recoverAtomAux first last fuel) := by
+  intro input
+  induction fuel generalizing last input with
+  | zero => trivial
+  | succ fuel inductionHypothesis =>
+      unfold recoverAtomAux
+      split
+      · unfold finishRecoveredAtom Reply.PreservesTokenWindow State.emit
+        exact ⟨rfl, rfl⟩
+      · cases advanced : input.advance? with
+        | none =>
+            unfold finishRecoveredAtom Reply.PreservesTokenWindow State.emit
+            exact ⟨rfl, rfl⟩
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            exact (inductionHypothesis token.span afterToken).trans (by
+              simp [(advance?_state_shape advanced).2])
+
+/-- Successful fuel-bounded recovery records cursor and first-token shape. -/
+theorem recoverAtomAux_ok_state_shape (first last : SourceSpan) :
+    ∀ fuel, ∀ {input final : State} {value : Expr},
+      recoverAtomAux first last fuel input = .ok value final →
+      input.cursor ≤ final.cursor ∧
+        first.startByte = value.span.startByte := by
+  intro fuel
+  induction fuel generalizing last with
+  | zero => simp [recoverAtomAux]
+  | succ fuel inductionHypothesis =>
+      intro input final value parsed
+      unfold recoverAtomAux at parsed
+      split at parsed
+      · unfold finishRecoveredAtom at parsed
+        cases parsed
+        exact ⟨Nat.le_refl _, rfl⟩
+      · cases advanced : input.advance? with
+        | none =>
+            simp only [advanced] at parsed
+            unfold finishRecoveredAtom at parsed
+            cases parsed
+            exact ⟨Nat.le_refl _, rfl⟩
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at parsed
+            have recursive := inductionHypothesis token.span parsed
+            exact ⟨Nat.le_trans (by
+              simp [(advance?_state_shape advanced).2]) recursive.1,
+              recursive.2⟩
+
+/-- Complete atom recovery preserves the ordinary token window. -/
+theorem recoverAtom_preservesTokenWindow :
+    Parser.PreservesTokenWindow recoverAtom := by
+  intro input
+  unfold recoverAtom
+  cases advanced : input.advance? with
+  | none => exact rejectAt_preservesTokenWindow input _ _
+  | some pair =>
+      rcases pair with ⟨token, afterToken⟩
+      exact (recoverAtomAux_preservesTokenWindow token.span token.span
+        (afterToken.remainingCount + 1) afterToken).trans (by
+          simp [(advance?_state_shape advanced).2])
+
+/-- Complete recovery is cursor-monotone and begins at its consumed token. -/
+theorem recoverAtom_ok_state_shape {input final : State} {value : Expr}
+    (parsed : recoverAtom input = .ok value final) :
+    input.cursor ≤ final.cursor ∧
+      ∃ token, input.peek? = some token ∧
+        token.span.startByte = value.span.startByte := by
+  unfold recoverAtom at parsed
+  cases advanced : input.advance? with
+  | none => simp [advanced, rejectAt] at parsed
+  | some pair =>
+      rcases pair with ⟨token, afterToken⟩
+      simp only [advanced] at parsed
+      have recovered := recoverAtomAux_ok_state_shape token.span token.span
+        (afterToken.remainingCount + 1) parsed
+      exact ⟨Nat.le_trans (by simp [(advance?_state_shape advanced).2])
+        recovered.1, token, (advance?_state_shape advanced).1, recovered.2⟩
+
+/-- Public atom parsing preserves token windows through dispatch and recovery. -/
+theorem expressionAtom_preservesTokenWindow
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (blockWindow : Parser.PreservesTokenWindow block) :
+    Parser.PreservesTokenWindow (expressionAtom nested block) := by
+  intro input
+  unfold expressionAtom
+  have coreShape := expressionAtomCore_preservesTokenWindow nested block
+    nestedWindow blockWindow input
+  cases coreResult : expressionAtomCore nested block input with
+  | ok value next => rw [coreResult] at coreShape; exact coreShape
+  | invariant error => trivial
+  | reject failure failedState =>
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have failedShape : failedState.tokens = input.tokens ∧
+          failedState.window = input.window := by
+        simpa only [Reply.PreservesTokenWindow] using coreShape
+      have rewoundShape : rewound.tokens = input.tokens ∧
+          rewound.window = input.window := by simpa [rewound] using failedShape
+      change Reply.PreservesTokenWindow
+        (if isAtomBoundary rewound then Reply.reject failure rewound
+        else recoverAtom (rewound.emit failure.toDiagnostic)) input
+      split
+      · exact rewoundShape
+      · exact (recoverAtom_preservesTokenWindow
+          (rewound.emit failure.toDiagnostic)).trans (by
+            simpa [State.emit] using rewoundShape)
+
+theorem expressionAtom_preservesTokensOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (blockWindow : Parser.PreservesTokenWindow block) :
+    Parser.PreservesTokensOnSuccess (expressionAtom nested block) :=
+  (expressionAtom_preservesTokenWindow nested block nestedWindow
+    blockWindow).preservesTokensOnSuccess
+
+/-- Public atom successes never rewind through either parsing path. -/
+theorem expressionAtom_cursorMonotoneOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block) :
+    Parser.CursorMonotoneOnSuccess (expressionAtom nested block) := by
+  intro input value next result
+  unfold expressionAtom at result
+  cases coreResult : expressionAtomCore nested block input with
+  | invariant error => simp [coreResult] at result
+  | ok coreValue afterCore =>
+      simp only [coreResult] at result
+      have monotone := expressionAtomCore_cursorMonotoneOnSuccess nested block
+        nestedCursor blockCursor input coreValue afterCore coreResult
+      cases result
+      exact monotone
+  | reject failure failedState =>
+      simp only [coreResult] at result
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if isAtomBoundary rewound then Reply.reject failure rewound
+        else recoverAtom (rewound.emit failure.toDiagnostic)) =
+          .ok value next at result
+      split at result
+      · contradiction
+      · exact (by simpa [rewound, State.emit] using
+          (recoverAtom_ok_state_shape result).1)
+
+/-- Public atom success starts at its caller's current token. -/
+theorem expressionAtom_startsAtCurrentTokenOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (blockWindow : Parser.PreservesTokenWindow block) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (expressionAtom nested block) (·.span) := by
+  intro input value next result
+  unfold expressionAtom at result
+  cases coreResult : expressionAtomCore nested block input with
+  | invariant error => simp [coreResult] at result
+  | ok coreValue afterCore =>
+      simp only [coreResult] at result
+      have starts := expressionAtomCore_startsAtCurrentTokenOnSuccess
+        nested block input coreValue afterCore coreResult
+      cases result
+      exact starts
+  | reject failure failedState =>
+      simp only [coreResult] at result
+      have coreShape := expressionAtomCore_preservesTokenWindow nested block
+        nestedWindow blockWindow input
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if isAtomBoundary rewound then Reply.reject failure rewound
+        else recoverAtom (rewound.emit failure.toDiagnostic)) =
+          .ok value next at result
+      split at result
+      · contradiction
+      · rcases (recoverAtom_ok_state_shape result).2 with
+          ⟨token, found, starts⟩
+        refine ⟨token, ?_, starts⟩
+        unfold State.peek? at found ⊢
+        simpa [rewound, State.emit, coreShape.1, coreShape.2] using found
 
 /-- The postfix loop preserves every ordinary token window. -/
 theorem postfixTail_preservesTokenWindow
