@@ -289,22 +289,27 @@ comma-delimited lists. Their fuel-exhaustion paths are unreachable; the loops
 that require element progress also rule out their no-progress paths.
 
 The complete contract body is now reduced to five explicit member parsers:
-field, contract function, constructor, fallback, and enum. The
-complete file loop, `sourceFile`, `parseLexed`, and public `parse` are reduced
-to six explicit declaration parsers: export, module function, enum, trait,
-implementation, and contract. Imports, type aliases, pragma declarations,
+field, contract function, constructor, fallback, and enum. The complete file
+loop, `sourceFile`, `parseLexed`, and public `parse` are reduced to five explicit
+declaration parsers: module function, enum, trait, implementation, and contract.
+Imports, exports, type aliases, pragma declarations,
 derive targets, derive attributes, derive recovery, attachment, dispatch, and
 outer accumulation are discharged internally. The complete recursive type
 parser is invariant-free on valid input: its production fuel is proved
 adequate across named, mapping, comptime, proxy, tuple, and function forms.
-Export-path fuel is also discharged; complete export totality is reduced to
-two export-name and delimited-item leaf contracts. This is a reduction, not a
-claim that the five member or six declaration obligations have all been
-discharged.
+Export paths, constructor selections, export names, selected-item lists, and
+complete export declarations are also invariant-free on valid input.
 
-The remaining formal parser work is to discharge those local obligations
-through the nested declaration, expression, pattern, statement, and Yul
-parsers, then relate successful execution to a declarative grammar.
+Term-parser totality has begun from its reusable leaves and fuel loops. Literal
+and Boolean token consumers, expression-name leaves, non-recursive expression
+atoms, malformed expression-atom recovery, malformed pattern recovery, and the
+prefix-unary scanner now have explicit ordinary-result or adequate-fuel
+contracts. This is not yet a claim that the mutually recursive expression,
+pattern, and statement parsers are fully invariant-free.
+
+The remaining formal parser work is to discharge the five declaration and five
+contract-member obligations through the nested expression, pattern, statement,
+and Yul parsers, then relate successful execution to a declarative grammar.
 Parser-wide resource bounds are no longer an undivided open item: the outer
 accumulation, recovery, and generic delimiter bounds above are complete.
 

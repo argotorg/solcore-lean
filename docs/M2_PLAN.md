@@ -137,12 +137,18 @@ top-level and contract-member recovery, malformed type-alias recovery, pragma
 accumulation, and generic comma-delimited lists are proved adequate. The
 complete contract body now exposes five member obligations: field, contract
 function, constructor, fallback, and enum. The file loop and public parser
-expose six declaration obligations: export, module function, enum, trait,
-implementation, and contract. Import, type alias, pragma, and the complete
-derive path are already discharged. The shared recursive type parser is now
-invariant-free with proved production-fuel adequacy across every type form.
-The next proof step is to close export-name leaves and the remaining declaration
-branches, then prove success soundness against a declarative grammar.
+expose five declaration obligations: module function, enum, trait,
+implementation, and contract. Import, export, type alias, pragma, and the
+complete derive path are already discharged. The shared recursive type parser
+is invariant-free with proved production-fuel adequacy across every type form.
+
+Term totality is now being assembled from explicit fuel-aware components.
+Literal and Boolean leaves, expression-name leaves, non-recursive expression
+atoms, malformed atom and pattern recovery, and prefix-unary scanning have
+ordinary-result or adequate-fuel proofs. The next proof step is to close the
+recursive expression, pattern, statement, and block layers, use them to
+discharge the remaining declaration branches, and then prove success soundness
+against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the
