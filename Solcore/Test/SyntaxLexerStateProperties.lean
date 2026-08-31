@@ -1,4 +1,4 @@
-import Solcore.Syntax.Lexer.State
+import Solcore.Syntax.Lexer.Properties
 
 /-! External compile consumers for canonical lexer state invariants. -/
 
@@ -54,5 +54,18 @@ example (file : SourceFile) (state : State) (valid : state.ValidFor file) :
       (∀ diagnostic ∈ lexed.diagnostics,
         diagnostic.span.ValidFor file) :=
   valid.finish
+
+example (file : SourceFile) (state : State) (valid : state.ValidFor file) :
+    (step file state).ValidFor file :=
+  step_validFor file state valid
+
+example (file : SourceFile) (lexed : LexedFile)
+    (result : lex file = .ok lexed) :
+    lexed.source = file.id ∧
+      (∀ token ∈ lexed.tokens, token.span.ValidFor file) ∧
+      (∀ comment ∈ lexed.comments, comment.span.ValidFor file) ∧
+      (∀ diagnostic ∈ lexed.diagnostics,
+        diagnostic.span.ValidFor file) :=
+  lex_ok_carrier_spans file lexed result
 
 end Tests
