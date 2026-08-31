@@ -54,25 +54,60 @@ private def yulControlToken (value : HardKeyword)
   let marker ← keyword value .yulStatement
   pure { span := marker.span, value := result }
 
+/-!
+Chumsky's ordered statement choice rewinds a rejected recognized branch before
+trying its final expression branch.  The expression parser may recover to a
+`YulExpr.error`; retain that AST and its cursor, but replace its speculative
+diagnostics with the more precise failure reached by the recognized branch.
+-/
+private def recognizedYulStatementOrFallback
+    (primary fallback : Parser YulStmt) : Parser YulStmt := fun state =>
+  match primary state with
+  | .ok value next => .ok value next
+  | .reject failure _ =>
+      match fallback state with
+      | .ok value next =>
+          let reset := { next with diagnosticsRev := state.diagnosticsRev }
+          .ok value (reset.emit failure.toDiagnostic)
+      | .reject _ _ => .reject failure state
+      | .invariant error => .invariant error
+  | .invariant error => .invariant error
+
 private def yulStatementCore (nested : Parser YulStmt) : Parser YulStmt :=
     fun state =>
-  if isSymbol state .leftBrace then yulBlockStatement nested state
-  else if isKeyword state .letKw then yulLetStatement state
-  else if isKeyword state .ifKw then yulIfStatement nested state
-  else if isKeyword state .forKw then yulForStatement nested state
-  else if isKeyword state .switchKw then yulSwitchStatement nested state
-  else if isKeyword state .functionKw then yulFunctionStatement nested state
-  else if isKeyword state .returnKw then yulReturnBuiltin state
+  let fallback := yulExpressionStatement
+  if isSymbol state .leftBrace then
+    recognizedYulStatementOrFallback
+      (yulBlockStatement nested) fallback state
+  else if isKeyword state .letKw then
+    recognizedYulStatementOrFallback yulLetStatement fallback state
+  else if isKeyword state .ifKw then
+    recognizedYulStatementOrFallback
+      (yulIfStatement nested) fallback state
+  else if isKeyword state .forKw then
+    recognizedYulStatementOrFallback
+      (yulForStatement nested) fallback state
+  else if isKeyword state .switchKw then
+    recognizedYulStatementOrFallback
+      (yulSwitchStatement nested) fallback state
+  else if isKeyword state .functionKw then
+    recognizedYulStatementOrFallback
+      (yulFunctionStatement nested) fallback state
+  else if isKeyword state .returnKw then
+    recognizedYulStatementOrFallback yulReturnBuiltin fallback state
   else if isKeyword state .leaveKw then
-    yulControlToken .leaveKw .leave state
+    recognizedYulStatementOrFallback
+      (yulControlToken .leaveKw .leave) fallback state
   else if isKeyword state .breakKw then
-    yulControlToken .breakKw .break state
+    recognizedYulStatementOrFallback
+      (yulControlToken .breakKw .break) fallback state
   else if isKeyword state .continueKw then
-    yulControlToken .continueKw .continue state
+    recognizedYulStatementOrFallback
+      (yulControlToken .continueKw .continue) fallback state
   else if startsYulName state then
-    orElse yulAssignment yulExpressionStatement state
+    orElse yulAssignment fallback state
   else
-    yulExpressionStatement state
+    fallback state
 
 private def optionalYulSemicolon (value : YulStmt) : Parser YulStmt := do
   let state ← getState
