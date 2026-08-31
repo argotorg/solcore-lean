@@ -51,6 +51,13 @@ private def aliasName? (item : TopItem) : Option String :=
   | .typeAlias declaration => some declaration.value.name.value
   | _ => none
 
+private def assertSingleErrorExpression
+    (body : Block) (label : String) : IO Unit :=
+  match body.value with
+  | [{ value := .expression { value := .error, .. } true, .. }] => pure ()
+  | statements => throw (IO.userError
+      s!"{label}: expected one recovered expression, got {reprStr statements}")
+
 private def testSameLineSuppression : IO Unit := do
   let output ← checkedParse "same-line cascade" "§ type Broken = ;"
   assertOneInvalidToken output "same-line cascade"
@@ -129,8 +136,8 @@ private def testBodyIsolationSuppressesLexCascade : IO Unit := do
     ] =>
       assertEqual bad.value.signature.name.value "bad"
         "isolated function name"
-      assertEqual bad.value.body.value []
-        "lexically broken isolated body"
+      assertSingleErrorExpression bad.value.body
+        "lexically broken fallback body"
       assertEqual (aliasName? kept) (some "Kept")
         "item after lexically broken body"
   | items => throw (IO.userError
@@ -154,7 +161,8 @@ private def testBodyNextLineDiagnosticSurvives : IO Unit := do
       s!"independent body diagnostic changed: {reprStr diagnostics}")
   match output.parsed.items with
   | [{ value := .function bad, .. }, kept] =>
-      assertEqual bad.value.body.value [] "isolated independently bad body"
+      assertSingleErrorExpression bad.value.body
+        "independently bad fallback body"
       assertEqual (aliasName? kept) (some "Kept")
         "item after independently bad body"
   | items => throw (IO.userError

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser
 
-/-! Regression coverage for balanced Core-body parse isolation. -/
+/-! Regression coverage for balanced Core-body parsing and local fallback. -/
 
 set_option autoImplicit false
 
@@ -42,6 +42,13 @@ private def missingExpression : ParseDiagnosticKind :=
   .unexpected (some (.symbol .semicolon))
     { head := .expression, tail := [] } .expression
 
+private def assertSingleErrorExpression
+    (body : Block) (label : String) : IO Unit :=
+  match body.value with
+  | [{ value := .expression { value := .error, .. } true, .. }] => pure ()
+  | statements => throw (IO.userError
+      s!"{label}: expected one recovered expression, got {reprStr statements}")
+
 private def testTopLevelIsolationAndDiagnosticOrder : IO Unit := do
   let source := String.intercalate "\n" [
     "function bad() public { x = y let broken = ; }",
@@ -66,7 +73,19 @@ private def testTopLevelIsolationAndDiagnosticOrder : IO Unit := do
       assertEqual bad.value.signature.name.value "bad" "bad function name"
       assertEqual (byteRange bad.value.body.span) (22, 46)
         "bad function body span"
-      assertEqual bad.value.body.value [] "bad function isolated body"
+      match bad.value.body.value with
+      | [
+          { value := .assignValue left _ right, .. },
+          { value := .expression { value := .error, .. } true, .. }
+        ] =>
+          match left.value, right.value with
+          | .identifier leftName, .identifier rightName =>
+              assertEqual leftName.value "x" "statement before fallback"
+              assertEqual rightName.value "y" "assignment before fallback"
+          | left, right => throw (IO.userError
+              s!"assignment around fallback changed: {reprStr left}; {reprStr right}")
+      | body => throw (IO.userError
+          s!"bad function fallback body changed: {reprStr body}")
       assertEqual kept.value.name.value "Kept" "following alias"
       assertEqual good.value.signature.name.value "good" "following function"
       assertEqual good.value.body.value.length 1 "following function body"
@@ -110,17 +129,19 @@ private def testContractEntryIsolation : IO Unit := do
           { value := .fallback fallback, .. },
           { value := .function good, .. }
         ] =>
-          assertEqual bad.value.body.value [] "contract function empty body"
+          assertSingleErrorExpression bad.value.body
+            "contract function fallback body"
           assertEqual (byteRange bad.value.body.span) (30, 43)
             "contract function body span"
           assertEqual first.value.name.value "first" "member after function"
-          assertEqual constructor.value.body.value []
-            "constructor empty body"
+          assertSingleErrorExpression constructor.value.body
+            "constructor fallback body"
           assertEqual (byteRange constructor.value.body.span) (75, 88)
             "constructor body span"
           assertEqual second.value.name.value "second"
             "member after constructor"
-          assertEqual fallback.value.body.value [] "fallback empty body"
+          assertSingleErrorExpression fallback.value.body
+            "fallback entry body"
           assertEqual (byteRange fallback.value.body.span) (118, 131)
             "fallback body span"
           assertEqual good.value.signature.name.value "good"
@@ -148,7 +169,15 @@ private def testNestedBlockIsolation : IO Unit := do
       assertEqual outer.value.signature.name.value "outer" "outer function"
       assertEqual (byteRange outer.value.body.span) (17, 47)
         "outer isolated body span"
-      assertEqual outer.value.body.value [] "outer isolated body"
+      match outer.value.body.value with
+      | [
+          { value := .block [
+              { value := .expression { value := .error, .. } true, .. }
+            ], .. },
+          { value := .returnStmt none, .. }
+        ] => pure ()
+      | body => throw (IO.userError
+          s!"nested fallback body changed: {reprStr body}")
       assertEqual after.value.signature.name.value "after"
         "function after nested error"
   | items => throw (IO.userError
@@ -182,7 +211,7 @@ private def testLambdaBodyIsolation : IO Unit := do
                 "isolated lambda span"
               assertEqual (byteRange body.span) (33, 51)
                 "isolated lambda body span"
-              assertEqual body.value [] "isolated lambda body"
+              assertSingleErrorExpression body "lambda fallback body"
           | value => throw (IO.userError
               s!"lambda initializer changed: {reprStr value}")
       | statements => throw (IO.userError
@@ -209,7 +238,7 @@ private def testUnclosedBodyIsNotRecovered : IO Unit := do
   | diagnostic => throw (IO.userError
       s!"unclosed body diagnostic changed: {reprStr diagnostic}")
 
-/-- Run balanced-body isolation and unclosed-body regressions. -/
+/-- Run balanced-body fallback, isolation, and unclosed-body regressions. -/
 def testSyntaxParserBodyIsolation : IO Unit := do
   testTopLevelIsolationAndDiagnosticOrder
   testContractEntryIsolation
