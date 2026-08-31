@@ -45,6 +45,18 @@ theorem of_file_eq {α : Type} {reply : Reply α} {input other : State}
   cases reply <;> simp [Reply.ValidFor, fileEq] at valid ⊢ <;>
     exact valid
 
+/-- Transport only the successful value predicate of a reply contract. -/
+theorem mono {α : Type} {reply : Reply α} {input : State}
+    {first second : SourceFile → α → Prop}
+    (valid : reply.ValidFor input first)
+    (implies : ∀ file value, first file value → second file value) :
+    reply.ValidFor input second := by
+  cases reply with
+  | ok value next =>
+      exact ⟨implies input.file value valid.1, valid.2.1, valid.2.2⟩
+  | reject failure next => exact valid
+  | invariant error => trivial
+
 end ValidFor
 
 end Reply
@@ -83,13 +95,18 @@ theorem pure_validFor {α : Type} (value : α)
   intro input inputValid
   exact ⟨validValue input.file, inputValid, rfl⟩
 
-/-- Sequential composition preserves the continuation's result contract. -/
-theorem bind_validFor {α β : Type} {first : Parser α}
+/--
+Sequential composition may use the first value's validity evidence when
+establishing the continuation at the actual intermediate state.
+-/
+theorem bind_validFor_of_value {α β : Type} {first : Parser α}
     {next : α → Parser β}
     {firstValueValid : SourceFile → α → Prop}
     {resultValid : SourceFile → β → Prop}
     (firstValid : first.ValidFor firstValueValid)
-    (nextValid : ∀ value, (next value).ValidFor resultValid) :
+    (nextValid : ∀ value input, input.ValidFor →
+      firstValueValid input.file value →
+      (next value input).ValidFor input resultValid) :
     (first >>= next).ValidFor resultValid := by
   intro input inputValid
   have firstResult := firstValid input inputValid
@@ -103,8 +120,10 @@ theorem bind_validFor {α β : Type} {first : Parser α}
   | ok value afterFirst =>
       rw [result] at firstResult
       rw [binding, result]
-      exact (nextValid value afterFirst firstResult.2.1).of_file_eq
-        firstResult.2.2
+      have valueValidAfter : firstValueValid afterFirst.file value := by
+        simpa [firstResult.2.2] using firstResult.1
+      exact (nextValid value afterFirst firstResult.2.1
+        valueValidAfter).of_file_eq firstResult.2.2
   | reject failure rejected =>
       rw [result] at firstResult
       rw [binding, result]
@@ -112,6 +131,18 @@ theorem bind_validFor {α β : Type} {first : Parser α}
   | invariant error =>
       rw [binding, result]
       trivial
+
+/-- Sequential composition preserves the continuation's result contract. -/
+theorem bind_validFor {α β : Type} {first : Parser α}
+    {next : α → Parser β}
+    {firstValueValid : SourceFile → α → Prop}
+    {resultValid : SourceFile → β → Prop}
+    (firstValid : first.ValidFor firstValueValid)
+    (nextValid : ∀ value, (next value).ValidFor resultValid) :
+    (first >>= next).ValidFor resultValid := by
+  apply bind_validFor_of_value firstValid
+  intro value input inputValid _valueValid
+  exact nextValid value input inputValid
 
 /-- Transactional ordered choice preserves a shared result contract. -/
 theorem orElse_validFor {α : Type} {first second : Parser α}
@@ -129,7 +160,66 @@ theorem orElse_validFor {α : Type} {first second : Parser α}
   | reject failure rejected => exact secondValid input inputValid
   | invariant error => trivial
 
+/-- Transport a parser's successful value predicate pointwise. -/
+theorem ValidFor.mono {α : Type} {parser : Parser α}
+    {first second : SourceFile → α → Prop}
+    (valid : parser.ValidFor first)
+    (implies : ∀ file value, first file value → second file value) :
+    parser.ValidFor second := by
+  intro input inputValid
+  exact (valid input inputValid).mono implies
+
 end Parser
+
+namespace State
+
+/-- A parser-returned state remains valid and owned by the input file. -/
+def ValueValidFor (file : SourceFile) (state : State) : Prop :=
+  state.ValidFor ∧ state.file = file
+
+end State
+
+/-- Reading the current state preserves it as both value and continuation. -/
+theorem getState_validFor :
+    getState.ValidFor State.ValueValidFor := by
+  intro input inputValid
+  exact ⟨⟨inputValid, rfl⟩, inputValid, rfl⟩
+
+/-- A validity- and file-preserving update defines a valid state parser. -/
+theorem modifyState_validFor (update : State → State)
+    (preserves : ∀ input, input.ValidFor →
+      (update input).ValidFor ∧ (update input).file = input.file) :
+    (modifyState update).ValidFor (fun _ _ => True) := by
+  intro input inputValid
+  unfold modifyState Reply.ValidFor
+  exact ⟨trivial, (preserves input inputValid).1,
+    (preserves input inputValid).2⟩
+
+/-- Emit one diagnostic known valid for this concrete input state. -/
+theorem emitDiagnostic_reply_validFor {input : State}
+    (inputValid : input.ValidFor) (diagnostic : ParseDiagnostic)
+    (diagnosticValid : diagnostic.span.ValidFor input.file) :
+    (emitDiagnostic diagnostic input).ValidFor input (fun _ _ => True) := by
+  unfold emitDiagnostic modifyState Reply.ValidFor
+  exact ⟨trivial, inputValid.emit_validFor diagnostic diagnosticValid, rfl⟩
+
+/-- Emit a fixed diagnostic valid for every admitted input file. -/
+theorem emitDiagnostic_validFor (diagnostic : ParseDiagnostic)
+    (diagnosticValid : ∀ input : State, input.ValidFor →
+      diagnostic.span.ValidFor input.file) :
+    (emitDiagnostic diagnostic).ValidFor (fun _ _ => True) := by
+  intro input inputValid
+  exact emitDiagnostic_reply_validFor inputValid diagnostic
+    (diagnosticValid input inputValid)
+
+/-- Committing a valid failure diagnostic preserves state validity and file. -/
+theorem emitFailure_validFor {state : State} (stateValid : state.ValidFor)
+    (failure : Failure) (failureValid : failure.span.ValidFor state.file) :
+    (emitFailure failure state).ValidFor ∧
+      (emitFailure failure state).file = state.file := by
+  refine ⟨?_, rfl⟩
+  apply stateValid.emit_validFor
+  exact failure.toDiagnostic_span_validFor failureValid
 
 /-- Generic token acceptance satisfies the located-span contract. -/
 theorem acceptToken_validFor (expected : ParseExpectation)
