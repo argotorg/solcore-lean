@@ -1,5 +1,8 @@
 import Solcore.Syntax.Parser.Contract
+import Solcore.Syntax.Parser.DeclarationCanonicalProperties
+import Solcore.Syntax.Parser.EnumProperties
 import Solcore.Syntax.Parser.TypeRecursiveProperties
+import Solcore.Syntax.Parser.TypeAliasProperties
 import Solcore.Syntax.ContractDeclarationValidity
 
 /-! Contracts for canonical contract declaration parsing. -/
@@ -257,5 +260,181 @@ theorem contractField_validFor (expression : Parser Expr)
       exact ⟨contractField_value_validForOnSuccess expression
         expressionValueValid expressionValid expressionWindow expressionCursor
         inputValid parsed, weakResult.2.1, weakResult.2.2⟩
+
+abbrev CanonicalContractMemberValid : SourceFile → ContractMember → Prop :=
+  ContractMember.ValidFor CoreStatement.ValidFor
+    (Expr.ValidFor CoreStatement.ValidFor)
+
+structure ContractMemberParserContract
+    (parser : Parser ContractMember) : Prop where
+  validFor : parser.ValidFor CanonicalContractMemberValid
+  preservesTokenWindow : Parser.PreservesTokenWindow parser
+  cursorMonotoneOnSuccess : Parser.CursorMonotoneOnSuccess parser
+  startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess parser (·.span)
+
+namespace ContractMemberParserContract
+
+theorem preservesTokensOnSuccess {parser : Parser ContractMember}
+    (contract : ContractMemberParserContract parser) :
+    Parser.PreservesTokensOnSuccess parser :=
+  contract.preservesTokenWindow.preservesTokensOnSuccess
+
+end ContractMemberParserContract
+
+theorem mapMember_contract {alpha : Type} (parser : Parser alpha)
+    (wrap : alpha → ContractMember)
+    (valueValid : SourceFile → alpha → Prop) (span : alpha → SourceSpan)
+    (parserValid : parser.ValidFor valueValid)
+    (parserWindow : Parser.PreservesTokenWindow parser)
+    (parserCursor : Parser.CursorMonotoneOnSuccess parser)
+    (parserStarts : Parser.StartsAtCurrentTokenOnSuccess parser span)
+    (wrapValid : ∀ file value, valueValid file value →
+      CanonicalContractMemberValid file (wrap value))
+    (wrapSpan : ∀ value, (wrap value).span = span value) :
+    ContractMemberParserContract (mapMember parser wrap) := {
+  validFor := by
+    unfold mapMember
+    apply Parser.bind_validFor_of_value parserValid
+    intro value input inputValid valueIsValid
+    exact ⟨wrapValid input.file value valueIsValid, inputValid, rfl⟩
+  preservesTokenWindow := by
+    unfold mapMember
+    apply Parser.bind_preservesTokenWindow parserWindow
+    intro value
+    exact Parser.pure_preservesTokenWindow _
+  cursorMonotoneOnSuccess := by
+    unfold mapMember
+    apply Parser.bind_cursorMonotoneOnSuccess parserCursor
+    intro value
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  startsAtCurrentTokenOnSuccess := by
+    unfold mapMember
+    apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first parserStarts
+    intro value input member final parsed
+    cases parsed
+    exact (congrArg SourceSpan.startByte (wrapSpan value)).symm
+}
+
+theorem contractField_canonical_contract : ContractMemberParserContract
+    (mapMember (contractField expression) wrapField) :=
+  mapMember_contract (contractField expression) wrapField
+    (ContractField.ValidFor (Expr.ValidFor CoreStatement.ValidFor)) (·.span)
+    (contractField_validFor expression (Expr.ValidFor CoreStatement.ValidFor)
+      expression_canonical_contract.validFor
+      expression_canonical_contract.preservesTokenWindow
+      expression_canonical_contract.cursorMonotoneOnSuccess)
+    (contractField_preservesTokenWindow expression
+      expression_canonical_contract.preservesTokenWindow)
+    (contractField_cursorMonotoneOnSuccess expression
+      expression_canonical_contract.cursorMonotoneOnSuccess)
+    (contractField_startsAtCurrentTokenOnSuccess expression)
+    (fun _ _ valid => .field valid.1 (by simp) valid) (fun _ => rfl)
+
+theorem contractFunction_canonical_contract : ContractMemberParserContract
+    (mapMember (functionDecl .contract) wrapContractFunction) :=
+  mapMember_contract (functionDecl .contract) wrapContractFunction
+    (FunctionDecl.ValidFor CoreStatement.ValidFor) (·.span)
+    (functionDecl_canonical_validFor .contract)
+    (functionDecl_preservesTokenWindow_of_block .contract
+      (block_canonical_preservesTokenWindow .allow))
+    (functionDecl_cursorMonotoneOnSuccess_of_block .contract
+      (block_canonical_cursorMonotoneOnSuccess .allow))
+    (functionDecl_startsAtCurrentTokenOnSuccess .contract)
+    (fun _ _ valid => .function valid.1 (by simp) valid) (fun _ => rfl)
+
+theorem contractConstructor_canonical_contract : ContractMemberParserContract
+    (mapMember constructorDecl wrapConstructor) :=
+  mapMember_contract constructorDecl wrapConstructor
+    (ConstructorDecl.ValidFor CoreStatement.ValidFor) (·.span)
+    constructorDecl_canonical_validFor
+    (constructorDecl_preservesTokenWindow
+      (block_canonical_preservesTokenWindow .require))
+    (constructorDecl_cursorMonotoneOnSuccess
+      (block_canonical_cursorMonotoneOnSuccess .require))
+    constructorDecl_startsAtCurrentTokenOnSuccess
+    (fun _ _ valid => .constructor valid.1 (by simp) valid) (fun _ => rfl)
+
+theorem contractFallback_canonical_contract : ContractMemberParserContract
+    (mapMember fallbackDecl wrapFallback) :=
+  mapMember_contract fallbackDecl wrapFallback
+    (FallbackDecl.ValidFor CoreStatement.ValidFor) (·.span)
+    fallbackDecl_canonical_validFor
+    (fallbackDecl_preservesTokenWindow
+      (block_canonical_preservesTokenWindow .require))
+    (fallbackDecl_cursorMonotoneOnSuccess
+      (block_canonical_cursorMonotoneOnSuccess .require))
+    fallbackDecl_startsAtCurrentTokenOnSuccess
+    (fun _ _ valid => .fallback valid.1 (by simp) valid) (fun _ => rfl)
+
+theorem contractTypeAlias_canonical_contract : ContractMemberParserContract
+    (mapMember typeAlias wrapContractTypeAlias) :=
+  mapMember_contract typeAlias wrapContractTypeAlias TypeAliasDecl.ValidFor
+    (·.span) typeAlias_validFor typeAlias_preservesTokenWindow
+    typeAlias_cursorMonotoneOnSuccess
+    typeAlias_startsAtCurrentTokenOnSuccess
+    (fun _ _ valid => .typeAlias valid.1 (by simp) valid) (fun _ => rfl)
+
+theorem contractEnum_canonical_contract : ContractMemberParserContract
+    (mapMember (enumDecl none) wrapContractEnum) :=
+  mapMember_contract (enumDecl none) wrapContractEnum EnumDecl.ValidFor
+    (·.span) enumDecl_none_validFor (enumDecl_preservesTokenWindow none)
+    (enumDecl_cursorMonotoneOnSuccess none)
+    enumDecl_none_startsAtCurrentTokenOnSuccess
+    (fun _ _ valid => .enum valid.1 (by simp) valid) (fun _ => rfl)
+
+theorem rejectedContractMember_canonical_contract :
+    ContractMemberParserContract rejectedContractMember := {
+  validFor := by
+    intro input inputValid
+    unfold rejectedContractMember rejectAt Reply.ValidFor
+    exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+  preservesTokenWindow := by
+    intro input
+    exact rejectAt_preservesTokenWindow input _ _
+  cursorMonotoneOnSuccess := by
+    intro input value next parsed
+    simp [rejectedContractMember, rejectAt] at parsed
+  startsAtCurrentTokenOnSuccess := by
+    intro input value next parsed
+    simp [rejectedContractMember, rejectAt] at parsed
+}
+
+theorem contractMemberParser_canonical_contract (state : State) :
+    ContractMemberParserContract (contractMemberParser state) := by
+  unfold contractMemberParser
+  split
+  · exact contractField_canonical_contract
+  split
+  · exact contractFunction_canonical_contract
+  split
+  · exact contractConstructor_canonical_contract
+  split
+  · exact contractFallback_canonical_contract
+  split
+  · exact contractTypeAlias_canonical_contract
+  split
+  · exact contractEnum_canonical_contract
+  · exact rejectedContractMember_canonical_contract
+
+theorem contractMemberCore_canonical_contract :
+    ContractMemberParserContract contractMemberCore := {
+  validFor := by
+    intro input inputValid
+    exact (contractMemberParser_canonical_contract input).validFor
+      input inputValid
+  preservesTokenWindow := by
+    intro input
+    exact (contractMemberParser_canonical_contract input).preservesTokenWindow
+      input
+  cursorMonotoneOnSuccess := by
+    intro input value next parsed
+    exact (contractMemberParser_canonical_contract input).cursorMonotoneOnSuccess
+      input value next parsed
+  startsAtCurrentTokenOnSuccess := by
+    intro input value next parsed
+    exact (contractMemberParser_canonical_contract input).startsAtCurrentTokenOnSuccess
+      input value next parsed
+}
 end ContractInternals
 end Solcore.Syntax.Parser

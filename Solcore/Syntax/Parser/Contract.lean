@@ -31,44 +31,52 @@ def contractField (expression : Parser Expr) : Parser ContractField := do
 
 end ContractInternals
 
-private def wrapField (declaration : ContractField) : ContractMember := {
+namespace ContractInternals
+
+def wrapField (declaration : ContractField) : ContractMember := {
   span := declaration.span
   leadingComments := []
   value := .field declaration
 }
 
-private def wrapContractFunction
+def wrapContractFunction
     (declaration : FunctionDecl) : ContractMember := {
   span := declaration.span
   leadingComments := []
   value := .function declaration
 }
 
-private def wrapConstructor
+def wrapConstructor
     (declaration : ConstructorDecl) : ContractMember := {
   span := declaration.span
   leadingComments := []
   value := .constructor declaration
 }
 
-private def wrapFallback (declaration : FallbackDecl) : ContractMember := {
+def wrapFallback (declaration : FallbackDecl) : ContractMember := {
   span := declaration.span
   leadingComments := []
   value := .fallback declaration
 }
 
-private def wrapContractTypeAlias
+def wrapContractTypeAlias
     (declaration : TypeAliasDecl) : ContractMember := {
   span := declaration.span
   leadingComments := []
   value := .typeAlias declaration
 }
 
-private def wrapContractEnum (declaration : EnumDecl) : ContractMember := {
+def wrapContractEnum (declaration : EnumDecl) : ContractMember := {
   span := declaration.span
   leadingComments := []
   value := .enum declaration
 }
+
+def mapMember {alpha : Type} (parser : Parser alpha)
+    (wrap : alpha → ContractMember) : Parser ContractMember := do
+  pure (wrap (← parser))
+
+end ContractInternals
 
 private def extendContractMemberStart (prefixSpan : SourceSpan)
     (member : ContractMember) : ContractMember :=
@@ -83,42 +91,34 @@ private def extendContractMemberStart (prefixSpan : SourceSpan)
     | .error => .error
   { member with span, value }
 
-private def startsContractField (state : State) : Bool :=
+namespace ContractInternals
+
+def startsContractField (state : State) : Bool :=
   isIdentifier state && state.peekOffsetKind? 1 == some (.symbol .colon)
 
-private def contractMemberCore : Parser ContractMember := fun state =>
+def rejectedContractMember : Parser ContractMember := fun state =>
+  rejectAt state { head := .topItem, tail := [] } .contractMember
+
+def contractMemberParser (state : State) : Parser ContractMember :=
   if startsContractField state then
-    match ContractInternals.contractField expression state with
-    | .ok value next => .ok (wrapField value) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapMember (contractField expression) wrapField
   else if isKeyword state .functionKw then
-    match functionDecl .contract state with
-    | .ok value next => .ok (wrapContractFunction value) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapMember (functionDecl .contract) wrapContractFunction
   else if isKeyword state .constructorKw then
-    match constructorDecl state with
-    | .ok value next => .ok (wrapConstructor value) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapMember constructorDecl wrapConstructor
   else if isKeyword state .fallbackKw then
-    match fallbackDecl state with
-    | .ok value next => .ok (wrapFallback value) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapMember fallbackDecl wrapFallback
   else if isKeyword state .typeKw then
-    match typeAlias state with
-    | .ok value next => .ok (wrapContractTypeAlias value) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapMember typeAlias wrapContractTypeAlias
   else if isContextual state .enum then
-    match enumDecl none state with
-    | .ok value next => .ok (wrapContractEnum value) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapMember (enumDecl none) wrapContractEnum
   else
-    rejectAt state { head := .topItem, tail := [] } .contractMember
+    rejectedContractMember
+
+def contractMemberCore : Parser ContractMember := fun state =>
+  contractMemberParser state state
+
+end ContractInternals
 
 private def attachContractDerive (derive : DeriveAttribute)
     (member : ContractMember) : Parser ContractMember :=
@@ -145,14 +145,14 @@ private def contractMemberWithAttribute : Parser ContractMember := fun state =>
   if isSymbol state .hash then
     match deriveAttribute state with
     | .ok derive afterDerive =>
-        match contractMemberCore afterDerive with
+        match ContractInternals.contractMemberCore afterDerive with
         | .ok member next => attachContractDerive derive member next
         | .reject failure next => .reject failure next
         | .invariant error => .invariant error
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else
-    contractMemberCore state
+    ContractInternals.contractMemberCore state
 
 private def atContractRecoveryBoundary (state : State) : Bool :=
   isSymbol state .hash || isKeyword state .functionKw ||
