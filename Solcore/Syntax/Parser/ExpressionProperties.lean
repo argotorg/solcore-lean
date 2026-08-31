@@ -84,6 +84,144 @@ theorem foldConditionalHeads_validFor
       rw [foldConditionalHead_preservesElseEnd]
       exact ordered retained (by simp [member])
 
+/-- The conditional-prefix loop preserves every ordinary token window. -/
+theorem conditionalTail_preservesTokenWindow
+    (nested alternative : Parser Expr)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (alternativeWindow : Parser.PreservesTokenWindow alternative) :
+    ∀ fuel heads condition,
+      Parser.PreservesTokenWindow
+        (conditionalTail nested alternative fuel heads condition) := by
+  intro fuel
+  induction fuel with
+  | zero => intro heads condition input; trivial
+  | succ fuel inductionHypothesis =>
+      intro heads condition input
+      unfold conditionalTail
+      by_cases present : isSymbol input .question
+      · simp only [present, if_true]
+        have questionShape :=
+          symbol_preservesTokenWindow .question .expression input
+        cases questionResult : symbol .question .expression input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [questionResult] at questionShape
+            exact questionShape
+        | ok question afterQuestion =>
+            rw [questionResult] at questionShape
+            simp only
+            have thenShape := nestedWindow afterQuestion
+            cases thenResult : nested afterQuestion with
+            | invariant error => trivial
+            | reject failure rejected =>
+                rw [thenResult] at thenShape
+                exact thenShape.trans questionShape
+            | ok thenBranch afterThen =>
+                rw [thenResult] at thenShape
+                simp only
+                have colonShape :=
+                  symbol_preservesTokenWindow .colon .expression afterThen
+                cases colonResult : symbol .colon .expression afterThen with
+                | invariant error => trivial
+                | reject failure rejected =>
+                    rw [colonResult] at colonShape
+                    exact (colonShape.trans thenShape).trans questionShape
+                | ok colon afterColon =>
+                    rw [colonResult] at colonShape
+                    simp only
+                    have alternativeShape := alternativeWindow afterColon
+                    cases alternativeResult : alternative afterColon with
+                    | invariant error => trivial
+                    | reject failure rejected =>
+                        rw [alternativeResult] at alternativeShape
+                        exact ((alternativeShape.trans colonShape).trans
+                          thenShape).trans questionShape
+                    | ok nextCondition next =>
+                        rw [alternativeResult] at alternativeShape
+                        exact ((((inductionHypothesis ({
+                            condition
+                            question := question.span
+                            thenBranch
+                            colon := colon.span
+                          } :: heads) nextCondition next).trans
+                            alternativeShape).trans colonShape).trans
+                              thenShape).trans questionShape
+      · simp only [present]
+        exact ⟨rfl, rfl⟩
+
+theorem conditionalTail_preservesTokensOnSuccess
+    (nested alternative : Parser Expr)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (alternativeWindow : Parser.PreservesTokenWindow alternative)
+    (fuel : Nat) (heads : List ConditionalHead) (condition : Expr) :
+    Parser.PreservesTokensOnSuccess
+      (conditionalTail nested alternative fuel heads condition) :=
+  (conditionalTail_preservesTokenWindow nested alternative nestedWindow
+    alternativeWindow fuel heads condition).preservesTokensOnSuccess
+
+/-- Successful conditional-prefix parsing never rewinds its caller. -/
+theorem conditionalTail_cursorMonotoneOnSuccess
+    (nested alternative : Parser Expr)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    (alternativeCursor : Parser.CursorMonotoneOnSuccess alternative) :
+    ∀ fuel heads condition,
+      Parser.CursorMonotoneOnSuccess
+        (conditionalTail nested alternative fuel heads condition) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro heads condition input expression final parsed
+      unfold conditionalTail at parsed
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro heads condition input expression final parsed
+      unfold conditionalTail at parsed
+      by_cases present : isSymbol input .question
+      · simp only [present, if_true] at parsed
+        cases questionResult : symbol .question .expression input with
+        | invariant error => simp [questionResult] at parsed
+        | reject failure rejected => simp [questionResult] at parsed
+        | ok question afterQuestion =>
+            simp only [questionResult] at parsed
+            cases thenResult : nested afterQuestion with
+            | invariant error => simp [thenResult] at parsed
+            | reject failure rejected => simp [thenResult] at parsed
+            | ok thenBranch afterThen =>
+                simp only [thenResult] at parsed
+                cases colonResult : symbol .colon .expression afterThen with
+                | invariant error => simp [colonResult] at parsed
+                | reject failure rejected => simp [colonResult] at parsed
+                | ok colon afterColon =>
+                    simp only [colonResult] at parsed
+                    cases alternativeResult : alternative afterColon with
+                    | invariant error => simp [alternativeResult] at parsed
+                    | reject failure rejected =>
+                        simp [alternativeResult] at parsed
+                    | ok nextCondition next =>
+                        simp only [alternativeResult] at parsed
+                        exact Nat.le_trans
+                          (symbol_cursorMonotoneOnSuccess .question .expression
+                            input question afterQuestion questionResult)
+                          (Nat.le_trans
+                            (nestedCursor afterQuestion thenBranch afterThen
+                              thenResult)
+                            (Nat.le_trans
+                              (symbol_cursorMonotoneOnSuccess .colon .expression
+                                afterThen colon afterColon colonResult)
+                              (Nat.le_trans
+                                (alternativeCursor afterColon nextCondition next
+                                  alternativeResult)
+                                (inductionHypothesis ({
+                                    condition
+                                    question := question.span
+                                    thenBranch
+                                    colon := colon.span
+                                  } :: heads) nextCondition next expression
+                                    final parsed))))
+      · simp only [present] at parsed
+        cases parsed
+        exact Nat.le_refl _
+
 /-- Prefix unary scanning preserves operator spans and parser-state validity. -/
 theorem unaryOperators_validFor :
     ∀ fuel operatorsRev input,

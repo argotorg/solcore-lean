@@ -185,8 +185,11 @@ def foldConditionalHead (elseBranch : Expr)
 
 end ExpressionInternals
 
-private def conditionalTail (nested alternative : Parser Expr) :
-    Nat → List ExpressionInternals.ConditionalHead →
+namespace ExpressionInternals
+
+/-- Parse repeated conditional prefixes, then rebuild their right nesting. -/
+def conditionalTail (nested alternative : Parser Expr) :
+    Nat → List ConditionalHead →
       Expr → State → Reply Expr
   | 0, _, _, state => .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1, headsRev, condition, state =>
@@ -199,7 +202,7 @@ private def conditionalTail (nested alternative : Parser Expr) :
                 | .ok colon afterColon =>
                     match alternative afterColon with
                     | .ok nextCondition next =>
-                        conditionalTail nested alternative fuel ({
+                        ExpressionInternals.conditionalTail nested alternative fuel ({
                           condition
                           question := question.span
                           thenBranch
@@ -214,17 +217,20 @@ private def conditionalTail (nested alternative : Parser Expr) :
         | .reject failure failed => .reject failure failed
         | .invariant error => .invariant error
       else
-        .ok (headsRev.foldl ExpressionInternals.foldConditionalHead condition)
-          state
+        .ok (headsRev.foldl foldConditionalHead condition) state
 
-private def conditional (nested alternative : Parser Expr) : Parser Expr :=
+/-- Parse one complete right-associated conditional-expression layer. -/
+def conditional (nested alternative : Parser Expr) : Parser Expr :=
     fun state =>
   match alternative state with
   | .ok condition next =>
-      conditionalTail nested alternative (next.remainingCount + 1)
+      ExpressionInternals.conditionalTail nested alternative
+        (next.remainingCount + 1)
         [] condition next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+end ExpressionInternals
 
 /--
 Build one expression recursion layer. Recursive expressions and lambda bodies
@@ -242,7 +248,7 @@ def expressionLayer (nested : Parser Expr)
   let equality := ExpressionInternals.nonAssociative relational 2
   let logicalAnd := ExpressionInternals.leftAssociative equality 1
   let logicalOr := ExpressionInternals.leftAssociative logicalAnd 0
-  conditional nested logicalOr
+  ExpressionInternals.conditional nested logicalOr
 
 /-- Whether the current token may begin a canonical Core expression. -/
 def startsExpression (state : State) : Bool :=
