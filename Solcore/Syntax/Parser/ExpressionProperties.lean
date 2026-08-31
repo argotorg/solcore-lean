@@ -253,5 +253,137 @@ theorem binaryNode_validFor
     (operator : Located BinaryOp) (right : Expr) :
     (binaryNode left operator right).span.endByte = right.span.endByte := rfl
 
+/-- A left-associative tail preserves every ordinary token window. -/
+theorem leftAssociativeTail_preservesTokenWindow (operand : Parser Expr)
+    (operandWindow : Parser.PreservesTokenWindow operand)
+    (precedence : Nat) : ∀ fuel left,
+    Parser.PreservesTokenWindow
+      (leftAssociativeTail operand precedence fuel left) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro left input
+      trivial
+  | succ fuel inductionHypothesis =>
+      intro left input
+      unfold leftAssociativeTail
+      cases operatorResult : binaryAtPrecedence? input precedence with
+      | none => exact ⟨rfl, rfl⟩
+      | some operator =>
+          simp only
+          have consumedShape := consumeBinary_preservesTokenWindow
+            operator input
+          cases consumedResult : consumeBinary operator input with
+          | invariant error =>
+              simp only
+              trivial
+          | reject failure rejected =>
+              rw [consumedResult] at consumedShape
+              simp only
+              exact consumedShape
+          | ok value afterOperator =>
+              rw [consumedResult] at consumedShape
+              simp only
+              have operandShape := operandWindow afterOperator
+              cases operandResult : operand afterOperator with
+              | invariant error =>
+                  simp only
+                  trivial
+              | reject failure rejected =>
+                  rw [operandResult] at operandShape
+                  simp only
+                  exact operandShape.trans consumedShape
+              | ok right next =>
+                  rw [operandResult] at operandShape
+                  simp only
+                  exact (inductionHypothesis
+                    (binaryNode left operator right) next).trans
+                      (operandShape.trans consumedShape)
+
+theorem leftAssociativeTail_preservesTokensOnSuccess
+    (operand : Parser Expr)
+    (operandWindow : Parser.PreservesTokenWindow operand)
+    (precedence fuel : Nat) (left : Expr) :
+    Parser.PreservesTokensOnSuccess
+      (leftAssociativeTail operand precedence fuel left) :=
+  (leftAssociativeTail_preservesTokenWindow operand operandWindow precedence
+    fuel left).preservesTokensOnSuccess
+
+/-- A left-associative tail never rewinds the parser cursor. -/
+theorem leftAssociativeTail_cursorMonotoneOnSuccess
+    (operand : Parser Expr)
+    (operandCursor : Parser.CursorMonotoneOnSuccess operand)
+    (precedence : Nat) : ∀ fuel left,
+    Parser.CursorMonotoneOnSuccess
+      (leftAssociativeTail operand precedence fuel left) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro left input expression final parsed
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro left input expression final parsed
+      unfold leftAssociativeTail at parsed
+      cases operatorResult : binaryAtPrecedence? input precedence with
+      | none =>
+          simp only [operatorResult] at parsed
+          cases parsed
+          exact Nat.le_refl _
+      | some operator =>
+          simp only [operatorResult] at parsed
+          cases consumedResult : consumeBinary operator input with
+          | invariant error => simp [consumedResult] at parsed
+          | reject failure rejected => simp [consumedResult] at parsed
+          | ok value afterOperator =>
+              simp only [consumedResult] at parsed
+              have consumedMonotone :=
+                consumeBinary_cursorMonotoneOnSuccess operator input value
+                  afterOperator consumedResult
+              cases operandResult : operand afterOperator with
+              | invariant error => simp [operandResult] at parsed
+              | reject failure rejected => simp [operandResult] at parsed
+              | ok right next =>
+                  simp only [operandResult] at parsed
+                  exact Nat.le_trans consumedMonotone
+                    (Nat.le_trans
+                      (operandCursor afterOperator right next operandResult)
+                      (inductionHypothesis
+                        (binaryNode left operator right) next expression final
+                          parsed))
+
+/-- Every successful left-associative tail keeps its original left edge. -/
+theorem leftAssociativeTail_preservesLeftStartOnSuccess
+    (operand : Parser Expr) (precedence : Nat) :
+    ∀ fuel left input expression final,
+      leftAssociativeTail operand precedence fuel left input =
+        .ok expression final →
+      expression.span.startByte = left.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro left input expression final parsed
+      unfold leftAssociativeTail at parsed
+      cases operatorResult : binaryAtPrecedence? input precedence with
+      | none =>
+          simp only [operatorResult] at parsed
+          cases parsed
+          rfl
+      | some operator =>
+          simp only [operatorResult] at parsed
+          cases consumedResult : consumeBinary operator input with
+          | invariant error => simp [consumedResult] at parsed
+          | reject failure rejected => simp [consumedResult] at parsed
+          | ok value afterOperator =>
+              simp only [consumedResult] at parsed
+              cases operandResult : operand afterOperator with
+              | invariant error => simp [operandResult] at parsed
+              | reject failure rejected => simp [operandResult] at parsed
+              | ok right next =>
+                  simp only [operandResult] at parsed
+                  simpa using inductionHypothesis
+                    (binaryNode left operator right) next expression final
+                      parsed
+
 end ExpressionInternals
 end Solcore.Syntax.Parser

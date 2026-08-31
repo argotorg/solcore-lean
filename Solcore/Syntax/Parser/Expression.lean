@@ -105,7 +105,10 @@ def binaryNode (left : Expr) (operator : Located BinaryOp)
 
 end ExpressionInternals
 
-private def leftAssociativeTail (operand : Parser Expr)
+namespace ExpressionInternals
+
+/-- Extend a left-associated expression at one binary precedence. -/
+def leftAssociativeTail (operand : Parser Expr)
     (precedence : Nat) : Nat → Expr → State → Reply Expr
   | 0, _, state => .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1, left, state =>
@@ -116,19 +119,21 @@ private def leftAssociativeTail (operand : Parser Expr)
           | .ok _ afterOperator =>
               match operand afterOperator with
               | .ok right next =>
-                  leftAssociativeTail operand precedence fuel
+                  ExpressionInternals.leftAssociativeTail operand precedence fuel
                     (ExpressionInternals.binaryNode left operator right) next
               | .reject failure next => .reject failure next
               | .invariant error => .invariant error
           | .reject failure next => .reject failure next
           | .invariant error => .invariant error
 
+end ExpressionInternals
+
 private def leftAssociative (operand : Parser Expr)
     (precedence : Nat) : Parser Expr := fun state =>
   match operand state with
   | .ok left next =>
-      leftAssociativeTail operand precedence (next.remainingCount + 1)
-        left next
+      ExpressionInternals.leftAssociativeTail operand precedence
+        (next.remainingCount + 1) left next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 

@@ -25,5 +25,9 @@ example := @ExpressionInternals.consumeBinary_cursorMonotoneOnSuccess
 example := @ExpressionInternals.binaryNode_validFor
 example := @ExpressionInternals.binaryNode_startByte
 example := @ExpressionInternals.binaryNode_endByte
+example := @ExpressionInternals.leftAssociativeTail_preservesTokenWindow
+example := @ExpressionInternals.leftAssociativeTail_preservesTokensOnSuccess
+example := @ExpressionInternals.leftAssociativeTail_cursorMonotoneOnSuccess
+example := @ExpressionInternals.leftAssociativeTail_preservesLeftStartOnSuccess
 
 end Tests
