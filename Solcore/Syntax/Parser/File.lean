@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Export
+import Solcore.Syntax.Parser.Function
 import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.Pragma
 import Solcore.Syntax.Parser.TopLevel
@@ -33,6 +34,12 @@ private def wrapPragma (declaration : PragmaDecl) : TopItem := {
   value := .pragmaDecl declaration
 }
 
+private def wrapFunction (declaration : FunctionDecl) : TopItem := {
+  span := declaration.span
+  leadingComments := []
+  value := .function declaration
+}
+
 /-- Parse the top-level forms implemented by the current vertical slice. -/
 private def topItem : Parser TopItem := fun state =>
   if isKeyword state .importKw then
@@ -53,6 +60,11 @@ private def topItem : Parser TopItem := fun state =>
   else if isKeyword state .typeKw then
     match typeAlias state with
     | .ok declaration next => .ok (wrapTypeAlias declaration) next
+    | .reject failure next => .reject failure next
+    | .invariant error => .invariant error
+  else if isKeyword state .functionKw then
+    match functionDecl .module state with
+    | .ok declaration next => .ok (wrapFunction declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else
