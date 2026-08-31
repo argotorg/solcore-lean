@@ -51,6 +51,14 @@ theorem coreLiteral_preservesTokensOnSuccess :
   intro input literal next result
   rw [coreLiteral_ok_state_shape result]
 
+/-- Core-literal success consumes exactly one token. -/
+theorem coreLiteral_cursor_lt_onSuccess {input next : State}
+    {literal : CoreLiteral}
+    (result : coreLiteral input = .ok literal next) :
+    input.cursor < next.cursor := by
+  rw [coreLiteral_ok_state_shape result]
+  simp
+
 /-- Core-literal success advances by exactly one token. -/
 theorem coreLiteral_cursorMonotoneOnSuccess :
     Parser.CursorMonotoneOnSuccess coreLiteral := by
@@ -63,6 +71,14 @@ theorem booleanIdentifier_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess booleanIdentifier := by
   intro input name next result
   rw [booleanIdentifier_ok_state_shape result]
+
+/-- Boolean-identifier success consumes exactly one token. -/
+theorem booleanIdentifier_cursor_lt_onSuccess {input next : State}
+    {name : Identifier}
+    (result : booleanIdentifier input = .ok name next) :
+    input.cursor < next.cursor := by
+  rw [booleanIdentifier_ok_state_shape result]
+  simp
 
 /-- Boolean-identifier success advances by exactly one token. -/
 theorem booleanIdentifier_cursorMonotoneOnSuccess :

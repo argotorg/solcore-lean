@@ -21,6 +21,9 @@ example : Parser.PreservesTokensOnSuccess coreLiteral :=
 example : Parser.PreservesTokensOnSuccess booleanIdentifier :=
   booleanIdentifier_preservesTokensOnSuccess
 
+example := @coreLiteral_cursor_lt_onSuccess
+example := @booleanIdentifier_cursor_lt_onSuccess
+
 example : Parser.CursorMonotoneOnSuccess coreLiteral :=
   coreLiteral_cursorMonotoneOnSuccess
 
