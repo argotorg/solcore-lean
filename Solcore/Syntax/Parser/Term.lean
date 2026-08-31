@@ -10,7 +10,9 @@ the final assignment-or-expression branch.  Keep that behavior explicit: the
 fallback supplies the recovered statement and cursor, while the more precise
 failure reached by the recognized branch supplies the sole diagnostic.
 -/
-private def recognizedStatementOrFallback
+namespace TermInternals
+
+def recognizedStatementOrFallback
     (primary fallback : Parser Statement) : Parser Statement := fun state =>
   match primary state with
   | .ok value next => .ok value next
@@ -23,35 +25,40 @@ private def recognizedStatementOrFallback
       | .invariant error => .invariant error
   | .invariant error => .invariant error
 
+end TermInternals
+
 private def statementLayer (nestedStatement : Parser Statement)
     (expression : Parser Expr) (pattern : Parser Pattern) : Parser Statement :=
     fun state =>
   let fallback := assignmentOrExpressionStatement expression
   if isKeyword state .letKw then
-    recognizedStatementOrFallback (letStatement expression) fallback state
+    TermInternals.recognizedStatementOrFallback
+      (letStatement expression) fallback state
   else if isKeyword state .returnKw then
-    recognizedStatementOrFallback (returnStatement expression) fallback state
+    TermInternals.recognizedStatementOrFallback
+      (returnStatement expression) fallback state
   else if isKeyword state .matchKw then
-    recognizedStatementOrFallback
+    TermInternals.recognizedStatementOrFallback
       (matchStatement nestedStatement expression pattern) fallback state
   else if isKeyword state .forKw then
-    recognizedStatementOrFallback
+    TermInternals.recognizedStatementOrFallback
       (forStatement nestedStatement expression) fallback state
   else if isContextual state .while then
-    recognizedStatementOrFallback
+    TermInternals.recognizedStatementOrFallback
       (whileStatement nestedStatement expression) fallback state
   else if isKeyword state .ifKw then
-    recognizedStatementOrFallback
+    TermInternals.recognizedStatementOrFallback
       (ifStatement nestedStatement expression) fallback state
   else if isKeyword state .assemblyKw then
-    recognizedStatementOrFallback assemblyStatement fallback state
+    TermInternals.recognizedStatementOrFallback
+      assemblyStatement fallback state
   else if isSymbol state .leftBrace then
-    recognizedStatementOrFallback
+    TermInternals.recognizedStatementOrFallback
       (blockStatement nestedStatement) fallback state
   else if isKeyword state .breakKw then
-    recognizedStatementOrFallback breakStatement fallback state
+    TermInternals.recognizedStatementOrFallback breakStatement fallback state
   else if isKeyword state .continueKw then
-    recognizedStatementOrFallback continueStatement fallback state
+    TermInternals.recognizedStatementOrFallback continueStatement fallback state
   else fallback state
 
 namespace TermInternals
