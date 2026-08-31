@@ -136,10 +136,12 @@ Totality is being closed from the outside inward. The production bounds for
 top-level and contract-member recovery, malformed type-alias recovery, pragma
 accumulation, and generic comma-delimited lists are proved adequate. The
 complete contract body is total once its member parser is invariant-free on
-valid input. The file loop and public parser are total once the derive-aware
-top-item parser is invariant-free on valid input. The next proof work is to
-discharge those two local premises through their nested parsers, followed by
-success soundness against a declarative grammar.
+valid input. The file loop and public parser now expose exactly eight remaining
+declaration obligations: import, export, type alias, module function, enum,
+trait, implementation, and contract. Pragma and the complete derive path are
+already discharged. The next proof work is to close those declaration and
+member obligations through their nested parsers, followed by success soundness
+against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the

@@ -290,17 +290,19 @@ that require element progress also rule out their no-progress paths.
 
 The complete contract body is ordinary under one remaining premise: each
 valid contract-member invocation must itself avoid an internal invariant. The
-complete file loop, `sourceFile`, `parseLexed`, and public `parse` similarly
-become total under one remaining premise at the derive-aware top-item parser.
-These are reductions, not claims that the two premises have already been
-discharged. Pragma declarations are already invariant-free without either
-premise.
+complete file loop, `sourceFile`, `parseLexed`, and public `parse` are now
+reduced further to eight explicit declaration parsers: import, export, type
+alias, module function, enum, trait, implementation, and contract. Pragma
+declarations, derive targets, derive attributes, derive recovery, attachment,
+dispatch, and outer item accumulation are discharged internally. This is a
+reduction, not a claim that the eight declaration obligations or the contract
+member premise have already been discharged.
 
-The remaining formal parser work is to discharge those local premises through
-the nested declaration, expression, pattern, statement, type, and Yul parsers,
-then relate successful execution to a declarative grammar. Parser-wide
-resource bounds are no longer an undivided open item: the outer accumulation,
-recovery, and generic delimiter bounds above are complete.
+The remaining formal parser work is to discharge those local obligations
+through the nested declaration, expression, pattern, statement, type, and Yul
+parsers, then relate successful execution to a declarative grammar.
+Parser-wide resource bounds are no longer an undivided open item: the outer
+accumulation, recovery, and generic delimiter bounds above are complete.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
