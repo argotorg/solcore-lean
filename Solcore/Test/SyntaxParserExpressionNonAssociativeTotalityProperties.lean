@@ -1,0 +1,12 @@
+import Solcore.Syntax.Parser.ExpressionNonAssociativeTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserExpressionNonAssociativeTotalityProperties
+
+open Solcore.Syntax.Parser.ExpressionInternals
+
+example := @nonAssociative_ordinary_of_elementFuel
+example := @nonAssociative_ne_invariant_of_elementFuel
+
+end Solcore.Test.SyntaxParserExpressionNonAssociativeTotalityProperties
