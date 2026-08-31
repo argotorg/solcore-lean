@@ -4,10 +4,15 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def unaryOp? : TokenKind → Option UnaryOp
+namespace ExpressionInternals
+
+/-- Recognize one canonical prefix unary operator token. -/
+def unaryOp? : TokenKind → Option UnaryOp
   | .symbol .bang => some .logicalNot
   | .symbol .tilde => some .bitNot
   | _ => none
+
+end ExpressionInternals
 
 private def binaryOp? : TokenKind → Option BinaryOp
   | .symbol .star => some .multiply
@@ -28,22 +33,28 @@ private def binaryOp? : TokenKind → Option BinaryOp
   | .symbol .logicalOr => some .logicalOr
   | _ => none
 
-private def unaryOperators :
+namespace ExpressionInternals
+
+/-- Consume the maximal prefix sequence of canonical unary operators. -/
+def unaryOperators :
     Nat → List (Located UnaryOp) → State → Reply (List (Located UnaryOp))
   | 0, _, state => .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1, operatorsRev, state =>
       match state.peek? with
       | some token =>
-          match unaryOp? token.value with
+          match ExpressionInternals.unaryOp? token.value with
           | some operator => unaryOperators fuel
               ({ span := token.span, value := operator } :: operatorsRev)
               { state with cursor := state.cursor + 1 }
           | none => .ok operatorsRev.reverse state
       | none => .ok operatorsRev.reverse state
 
+end ExpressionInternals
+
 private def expressionUnary (nested : Parser Expr)
     (block : Parser Block) : Parser Expr := fun state =>
-  match unaryOperators (state.remainingCount + 1) [] state with
+  match ExpressionInternals.unaryOperators
+      (state.remainingCount + 1) [] state with
   | .ok operators afterOperators =>
       match expressionPostfix nested block afterOperators with
       | .ok base next =>

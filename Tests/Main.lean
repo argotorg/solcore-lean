@@ -28,6 +28,7 @@ import Solcore.Test.SyntaxParserDeriveTargetProperties
 import Solcore.Test.SyntaxParserDiagnosticSuppression
 import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExpressionAtomProperties
+import Solcore.Test.SyntaxParserExpressionProperties
 import Solcore.Test.SyntaxParserExportProperties
 import Solcore.Test.SyntaxParserExports
 import Solcore.Test.SyntaxParserFunctionSignatureProperties
