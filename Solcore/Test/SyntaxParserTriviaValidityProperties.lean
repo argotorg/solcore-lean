@@ -21,5 +21,8 @@ example := @attachTopItemComments_leading_validFor
 example := @attachTopItemComments_trait_validFor
 example := @attachTopItemComments_impl_validFor
 example := @attachTopItemComments_validFor
+example := @attachTopItemComments_span
+example := @attachTopItemComments_list_validFor
+example := @parsedFile_withAttachedComments_validFor
 
 end Tests

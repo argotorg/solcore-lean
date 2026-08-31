@@ -338,4 +338,46 @@ theorem attachTopItemComments_validFor
       exact TopItem.ValidFor.error spanValid
         (commentsDirectlyBefore_validFor file comments commentsValid span.startByte)
 
+/-- Comment attachment never changes a top-level item's source range. -/
+@[simp] theorem attachTopItemComments_span (file : SourceFile)
+    (comments : List Comment) (item : TopItem) :
+    (attachTopItemComments file comments item).span = item.span := by
+  rfl
+
+/-- Attaching one shared comment stream preserves a valid top-level list. -/
+theorem attachTopItemComments_list_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (expressionValid : SourceFile → Expr → Prop)
+    (file : SourceFile) (comments : List Comment)
+    (commentsValid : ∀ comment ∈ comments, comment.span.ValidFor file)
+    (items : List TopItem)
+    (itemsValid : List.ValidFor
+      (TopItem.ValidFor statementValid expressionValid) file items) :
+    List.ValidFor (TopItem.ValidFor statementValid expressionValid) file
+      (items.map (attachTopItemComments file comments)) := by
+  intro attached attachedMember
+  rcases List.mem_map.mp attachedMember with ⟨item, itemMember, rfl⟩
+  exact attachTopItemComments_validFor statementValid expressionValid file
+    comments commentsValid item (itemsValid item itemMember)
+
+/-- Build a valid complete parsed file after attaching its lexical comments. -/
+theorem parsedFile_withAttachedComments_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (expressionValid : SourceFile → Expr → Prop)
+    (file : SourceFile) (comments : List Comment)
+    (commentsValid : ∀ comment ∈ comments, comment.span.ValidFor file)
+    (items : List TopItem)
+    (itemsValid : List.ValidFor
+      (TopItem.ValidFor statementValid expressionValid) file items) :
+    ParsedFile.ValidFor statementValid expressionValid file {
+      source := file.id
+      span := SourceSpan.fullFile file
+      items := items.map (attachTopItemComments file comments)
+      comments
+    } := by
+  exact ⟨rfl, SourceSpan.fullFile_validFor file,
+    attachTopItemComments_list_validFor statementValid expressionValid file
+      comments commentsValid items itemsValid,
+    commentsValid⟩
+
 end Solcore.Syntax.Parser
