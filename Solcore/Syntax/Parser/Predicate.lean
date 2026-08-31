@@ -5,30 +5,12 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def requireTypeArguments (values : DelimitedList TypeExpr) :
-    Parser (NonemptyDelimitedList TypeExpr) :=
-  match values.elements with
-  | head :: tail => pure {
-      span := values.span
-      elements := { head, tail }
-    }
-  | [] => fun _ => .invariant (.noProgress .typeExpr values.span)
-
 /-- Parse one trait predicate `subject: Trait<arguments...>`. -/
 def predicate : Parser Predicate := do
   let subject ← typeExpr
   let _ ← symbol .colon .typeExpr
   let traitName ← identifier .typeExpr
-  let state ← getState
-  let arguments ←
-    if isSymbol state .less then
-      do
-        let values ← delimited .less .greater false typeExpr
-          .typeExpr .typeExpr
-        let nonempty ← requireTypeArguments values
-        pure (some nonempty)
-    else
-      pure none
+  let arguments ← parseNamedTypeArguments typeExpr
   let endSpan := match arguments with
     | some values => values.span
     | none => traitName.span
