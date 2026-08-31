@@ -101,6 +101,12 @@ private def testTopLevelRecovery : IO Unit := do
           "top-level recovery: wrong recovered item shapes")
   | items => throw (IO.userError
       s!"top-level recovery: expected two items, got {items.length}")
+  match output.parseDiagnostics with
+  | [{ span, kind := .recovered .topItem }] =>
+      assertEqual (byteRange span) (0, 4)
+        "top-level recovery diagnostic span"
+  | diagnostics => throw (IO.userError
+      s!"top-level recovery: wrong diagnostics {reprStr diagnostics}")
 
 private def nestedNamed : Nat → String
   | 0 => "word"

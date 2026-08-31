@@ -107,12 +107,12 @@ private def parseItems :
               failedState with
               cursor := state.cursor
             }
-            let diagnosed := rewound.emit failure.toDiagnostic
             if atTopItemStart state then
               -- Rust recovery also refuses to consume a recognized item start.
-              .ok itemsRev.reverse diagnosed
+              .ok itemsRev.reverse (rewound.emit failure.toDiagnostic)
             else
-              match recoverTopItem diagnosed with
+              -- The enclosing recovery diagnostic replaces its inner failure.
+              match recoverTopItem rewound with
               | .ok item next =>
                   parseItems fuel (item :: itemsRev) next
               | .reject recoveryFailure next =>
