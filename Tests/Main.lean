@@ -14,6 +14,7 @@ import Solcore.Test.SyntaxParserDeclarationTrivia
 import Solcore.Test.SyntaxParserDiagnosticSuppression
 import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExports
+import Solcore.Test.SyntaxParserLegacyRejection
 import Solcore.Test.SyntaxParserModules
 import Solcore.Test.SyntaxParserRecovery
 import Solcore.Test.SyntaxParserReservedWords
@@ -5070,6 +5071,7 @@ def run : IO Unit := do
   testSyntaxParserDeclarationTrivia
   testSyntaxParserDiagnosticSuppression
   testSyntaxParserEnumTraitImpl
+  testSyntaxParserLegacyRejection
   testSyntaxParserModules
   testSyntaxParserExports
   testSyntaxParserTypes
