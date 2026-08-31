@@ -10,12 +10,19 @@ open Solcore.Syntax
 open Solcore.Syntax.Parser
 
 example := @coreBlock_preservesTokensOnSuccess
+example := @coreBlock_preservesTokenWindow
 example := @coreBlock_cursor_lt_onSuccess
 example := @coreBlock_cursorMonotoneOnSuccess
 example := @hasBalancedBlockCapture
 example := @isolateBlock_preservesTokensOnSuccess
+example := @isolateBlock_preservesTokenWindow
 example := @isolateBlock_cursor_lt_onSuccess_of_balancedCapture
 example := @isolateBlock_cursorMonotoneOnSuccess
+
+example (statement : Parser Statement) (policy : TailExpressionPolicy)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (coreBlock statement policy) :=
+  coreBlock_preservesTokenWindow statement policy statementShape
 
 example (statement : Parser Statement) (policy : TailExpressionPolicy)
     (statementShape : Parser.PreservesTokensOnSuccess statement) :
@@ -38,6 +45,11 @@ example (parser : Parser Block)
       Parser.CursorMonotoneOnSuccess (isolateBlock parser) :=
   ⟨isolateBlock_preservesTokensOnSuccess parser shape,
     isolateBlock_cursorMonotoneOnSuccess parser monotone⟩
+
+example (parser : Parser Block)
+    (shape : Parser.PreservesTokenWindow parser) :
+    Parser.PreservesTokenWindow (isolateBlock parser) :=
+  isolateBlock_preservesTokenWindow parser shape
 
 example (parser : Parser Block) {input next : State} {body : Block}
     (captured : hasBalancedBlockCapture input = true)

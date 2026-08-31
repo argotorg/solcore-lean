@@ -107,6 +107,33 @@ private theorem validateBlockTails_state_shape :
           exact ⟨recursive.1.trans update.1,
             recursive.2.trans update.2⟩
 
+private theorem validateExpressionSemicolon_window_shape
+    (statement : Statement) (state : State) :
+    (validateExpressionSemicolon statement state).window = state.window := by
+  rcases statement with ⟨span, value⟩
+  cases value <;> try rfl
+  case expression expression trailingSemicolon =>
+    cases trailingSemicolon <;> rfl
+
+private theorem validateBlockTails_window_shape :
+    ∀ policy statements state,
+      (validateBlockTails policy statements state).window = state.window := by
+  intro policy statements
+  induction statements with
+  | nil => intro state; rfl
+  | cons first rest inductionHypothesis =>
+      intro state
+      cases rest with
+      | nil =>
+          cases policy with
+          | allow => rfl
+          | require =>
+              exact validateExpressionSemicolon_window_shape first state
+      | cons second tail =>
+          exact (inductionHypothesis
+            (validateExpressionSemicolon first state)).trans
+              (validateExpressionSemicolon_window_shape first state)
+
 private theorem bind_cursor_lt_onSuccess_of_first {α β : Type}
     {first : Parser α} {next : α → Parser β}
     (firstStrict : ∀ input value afterFirst,
@@ -147,6 +174,23 @@ private theorem closeCoreBlock_preservesTokensOnSuccess (opening : Token)
     exact (validateBlockTails_state_shape policy bodyRev.reverse state).1
   · intro _
     exact Parser.pure_preservesTokensOnSuccess _
+
+private theorem closeCoreBlock_preservesTokenWindow (opening : Token)
+    (policy : TailExpressionPolicy) (bodyRev : List Statement) :
+    Parser.PreservesTokenWindow
+      (closeCoreBlock opening policy bodyRev) := by
+  unfold closeCoreBlock
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .rightBrace .statement)
+  intro closing
+  dsimp only
+  apply Parser.bind_preservesTokenWindow
+  · apply modifyState_preservesTokenWindow
+    intro state
+    exact ⟨(validateBlockTails_state_shape policy bodyRev.reverse state).1,
+      validateBlockTails_window_shape policy bodyRev.reverse state⟩
+  · intro _
+    exact Parser.pure_preservesTokenWindow _
 
 private theorem closeCoreBlock_cursor_lt_onSuccess (opening : Token)
     (policy : TailExpressionPolicy) (bodyRev : List Statement)
@@ -258,6 +302,64 @@ private theorem coreBlockItems_cursor_lt_onSuccess
               · contradiction
           | reject failure rejected => simp [statementResult] at result
           | invariant error => simp [statementResult] at result
+
+private theorem coreBlockItems_preservesTokenWindow
+    (statement : Parser Statement)
+    (statementShape : Parser.PreservesTokenWindow statement)
+    (opening : Token) (policy : TailExpressionPolicy) :
+    ∀ fuel bodyRev,
+      Parser.PreservesTokenWindow
+        (coreBlockItems statement opening policy fuel bodyRev) := by
+  intro fuel
+  induction fuel with
+  | zero => intro bodyRev input; trivial
+  | succ fuel inductionHypothesis =>
+      intro bodyRev input
+      unfold coreBlockItems
+      split
+      · exact closeCoreBlock_preservesTokenWindow opening policy bodyRev input
+      · split
+        · have closingShape :=
+            symbol_preservesTokenWindow .rightBrace .statement input
+          cases closingResult : symbol .rightBrace .statement input with
+          | ok closing afterClosing => trivial
+          | reject failure rejected =>
+              rw [closingResult] at closingShape
+              exact closingShape
+          | invariant error => trivial
+        · have itemShape := statementShape input
+          cases statementResult : statement input with
+          | ok value afterStatement =>
+              rw [statementResult] at itemShape
+              simp only
+              split
+              · exact (inductionHypothesis (value :: bodyRev)
+                  afterStatement).trans itemShape
+              · trivial
+          | reject failure rejected =>
+              rw [statementResult] at itemShape
+              exact itemShape
+          | invariant error => trivial
+
+/-- Core-block replies preserve the statement parser's complete token window. -/
+theorem coreBlock_preservesTokenWindow (statement : Parser Statement)
+    (policy : TailExpressionPolicy)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (coreBlock statement policy) := by
+  intro input
+  unfold coreBlock
+  have openingShape :=
+    symbol_preservesTokenWindow .leftBrace .statement input
+  cases openingResult : symbol .leftBrace .statement input with
+  | ok opening afterOpening =>
+      rw [openingResult] at openingShape
+      exact (coreBlockItems_preservesTokenWindow statement statementShape
+        opening policy (afterOpening.remainingCount + 1) []
+        afterOpening).trans openingShape
+  | reject failure rejected =>
+      rw [openingResult] at openingShape
+      exact openingShape
+  | invariant error => trivial
 
 /-- Core-block success preserves the statement parser's immutable carrier. -/
 theorem coreBlock_preservesTokensOnSuccess (statement : Parser Statement)
@@ -451,6 +553,28 @@ theorem isolateBlock_preservesTokensOnSuccess (parser : Parser Block)
           rfl
       | invariant error =>
           simp [childResult] at result
+
+/-- Block isolation preserves the parent's complete ordinary token window. -/
+theorem isolateBlock_preservesTokenWindow (parser : Parser Block)
+    (parserShape : Parser.PreservesTokenWindow parser) :
+    Parser.PreservesTokenWindow (isolateBlock parser) := by
+  intro input
+  unfold isolateBlock
+  cases captureResult : captureBlock? input with
+  | none =>
+      exact parserShape input
+  | some captured =>
+      simp only
+      cases childResult : parser
+          (input.enterWindow input.cursor captured.window) with
+      | ok childBody childAfter =>
+          simp only [Reply.PreservesTokenWindow]
+          exact ⟨rfl, rfl⟩
+      | reject failure childAfter =>
+          simp only [Reply.PreservesTokenWindow]
+          exact ⟨rfl, rfl⟩
+      | invariant error =>
+          simp only [Reply.PreservesTokenWindow]
 
 private theorem isolateBlock_cursor_lt_onSuccess_of_capture
     (parser : Parser Block) {input next : State} {body : Block}
