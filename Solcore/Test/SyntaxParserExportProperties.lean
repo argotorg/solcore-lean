@@ -48,5 +48,10 @@ example := @pathExport_preservesTokenWindow
 example := @pathExport_preservesTokensOnSuccess
 example := @pathExport_cursorMonotoneOnSuccess
 example := @pathExport_keepsStartByte
+example := @exportDecl_validFor
+example := @exportDecl_preservesTokenWindow
+example := @exportDecl_preservesTokensOnSuccess
+example := @exportDecl_cursorMonotoneOnSuccess
+example := @exportDecl_startsAtCurrentTokenOnSuccess
 
 end Tests

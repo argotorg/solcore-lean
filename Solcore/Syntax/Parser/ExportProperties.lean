@@ -1595,4 +1595,89 @@ theorem pathExport_keepsStartByte (start : SourceSpan)
       exact finishExport_keepsStartByte start (.moduleAs path alias) finished
     · exact finishExport_keepsStartByte start (.module path) rest
 
+/-- Complete export parsing preserves every retained source range. -/
+theorem exportDecl_validFor : exportDecl.ValidFor ExportDecl.ValidFor := by
+  intro input inputValid
+  unfold exportDecl
+  cases keywordResult : keyword .exportKw .exportDecl input with
+  | invariant error => simp only [bind, keywordResult, Reply.ValidFor]
+  | reject failure rejected =>
+      have keywordReply := keyword_validFor .exportKw .exportDecl
+        input inputValid
+      rw [keywordResult] at keywordReply
+      simpa only [bind, keywordResult, Reply.ValidFor] using keywordReply
+  | ok exportKeyword afterKeyword =>
+      have keywordReply := keyword_validFor .exportKw .exportDecl
+        input inputValid
+      rw [keywordResult] at keywordReply
+      have keywordShape := acceptToken_ok_state_shape
+        (.keyword .exportKw) .exportDecl (· == .keyword .exportKw)
+        keywordResult
+      have startFoundAfter :
+          afterKeyword.tokens[input.cursor]? = some exportKeyword := by
+        rw [keywordShape.2]
+        exact State.getElem?_eq_some_of_peek?_eq_some keywordShape.1
+      have startBeforeAfter : input.cursor < afterKeyword.cursor := by
+        rw [keywordShape.2]
+        simp
+      have startValidAfter :
+          exportKeyword.span.ValidFor afterKeyword.file := by
+        have validAtInput : exportKeyword.span.ValidFor input.file := by
+          simpa only [Located.ValidFor] using keywordReply.1
+        simpa [keywordReply.2.2] using validAtInput
+      simp only [bind, keywordResult, getState]
+      split
+      · exact (localExport_validFor exportKeyword.span afterKeyword
+          keywordReply.2.1 startValidAfter startFoundAfter rfl
+          startBeforeAfter).of_file_eq keywordReply.2.2
+      · exact (pathExport_validFor exportKeyword.span afterKeyword
+          keywordReply.2.1 startValidAfter startFoundAfter rfl
+          startBeforeAfter).of_file_eq keywordReply.2.2
+
+/-- Complete export parsing preserves every ordinary token window. -/
+theorem exportDecl_preservesTokenWindow :
+    Parser.PreservesTokenWindow exportDecl := by
+  unfold exportDecl
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .exportKw .exportDecl)
+  intro exportKeyword
+  apply Parser.bind_preservesTokenWindow getState_preservesExportTokenWindow
+  intro observed
+  split
+  · exact localExport_preservesTokenWindow exportKeyword.span
+  · exact pathExport_preservesTokenWindow exportKeyword.span
+
+theorem exportDecl_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess exportDecl :=
+  exportDecl_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Complete export parsing never rewinds the parser cursor. -/
+theorem exportDecl_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess exportDecl := by
+  unfold exportDecl
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .exportKw .exportDecl)
+  intro exportKeyword
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  split
+  · exact localExport_cursorMonotoneOnSuccess exportKeyword.span
+  · exact pathExport_cursorMonotoneOnSuccess exportKeyword.span
+
+/-- Complete export parsing starts at the leading `export` token. -/
+theorem exportDecl_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess exportDecl (·.span) := by
+  unfold exportDecl
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess
+      (.keyword .exportKw) .exportDecl (· == .keyword .exportKw))
+  intro exportKeyword input result final parsed
+  rcases exportBind_ok_components parsed with
+    ⟨observed, afterObserved, observedResult, branchResult⟩
+  unfold getState at observedResult
+  cases observedResult
+  split at branchResult
+  · exact localExport_keepsStartByte exportKeyword.span branchResult
+  · exact pathExport_keepsStartByte exportKeyword.span branchResult
+
 end Solcore.Syntax.Parser
