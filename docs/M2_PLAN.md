@@ -81,22 +81,31 @@ through recovery, and their delimited function-parameter list has the complete
 compositional boundary.
 
 The recursive validity contracts for types, Yul syntax, Core expressions,
-patterns, and Core statements are defined independently of parser control
-flow. Type and Yul lifting are complete at their public parser boundaries.
-Pattern lifting covers wildcard, literal and Boolean leaves, both constructor
-forms, parenthesized groups and tuples, and comptime patterns. Their common
-dispatch and recovery layer also satisfy the compositional contracts; lifting
-that layer through the public fuel-indexed recursion remains. Core expression
-lifting covers literal, identifier, proxy, and leading-dot constructor atoms,
-complete parenthesized groups and tuples, prefix-unary scanning, and the binary
-operator helper layer. Assignment/expression, `let`, return, block, and `while`
-statements have complete ordinary-result contracts. Non-`let` `for`-header
-items have also reached that boundary. The remaining Core expression,
-statement, declaration, and complete-file parsers are active work.
+patterns, and Core statements are independent of parser control flow. The
+proof implementation currently has the following shape:
 
-The remaining proof boundary also includes parser-generated diagnostic
-validity, provenance and unreachability of grammar invariant failures, parser
-resource bounds, and parser success soundness against a declarative grammar.
+- public type and Yul parsers are complete at the compositional boundary;
+- pattern leaves, constructors, groups, tuples, comptime forms, dispatch, and
+  recovery are complete below the public fuel-indexed recursive wrapper;
+- established expression atoms, groups, tuples, arrays, operator helpers, and
+  the left- and non-associative layers have complete contracts;
+- conditional folding and the conditional tail preserve recursive validity,
+  token windows, carriers, and cursor order;
+- lambda return types and lambda-expression state/start/end behavior are
+  proved, while ordinary, comptime, and recovery lambda-parameter branches
+  retain source-valid values;
+- assignment/expression, `let`, return, block, `while`, `if`, and `for`
+  statements are complete, including both `for` item forms and item lists; and
+- match cases and the repeated case loop are complete below default-body and
+  outer-match assembly.
+
+The next proof work is therefore concrete: close the postfix and unary
+expression wrappers, complete the outer conditional and lambda parsers, lift
+the shared pattern layer through public recursion, and finish default and outer
+match parsing. Remaining declarations and the complete-file parser follow.
+Parser-generated diagnostic validity, grammar-invariant provenance and
+unreachability, resource bounds, and success soundness against a declarative
+grammar remain part of the final boundary.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the

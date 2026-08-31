@@ -219,31 +219,40 @@ function parameters retain
 source provenance through both ordinary parsing and recovery. Diagnostic
 filtering can only remove diagnostics and preserves span validity.
 
-Reusable recursive contracts now state what it means for every retained range
-inside a type, Yul expression or statement, Core expression, pattern, or Core
-statement to belong to the original source. The public Yul expression,
-statement, and body parsers now satisfy the full provenance, token-window,
-carrier, cursor, and starting-token boundary. Type syntax has likewise been
-lifted through its public recursive parser. Pattern lifting now covers the
-wildcard, literal and Boolean leaves, qualified and leading-dot constructors,
-parenthesized groups and tuples, and comptime patterns. Their common dispatch
-and recovery layer also satisfy those contracts. Connecting that generic layer
-through the fuel-indexed public pattern parser remains active work. Core
-expression lifting covers literal, identifier, proxy, and leading-dot
-constructor atoms, complete parenthesized groups and tuples, the prefix-unary
-scanner, and the binary-operator helper layer. The remaining postfix and
-operator-precedence layers are still being composed. Assignment/expression,
-`let`, return, block, and `while` statements now have the full provenance,
-token-window, carrier, cursor, and starting-token boundary. Non-`let` items in
-`for` headers have the same contract; the complete `for` statement and other
-control forms remain in progress. Proof lifting also
-remains active for other declarations and the complete-file parser; defining a
-validity predicate alone is not treated as proof that a parser satisfies it.
+Reusable contracts now describe both retained source ranges and parser-state
+behavior. At the current proof boundary:
 
-The remaining proof work includes those unclosed recursive and declaration
-parsers, validity of every parser-generated diagnostic, provenance and
-unreachability of grammar invariant failures, parser resource bounds, and
-soundness against a declarative grammar.
+- the public type and Yul parsers have complete source-validity, token-window,
+  carrier, cursor, and starting-token contracts;
+- pattern proofs cover leaves, constructor forms, parenthesized groups and
+  tuples, comptime patterns, and the shared dispatch and recovery layer;
+- expression proofs cover the established atoms, parenthesized expressions and
+  tuples, array literals, the prefix-operator scanner, binary-operator helpers,
+  and the complete left- and non-associative layers;
+- conditional-expression folding and its fuel-indexed tail preserve recursive
+  source validity as well as token-window, carrier, and cursor contracts;
+- lambda return-type parsing and the lambda expression's state, start, and body
+  endpoint contracts are complete, and the ordinary, comptime, and recovery
+  lambda-parameter branches preserve source validity;
+- assignment/expression, `let`, return, block, `while`, `if`, and `for`
+  statements have complete source-validity and state contracts, including both
+  kinds of `for` header item and their comma-separated lists; and
+- individual `match` cases and the repeated case list preserve their retained
+  patterns, bodies, source ranges, token windows, carriers, and cursor order.
+
+The remaining recursive boundary is explicit. The postfix layer, the unary
+expression wrapper, and the outer conditional-expression parser are not yet
+closed. Lambda precursors have not yet been assembled into complete lambda
+expression validity. The common pattern layer still needs lifting through the
+public fuel-indexed recursive pattern parser. Match default-body handling and
+the enclosing `match` statement remain open. Other declaration parsers and the
+complete-file parser also remain active work; defining a validity predicate is
+not treated as proof that a parser satisfies it.
+
+Beyond those parser-specific gaps, remaining work includes validity of every
+parser-generated diagnostic, provenance and unreachability of grammar
+invariant failures, parser resource bounds, and soundness against a declarative
+grammar.
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
