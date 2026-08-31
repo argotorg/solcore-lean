@@ -1,6 +1,34 @@
-import Solcore.Syntax.Parser.Primitive
+import Solcore.Syntax.Parser.Validity
+import Solcore.Syntax.Parser.StateCursorProperties
 
 set_option autoImplicit false
+
+namespace Solcore.Syntax
+
+namespace DelimitedList
+
+/-- The delimiter range and every retained element belong to one input file. -/
+def ValidFor {α : Type} (elementValid : SourceFile → α → Prop)
+    (file : SourceFile) (values : DelimitedList α) : Prop :=
+  values.span.ValidFor file ∧
+    ∀ element ∈ values.elements, elementValid file element
+
+end DelimitedList
+
+namespace Parser
+
+namespace Parser
+
+/-- Successful parsing preserves the immutable token carrier. -/
+def PreservesTokensOnSuccess {α : Type} (parser : Parser α) : Prop :=
+  ∀ input value next, parser input = .ok value next →
+    next.tokens = input.tokens
+
+end Parser
+
+end Parser
+
+end Solcore.Syntax
 
 namespace Solcore.Syntax.Parser
 
@@ -14,6 +42,47 @@ private def closeDelimited {α : Type} (opening : Token)
     } next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+private theorem closeDelimited_validFor {α : Type}
+    (elementValid : SourceFile → α → Prop)
+    (opening : Token) (closing : Symbol) (context : ParseContext)
+    (elementsRev : List α) (state : State) (openingIndex : Nat)
+    (stateValid : state.ValidFor)
+    (openingValid : opening.span.ValidFor state.file)
+    (elementsValid : ∀ element ∈ elementsRev,
+      elementValid state.file element)
+    (openingFound : state.tokens[openingIndex]? = some opening)
+    (openingBeforeCursor : openingIndex < state.cursor) :
+    (closeDelimited opening closing context elementsRev state).ValidFor
+      state (DelimitedList.ValidFor elementValid) := by
+  unfold closeDelimited
+  cases closingResult : symbol closing context state with
+  | invariant error => simp only [Reply.ValidFor]
+  | reject failure rejected =>
+      have closingValid := symbol_validFor closing context state stateValid
+      rw [closingResult] at closingValid
+      simpa only [Reply.ValidFor] using closingValid
+  | ok closingToken next =>
+      have closingValid := symbol_validFor closing context state stateValid
+      rw [closingResult] at closingValid
+      have closingShape := symbol_ok_state_shape closing context closingResult
+      have closingFound :=
+        State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have openingBeforeClosing :=
+        stateValid.token_end_le_token_start_of_getElem?_lt
+          openingFound closingFound openingBeforeCursor
+      have closingSpanValid : closingToken.span.ValidFor state.file := by
+        simpa only [Located.ValidFor] using closingValid.1
+      have coverValid :
+          (SourceSpan.cover opening.span closingToken.span).ValidFor state.file := by
+        apply SourceSpan.cover_validFor openingValid closingSpanValid
+        exact Nat.le_trans openingValid.2.1
+          (Nat.le_trans openingBeforeClosing closingSpanValid.2.1)
+      simp only
+      unfold Reply.ValidFor DelimitedList.ValidFor
+      refine ⟨⟨coverValid, ?_⟩, closingValid.2.1, closingValid.2.2⟩
+      intro element member
+      exact elementsValid element (by simpa using member)
 
 private def afterDelimitedElement {α : Type}
     (element : Parser α) (closing : Symbol)
@@ -49,6 +118,106 @@ private def afterDelimitedElement {α : Type}
           tail := [.symbol closing]
         } context
 
+private theorem afterDelimitedElement_validFor {α : Type}
+    (elementValid : SourceFile → α → Prop) (element : Parser α)
+    (elementContract : element.ValidFor elementValid)
+    (elementShape : Parser.PreservesTokensOnSuccess element)
+    (closing : Symbol) (allowTrailing : Bool)
+    (context : ParseContext) (phase : ParserPhase) (opening : Token) :
+    ∀ fuel elementsRev state openingIndex,
+      state.ValidFor →
+      opening.span.ValidFor state.file →
+      (∀ value ∈ elementsRev, elementValid state.file value) →
+      state.tokens[openingIndex]? = some opening →
+      openingIndex < state.cursor →
+      (afterDelimitedElement element closing allowTrailing context phase opening
+        fuel elementsRev state).ValidFor state
+          (DelimitedList.ValidFor elementValid) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro elementsRev state openingIndex stateValid openingValid
+        elementsValid openingFound openingBeforeCursor
+      trivial
+  | succ fuel inductionHypothesis =>
+      intro elementsRev state openingIndex stateValid openingValid
+        elementsValid openingFound openingBeforeCursor
+      unfold afterDelimitedElement
+      split
+      · cases commaResult : symbol .comma context state with
+        | invariant error => simp only [Reply.ValidFor]
+        | reject failure rejected =>
+            have commaValid := symbol_validFor .comma context state stateValid
+            rw [commaResult] at commaValid
+            simpa only [Reply.ValidFor] using commaValid
+        | ok comma afterComma =>
+            have commaValid := symbol_validFor .comma context state stateValid
+            rw [commaResult] at commaValid
+            have commaShape := symbol_ok_state_shape .comma context commaResult
+            have openingValidAfterComma :
+                opening.span.ValidFor afterComma.file := by
+              simpa [commaValid.2.2] using openingValid
+            have elementsValidAfterComma : ∀ value ∈ elementsRev,
+                elementValid afterComma.file value := by
+              intro value member
+              simpa [commaValid.2.2] using elementsValid value member
+            have openingFoundAfterComma :
+                afterComma.tokens[openingIndex]? = some opening := by
+              simpa [commaShape.2] using openingFound
+            have openingBeforeAfterComma : openingIndex < afterComma.cursor := by
+              rw [commaShape.2]
+              exact Nat.lt_of_lt_of_le openingBeforeCursor
+                (Nat.le_add_right state.cursor 1)
+            simp only
+            split
+            · have closed := closeDelimited_validFor elementValid opening
+                closing context elementsRev afterComma openingIndex
+                commaValid.2.1 openingValidAfterComma
+                elementsValidAfterComma openingFoundAfterComma
+                openingBeforeAfterComma
+              exact closed.of_file_eq commaValid.2.2
+            · cases elementResult : element afterComma with
+              | invariant error => simp only [Reply.ValidFor]
+              | reject failure rejected =>
+                  have valueValid := elementContract afterComma commaValid.2.1
+                  rw [elementResult] at valueValid
+                  simpa only [Reply.ValidFor] using
+                    valueValid.of_file_eq commaValid.2.2
+              | ok value next =>
+                  have valueValid := elementContract afterComma commaValid.2.1
+                  rw [elementResult] at valueValid
+                  have tokensEq := elementShape afterComma value next elementResult
+                  simp only
+                  split
+                  · have openingValidNext :
+                        opening.span.ValidFor next.file := by
+                      simpa [valueValid.2.2] using openingValidAfterComma
+                    have valueValidNext : elementValid next.file value := by
+                      simpa [valueValid.2.2] using valueValid.1
+                    have elementsValidNext : ∀ item ∈ value :: elementsRev,
+                        elementValid next.file item := by
+                      intro item member
+                      rcases List.mem_cons.mp member with rfl | member
+                      · exact valueValidNext
+                      · simpa [valueValid.2.2] using
+                          elementsValidAfterComma item member
+                    have openingFoundNext :
+                        next.tokens[openingIndex]? = some opening := by
+                      simpa [tokensEq] using openingFoundAfterComma
+                    have recursiveValid := inductionHypothesis
+                      (value :: elementsRev) next openingIndex valueValid.2.1
+                      openingValidNext elementsValidNext openingFoundNext
+                      (Nat.lt_trans openingBeforeAfterComma (by assumption))
+                    exact recursiveValid.of_file_eq
+                      (valueValid.2.2.trans commaValid.2.2)
+                  · simp only [Reply.ValidFor]
+      · split
+        · exact closeDelimited_validFor elementValid opening closing context
+            elementsRev state openingIndex stateValid openingValid
+            elementsValid openingFound openingBeforeCursor
+        · unfold rejectAt Reply.ValidFor
+          exact ⟨stateValid.currentSpan_validFor, stateValid, rfl⟩
+
 /--
 Parse a comma-separated delimited sequence. Empty and trailing-comma policy is
 selected by the caller; every accepted element must advance the cursor.
@@ -75,16 +244,116 @@ def delimitedWithPolicy {α : Type} (opening closing : Symbol)
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
+/-- A valid, token-preserving element parser lifts through delimiter policy. -/
+theorem delimitedWithPolicy_validFor {α : Type}
+    (elementValid : SourceFile → α → Prop)
+    (opening closing : Symbol) (allowEmpty allowTrailing : Bool)
+    (element : Parser α) (context : ParseContext) (phase : ParserPhase)
+    (elementContract : element.ValidFor elementValid)
+    (elementShape : Parser.PreservesTokensOnSuccess element) :
+    (delimitedWithPolicy opening closing allowEmpty allowTrailing element
+      context phase).ValidFor (DelimitedList.ValidFor elementValid) := by
+  intro input inputValid
+  unfold delimitedWithPolicy
+  cases openingResult : symbol opening context input with
+  | invariant error => simp only [Reply.ValidFor]
+  | reject failure rejected =>
+      have openingValid := symbol_validFor opening context input inputValid
+      rw [openingResult] at openingValid
+      simpa only [Reply.ValidFor] using openingValid
+  | ok openingToken afterOpening =>
+      have openingValid := symbol_validFor opening context input inputValid
+      rw [openingResult] at openingValid
+      have openingShape := symbol_ok_state_shape opening context openingResult
+      have openingSpanValid : openingToken.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using openingValid.1
+      have openingFoundInput :=
+        State.getElem?_eq_some_of_peek?_eq_some openingShape.1
+      have openingSpanValidAfter :
+          openingToken.span.ValidFor afterOpening.file := by
+        simpa [openingValid.2.2] using openingSpanValid
+      have openingFoundAfter :
+          afterOpening.tokens[input.cursor]? = some openingToken := by
+        simpa [openingShape.2] using openingFoundInput
+      have openingBeforeAfter : input.cursor < afterOpening.cursor := by
+        rw [openingShape.2]
+        simp
+      simp only
+      split
+      · have closed := closeDelimited_validFor elementValid openingToken
+          closing context [] afterOpening input.cursor openingValid.2.1
+          openingSpanValidAfter (by simp) openingFoundAfter openingBeforeAfter
+        exact closed.of_file_eq openingValid.2.2
+      · cases elementResult : element afterOpening with
+        | invariant error => simp only [Reply.ValidFor]
+        | reject failure rejected =>
+            have valueValid := elementContract afterOpening openingValid.2.1
+            rw [elementResult] at valueValid
+            simpa only [Reply.ValidFor] using
+              valueValid.of_file_eq openingValid.2.2
+        | ok value next =>
+            have valueValid := elementContract afterOpening openingValid.2.1
+            rw [elementResult] at valueValid
+            have tokensEq := elementShape afterOpening value next elementResult
+            simp only
+            split
+            · have openingSpanValidNext :
+                  openingToken.span.ValidFor next.file := by
+                simpa [valueValid.2.2] using openingSpanValidAfter
+              have valueValidNext : elementValid next.file value := by
+                simpa [valueValid.2.2] using valueValid.1
+              have openingFoundNext :
+                  next.tokens[input.cursor]? = some openingToken := by
+                simpa [tokensEq] using openingFoundAfter
+              have tailValid := afterDelimitedElement_validFor elementValid
+                element elementContract elementShape closing allowTrailing
+                context phase openingToken (afterOpening.remainingCount + 1)
+                [value] next input.cursor valueValid.2.1
+                openingSpanValidNext (by
+                  intro item member
+                  simp only [List.mem_singleton] at member
+                  subst item
+                  exact valueValidNext)
+                openingFoundNext
+                (Nat.lt_trans openingBeforeAfter (by assumption))
+              exact tailValid.of_file_eq
+                (valueValid.2.2.trans openingValid.2.2)
+            · simp only [Reply.ValidFor]
+
 /-- Parse a delimited list whose final comma is accepted. -/
 def delimited {α : Type} (opening closing : Symbol) (allowEmpty : Bool)
     (element : Parser α) (context : ParseContext)
     (phase : ParserPhase) : Parser (DelimitedList α) :=
   delimitedWithPolicy opening closing allowEmpty true element context phase
 
+/-- Trailing-comma lists preserve delimiter and element provenance. -/
+theorem delimited_validFor {α : Type}
+    (elementValid : SourceFile → α → Prop)
+    (opening closing : Symbol) (allowEmpty : Bool)
+    (element : Parser α) (context : ParseContext) (phase : ParserPhase)
+    (elementContract : element.ValidFor elementValid)
+    (elementShape : Parser.PreservesTokensOnSuccess element) :
+    (delimited opening closing allowEmpty element context phase).ValidFor
+      (DelimitedList.ValidFor elementValid) := by
+  exact delimitedWithPolicy_validFor elementValid opening closing allowEmpty
+    true element context phase elementContract elementShape
+
 /-- Parse a delimited list whose final comma is rejected. -/
 def delimitedNoTrailing {α : Type} (opening closing : Symbol)
     (allowEmpty : Bool) (element : Parser α) (context : ParseContext)
     (phase : ParserPhase) : Parser (DelimitedList α) :=
   delimitedWithPolicy opening closing allowEmpty false element context phase
+
+/-- Non-trailing-comma lists preserve delimiter and element provenance. -/
+theorem delimitedNoTrailing_validFor {α : Type}
+    (elementValid : SourceFile → α → Prop)
+    (opening closing : Symbol) (allowEmpty : Bool)
+    (element : Parser α) (context : ParseContext) (phase : ParserPhase)
+    (elementContract : element.ValidFor elementValid)
+    (elementShape : Parser.PreservesTokensOnSuccess element) :
+    (delimitedNoTrailing opening closing allowEmpty element context phase).ValidFor
+      (DelimitedList.ValidFor elementValid) := by
+  exact delimitedWithPolicy_validFor elementValid opening closing allowEmpty
+    false element context phase elementContract elementShape
 
 end Solcore.Syntax.Parser
