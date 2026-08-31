@@ -78,7 +78,7 @@ def mapMember {alpha : Type} (parser : Parser alpha)
 
 end ContractInternals
 
-private def extendContractMemberStart (prefixSpan : SourceSpan)
+def ContractInternals.extendContractMemberStart (prefixSpan : SourceSpan)
     (member : ContractMember) : ContractMember :=
   let span := SourceSpan.cover prefixSpan member.span
   let value := match member.value with
@@ -120,7 +120,7 @@ def contractMemberCore : Parser ContractMember := fun state =>
 
 end ContractInternals
 
-private def attachContractDerive (derive : DeriveAttribute)
+def ContractInternals.attachContractDerive (derive : DeriveAttribute)
     (member : ContractMember) : Parser ContractMember :=
   match member.value with
   | .enum declaration =>
@@ -139,14 +139,16 @@ private def attachContractDerive (derive : DeriveAttribute)
         span := derive.span
         kind := .constraintViolation .deriveOnlyEnum
       }
-      pure (extendContractMemberStart derive.span member)
+      pure (ContractInternals.extendContractMemberStart derive.span member)
 
-private def contractMemberWithAttribute : Parser ContractMember := fun state =>
+def ContractInternals.contractMemberWithAttribute : Parser ContractMember :=
+    fun state =>
   if isSymbol state .hash then
     match deriveAttribute state with
     | .ok derive afterDerive =>
         match ContractInternals.contractMemberCore afterDerive with
-        | .ok member next => attachContractDerive derive member next
+        | .ok member next =>
+            ContractInternals.attachContractDerive derive member next
         | .reject failure next => .reject failure next
         | .invariant error => .invariant error
     | .reject failure next => .reject failure next
@@ -211,7 +213,7 @@ private def contractMembers (opening : Token) :
         | .reject failure next => .reject failure next
         | .invariant error => .invariant error
       else
-        match contractMemberWithAttribute state with
+        match ContractInternals.contractMemberWithAttribute state with
         | .ok member next =>
             if next.cursor > state.cursor then
               contractMembers opening fuel (member :: membersRev) next

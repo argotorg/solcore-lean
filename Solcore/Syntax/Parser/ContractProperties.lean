@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Contract
 import Solcore.Syntax.Parser.DeclarationCanonicalProperties
+import Solcore.Syntax.Parser.DeriveCarrierProperties
 import Solcore.Syntax.Parser.EnumProperties
 import Solcore.Syntax.Parser.TypeRecursiveProperties
 import Solcore.Syntax.Parser.TypeAliasProperties
@@ -265,6 +266,150 @@ abbrev CanonicalContractMemberValid : SourceFile → ContractMember → Prop :=
   ContractMember.ValidFor CoreStatement.ValidFor
     (Expr.ValidFor CoreStatement.ValidFor)
 
+def ContractMemberSpanAligned (member : ContractMember) : Prop :=
+  match member.value with
+  | .field declaration => member.span = declaration.span
+  | .function declaration => member.span = declaration.span
+  | .constructor declaration => member.span = declaration.span
+  | .fallback declaration => member.span = declaration.span
+  | .typeAlias declaration => member.span = declaration.span
+  | .enum declaration => member.span = declaration.span
+  | .error => True
+
+/-- Canonical validity plus the alignment needed by attribute attachment. -/
+structure CanonicalContractMemberContract (file : SourceFile)
+    (member : ContractMember) : Prop where
+  validFor : CanonicalContractMemberValid file member
+  spanAligned : ContractMemberSpanAligned member
+
+private theorem contractMember_span_valid {file : SourceFile} {member : ContractMember}
+    (valid : CanonicalContractMemberValid file member) :
+    member.span.ValidFor file := by cases valid <;> assumption
+
+/-- Prefix extension preserves member provenance and outer-span alignment. -/
+theorem extendContractMemberStart_contract {file : SourceFile}
+    (prefixSpan : SourceSpan) (member : ContractMember)
+    (prefixValid : prefixSpan.ValidFor file)
+    (memberContract : CanonicalContractMemberContract file member)
+    (ordered : prefixSpan.startByte ≤ member.span.endByte) :
+    CanonicalContractMemberContract file (extendContractMemberStart prefixSpan member) := by
+  have coveredValid := SourceSpan.cover_validFor prefixValid
+    (contractMember_span_valid memberContract.validFor) ordered
+  constructor
+  · cases memberContract.validFor with
+    | field _ commentsValid declarationValid =>
+        exact .field coveredValid commentsValid ⟨coveredValid, declarationValid.2⟩
+    | function _ commentsValid declarationValid =>
+        exact .function coveredValid commentsValid ⟨coveredValid, declarationValid.2⟩
+    | constructor _ commentsValid declarationValid =>
+        exact .constructor coveredValid commentsValid ⟨coveredValid, declarationValid.2⟩
+    | fallback _ commentsValid declarationValid =>
+        exact .fallback coveredValid commentsValid ⟨coveredValid, declarationValid.2⟩
+    | typeAlias _ commentsValid declarationValid =>
+        exact .typeAlias coveredValid commentsValid ⟨coveredValid, declarationValid.2⟩
+    | enum _ commentsValid declarationValid =>
+        exact .enum coveredValid commentsValid ⟨coveredValid, declarationValid.2⟩
+    | error _ commentsValid => exact .error coveredValid commentsValid
+  · rcases member with ⟨span, comments, value⟩
+    cases value <;> simp [extendContractMemberStart, ContractMemberSpanAligned]
+
+/-- Attaching a valid derive attribute preserves the canonical member contract. -/
+theorem attachContractDerive_reply_validFor
+    (derive : DeriveAttribute) (member : ContractMember) (input : State)
+    (inputValid : input.ValidFor)
+    (deriveValid : DeriveAttribute.ValidFor input.file derive)
+    (memberContract : CanonicalContractMemberContract input.file member)
+    (ordered : derive.span.startByte ≤ member.span.endByte) :
+    (attachContractDerive derive member input).ValidFor input
+      CanonicalContractMemberContract := by
+  rcases member with ⟨memberSpan, comments, value⟩
+  cases value
+  all_goals first
+  | have extended := extendContractMemberStart_contract derive.span _ deriveValid.1 memberContract ordered
+    unfold attachContractDerive bind emitDiagnostic modifyState pure Reply.ValidFor
+    exact ⟨extended, inputValid.emit_validFor _ deriveValid.1, rfl⟩
+  | rename_i declaration
+    have aligned : memberSpan = declaration.span := by
+      simpa only [ContractMemberSpanAligned] using memberContract.spanAligned
+    have declarationValid := by cases memberContract.validFor; assumption
+    have coveredValid := SourceSpan.cover_validFor deriveValid.1
+      declarationValid.1 (by simpa [aligned] using ordered)
+    have retainedDerive : ∀ retained ∈ (some derive : Option DeriveAttribute), DeriveAttribute.ValidFor input.file retained := by
+      intro retained retainedMember
+      simp only [Option.mem_def] at retainedMember
+      cases Option.some.inj retainedMember
+      exact deriveValid
+    unfold attachContractDerive Reply.ValidFor
+    exact ⟨{
+      validFor := .enum coveredValid (by
+        cases memberContract.validFor
+        assumption) ⟨coveredValid, retainedDerive, declarationValid.2.2⟩
+      spanAligned := rfl
+    }, inputValid, rfl⟩
+
+private theorem emitThenPure_preservesTokenWindow
+    (diagnostic : ParseDiagnostic) (value : ContractMember) :
+    Parser.PreservesTokenWindow (do
+      let _ ← emitDiagnostic diagnostic
+      pure value) := by
+  apply Parser.bind_preservesTokenWindow
+    (emitDiagnostic_preservesTokenWindow diagnostic)
+  intro _
+  exact Parser.pure_preservesTokenWindow value
+
+theorem attachContractDerive_preservesTokenWindow
+    (derive : DeriveAttribute) (member : ContractMember) :
+    Parser.PreservesTokenWindow (attachContractDerive derive member) := by
+  rcases member with ⟨span, comments, value⟩
+  cases value <;> first
+  | exact Parser.pure_preservesTokenWindow _
+  | exact emitThenPure_preservesTokenWindow _ _
+
+theorem attachContractDerive_preservesTokensOnSuccess
+    (derive : DeriveAttribute) (member : ContractMember) :
+    Parser.PreservesTokensOnSuccess (attachContractDerive derive member) :=
+  (attachContractDerive_preservesTokenWindow derive member).preservesTokensOnSuccess
+
+private theorem emitThenPure_cursorMonotoneOnSuccess
+    (diagnostic : ParseDiagnostic) (value : ContractMember) :
+    Parser.CursorMonotoneOnSuccess (do
+      let _ ← emitDiagnostic diagnostic
+      pure value) := by
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (emitDiagnostic_cursorMonotoneOnSuccess diagnostic)
+  intro _
+  exact Parser.pure_cursorMonotoneOnSuccess value
+
+theorem attachContractDerive_cursorMonotoneOnSuccess
+    (derive : DeriveAttribute) (member : ContractMember) :
+    Parser.CursorMonotoneOnSuccess (attachContractDerive derive member) := by
+  rcases member with ⟨span, comments, value⟩
+  cases value <;> first
+  | exact Parser.pure_cursorMonotoneOnSuccess _
+  | exact emitThenPure_cursorMonotoneOnSuccess _ _
+
+theorem attachContractDerive_preservesDeriveStartOnSuccess
+    (derive : DeriveAttribute) (member : ContractMember)
+    {input final : State} {result : ContractMember}
+    (parsed : attachContractDerive derive member input = .ok result final) :
+    derive.span.startByte = result.span.startByte := by
+  rcases member with ⟨span, comments, value⟩
+  cases value <;>
+    unfold attachContractDerive bind emitDiagnostic modifyState pure at parsed
+  all_goals cases parsed; rfl
+
+theorem attachContractDerive_spanAlignedOnSuccess
+    (derive : DeriveAttribute) (member : ContractMember)
+    {input final : State} {result : ContractMember}
+    (parsed : attachContractDerive derive member input = .ok result final) :
+    ContractMemberSpanAligned result := by
+  rcases member with ⟨span, comments, value⟩
+  cases value <;>
+    unfold attachContractDerive bind emitDiagnostic modifyState pure at parsed
+  all_goals cases parsed <;>
+    simp [ContractMemberSpanAligned, extendContractMemberStart]
+
+/-- Source and state guarantees shared by every contract-member branch. -/
 structure ContractMemberParserContract
     (parser : Parser ContractMember) : Prop where
   validFor : parser.ValidFor CanonicalContractMemberValid
@@ -272,6 +417,8 @@ structure ContractMemberParserContract
   cursorMonotoneOnSuccess : Parser.CursorMonotoneOnSuccess parser
   startsAtCurrentTokenOnSuccess :
     Parser.StartsAtCurrentTokenOnSuccess parser (·.span)
+  spanAlignedOnSuccess : ∀ input member next,
+    parser input = .ok member next → ContractMemberSpanAligned member
 
 namespace ContractMemberParserContract
 
@@ -291,7 +438,8 @@ theorem mapMember_contract {alpha : Type} (parser : Parser alpha)
     (parserStarts : Parser.StartsAtCurrentTokenOnSuccess parser span)
     (wrapValid : ∀ file value, valueValid file value →
       CanonicalContractMemberValid file (wrap value))
-    (wrapSpan : ∀ value, (wrap value).span = span value) :
+    (wrapSpan : ∀ value, (wrap value).span = span value)
+    (wrapAligned : ∀ value, ContractMemberSpanAligned (wrap value)) :
     ContractMemberParserContract (mapMember parser wrap) := {
   validFor := by
     unfold mapMember
@@ -314,6 +462,11 @@ theorem mapMember_contract {alpha : Type} (parser : Parser alpha)
     intro value input member final parsed
     cases parsed
     exact (congrArg SourceSpan.startByte (wrapSpan value)).symm
+  spanAlignedOnSuccess := by
+    intro input member next parsed
+    rcases contractBind_ok_components parsed with ⟨value, _, _, finished⟩
+    cases finished
+    exact wrapAligned value
 }
 
 theorem contractField_canonical_contract : ContractMemberParserContract
@@ -330,6 +483,7 @@ theorem contractField_canonical_contract : ContractMemberParserContract
       expression_canonical_contract.cursorMonotoneOnSuccess)
     (contractField_startsAtCurrentTokenOnSuccess expression)
     (fun _ _ valid => .field valid.1 (by simp) valid) (fun _ => rfl)
+    (fun _ => rfl)
 
 theorem contractFunction_canonical_contract : ContractMemberParserContract
     (mapMember (functionDecl .contract) wrapContractFunction) :=
@@ -342,6 +496,7 @@ theorem contractFunction_canonical_contract : ContractMemberParserContract
       (block_canonical_cursorMonotoneOnSuccess .allow))
     (functionDecl_startsAtCurrentTokenOnSuccess .contract)
     (fun _ _ valid => .function valid.1 (by simp) valid) (fun _ => rfl)
+    (fun _ => rfl)
 
 theorem contractConstructor_canonical_contract : ContractMemberParserContract
     (mapMember constructorDecl wrapConstructor) :=
@@ -354,6 +509,7 @@ theorem contractConstructor_canonical_contract : ContractMemberParserContract
       (block_canonical_cursorMonotoneOnSuccess .require))
     constructorDecl_startsAtCurrentTokenOnSuccess
     (fun _ _ valid => .constructor valid.1 (by simp) valid) (fun _ => rfl)
+    (fun _ => rfl)
 
 theorem contractFallback_canonical_contract : ContractMemberParserContract
     (mapMember fallbackDecl wrapFallback) :=
@@ -366,6 +522,7 @@ theorem contractFallback_canonical_contract : ContractMemberParserContract
       (block_canonical_cursorMonotoneOnSuccess .require))
     fallbackDecl_startsAtCurrentTokenOnSuccess
     (fun _ _ valid => .fallback valid.1 (by simp) valid) (fun _ => rfl)
+    (fun _ => rfl)
 
 theorem contractTypeAlias_canonical_contract : ContractMemberParserContract
     (mapMember typeAlias wrapContractTypeAlias) :=
@@ -374,6 +531,7 @@ theorem contractTypeAlias_canonical_contract : ContractMemberParserContract
     typeAlias_cursorMonotoneOnSuccess
     typeAlias_startsAtCurrentTokenOnSuccess
     (fun _ _ valid => .typeAlias valid.1 (by simp) valid) (fun _ => rfl)
+    (fun _ => rfl)
 
 theorem contractEnum_canonical_contract : ContractMemberParserContract
     (mapMember (enumDecl none) wrapContractEnum) :=
@@ -382,6 +540,7 @@ theorem contractEnum_canonical_contract : ContractMemberParserContract
     (enumDecl_cursorMonotoneOnSuccess none)
     enumDecl_none_startsAtCurrentTokenOnSuccess
     (fun _ _ valid => .enum valid.1 (by simp) valid) (fun _ => rfl)
+    (fun _ => rfl)
 
 theorem rejectedContractMember_canonical_contract :
     ContractMemberParserContract rejectedContractMember := {
@@ -396,6 +555,9 @@ theorem rejectedContractMember_canonical_contract :
     intro input value next parsed
     simp [rejectedContractMember, rejectAt] at parsed
   startsAtCurrentTokenOnSuccess := by
+    intro input value next parsed
+    simp [rejectedContractMember, rejectAt] at parsed
+  spanAlignedOnSuccess := by
     intro input value next parsed
     simp [rejectedContractMember, rejectAt] at parsed
 }
@@ -435,6 +597,145 @@ theorem contractMemberCore_canonical_contract :
     intro input value next parsed
     exact (contractMemberParser_canonical_contract input).startsAtCurrentTokenOnSuccess
       input value next parsed
+  spanAlignedOnSuccess := by
+    intro input value next parsed
+    exact (contractMemberParser_canonical_contract input).spanAlignedOnSuccess
+      input value next parsed
+}
+
+private theorem derive_start_le_member_end {input afterDerive next : State}
+    {derive : DeriveAttribute} {member : ContractMember}
+    (inputValid : input.ValidFor)
+    (deriveResult : deriveAttribute input = .ok derive afterDerive)
+    (memberResult : contractMemberCore afterDerive = .ok member next)
+    (memberSpanValid : member.span.ValidFor input.file) :
+    derive.span.startByte ≤ member.span.endByte := by
+  rcases deriveAttribute_startsAtCurrentTokenOnSuccess _ _ _ deriveResult with
+    ⟨first, firstFound, firstStart⟩
+  rcases contractMemberCore_canonical_contract.startsAtCurrentTokenOnSuccess
+      _ _ _ memberResult with ⟨last, lastFound, lastStart⟩
+  have firstAt := State.getElem?_eq_some_of_peek?_eq_some firstFound
+  have lastAt := State.getElem?_eq_some_of_peek?_eq_some lastFound
+  have separated := inputValid.token_end_le_token_start_of_getElem?_lt firstAt
+    (by simpa [deriveAttribute_preservesTokensOnSuccess _ _ _ deriveResult]
+      using lastAt) (deriveAttribute_cursor_lt_onSuccess deriveResult)
+  exact calc
+    derive.span.startByte = first.span.startByte := firstStart.symm
+    _ ≤ first.span.endByte := (inputValid.peek?_span_validFor firstFound).2.1
+    _ ≤ last.span.startByte := separated
+    _ = member.span.startByte := lastStart
+    _ ≤ member.span.endByte := memberSpanValid.2.1
+
+/-- The derive-aware member parser satisfies the canonical member contract. -/
+theorem contractMemberWithAttribute_canonical_contract :
+    ContractMemberParserContract contractMemberWithAttribute := {
+  validFor := by
+    intro input inputValid
+    unfold contractMemberWithAttribute
+    by_cases attributed : isSymbol input .hash
+    · simp only [attributed, if_true]
+      have deriveReply := deriveAttribute_validFor input inputValid
+      cases deriveResult : deriveAttribute input with
+      | invariant error => simp only [Reply.ValidFor]
+      | reject failure rejected =>
+          simp only
+          rw [deriveResult] at deriveReply
+          simpa only [Reply.ValidFor] using deriveReply
+      | ok derive afterDerive =>
+          simp only
+          rw [deriveResult] at deriveReply
+          have memberReply := contractMemberCore_canonical_contract.validFor
+            afterDerive deriveReply.2.1
+          cases memberResult : contractMemberCore afterDerive with
+          | invariant error => simp only [Reply.ValidFor]
+          | reject failure rejected =>
+              simp only
+              rw [memberResult] at memberReply
+              exact memberReply.of_file_eq deriveReply.2.2
+          | ok member next =>
+              simp only
+              rw [memberResult] at memberReply
+              have fileEq := memberReply.2.2.trans deriveReply.2.2
+              have attached := attachContractDerive_reply_validFor derive member
+                next memberReply.2.1 (by simpa [fileEq] using deriveReply.1)
+                ⟨by simpa [memberReply.2.2] using memberReply.1,
+                  contractMemberCore_canonical_contract.spanAlignedOnSuccess
+                    _ _ _ memberResult⟩
+                (derive_start_le_member_end inputValid deriveResult memberResult
+                  (by simpa [deriveReply.2.2] using
+                    contractMember_span_valid memberReply.1))
+              exact (attached.mono (fun _ _ contract => contract.validFor)).of_file_eq
+                fileEq
+    · simp only [attributed]
+      exact contractMemberCore_canonical_contract.validFor input inputValid
+  preservesTokenWindow := by
+    intro input
+    unfold contractMemberWithAttribute
+    split
+    · have deriveWindow := deriveAttribute_preservesTokenWindow input
+      cases deriveResult : deriveAttribute input with
+      | invariant error => simp only [Reply.PreservesTokenWindow]
+      | reject failure rejected =>
+          simp only
+          rw [deriveResult] at deriveWindow
+          simpa only [Reply.PreservesTokenWindow] using deriveWindow
+      | ok derive afterDerive =>
+          simp only
+          rw [deriveResult] at deriveWindow
+          have memberWindow :=
+            contractMemberCore_canonical_contract.preservesTokenWindow afterDerive
+          cases memberResult : contractMemberCore afterDerive with
+          | invariant error => simp only [Reply.PreservesTokenWindow]
+          | reject failure rejected =>
+              simp only
+              rw [memberResult] at memberWindow
+              exact memberWindow.trans deriveWindow
+          | ok member next =>
+              simp only
+              rw [memberResult] at memberWindow
+              exact (attachContractDerive_preservesTokenWindow derive member next).trans
+                (memberWindow.trans deriveWindow)
+    · exact contractMemberCore_canonical_contract.preservesTokenWindow input
+  cursorMonotoneOnSuccess := by
+    intro input result final parsed
+    unfold contractMemberWithAttribute at parsed
+    split at parsed
+    · cases deriveResult : deriveAttribute input <;> simp [deriveResult] at parsed
+      rename_i derive afterDerive
+      cases memberResult : contractMemberCore afterDerive <;>
+        simp [memberResult] at parsed
+      rename_i member next
+      exact Nat.le_trans (deriveAttribute_cursorMonotoneOnSuccess _ _ _ deriveResult)
+        (Nat.le_trans (contractMemberCore_canonical_contract.cursorMonotoneOnSuccess
+          _ _ _ memberResult)
+          (attachContractDerive_cursorMonotoneOnSuccess _ _ _ _ _ parsed))
+    · exact contractMemberCore_canonical_contract.cursorMonotoneOnSuccess
+        _ _ _ parsed
+  startsAtCurrentTokenOnSuccess := by
+    intro input result final parsed
+    unfold contractMemberWithAttribute at parsed
+    split at parsed
+    · cases deriveResult : deriveAttribute input <;> simp [deriveResult] at parsed
+      rename_i derive afterDerive
+      cases memberResult : contractMemberCore afterDerive <;>
+        simp [memberResult] at parsed
+      rcases deriveAttribute_startsAtCurrentTokenOnSuccess _ _ _ deriveResult with
+        ⟨token, found, start⟩
+      exact ⟨token, found, start.trans
+        (attachContractDerive_preservesDeriveStartOnSuccess _ _ parsed)⟩
+    · exact contractMemberCore_canonical_contract.startsAtCurrentTokenOnSuccess
+        _ _ _ parsed
+  spanAlignedOnSuccess := by
+    intro input result final parsed
+    unfold contractMemberWithAttribute at parsed
+    split at parsed
+    · cases deriveResult : deriveAttribute input <;> simp [deriveResult] at parsed
+      rename_i derive afterDerive
+      cases memberResult : contractMemberCore afterDerive <;>
+        simp [memberResult] at parsed
+      exact attachContractDerive_spanAlignedOnSuccess _ _ parsed
+    · exact contractMemberCore_canonical_contract.spanAlignedOnSuccess
+        _ _ _ parsed
 }
 end ContractInternals
 end Solcore.Syntax.Parser
