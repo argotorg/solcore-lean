@@ -33,6 +33,14 @@ example := @EnumInternals.enumConstructor_preservesTokenWindow
 example := @EnumInternals.enumConstructor_preservesTokensOnSuccess
 example := @EnumInternals.enumConstructor_cursorMonotoneOnSuccess
 example := @EnumInternals.enumConstructor_startsAtCurrentTokenOnSuccess
+example := @EnumInternals.closeEnumBody_validFor
+example := @EnumInternals.closeEnumBody_preservesTokenWindow
+example := @EnumInternals.closeEnumBody_cursorMonotoneOnSuccess
+example := @EnumInternals.closeEnumBody_preservesOpeningStartOnSuccess
+example := @EnumInternals.enumConstructors_validFor
+example := @EnumInternals.enumConstructors_preservesTokenWindow
+example := @EnumInternals.enumConstructors_cursorMonotoneOnSuccess
+example := @EnumInternals.enumConstructors_preservesOpeningStartOnSuccess
 
 example (file : SourceFile) (declaration : TypeAliasDecl)
     (valid : TypeAliasDecl.ValidFor file declaration) :

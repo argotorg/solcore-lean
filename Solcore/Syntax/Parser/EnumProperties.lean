@@ -218,5 +218,297 @@ theorem enumConstructor_startsAtCurrentTokenOnSuccess :
   cases finished
   exact ⟨token, found, by simp [SourceSpan.cover, tokenSpan]⟩
 
+namespace EnumBody
+
+/-- An enum body retains a valid brace range and valid constructors. -/
+def ValidFor (file : SourceFile) (body : EnumBody) : Prop :=
+  body.span.ValidFor file ∧
+    List.ValidFor EnumConstructor.ValidFor file body.constructors
+
+end EnumBody
+
+/-- Closing a body preserves its brace range and reversed constructor list. -/
+theorem closeEnumBody_validFor (opening : Token)
+    (constructorsRev : List EnumConstructor) {input : State}
+    {openingIndex : Nat} (inputValid : input.ValidFor)
+    (openingFound : input.tokens[openingIndex]? = some opening)
+    (openingBefore : openingIndex < input.cursor)
+    (constructorsValid : List.ValidFor EnumConstructor.ValidFor input.file
+      constructorsRev) :
+    (closeEnumBody opening constructorsRev input).ValidFor input
+      EnumBody.ValidFor := by
+  unfold closeEnumBody
+  simp only [bind]
+  cases closingResult : symbol .rightBrace .topItem input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := symbol_validFor .rightBrace .topItem input inputValid
+      rw [closingResult] at valid
+      exact valid
+  | ok closing afterClosing =>
+      have closingValid := symbol_validFor .rightBrace .topItem input inputValid
+      rw [closingResult] at closingValid
+      have closingShape := symbol_ok_state_shape .rightBrace .topItem
+        closingResult
+      have closingFound :=
+        State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have openingValid :=
+        inputValid.token_span_validFor_of_getElem?_eq_some openingFound
+      have closingSpanValid : closing.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using closingValid.1
+      have openingBeforeClosing :=
+        inputValid.token_end_le_token_start_of_getElem?_lt openingFound
+          closingFound openingBefore
+      have outerValid := SourceSpan.cover_validFor openingValid closingSpanValid
+        (Nat.le_trans openingValid.2.1
+          (Nat.le_trans openingBeforeClosing closingSpanValid.2.1))
+      exact ⟨⟨outerValid, by
+          intro constructor member
+          exact constructorsValid constructor (by simpa using member)⟩,
+        closingValid.2.1, closingValid.2.2⟩
+
+/-- Closing a body preserves every ordinary token window. -/
+theorem closeEnumBody_preservesTokenWindow (opening : Token)
+    (constructorsRev : List EnumConstructor) :
+    Parser.PreservesTokenWindow (closeEnumBody opening constructorsRev) := by
+  unfold closeEnumBody
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .rightBrace .topItem)
+  intro closing
+  exact Parser.pure_preservesTokenWindow _
+
+theorem closeEnumBody_preservesTokensOnSuccess (opening : Token)
+    (constructorsRev : List EnumConstructor) :
+    Parser.PreservesTokensOnSuccess (closeEnumBody opening constructorsRev) :=
+  Parser.PreservesTokenWindow.preservesTokensOnSuccess
+    (closeEnumBody_preservesTokenWindow opening constructorsRev)
+
+/-- Closing a body advances monotonically through its `}` token. -/
+theorem closeEnumBody_cursorMonotoneOnSuccess (opening : Token)
+    (constructorsRev : List EnumConstructor) :
+    Parser.CursorMonotoneOnSuccess (closeEnumBody opening constructorsRev) := by
+  unfold closeEnumBody
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .rightBrace .topItem)
+  intro closing
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- Closing retains the opening brace as the body's starting endpoint. -/
+theorem closeEnumBody_preservesOpeningStartOnSuccess (opening : Token)
+    (constructorsRev : List EnumConstructor) {input final : State}
+    {body : EnumBody} (parsed : closeEnumBody opening constructorsRev input =
+      .ok body final) :
+    body.span.startByte = opening.span.startByte := by
+  unfold closeEnumBody at parsed
+  rcases enumBind_ok_components parsed with
+    ⟨closing, afterClosing, _closingResult, finished⟩
+  cases finished
+  rfl
+
+/-- The body endpoint is the current closing-brace token. -/
+theorem closeEnumBody_endsAtCurrentTokenOnSuccess (opening : Token)
+    (constructorsRev : List EnumConstructor) {input final : State}
+    {body : EnumBody} (parsed : closeEnumBody opening constructorsRev input =
+      .ok body final) :
+    ∃ closing, input.peek? = some closing ∧
+      closing.span.endByte = body.span.endByte := by
+  unfold closeEnumBody at parsed
+  rcases enumBind_ok_components parsed with
+    ⟨closing, afterClosing, closingResult, finished⟩
+  have found := (symbol_ok_state_shape .rightBrace .topItem closingResult).1
+  cases finished
+  exact ⟨closing, found, rfl⟩
+
+/-- The constructor loop preserves its opening brace and accumulated cases. -/
+theorem enumConstructors_validFor (opening : Token) :
+    ∀ fuel constructorsRev input openingIndex,
+      input.ValidFor →
+      input.tokens[openingIndex]? = some opening →
+      openingIndex < input.cursor →
+      List.ValidFor EnumConstructor.ValidFor input.file constructorsRev →
+      (enumConstructors opening fuel constructorsRev input).ValidFor input
+        EnumBody.ValidFor := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro constructorsRev input openingIndex inputValid openingFound
+        openingBefore constructorsValid
+      unfold enumConstructors
+      split
+      · cases commaResult : symbol .comma .topItem input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            have valid := symbol_validFor .comma .topItem input inputValid
+            rw [commaResult] at valid
+            exact valid
+        | ok comma afterComma =>
+            have commaValid := symbol_validFor .comma .topItem input inputValid
+            rw [commaResult] at commaValid
+            have commaShape := symbol_ok_state_shape .comma .topItem commaResult
+            have openingFoundAfter :
+                afterComma.tokens[openingIndex]? = some opening := by
+              simpa [commaShape.2] using openingFound
+            have openingBeforeAfter : openingIndex < afterComma.cursor := by
+              simpa [commaShape.2] using Nat.lt_succ_of_lt openingBefore
+            have constructorsValidAfter : List.ValidFor
+                EnumConstructor.ValidFor afterComma.file constructorsRev := by
+              simpa [commaValid.2.2] using constructorsValid
+            simp only
+            split
+            · exact (closeEnumBody_validFor opening constructorsRev
+                commaValid.2.1 openingFoundAfter openingBeforeAfter
+                constructorsValidAfter).of_file_eq commaValid.2.2
+            · cases constructorResult : enumConstructor afterComma with
+              | invariant error => trivial
+              | reject failure rejected =>
+                  have valid := enumConstructor_validFor afterComma
+                    commaValid.2.1
+                  rw [constructorResult] at valid
+                  exact valid.of_file_eq commaValid.2.2
+              | ok constructor next =>
+                  have constructorValid := enumConstructor_validFor afterComma
+                    commaValid.2.1
+                  rw [constructorResult] at constructorValid
+                  simp only
+                  split
+                  · have openingFoundNext :
+                        next.tokens[openingIndex]? = some opening := by
+                      simpa [enumConstructor_preservesTokensOnSuccess afterComma
+                        constructor next constructorResult] using
+                        openingFoundAfter
+                    have accumulatedValid : List.ValidFor
+                        EnumConstructor.ValidFor next.file
+                        (constructor :: constructorsRev) := by
+                      intro retained member
+                      rcases List.mem_cons.mp member with rfl | member
+                      · simpa [constructorValid.2.2] using constructorValid.1
+                      · simpa [constructorValid.2.2] using
+                          constructorsValidAfter retained member
+                    exact (inductionHypothesis (constructor :: constructorsRev)
+                      next openingIndex constructorValid.2.1 openingFoundNext
+                      (by omega) accumulatedValid).of_file_eq
+                        (constructorValid.2.2.trans commaValid.2.2)
+                  · trivial
+      · exact closeEnumBody_validFor opening constructorsRev inputValid
+          openingFound openingBefore constructorsValid
+
+/-- The constructor loop preserves every ordinary token window. -/
+theorem enumConstructors_preservesTokenWindow (opening : Token) :
+    ∀ fuel constructorsRev,
+      Parser.PreservesTokenWindow
+        (enumConstructors opening fuel constructorsRev) := by
+  intro fuel
+  induction fuel with
+  | zero => intros constructorsRev input; trivial
+  | succ fuel inductionHypothesis =>
+      intro constructorsRev input
+      unfold enumConstructors
+      split
+      · have commaShape := symbol_preservesTokenWindow .comma .topItem input
+        cases commaResult : symbol .comma .topItem input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [commaResult] at commaShape
+            exact commaShape
+        | ok comma afterComma =>
+            rw [commaResult] at commaShape
+            simp only
+            split
+            · exact (closeEnumBody_preservesTokenWindow opening
+                constructorsRev afterComma).trans commaShape
+            · have constructorShape :=
+                  enumConstructor_preservesTokenWindow afterComma
+              cases constructorResult : enumConstructor afterComma with
+              | invariant error => trivial
+              | reject failure rejected =>
+                  rw [constructorResult] at constructorShape
+                  exact constructorShape.trans commaShape
+              | ok constructor next =>
+                  rw [constructorResult] at constructorShape
+                  simp only
+                  split
+                  · exact (inductionHypothesis (constructor :: constructorsRev)
+                      next).trans (constructorShape.trans commaShape)
+                  · trivial
+      · exact closeEnumBody_preservesTokenWindow opening constructorsRev input
+
+theorem enumConstructors_preservesTokensOnSuccess (opening : Token)
+    (fuel : Nat) (constructorsRev : List EnumConstructor) :
+    Parser.PreservesTokensOnSuccess
+      (enumConstructors opening fuel constructorsRev) :=
+  Parser.PreservesTokenWindow.preservesTokensOnSuccess
+    (enumConstructors_preservesTokenWindow opening fuel constructorsRev)
+
+/-- The constructor loop never rewinds its parser cursor. -/
+theorem enumConstructors_cursorMonotoneOnSuccess (opening : Token) :
+    ∀ fuel constructorsRev,
+      Parser.CursorMonotoneOnSuccess
+        (enumConstructors opening fuel constructorsRev) := by
+  intro fuel
+  induction fuel with
+  | zero => intros constructorsRev input body final parsed; contradiction
+  | succ fuel inductionHypothesis =>
+      intro constructorsRev input body final parsed
+      unfold enumConstructors at parsed
+      split at parsed
+      · cases commaResult : symbol .comma .topItem input with
+        | invariant error => simp [commaResult] at parsed
+        | reject failure rejected => simp [commaResult] at parsed
+        | ok comma afterComma =>
+            simp only [commaResult] at parsed
+            have commaMonotone := symbol_cursorMonotoneOnSuccess .comma
+              .topItem input comma afterComma commaResult
+            split at parsed
+            · exact Nat.le_trans commaMonotone
+                (closeEnumBody_cursorMonotoneOnSuccess opening constructorsRev
+                  afterComma body final parsed)
+            · cases constructorResult : enumConstructor afterComma with
+              | invariant error => simp [constructorResult] at parsed
+              | reject failure rejected => simp [constructorResult] at parsed
+              | ok constructor next =>
+                  simp only [constructorResult] at parsed
+                  split at parsed
+                  · exact Nat.le_trans commaMonotone (Nat.le_trans
+                      (enumConstructor_cursorMonotoneOnSuccess afterComma
+                        constructor next constructorResult)
+                      (inductionHypothesis (constructor :: constructorsRev)
+                        next body final parsed))
+                  · contradiction
+      · exact closeEnumBody_cursorMonotoneOnSuccess opening constructorsRev
+          input body final parsed
+
+/-- Every successful loop result keeps the original opening-brace start. -/
+theorem enumConstructors_preservesOpeningStartOnSuccess (opening : Token) :
+    ∀ fuel constructorsRev input body final,
+      enumConstructors opening fuel constructorsRev input = .ok body final →
+      body.span.startByte = opening.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro constructorsRev input body final parsed
+      unfold enumConstructors at parsed
+      split at parsed
+      · cases commaResult : symbol .comma .topItem input with
+        | invariant error => simp [commaResult] at parsed
+        | reject failure rejected => simp [commaResult] at parsed
+        | ok comma afterComma =>
+            simp only [commaResult] at parsed
+            split at parsed
+            · exact closeEnumBody_preservesOpeningStartOnSuccess opening
+                constructorsRev parsed
+            · cases constructorResult : enumConstructor afterComma with
+              | invariant error => simp [constructorResult] at parsed
+              | reject failure rejected => simp [constructorResult] at parsed
+              | ok constructor next =>
+                  simp only [constructorResult] at parsed
+                  split at parsed
+                  · exact inductionHypothesis (constructor :: constructorsRev)
+                      next body final parsed
+                  · contradiction
+      · exact closeEnumBody_preservesOpeningStartOnSuccess opening
+          constructorsRev parsed
+
 end EnumInternals
 end Solcore.Syntax.Parser
