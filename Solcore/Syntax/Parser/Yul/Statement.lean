@@ -4,7 +4,8 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def yulBlockStatement (statement : Parser YulStmt) : Parser YulStmt := do
+/-- Lift a parsed Yul block into statement position. -/
+def yulBlockStatement (statement : Parser YulStmt) : Parser YulStmt := do
   let block ← yulBlock statement
   pure { span := block.span, value := .block block.body }
 
@@ -81,7 +82,8 @@ def recognizedYulStatementOrFallback
       | .invariant error => .invariant error
   | .invariant error => .invariant error
 
-private def yulStatementCore (nested : Parser YulStmt) : Parser YulStmt :=
+/-- Select one non-terminating Yul statement form. -/
+def yulStatementCore (nested : Parser YulStmt) : Parser YulStmt :=
     fun state =>
   let fallback := yulExpressionStatement
   if isSymbol state .leftBrace then

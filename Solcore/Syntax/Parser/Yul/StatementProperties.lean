@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Yul.Statement
+import Solcore.Syntax.Parser.Yul.ControlSwitchProperties
 import Solcore.Syntax.Parser.Yul.ExpressionProperties
 import Solcore.Syntax.YulStatementValidity
 
@@ -28,6 +29,51 @@ private theorem yulStatementBind_ok_components {α β : Type}
       exact ⟨firstValue, afterFirst, rfl, parsed⟩
   | reject failure rejected => rw [firstResult] at parsed; contradiction
   | invariant error => rw [firstResult] at parsed; contradiction
+
+/-- A block statement preserves its braces and every nested statement. -/
+theorem yulBlockStatement_validFor (statement : Parser YulStmt)
+    (statementValid : statement.ValidFor YulStmt.ValidFor)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    (yulBlockStatement statement).ValidFor YulStmt.ValidFor := by
+  unfold yulBlockStatement
+  apply Parser.bind_validFor_of_value
+    (yulBlock_validFor YulStmt.ValidFor statement statementValid
+      statementPreserves)
+  intro block input inputValid blockValid
+  exact ⟨YulStmt.ValidFor.block blockValid.1 blockValid.2,
+    inputValid, rfl⟩
+
+theorem yulBlockStatement_preservesTokensOnSuccess
+    (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    Parser.PreservesTokensOnSuccess (yulBlockStatement statement) := by
+  unfold yulBlockStatement
+  apply Parser.bind_preservesTokensOnSuccess
+    (yulBlock_preservesTokensOnSuccess statement statementPreserves)
+  intro block
+  exact Parser.pure_preservesTokensOnSuccess _
+
+theorem yulBlockStatement_cursorMonotoneOnSuccess
+    (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    Parser.CursorMonotoneOnSuccess (yulBlockStatement statement) := by
+  unfold yulBlockStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (yulBlock_cursorMonotoneOnSuccess statement statementPreserves)
+  intro block
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+theorem yulBlockStatement_startsAtCurrentTokenOnSuccess
+    (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (yulBlockStatement statement) (·.span) := by
+  unfold yulBlockStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (yulBlock_startsAtCurrentTokenOnSuccess statement statementPreserves)
+  intros
+  cases ‹_ = Reply.ok _ _›
+  rfl
 
 private theorem getState_preservesTokenWindow :
     Parser.PreservesTokenWindow getState := by
@@ -670,6 +716,35 @@ theorem recognizedYulStatementOrFallback_preservesTokensOnSuccess
   (recognizedYulStatementOrFallback_preservesTokenWindow primary fallback
     primaryShape fallbackShape).preservesTokensOnSuccess
 
+/-- Success-only carrier contracts also compose through recognized fallback. -/
+theorem recognizedYulStatementOrFallback_preservesTokensOnSuccess_of_success
+    (primary fallback : Parser YulStmt)
+    (primaryPreserves : Parser.PreservesTokensOnSuccess primary)
+    (fallbackPreserves : Parser.PreservesTokensOnSuccess fallback) :
+    Parser.PreservesTokensOnSuccess
+      (recognizedYulStatementOrFallback primary fallback) := by
+  intro input value next result
+  unfold recognizedYulStatementOrFallback at result
+  cases primaryResult : primary input with
+  | invariant error => simp [primaryResult] at result
+  | ok primaryValue afterPrimary =>
+      simp only [primaryResult] at result
+      have preserved := primaryPreserves input primaryValue afterPrimary
+        primaryResult
+      cases result
+      exact preserved
+  | reject failure failedState =>
+      simp only [primaryResult] at result
+      cases fallbackResult : fallback input with
+      | invariant error => simp [fallbackResult] at result
+      | reject fallbackFailure fallbackState => simp [fallbackResult] at result
+      | ok fallbackValue afterFallback =>
+          simp only [fallbackResult] at result
+          have preserved := fallbackPreserves input fallbackValue afterFallback
+            fallbackResult
+          cases result
+          exact preserved
+
 /-- Recognized-statement fallback never rewinds either successful branch. -/
 theorem recognizedYulStatementOrFallback_cursorMonotoneOnSuccess
     (primary fallback : Parser YulStmt)
@@ -726,5 +801,212 @@ theorem recognizedYulStatementOrFallback_startsAtCurrentTokenOnSuccess
             fallbackResult
           cases result
           exact starts
+
+/-- Contracts needed to compose one recursive Yul statement choice. -/
+structure YulStatementParserContracts (parser : Parser YulStmt) : Prop where
+  validFor : parser.ValidFor YulStmt.ValidFor
+  preservesTokens : Parser.PreservesTokensOnSuccess parser
+  cursorMonotone : Parser.CursorMonotoneOnSuccess parser
+  startsAtToken : Parser.StartsAtCurrentTokenOnSuccess parser (·.span)
+
+private theorem stateChoice_contracts (condition : State → Bool)
+    (first second : Parser YulStmt)
+    (firstContracts : YulStatementParserContracts first)
+    (secondContracts : YulStatementParserContracts second) :
+    YulStatementParserContracts (fun input =>
+      if condition input then first input else second input) := {
+  validFor := by
+    intro input inputValid
+    by_cases selected : condition input = true
+    · simpa [selected] using firstContracts.validFor input inputValid
+    · simpa [selected] using secondContracts.validFor input inputValid
+  preservesTokens := by
+    intro input value next result
+    by_cases selected : condition input = true
+    · exact firstContracts.preservesTokens input value next
+        (by simpa [selected] using result)
+    · exact secondContracts.preservesTokens input value next
+        (by simpa [selected] using result)
+  cursorMonotone := by
+    intro input value next result
+    by_cases selected : condition input = true
+    · exact firstContracts.cursorMonotone input value next
+        (by simpa [selected] using result)
+    · exact secondContracts.cursorMonotone input value next
+        (by simpa [selected] using result)
+  startsAtToken := by
+    intro input value next result
+    by_cases selected : condition input = true
+    · exact firstContracts.startsAtToken input value next
+        (by simpa [selected] using result)
+    · exact secondContracts.startsAtToken input value next
+        (by simpa [selected] using result)
+}
+
+private theorem recognized_contracts (primary fallback : Parser YulStmt)
+    (primaryContracts : YulStatementParserContracts primary)
+    (fallbackContracts : YulStatementParserContracts fallback) :
+    YulStatementParserContracts
+      (recognizedYulStatementOrFallback primary fallback) := {
+  validFor := recognizedYulStatementOrFallback_validFor primary fallback
+    primaryContracts.validFor fallbackContracts.validFor
+  preservesTokens :=
+    recognizedYulStatementOrFallback_preservesTokensOnSuccess_of_success
+      primary fallback primaryContracts.preservesTokens
+        fallbackContracts.preservesTokens
+  cursorMonotone :=
+    recognizedYulStatementOrFallback_cursorMonotoneOnSuccess primary fallback
+      primaryContracts.cursorMonotone fallbackContracts.cursorMonotone
+  startsAtToken :=
+    recognizedYulStatementOrFallback_startsAtCurrentTokenOnSuccess
+      primary fallback primaryContracts.startsAtToken
+        fallbackContracts.startsAtToken
+}
+
+private theorem orElse_contracts (first second : Parser YulStmt)
+    (firstContracts : YulStatementParserContracts first)
+    (secondContracts : YulStatementParserContracts second) :
+    YulStatementParserContracts (orElse first second) := {
+  validFor := Parser.orElse_validFor firstContracts.validFor
+    secondContracts.validFor
+  preservesTokens := Parser.orElse_preservesTokensOnSuccess
+    firstContracts.preservesTokens secondContracts.preservesTokens
+  cursorMonotone := Parser.orElse_cursorMonotoneOnSuccess
+    firstContracts.cursorMonotone secondContracts.cursorMonotone
+  startsAtToken := Parser.orElse_startsAtCurrentTokenOnSuccess
+    firstContracts.startsAtToken secondContracts.startsAtToken
+}
+
+/-- All non-terminating Yul statement choices compose from recursive input. -/
+theorem yulStatementCore_contracts (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    YulStatementParserContracts (yulStatementCore nested) := by
+  let fallbackContracts :
+      YulStatementParserContracts yulExpressionStatement :=
+    ⟨yulExpressionStatement_validFor,
+      yulExpressionStatement_preservesTokensOnSuccess,
+      yulExpressionStatement_cursorMonotoneOnSuccess,
+      yulExpressionStatement_startsAtCurrentTokenOnSuccess⟩
+  have blockContracts :
+      YulStatementParserContracts (yulBlockStatement nested) :=
+    ⟨yulBlockStatement_validFor nested nestedValid nestedPreserves,
+      yulBlockStatement_preservesTokensOnSuccess nested nestedPreserves,
+      yulBlockStatement_cursorMonotoneOnSuccess nested nestedPreserves,
+      yulBlockStatement_startsAtCurrentTokenOnSuccess nested nestedPreserves⟩
+  have letContracts : YulStatementParserContracts yulLetStatement :=
+    ⟨yulLetStatement_validFor, yulLetStatement_preservesTokensOnSuccess,
+      yulLetStatement_cursorMonotoneOnSuccess,
+      yulLetStatement_startsAtCurrentTokenOnSuccess⟩
+  have ifContracts :
+      YulStatementParserContracts (yulIfStatement nested) :=
+    ⟨yulIfStatement_validFor nested yulExpression_validFor
+        yulExpression_startsAtCurrentTokenOnSuccess
+        yulExpression_preservesTokensOnSuccess
+        yulExpression_cursorMonotoneOnSuccess nestedValid nestedPreserves,
+      yulIfStatement_preservesTokensOnSuccess nested
+        yulExpression_preservesTokensOnSuccess nestedPreserves,
+      yulIfStatement_cursorMonotoneOnSuccess nested
+        yulExpression_cursorMonotoneOnSuccess nestedPreserves,
+      yulIfStatement_startsAtCurrentTokenOnSuccess nested⟩
+  have forContracts :
+      YulStatementParserContracts (yulForStatement nested) :=
+    ⟨yulForStatement_validFor nested yulExpression_validFor
+        yulExpression_preservesTokensOnSuccess
+        yulExpression_cursorMonotoneOnSuccess nestedValid nestedPreserves,
+      yulForStatement_preservesTokensOnSuccess nested
+        yulExpression_preservesTokensOnSuccess nestedPreserves,
+      yulForStatement_cursorMonotoneOnSuccess nested
+        yulExpression_cursorMonotoneOnSuccess nestedPreserves,
+      yulForStatement_startsAtCurrentTokenOnSuccess nested⟩
+  have switchContracts :
+      YulStatementParserContracts (yulSwitchStatement nested) :=
+    ⟨yulSwitchStatement_validFor nested nestedValid nestedPreserves,
+      yulSwitchStatement_preservesTokensOnSuccess nested nestedPreserves,
+      yulSwitchStatement_cursorMonotoneOnSuccess nested nestedPreserves,
+      yulSwitchStatement_startsAtCurrentTokenOnSuccess nested⟩
+  have functionContracts :
+      YulStatementParserContracts (yulFunctionStatement nested) :=
+    ⟨yulFunctionStatement_validFor nested nestedValid nestedPreserves,
+      yulFunctionStatement_preservesTokensOnSuccess nested nestedPreserves,
+      yulFunctionStatement_cursorMonotoneOnSuccess nested nestedPreserves,
+      yulFunctionStatement_startsAtCurrentTokenOnSuccess nested⟩
+  have returnContracts : YulStatementParserContracts yulReturnBuiltin :=
+    ⟨yulReturnBuiltin_validFor, yulReturnBuiltin_preservesTokensOnSuccess,
+      yulReturnBuiltin_cursorMonotoneOnSuccess,
+      yulReturnBuiltin_startsAtCurrentTokenOnSuccess⟩
+  have leaveContracts : YulStatementParserContracts
+      (yulControlToken .leaveKw .leave) :=
+    ⟨yulLeaveControl_validFor,
+      yulControlToken_preservesTokensOnSuccess .leaveKw .leave,
+      yulControlToken_cursorMonotoneOnSuccess .leaveKw .leave,
+      yulControlToken_startsAtCurrentTokenOnSuccess .leaveKw .leave⟩
+  have breakContracts : YulStatementParserContracts
+      (yulControlToken .breakKw .break) :=
+    ⟨yulBreakControl_validFor,
+      yulControlToken_preservesTokensOnSuccess .breakKw .break,
+      yulControlToken_cursorMonotoneOnSuccess .breakKw .break,
+      yulControlToken_startsAtCurrentTokenOnSuccess .breakKw .break⟩
+  have continueContracts : YulStatementParserContracts
+      (yulControlToken .continueKw .continue) :=
+    ⟨yulContinueControl_validFor,
+      yulControlToken_preservesTokensOnSuccess .continueKw .continue,
+      yulControlToken_cursorMonotoneOnSuccess .continueKw .continue,
+      yulControlToken_startsAtCurrentTokenOnSuccess .continueKw .continue⟩
+  have assignmentContracts : YulStatementParserContracts yulAssignment :=
+    ⟨yulAssignment_validFor, yulAssignment_preservesTokensOnSuccess,
+      yulAssignment_cursorMonotoneOnSuccess,
+      yulAssignment_startsAtCurrentTokenOnSuccess⟩
+  unfold yulStatementCore
+  apply stateChoice_contracts
+  · exact recognized_contracts _ _ blockContracts fallbackContracts
+  · apply stateChoice_contracts
+    · exact recognized_contracts _ _ letContracts fallbackContracts
+    · apply stateChoice_contracts
+      · exact recognized_contracts _ _ ifContracts fallbackContracts
+      · apply stateChoice_contracts
+        · exact recognized_contracts _ _ forContracts fallbackContracts
+        · apply stateChoice_contracts
+          · exact recognized_contracts _ _ switchContracts fallbackContracts
+          · apply stateChoice_contracts
+            · exact recognized_contracts _ _ functionContracts fallbackContracts
+            · apply stateChoice_contracts
+              · exact recognized_contracts _ _ returnContracts fallbackContracts
+              · apply stateChoice_contracts
+                · exact recognized_contracts _ _ leaveContracts fallbackContracts
+                · apply stateChoice_contracts
+                  · exact recognized_contracts _ _ breakContracts fallbackContracts
+                  · apply stateChoice_contracts
+                    · exact recognized_contracts _ _ continueContracts
+                        fallbackContracts
+                    · apply stateChoice_contracts
+                      · exact orElse_contracts _ _ assignmentContracts
+                          fallbackContracts
+                      · exact fallbackContracts
+
+theorem yulStatementCore_validFor (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (yulStatementCore nested).ValidFor YulStmt.ValidFor :=
+  (yulStatementCore_contracts nested nestedValid nestedPreserves).validFor
+
+theorem yulStatementCore_preservesTokensOnSuccess (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (yulStatementCore nested) :=
+  (yulStatementCore_contracts nested nestedValid nestedPreserves).preservesTokens
+
+theorem yulStatementCore_cursorMonotoneOnSuccess (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (yulStatementCore nested) :=
+  (yulStatementCore_contracts nested nestedValid nestedPreserves).cursorMonotone
+
+theorem yulStatementCore_startsAtCurrentTokenOnSuccess
+    (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.StartsAtCurrentTokenOnSuccess (yulStatementCore nested) (·.span) :=
+  (yulStatementCore_contracts nested nestedValid nestedPreserves).startsAtToken
 
 end Solcore.Syntax.Parser
