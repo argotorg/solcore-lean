@@ -49,6 +49,7 @@ import Solcore.Test.SyntaxParserStateProperties
 import Solcore.Test.SyntaxParserStatementFallback
 import Solcore.Test.SyntaxParserStatements
 import Solcore.Test.SyntaxParserTerms
+import Solcore.Test.SyntaxParserTraitProperties
 import Solcore.Test.SyntaxParserTotality
 import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTypeExprProperties
