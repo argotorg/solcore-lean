@@ -5,7 +5,9 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def valueAssignOp? : TokenKind → Option ValueAssignOp
+namespace StatementSimpleInternals
+
+def valueAssignOp? : TokenKind → Option ValueAssignOp
   | .symbol .equal => some .equal
   | .symbol .plusEqual => some .add
   | .symbol .minusEqual => some .subtract
@@ -17,13 +19,15 @@ private def valueAssignOp? : TokenKind → Option ValueAssignOp
   | .symbol .pipeEqual => some .bitOr
   | _ => none
 
-private def valueAssignOperator : Parser (Located ValueAssignOp) := fun state =>
+def valueAssignOperator : Parser (Located ValueAssignOp) := fun state =>
   match state.peek? with
   | some token => match valueAssignOp? token.value with
     | some operator => .ok { span := token.span, value := operator }
         { state with cursor := state.cursor + 1 }
     | none => rejectAt state { head := .expression, tail := [] } .statement
   | none => rejectAt state { head := .expression, tail := [] } .statement
+
+end StatementSimpleInternals
 
 private inductive AssignmentTail where
   | value (operator : Located ValueAssignOp) (right : Expr)
@@ -36,9 +40,9 @@ private def assignmentTail
     | .ok operator next => .ok (.bitNot operator.span) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
-  else match state.peekKind?.bind valueAssignOp? with
+  else match state.peekKind?.bind StatementSimpleInternals.valueAssignOp? with
     | some _ =>
-        match valueAssignOperator state with
+        match StatementSimpleInternals.valueAssignOperator state with
         | .ok operator afterOperator =>
             match expression afterOperator with
             | .ok right next => .ok (.value operator right) next
@@ -50,7 +54,8 @@ private def assignmentTail
 
 private def optionalAssignmentTail
     (expression : Parser Expr) : Parser (Option AssignmentTail) := fun state =>
-  if isSymbol state .tildeEqual || (state.peekKind?.bind valueAssignOp?).isSome then
+  if isSymbol state .tildeEqual ||
+      (state.peekKind?.bind StatementSimpleInternals.valueAssignOp?).isSome then
     match assignmentTail expression state with
     | .ok value next => .ok (some value) next
     | .reject failure next => .reject failure next
