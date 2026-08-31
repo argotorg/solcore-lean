@@ -39,6 +39,20 @@ example (nested : Parser YulExpr)
     Parser.PreservesTokensOnSuccess (yulExpressionCore nested) :=
   yulExpressionCore_preservesTokensOnSuccess nested preserves
 
+example (nested : Parser YulExpr)
+    (shape : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (yulExpressionCore nested) :=
+  yulExpressionCore_preservesTokenWindow nested shape
+
+example (nested : Parser YulExpr)
+    (shape : Parser.PreservesTokenWindow nested)
+    {input failedState : State} {failure : Failure}
+    (rejected : yulExpressionCore nested input =
+      .reject failure failedState) :
+    failedState.tokens = input.tokens ∧
+      failedState.window = input.window :=
+  yulExpressionCore_reject_preservesTokenWindow nested shape rejected
+
 example (nested : Parser YulExpr) :
     Parser.CursorMonotoneOnSuccess (yulExpressionCore nested) :=
   yulExpressionCore_cursorMonotoneOnSuccess nested

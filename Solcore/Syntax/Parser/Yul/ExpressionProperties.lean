@@ -33,6 +33,18 @@ private theorem presentYulCallArguments_preservesTokensOnSuccess
   · intro arguments
     exact Parser.pure_preservesTokensOnSuccess (some arguments)
 
+private theorem presentYulCallArguments_preservesTokenWindow
+    (nested : Parser YulExpr)
+    (nestedShape : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (do
+      pure (some (← delimited .leftParen .rightParen true nested
+        .yulExpression .yul))) := by
+  apply Parser.bind_preservesTokenWindow
+  · exact delimited_preservesTokenWindow .leftParen .rightParen true nested
+      .yulExpression .yul nestedShape
+  · intro arguments
+    exact Parser.pure_preservesTokenWindow (some arguments)
+
 private theorem presentYulCallArguments_cursorMonotoneOnSuccess
     (nested : Parser YulExpr) :
     Parser.CursorMonotoneOnSuccess (do
@@ -59,6 +71,19 @@ theorem optionalYulCallArguments_validFor
         nestedPreserves)
       (Parser.pure_validFor none _ (fun _ => trivial)) input inputValid
   · exact ⟨trivial, inputValid, rfl⟩
+
+/-- Optional call arguments preserve every ordinary token window. -/
+theorem optionalYulCallArguments_preservesTokenWindow
+    (nested : Parser YulExpr)
+    (nestedShape : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (optionalYulCallArguments nested) := by
+  intro input
+  unfold optionalYulCallArguments
+  split
+  · exact Parser.orElse_preservesTokenWindow
+      (presentYulCallArguments_preservesTokenWindow nested nestedShape)
+      (Parser.pure_preservesTokenWindow none) input
+  · exact ⟨rfl, rfl⟩
 
 /-- Optional Yul-call arguments preserve the immutable lexer token carrier. -/
 theorem optionalYulCallArguments_preservesTokensOnSuccess
@@ -164,6 +189,19 @@ theorem rejectedMeta_yulExpr_validFor :
         cases kind <;> simp only [found] at result
         all_goals try { exact rejectAt_reject_validFor inputValid _ _ result }
         all_goals contradiction
+
+/-- Meta-syntax rejection preserves every ordinary token window. -/
+theorem rejectedMeta_preservesTokenWindow :
+    Parser.PreservesTokenWindow rejectedMeta := by
+  intro input
+  unfold rejectedMeta
+  cases found : input.peek? with
+  | none => exact rejectAt_preservesTokenWindow input _ _
+  | some token =>
+      rcases token with ⟨span, kind⟩
+      cases kind
+      all_goals try { exact rejectAt_preservesTokenWindow input _ _ }
+      all_goals exact ⟨rfl, rfl⟩
 
 /-- The outer range of rejected meta syntax remains source-valid. -/
 theorem rejectedMeta_validFor :
@@ -399,6 +437,62 @@ theorem yulExpressionCore_preservesTokensOnSuccess
           rejectedMeta_preservesTokensOnSuccess input expression next result }
       unfold rejectAt at result
       contradiction
+
+/-- One Yul-expression layer preserves every ordinary token window. -/
+theorem yulExpressionCore_preservesTokenWindow
+    (nested : Parser YulExpr)
+    (nestedShape : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (yulExpressionCore nested) := by
+  intro input
+  unfold yulExpressionCore
+  split
+  · have literalShape := yulLiteral_preservesTokenWindow input
+    cases literalResult : yulLiteral input with
+    | ok literal next => rw [literalResult] at literalShape; exact literalShape
+    | reject failure next =>
+        rw [literalResult] at literalShape
+        exact literalShape
+    | invariant error => trivial
+  · split
+    · have nameShape := yulName_preservesTokenWindow input
+      cases nameResult : yulName input with
+      | ok name afterName =>
+          rw [nameResult] at nameShape
+          have argumentsShape :=
+            optionalYulCallArguments_preservesTokenWindow nested nestedShape
+              afterName
+          cases argumentsResult : optionalYulCallArguments nested afterName with
+          | ok arguments next =>
+              rw [argumentsResult] at argumentsShape
+              cases arguments <;>
+                simp only [argumentsResult, Reply.PreservesTokenWindow] <;>
+                exact argumentsShape.trans nameShape
+          | reject failure next =>
+              rw [argumentsResult] at argumentsShape
+              simp only [argumentsResult, Reply.PreservesTokenWindow]
+              exact argumentsShape.trans nameShape
+          | invariant error =>
+              simp only [argumentsResult, Reply.PreservesTokenWindow]
+      | reject failure next =>
+          rw [nameResult] at nameShape
+          exact nameShape
+      | invariant error => trivial
+    · split
+      all_goals try { exact rejectedMeta_preservesTokenWindow input }
+      exact rejectAt_preservesTokenWindow input _ _
+
+/-- Core Yul rejection retains the caller's immutable token window. -/
+theorem yulExpressionCore_reject_preservesTokenWindow
+    (nested : Parser YulExpr)
+    (nestedShape : Parser.PreservesTokenWindow nested)
+    {input failedState : State} {failure : Failure}
+    (result : yulExpressionCore nested input =
+      .reject failure failedState) :
+    failedState.tokens = input.tokens ∧
+      failedState.window = input.window := by
+  have preserved := yulExpressionCore_preservesTokenWindow nested nestedShape input
+  rw [result] at preserved
+  exact preserved
 
 /-- Every successful Yul-expression layer consumes at least its leading token. -/
 theorem yulExpressionCore_cursor_lt_onSuccess

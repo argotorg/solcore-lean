@@ -1,5 +1,5 @@
 import Solcore.Syntax.CollectionValidity
-import Solcore.Syntax.Parser.Validity
+import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.StateCursorProperties
 
 set_option autoImplicit false
@@ -329,6 +329,113 @@ theorem delimitedNoTrailing_validFor {α : Type}
       (DelimitedList.ValidFor elementValid) := by
   exact delimitedWithPolicy_validFor elementValid opening closing allowEmpty
     false element context phase elementContract elementShape
+
+private theorem closeDelimited_preservesTokenWindow {α : Type}
+    (opening : Token) (closing : Symbol) (context : ParseContext)
+    (elementsRev : List α) :
+    Parser.PreservesTokenWindow
+      (closeDelimited opening closing context elementsRev) := by
+  intro input
+  unfold closeDelimited
+  have closingShape := symbol_preservesTokenWindow closing context input
+  cases result : symbol closing context input with
+  | ok token next => rw [result] at closingShape; exact closingShape
+  | reject failure next => rw [result] at closingShape; exact closingShape
+  | invariant error => trivial
+
+private theorem afterDelimitedElement_preservesTokenWindow {α : Type}
+    (element : Parser α) (elementShape : Parser.PreservesTokenWindow element)
+    (closing : Symbol) (allowTrailing : Bool) (context : ParseContext)
+    (phase : ParserPhase) (opening : Token) :
+    ∀ fuel elementsRev,
+      Parser.PreservesTokenWindow
+        (afterDelimitedElement element closing allowTrailing context phase
+          opening fuel elementsRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro elementsRev input
+      simp only [afterDelimitedElement, Reply.PreservesTokenWindow]
+  | succ fuel inductionHypothesis =>
+      intro elementsRev input
+      unfold afterDelimitedElement
+      split
+      · have commaShape := symbol_preservesTokenWindow .comma context input
+        cases commaResult : symbol .comma context input with
+        | ok comma afterComma =>
+            rw [commaResult] at commaShape
+            simp only
+            split
+            · exact (closeDelimited_preservesTokenWindow opening closing context
+                elementsRev afterComma).trans commaShape
+            · have itemShape := elementShape afterComma
+              cases itemResult : element afterComma with
+              | ok value afterElement =>
+                  rw [itemResult] at itemShape
+                  simp only
+                  split
+                  · exact (inductionHypothesis (value :: elementsRev)
+                      afterElement).trans (itemShape.trans commaShape)
+                  · trivial
+              | reject failure rejected =>
+                  rw [itemResult] at itemShape
+                  exact itemShape.trans commaShape
+              | invariant error => trivial
+        | reject failure rejected =>
+            rw [commaResult] at commaShape
+            exact commaShape
+        | invariant error => trivial
+      · split
+        · exact closeDelimited_preservesTokenWindow opening closing context
+            elementsRev input
+        · exact rejectAt_preservesTokenWindow input _ _
+
+/-- Delimiter parsing preserves every ordinary token window. -/
+theorem delimitedWithPolicy_preservesTokenWindow {α : Type}
+    (opening closing : Symbol) (allowEmpty allowTrailing : Bool)
+    (element : Parser α) (context : ParseContext) (phase : ParserPhase)
+    (elementShape : Parser.PreservesTokenWindow element) :
+    Parser.PreservesTokenWindow
+      (delimitedWithPolicy opening closing allowEmpty allowTrailing element
+        context phase) := by
+  intro input
+  unfold delimitedWithPolicy
+  have openingShape := symbol_preservesTokenWindow opening context input
+  cases openingResult : symbol opening context input with
+  | ok openingToken afterOpening =>
+      rw [openingResult] at openingShape
+      simp only
+      split
+      · exact (closeDelimited_preservesTokenWindow openingToken closing context
+          [] afterOpening).trans openingShape
+      · have itemShape := elementShape afterOpening
+        cases itemResult : element afterOpening with
+        | ok value afterElement =>
+            rw [itemResult] at itemShape
+            simp only
+            split
+            · exact (afterDelimitedElement_preservesTokenWindow element
+                elementShape closing allowTrailing context phase openingToken
+                (afterOpening.remainingCount + 1) [value] afterElement).trans
+                (itemShape.trans openingShape)
+            · trivial
+        | reject failure rejected =>
+            rw [itemResult] at itemShape
+            exact itemShape.trans openingShape
+        | invariant error => trivial
+  | reject failure rejected =>
+      rw [openingResult] at openingShape
+      exact openingShape
+  | invariant error => trivial
+
+theorem delimited_preservesTokenWindow {α : Type}
+    (opening closing : Symbol) (allowEmpty : Bool) (element : Parser α)
+    (context : ParseContext) (phase : ParserPhase)
+    (elementShape : Parser.PreservesTokenWindow element) :
+    Parser.PreservesTokenWindow
+      (delimited opening closing allowEmpty element context phase) :=
+  delimitedWithPolicy_preservesTokenWindow opening closing allowEmpty true
+    element context phase elementShape
 
 private theorem closeDelimited_preservesTokensOnSuccess {α : Type}
     (opening : Token) (closing : Symbol) (context : ParseContext)

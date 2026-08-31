@@ -227,6 +227,46 @@ theorem yulLiteral_validFor : yulLiteral.ValidFor Located.ValidFor := by
   · intro input inputValid failure next result
     exact yulLiteral_reject_validFor inputValid result
 
+/-- Yul names preserve the token window on every ordinary reply. -/
+theorem yulName_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulName := by
+  intro input
+  unfold yulName
+  cases found : input.peek? with
+  | none => exact rejectAt_preservesTokenWindow input _ _
+  | some token =>
+      rcases token with ⟨span, kind⟩
+      cases kind
+      all_goals try { exact rejectAt_preservesTokenWindow input _ _ }
+      case identifier text =>
+        exact identifier_preservesTokenWindow .yulExpression input
+      case yulIdentifier text => exact ⟨rfl, rfl⟩
+      case keyword keyword =>
+        cases keyword
+        all_goals try { exact rejectAt_preservesTokenWindow input _ _ }
+        exact ⟨rfl, rfl⟩
+      case symbol symbol =>
+        cases symbol
+        all_goals try { exact rejectAt_preservesTokenWindow input _ _ }
+        exact ⟨rfl, rfl⟩
+
+/-- Yul literals preserve the token window on every ordinary reply. -/
+theorem yulLiteral_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulLiteral := by
+  intro input
+  unfold yulLiteral
+  cases found : input.peek? with
+  | none => exact rejectAt_preservesTokenWindow input _ _
+  | some token =>
+      rcases token with ⟨span, kind⟩
+      cases kind
+      all_goals try { exact rejectAt_preservesTokenWindow input _ _ }
+      all_goals try { exact ⟨rfl, rfl⟩ }
+      case keyword keyword =>
+        cases keyword
+        all_goals try { exact rejectAt_preservesTokenWindow input _ _ }
+        all_goals exact ⟨rfl, rfl⟩
+
 /-- Yul-name parsing preserves the immutable token carrier. -/
 theorem yulName_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess yulName := by
