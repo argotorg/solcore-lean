@@ -428,7 +428,9 @@ theorem requireScrutinees_validFor
       (NonemptyDelimitedList.ValidFor expressionValueValid) := by
   unfold requireScrutinees
   cases elements : values.elements with
-  | nil => trivial
+  | nil =>
+      unfold rejectAt Reply.ValidFor
+      exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
   | cons head tail =>
       simp only [pure, Reply.ValidFor, NonemptyDelimitedList.ValidFor]
       refine ⟨⟨valuesValid.1, ?_⟩, inputValid, trivial⟩
@@ -443,7 +445,7 @@ theorem requireScrutinees_preservesTokenWindow
   intro input
   unfold requireScrutinees
   cases values.elements with
-  | nil => trivial
+  | nil => exact rejectAt_preservesTokenWindow input _ _
   | cons head tail => exact ⟨rfl, rfl⟩
 
 /-- Requiring a nonempty scrutinee list never rewinds the cursor. -/

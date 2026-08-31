@@ -185,6 +185,59 @@ private def testControlStatements : IO Unit := do
       s!"control statement shapes changed: {reprStr statements}")
 
 private def testMatchStatements : IO Unit := do
+  let malformedContent := "match () {}"
+  let malformedFile : SourceFile := {
+    id := statementSource
+    content := malformedContent
+  }
+  let malformedLexed ← match Lexer.lex malformedFile with
+    | .ok value => pure value
+    | .error error => throw (IO.userError
+        s!"empty match lexer invariant failed: {reprStr error}")
+  let malformedInput := Parser.State.initial malformedFile malformedLexed
+
+  match Parser.matchStatement Parser.statement Parser.expression
+      Parser.pattern malformedInput with
+  | .reject failure rejected =>
+      assertEqual (byteRange failure.span) (7, 8)
+        "empty match rejection range"
+      assertEqual failure.toDiagnostic.kind
+        (.unexpected (some (.symbol .rightParen))
+          { head := .expression, tail := [] } .expression)
+        "empty match rejection kind"
+      assertEqual rejected.cursor 2 "empty match rejection cursor"
+      assertEqual rejected.tokens malformedInput.tokens
+        "empty match rejection tokens"
+      assertEqual rejected.window malformedInput.window
+        "empty match rejection window"
+  | .ok value _ => throw (IO.userError
+      s!"empty match unexpectedly parsed: {reprStr value}")
+  | .invariant error => throw (IO.userError
+      s!"empty match exposed an invariant: {reprStr error}")
+
+  let emptyValues : DelimitedList Expr := {
+    span := malformedInput.currentSpan
+    elements := []
+  }
+  match Parser.MatchInternals.requireScrutinees emptyValues malformedInput with
+  | .reject failure rejected =>
+      assertEqual failure.span malformedInput.currentSpan
+        "empty scrutinee helper rejection range"
+      assertEqual failure.toDiagnostic.kind
+        (.unexpected (some (.keyword .matchKw))
+          { head := .expression, tail := [] } .expression)
+        "empty scrutinee helper rejection kind"
+      assertEqual rejected.cursor malformedInput.cursor
+        "empty scrutinee helper rejection cursor"
+      assertEqual rejected.tokens malformedInput.tokens
+        "empty scrutinee helper rejection tokens"
+      assertEqual rejected.window malformedInput.window
+        "empty scrutinee helper rejection window"
+  | .ok value _ => throw (IO.userError
+      s!"empty scrutinee helper unexpectedly succeeded: {reprStr value}")
+  | .invariant error => throw (IO.userError
+      s!"empty scrutinee helper exposed an invariant: {reprStr error}")
+
   let valid ← runStatement "valid match"
     "match (x, y,) { case (a, b) { return; } default { return; } }"
   assertEqual valid.state.diagnostics [] "valid match diagnostics"

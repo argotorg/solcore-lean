@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Statement.MatchProperties
+import Solcore.Syntax.Parser.Statement.MatchScrutineeTotalityProperties
 
 /-! External consumers for canonical Core match-component contracts. -/
 
@@ -24,6 +24,11 @@ example := @MatchInternals.optionalDefaultBody_preservesTokensOnSuccess
 example := @MatchInternals.optionalDefaultBody_cursorMonotoneOnSuccess
 example := @MatchInternals.optionalDefaultBody_some_startsAfterKeyword
 example := @MatchInternals.requireScrutinees_validFor
+example := @MatchInternals.requireScrutinees_preservesTokenWindow
+example := @MatchInternals.requireScrutinees_cursorMonotoneOnSuccess
+example := @MatchInternals.requireScrutinees_ordinary
+example := @MatchInternals.requireScrutinees_invariantFreeOnValid
+example := @MatchInternals.requireScrutinees_ne_invariant
 example := @matchStatement_validFor
 example := @matchStatement_preservesTokenWindow
 example := @matchStatement_preservesTokensOnSuccess

@@ -12,7 +12,8 @@ def MatchInternals.requireScrutinees (values : DelimitedList Expr) :
       span := values.span
       elements := { head, tail }
     }
-  | [] => fun _ => .invariant (.noProgress .statement values.span)
+  | [] => fun state =>
+      rejectAt state { head := .expression, tail := [] } .expression
 
 namespace MatchInternals
 
