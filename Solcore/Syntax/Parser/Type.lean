@@ -5,9 +5,6 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-/-- Match the canonical Rust parser's recursive syntax ceiling. -/
-def maxTypeNesting : Nat := 128
-
 private def requireNonempty {α : Type} (parsed : DelimitedList α)
     (phase : ParserPhase) : Parser (NonemptyDelimitedList α) :=
   match parsed.elements with
@@ -114,11 +111,7 @@ private def hasFollowingSymbol (state : State) (value : Symbol) : Bool :=
 /-- Recursive Core type parser, parameterized by remaining nesting depth. -/
 def typeExprWithFuel : Nat → Parser TypeExpr
   | 0 => fun state =>
-      let next := state.emit {
-        span := state.currentSpan
-        kind := .nestingExceeded .delimiter maxTypeNesting
-      }
-      rejectAt next { head := .typeExpr, tail := [] } .typeExpr
+      .invariant (.fuelExhausted .typeExpr state.currentSpan)
   | fuel + 1 => fun state =>
       let nested := typeExprWithFuel fuel
       if isKeyword state .functionKw then
@@ -139,7 +132,7 @@ def typeExprWithFuel : Nat → Parser TypeExpr
         rejectAt state { head := .typeExpr, tail := [] } .typeExpr
 
 /-- Parse one complete canonical Core type expression. -/
-def typeExpr : Parser TypeExpr :=
-  typeExprWithFuel maxTypeNesting
+def typeExpr : Parser TypeExpr := fun state =>
+  typeExprWithFuel (state.remainingCount + 1) state
 
 end Solcore.Syntax.Parser
