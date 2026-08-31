@@ -6,6 +6,7 @@ import Solcore.Oracle.V3.Handler
 import Solcore.Oracle.V4
 import Solcore.Oracle.Stream
 import Solcore.Standard.CanonicalData
+import Solcore.Test.SyntaxCallableDeclarationValidity
 import Solcore.Test.SyntaxIdentifier
 import Solcore.Test.SyntaxExpressionValidity
 import Solcore.Test.SyntaxDiagnosticFilterProperties
