@@ -116,7 +116,10 @@ def patternTupleTail (nested : Parser Pattern) (opening : Token) :
 
 end PatternInternals
 
-private def parenthesizedPattern (nested : Parser Pattern) : Parser Pattern :=
+namespace PatternInternals
+
+/-- Parse an empty tuple, grouped pattern, or comma-separated tuple. -/
+def parenthesizedPattern (nested : Parser Pattern) : Parser Pattern :=
     fun state =>
   match symbol .leftParen .pattern state with
   | .ok opening afterOpening =>
@@ -129,21 +132,17 @@ private def parenthesizedPattern (nested : Parser Pattern) : Parser Pattern :=
             if next.cursor ≤ before then
               .invariant (.noProgress .pattern next.currentSpan)
             else if isSymbol next .comma then
-              PatternInternals.patternTupleTail nested opening
+              patternTupleTail nested opening
                 (next.remainingCount + 1)
                 [first] next
             else
-              match symbol .rightParen .pattern next with
-              | .ok closing afterClosing => .ok {
-                  span := SourceSpan.cover opening.span closing.span
-                  value := .group first
-                } afterClosing
-              | .reject failure failed => .reject failure failed
-              | .invariant error => .invariant error
+              closePatternTuple opening [first] next
         | .reject failure next => .reject failure next
         | .invariant error => .invariant error
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+end PatternInternals
 
 namespace PatternInternals
 
@@ -196,7 +195,8 @@ private def patternCore (nested : Parser Pattern)
     PatternInternals.literalPattern state
   else if isBooleanValue state then
     PatternInternals.booleanBinderPattern state
-  else if isSymbol state .leftParen then parenthesizedPattern nested state
+  else if isSymbol state .leftParen then
+    PatternInternals.parenthesizedPattern nested state
   else if isSymbol state .dot then
     PatternInternals.dotConstructorPattern nested state
   else if isContextual state .comptime then
