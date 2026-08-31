@@ -25,5 +25,10 @@ example := @ControlInternals.optionalElseBody_preservesTokenWindow
 example := @ControlInternals.optionalElseBody_preservesTokensOnSuccess
 example := @ControlInternals.optionalElseBody_cursorMonotoneOnSuccess
 example := @ControlInternals.optionalElseBody_some_startsAfterKeyword
+example := @ifStatement_validFor
+example := @ifStatement_preservesTokenWindow
+example := @ifStatement_preservesTokensOnSuccess
+example := @ifStatement_cursorMonotoneOnSuccess
+example := @ifStatement_startsAtCurrentTokenOnSuccess
 
 end Tests

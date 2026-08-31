@@ -458,4 +458,289 @@ theorem optionalElseBody_some_startsAfterKeyword
 
 end ControlInternals
 
+/-- `if` parsing retains its condition and every selected branch body. -/
+theorem ifStatement_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop)
+    (statement : Parser Statement) (expression : Parser Expr)
+    (statementValid : statement.ValidFor
+      (Statement.ValidFor expressionValueValid patternValueValid
+        yulValueValid))
+    (statementTokens : Parser.PreservesTokensOnSuccess statement)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionTokens : Parser.PreservesTokensOnSuccess expression)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    (ifStatement statement expression).ValidFor
+      (Statement.ValidFor expressionValueValid patternValueValid
+        yulValueValid) := by
+  have bodyValid := coreBlock_validFor
+    (Statement.ValidFor expressionValueValid patternValueValid yulValueValid)
+    statement .require statementValid statementTokens
+    (fun _ _ valid => valid.span_valid)
+  have elseValid := ControlInternals.optionalElseBody_validFor
+    expressionValueValid patternValueValid yulValueValid statement
+      statementValid statementTokens
+  have weak : (ifStatement statement expression).ValidFor
+      (fun _ _ => True) := by
+    unfold ifStatement
+    apply Parser.bind_validFor (keyword_validFor .ifKw .statement)
+    intro marker
+    apply Parser.bind_validFor (symbol_validFor .leftParen .statement)
+    intro opening
+    apply Parser.bind_validFor expressionValid
+    intro condition
+    apply Parser.bind_validFor (symbol_validFor .rightParen .statement)
+    intro closing
+    apply Parser.bind_validFor bodyValid
+    intro thenBody
+    apply Parser.bind_validFor elseValid
+    intro elseBody
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakReply := weak input inputValid
+  cases parsed : ifStatement statement expression input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakReply
+      exact weakReply
+  | ok parsedStatement final =>
+      rw [parsed] at weakReply
+      have stages := parsed
+      unfold ifStatement at stages
+      rcases controlBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨opening, afterOpening, openingResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨condition, afterCondition, conditionResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨closing, afterClosing, closingResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨thenBody, afterThen, thenResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨elseBody, afterElse, elseResult, finished⟩
+      have markerReply := keyword_validFor .ifKw .statement input inputValid
+      rw [markerResult] at markerReply
+      have openingReply := symbol_validFor .leftParen .statement afterMarker
+        markerReply.2.1
+      rw [openingResult] at openingReply
+      have conditionReply := expressionValid afterOpening openingReply.2.1
+      rw [conditionResult] at conditionReply
+      have closingReply := symbol_validFor .rightParen .statement
+        afterCondition conditionReply.2.1
+      rw [closingResult] at closingReply
+      have thenReply := bodyValid afterClosing closingReply.2.1
+      rw [thenResult] at thenReply
+      have elseReply := elseValid afterThen thenReply.2.1
+      rw [elseResult] at elseReply
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerReply.1
+      have conditionValidInput : expressionValueValid input.file condition := by
+        simpa [conditionReply.2.2, openingReply.2.2,
+          markerReply.2.2] using conditionReply.1
+      have thenValidInput : Block.ValidFor
+          (Statement.ValidFor expressionValueValid patternValueValid
+            yulValueValid) input.file thenBody := by
+        simpa [thenReply.2.2, closingReply.2.2, conditionReply.2.2,
+          openingReply.2.2, markerReply.2.2] using thenReply.1
+      have elseValidInput : Option.ValidFor (Block.ValidFor
+          (Statement.ValidFor expressionValueValid patternValueValid
+            yulValueValid)) input.file elseBody := by
+        simpa [thenReply.2.2, closingReply.2.2, conditionReply.2.2,
+          openingReply.2.2, markerReply.2.2] using elseReply.1
+      have markerAt := State.getElem?_eq_some_of_peek?_eq_some
+        (acceptToken_ok_state_shape (.keyword .ifKw) .statement
+          (fun kind => kind == .keyword .ifKw) markerResult).1
+      cases elseBody with
+      | none =>
+          rcases coreBlock_startsAtCurrentTokenOnSuccess statement .require
+              afterClosing thenBody afterThen thenResult with
+            ⟨bodyOpening, bodyOpeningFound, bodyStart⟩
+          have bodyOpeningAtAfter :=
+            State.getElem?_eq_some_of_peek?_eq_some bodyOpeningFound
+          have bodyOpeningAt : input.tokens[afterClosing.cursor]? =
+              some bodyOpening := by
+            simpa [
+              keyword_preservesTokensOnSuccess .ifKw .statement input marker
+                afterMarker markerResult,
+              symbol_preservesTokensOnSuccess .leftParen .statement
+                afterMarker opening afterOpening openingResult,
+              expressionTokens afterOpening condition afterCondition
+                conditionResult,
+              symbol_preservesTokensOnSuccess .rightParen .statement
+                afterCondition closing afterClosing closingResult] using
+                  bodyOpeningAtAfter
+          have cursorOrder : input.cursor < afterClosing.cursor :=
+            Nat.lt_of_lt_of_le
+              (acceptToken_cursor_lt_onSuccess (.keyword .ifKw) .statement
+                (fun kind => kind == .keyword .ifKw) markerResult)
+              (Nat.le_trans
+                (symbol_cursorMonotoneOnSuccess .leftParen .statement
+                  afterMarker opening afterOpening openingResult)
+                (Nat.le_trans
+                  (expressionCursor afterOpening condition afterCondition
+                    conditionResult)
+                  (symbol_cursorMonotoneOnSuccess .rightParen .statement
+                    afterCondition closing afterClosing closingResult)))
+          have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+            markerAt bodyOpeningAt cursorOrder
+          have outerValid := SourceSpan.cover_validFor markerSpanValid
+            thenValidInput.1 (by
+              calc
+                marker.span.startByte ≤ marker.span.endByte :=
+                  markerSpanValid.2.1
+                _ ≤ bodyOpening.span.startByte := separated
+                _ = thenBody.span.startByte := bodyStart
+                _ ≤ thenBody.span.endByte := thenValidInput.1.2.1)
+          cases finished
+          exact ⟨Statement.ValidFor.ifThen outerValid conditionValidInput
+            thenValidInput.1 thenValidInput.2 (by simp) (by simp),
+            weakReply.2.1, weakReply.2.2⟩
+      | some selectedElse =>
+          simp only [Option.ValidFor] at elseValidInput
+          rcases ControlInternals.optionalElseBody_some_startsAfterKeyword
+              statement elseResult with
+            ⟨elseMarker, afterElseMarker, bodyOpening, elseMarkerResult,
+              bodyOpeningFound, bodyStart⟩
+          have bodyOpeningAtAfter :=
+            State.getElem?_eq_some_of_peek?_eq_some bodyOpeningFound
+          have bodyOpeningAt : input.tokens[afterElseMarker.cursor]? =
+              some bodyOpening := by
+            simpa [
+              keyword_preservesTokensOnSuccess .ifKw .statement input marker
+                afterMarker markerResult,
+              symbol_preservesTokensOnSuccess .leftParen .statement
+                afterMarker opening afterOpening openingResult,
+              expressionTokens afterOpening condition afterCondition
+                conditionResult,
+              symbol_preservesTokensOnSuccess .rightParen .statement
+                afterCondition closing afterClosing closingResult,
+              coreBlock_preservesTokensOnSuccess statement .require
+                statementTokens afterClosing thenBody afterThen thenResult,
+              keyword_preservesTokensOnSuccess .elseKw .statement afterThen
+                elseMarker afterElseMarker elseMarkerResult] using
+                  bodyOpeningAtAfter
+          have cursorOrder : input.cursor < afterElseMarker.cursor :=
+            Nat.lt_of_lt_of_le
+              (acceptToken_cursor_lt_onSuccess (.keyword .ifKw) .statement
+                (fun kind => kind == .keyword .ifKw) markerResult)
+              (calc
+                afterMarker.cursor ≤ afterOpening.cursor :=
+                  symbol_cursorMonotoneOnSuccess .leftParen .statement
+                    afterMarker opening afterOpening openingResult
+                _ ≤ afterCondition.cursor := expressionCursor afterOpening
+                  condition afterCondition conditionResult
+                _ ≤ afterClosing.cursor :=
+                  symbol_cursorMonotoneOnSuccess .rightParen .statement
+                    afterCondition closing afterClosing closingResult
+                _ ≤ afterThen.cursor := coreBlock_cursorMonotoneOnSuccess
+                  statement .require afterClosing thenBody afterThen thenResult
+                _ ≤ afterElseMarker.cursor :=
+                  keyword_cursorMonotoneOnSuccess .elseKw .statement afterThen
+                    elseMarker afterElseMarker elseMarkerResult)
+          have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+            markerAt bodyOpeningAt cursorOrder
+          have outerValid := SourceSpan.cover_validFor markerSpanValid
+            elseValidInput.1 (by
+              calc
+                marker.span.startByte ≤ marker.span.endByte :=
+                  markerSpanValid.2.1
+                _ ≤ bodyOpening.span.startByte := separated
+                _ = selectedElse.span.startByte := bodyStart
+                _ ≤ selectedElse.span.endByte := elseValidInput.1.2.1)
+          cases finished
+          exact ⟨Statement.ValidFor.ifThen outerValid conditionValidInput
+            thenValidInput.1 thenValidInput.2
+            (by simpa using elseValidInput.1)
+            (by simpa using elseValidInput.2), weakReply.2.1,
+            weakReply.2.2⟩
+
+/-- `if` parsing preserves every ordinary token window. -/
+theorem ifStatement_preservesTokenWindow
+    (statement : Parser Statement) (expression : Parser Expr)
+    (statementWindow : Parser.PreservesTokenWindow statement)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (ifStatement statement expression) := by
+  unfold ifStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .ifKw .statement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .leftParen .statement)
+  intro opening
+  apply Parser.bind_preservesTokenWindow expressionWindow
+  intro condition
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .rightParen .statement)
+  intro closing
+  apply Parser.bind_preservesTokenWindow
+    (coreBlock_preservesTokenWindow statement .require statementWindow)
+  intro thenBody
+  apply Parser.bind_preservesTokenWindow
+    (ControlInternals.optionalElseBody_preservesTokenWindow statement
+      statementWindow)
+  intro elseBody
+  exact Parser.pure_preservesTokenWindow _
+
+/-- Successful `if` parsing preserves the immutable token carrier. -/
+theorem ifStatement_preservesTokensOnSuccess
+    (statement : Parser Statement) (expression : Parser Expr)
+    (statementWindow : Parser.PreservesTokenWindow statement)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (ifStatement statement expression) :=
+  (ifStatement_preservesTokenWindow statement expression statementWindow
+    expressionWindow).preservesTokensOnSuccess
+
+/-- A successful `if` statement never rewinds the token cursor. -/
+theorem ifStatement_cursorMonotoneOnSuccess
+    (statement : Parser Statement) (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (ifStatement statement expression) := by
+  unfold ifStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .ifKw .statement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .leftParen .statement)
+  intro opening
+  apply Parser.bind_cursorMonotoneOnSuccess expressionCursor
+  intro condition
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .rightParen .statement)
+  intro closing
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (coreBlock_cursorMonotoneOnSuccess statement .require)
+  intro thenBody
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (ControlInternals.optionalElseBody_cursorMonotoneOnSuccess statement)
+  intro elseBody
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- An `if` statement starts at its `if` keyword token. -/
+theorem ifStatement_startsAtCurrentTokenOnSuccess
+    (statement : Parser Statement) (expression : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (ifStatement statement expression) (·.span) := by
+  intro input parsedStatement final parsed
+  have stages := parsed
+  unfold ifStatement at stages
+  rcases controlBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases controlBind_ok_components rest with
+    ⟨opening, afterOpening, openingResult, rest⟩
+  rcases controlBind_ok_components rest with
+    ⟨condition, afterCondition, conditionResult, rest⟩
+  rcases controlBind_ok_components rest with
+    ⟨closing, afterClosing, closingResult, rest⟩
+  rcases controlBind_ok_components rest with
+    ⟨thenBody, afterThen, thenResult, rest⟩
+  rcases controlBind_ok_components rest with
+    ⟨elseBody, afterElse, elseResult, finished⟩
+  rcases acceptToken_startsAtCurrentTokenOnSuccess (.keyword .ifKw)
+      .statement (fun kind => kind == .keyword .ifKw) input marker
+      afterMarker markerResult with ⟨token, found, starts⟩
+  cases finished
+  exact ⟨token, found, starts⟩
+
 end Solcore.Syntax.Parser
