@@ -151,6 +151,87 @@ private def testAtomsAndTuples : IO Unit := do
     assertEqual (byteRange run.value.span) (0, source.utf8ByteSize)
       s!"atom span {source}"
 
+private def testSourcePreservingWitnesses : IO Unit := do
+  let proxy ← runExpression "proxy expression" "@pkg.Box<word>"
+  assertEqual proxy.state.diagnostics [] "proxy expression diagnostics"
+  assertEqual (byteRange proxy.value.span) (0, 14) "proxy expression span"
+  match proxy.value.value with
+  | .proxy marker type =>
+      assertEqual (byteRange marker) (0, 1) "proxy marker span"
+      assertEqual (byteRange type.span) (1, 14) "proxied type span"
+      match type.value with
+      | .named name (some arguments) =>
+          assertEqual
+            (name.value.components.toList.map (fun item => item.value))
+            ["pkg", "Box"] "proxied qualified name"
+          assertEqual (byteRange name.span) (1, 8) "proxied name span"
+          assertEqual (byteRange arguments.span) (8, 14)
+            "proxied type arguments span"
+          match arguments.elements.toList with
+          | [{ span, value := .named argumentName none }] =>
+              assertEqual (byteRange span) (9, 13)
+                "proxied argument span"
+              assertEqual
+                (argumentName.value.components.toList.map
+                  (fun item => item.value))
+                ["word"] "proxied argument name"
+          | values => throw (IO.userError
+              s!"proxied type arguments changed: {reprStr values}")
+      | value => throw (IO.userError
+          s!"proxied type changed: {reprStr value}")
+  | value => throw (IO.userError
+      s!"proxy expression was not preserved: {reprStr value}")
+
+  let lambdaSource :=
+    "lam(x, comptime y, comptime z: word) { return z; }"
+  let lambda ← runExpression "lambda parameter distinctions" lambdaSource
+  assertEqual (byteRange lambda.value.span) (0, lambdaSource.utf8ByteSize)
+    "lambda expression span"
+  assertEqual (lambda.state.diagnostics.map fun diagnostic =>
+      (byteRange diagnostic.span, diagnostic.kind)) [
+    ((7, 17), .constraintViolation .comptimeParameterRequiresType)
+  ] "untyped comptime lambda diagnostic"
+  match lambda.value.value with
+  | .lambda keyword parameters none body =>
+      assertEqual (byteRange keyword) (0, 3) "lambda keyword span"
+      assertEqual (byteRange parameters.span) (3, 36)
+        "lambda parameter-list span"
+      match parameters.elements with
+      | [
+          { span := inferredSpan, value := .inferred inferredName },
+          { span := errorSpan, value := .error },
+          { span := typedSpan,
+            value := .typed (some comptimeSpan) typedName typedType }
+        ] =>
+          assertEqual (byteRange inferredSpan) (4, 5)
+            "inferred lambda parameter span"
+          assertEqual inferredName.value "x" "inferred lambda parameter"
+          assertEqual (byteRange errorSpan) (7, 17)
+            "untyped comptime error placeholder span"
+          assertEqual (byteRange typedSpan) (19, 35)
+            "typed comptime parameter span"
+          assertEqual (byteRange comptimeSpan) (19, 27)
+            "typed comptime marker span"
+          assertEqual typedName.value "z" "typed comptime parameter"
+          match typedType.value with
+          | .named typeName none =>
+              assertEqual
+                (typeName.value.components.toList.map
+                  (fun item => item.value))
+                ["word"] "typed comptime parameter type"
+          | value => throw (IO.userError
+              s!"typed comptime parameter type changed: {reprStr value}")
+      | values => throw (IO.userError
+          s!"lambda parameter distinctions changed: {reprStr values}")
+      match body.value with
+      | [{ value := .returnStmt (some returned), .. }] =>
+          assertEqual (expressionShape returned) (ident "z")
+            "lambda body preserved after parameter error"
+      | statements => throw (IO.userError
+          s!"lambda body changed after parameter error: {reprStr statements}")
+  | value => throw (IO.userError
+      s!"lambda expression changed: {reprStr value}")
+
 private def testTrailingCommaRejection : IO Unit := do
   for (source, close) in [("[x,]", Symbol.rightBracket),
       ("f(x,)", .rightParen), (".C(x,)", .rightParen)] do
@@ -293,6 +374,7 @@ private def testPatternRecovery : IO Unit := do
 /-- Run direct expression and pattern parser regressions. -/
 def testSyntaxParserTerms : IO Unit := do
   testAtomsAndTuples
+  testSourcePreservingWitnesses
   testTrailingCommaRejection
   testPostfixAndUnary
   testPrecedenceAndAssociativity
