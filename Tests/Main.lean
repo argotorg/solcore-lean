@@ -10,6 +10,7 @@ import Solcore.Test.SyntaxLexer
 import Solcore.Test.SyntaxParserBodyIsolation
 import Solcore.Test.SyntaxParserContracts
 import Solcore.Test.SyntaxParserDeclarationTrivia
+import Solcore.Test.SyntaxParserDiagnosticSuppression
 import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExports
 import Solcore.Test.SyntaxParserModules
@@ -5059,6 +5060,7 @@ def run : IO Unit := do
   testSyntaxParserBodyIsolation
   testSyntaxParserContracts
   testSyntaxParserDeclarationTrivia
+  testSyntaxParserDiagnosticSuppression
   testSyntaxParserEnumTraitImpl
   testSyntaxParserModules
   testSyntaxParserExports
