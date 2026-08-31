@@ -222,6 +222,55 @@ private theorem closeCoreBlock_cursor_lt_onSuccess (opening : Token)
     · intro _
       exact Parser.pure_cursorMonotoneOnSuccess _
 
+/-- Closing a Core block retains the opening-brace start byte. -/
+private theorem closeCoreBlock_preservesOpeningStartOnSuccess
+    (opening : Token) (policy : TailExpressionPolicy)
+    (bodyRev : List Statement) {input next : State} {body : Block}
+    (result : closeCoreBlock opening policy bodyRev input = .ok body next) :
+    body.span.startByte = opening.span.startByte := by
+  unfold closeCoreBlock at result
+  simp only [bind] at result
+  cases closingResult : symbol .rightBrace .statement input with
+  | invariant error => simp [closingResult] at result
+  | reject failure rejected => simp [closingResult] at result
+  | ok closing afterClosing =>
+      simp only [closingResult] at result
+      simp only [modifyState] at result
+      cases result
+      rfl
+
+/-- Every successful item loop retains the original opening-brace start. -/
+private theorem coreBlockItems_preservesOpeningStartOnSuccess
+    (statement : Parser Statement) (opening : Token)
+    (policy : TailExpressionPolicy) :
+    ∀ fuel bodyRev input body next,
+      coreBlockItems statement opening policy fuel bodyRev input =
+          .ok body next →
+        body.span.startByte = opening.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro bodyRev input body next result
+      unfold coreBlockItems at result
+      split at result
+      · exact closeCoreBlock_preservesOpeningStartOnSuccess opening policy
+          bodyRev result
+      · split at result
+        · cases closingResult : symbol .rightBrace .statement input with
+          | ok closing afterClosing => simp [closingResult] at result
+          | reject failure rejected => simp [closingResult] at result
+          | invariant error => simp [closingResult] at result
+        · cases statementResult : statement input with
+          | ok value afterStatement =>
+              simp only [statementResult] at result
+              split at result
+              · exact inductionHypothesis (value :: bodyRev) afterStatement
+                  body next result
+              · contradiction
+          | reject failure rejected => simp [statementResult] at result
+          | invariant error => simp [statementResult] at result
+
 private theorem closeCoreBlock_ok_state_shape (opening : Token)
     (policy : TailExpressionPolicy) (bodyRev : List Statement)
     {input next : State} {body : Block}
@@ -412,6 +461,25 @@ theorem coreBlock_cursorMonotoneOnSuccess (statement : Parser Statement)
   intro input body next result
   exact Nat.le_of_lt
     (coreBlock_cursor_lt_onSuccess statement policy result)
+
+/-- A successful Core block starts at its opening-brace token. -/
+theorem coreBlock_startsAtCurrentTokenOnSuccess
+    (statement : Parser Statement) (policy : TailExpressionPolicy) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (coreBlock statement policy) (·.span) := by
+  intro input body next result
+  unfold coreBlock at result
+  cases openingResult : symbol .leftBrace .statement input with
+  | invariant error => simp [openingResult] at result
+  | reject failure rejected => simp [openingResult] at result
+  | ok opening afterOpening =>
+      simp only [openingResult] at result
+      have found :=
+        (symbol_ok_state_shape .leftBrace .statement openingResult).1
+      have start := coreBlockItems_preservesOpeningStartOnSuccess statement
+        opening policy (afterOpening.remainingCount + 1) [] afterOpening body
+          next result
+      exact ⟨opening, found, start.symm⟩
 
 namespace BlockInternals
 

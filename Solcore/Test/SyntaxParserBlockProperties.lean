@@ -13,6 +13,7 @@ example := @coreBlock_preservesTokensOnSuccess
 example := @coreBlock_preservesTokenWindow
 example := @coreBlock_cursor_lt_onSuccess
 example := @coreBlock_cursorMonotoneOnSuccess
+example := @coreBlock_startsAtCurrentTokenOnSuccess
 example := @BlockInternals.captureBlockTail_validFor
 example := @BlockInternals.captureBlock?_validFor
 example := @BlockInternals.captureBlock?_startsAtCurrentToken
