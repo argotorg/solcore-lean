@@ -1,6 +1,7 @@
 import Solcore.Syntax.Parser.File
 import Solcore.Syntax.Parser.DiagnosticFilter
 import Solcore.Syntax.Parser.Preflight
+import Solcore.Syntax.Parser.PrimitiveProperties
 
 set_option autoImplicit false
 

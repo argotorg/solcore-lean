@@ -18,6 +18,7 @@ import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExports
 import Solcore.Test.SyntaxParserLegacyRejection
 import Solcore.Test.SyntaxParserModules
+import Solcore.Test.SyntaxParserPrimitiveProperties
 import Solcore.Test.SyntaxParserRecovery
 import Solcore.Test.SyntaxParserReservedWords
 import Solcore.Test.SyntaxParserSignatures
