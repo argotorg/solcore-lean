@@ -279,6 +279,26 @@ theorem parse_ok_lexicalDiagnostics_validFor
       diagnostic.span.ValidFor file :=
   (parse_ok_retained_spans_validFor file output result).2.2
 
+/-- Public parser tokens retain the complete validated source-order contract. -/
+theorem parse_ok_tokens_sequence_validFor
+    (file : SourceFile) (output : ParseOutput)
+    (result : parse file = .ok output) :
+    SpanSequence.ValidFor file (fun token : Token => token.span)
+      0 output.tokens := by
+  rcases parse_ok_valid_lexed_provenance file output result with
+    ⟨lexed, _lexing, _parsing, valid, tokens, _diagnostics, _comments⟩
+  simpa only [tokens] using valid.tokens
+
+/-- Retained parser comments preserve their validated source-order contract. -/
+theorem parse_ok_comments_sequence_validFor
+    (file : SourceFile) (output : ParseOutput)
+    (result : parse file = .ok output) :
+    SpanSequence.ValidFor file (fun comment : Comment => comment.span)
+      0 output.parsed.comments := by
+  rcases parse_ok_valid_lexed_provenance file output result with
+    ⟨lexed, _lexing, _parsing, valid, _tokens, _diagnostics, comments⟩
+  simpa only [comments] using valid.comments
+
 theorem parse_ok_source
     (file : SourceFile) (output : ParseOutput)
     (result : parse file = .ok output) :

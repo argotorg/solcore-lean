@@ -87,4 +87,23 @@ example (file : SourceFile) (output : ParseOutput)
     diagnostic.span.ValidFor file :=
   parse_ok_lexicalDiagnostics_validFor file output parsed diagnostic member
 
+example (file : SourceFile) (output : ParseOutput)
+    (parsed : parse file = .ok output) :
+    SpanSequence.ValidFor file (fun token : Token => token.span)
+      0 output.tokens :=
+  parse_ok_tokens_sequence_validFor file output parsed
+
+example (file : SourceFile) (output : ParseOutput)
+    (parsed : parse file = .ok output) :
+    SpanSequence.ValidFor file (fun comment : Comment => comment.span)
+      0 output.parsed.comments :=
+  parse_ok_comments_sequence_validFor file output parsed
+
+example (file : SourceFile) (tokens : List Token)
+    (valid : SpanSequence.ValidFor file (fun token : Token => token.span)
+      0 tokens) (token : Token) (member : token ∈ tokens) :
+    0 ≤ token.span.startByte ∧
+      token.span.startByte < token.span.endByte :=
+  ⟨valid.previousEnd_le_start member, valid.span_nonempty member⟩
+
 end Tests

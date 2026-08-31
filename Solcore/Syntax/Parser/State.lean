@@ -31,6 +31,40 @@ theorem span_valid {α : Type} {file : SourceFile}
       · exact headValid
       · exact ih tailValid member
 
+/-- Every member begins at or after the sequence's incoming byte boundary. -/
+theorem previousEnd_le_start {α : Type} {file : SourceFile}
+    {spanOf : α → SourceSpan} {previousEnd : Nat} {items : List α}
+    (valid : SpanSequence.ValidFor file spanOf previousEnd items)
+    {item : α} (member : item ∈ items) :
+    previousEnd ≤ (spanOf item).startByte := by
+  induction items generalizing previousEnd with
+  | nil => contradiction
+  | cons head tail ih =>
+      simp only [SpanSequence.ValidFor] at valid
+      rcases valid with
+        ⟨_headValid, afterPrevious, headNonempty, tailValid⟩
+      rcases List.mem_cons.mp member with rfl | member
+      · exact afterPrevious
+      · exact Nat.le_trans
+          (Nat.le_trans afterPrevious (Nat.le_of_lt headNonempty))
+          (ih tailValid member)
+
+/-- Every member of a validated lexer sequence has a nonempty span. -/
+theorem span_nonempty {α : Type} {file : SourceFile}
+    {spanOf : α → SourceSpan} {previousEnd : Nat} {items : List α}
+    (valid : SpanSequence.ValidFor file spanOf previousEnd items)
+    {item : α} (member : item ∈ items) :
+    (spanOf item).startByte < (spanOf item).endByte := by
+  induction items generalizing previousEnd with
+  | nil => contradiction
+  | cons head tail ih =>
+      simp only [SpanSequence.ValidFor] at valid
+      rcases valid with
+        ⟨_headValid, _afterPrevious, headNonempty, tailValid⟩
+      rcases List.mem_cons.mp member with rfl | member
+      · exact headNonempty
+      · exact ih tailValid member
+
 end SpanSequence.ValidFor
 
 end Solcore.Syntax
