@@ -26,5 +26,12 @@ example := @implDecl_preservesTokensOnSuccess_of_block
 example := @implDecl_cursor_lt_onSuccess
 example := @implDecl_cursorMonotoneOnSuccess
 example := @implDecl_startsAtCurrentTokenOnSuccess
+example := @ImplInternals.ImplBody.ValidFor
+example := @ImplInternals.requireImplArguments_reply_validFor
+example := @ImplInternals.implMethod_validFor
+example := @ImplInternals.implMethods_validFor
+example := @ImplInternals.implBody_validFor
+example := @ImplInternals.implBody_startsAtCurrentTokenOnSuccess
+example := @ImplInternals.implDefaultMarker_validFor
 
 end Tests

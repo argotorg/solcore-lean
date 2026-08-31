@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Impl
 import Solcore.Syntax.Parser.FunctionProperties
+import Solcore.Syntax.CallableDeclarationValidity
 
 /-! State-shape contracts for canonical implementation parsing. -/
 
@@ -392,5 +393,231 @@ theorem implDecl_startsAtCurrentTokenOnSuccess :
     rcases contextual_startsAtCurrentTokenOnSuccess .impl .topItem
         input marker afterMarker markerResult with ⟨token, found, start⟩
     exact ⟨token, found, by simpa [declarationStart] using start⟩
+
+namespace ImplInternals
+
+namespace ImplBody
+
+/-- Every implementation-body range and retained method belongs to one source. -/
+def ValidFor (statementValid : SourceFile → Statement → Prop)
+    (file : SourceFile) (body : ImplBody) : Prop :=
+  body.span.ValidFor file ∧
+    List.ValidFor (ImplMethod.ValidFor statementValid) file body.methods
+
+end ImplBody
+
+/-- Requiring nonempty head arguments preserves recursive type provenance. -/
+theorem requireImplArguments_reply_validFor
+    (values : DelimitedList TypeExpr) (input : State)
+    (inputValid : input.ValidFor)
+    (valuesValid : values.ValidFor TypeExpr.ValidFor input.file) :
+    (requireImplArguments values input).ValidFor input
+      (NonemptyDelimitedList.ValidFor TypeExpr.ValidFor) := by
+  unfold requireImplArguments
+  cases elements : values.elements with
+  | nil => trivial
+  | cons head tail =>
+      simp only [Reply.ValidFor, NonemptyDelimitedList.ValidFor]
+      refine ⟨⟨valuesValid.1, ?_⟩, inputValid, rfl⟩
+      intro element member
+      apply valuesValid.2 element
+      simpa [NonemptyList.toList, elements] using member
+
+/-- One implementation method retains its function and empty comment prefix. -/
+theorem implMethod_validFor (statementValid : SourceFile → Statement → Prop)
+    (blockValid : (block .allow).ValidFor
+      (Block.ValidFor statementValid)) :
+    implMethod.ValidFor (ImplMethod.ValidFor statementValid) := by
+  unfold implMethod
+  apply Parser.bind_validFor_of_value
+    (functionDecl_validFor statementValid .module blockValid)
+  intro declaration input inputValid declarationValid
+  exact ⟨⟨declarationValid.1, by simp, declarationValid⟩,
+    inputValid, rfl⟩
+
+private theorem closeImplBody_validFor
+    (statementValid : SourceFile → Statement → Prop) (opening : Token)
+    (methodsRev : List ImplMethod) (input : State) (openingIndex : Nat)
+    (inputValid : input.ValidFor)
+    (openingFound : input.tokens[openingIndex]? = some opening)
+    (openingBefore : openingIndex < input.cursor)
+    (methodsValid : List.ValidFor (ImplMethod.ValidFor statementValid)
+      input.file methodsRev) :
+    (closeImplBody opening methodsRev input).ValidFor input
+      (ImplBody.ValidFor statementValid) := by
+  unfold closeImplBody
+  have closingReply := symbol_validFor .rightBrace .topItem input inputValid
+  cases closingResult : symbol .rightBrace .topItem input with
+  | invariant error => simp only [bind, closingResult]; trivial
+  | reject failure rejected =>
+      rw [closingResult] at closingReply
+      simp only [bind, closingResult]
+      exact closingReply
+  | ok closing next =>
+      rw [closingResult] at closingReply
+      simp only [bind, closingResult, pure, Reply.ValidFor]
+      have closingShape := symbol_ok_state_shape .rightBrace .topItem
+        closingResult
+      have closingAt := State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have openingValid :=
+        inputValid.token_span_validFor_of_getElem?_eq_some openingFound
+      have closingValid : closing.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using closingReply.1
+      have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+        openingFound closingAt openingBefore
+      have ordered : opening.span.startByte ≤ closing.span.endByte :=
+        Nat.le_trans openingValid.2.1
+          (Nat.le_trans separated closingValid.2.1)
+      refine ⟨⟨SourceSpan.cover_validFor openingValid closingValid ordered, ?_⟩,
+        closingReply.2.1, closingReply.2.2⟩
+      intro method member
+      exact methodsValid method (by simpa using member)
+
+/-- The method loop retains every method and the complete body range. -/
+theorem implMethods_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (blockValid : (block .allow).ValidFor (Block.ValidFor statementValid))
+    (bodyWindow : Parser.PreservesTokenWindow (block .allow))
+    (opening : Token) : ∀ fuel methodsRev input openingIndex,
+      input.ValidFor → input.tokens[openingIndex]? = some opening →
+      openingIndex < input.cursor →
+      List.ValidFor (ImplMethod.ValidFor statementValid) input.file methodsRev →
+      (implMethods opening fuel methodsRev input).ValidFor input
+        (ImplBody.ValidFor statementValid) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro methodsRev input openingIndex inputValid openingFound
+        openingBefore methodsValid
+      unfold implMethods
+      split
+      · exact closeImplBody_validFor statementValid opening methodsRev input
+          openingIndex inputValid openingFound openingBefore methodsValid
+      · split
+        · have methodReply := implMethod_validFor statementValid blockValid
+            input inputValid
+          cases methodResult : implMethod input with
+          | invariant error => trivial
+          | reject failure rejected =>
+              rw [methodResult] at methodReply
+              exact methodReply
+          | ok method next =>
+              rw [methodResult] at methodReply
+              simp only
+              split
+              · have methodTokens :=
+                  (implMethod_preservesTokenWindow_of_block bodyWindow
+                    ).preservesTokensOnSuccess
+                have openingFoundNext : next.tokens[openingIndex]? =
+                    some opening := by
+                  simpa [methodTokens input method next methodResult] using
+                    openingFound
+                have accumulated : List.ValidFor
+                    (ImplMethod.ValidFor statementValid) next.file
+                    (method :: methodsRev) := by
+                  intro retained member
+                  rcases List.mem_cons.mp member with rfl | retainedMember
+                  · simpa [methodReply.2.2] using methodReply.1
+                  · simpa [methodReply.2.2] using
+                      methodsValid retained retainedMember
+                have progress : input.cursor < next.cursor := by omega
+                exact (inductionHypothesis (method :: methodsRev) next
+                  openingIndex methodReply.2.1 openingFoundNext
+                  (Nat.lt_trans openingBefore progress) accumulated
+                    ).of_file_eq methodReply.2.2
+              · trivial
+        · unfold rejectAt Reply.ValidFor
+          exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+
+/-- A complete implementation body retains both braces and every method. -/
+theorem implBody_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (blockValid : (block .allow).ValidFor (Block.ValidFor statementValid))
+    (bodyWindow : Parser.PreservesTokenWindow (block .allow)) :
+    implBody.ValidFor (ImplBody.ValidFor statementValid) := by
+  intro input inputValid
+  unfold implBody
+  have openingReply := symbol_validFor .leftBrace .topItem input inputValid
+  cases openingResult : symbol .leftBrace .topItem input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [openingResult] at openingReply
+      exact openingReply
+  | ok opening next =>
+      rw [openingResult] at openingReply
+      have openingShape := symbol_ok_state_shape .leftBrace .topItem
+        openingResult
+      have openingAtInput :=
+        State.getElem?_eq_some_of_peek?_eq_some openingShape.1
+      have openingAtNext : next.tokens[input.cursor]? = some opening := by
+        simpa [openingShape.2] using openingAtInput
+      exact (implMethods_validFor statementValid blockValid bodyWindow opening
+        (next.remainingCount + 1) [] next input.cursor openingReply.2.1
+        openingAtNext (by simp [openingShape.2])
+        (by simp [List.ValidFor])).of_file_eq openingReply.2.2
+
+private theorem implMethods_preservesOpeningStartOnSuccess
+    (opening : Token) : ∀ fuel methodsRev input body final,
+    implMethods opening fuel methodsRev input = .ok body final →
+      body.span.startByte = opening.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro methodsRev input body final parsed
+      unfold implMethods at parsed
+      split at parsed
+      · unfold closeImplBody at parsed
+        rcases implBind_ok_components parsed with
+          ⟨closing, afterClosing, closingResult, finished⟩
+        cases finished
+        rfl
+      · split at parsed
+        · cases methodResult : implMethod input with
+          | invariant error => simp [methodResult] at parsed
+          | reject failure rejected => simp [methodResult] at parsed
+          | ok method next =>
+              simp only [methodResult] at parsed
+              split at parsed
+              · exact inductionHypothesis (method :: methodsRev) next body
+                  final parsed
+              · contradiction
+        · simp [rejectAt] at parsed
+
+/-- A complete implementation body starts at its opening brace token. -/
+theorem implBody_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess implBody (·.span) := by
+  intro input body final parsed
+  unfold implBody at parsed
+  cases openingResult : symbol .leftBrace .topItem input with
+  | invariant error => simp [openingResult] at parsed
+  | reject failure rejected => simp [openingResult] at parsed
+  | ok opening next =>
+      simp only [openingResult] at parsed
+      have openingShape := symbol_ok_state_shape .leftBrace .topItem
+        openingResult
+      have retained := implMethods_preservesOpeningStartOnSuccess opening
+        (next.remainingCount + 1) [] next body final parsed
+      exact ⟨opening, openingShape.1, retained.symm⟩
+
+/-- Optional default parsing retains only a valid marker when present. -/
+theorem implDefaultMarker_validFor :
+    implDefaultMarker.ValidFor
+      (Option.ValidFor (fun file span => span.ValidFor file)) := by
+  unfold implDefaultMarker
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isKeyword observed .defaultKw
+  · simp only [present, if_true]
+    apply Parser.bind_validFor_of_value
+      (keyword_validFor .defaultKw .topItem)
+    intro marker input inputValid markerValid
+    exact ⟨by simpa only [Option.ValidFor, Located.ValidFor] using markerValid,
+      inputValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+
+end ImplInternals
 
 end Solcore.Syntax.Parser
