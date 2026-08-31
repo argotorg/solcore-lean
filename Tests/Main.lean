@@ -7,7 +7,10 @@ import Solcore.Oracle.V4
 import Solcore.Oracle.Stream
 import Solcore.Standard.CanonicalData
 import Solcore.Test.SyntaxLexer
+import Solcore.Test.SyntaxParserExports
+import Solcore.Test.SyntaxParserModules
 import Solcore.Test.SyntaxParserRecovery
+import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTypes
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
@@ -5045,8 +5048,11 @@ def testCanonicalRawLexing : IO Unit := do
 
 def run : IO Unit := do
   testSyntaxLexer
+  testSyntaxParserModules
+  testSyntaxParserExports
   testSyntaxParserTypes
   testSyntaxParserRecovery
+  testSyntaxParserTrivia
   testProfile
   testFeatureMatrix
   testAbiKeccak256
