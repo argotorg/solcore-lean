@@ -72,19 +72,19 @@ inductive PatternValue where
   | error
   deriving Repr, BEq
 
-/-- One explicit non-default Core match arm. -/
-inductive MatchCaseValue where
-  | arm
-      (patterns : NonemptyList (Located PatternValue))
-      (body : Located (List (Located StatementValue)))
+/-- One explicit non-default Core match arm as written after `case`. -/
+structure MatchCaseValue where
+  pattern : Located PatternValue
+  body : Located (List (Located StatementValue))
   deriving Repr, BEq
 
-/-- Nonempty match-arm collection with `default`, when present, fixed last. -/
-inductive MatchArmsValue where
-  | cases
-      (cases : NonemptyList (Located MatchCaseValue))
-      (defaultBody : Option (Located (List (Located StatementValue))))
-  | defaultOnly (body : Located (List (Located StatementValue)))
+/--
+Parsed match-arm collection. An empty collection is retained when recovery has
+already emitted the missing-arm diagnostic.
+-/
+structure MatchArmsValue where
+  cases : List (Located MatchCaseValue)
+  defaultBody : Option (Located (List (Located StatementValue)))
   deriving Repr, BEq
 
 /-- Restricted item accepted in a canonical `for` header. -/
