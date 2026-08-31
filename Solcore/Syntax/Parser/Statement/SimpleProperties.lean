@@ -638,6 +638,63 @@ theorem optionalReturnValue_cursorMonotoneOnSuccess
 
 end StatementSimpleInternals
 
+/-- Return statements preserve nested expression token windows. -/
+theorem returnStatement_preservesTokenWindow (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (returnStatement expression) := by
+  unfold returnStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .returnKw .statement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (StatementSimpleInternals.optionalReturnValue_preservesTokenWindow
+      expression expressionWindow)
+  intro value
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .semicolon .statement)
+  intro semicolon
+  exact Parser.pure_preservesTokenWindow _
+
+theorem returnStatement_preservesTokensOnSuccess (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (returnStatement expression) :=
+  (returnStatement_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- Return-statement parsing never rewinds the token cursor. -/
+theorem returnStatement_cursorMonotoneOnSuccess (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (returnStatement expression) := by
+  unfold returnStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .returnKw .statement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (StatementSimpleInternals.optionalReturnValue_cursorMonotoneOnSuccess
+      expression expressionCursor)
+  intro value
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .semicolon .statement)
+  intro semicolon
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A return statement starts at its `return` keyword. -/
+theorem returnStatement_startsAtCurrentTokenOnSuccess
+    (expression : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (returnStatement expression) (·.span) := by
+  unfold returnStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .returnKw)
+      .statement (· == .keyword .returnKw))
+  intro marker input statement final parsed
+  rcases StatementSimpleInternals.simpleBind_ok_components parsed with
+    ⟨value, afterValue, valueResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+  cases finished
+  rfl
+
 /-- Assignment/expression statements preserve nested expression windows. -/
 theorem assignmentOrExpressionStatement_preservesTokenWindow
     (expression : Parser Expr)

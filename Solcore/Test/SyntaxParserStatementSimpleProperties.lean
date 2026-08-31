@@ -53,6 +53,10 @@ example :=
   @StatementSimpleInternals.optionalReturnValue_preservesTokensOnSuccess
 example :=
   @StatementSimpleInternals.optionalReturnValue_cursorMonotoneOnSuccess
+example := @returnStatement_preservesTokenWindow
+example := @returnStatement_preservesTokensOnSuccess
+example := @returnStatement_cursorMonotoneOnSuccess
+example := @returnStatement_startsAtCurrentTokenOnSuccess
 example := @assignmentOrExpressionStatement_preservesTokenWindow
 example := @assignmentOrExpressionStatement_preservesTokensOnSuccess
 example := @assignmentOrExpressionStatement_cursorMonotoneOnSuccess
