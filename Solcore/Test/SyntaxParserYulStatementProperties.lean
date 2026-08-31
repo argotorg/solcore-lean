@@ -55,5 +55,18 @@ example := @recognizedYulStatementOrFallback_preservesTokenWindow
 example := @recognizedYulStatementOrFallback_preservesTokensOnSuccess
 example := @recognizedYulStatementOrFallback_cursorMonotoneOnSuccess
 example := @recognizedYulStatementOrFallback_startsAtCurrentTokenOnSuccess
+example := @optionalYulSemicolon_validForAt
+example := @optionalYulSemicolon_preservesTokenWindow
+example := @optionalYulSemicolon_cursorMonotoneOnSuccess
+example := @optionalYulSemicolon_value_eq
+example := @yulStatementTerminated_validFor
+example := @yulStatementTerminated_preservesTokensOnSuccess
+example := @yulStatementTerminated_cursorMonotoneOnSuccess
+example := @yulStatementTerminated_startsAtCurrentTokenOnSuccess
+example := @finishRecoveredYulStatement_validFor
+example := @recoverYulStatementAux_validFor
+example := @recoverYulStatementAux_preservesTokenWindow
+example := @recoverYulStatementAux_preservesTokensOnSuccess
+example := @recoverYulStatementAux_cursorMonotoneOnSuccess
 
 end Tests

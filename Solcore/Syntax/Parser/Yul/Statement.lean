@@ -119,7 +119,8 @@ def yulStatementCore (nested : Parser YulStmt) : Parser YulStmt :=
   else
     fallback state
 
-private def optionalYulSemicolon (value : YulStmt) : Parser YulStmt := do
+/-- Consume an optional semicolon without changing the parsed statement. -/
+def optionalYulSemicolon (value : YulStmt) : Parser YulStmt := do
   let state ← getState
   if isSymbol state .semicolon then
     let _ ← symbol .semicolon .yulStatement
@@ -127,11 +128,13 @@ private def optionalYulSemicolon (value : YulStmt) : Parser YulStmt := do
   else
     pure value
 
-private def yulStatementTerminated
+/-- Parse one statement and its optional trailing semicolon. -/
+def yulStatementTerminated
     (nested : Parser YulStmt) : Parser YulStmt := do
   optionalYulSemicolon (← yulStatementCore nested)
 
-private def finishRecoveredYulStatement (first last : SourceSpan)
+/-- Finish statement recovery with one diagnosed error node. -/
+def finishRecoveredYulStatement (first last : SourceSpan)
     (state : State) : Reply YulStmt :=
   let span := SourceSpan.cover first last
   .ok { span, value := .error } (state.emit {
@@ -139,7 +142,8 @@ private def finishRecoveredYulStatement (first last : SourceSpan)
     kind := .recovered .yulStatement
   })
 
-private def recoverYulStatementAux (first last : SourceSpan) :
+/-- Scan to a Yul statement boundary using explicit fuel. -/
+def recoverYulStatementAux (first last : SourceSpan) :
     Nat → State → Reply YulStmt
   | 0, state => .invariant (.fuelExhausted .yul state.currentSpan)
   | fuel + 1, state =>

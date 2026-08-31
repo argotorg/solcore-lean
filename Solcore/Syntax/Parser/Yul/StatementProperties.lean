@@ -1009,4 +1009,267 @@ theorem yulStatementCore_startsAtCurrentTokenOnSuccess
     Parser.StartsAtCurrentTokenOnSuccess (yulStatementCore nested) (·.span) :=
   (yulStatementCore_contracts nested nestedValid nestedPreserves).startsAtToken
 
+/-- Optional semicolon parsing preserves a supplied valid statement. -/
+theorem optionalYulSemicolon_validForAt (value : YulStmt) (input : State)
+    (inputValid : input.ValidFor) (valueValid : YulStmt.ValidFor input.file value) :
+    (optionalYulSemicolon value input).ValidFor input YulStmt.ValidFor := by
+  unfold optionalYulSemicolon getState
+  simp only [bind]
+  by_cases present : isSymbol input .semicolon = true
+  · simp only [present, if_true]
+    cases semicolonResult : symbol .semicolon .yulStatement input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        have valid := symbol_validFor .semicolon .yulStatement input inputValid
+        rw [semicolonResult] at valid
+        simpa only [bind, semicolonResult, Reply.ValidFor] using valid
+    | ok marker next =>
+        have valid := symbol_validFor .semicolon .yulStatement input inputValid
+        rw [semicolonResult] at valid
+        simp only [Reply.ValidFor]
+        exact ⟨by simpa [valid.2.2] using valueValid,
+          valid.2.1, valid.2.2⟩
+  · simp only [present, Bool.false_eq_true, if_false, Reply.ValidFor]
+    exact ⟨valueValid, inputValid, rfl⟩
+
+/-- Optional semicolons preserve every ordinary token window. -/
+theorem optionalYulSemicolon_preservesTokenWindow (value : YulStmt) :
+    Parser.PreservesTokenWindow (optionalYulSemicolon value) := by
+  unfold optionalYulSemicolon
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro state
+  split
+  · apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .semicolon .yulStatement)
+    intro marker
+    exact Parser.pure_preservesTokenWindow value
+  · exact Parser.pure_preservesTokenWindow value
+
+/-- Optional semicolons never rewind the parser cursor. -/
+theorem optionalYulSemicolon_cursorMonotoneOnSuccess (value : YulStmt) :
+    Parser.CursorMonotoneOnSuccess (optionalYulSemicolon value) := by
+  unfold optionalYulSemicolon
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro state
+  split
+  · apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .semicolon .yulStatement)
+    intro marker
+    exact Parser.pure_cursorMonotoneOnSuccess value
+  · exact Parser.pure_cursorMonotoneOnSuccess value
+
+/-- Optional semicolon parsing returns the supplied statement unchanged. -/
+theorem optionalYulSemicolon_value_eq (value parsed : YulStmt)
+    (input next : State)
+    (result : optionalYulSemicolon value input = .ok parsed next) :
+    parsed = value := by
+  unfold optionalYulSemicolon getState at result
+  simp only [bind] at result
+  by_cases present : isSymbol input .semicolon = true
+  · simp only [present, if_true] at result
+    cases semicolonResult : symbol .semicolon .yulStatement input with
+    | invariant error => simp [semicolonResult] at result
+    | reject failure rejected => simp [semicolonResult] at result
+    | ok marker afterMarker =>
+        simp only [semicolonResult] at result
+        cases result
+        rfl
+  · simp only [present, Bool.false_eq_true, if_false] at result
+    cases result
+    rfl
+
+/-- Optional termination preserves recursive statement provenance. -/
+theorem yulStatementTerminated_validFor (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (yulStatementTerminated nested).ValidFor YulStmt.ValidFor := by
+  intro input inputValid
+  unfold yulStatementTerminated
+  cases coreResult : yulStatementCore nested input with
+  | invariant error => simp [bind, coreResult, Reply.ValidFor]
+  | reject failure rejected =>
+      have valid := yulStatementCore_validFor nested nestedValid
+        nestedPreserves input inputValid
+      rw [coreResult] at valid
+      simpa only [bind, coreResult] using valid
+  | ok value afterCore =>
+      have valid := yulStatementCore_validFor nested nestedValid
+        nestedPreserves input inputValid
+      rw [coreResult] at valid
+      simpa only [bind, coreResult] using
+        (optionalYulSemicolon_validForAt value afterCore valid.2.1
+          (by simpa [valid.2.2] using valid.1)).of_file_eq valid.2.2
+
+theorem yulStatementTerminated_preservesTokensOnSuccess
+    (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (yulStatementTerminated nested) := by
+  unfold yulStatementTerminated
+  apply Parser.bind_preservesTokensOnSuccess
+    (yulStatementCore_preservesTokensOnSuccess nested nestedValid
+      nestedPreserves)
+  intro value
+  exact (optionalYulSemicolon_preservesTokenWindow value).preservesTokensOnSuccess
+
+theorem yulStatementTerminated_cursorMonotoneOnSuccess
+    (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (yulStatementTerminated nested) := by
+  unfold yulStatementTerminated
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (yulStatementCore_cursorMonotoneOnSuccess nested nestedValid
+      nestedPreserves)
+  intro value
+  exact optionalYulSemicolon_cursorMonotoneOnSuccess value
+
+theorem yulStatementTerminated_startsAtCurrentTokenOnSuccess
+    (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (yulStatementTerminated nested) (·.span) := by
+  unfold yulStatementTerminated
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (yulStatementCore_startsAtCurrentTokenOnSuccess nested nestedValid
+      nestedPreserves)
+  intro value input parsed final result
+  rw [optionalYulSemicolon_value_eq value parsed input final result]
+
+private theorem yulStatementAdvance_state_shape {input next : State}
+    {token : Token} (advanced : input.advance? = some (token, next)) :
+    input.peek? = some token ∧
+      next = { input with cursor := input.cursor + 1 } := by
+  unfold State.advance? at advanced
+  cases found : input.peek? with
+  | none => simp [found] at advanced
+  | some current =>
+      simp only [found, Option.map_some] at advanced
+      cases advanced
+      exact ⟨rfl, rfl⟩
+
+/-- Finishing statement recovery retains a source-valid error range. -/
+theorem finishRecoveredYulStatement_validFor (first last : SourceSpan)
+    (state : State) (stateValid : state.ValidFor)
+    (firstValid : first.ValidFor state.file)
+    (lastValid : last.ValidFor state.file)
+    (ordered : first.startByte ≤ last.endByte) :
+    (finishRecoveredYulStatement first last state).ValidFor state
+      YulStmt.ValidFor := by
+  have spanValid := SourceSpan.cover_validFor firstValid lastValid ordered
+  unfold finishRecoveredYulStatement Reply.ValidFor
+  exact ⟨YulStmt.ValidFor.error spanValid,
+    stateValid.emit_validFor _ spanValid, rfl⟩
+
+/-- Statement recovery preserves the provenance of its consumed range. -/
+theorem recoverYulStatementAux_validFor (first : SourceSpan) :
+    ∀ fuel last state lastIndex lastToken,
+      state.ValidFor → first.ValidFor state.file →
+      last.ValidFor state.file → first.startByte ≤ last.endByte →
+      state.tokens[lastIndex]? = some lastToken → lastToken.span = last →
+      lastIndex < state.cursor →
+      (recoverYulStatementAux first last fuel state).ValidFor state
+        YulStmt.ValidFor := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro last state lastIndex lastToken stateValid firstValid lastValid
+        ordered lastFound lastSpan lastBefore
+      unfold recoverYulStatementAux
+      split
+      · exact finishRecoveredYulStatement_validFor first last state
+          stateValid firstValid lastValid ordered
+      · cases advanced : state.advance? with
+        | none =>
+            exact finishRecoveredYulStatement_validFor first last state
+              stateValid firstValid lastValid ordered
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have nextValid := stateValid.advance?_validFor advanced
+            have shape := yulStatementAdvance_state_shape advanced
+            have tokenValid := stateValid.peek?_span_validFor shape.1
+            have currentFound :=
+              State.getElem?_eq_some_of_peek?_eq_some shape.1
+            have lastBeforeCurrent :=
+              stateValid.token_end_le_token_start_of_getElem?_lt lastFound
+                currentFound lastBefore
+            apply (inductionHypothesis token.span next state.cursor token
+              nextValid (by simpa [shape.2] using firstValid)
+              (by simpa [shape.2] using tokenValid)
+              (Nat.le_trans ordered (Nat.le_trans
+                (by simpa [lastSpan] using lastBeforeCurrent)
+                tokenValid.2.1))
+              (by simpa [shape.2] using currentFound) rfl
+              (by simp [shape.2])).of_file_eq
+            simp [shape.2]
+
+/-- Successful statement recovery preserves carrier, cursor, and first byte. -/
+theorem recoverYulStatementAux_ok_state_shape (first : SourceSpan) :
+    ∀ fuel last input statement next,
+      recoverYulStatementAux first last fuel input = .ok statement next →
+      next.tokens = input.tokens ∧ input.cursor ≤ next.cursor ∧
+        statement.span.startByte = first.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro last input statement next result
+      unfold recoverYulStatementAux at result
+      split at result
+      · unfold finishRecoveredYulStatement at result
+        cases result
+        exact ⟨rfl, Nat.le_refl _, rfl⟩
+      · cases advanced : input.advance? with
+        | none =>
+            simp only [advanced] at result
+            unfold finishRecoveredYulStatement at result
+            cases result
+            exact ⟨rfl, Nat.le_refl _, rfl⟩
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have recursive := inductionHypothesis token.span afterToken
+              statement next result
+            have shape := yulStatementAdvance_state_shape advanced
+            exact ⟨recursive.1.trans (by simp [shape.2]),
+              Nat.le_trans (by simp [shape.2]) recursive.2.1,
+              recursive.2.2⟩
+
+/-- Statement recovery preserves every ordinary token window. -/
+theorem recoverYulStatementAux_preservesTokenWindow (first last : SourceSpan) :
+    ∀ fuel, Parser.PreservesTokenWindow
+      (recoverYulStatementAux first last fuel) := by
+  intro fuel input
+  induction fuel generalizing last input with
+  | zero => trivial
+  | succ fuel inductionHypothesis =>
+      unfold recoverYulStatementAux
+      split
+      · unfold finishRecoveredYulStatement Reply.PreservesTokenWindow
+        exact ⟨rfl, rfl⟩
+      · cases advanced : input.advance? with
+        | none =>
+            unfold finishRecoveredYulStatement Reply.PreservesTokenWindow
+            exact ⟨rfl, rfl⟩
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            exact (inductionHypothesis token.span afterToken).trans (by
+              simp [(yulStatementAdvance_state_shape advanced).2])
+
+theorem recoverYulStatementAux_preservesTokensOnSuccess
+    (first last : SourceSpan) (fuel : Nat) :
+    Parser.PreservesTokensOnSuccess
+      (recoverYulStatementAux first last fuel) :=
+  (recoverYulStatementAux_preservesTokenWindow first last fuel).preservesTokensOnSuccess
+
+theorem recoverYulStatementAux_cursorMonotoneOnSuccess
+    (first last : SourceSpan) (fuel : Nat) :
+    Parser.CursorMonotoneOnSuccess
+      (recoverYulStatementAux first last fuel) := by
+  intro input statement next result
+  exact (recoverYulStatementAux_ok_state_shape first fuel last input statement
+    next result).2.1
+
 end Solcore.Syntax.Parser
