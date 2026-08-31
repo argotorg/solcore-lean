@@ -48,5 +48,11 @@ example := @ExpressionAtomInternals.tupleTail_preservesTokensOnSuccess
 example := @ExpressionAtomInternals.tupleTail_cursorMonotoneOnSuccess
 example := @ExpressionAtomInternals.tupleTail_preservesOpeningStartOnSuccess
 example := @ExpressionAtomInternals.tupleTail_endsAtLastConsumedTokenOnSuccess
+example := @ExpressionAtomInternals.parenthesized_validFor
+example := @ExpressionAtomInternals.parenthesized_preservesTokenWindow
+example := @ExpressionAtomInternals.parenthesized_preservesTokensOnSuccess
+example := @ExpressionAtomInternals.parenthesized_cursorMonotoneOnSuccess
+example := @ExpressionAtomInternals.parenthesized_startsAtCurrentTokenOnSuccess
+example := @ExpressionAtomInternals.parenthesized_endsAtLastConsumedTokenOnSuccess
 
 end Tests

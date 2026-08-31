@@ -908,5 +908,214 @@ theorem tupleTail_endsAtLastConsumedTokenOnSuccess
                       opening (value :: elementsRev) parsed
                 · contradiction
 
+/-- Parenthesized expressions retain delimiters and every nested range. -/
+theorem parenthesized_validFor (nested : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (parenthesized nested).ValidFor (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  unfold parenthesized
+  cases openingResult : symbol .leftParen .expression input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := symbol_validFor .leftParen .expression input inputValid
+      rw [openingResult] at valid
+      exact valid
+  | ok opening afterOpening =>
+      have openingValid := symbol_validFor .leftParen .expression input
+        inputValid
+      rw [openingResult] at openingValid
+      have openingShape := symbol_ok_state_shape .leftParen .expression
+        openingResult
+      have openingFound :=
+        State.getElem?_eq_some_of_peek?_eq_some openingShape.1
+      have openingFoundAfter :
+          afterOpening.tokens[input.cursor]? = some opening := by
+        simpa [openingShape.2] using openingFound
+      have openingBeforeAfter : input.cursor < afterOpening.cursor := by
+        rw [openingShape.2]
+        simp
+      simp only
+      split
+      · exact (closeTuple_validFor statementValid opening []
+            openingValid.2.1 openingFoundAfter openingBeforeAfter
+            (by simp [List.ValidFor])).of_file_eq openingValid.2.2
+      · cases nestedResult : nested afterOpening with
+        | invariant error => trivial
+        | reject failure rejected =>
+            have valid := nestedValid afterOpening openingValid.2.1
+            rw [nestedResult] at valid
+            exact valid.of_file_eq openingValid.2.2
+        | ok first next =>
+            have firstValid := nestedValid afterOpening openingValid.2.1
+            rw [nestedResult] at firstValid
+            simp only
+            split
+            · trivial
+            · have tokensEq := nestedPreserves afterOpening first next
+                  nestedResult
+              have openingFoundNext :
+                  next.tokens[input.cursor]? = some opening := by
+                simpa [tokensEq] using openingFoundAfter
+              have openingBeforeNext : input.cursor < next.cursor :=
+                Nat.lt_trans openingBeforeAfter (by omega)
+              have accumulatedValid : List.ValidFor
+                  (Expr.ValidFor statementValid) next.file [first] := by
+                intro retained member
+                simp only [List.mem_singleton] at member
+                subst retained
+                simpa [firstValid.2.2] using firstValid.1
+              split
+              · exact (tupleTail_validFor nested statementValid nestedValid
+                    nestedPreserves opening (next.remainingCount + 1)
+                    [first] next input.cursor firstValid.2.1
+                    openingFoundNext openingBeforeNext accumulatedValid
+                  ).of_file_eq (firstValid.2.2.trans openingValid.2.2)
+              · exact (closeTuple_validFor statementValid opening [first]
+                    firstValid.2.1 openingFoundNext openingBeforeNext
+                    accumulatedValid).of_file_eq
+                      (firstValid.2.2.trans openingValid.2.2)
+
+/-- Parenthesized parsing preserves every ordinary token window. -/
+theorem parenthesized_preservesTokenWindow (nested : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parenthesized nested) := by
+  intro input
+  unfold parenthesized
+  have openingShape := symbol_preservesTokenWindow .leftParen .expression input
+  cases openingResult : symbol .leftParen .expression input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [openingResult] at openingShape
+      exact openingShape
+  | ok opening afterOpening =>
+      rw [openingResult] at openingShape
+      simp only
+      split
+      · exact (closeTuple_preservesTokenWindow opening []
+            afterOpening).trans openingShape
+      · have nestedShape := nestedPreserves afterOpening
+        cases nestedResult : nested afterOpening with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [nestedResult] at nestedShape
+            exact nestedShape.trans openingShape
+        | ok first next =>
+            rw [nestedResult] at nestedShape
+            simp only
+            split
+            · trivial
+            · split
+              · exact (tupleTail_preservesTokenWindow nested
+                    nestedPreserves opening (next.remainingCount + 1)
+                    [first] next).trans (nestedShape.trans openingShape)
+              · exact (closeTuple_preservesTokenWindow opening
+                    [first] next).trans (nestedShape.trans openingShape)
+
+theorem parenthesized_preservesTokensOnSuccess (nested : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokensOnSuccess (parenthesized nested) :=
+  (parenthesized_preservesTokenWindow nested
+    nestedPreserves).preservesTokensOnSuccess
+
+/-- Parenthesized parsing never rewinds the parser cursor. -/
+theorem parenthesized_cursorMonotoneOnSuccess (nested : Parser Expr)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (parenthesized nested) := by
+  intro input expression final parsed
+  unfold parenthesized at parsed
+  cases openingResult : symbol .leftParen .expression input with
+  | invariant error => simp [openingResult] at parsed
+  | reject failure rejected => simp [openingResult] at parsed
+  | ok opening afterOpening =>
+      simp only [openingResult] at parsed
+      have openingMonotone := symbol_cursorMonotoneOnSuccess .leftParen
+        .expression input opening afterOpening openingResult
+      split at parsed
+      · exact Nat.le_trans openingMonotone
+          (closeTuple_cursorMonotoneOnSuccess opening []
+            afterOpening expression final parsed)
+      · cases nestedResult : nested afterOpening with
+        | invariant error => simp [nestedResult] at parsed
+        | reject failure rejected => simp [nestedResult] at parsed
+        | ok first next =>
+            simp only [nestedResult] at parsed
+            have firstMonotone := nestedMonotone afterOpening first next
+              nestedResult
+            split at parsed
+            · contradiction
+            · split at parsed
+              · exact Nat.le_trans openingMonotone
+                  (Nat.le_trans firstMonotone
+                    (tupleTail_cursorMonotoneOnSuccess nested
+                      nestedMonotone opening (next.remainingCount + 1)
+                      [first] next expression final parsed))
+              · exact Nat.le_trans openingMonotone
+                  (Nat.le_trans firstMonotone
+                    (closeTuple_cursorMonotoneOnSuccess opening
+                      [first] next expression final parsed))
+
+/-- A parenthesized expression starts at its opening parenthesis. -/
+theorem parenthesized_startsAtCurrentTokenOnSuccess (nested : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (parenthesized nested) (fun expression => expression.span) := by
+  intro input expression final parsed
+  unfold parenthesized at parsed
+  cases openingResult : symbol .leftParen .expression input with
+  | invariant error => simp [openingResult] at parsed
+  | reject failure rejected => simp [openingResult] at parsed
+  | ok opening afterOpening =>
+      simp only [openingResult] at parsed
+      have found :=
+        (symbol_ok_state_shape .leftParen .expression openingResult).1
+      split at parsed
+      · have start := closeTuple_preservesOpeningStartOnSuccess
+            opening [] parsed
+        exact ⟨opening, found, start.symm⟩
+      · cases nestedResult : nested afterOpening with
+        | invariant error => simp [nestedResult] at parsed
+        | reject failure rejected => simp [nestedResult] at parsed
+        | ok first next =>
+            simp only [nestedResult] at parsed
+            split at parsed
+            · contradiction
+            · split at parsed
+              · have start := tupleTail_preservesOpeningStartOnSuccess
+                    nested opening (next.remainingCount + 1) [first]
+                    next expression final parsed
+                exact ⟨opening, found, start.symm⟩
+              · have start := closeTuple_preservesOpeningStartOnSuccess
+                    opening [first] parsed
+                exact ⟨opening, found, start.symm⟩
+
+/-- A parenthesized expression ends at its final consumed parenthesis. -/
+theorem parenthesized_endsAtLastConsumedTokenOnSuccess
+    (nested : Parser Expr) {input final : State} {expression : Expr}
+    (parsed : parenthesized nested input = .ok expression final) :
+    ∃ closing, final.tokens[final.cursor - 1]? = some closing ∧
+      closing.span.endByte = expression.span.endByte := by
+  unfold parenthesized at parsed
+  cases openingResult : symbol .leftParen .expression input with
+  | invariant error => simp [openingResult] at parsed
+  | reject failure rejected => simp [openingResult] at parsed
+  | ok opening afterOpening =>
+      simp only [openingResult] at parsed
+      split at parsed
+      · exact closeTuple_endsAtLastConsumedTokenOnSuccess opening [] parsed
+      · cases nestedResult : nested afterOpening with
+        | invariant error => simp [nestedResult] at parsed
+        | reject failure rejected => simp [nestedResult] at parsed
+        | ok first next =>
+            simp only [nestedResult] at parsed
+            split at parsed
+            · contradiction
+            · split at parsed
+              · exact tupleTail_endsAtLastConsumedTokenOnSuccess nested
+                  opening (next.remainingCount + 1) [first]
+                  next expression final parsed
+              · exact closeTuple_endsAtLastConsumedTokenOnSuccess
+                  opening [first] parsed
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser

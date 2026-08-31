@@ -107,7 +107,10 @@ def tupleTail (nested : Parser Expr) (opening : Token) :
 
 end ExpressionAtomInternals
 
-private def parenthesized (nested : Parser Expr) : Parser Expr := fun state =>
+namespace ExpressionAtomInternals
+
+/-- Parse a grouped expression or tuple after an opening parenthesis. -/
+def parenthesized (nested : Parser Expr) : Parser Expr := fun state =>
   match symbol .leftParen .expression state with
   | .ok opening afterOpening =>
       if isSymbol afterOpening .rightParen then
@@ -122,17 +125,13 @@ private def parenthesized (nested : Parser Expr) : Parser Expr := fun state =>
               ExpressionAtomInternals.tupleTail nested opening
                 (next.remainingCount + 1) [first] next
             else
-              match symbol .rightParen .expression next with
-              | .ok closing afterClosing => .ok {
-                  span := SourceSpan.cover opening.span closing.span
-                  value := .group first
-                } afterClosing
-              | .reject failure failed => .reject failure failed
-              | .invariant error => .invariant error
+              ExpressionAtomInternals.closeTuple opening [first] next
         | .reject failure next => .reject failure next
         | .invariant error => .invariant error
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+end ExpressionAtomInternals
 
 private def lambdaExpression (block : Parser Block) : Parser Expr := do
   let marker ← keyword .lamKw .expression
@@ -161,7 +160,8 @@ private def expressionAtomCore (nested : Parser Expr)
     ExpressionAtomInternals.dotConstructor nested state
   else if isSymbol state .at then
     ExpressionAtomInternals.proxyExpression state
-  else if isSymbol state .leftParen then parenthesized nested state
+  else if isSymbol state .leftParen then
+    ExpressionAtomInternals.parenthesized nested state
   else if isSymbol state .leftBracket then
     match delimitedNoTrailing .leftBracket .rightBracket true nested
         .expression .expression state with
