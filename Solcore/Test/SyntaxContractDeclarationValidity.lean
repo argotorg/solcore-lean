@@ -48,6 +48,14 @@ example :=
   @ContractEntryInternals.implicitPublicModifiers_preservesTokensOnSuccess
 example :=
   @ContractEntryInternals.implicitPublicModifiers_cursorMonotoneOnSuccess
+example := @constructorDecl_preservesTokenWindow
+example := @constructorDecl_preservesTokensOnSuccess
+example := @constructorDecl_cursorMonotoneOnSuccess
+example := @constructorDecl_startsAtCurrentTokenOnSuccess
+example := @fallbackDecl_preservesTokenWindow
+example := @fallbackDecl_preservesTokensOnSuccess
+example := @fallbackDecl_cursorMonotoneOnSuccess
+example := @fallbackDecl_startsAtCurrentTokenOnSuccess
 
 example (statementValid : SourceFile → Statement → Prop)
     (expressionValid : SourceFile → Expr → Prop)

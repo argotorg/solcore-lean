@@ -218,4 +218,168 @@ theorem implicitPublicModifiers_cursorMonotoneOnSuccess
       exact optionalModifier_cursorMonotoneOnSuccess .payableKw
 
 end ContractEntryInternals
+
+/-- Constructor parsing preserves every ordinary token window. -/
+theorem constructorDecl_preservesTokenWindow
+    (bodyShape : Parser.PreservesTokenWindow (block .require)) :
+    Parser.PreservesTokenWindow constructorDecl := by
+  unfold constructorDecl
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .constructorKw .contractMember)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    ContractEntryInternals.entryParameters_preservesTokenWindow
+  intro parameters
+  apply Parser.bind_preservesTokenWindow
+    (ContractEntryInternals.implicitPublicModifiers_preservesTokenWindow
+      .constructorKw)
+  intro payableMarker
+  apply Parser.bind_preservesTokenWindow
+    (isolateBlock_preservesTokenWindow (block .require) bodyShape)
+  intro body
+  exact Parser.pure_preservesTokenWindow _
+
+theorem constructorDecl_preservesTokensOnSuccess
+    (bodyShape : Parser.PreservesTokenWindow (block .require)) :
+    Parser.PreservesTokensOnSuccess constructorDecl :=
+  (constructorDecl_preservesTokenWindow bodyShape).preservesTokensOnSuccess
+
+/-- Constructor parsing is cursor-monotone when its body parser is. -/
+theorem constructorDecl_cursorMonotoneOnSuccess
+    (bodyMonotone : Parser.CursorMonotoneOnSuccess (block .require)) :
+    Parser.CursorMonotoneOnSuccess constructorDecl := by
+  unfold constructorDecl
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .constructorKw .contractMember)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    ContractEntryInternals.entryParameters_cursorMonotoneOnSuccess
+  intro parameters
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (ContractEntryInternals.implicitPublicModifiers_cursorMonotoneOnSuccess
+      .constructorKw)
+  intro payableMarker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (isolateBlock_cursorMonotoneOnSuccess (block .require) bodyMonotone)
+  intro body
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A constructor declaration starts at its `constructor` keyword. -/
+theorem constructorDecl_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess constructorDecl (·.span) := by
+  unfold constructorDecl
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .constructorKw)
+      .contractMember (· == .keyword .constructorKw))
+  intro marker input declaration final parsed
+  rcases ContractEntryInternals.entryBind_ok_components parsed with
+    ⟨parameters, afterParameters, parametersResult, rest⟩
+  rcases ContractEntryInternals.entryBind_ok_components rest with
+    ⟨payableMarker, afterModifiers, modifiersResult, rest⟩
+  rcases ContractEntryInternals.entryBind_ok_components rest with
+    ⟨body, afterBody, bodyResult, finished⟩
+  cases finished
+  rfl
+
+/-- Fallback parsing preserves windows across its diagnostic branch. -/
+theorem fallbackDecl_preservesTokenWindow
+    (bodyShape : Parser.PreservesTokenWindow (block .require)) :
+    Parser.PreservesTokenWindow fallbackDecl := by
+  unfold fallbackDecl
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .fallbackKw .contractMember)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    ContractEntryInternals.entryParameters_preservesTokenWindow
+  intro parameters
+  by_cases empty : parameters.elements.isEmpty
+  · simp only [empty, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (ContractEntryInternals.implicitPublicModifiers_preservesTokenWindow
+        .fallbackKw)
+    intro payableMarker
+    apply Parser.bind_preservesTokenWindow
+      (isolateBlock_preservesTokenWindow (block .require) bodyShape)
+    intro body
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [empty, Bool.false_eq_true, if_false]
+    apply Parser.bind_preservesTokenWindow
+      (emitDiagnostic_preservesTokenWindow _)
+    intro _
+    apply Parser.bind_preservesTokenWindow
+      (ContractEntryInternals.implicitPublicModifiers_preservesTokenWindow
+        .fallbackKw)
+    intro payableMarker
+    apply Parser.bind_preservesTokenWindow
+      (isolateBlock_preservesTokenWindow (block .require) bodyShape)
+    intro body
+    exact Parser.pure_preservesTokenWindow _
+
+theorem fallbackDecl_preservesTokensOnSuccess
+    (bodyShape : Parser.PreservesTokenWindow (block .require)) :
+    Parser.PreservesTokensOnSuccess fallbackDecl :=
+  (fallbackDecl_preservesTokenWindow bodyShape).preservesTokensOnSuccess
+
+/-- Fallback parsing never rewinds, including parameter diagnostics. -/
+theorem fallbackDecl_cursorMonotoneOnSuccess
+    (bodyMonotone : Parser.CursorMonotoneOnSuccess (block .require)) :
+    Parser.CursorMonotoneOnSuccess fallbackDecl := by
+  unfold fallbackDecl
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .fallbackKw .contractMember)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    ContractEntryInternals.entryParameters_cursorMonotoneOnSuccess
+  intro parameters
+  by_cases empty : parameters.elements.isEmpty
+  · simp only [empty, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (ContractEntryInternals.implicitPublicModifiers_cursorMonotoneOnSuccess
+        .fallbackKw)
+    intro payableMarker
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (isolateBlock_cursorMonotoneOnSuccess (block .require) bodyMonotone)
+    intro body
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [empty, Bool.false_eq_true, if_false]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (emitDiagnostic_cursorMonotoneOnSuccess _)
+    intro _
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (ContractEntryInternals.implicitPublicModifiers_cursorMonotoneOnSuccess
+        .fallbackKw)
+    intro payableMarker
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (isolateBlock_cursorMonotoneOnSuccess (block .require) bodyMonotone)
+    intro body
+    exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A fallback declaration starts at its `fallback` keyword. -/
+theorem fallbackDecl_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess fallbackDecl (·.span) := by
+  unfold fallbackDecl
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .fallbackKw)
+      .contractMember (· == .keyword .fallbackKw))
+  intro marker input declaration final parsed
+  rcases ContractEntryInternals.entryBind_ok_components parsed with
+    ⟨parameters, afterParameters, parametersResult, rest⟩
+  by_cases empty : parameters.elements.isEmpty
+  · simp only [empty, if_true] at rest
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨payableMarker, afterModifiers, modifiersResult, rest⟩
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨body, afterBody, bodyResult, finished⟩
+    cases finished
+    rfl
+  · simp only [empty, Bool.false_eq_true, if_false] at rest
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨_, afterValidation, validationResult, rest⟩
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨payableMarker, afterModifiers, modifiersResult, rest⟩
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨body, afterBody, bodyResult, finished⟩
+    cases finished
+    rfl
+
 end Solcore.Syntax.Parser
