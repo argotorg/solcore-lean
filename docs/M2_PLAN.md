@@ -69,8 +69,10 @@ primitive consumers, carrier-preservation rules, and cursor/order laws now
 support compositional proofs for names, selectors, literals, delimiters,
 pragmas, derive attributes, Core blocks, the complete recursive type parser,
 complete function signatures, and the public Yul expression, statement, and
-body parsers. Complete imports, exports, type aliases, and enums have
-source-validity, token-window, carrier, cursor, and start-position contracts.
+body parsers. The generic Core block proof now lifts any valid,
+token-preserving statement parser. Complete imports, exports, type aliases,
+and enums have source-validity, token-window, carrier, cursor, and
+start-position contracts.
 Function declarations reach the same boundary once their recursive block
 parser supplies its validity contract; constructors and fallback entries have
 the corresponding conditional guarantee for non-tail bodies. Individual trait
@@ -85,11 +87,11 @@ Pattern lifting covers wildcard, literal and Boolean leaves, both constructor
 forms, parenthesized groups and tuples, and comptime patterns. Their common
 dispatch and recovery layer also satisfy the compositional contracts; lifting
 that layer through the public fuel-indexed recursion remains. Core expression
-lifting covers literal, identifier, proxy, and leading-dot constructor atoms.
-Assignment/expression and return statements have their complete ordinary-result
-contracts, and the optional `let` components are ready for composition. The
-remaining Core expression, statement, declaration, and complete-file parsers
-are active work.
+lifting covers literal, identifier, proxy, and leading-dot constructor atoms;
+prefix-unary scanning and tuple/group closing have also been lifted.
+Assignment/expression, `let`, and return statements have complete ordinary-result
+contracts. The remaining Core expression, statement, declaration, and
+complete-file parsers are active work.
 
 The remaining proof boundary also includes parser-generated diagnostic
 validity, provenance and unreachability of grammar invariant failures, parser
