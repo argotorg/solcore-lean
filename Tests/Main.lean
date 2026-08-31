@@ -63,6 +63,7 @@ import Solcore.Test.SyntaxParserTerms
 import Solcore.Test.SyntaxParserTraitProperties
 import Solcore.Test.SyntaxParserTotality
 import Solcore.Test.SyntaxParserTrivia
+import Solcore.Test.SyntaxParserTriviaSelectionProperties
 import Solcore.Test.SyntaxParserTypeExprProperties
 import Solcore.Test.SyntaxParserTypeProxyProperties
 import Solcore.Test.SyntaxParserTypes

@@ -265,4 +265,60 @@ def attachTopItemComments (file : SourceFile) (comments : List Comment)
     value
   }
 
+private theorem attachBeforeAux_mem_of_mem
+    (source : String) (allComments : List Comment)
+    (allowedLinePrefixEnd : Option Nat) :
+    ∀ candidates cursor attached,
+      (∀ comment ∈ candidates, comment ∈ allComments) →
+      (∀ comment ∈ attached, comment ∈ allComments) →
+      ∀ comment ∈ attachBeforeAux source allComments allowedLinePrefixEnd
+        cursor candidates attached,
+        comment ∈ allComments := by
+  intro candidates
+  induction candidates with
+  | nil =>
+      intro cursor attached candidatesSubset attachedSubset comment member
+      exact attachedSubset comment (by simpa [attachBeforeAux] using member)
+  | cons head rest inductionHypothesis =>
+      intro cursor attached candidatesSubset attachedSubset comment member
+      unfold attachBeforeAux at member
+      cases slice : utf8Slice? source head.span.endByte cursor with
+      | none =>
+          exact attachedSubset comment (by simpa [slice] using member)
+      | some gap =>
+          simp only [slice] at member
+          split at member
+          · exact attachedSubset comment member
+          · apply inductionHypothesis head.span.startByte (head :: attached)
+            · intro retained retainedMember
+              exact candidatesSubset retained (List.mem_cons_of_mem head
+                retainedMember)
+            · intro retained retainedMember
+              rcases List.mem_cons.mp retainedMember with retainedEq | priorMember
+              · exact candidatesSubset retained (by simp [retainedEq])
+              · exact attachedSubset retained priorMember
+            · exact member
+
+/-- Every comment selected for a declaration comes from the supplied stream. -/
+theorem commentsDirectlyBefore_mem (source : String)
+    (comments : List Comment) (declarationStart : Nat)
+    {comment : Comment}
+    (member : comment ∈ commentsDirectlyBefore source comments
+      declarationStart) :
+    comment ∈ comments := by
+  unfold commentsDirectlyBefore commentsDirectlyBeforeSince at member
+  apply attachBeforeAux_mem_of_mem source comments none
+    ((comments.filter fun retained =>
+      0 ≤ retained.span.startByte &&
+        retained.span.endByte ≤ declarationStart).reverse)
+    declarationStart []
+  · intro retained retainedMember
+    have filteredMember : retained ∈ comments.filter fun candidate =>
+        0 ≤ candidate.span.startByte &&
+          candidate.span.endByte ≤ declarationStart := by
+      simpa using retainedMember
+    exact (List.mem_filter.mp filteredMember).1
+  · simp
+  · exact member
+
 end Solcore.Syntax.Parser
