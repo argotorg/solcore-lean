@@ -1,0 +1,11 @@
+import Solcore.Syntax.Parser.ExpressionLayerFuelContractProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserExpressionLayerFuelContractProperties
+
+open Solcore.Syntax.Parser.ExpressionInternals
+
+example := @expressionLayer_fuelTotalityContract
+
+end Solcore.Test.SyntaxParserExpressionLayerFuelContractProperties
