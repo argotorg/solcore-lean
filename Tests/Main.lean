@@ -53,6 +53,7 @@ import Solcore.Test.SyntaxParserValidityProperties
 import Solcore.Test.SyntaxParserYul
 import Solcore.Test.SyntaxParserYulChoiceRecovery
 import Solcore.Test.SyntaxParserYulCommonProperties
+import Solcore.Test.SyntaxParserYulControlProperties
 import Solcore.Test.SyntaxParserYulExpressionProperties
 import Solcore.Test.SyntaxParserYulLeafProperties
 import Solcore.Test.SyntaxPatternValidity
