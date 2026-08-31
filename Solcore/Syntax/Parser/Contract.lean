@@ -193,11 +193,13 @@ def recoverContractMember (state : State) : Reply ContractMember :=
 
 end ContractInternals
 
-private structure ContractBody where
+namespace ContractInternals
+
+structure ContractBody where
   span : SourceSpan
   members : List ContractMember
 
-private def closeContractBody (opening : Token)
+def closeContractBody (opening : Token)
     (membersRev : List ContractMember) : Parser ContractBody := do
   let closing ← symbol .rightBrace .topItem
   pure {
@@ -205,7 +207,7 @@ private def closeContractBody (opening : Token)
     members := membersRev.reverse
   }
 
-private def contractMembers (opening : Token) :
+def contractMembers (opening : Token) :
     Nat → List ContractMember → State → Reply ContractBody
   | 0, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, membersRev, state =>
@@ -235,19 +237,21 @@ private def contractMembers (opening : Token) :
               | .invariant error => .invariant error
         | .invariant error => .invariant error
 
-private def contractBody : Parser ContractBody := fun state =>
+def contractBody : Parser ContractBody := fun state =>
   match symbol .leftBrace .topItem state with
   | .ok opening next =>
       contractMembers opening (next.remainingCount + 1) [] next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
+end ContractInternals
+
 /-- Parse a canonical contract while preserving member source order. -/
 def contractDecl : Parser ContractDecl := do
   let marker ← keyword .contractKw .topItem
   let name ← identifier .topItem
   let genericParameters ← optionalGenericParameters
-  let body ← contractBody
+  let body ← ContractInternals.contractBody
   pure {
     span := SourceSpan.cover marker.span body.span
     value := {
