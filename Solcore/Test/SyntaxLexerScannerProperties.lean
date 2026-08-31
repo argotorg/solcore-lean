@@ -32,4 +32,27 @@ example (text : String) (keyword : HardKeyword)
     keyword.spelling = text :=
   HardKeyword.spelling_eq_of_ofString?_eq_some text keyword recognized
 
+example (file : SourceFile) :
+    CursorSuffix file 0 file.content.toList :=
+  CursorSuffix.initial file
+
+example (file : SourceFile) (cursor : Nat) (remaining : List Char)
+    (suffix : CursorSuffix file cursor remaining) :
+    file.content.utf8ByteSize = cursor + byteSize remaining :=
+  suffix.remainingByteSize
+
+example (file : SourceFile) (cursor : Nat) (remaining : List Char)
+    (suffix : CursorSuffix file cursor remaining) :
+    isUtf8Boundary file.content cursor = true :=
+  suffix.boundary
+
+example (file : SourceFile) (startByte : Nat) (input : List Char)
+    (suffix : CursorSuffix file startByte input)
+    (predicate : Char → Bool) :
+    let scan := takeWhile predicate input
+    (sourceSpan file startByte
+      (startByte + byteSize scan.consumed)).ValidFor file := by
+  exact suffix.sourceSpan_validFor
+    (takeWhile_advances predicate startByte input)
+
 end Tests

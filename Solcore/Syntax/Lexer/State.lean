@@ -1,4 +1,4 @@
-import Solcore.Syntax.Lexer.Character
+import Solcore.Syntax.Lexer.Invariant
 
 set_option autoImplicit false
 
