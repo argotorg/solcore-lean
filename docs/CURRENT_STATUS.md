@@ -270,24 +270,24 @@ behavior. At the current proof boundary:
   alignment. Top-level error recovery has canonical source, token-window,
   carrier, cursor, strict-progress, and starting-token contracts.
 
-Contract-member derive attachment and error recovery now satisfy the same
-canonical source and parser-state boundary. All nine plain top-level branches
-and the derive-aware item parser are composed with one explicit dependency on
-the still-open outer `contractDecl` contract. Under that dependency, the
-fuel-bounded item loop, complete `sourceFile`, `parseLexed`, and public `parse`
-already return canonically valid parsed files.
+Contract-member derive attachment, member recovery, the complete contract body,
+and the outer contract declaration now satisfy the same canonical source and
+parser-state boundary. This closes the last declaration-specific assumption:
+all nine plain top-level branches, the derive-aware item parser, the
+fuel-bounded item loop, `sourceFile`, `parseLexed`, and public `parse` now have
+unconditional canonical contracts.
 
-The remaining parser work is concentrated above the Core term layer: contract
-body composition and the outer contract declaration. Closing that declaration
-will discharge the sole remaining assumption in the complete-file and public
-parser validity path.
-Defining a validity predicate is not treated as proof that a parser satisfies
-it.
+A successful public parse also satisfies one complete output contract. Its
+parsed file is canonically valid, and every retained token, lexical diagnostic,
+and parse diagnostic has a valid span owned by the same source file. Delimiter
+and conditional-nesting diagnostics have an explicit provenance proof as well.
 
-Beyond those parser-specific gaps, remaining work includes validity of every
-parser-generated diagnostic, provenance and unreachability of grammar
-invariant failures, parser resource bounds, and soundness against a declarative
-grammar.
+The remaining formal parser work is deeper than AST source validity. It
+includes proving grammar invariant failures unreachable, closing parser-wide
+resource bounds, and relating successful execution to a declarative grammar.
+Defining any of those properties is not treated as proof that the parser
+satisfies it.
+
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.

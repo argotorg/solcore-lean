@@ -120,17 +120,19 @@ proof implementation currently has the following shape:
   premise, yielding unconditional public contracts for expressions, patterns,
   statements, and Core blocks.
 
-Contract-member dispatch, derive attachment, recovery, and top-level recovery
-now have canonical source/state contracts. Comment attachment preserves
-validity for every top-level branch, item lists, and complete parsed-file
-construction. All nine plain top-level declarations and the derive-aware item
-parser are composed under one explicit outer `contractDecl` dependency; that
-same dependency now reaches through the item loop, `sourceFile`, `parseLexed`,
-and public `parse`. The next proof work is therefore concrete: finish contract
-body composition and the outer declaration, then discharge that final input.
-Parser-generated diagnostic validity, grammar-invariant provenance and
-unreachability, resource bounds, and success soundness against a declarative
-grammar remain part of the final boundary.
+Contract-member dispatch, derive attachment, recovery, the complete contract
+body, the outer declaration, and top-level recovery now have canonical
+source/state contracts. Comment attachment preserves validity for every
+top-level branch, item list, and complete parsed file. All nine plain top-level
+declarations, the derive-aware item parser, the item loop, `sourceFile`,
+`parseLexed`, and public `parse` are therefore composed without an assumed
+declaration contract.
+
+Successful public output now has one unconditional contract covering the
+canonical parsed file plus every retained token, lexical-diagnostic, and
+parse-diagnostic span. Nesting diagnostics also have direct source provenance.
+The next proof work is grammar-invariant unreachability, parser-wide resource
+bounds, and success soundness against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the
