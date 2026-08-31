@@ -1,0 +1,12 @@
+import Solcore.Syntax.Parser.ExpressionUnaryLayerTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserExpressionUnaryLayerTotalityProperties
+
+open Solcore.Syntax.Parser.ExpressionInternals
+
+example := @expressionUnary_ordinary_of_postfixFuel
+example := @expressionUnary_ne_invariant_of_postfixFuel
+
+end Solcore.Test.SyntaxParserExpressionUnaryLayerTotalityProperties
