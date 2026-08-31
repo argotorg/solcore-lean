@@ -19,6 +19,37 @@ namespace Parser
 namespace Reply
 
 /--
+Every ordinary reply retains the immutable token array and active token
+window of its input. Invariant failures carry no parser state.
+-/
+def PreservesTokenWindow {α : Type} (reply : Reply α)
+    (input : State) : Prop :=
+  match reply with
+  | .ok _ next
+  | .reject _ next =>
+      next.tokens = input.tokens ∧ next.window = input.window
+  | .invariant _ => True
+
+namespace PreservesTokenWindow
+
+/-- Retarget an ordinary reply through an equal immutable token window. -/
+theorem trans {α : Type} {reply : Reply α} {middle input : State}
+    (replyShape : reply.PreservesTokenWindow middle)
+    (middleShape : middle.tokens = input.tokens ∧
+      middle.window = input.window) :
+    reply.PreservesTokenWindow input := by
+  cases reply with
+  | ok value next =>
+      exact ⟨replyShape.1.trans middleShape.1,
+        replyShape.2.trans middleShape.2⟩
+  | reject failure next =>
+      exact ⟨replyShape.1.trans middleShape.1,
+        replyShape.2.trans middleShape.2⟩
+  | invariant error => trivial
+
+end PreservesTokenWindow
+
+/--
 Ordinary parser results preserve source provenance and state validity.
 Invariant failures remain admissible because they are outside source-result
 semantics and are handled by the total public parser boundary.
@@ -68,6 +99,10 @@ def ValidFor {α : Type} (parser : Parser α)
     (valueValid : SourceFile → α → Prop) : Prop :=
   ∀ input, input.ValidFor → (parser input).ValidFor input valueValid
 
+/-- Every ordinary result preserves the input token array and window. -/
+def PreservesTokenWindow {α : Type} (parser : Parser α) : Prop :=
+  ∀ input, (parser input).PreservesTokenWindow input
+
 /-- Successful parsing preserves the immutable token carrier. -/
 def PreservesTokensOnSuccess {α : Type} (parser : Parser α) : Prop :=
   ∀ input value next, parser input = .ok value next →
@@ -88,6 +123,74 @@ def StartsAtCurrentTokenOnSuccess {α : Type} (parser : Parser α)
   ∀ input value next, parser input = .ok value next →
     ∃ token, input.peek? = some token ∧
       token.span.startByte = (spanOf value).startByte
+
+/-- The stronger ordinary-result contract implies success-only preservation. -/
+theorem PreservesTokenWindow.preservesTokensOnSuccess
+    {α : Type} {parser : Parser α}
+    (preserves : PreservesTokenWindow parser) :
+    PreservesTokensOnSuccess parser := by
+  intro input value next parsed
+  have result := preserves input
+  rw [parsed] at result
+  exact result.1
+
+/-- A pure parser retains the complete immutable token window. -/
+theorem pure_preservesTokenWindow {α : Type} (value : α) :
+    PreservesTokenWindow (pure value : Parser α) := by
+  intro input
+  exact ⟨rfl, rfl⟩
+
+/-- Sequential composition preserves a shared ordinary-result contract. -/
+theorem bind_preservesTokenWindow {α β : Type} {first : Parser α}
+    {next : α → Parser β}
+    (firstPreserves : PreservesTokenWindow first)
+    (nextPreserves : ∀ value, PreservesTokenWindow (next value)) :
+    PreservesTokenWindow (first >>= next) := by
+  intro input
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error).PreservesTokenWindow input
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      have firstShape := firstPreserves input
+      rw [firstResult] at firstShape
+      cases nextResult : next firstValue afterFirst with
+      | ok value final =>
+          have nextShape := nextPreserves firstValue afterFirst
+          rw [nextResult] at nextShape
+          simp only [nextResult, Reply.PreservesTokenWindow]
+          exact ⟨nextShape.1.trans firstShape.1,
+            nextShape.2.trans firstShape.2⟩
+      | reject failure rejected =>
+          have nextShape := nextPreserves firstValue afterFirst
+          rw [nextResult] at nextShape
+          simp only [nextResult, Reply.PreservesTokenWindow]
+          exact ⟨nextShape.1.trans firstShape.1,
+            nextShape.2.trans firstShape.2⟩
+      | invariant error =>
+          simp only [nextResult, Reply.PreservesTokenWindow]
+  | reject failure rejected =>
+      have firstShape := firstPreserves input
+      rw [firstResult] at firstShape
+      simpa only [Reply.PreservesTokenWindow] using firstShape
+  | invariant error => simp only [Reply.PreservesTokenWindow]
+
+/-- Transactional ordered choice preserves a shared token-window contract. -/
+theorem orElse_preservesTokenWindow {α : Type}
+    {first second : Parser α}
+    (firstPreserves : PreservesTokenWindow first)
+    (secondPreserves : PreservesTokenWindow second) :
+    PreservesTokenWindow (orElse first second) := by
+  intro input
+  unfold orElse
+  cases firstResult : first input with
+  | ok value next =>
+      have firstShape := firstPreserves input
+      rw [firstResult] at firstShape
+      simpa only [Reply.PreservesTokenWindow] using firstShape
+  | reject failure rejected => exact secondPreserves input
+  | invariant error => simp only [Reply.PreservesTokenWindow]
 
 /-- A pure parser leaves the token carrier unchanged. -/
 theorem pure_preservesTokensOnSuccess {α : Type} (value : α) :
