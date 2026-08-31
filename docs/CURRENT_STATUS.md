@@ -170,11 +170,20 @@ total canonical lexer are implemented under `Solcore.Syntax`. Focused tests
 cover the closed token catalog, maximal munch, retained nested comments,
 strict strings, recovery, diagnostic accumulation, and exact UTF-8 spans.
 
-The parser, canonical parser fixture corpus, and public source interface remain
-under implementation. Resolution, source type checking, and elaboration into
-checked Semantic Core follow executable parsing. No new frontend result is
-published through Oracle v4; that interface continues to mean only its frozen
-Surface v1 format.
+`Solcore.Syntax.Parser.parse` is now a total source-to-syntax library entry
+point. It validates token and comment provenance, applies the canonical
+delimiter and conditional nesting guard, retains lexical and parse diagnostics,
+and attaches leading comments using the Rust 1.97 Unicode-whitespace rules.
+The executable parser currently covers the complete type grammar, top-level
+type aliases, and import, export, and pragma declarations. Its recovery and
+byte-span behavior are regression-tested against the pinned Rust grammar.
+
+Expressions, patterns, statements, inline Yul, and the remaining declarations
+are still being implemented, so this is not yet a complete arbitrary-source
+parser. Resolution, source type checking, and elaboration into checked Semantic
+Core follow complete executable parsing. No new frontend result is published
+through Oracle v4; that interface continues to mean only its frozen Surface v1
+format.
 
 ## What is not yet claimed
 

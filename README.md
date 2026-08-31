@@ -15,8 +15,10 @@ The repository provides:
 - versioned compatibility interfaces for previously published formats; and
 - Lean proofs and executable tests for the modeled rules.
 
-Oracle v5 consumes Semantic Core rather than source text. Source parsing, name
-resolution, source type checking, and elaboration are separate stages; an
+Oracle v5 consumes Semantic Core rather than source text. A new canonical
+source parser is available as a Lean library for module declarations, the
+complete type grammar, and type aliases; the remaining source grammar, name
+resolution, source type checking, and elaboration are still in progress. An
 end-to-end source execution interface is not yet public.
 
 ## Requirements
@@ -102,6 +104,25 @@ Or import the checked-contract Oracle directly:
 ```lean
 import Solcore.Oracle.V5
 ```
+
+To lex and parse the currently supported canonical source forms:
+
+```lean
+import Solcore.Syntax
+
+open Solcore.Syntax
+
+def exampleSyntax : ParseResult :=
+  Parser.parse {
+    id := { origin := .main, path := "example.sol" }
+    content := "type Store = mapping(address => word);"
+  }
+```
+
+Successful results retain tokens, comments, lexical diagnostics, parse
+diagnostics, and the source-preserving AST. Ordinary malformed input is
+reported in those diagnostic lists; the exceptional branch is reserved for
+an internal executor invariant.
 
 To generate a reproducible checked Core program, import the synthesis library:
 
