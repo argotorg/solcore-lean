@@ -13,6 +13,7 @@ example := @qualifiedName_ok_state_shape
 example := @qualifiedName_preservesTokensOnSuccess
 example := @ModulePath.ValidFor
 example := @modulePath_validFor
+example := @modulePath_preservesTokenWindow
 example := @modulePath_preservesTokensOnSuccess
 example := @modulePath_startsAtCurrentTokenOnSuccess
 example := @modulePath_cursor_lt_onSuccess

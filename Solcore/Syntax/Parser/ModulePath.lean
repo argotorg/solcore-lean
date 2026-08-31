@@ -108,6 +108,42 @@ theorem modulePath_validFor (context : ParseContext) :
         exact ⟨⟨nameValid.1.1, trivial, nameValid.1.2⟩,
           nameValid.2.1, nameValid.2.2⟩
 
+/-- Module paths preserve tokens and the active window on every reply. -/
+theorem modulePath_preservesTokenWindow (context : ParseContext) :
+    Parser.PreservesTokenWindow (modulePath context) := by
+  intro input
+  unfold modulePath
+  split
+  · have markerShape := symbol_preservesTokenWindow .at context input
+    cases markerResult : symbol .at context input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        rw [markerResult] at markerShape
+        exact markerShape
+    | ok marker afterMarker =>
+        rw [markerResult] at markerShape
+        simp only
+        have nameShape := qualifiedName_preservesTokenWindow context
+          .topLevel afterMarker
+        cases nameResult : qualifiedName context .topLevel afterMarker with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [nameResult] at nameShape
+            exact nameShape.trans markerShape
+        | ok name next =>
+            rw [nameResult] at nameShape
+            exact nameShape.trans markerShape
+  · have nameShape := qualifiedName_preservesTokenWindow context
+      .topLevel input
+    cases nameResult : qualifiedName context .topLevel input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        rw [nameResult] at nameShape
+        exact nameShape
+    | ok name next =>
+        rw [nameResult] at nameShape
+        exact nameShape
+
 /-- Module-path success preserves the immutable token carrier. -/
 theorem modulePath_preservesTokensOnSuccess (context : ParseContext) :
     Parser.PreservesTokensOnSuccess (modulePath context) := by
