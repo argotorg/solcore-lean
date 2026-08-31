@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Delimited
 import Solcore.Syntax.Parser.Name
+import Solcore.Syntax.TypeValidity
 
 set_option autoImplicit false
 
@@ -75,13 +76,47 @@ private def parseProxyType (nested : Parser TypeExpr) : Parser TypeExpr := do
     value := .proxy marker.span inner
   }
 
-private def parseTupleType (nested : Parser TypeExpr) : Parser TypeExpr := do
+/-- Parse a parenthesized tuple type using the supplied recursive parser. -/
+def parseTupleType (nested : Parser TypeExpr) : Parser TypeExpr := do
   let tuple ← delimited .leftParen .rightParen true nested
     .typeExpr .typeExpr
   pure {
     span := tuple.span
     value := .tuple tuple.elements
   }
+
+/-- Tuple parsing preserves delimiter and recursive element provenance. -/
+theorem parseTupleType_validFor (nested : Parser TypeExpr)
+    (nestedValid : nested.ValidFor TypeExpr.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (parseTupleType nested).ValidFor TypeExpr.ValidFor := by
+  unfold parseTupleType
+  apply Parser.bind_validFor_of_value
+    (delimited_validFor TypeExpr.ValidFor .leftParen .rightParen true
+      nested .typeExpr .typeExpr nestedValid nestedPreserves)
+  intro tuple input inputValid tupleValid
+  exact ⟨.tuple tupleValid.1 tupleValid.2, inputValid, rfl⟩
+
+/-- Tuple parsing never replaces or reorders the immutable token carrier. -/
+theorem parseTupleType_preservesTokensOnSuccess (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (parseTupleType nested) := by
+  unfold parseTupleType
+  apply Parser.bind_preservesTokensOnSuccess
+  · exact delimited_preservesTokensOnSuccess .leftParen .rightParen true
+      nested .typeExpr .typeExpr nestedPreserves
+  · intro tuple
+    exact Parser.pure_preservesTokensOnSuccess _
+
+/-- Tuple parsing never moves the parser cursor backwards. -/
+theorem parseTupleType_cursorMonotoneOnSuccess (nested : Parser TypeExpr) :
+    Parser.CursorMonotoneOnSuccess (parseTupleType nested) := by
+  unfold parseTupleType
+  apply Parser.bind_cursorMonotoneOnSuccess
+  · exact delimited_cursorMonotoneOnSuccess .leftParen .rightParen true
+      nested .typeExpr .typeExpr
+  · intro tuple
+    exact Parser.pure_cursorMonotoneOnSuccess _
 
 private def parseFunctionType (nested : Parser TypeExpr) : Parser TypeExpr := do
   let functionKeyword ← keyword .functionKw .typeExpr
