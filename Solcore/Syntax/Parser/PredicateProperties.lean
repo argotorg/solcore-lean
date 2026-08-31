@@ -8,7 +8,7 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private theorem predicateBind_ok_components {α β : Type}
+theorem predicateBind_ok_components {α β : Type}
     {first : Parser α} {next : α → Parser β} {input final : State}
     {value : β} (parsed : (first >>= next) input = .ok value final) :
     ∃ firstValue afterFirst,
