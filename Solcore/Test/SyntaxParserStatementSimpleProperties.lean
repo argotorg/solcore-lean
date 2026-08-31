@@ -78,6 +78,11 @@ example :=
 example :=
   @StatementSimpleInternals.forAssignmentOrExpression_startsAtCurrentTokenOnSuccess
 example := @StatementSimpleInternals.forAssignmentOrExpression_validFor
+example := @forItem_preservesTokenWindow
+example := @forItem_preservesTokensOnSuccess
+example := @forItem_cursorMonotoneOnSuccess
+example := @forItem_startsAtCurrentTokenOnSuccess
+example := @forItem_validFor
 example := @letStatement_preservesTokenWindow
 example := @letStatement_preservesTokensOnSuccess
 example := @letStatement_cursorMonotoneOnSuccess

@@ -1200,6 +1200,81 @@ theorem forAssignmentOrExpression_validFor
 
 end StatementSimpleInternals
 
+/-- Public for-header items preserve every ordinary token window. -/
+theorem forItem_preservesTokenWindow (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (forItem expression) := by
+  intro input
+  unfold forItem
+  by_cases letBranch : isKeyword input .letKw
+  · simp only [letBranch, if_true]
+    exact StatementSimpleInternals.forLetItem_preservesTokenWindow
+      expression expressionWindow input
+  · simp only [letBranch]
+    exact StatementSimpleInternals.forAssignmentOrExpression_preservesTokenWindow
+      expression expressionWindow input
+
+theorem forItem_preservesTokensOnSuccess (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (forItem expression) :=
+  (forItem_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- Public for-header item parsing never rewinds the token cursor. -/
+theorem forItem_cursorMonotoneOnSuccess (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (forItem expression) := by
+  intro input item next parsed
+  unfold forItem at parsed
+  by_cases letBranch : isKeyword input .letKw
+  · simp only [letBranch, if_true] at parsed
+    exact StatementSimpleInternals.forLetItem_cursorMonotoneOnSuccess
+      expression expressionCursor input item next parsed
+  · simp only [letBranch] at parsed
+    exact StatementSimpleInternals.forAssignmentOrExpression_cursorMonotoneOnSuccess
+      expression expressionCursor input item next parsed
+
+/-- Public for-header items start at their selected branch's current token. -/
+theorem forItem_startsAtCurrentTokenOnSuccess (expression : Parser Expr)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span)) :
+    Parser.StartsAtCurrentTokenOnSuccess (forItem expression) (·.span) := by
+  intro input item next parsed
+  unfold forItem at parsed
+  by_cases letBranch : isKeyword input .letKw
+  · simp only [letBranch, if_true] at parsed
+    exact StatementSimpleInternals.forLetItem_startsAtCurrentTokenOnSuccess
+      expression input item next parsed
+  · simp only [letBranch] at parsed
+    exact StatementSimpleInternals.forAssignmentOrExpression_startsAtCurrentTokenOnSuccess
+      expression expressionStarts input item next parsed
+
+/-- Every public for-header item retains complete source provenance. -/
+theorem forItem_validFor
+    (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (expressionCursorLt : ∀ {input next : State} {value : Expr},
+      expression input = .ok value next → input.cursor < next.cursor)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span)) :
+    (forItem expression).ValidFor
+      (ForItem.ValidFor expressionValueValid) := by
+  intro input inputValid
+  unfold forItem
+  by_cases letBranch : isKeyword input .letKw
+  · simp only [letBranch, if_true]
+    exact StatementSimpleInternals.forLetItem_validFor expression
+      expressionValueValid expressionValid expressionSpan expressionStarts
+        input inputValid
+  · simp only [letBranch]
+    exact StatementSimpleInternals.forAssignmentOrExpression_validFor
+      expression expressionValueValid expressionValid expressionSpan
+        expressionWindow expressionCursorLt expressionStarts input inputValid
+
 /-- Let statements preserve nested expression token windows. -/
 theorem letStatement_preservesTokenWindow (expression : Parser Expr)
     (expressionWindow : Parser.PreservesTokenWindow expression) :
