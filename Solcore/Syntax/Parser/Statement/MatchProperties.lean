@@ -919,6 +919,71 @@ theorem matchStatement_cursorMonotoneOnSuccess
   · simp only [missing]
     exact Parser.pure_cursorMonotoneOnSuccess _
 
+/-- A successful `match` statement strictly consumes its leading marker. -/
+theorem matchStatement_cursor_lt_onSuccess
+    (statement : Parser Statement) (expression : Parser Expr)
+    (pattern : Parser Pattern) {input final : State}
+    {retainedStatement : Statement}
+    (parsed : matchStatement statement expression pattern input =
+      .ok retainedStatement final) :
+    input.cursor < final.cursor := by
+  have stages := parsed
+  unfold matchStatement at stages
+  rcases matchBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨values, afterValues, valuesResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨scrutinees, afterScrutinees, scrutineesResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨opening, afterOpening, openingResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨cases, afterCases, casesResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨defaultBody, afterDefault, defaultResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨closing, afterClosing, closingResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨validated, afterValidation, validationResult, rest⟩
+  have markerStrict : input.cursor < afterMarker.cursor :=
+    acceptToken_cursor_lt_onSuccess (.keyword .matchKw) .statement
+      (fun kind => kind == .keyword .matchKw) markerResult
+  have tailMonotone : afterMarker.cursor ≤ afterValidation.cursor := by
+    calc
+      afterMarker.cursor ≤ afterValues.cursor :=
+        delimited_cursorMonotoneOnSuccess .leftParen .rightParen false
+          expression .expression .statement afterMarker values afterValues
+            valuesResult
+      _ ≤ afterScrutinees.cursor :=
+        MatchInternals.requireScrutinees_cursorMonotoneOnSuccess values
+          afterValues scrutinees afterScrutinees scrutineesResult
+      _ ≤ afterOpening.cursor := symbol_cursorMonotoneOnSuccess
+        .leftBrace .statement afterScrutinees opening afterOpening openingResult
+      _ ≤ afterCases.cursor :=
+        MatchInternals.matchCases_cursorMonotoneOnSuccess statement pattern
+          (afterOpening.remainingCount + 1) [] afterOpening cases afterCases
+            casesResult
+      _ ≤ afterDefault.cursor :=
+        MatchInternals.optionalDefaultBody_cursorMonotoneOnSuccess statement
+          afterCases defaultBody afterDefault defaultResult
+      _ ≤ afterClosing.cursor := symbol_cursorMonotoneOnSuccess
+        .rightBrace .statement afterDefault closing afterClosing closingResult
+      _ ≤ afterValidation.cursor :=
+        MatchInternals.validateMatchArities_cursorMonotoneOnSuccess
+          scrutinees.elements.toList.length cases afterClosing validated
+            afterValidation validationResult
+  by_cases missing : cases.isEmpty && defaultBody.isNone
+  · simp only [missing, if_true] at rest
+    rcases matchBind_ok_components rest with
+      ⟨presence, afterPresence, presenceResult, finished⟩
+    cases finished
+    exact Nat.lt_of_lt_of_le markerStrict (Nat.le_trans tailMonotone
+      (emitDiagnostic_cursorMonotoneOnSuccess _ afterValidation presence
+        final presenceResult))
+  · simp only [missing] at rest
+    cases rest
+    exact Nat.lt_of_lt_of_le markerStrict tailMonotone
+
 /-- A complete `match` statement starts at its `match` keyword token. -/
 theorem matchStatement_startsAtCurrentTokenOnSuccess
     (statement : Parser Statement) (expression : Parser Expr)

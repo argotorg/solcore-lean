@@ -28,6 +28,7 @@ example := @matchStatement_validFor
 example := @matchStatement_preservesTokenWindow
 example := @matchStatement_preservesTokensOnSuccess
 example := @matchStatement_cursorMonotoneOnSuccess
+example := @matchStatement_cursor_lt_onSuccess
 example := @matchStatement_startsAtCurrentTokenOnSuccess
 
 end Tests
