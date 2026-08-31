@@ -26,6 +26,7 @@ import Solcore.Test.SyntaxParserTerms
 import Solcore.Test.SyntaxParserTotality
 import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTypes
+import Solcore.Test.SyntaxParserUpstreamDiagnosticPolicy
 import Solcore.Test.SyntaxParserUpstreamFixtures
 import Solcore.Test.SyntaxParserYul
 import Solcore.Test.SyntaxParserYulChoiceRecovery
@@ -5088,6 +5089,7 @@ def run : IO Unit := do
   testSyntaxParserTerms
   testSyntaxParserTotality
   testSyntaxParserTrivia
+  testSyntaxParserUpstreamDiagnosticPolicy
   testSyntaxParserUpstreamFixtures
   testSyntaxPublicBoundary
   testProfile
