@@ -1,0 +1,11 @@
+import Solcore.Syntax.Parser.TermPatternFuelTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserTermPatternFuelTotalityProperties
+
+open Solcore.Syntax.Parser.TermInternals
+
+example := @corePatternWithFuel_fuelElementTotalityContract
+
+end Solcore.Test.SyntaxParserTermPatternFuelTotalityProperties
