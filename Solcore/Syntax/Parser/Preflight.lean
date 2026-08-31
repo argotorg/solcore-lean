@@ -4,35 +4,6 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax
 
-/-- Source-ordered, nonempty spans whose provenance is valid for one file. -/
-def SpanSequence.ValidFor {α : Type} (file : SourceFile)
-    (spanOf : α → SourceSpan) : Nat → List α → Prop
-  | _, [] => True
-  | previousEnd, item :: rest =>
-      (spanOf item).ValidFor file ∧
-        previousEnd ≤ (spanOf item).startByte ∧
-        (spanOf item).startByte < (spanOf item).endByte ∧
-        SpanSequence.ValidFor file spanOf (spanOf item).endByte rest
-
-namespace SpanSequence.ValidFor
-
-/-- Every member of a valid sequence has valid source provenance. -/
-theorem span_valid {α : Type} {file : SourceFile}
-    {spanOf : α → SourceSpan} {previousEnd : Nat} {items : List α}
-    (valid : SpanSequence.ValidFor file spanOf previousEnd items)
-    {item : α} (member : item ∈ items) :
-    (spanOf item).ValidFor file := by
-  induction items generalizing previousEnd with
-  | nil => contradiction
-  | cons head tail ih =>
-      simp only [SpanSequence.ValidFor] at valid
-      rcases valid with ⟨headValid, _afterPrevious, _nonempty, tailValid⟩
-      rcases List.mem_cons.mp member with rfl | member
-      · exact headValid
-      · exact ih tailValid member
-
-end SpanSequence.ValidFor
-
 namespace LexedFile
 
 /--
@@ -69,6 +40,23 @@ theorem diagnostic_span {file : SourceFile} {lexed : LexedFile}
 end ValidFor
 
 end LexedFile
+
+namespace Parser.State
+
+/-- Canonical root-state construction preserves validated lexer provenance. -/
+theorem initial_validFor {file : SourceFile} {lexed : LexedFile}
+    (valid : lexed.ValidFor file) :
+    (initial file lexed).ValidFor := by
+  exact {
+    tokens := by simpa [initial] using valid.tokens
+    cursor_le_endIndex := Nat.zero_le _
+    endIndex_le_size := by simp [initial]
+    endByte_le_source := Nat.le_refl _
+    endByte_boundary := isUtf8Boundary_end file.content
+    diagnosticsRev := by simp [initial]
+  }
+
+end Parser.State
 
 end Solcore.Syntax
 
