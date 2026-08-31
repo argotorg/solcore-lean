@@ -1,0 +1,20 @@
+import Solcore.Syntax.Parser.TermStatementFallbackTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserTermStatementFallbackTotalityProperties
+
+open Solcore.Syntax.Parser
+
+example := @StatementSimpleInternals.valueAssignOperator_invariantFreeOnValid
+example := @StatementSimpleInternals.assignmentTail_invariantFreeOnValid
+example := @StatementSimpleInternals.optionalAssignmentTail_invariantFreeOnValid
+example := @StatementSimpleInternals.optionalSemicolon_invariantFreeOnValid
+example := @assignmentOrExpressionStatement_invariantFreeOnValid
+example := @assignmentOrExpressionStatement_ne_invariant
+example :=
+  @assignmentOrExpressionStatement_invariantFreeOnValid_of_elementTotality
+example := @assignmentOrExpressionStatement_ne_invariant_of_elementTotality
+example := @assignmentOrExpressionStatement_totalityContract
+
+end Solcore.Test.SyntaxParserTermStatementFallbackTotalityProperties
