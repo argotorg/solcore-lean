@@ -6,7 +6,8 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def closeDelimited {α : Type} (opening : Token)
+/-- Proof-visible closing step for generic delimited parser laws. -/
+def closeDelimited {α : Type} (opening : Token)
     (closing : Symbol) (context : ParseContext)
     (elementsRev : List α) : Parser (DelimitedList α) := fun state =>
   match symbol closing context state with
@@ -58,7 +59,8 @@ private theorem closeDelimited_validFor {α : Type}
       intro element member
       exact elementsValid element (by simpa using member)
 
-private def afterDelimitedElement {α : Type}
+/-- Proof-visible fuel loop for generic delimited parser laws. -/
+def afterDelimitedElement {α : Type}
     (element : Parser α) (closing : Symbol)
     (allowTrailing : Bool)
     (context : ParseContext) (phase : ParserPhase)
