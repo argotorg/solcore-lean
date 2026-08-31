@@ -1541,5 +1541,148 @@ theorem postfixTail_cursorMonotoneOnSuccess
             cases parsed
             exact Nat.le_refl _
 
+/-- Every successful postfix tail retains its original base's left edge. -/
+theorem postfixTail_preservesBaseStartOnSuccess
+    (nested : Parser Expr) (block : Parser Block) :
+    ∀ fuel base input expression final,
+      postfixTail nested block fuel base input = .ok expression final →
+      expression.span.startByte = base.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro base input expression final parsed
+      unfold postfixTail at parsed
+      by_cases indexed : isSymbol input .leftBracket
+      · simp only [indexed, if_true] at parsed
+        cases openingResult : symbol .leftBracket .expression input with
+        | invariant error => simp [openingResult] at parsed
+        | reject failure rejected => simp [openingResult] at parsed
+        | ok opening afterOpening =>
+            simp only [openingResult] at parsed
+            cases indexResult : nested afterOpening with
+            | invariant error => simp [indexResult] at parsed
+            | reject failure rejected => simp [indexResult] at parsed
+            | ok index next =>
+                simp only [indexResult] at parsed
+                cases closingResult : symbol .rightBracket .expression next with
+                | invariant error => simp [closingResult] at parsed
+                | reject failure rejected => simp [closingResult] at parsed
+                | ok closing afterClosing =>
+                    simp only [closingResult] at parsed
+                    calc
+                      expression.span.startByte =
+                          (SourceSpan.cover base.span closing.span).startByte :=
+                        inductionHypothesis {
+                          span := SourceSpan.cover base.span closing.span
+                          value := .index base
+                            (SourceSpan.cover opening.span closing.span) index
+                        } afterClosing expression final parsed
+                      _ = base.span.startByte := rfl
+      · simp only [indexed, Bool.false_eq_true, if_false] at parsed
+        by_cases called : isSymbol input .leftParen
+        · simp only [called, if_true] at parsed
+          cases argumentsResult :
+              delimitedNoTrailing .leftParen .rightParen true nested
+                .expression .expression input with
+          | invariant error => simp [argumentsResult] at parsed
+          | reject failure rejected => simp [argumentsResult] at parsed
+          | ok arguments next =>
+              simp only [argumentsResult] at parsed
+              calc
+                expression.span.startByte =
+                    (SourceSpan.cover base.span arguments.span).startByte :=
+                  inductionHypothesis {
+                    span := SourceSpan.cover base.span arguments.span
+                    value := .call base arguments
+                  } next expression final parsed
+                _ = base.span.startByte := rfl
+        · simp only [called, Bool.false_eq_true, if_false] at parsed
+          by_cases field : isSymbol input .dot
+          · simp only [field, if_true] at parsed
+            cases dotResult : symbol .dot .expression input with
+            | invariant error => simp [dotResult] at parsed
+            | reject failure rejected => simp [dotResult] at parsed
+            | ok dot afterDot =>
+                simp only [dotResult] at parsed
+                cases nameResult : identifier .expression afterDot with
+                | invariant error => simp [nameResult] at parsed
+                | reject failure rejected => simp [nameResult] at parsed
+                | ok name next =>
+                    simp only [nameResult] at parsed
+                    calc
+                      expression.span.startByte =
+                          (SourceSpan.cover base.span name.span).startByte :=
+                        inductionHypothesis {
+                          span := SourceSpan.cover base.span name.span
+                          value := .field base dot.span name
+                        } next expression final parsed
+                      _ = base.span.startByte := rfl
+          · simp only [field] at parsed
+            cases parsed
+            rfl
+
+/-- Postfix parsing preserves token windows when its atom and leaves do. -/
+theorem expressionPostfix_preservesTokenWindow
+    (nested : Parser Expr) (block : Parser Block)
+    (atomWindow : Parser.PreservesTokenWindow (expressionAtom nested block))
+    (nestedWindow : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (expressionPostfix nested block) := by
+  intro input
+  unfold expressionPostfix
+  have atomShape := atomWindow input
+  cases atomResult : expressionAtom nested block input with
+  | invariant error => trivial
+  | reject failure rejected => rw [atomResult] at atomShape; exact atomShape
+  | ok base next =>
+      rw [atomResult] at atomShape
+      exact (postfixTail_preservesTokenWindow nested block nestedWindow
+        (next.remainingCount + 1) base next).trans atomShape
+
+theorem expressionPostfix_preservesTokensOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (atomWindow : Parser.PreservesTokenWindow (expressionAtom nested block))
+    (nestedWindow : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokensOnSuccess (expressionPostfix nested block) :=
+  (expressionPostfix_preservesTokenWindow nested block atomWindow
+    nestedWindow).preservesTokensOnSuccess
+
+/-- Postfix parsing never rewinds when its atom and recursive leaves do not. -/
+theorem expressionPostfix_cursorMonotoneOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (atomCursor : Parser.CursorMonotoneOnSuccess (expressionAtom nested block))
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (expressionPostfix nested block) := by
+  intro input expression final parsed
+  unfold expressionPostfix at parsed
+  cases atomResult : expressionAtom nested block input with
+  | invariant error => simp [atomResult] at parsed
+  | reject failure rejected => simp [atomResult] at parsed
+  | ok base next =>
+      simp only [atomResult] at parsed
+      exact Nat.le_trans (atomCursor input base next atomResult)
+        (postfixTail_cursorMonotoneOnSuccess nested block nestedCursor
+          (next.remainingCount + 1) base next expression final parsed)
+
+/-- A postfix expression starts at the same token as its atom. -/
+theorem expressionPostfix_startsAtCurrentTokenOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (atomStarts : Parser.StartsAtCurrentTokenOnSuccess
+      (expressionAtom nested block) (·.span)) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (expressionPostfix nested block) (·.span) := by
+  intro input expression final parsed
+  unfold expressionPostfix at parsed
+  cases atomResult : expressionAtom nested block input with
+  | invariant error => simp [atomResult] at parsed
+  | reject failure rejected => simp [atomResult] at parsed
+  | ok base next =>
+      simp only [atomResult] at parsed
+      rcases atomStarts input base next atomResult with
+        ⟨token, found, starts⟩
+      have retained := postfixTail_preservesBaseStartOnSuccess nested block
+        (next.remainingCount + 1) base next expression final parsed
+      exact ⟨token, found, starts.trans retained.symm⟩
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser
