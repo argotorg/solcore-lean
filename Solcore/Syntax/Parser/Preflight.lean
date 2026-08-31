@@ -113,6 +113,71 @@ private theorem validateLexicalDiagnostics_sound (file : SourceFile)
         · exact ih (index := index + 1) result diagnostic member
       · contradiction
 
+private theorem validateTokens_complete (file : SourceFile)
+    (index previousEnd : Nat) (tokens : List Token)
+    (valid : SpanSequence.ValidFor file
+      (fun token : Token => token.span) previousEnd tokens) :
+    validateTokens file index previousEnd tokens = .ok () := by
+  induction tokens generalizing index previousEnd with
+  | nil => rfl
+  | cons token rest ih =>
+      simp only [SpanSequence.ValidFor] at valid
+      rcases valid with
+        ⟨spanValid, afterPrevious, nonempty, restValid⟩
+      simp only [validateTokens]
+      have accepted :
+          (token.span.isValidFor file &&
+            decide (previousEnd ≤ token.span.startByte) &&
+            decide (token.span.startByte < token.span.endByte)) = true := by
+        simp only [Bool.and_eq_true,
+          SourceSpan.isValidFor_eq_true_iff]
+        exact ⟨⟨spanValid, decide_eq_true afterPrevious⟩,
+          decide_eq_true nonempty⟩
+      rw [if_pos accepted]
+      exact ih (index := index + 1)
+        (previousEnd := token.span.endByte) restValid
+
+private theorem validateComments_complete (file : SourceFile)
+    (index previousEnd : Nat) (comments : List Comment)
+    (valid : SpanSequence.ValidFor file
+      (fun comment : Comment => comment.span) previousEnd comments) :
+    validateComments file index previousEnd comments = .ok () := by
+  induction comments generalizing index previousEnd with
+  | nil => rfl
+  | cons comment rest ih =>
+      simp only [SpanSequence.ValidFor] at valid
+      rcases valid with
+        ⟨spanValid, afterPrevious, nonempty, restValid⟩
+      simp only [validateComments]
+      have accepted :
+          (comment.span.isValidFor file &&
+            decide (previousEnd ≤ comment.span.startByte) &&
+            decide (comment.span.startByte < comment.span.endByte)) = true := by
+        simp only [Bool.and_eq_true,
+          SourceSpan.isValidFor_eq_true_iff]
+        exact ⟨⟨spanValid, decide_eq_true afterPrevious⟩,
+          decide_eq_true nonempty⟩
+      rw [if_pos accepted]
+      exact ih (index := index + 1)
+        (previousEnd := comment.span.endByte) restValid
+
+private theorem validateLexicalDiagnostics_complete (file : SourceFile)
+    (index : Nat) (diagnostics : List LexicalDiagnostic)
+    (valid : ∀ diagnostic ∈ diagnostics,
+      diagnostic.span.ValidFor file) :
+    validateLexicalDiagnostics file index diagnostics = .ok () := by
+  induction diagnostics generalizing index with
+  | nil => rfl
+  | cons head tail ih =>
+      simp only [validateLexicalDiagnostics]
+      have headValid : head.span.isValidFor file = true :=
+        (SourceSpan.isValidFor_eq_true_iff head.span file).mpr
+          (valid head (by simp))
+      rw [if_pos headValid]
+      apply ih (index := index + 1)
+      intro diagnostic member
+      exact valid diagnostic (by simp [member])
+
 /-- Validate all provenance consumed or retained by `parseLexed`. -/
 def validateLexed (file : SourceFile)
     (lexed : LexedFile) : Except ParserInvariantError Unit := do
@@ -160,6 +225,27 @@ theorem validateLexed_ok_validFor (file : SourceFile) (lexed : LexedFile)
                 · exact tokensResult
                 · exact commentsResult
                 · exact diagnosticsResult
+
+/-- Every declaratively valid lexer result passes parser preflight. -/
+theorem validateLexed_validFor_ok (file : SourceFile) (lexed : LexedFile)
+    (valid : lexed.ValidFor file) :
+    validateLexed file lexed = .ok () := by
+  unfold validateLexed
+  have sourceAccepted : ¬ lexed.source ≠ file.id := by
+    intro rejected
+    exact rejected valid.source_eq
+  rw [if_neg sourceAccepted]
+  rw [validateTokens_complete file 0 0 lexed.tokens valid.tokens]
+  rw [validateComments_complete file 0 0 lexed.comments valid.comments]
+  exact validateLexicalDiagnostics_complete file 0
+    lexed.diagnostics valid.diagnostics
+
+/-- Parser preflight decides the complete declarative lexer contract. -/
+theorem validateLexed_ok_iff_validFor (file : SourceFile)
+    (lexed : LexedFile) :
+    validateLexed file lexed = .ok () ↔ lexed.ValidFor file :=
+  ⟨validateLexed_ok_validFor file lexed,
+    validateLexed_validFor_ok file lexed⟩
 
 private structure NestingState where
   delimiterDepth : Nat := 0
