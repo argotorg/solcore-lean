@@ -1684,5 +1684,281 @@ theorem expressionPostfix_startsAtCurrentTokenOnSuccess
         (next.remainingCount + 1) base next expression final parsed
       exact ⟨token, found, starts.trans retained.symm⟩
 
+/-- The postfix loop retains its base and every suffix source range. -/
+theorem postfixTail_validFor
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) :
+    ∀ fuel base input,
+      input.ValidFor →
+      Expr.ValidFor statementValid input.file base →
+      (∀ token, input.peek? = some token →
+        base.span.startByte ≤ token.span.startByte) →
+      (postfixTail nested block fuel base input).ValidFor input
+        (Expr.ValidFor statementValid) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro base input inputValid baseValid baseBefore
+      unfold postfixTail
+      by_cases indexed : isSymbol input .leftBracket
+      · simp only [indexed, if_true]
+        cases openingResult : symbol .leftBracket .expression input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            have reply := symbol_validFor .leftBracket .expression input inputValid
+            rw [openingResult] at reply
+            exact reply
+        | ok opening afterOpening =>
+            have openingReply := symbol_validFor .leftBracket .expression input
+              inputValid
+            rw [openingResult] at openingReply
+            simp only
+            cases indexResult : nested afterOpening with
+            | invariant error => trivial
+            | reject failure rejected =>
+                have reply := nestedValid afterOpening openingReply.2.1
+                rw [indexResult] at reply
+                exact reply.of_file_eq openingReply.2.2
+            | ok index next =>
+                have indexReply := nestedValid afterOpening openingReply.2.1
+                rw [indexResult] at indexReply
+                simp only
+                cases closingResult : symbol .rightBracket .expression next with
+                | invariant error => trivial
+                | reject failure rejected =>
+                    have reply := symbol_validFor .rightBracket .expression next
+                      indexReply.2.1
+                    rw [closingResult] at reply
+                    exact reply.of_file_eq
+                      (indexReply.2.2.trans openingReply.2.2)
+                | ok closing afterClosing =>
+                    have closingReply := symbol_validFor .rightBracket
+                      .expression next indexReply.2.1
+                    rw [closingResult] at closingReply
+                    have openingShape := symbol_ok_state_shape .leftBracket
+                      .expression openingResult
+                    have closingShape := symbol_ok_state_shape .rightBracket
+                      .expression closingResult
+                    have openingAt :=
+                      State.getElem?_eq_some_of_peek?_eq_some openingShape.1
+                    have closingAtNext :=
+                      State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+                    have openingTokens := symbol_preservesTokensOnSuccess
+                      .leftBracket .expression input opening afterOpening
+                        openingResult
+                    have indexTokens := nestedTokens afterOpening index next
+                      indexResult
+                    have closingAt : input.tokens[next.cursor]? = some closing := by
+                      simpa [indexTokens, openingTokens] using closingAtNext
+                    have separated :=
+                      inputValid.token_end_le_token_start_of_getElem?_lt
+                        openingAt closingAt
+                        (Nat.lt_of_lt_of_le
+                          (acceptToken_cursor_lt_onSuccess
+                            (.symbol .leftBracket) .expression
+                            (· == .symbol .leftBracket) openingResult)
+                          (nestedCursor afterOpening index next indexResult))
+                    have openingSpan : opening.span.ValidFor input.file := by
+                      simpa only [Located.ValidFor] using openingReply.1
+                    have closingSpan : closing.span.ValidFor input.file := by
+                      simpa only [Located.ValidFor, indexReply.2.2,
+                        openingReply.2.2] using closingReply.1
+                    have indexValid : Expr.ValidFor statementValid input.file
+                        index := by
+                      simpa [openingReply.2.2] using indexReply.1
+                    have bracketsValid := SourceSpan.cover_validFor openingSpan
+                      closingSpan (Nat.le_trans openingSpan.2.1
+                        (Nat.le_trans separated closingSpan.2.1))
+                    have baseToClosing : base.span.startByte ≤
+                        closing.span.endByte := Nat.le_trans
+                      (baseBefore opening openingShape.1)
+                      (Nat.le_trans openingSpan.2.1
+                        (Nat.le_trans separated closingSpan.2.1))
+                    let combined : Expr := {
+                      span := SourceSpan.cover base.span closing.span
+                      value := .index base
+                        (SourceSpan.cover opening.span closing.span) index
+                    }
+                    have combinedValid : Expr.ValidFor statementValid input.file
+                        combined := Expr.ValidFor.index
+                      (SourceSpan.cover_validFor baseValid.span_valid closingSpan
+                        baseToClosing) baseValid bracketsValid indexValid
+                    have resultFileEq : afterClosing.file = input.file :=
+                      closingReply.2.2.trans
+                        (indexReply.2.2.trans openingReply.2.2)
+                    have closingTokens := symbol_preservesTokensOnSuccess
+                      .rightBracket .expression next closing afterClosing
+                        closingResult
+                    have combinedBefore : ∀ future,
+                        afterClosing.peek? = some future →
+                        combined.span.startByte ≤ future.span.startByte := by
+                      intro future futureFound
+                      have futureAtAfter :=
+                        State.getElem?_eq_some_of_peek?_eq_some futureFound
+                      have futureAt : input.tokens[afterClosing.cursor]? =
+                          some future := by
+                        simpa [closingTokens, indexTokens, openingTokens] using
+                          futureAtAfter
+                      have beforeFuture :=
+                        inputValid.token_end_le_token_start_of_getElem?_lt
+                          openingAt futureAt (Nat.lt_of_lt_of_le
+                            (acceptToken_cursor_lt_onSuccess
+                              (.symbol .leftBracket) .expression
+                              (· == .symbol .leftBracket) openingResult)
+                            (Nat.le_trans
+                              (nestedCursor afterOpening index next indexResult)
+                              (symbol_cursorMonotoneOnSuccess .rightBracket
+                                .expression next closing afterClosing
+                                  closingResult)))
+                      exact Nat.le_trans (baseBefore opening openingShape.1)
+                        (Nat.le_trans openingSpan.2.1 beforeFuture)
+                    exact (inductionHypothesis combined afterClosing
+                      closingReply.2.1 (by simpa [resultFileEq] using
+                        combinedValid) combinedBefore).of_file_eq resultFileEq
+      · simp only [indexed, Bool.false_eq_true, if_false]
+        by_cases called : isSymbol input .leftParen
+        · simp only [called, if_true]
+          cases argumentsResult :
+              delimitedNoTrailing .leftParen .rightParen true nested
+                .expression .expression input with
+          | invariant error => trivial
+          | reject failure rejected =>
+              have reply := delimitedNoTrailing_validFor
+                (Expr.ValidFor statementValid) .leftParen .rightParen true
+                  nested .expression .expression nestedValid nestedTokens input
+                    inputValid
+              rw [argumentsResult] at reply
+              exact reply
+          | ok arguments next =>
+              have argumentsReply := delimitedNoTrailing_validFor
+                (Expr.ValidFor statementValid) .leftParen .rightParen true
+                  nested .expression .expression nestedValid nestedTokens input
+                    inputValid
+              rw [argumentsResult] at argumentsReply
+              rcases delimitedNoTrailing_startsAtCurrentTokenOnSuccess
+                  .leftParen .rightParen true nested .expression .expression
+                    input arguments next argumentsResult with
+                ⟨opening, openingFound, argumentsStart⟩
+              have argumentsValid := argumentsReply.1
+              have ordered : base.span.startByte ≤ arguments.span.endByte :=
+                Nat.le_trans (baseBefore opening openingFound)
+                  (by rw [argumentsStart]; exact argumentsValid.1.2.1)
+              let combined : Expr := {
+                span := SourceSpan.cover base.span arguments.span
+                value := .call base arguments
+              }
+              have combinedValid : Expr.ValidFor statementValid input.file
+                  combined := Expr.ValidFor.call
+                (SourceSpan.cover_validFor baseValid.span_valid argumentsValid.1
+                  ordered) baseValid argumentsValid.1 argumentsValid.2
+              have argumentsTokens :=
+                delimitedNoTrailing_preservesTokensOnSuccess .leftParen
+                  .rightParen true nested .expression .expression nestedTokens
+                    input arguments next argumentsResult
+              have combinedBefore : ∀ future, next.peek? = some future →
+                  combined.span.startByte ≤ future.span.startByte := by
+                intro future futureFound
+                have openingAt :=
+                  State.getElem?_eq_some_of_peek?_eq_some openingFound
+                have futureAtNext :=
+                  State.getElem?_eq_some_of_peek?_eq_some futureFound
+                have futureAt : input.tokens[next.cursor]? = some future := by
+                  simpa [argumentsTokens] using futureAtNext
+                have beforeFuture :=
+                  inputValid.token_end_le_token_start_of_getElem?_lt openingAt
+                    futureAt (by
+                      apply delimitedWithPolicy_cursor_lt_onSuccess .leftParen
+                        .rightParen true false nested .expression .expression
+                      simpa only [delimitedNoTrailing] using argumentsResult)
+                exact Nat.le_trans (baseBefore opening openingFound)
+                  (Nat.le_trans (inputValid.peek?_span_validFor openingFound).2.1
+                    beforeFuture)
+              exact (inductionHypothesis combined next argumentsReply.2.1
+                (by simpa [argumentsReply.2.2] using combinedValid)
+                  combinedBefore).of_file_eq argumentsReply.2.2
+        · simp only [called, Bool.false_eq_true, if_false]
+          by_cases field : isSymbol input .dot
+          · simp only [field, if_true]
+            cases dotResult : symbol .dot .expression input with
+            | invariant error => trivial
+            | reject failure rejected =>
+                have reply := symbol_validFor .dot .expression input inputValid
+                rw [dotResult] at reply
+                exact reply
+            | ok dot afterDot =>
+                have dotReply := symbol_validFor .dot .expression input inputValid
+                rw [dotResult] at dotReply
+                simp only
+                cases nameResult : identifier .expression afterDot with
+                | invariant error => trivial
+                | reject failure rejected =>
+                    have reply := identifier_validFor .expression afterDot
+                      dotReply.2.1
+                    rw [nameResult] at reply
+                    exact reply.of_file_eq dotReply.2.2
+                | ok name next =>
+                    have nameReply := identifier_validFor .expression afterDot
+                      dotReply.2.1
+                    rw [nameResult] at nameReply
+                    rcases identifier_ok_state_shape .expression nameResult with
+                      ⟨nameToken, nameFound, nameSpan, nameTokens, nameCursor⟩
+                    have dotShape := symbol_ok_state_shape .dot .expression
+                      dotResult
+                    have dotAt := State.getElem?_eq_some_of_peek?_eq_some
+                      dotShape.1
+                    have nameAtAfter :=
+                      State.getElem?_eq_some_of_peek?_eq_some nameFound
+                    have nameAt : input.tokens[afterDot.cursor]? =
+                        some nameToken := by
+                      simpa [dotShape.2] using nameAtAfter
+                    have separated :=
+                      inputValid.token_end_le_token_start_of_getElem?_lt dotAt
+                        nameAt (by simp [dotShape.2])
+                    have dotSpan : dot.span.ValidFor input.file := by
+                      simpa only [Located.ValidFor] using dotReply.1
+                    have nameValid : name.span.ValidFor input.file := by
+                      simpa only [Located.ValidFor, dotReply.2.2] using
+                        nameReply.1
+                    have ordered : base.span.startByte ≤ name.span.endByte :=
+                      Nat.le_trans (baseBefore dot dotShape.1)
+                        (Nat.le_trans dotSpan.2.1 (Nat.le_trans separated
+                          (by simpa [nameSpan] using nameValid.2.1)))
+                    let combined : Expr := {
+                      span := SourceSpan.cover base.span name.span
+                      value := .field base dot.span name
+                    }
+                    have combinedValid : Expr.ValidFor statementValid input.file
+                        combined := Expr.ValidFor.field
+                      (SourceSpan.cover_validFor baseValid.span_valid nameValid
+                        ordered) baseValid dotSpan nameValid
+                    have resultFileEq := nameReply.2.2.trans dotReply.2.2
+                    have combinedBefore : ∀ future, next.peek? = some future →
+                        combined.span.startByte ≤ future.span.startByte := by
+                      intro future futureFound
+                      have futureAtNext :=
+                        State.getElem?_eq_some_of_peek?_eq_some futureFound
+                      have futureAt : input.tokens[next.cursor]? = some future := by
+                        simpa [nameTokens, dotShape.2] using futureAtNext
+                      have dotProgress : input.cursor < afterDot.cursor := by
+                        rw [dotShape.2]
+                        simp
+                      have nameProgress : afterDot.cursor < next.cursor := by
+                        rw [nameCursor]
+                        simp
+                      have beforeFuture :=
+                        inputValid.token_end_le_token_start_of_getElem?_lt dotAt
+                          futureAt (Nat.lt_trans dotProgress nameProgress)
+                      exact Nat.le_trans (baseBefore dot dotShape.1)
+                        (Nat.le_trans dotSpan.2.1 beforeFuture)
+                    exact (inductionHypothesis combined next nameReply.2.1
+                      (by simpa [resultFileEq] using combinedValid)
+                        combinedBefore).of_file_eq resultFileEq
+          · simp only [field]
+            exact ⟨baseValid, inputValid, rfl⟩
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser
