@@ -791,6 +791,97 @@ theorem applyUnaryOperators_validFor
       simpa only [applyUnaryOperators, List.foldr] using
         (Expr.ValidFor.unary outerValid operatorValid operandValid)
 
+/-- Unary parsing preserves token windows when postfix parsing does. -/
+theorem expressionUnary_preservesTokenWindow
+    (nested : Parser Expr) (block : Parser Block)
+    (postfixWindow : Parser.PreservesTokenWindow
+      (expressionPostfix nested block)) :
+    Parser.PreservesTokenWindow (expressionUnary nested block) := by
+  intro input
+  unfold expressionUnary
+  have operatorsShape := unaryOperators_preservesTokenWindow
+    (input.remainingCount + 1) [] input
+  cases operatorsResult : unaryOperators (input.remainingCount + 1) [] input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [operatorsResult] at operatorsShape
+      exact operatorsShape
+  | ok operators afterOperators =>
+      rw [operatorsResult] at operatorsShape
+      simp only
+      have postfixShape := postfixWindow afterOperators
+      cases postfixResult : expressionPostfix nested block afterOperators with
+      | invariant error => simp only; trivial
+      | reject failure rejected =>
+          rw [postfixResult] at postfixShape
+          simp only
+          exact postfixShape.trans operatorsShape
+      | ok base next =>
+          rw [postfixResult] at postfixShape
+          simp only
+          exact postfixShape.trans operatorsShape
+
+theorem expressionUnary_preservesTokensOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (postfixWindow : Parser.PreservesTokenWindow
+      (expressionPostfix nested block)) :
+    Parser.PreservesTokensOnSuccess (expressionUnary nested block) :=
+  (expressionUnary_preservesTokenWindow nested block
+    postfixWindow).preservesTokensOnSuccess
+
+/-- Unary parsing never rewinds when postfix parsing does not. -/
+theorem expressionUnary_cursorMonotoneOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (postfixCursor : Parser.CursorMonotoneOnSuccess
+      (expressionPostfix nested block)) :
+    Parser.CursorMonotoneOnSuccess (expressionUnary nested block) := by
+  intro input expression final parsed
+  unfold expressionUnary at parsed
+  cases operatorsResult : unaryOperators (input.remainingCount + 1) [] input with
+  | invariant error => simp [operatorsResult] at parsed
+  | reject failure rejected => simp [operatorsResult] at parsed
+  | ok operators afterOperators =>
+      simp only [operatorsResult] at parsed
+      cases postfixResult : expressionPostfix nested block afterOperators with
+      | invariant error => simp [postfixResult] at parsed
+      | reject failure rejected => simp [postfixResult] at parsed
+      | ok base next =>
+          simp only [postfixResult] at parsed
+          have postfixMonotone :=
+            postfixCursor afterOperators base next postfixResult
+          cases parsed
+          exact Nat.le_trans
+            (unaryOperators_cursorMonotoneOnSuccess
+              (input.remainingCount + 1) [] input operators afterOperators
+                operatorsResult)
+            postfixMonotone
+
+/-- A unary result retains the endpoint of its parsed postfix base. -/
+theorem expressionUnary_retainsPostfixEndOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    {input final : State} {expression : Expr}
+    (parsed : expressionUnary nested block input = .ok expression final) :
+    ∃ operators afterOperators base,
+      unaryOperators (input.remainingCount + 1) [] input =
+        .ok operators afterOperators ∧
+      expressionPostfix nested block afterOperators = .ok base final ∧
+      expression.span.endByte = base.span.endByte := by
+  unfold expressionUnary at parsed
+  cases operatorsResult : unaryOperators (input.remainingCount + 1) [] input with
+  | invariant error => simp [operatorsResult] at parsed
+  | reject failure rejected => simp [operatorsResult] at parsed
+  | ok operators afterOperators =>
+      simp only [operatorsResult] at parsed
+      cases postfixResult : expressionPostfix nested block afterOperators with
+      | invariant error => simp [postfixResult] at parsed
+      | reject failure rejected => simp [postfixResult] at parsed
+      | ok base next =>
+          simp only [postfixResult] at parsed
+          cases parsed
+          exact ⟨operators, afterOperators, base, rfl,
+            by simpa using postfixResult,
+            applyUnaryOperators_preservesBaseEnd operators base⟩
+
 /-- Successful precedence lookup identifies the current token exactly. -/
 theorem binaryAtPrecedence?_some_state_shape {input : State}
     {precedence : Nat} {operator : Located BinaryOp}

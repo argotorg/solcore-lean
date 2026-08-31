@@ -64,7 +64,8 @@ def ExpressionInternals.applyUnaryOperators
     value := .unary operator operand
   }) base
 
-private def expressionUnary (nested : Parser Expr)
+/-- Parse prefix unary operators followed by one complete postfix expression. -/
+def ExpressionInternals.expressionUnary (nested : Parser Expr)
     (block : Parser Block) : Parser Expr := fun state =>
   match ExpressionInternals.unaryOperators
       (state.remainingCount + 1) [] state with
@@ -238,7 +239,7 @@ are supplied by the later statement/expression knot with strictly less fuel.
 -/
 def expressionLayer (nested : Parser Expr)
     (block : Parser Block) : Parser Expr :=
-  let unary := expressionUnary nested block
+  let unary := ExpressionInternals.expressionUnary nested block
   let multiply := ExpressionInternals.leftAssociative unary 8
   let add := ExpressionInternals.leftAssociative multiply 7
   let bitAnd := ExpressionInternals.leftAssociative add 6
