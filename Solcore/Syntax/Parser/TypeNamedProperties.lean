@@ -303,6 +303,19 @@ theorem parseNamedType_preservesTokenWindow (nested : Parser TypeExpr)
   intro arguments
   exact finishNamedType_preservesTokenWindow name arguments
 
+/-- Successful named-type parsing retains the recursive token carrier. -/
+theorem parseNamedType_preservesTokensOnSuccess (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (parseNamedType nested) := by
+  unfold parseNamedType
+  apply Parser.bind_preservesTokensOnSuccess
+    (qualifiedName_preservesTokensOnSuccess .typeExpr .typeExpr)
+  intro name
+  apply Parser.bind_preservesTokensOnSuccess
+    (parseNamedTypeArguments_preservesTokensOnSuccess nested nestedPreserves)
+  intro arguments
+  exact (finishNamedType_preservesTokenWindow name arguments).preservesTokensOnSuccess
+
 /-- Named-type parsing never rewinds the recursive parser cursor. -/
 theorem parseNamedType_cursorMonotoneOnSuccess (nested : Parser TypeExpr) :
     Parser.CursorMonotoneOnSuccess (parseNamedType nested) := by

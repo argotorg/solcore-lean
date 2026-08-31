@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.TypeNamedProperties
+import Solcore.Syntax.Parser.TypeRecursiveProperties
 
 /-! External consumers for recursive type-expression and tuple contracts. -/
 
@@ -36,6 +36,11 @@ example (nested : Parser TypeExpr)
     Parser.PreservesTokenWindow (parseNamedType nested) :=
   parseNamedType_preservesTokenWindow nested window
 
+example (nested : Parser TypeExpr)
+    (tokens : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (parseNamedType nested) :=
+  parseNamedType_preservesTokensOnSuccess nested tokens
+
 example (nested : Parser TypeExpr) :
     Parser.CursorMonotoneOnSuccess (parseNamedType nested) :=
   parseNamedType_cursorMonotoneOnSuccess nested
@@ -43,6 +48,19 @@ example (nested : Parser TypeExpr) :
 example (nested : Parser TypeExpr) :
     Parser.StartsAtCurrentTokenOnSuccess (parseNamedType nested) (·.span) :=
   parseNamedType_startsAtCurrentTokenOnSuccess nested
+
+example := @typeExprWithFuel_validFor
+example := @typeExprWithFuel_preservesTokensOnSuccess
+example := @typeExprWithFuel_cursorMonotoneOnSuccess
+example := @typeExprWithFuel_startsAtCurrentTokenOnSuccess
+
+example : typeExpr.ValidFor TypeExpr.ValidFor := typeExpr_validFor
+example : Parser.PreservesTokensOnSuccess typeExpr :=
+  typeExpr_preservesTokensOnSuccess
+example : Parser.CursorMonotoneOnSuccess typeExpr :=
+  typeExpr_cursorMonotoneOnSuccess
+example : Parser.StartsAtCurrentTokenOnSuccess typeExpr (·.span) :=
+  typeExpr_startsAtCurrentTokenOnSuccess
 
 example (nested : Parser TypeExpr)
     (nestedValid : nested.ValidFor TypeExpr.ValidFor)
