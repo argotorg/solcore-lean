@@ -86,7 +86,10 @@ def closePatternTuple (opening : Token)
 
 end PatternInternals
 
-private def patternTupleTail (nested : Parser Pattern) (opening : Token) :
+namespace PatternInternals
+
+/-- Continue a parenthesized tuple after its first comma. -/
+def patternTupleTail (nested : Parser Pattern) (opening : Token) :
     Nat → List Pattern → State → Reply Pattern
   | 0, _, state => .invariant (.fuelExhausted .pattern state.currentSpan)
   | fuel + 1, elementsRev, state =>
@@ -111,6 +114,8 @@ private def patternTupleTail (nested : Parser Pattern) (opening : Token) :
       | .reject failure next => .reject failure next
       | .invariant error => .invariant error
 
+end PatternInternals
+
 private def parenthesizedPattern (nested : Parser Pattern) : Parser Pattern :=
     fun state =>
   match symbol .leftParen .pattern state with
@@ -124,7 +129,8 @@ private def parenthesizedPattern (nested : Parser Pattern) : Parser Pattern :=
             if next.cursor ≤ before then
               .invariant (.noProgress .pattern next.currentSpan)
             else if isSymbol next .comma then
-              patternTupleTail nested opening (next.remainingCount + 1)
+              PatternInternals.patternTupleTail nested opening
+                (next.remainingCount + 1)
                 [first] next
             else
               match symbol .rightParen .pattern next with
