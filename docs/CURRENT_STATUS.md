@@ -300,16 +300,26 @@ adequate across named, mapping, comptime, proxy, tuple, and function forms.
 Export paths, constructor selections, export names, selected-item lists, and
 complete export declarations are also invariant-free on valid input.
 
-Term-parser totality has begun from its reusable leaves and fuel loops. Literal
-and Boolean token consumers, expression-name leaves, non-recursive expression
-atoms, malformed expression-atom recovery, malformed pattern recovery, and the
-prefix-unary scanner now have explicit ordinary-result or adequate-fuel
-contracts. This is not yet a claim that the mutually recursive expression,
-pattern, and statement parsers are fully invariant-free.
+Term-parser totality now reaches complete expression and pattern layers. Lambda
+parameters are unconditionally total. Lambda atoms, postfix calls and indexing,
+prefix operators, every binary precedence level, conditional expressions,
+pattern dispatch, and pattern recovery have explicit fuel-aware contracts. The
+recursive pattern family lifts those contracts through every fuel level, and
+the public pattern parser has an `ElementTotalityContract` whenever the
+corresponding recursive expression family contracts are supplied.
 
-The remaining formal parser work is to discharge the five declaration and five
-contract-member obligations through the nested expression, pattern, statement,
-and Yul parsers, then relate successful execution to a declarative grammar.
+On the statement side, assignment/expression fallback, `let`, `return`,
+`break`, and `continue` have ordinary-result contracts, and the fallback also
+has a recursive-fuel contract. Core block iteration and balanced-block
+isolation are invariant-free when their statement parser is invariant-free.
+The remaining mutual closure is the fuel-aware statement/block control-flow
+family and inline Yul; therefore this is not yet a claim that public
+expression and statement parsing are unconditionally invariant-free.
+
+The remaining formal parser work is to finish the mutually recursive
+expression/statement/block and inline-Yul fuel contracts, use them to discharge
+the five declaration and five contract-member obligations, and then relate
+successful execution to a declarative grammar.
 Parser-wide resource bounds are no longer an undivided open item: the outer
 accumulation, recovery, and generic delimiter bounds above are complete.
 

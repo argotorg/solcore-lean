@@ -142,13 +142,19 @@ implementation, and contract. Import, export, type alias, pragma, and the
 complete derive path are already discharged. The shared recursive type parser
 is invariant-free with proved production-fuel adequacy across every type form.
 
-Term totality is now being assembled from explicit fuel-aware components.
-Literal and Boolean leaves, expression-name leaves, non-recursive expression
-atoms, malformed atom and pattern recovery, and prefix-unary scanning have
-ordinary-result or adequate-fuel proofs. The next proof step is to close the
-recursive expression, pattern, statement, and block layers, use them to
-discharge the remaining declaration branches, and then prove success soundness
-against a declarative grammar.
+Term totality now covers the complete expression precedence layer and the
+complete recovering pattern layer. Lambda parameters are unconditionally
+total; lambda atoms, postfix operations, unary operators, binary operators, and
+conditionals compose from explicit recursive expression and block contracts.
+Pattern totality lifts through the recursive fuel family and reaches the public
+parser under the matching expression-family premises.
+
+Statement totality covers assignment/expression fallback, `let`, `return`,
+`break`, `continue`, and Core block iteration/isolation. Fuel-aware fallback is
+also complete. The next proof step is to finish fuel-aware blocks, recursive
+control statements, and inline Yul, close the simultaneous expression and
+statement families, discharge the remaining declaration branches, and then
+prove success soundness against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the
