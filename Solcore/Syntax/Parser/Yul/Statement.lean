@@ -155,7 +155,8 @@ def recoverYulStatementAux (first last : SourceSpan) :
             recoverYulStatementAux first token.span fuel next
         | none => finishRecoveredYulStatement first last state
 
-private def yulStatementLayer (nested : Parser YulStmt) : Parser YulStmt :=
+/-- Parse one recovering statement layer around a recursive statement parser. -/
+def yulStatementLayer (nested : Parser YulStmt) : Parser YulStmt :=
     fun state =>
   match yulStatementTerminated nested state with
   | .ok value next => .ok value next
@@ -172,7 +173,8 @@ private def yulStatementLayer (nested : Parser YulStmt) : Parser YulStmt :=
         | none => .reject failure rewound
   | .invariant error => .invariant error
 
-private def yulStatementWithFuel : Nat → Parser YulStmt
+/-- Iterate recovering statement layers with explicit recursion fuel. -/
+def yulStatementWithFuel : Nat → Parser YulStmt
   | 0 => fun state => .invariant (.fuelExhausted .yul state.currentSpan)
   | fuel + 1 => yulStatementLayer (yulStatementWithFuel fuel)
 

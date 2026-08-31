@@ -68,5 +68,15 @@ example := @recoverYulStatementAux_validFor
 example := @recoverYulStatementAux_preservesTokenWindow
 example := @recoverYulStatementAux_preservesTokensOnSuccess
 example := @recoverYulStatementAux_cursorMonotoneOnSuccess
+example := @yulStatementTerminated_preservesTokenWindow
+example := @yulStatementLayer_validFor
+example := @yulStatementLayer_preservesTokenWindow
+example := @yulStatementLayer_preservesTokensOnSuccess
+example := @yulStatementLayer_cursorMonotoneOnSuccess
+example := @yulStatementLayer_startsAtCurrentTokenOnSuccess
+example := @yulStatementWithFuel_preservesTokenWindow
+example := @yulStatementWithFuel_validFor
+example := @yulStatementWithFuel_cursorMonotoneOnSuccess
+example := @yulStatementWithFuel_startsAtCurrentTokenOnSuccess
 
 end Tests

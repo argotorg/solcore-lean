@@ -1272,4 +1272,288 @@ theorem recoverYulStatementAux_cursorMonotoneOnSuccess
   exact (recoverYulStatementAux_ok_state_shape first fuel last input statement
     next result).2.1
 
+/-- Optional termination retains any token-window contract of the core parser. -/
+theorem yulStatementTerminated_preservesTokenWindow (nested : Parser YulStmt)
+    (coreShape : Parser.PreservesTokenWindow (yulStatementCore nested)) :
+    Parser.PreservesTokenWindow (yulStatementTerminated nested) := by
+  unfold yulStatementTerminated
+  apply Parser.bind_preservesTokenWindow coreShape
+  intro statement
+  exact optionalYulSemicolon_preservesTokenWindow statement
+
+/-- One recovering statement layer preserves recursive source provenance. -/
+theorem yulStatementLayer_validFor (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (coreShape : Parser.PreservesTokenWindow (yulStatementCore nested)) :
+    (yulStatementLayer nested).ValidFor YulStmt.ValidFor := by
+  intro input inputValid
+  unfold yulStatementLayer
+  cases terminatedResult : yulStatementTerminated nested input with
+  | ok statement next =>
+      have valid := yulStatementTerminated_validFor nested nestedValid
+        nestedPreserves input inputValid
+      rw [terminatedResult] at valid
+      exact valid
+  | invariant error => trivial
+  | reject failure failedState =>
+      have terminatedValid := yulStatementTerminated_validFor nested nestedValid
+        nestedPreserves input inputValid
+      rw [terminatedResult] at terminatedValid
+      have terminatedShape :=
+        yulStatementTerminated_preservesTokenWindow nested coreShape input
+      rw [terminatedResult] at terminatedShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have rewoundValid : rewound.ValidFor := {
+        tokens := terminatedValid.2.1.tokens
+        cursor_le_endIndex := by
+          simpa [rewound, terminatedShape.2] using
+            inputValid.cursor_le_endIndex
+        endIndex_le_size := terminatedValid.2.1.endIndex_le_size
+        endByte_le_source := terminatedValid.2.1.endByte_le_source
+        endByte_boundary := terminatedValid.2.1.endByte_boundary
+        diagnosticsRev := terminatedValid.2.1.diagnosticsRev
+      }
+      have rewoundFile : rewound.file = input.file := by
+        simpa [rewound] using terminatedValid.2.2
+      have failureValid : failure.span.ValidFor rewound.file := by
+        simpa [rewound, terminatedValid.2.2] using terminatedValid.1
+      change (if rewound.atEnd || isSymbol rewound .rightBrace then
+        Reply.reject failure rewound else
+        match rewound.advance? with
+        | some (token, next) =>
+            recoverYulStatementAux token.span token.span
+              (next.remainingCount + 1) (next.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound).ValidFor input YulStmt.ValidFor
+      split
+      · exact ⟨terminatedValid.1, rewoundValid, rewoundFile⟩
+      · cases advanced : rewound.advance? with
+        | none => exact ⟨terminatedValid.1, rewoundValid, rewoundFile⟩
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have advanceShape := yulStatementAdvance_state_shape advanced
+            have nextValid := rewoundValid.advance?_validFor advanced
+            have tokenValid : token.span.ValidFor next.file := by
+              rw [advanceShape.2]
+              exact rewoundValid.peek?_span_validFor advanceShape.1
+            have emittedValid := nextValid.emit_validFor failure.toDiagnostic
+              (by simpa [advanceShape.2] using
+                failure.toDiagnostic_span_validFor failureValid)
+            have currentFound :
+                (next.emit failure.toDiagnostic).tokens[rewound.cursor]? =
+                  some token := by
+              simpa [advanceShape.2, State.emit] using
+                State.getElem?_eq_some_of_peek?_eq_some advanceShape.1
+            have recovered := recoverYulStatementAux_validFor token.span
+              (next.remainingCount + 1) token.span
+              (next.emit failure.toDiagnostic) rewound.cursor token emittedValid
+              (by simpa [State.emit] using tokenValid)
+              (by simpa [State.emit] using tokenValid)
+              tokenValid.2.1 currentFound rfl (by
+                simp [advanceShape.2, State.emit])
+            exact recovered.of_file_eq (by
+              simpa [advanceShape.2, State.emit] using rewoundFile)
+
+/-- A recovering statement layer preserves every ordinary token window. -/
+theorem yulStatementLayer_preservesTokenWindow (nested : Parser YulStmt)
+    (coreShape : Parser.PreservesTokenWindow (yulStatementCore nested)) :
+    Parser.PreservesTokenWindow (yulStatementLayer nested) := by
+  intro input
+  unfold yulStatementLayer
+  cases terminatedResult : yulStatementTerminated nested input with
+  | invariant error => trivial
+  | ok statement next =>
+      have terminatedShape :=
+        yulStatementTerminated_preservesTokenWindow nested coreShape input
+      rw [terminatedResult] at terminatedShape
+      exact terminatedShape
+  | reject failure failedState =>
+      have terminatedShape :=
+        yulStatementTerminated_preservesTokenWindow nested coreShape input
+      rw [terminatedResult] at terminatedShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have failedShape : failedState.tokens = input.tokens ∧
+          failedState.window = input.window := by
+        simpa only [Reply.PreservesTokenWindow] using terminatedShape
+      have rewoundShape : rewound.tokens = input.tokens ∧
+          rewound.window = input.window := by
+        simpa [rewound] using failedShape
+      change (if rewound.atEnd || isSymbol rewound .rightBrace then
+        Reply.reject failure rewound else
+        match rewound.advance? with
+        | some (token, next) =>
+            recoverYulStatementAux token.span token.span
+              (next.remainingCount + 1) (next.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound).PreservesTokenWindow input
+      split
+      · exact rewoundShape
+      · cases advanced : rewound.advance? with
+        | none => exact rewoundShape
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have recovered := recoverYulStatementAux_preservesTokenWindow
+              token.span token.span (next.remainingCount + 1)
+              (next.emit failure.toDiagnostic)
+            have advanceShape := yulStatementAdvance_state_shape advanced
+            exact recovered.trans (by
+              simpa [State.emit, advanceShape.2] using rewoundShape)
+
+theorem yulStatementLayer_preservesTokensOnSuccess (nested : Parser YulStmt)
+    (coreShape : Parser.PreservesTokenWindow (yulStatementCore nested)) :
+    Parser.PreservesTokensOnSuccess (yulStatementLayer nested) :=
+  (yulStatementLayer_preservesTokenWindow nested coreShape).preservesTokensOnSuccess
+
+/-- A recovering statement layer never rewinds its caller's cursor. -/
+theorem yulStatementLayer_cursorMonotoneOnSuccess (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (yulStatementLayer nested) := by
+  intro input statement next result
+  unfold yulStatementLayer at result
+  cases terminatedResult : yulStatementTerminated nested input with
+  | invariant error => simp [terminatedResult] at result
+  | ok value afterCore =>
+      simp only [terminatedResult] at result
+      have monotone := yulStatementTerminated_cursorMonotoneOnSuccess nested
+        nestedValid nestedPreserves input value afterCore terminatedResult
+      cases result
+      exact monotone
+  | reject failure failedState =>
+      simp only [terminatedResult] at result
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if rewound.atEnd || isSymbol rewound .rightBrace then
+        Reply.reject failure rewound else
+        match rewound.advance? with
+        | some (token, afterToken) =>
+            recoverYulStatementAux token.span token.span
+              (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound) = .ok statement next at result
+      split at result
+      · contradiction
+      · cases advanced : rewound.advance? with
+        | none => simp [advanced] at result
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have recovered := recoverYulStatementAux_cursorMonotoneOnSuccess
+              token.span token.span (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic) statement next result
+            have advanceShape := yulStatementAdvance_state_shape advanced
+            exact Nat.le_trans (by simp [advanceShape.2, State.emit, rewound])
+              recovered
+
+/-- A successful recovering layer starts at its caller's current token. -/
+theorem yulStatementLayer_startsAtCurrentTokenOnSuccess
+    (nested : Parser YulStmt)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (coreShape : Parser.PreservesTokenWindow (yulStatementCore nested)) :
+    Parser.StartsAtCurrentTokenOnSuccess (yulStatementLayer nested) (·.span) := by
+  intro input statement next result
+  unfold yulStatementLayer at result
+  cases terminatedResult : yulStatementTerminated nested input with
+  | invariant error => simp [terminatedResult] at result
+  | ok value afterCore =>
+      simp only [terminatedResult] at result
+      have starts := yulStatementTerminated_startsAtCurrentTokenOnSuccess nested
+        nestedValid nestedPreserves input value afterCore terminatedResult
+      cases result
+      simpa using starts
+  | reject failure failedState =>
+      simp only [terminatedResult] at result
+      have terminatedShape :=
+        yulStatementTerminated_preservesTokenWindow nested coreShape input
+      rw [terminatedResult] at terminatedShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if rewound.atEnd || isSymbol rewound .rightBrace then
+        Reply.reject failure rewound else
+        match rewound.advance? with
+        | some (token, afterToken) =>
+            recoverYulStatementAux token.span token.span
+              (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound) = .ok statement next at result
+      split at result
+      · contradiction
+      · cases advanced : rewound.advance? with
+        | none => simp [advanced] at result
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have advanceShape := yulStatementAdvance_state_shape advanced
+            have found : input.peek? = some token := by
+              have rewoundFound := advanceShape.1
+              unfold State.peek? at rewoundFound ⊢
+              simpa [rewound, terminatedShape.1, terminatedShape.2] using
+                rewoundFound
+            have recovered := recoverYulStatementAux_ok_state_shape token.span
+              (afterToken.remainingCount + 1) token.span
+              (afterToken.emit failure.toDiagnostic) statement next result
+            exact ⟨token, found, recovered.2.2.symm⟩
+
+/-- Fuel-bounded statements preserve windows once each core layer does. -/
+theorem yulStatementWithFuel_preservesTokenWindow
+    (coreShape : ∀ fuel, Parser.PreservesTokenWindow
+      (yulStatementCore (yulStatementWithFuel fuel))) :
+    ∀ fuel, Parser.PreservesTokenWindow (yulStatementWithFuel fuel) := by
+  intro fuel
+  induction fuel with
+  | zero => intro input; trivial
+  | succ fuel inductionHypothesis =>
+      exact yulStatementLayer_preservesTokenWindow
+        (yulStatementWithFuel fuel) (coreShape fuel)
+
+/-- Fuel-bounded statements retain provenance under the same core seam. -/
+theorem yulStatementWithFuel_validFor
+    (coreShape : ∀ fuel, Parser.PreservesTokenWindow
+      (yulStatementCore (yulStatementWithFuel fuel))) :
+    ∀ fuel, (yulStatementWithFuel fuel).ValidFor YulStmt.ValidFor := by
+  intro fuel
+  induction fuel with
+  | zero => intro input inputValid; trivial
+  | succ fuel inductionHypothesis =>
+      have nestedShape :=
+        yulStatementWithFuel_preservesTokenWindow coreShape fuel
+      exact yulStatementLayer_validFor (yulStatementWithFuel fuel)
+        inductionHypothesis nestedShape.preservesTokensOnSuccess
+        (coreShape fuel)
+
+/-- Fuel-bounded statement successes never rewind their caller. -/
+theorem yulStatementWithFuel_cursorMonotoneOnSuccess
+    (coreShape : ∀ fuel, Parser.PreservesTokenWindow
+      (yulStatementCore (yulStatementWithFuel fuel))) :
+    ∀ fuel, Parser.CursorMonotoneOnSuccess (yulStatementWithFuel fuel) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro input statement next result
+      simp [yulStatementWithFuel] at result
+  | succ fuel inductionHypothesis =>
+      have nestedShape :=
+        yulStatementWithFuel_preservesTokenWindow coreShape fuel
+      exact yulStatementLayer_cursorMonotoneOnSuccess
+        (yulStatementWithFuel fuel)
+        (yulStatementWithFuel_validFor coreShape fuel)
+        nestedShape.preservesTokensOnSuccess
+
+/-- Fuel-bounded statement successes begin at the current token. -/
+theorem yulStatementWithFuel_startsAtCurrentTokenOnSuccess
+    (coreShape : ∀ fuel, Parser.PreservesTokenWindow
+      (yulStatementCore (yulStatementWithFuel fuel))) :
+    ∀ fuel, Parser.StartsAtCurrentTokenOnSuccess
+      (yulStatementWithFuel fuel) (·.span) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro input statement next result
+      simp [yulStatementWithFuel] at result
+  | succ fuel inductionHypothesis =>
+      have nestedShape :=
+        yulStatementWithFuel_preservesTokenWindow coreShape fuel
+      exact yulStatementLayer_startsAtCurrentTokenOnSuccess
+        (yulStatementWithFuel fuel)
+        (yulStatementWithFuel_validFor coreShape fuel)
+        nestedShape.preservesTokensOnSuccess (coreShape fuel)
+
 end Solcore.Syntax.Parser
