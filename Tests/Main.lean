@@ -62,6 +62,7 @@ import Solcore.Test.SyntaxProvenanceProperties
 import Solcore.Test.SyntaxPreflightProperties
 import Solcore.Test.SyntaxPublicBoundary
 import Solcore.Test.SyntaxSourceSpanProperties
+import Solcore.Test.SyntaxSignatureValidity
 import Solcore.Test.SyntaxStatementValidity
 import Solcore.Test.SyntaxYulStatementValidity
 import Solcore.Surface.Multi.Grammar
