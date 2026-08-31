@@ -42,13 +42,17 @@ private def requireSelected (values : DelimitedList SelectedImport) :
     }
   | [] => fun _ => .invariant (.noProgress .topLevel values.span)
 
-private def requireSelectorNames (values : DelimitedList SelectorName) :
+namespace ImportInternals
+
+/-- Require at least one selector in a hiding clause. -/
+def requireSelectorNames (values : DelimitedList SelectorName) :
     Parser (NonemptyList SelectorName) :=
   match values.elements with
   | head :: tail => pure { head, tail }
   | [] => fun _ => .invariant (.noProgress .topLevel values.span)
 
-private def hidingClause : Parser HidingClause := do
+/-- Parse one nonempty `hiding { ... }` clause. -/
+def hidingClause : Parser HidingClause := do
   let hidingToken ← contextual .hiding .importDecl
   let values ← delimited .leftBrace .rightBrace false
     (selectorName .importDecl) .importDecl .topLevel
@@ -58,13 +62,16 @@ private def hidingClause : Parser HidingClause := do
     value := { names }
   }
 
-private def optionalHiding : Parser (Option HidingClause) := do
+/-- Parse an optional selected-import hiding clause. -/
+def optionalHiding : Parser (Option HidingClause) := do
   let state ← getState
   if isContextual state .hiding then
     let value ← hidingClause
     pure (some value)
   else
     pure none
+
+end ImportInternals
 
 /--
 Imports uniquely preserve a missing semicolon when another top-level start
@@ -110,7 +117,7 @@ private def wildcardImport (start : SourceSpan) : Parser ImportDecl := do
   let _ ← symbol .star .importDecl
   let _ ← contextual .from .importDecl
   let path ← modulePath .importDecl
-  let hidden ← optionalHiding
+  let hidden ← ImportInternals.optionalHiding
   let last := match hidden with
     | some clause => clause.span
     | none => path.span
@@ -122,7 +129,7 @@ private def selectiveImport (start : SourceSpan) : Parser ImportDecl := do
   let selection ← requireSelected values
   let _ ← contextual .from .importDecl
   let path ← modulePath .importDecl
-  let hidden ← optionalHiding
+  let hidden ← ImportInternals.optionalHiding
   let last := match hidden with
     | some clause => clause.span
     | none => path.span

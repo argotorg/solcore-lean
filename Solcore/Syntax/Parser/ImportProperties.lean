@@ -89,6 +89,219 @@ theorem selectedAlias_cursorMonotoneOnSuccess :
   · simp only [present]
     exact Parser.pure_cursorMonotoneOnSuccess none
 
+private theorem requireSelectorNames_validFor
+    (values : DelimitedList SelectorName) :
+    (ImportInternals.requireSelectorNames values).ValidFor
+      (fun _ _ => True) := by
+  intro input inputValid
+  unfold ImportInternals.requireSelectorNames
+  cases values.elements with
+  | nil => trivial
+  | cons head tail => exact ⟨trivial, inputValid, rfl⟩
+
+private theorem requireSelectorNames_preservesTokenWindow
+    (values : DelimitedList SelectorName) :
+    Parser.PreservesTokenWindow
+      (ImportInternals.requireSelectorNames values) := by
+  intro input
+  unfold ImportInternals.requireSelectorNames
+  cases values.elements with
+  | nil => trivial
+  | cons head tail => exact ⟨rfl, rfl⟩
+
+private theorem requireSelectorNames_cursorMonotoneOnSuccess
+    (values : DelimitedList SelectorName) :
+    Parser.CursorMonotoneOnSuccess
+      (ImportInternals.requireSelectorNames values) := by
+  intro input names next result
+  unfold ImportInternals.requireSelectorNames at result
+  cases elements : values.elements with
+  | nil =>
+      rw [elements] at result
+      contradiction
+  | cons head tail =>
+      rw [elements] at result
+      cases result
+      exact Nat.le_refl _
+
+/-- Hiding clauses retain their keyword cover and every selector range. -/
+theorem hidingClause_validFor :
+    ImportInternals.hidingClause.ValidFor HidingClause.ValidFor := by
+  have weak : ImportInternals.hidingClause.ValidFor
+      (fun _ _ => True) := by
+    unfold ImportInternals.hidingClause
+    apply Parser.bind_validFor
+      (contextual_validFor .hiding .importDecl)
+    intro marker
+    apply Parser.bind_validFor (delimited_validFor SelectorName.ValidFor
+      .leftBrace .rightBrace false (selectorName .importDecl)
+      .importDecl .topLevel (selectorName_validFor .importDecl)
+      (selectorName_preservesTokensOnSuccess .importDecl))
+    intro values
+    apply Parser.bind_validFor (requireSelectorNames_validFor values)
+    intro names
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : ImportInternals.hidingClause input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok clause final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold ImportInternals.hidingClause at stages
+      rcases importBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨values, afterValues, valuesResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨names, afterNames, namesResult, finished⟩
+      have markerValid := contextual_validFor .hiding .importDecl
+        input inputValid
+      rw [markerResult] at markerValid
+      have valuesValid := delimited_validFor SelectorName.ValidFor
+        .leftBrace .rightBrace false (selectorName .importDecl)
+        .importDecl .topLevel (selectorName_validFor .importDecl)
+        (selectorName_preservesTokensOnSuccess .importDecl)
+        afterMarker markerValid.2.1
+      rw [valuesResult] at valuesValid
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerValid.1
+      have valuesValidInput :
+          DelimitedList.ValidFor SelectorName.ValidFor input.file values := by
+        simpa [markerValid.2.2] using valuesValid.1
+      have markerShape := acceptToken_ok_state_shape
+        (.contextual .hiding) .importDecl (·.isContextual .hiding)
+        markerResult
+      have markerAdvanced : input.advance? = some (marker, afterMarker) := by
+        unfold State.advance?
+        rw [markerShape.1, markerShape.2]
+        rfl
+      rcases delimited_startsAtCurrentTokenOnSuccess .leftBrace .rightBrace
+          false (selectorName .importDecl) .importDecl .topLevel
+          afterMarker values afterValues valuesResult with
+        ⟨opening, openingFound, valuesStart⟩
+      have markerBeforeValues :=
+        inputValid.consumed_end_le_peek_start_after_advance
+          markerAdvanced openingFound
+      have ordered : marker.span.startByte ≤ values.span.endByte :=
+        Nat.le_trans markerSpanValid.2.1
+          (Nat.le_trans markerBeforeValues (by
+            rw [valuesStart]
+            exact valuesValidInput.1.2.1))
+      unfold ImportInternals.requireSelectorNames at namesResult
+      cases elements : values.elements with
+      | nil =>
+          rw [elements] at namesResult
+          contradiction
+      | cons head tail =>
+          rw [elements] at namesResult
+          cases namesResult
+          cases finished
+          exact ⟨⟨SourceSpan.cover_validFor markerSpanValid
+              valuesValidInput.1 ordered, by
+                simpa [NonemptyList.toList, elements] using
+                  valuesValidInput.2⟩,
+            weakResult.2.1, weakResult.2.2⟩
+
+/-- Hiding clauses preserve every ordinary token window. -/
+theorem hidingClause_preservesTokenWindow :
+    Parser.PreservesTokenWindow ImportInternals.hidingClause := by
+  unfold ImportInternals.hidingClause
+  apply Parser.bind_preservesTokenWindow
+    (contextual_preservesTokenWindow .hiding .importDecl)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (delimited_preservesTokenWindow .leftBrace .rightBrace false
+      (selectorName .importDecl) .importDecl .topLevel
+      (selectorName_preservesTokenWindow .importDecl))
+  intro values
+  apply Parser.bind_preservesTokenWindow
+    (requireSelectorNames_preservesTokenWindow values)
+  intro names
+  exact Parser.pure_preservesTokenWindow _
+
+theorem hidingClause_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess ImportInternals.hidingClause :=
+  hidingClause_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Hiding clauses never rewind the parser cursor. -/
+theorem hidingClause_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess ImportInternals.hidingClause := by
+  unfold ImportInternals.hidingClause
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (contextual_cursorMonotoneOnSuccess .hiding .importDecl)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (delimited_cursorMonotoneOnSuccess .leftBrace .rightBrace false
+      (selectorName .importDecl) .importDecl .topLevel)
+  intro values
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (requireSelectorNames_cursorMonotoneOnSuccess values)
+  intro names
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A hiding clause starts at its `hiding` token. -/
+theorem hidingClause_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess
+      ImportInternals.hidingClause (·.span) := by
+  unfold ImportInternals.hidingClause
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess
+      (.contextual .hiding) .importDecl (·.isContextual .hiding))
+  intro marker input clause final parsed
+  rcases importBind_ok_components parsed with
+    ⟨values, afterValues, _valuesResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨names, afterNames, _namesResult, finished⟩
+  cases finished
+  rfl
+
+/-- Optional hiding clauses preserve present-clause provenance. -/
+theorem optionalHiding_validFor :
+    ImportInternals.optionalHiding.ValidFor
+      (Option.ValidFor HidingClause.ValidFor) := by
+  unfold ImportInternals.optionalHiding
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  split
+  · apply Parser.bind_validFor_of_value hidingClause_validFor
+    intro clause input inputValid clauseValid
+    exact ⟨by simpa only [Option.ValidFor] using clauseValid,
+      inputValid, rfl⟩
+  · exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional hiding clauses preserve every ordinary token window. -/
+theorem optionalHiding_preservesTokenWindow :
+    Parser.PreservesTokenWindow ImportInternals.optionalHiding := by
+  unfold ImportInternals.optionalHiding
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro observed
+  split
+  · apply Parser.bind_preservesTokenWindow hidingClause_preservesTokenWindow
+    intro clause
+    exact Parser.pure_preservesTokenWindow _
+  · exact Parser.pure_preservesTokenWindow none
+
+theorem optionalHiding_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess ImportInternals.optionalHiding :=
+  optionalHiding_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Optional hiding clauses never rewind the parser cursor. -/
+theorem optionalHiding_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess ImportInternals.optionalHiding := by
+  unfold ImportInternals.optionalHiding
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  split
+  · apply Parser.bind_cursorMonotoneOnSuccess
+      hidingClause_cursorMonotoneOnSuccess
+    intro clause
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · exact Parser.pure_cursorMonotoneOnSuccess none
+
 private theorem selectedAlias_some_components {input next : State}
     {name : Identifier}
     (parsed : ImportInternals.selectedAlias input = .ok (some name) next) :
