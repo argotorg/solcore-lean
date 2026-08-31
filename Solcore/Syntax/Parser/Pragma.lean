@@ -1,21 +1,8 @@
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.ModuleValidity
 
 set_option autoImplicit false
-
-namespace Solcore.Syntax
-
-namespace PragmaDecl
-
-/-- Every source range retained by a provisional pragma belongs to one file. -/
-def ValidFor (file : SourceFile) (declaration : PragmaDecl) : Prop :=
-  declaration.span.ValidFor file ∧
-    declaration.value.name.span.ValidFor file ∧
-    ∀ item ∈ declaration.value.items, item.span.ValidFor file
-
-end PragmaDecl
-
-end Solcore.Syntax
 
 namespace Solcore.Syntax.Parser
 

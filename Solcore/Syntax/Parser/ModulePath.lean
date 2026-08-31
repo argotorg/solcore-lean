@@ -1,23 +1,7 @@
 import Solcore.Syntax.Parser.Name
+import Solcore.Syntax.ModuleValidity
 
 set_option autoImplicit false
-
-namespace Solcore.Syntax
-
-namespace ModulePath
-
-/-- Every range retained by a module path belongs to one input file. -/
-def ValidFor (file : SourceFile) (path : ModulePath) : Prop :=
-  path.span.ValidFor file ∧
-    (match path.value.externalMarker with
-    | some marker => marker.ValidFor file
-    | none => True) ∧
-    ∀ component ∈ path.value.components.toList,
-      component.span.ValidFor file
-
-end ModulePath
-
-end Solcore.Syntax
 
 namespace Solcore.Syntax.Parser
 

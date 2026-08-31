@@ -16,6 +16,7 @@ import Solcore.Test.SyntaxLexerContractProperties
 import Solcore.Test.SyntaxLexerScannerProperties
 import Solcore.Test.SyntaxLexerStateOrderProperties
 import Solcore.Test.SyntaxLexerStateProperties
+import Solcore.Test.SyntaxModuleValidity
 import Solcore.Test.SyntaxParserBlockProperties
 import Solcore.Test.SyntaxParserBodyIsolation
 import Solcore.Test.SyntaxParserContracts

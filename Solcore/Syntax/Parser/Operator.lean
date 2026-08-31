@@ -1,22 +1,8 @@
 import Solcore.Syntax.Parser.Validity
 import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.ModuleValidity
 
 set_option autoImplicit false
-
-namespace Solcore.Syntax
-
-namespace SelectorName
-
-/-- The selector range and an identifier payload belong to one input file. -/
-def ValidFor (file : SourceFile) (selector : SelectorName) : Prop :=
-  selector.span.ValidFor file ∧
-    match selector.value with
-    | .identifier name => name.span.ValidFor file
-    | .operator _ => True
-
-end SelectorName
-
-end Solcore.Syntax
 
 namespace Solcore.Syntax.Parser
 
