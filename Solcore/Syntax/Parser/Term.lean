@@ -4,24 +4,55 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+/-!
+Chumsky's statement `choice` rewinds a rejected recognized branch before trying
+the final assignment-or-expression branch.  Keep that behavior explicit: the
+fallback supplies the recovered statement and cursor, while the more precise
+failure reached by the recognized branch supplies the sole diagnostic.
+-/
+private def recognizedStatementOrFallback
+    (primary fallback : Parser Statement) : Parser Statement := fun state =>
+  match primary state with
+  | .ok value next => .ok value next
+  | .reject failure _ =>
+      match fallback state with
+      | .ok value next =>
+          let reset := { next with diagnosticsRev := state.diagnosticsRev }
+          .ok value (reset.emit failure.toDiagnostic)
+      | .reject _ _ => .reject failure state
+      | .invariant error => .invariant error
+  | .invariant error => .invariant error
+
 private def statementLayer (nestedStatement : Parser Statement)
     (expression : Parser Expr) (pattern : Parser Pattern) : Parser Statement :=
     fun state =>
-  if isKeyword state .letKw then letStatement expression state
-  else if isKeyword state .returnKw then returnStatement expression state
+  let fallback := assignmentOrExpressionStatement expression
+  if isKeyword state .letKw then
+    recognizedStatementOrFallback (letStatement expression) fallback state
+  else if isKeyword state .returnKw then
+    recognizedStatementOrFallback (returnStatement expression) fallback state
   else if isKeyword state .matchKw then
-    matchStatement nestedStatement expression pattern state
+    recognizedStatementOrFallback
+      (matchStatement nestedStatement expression pattern) fallback state
   else if isKeyword state .forKw then
-    forStatement nestedStatement expression state
+    recognizedStatementOrFallback
+      (forStatement nestedStatement expression) fallback state
   else if isContextual state .while then
-    whileStatement nestedStatement expression state
+    recognizedStatementOrFallback
+      (whileStatement nestedStatement expression) fallback state
   else if isKeyword state .ifKw then
-    ifStatement nestedStatement expression state
-  else if isKeyword state .assemblyKw then assemblyStatement state
-  else if isSymbol state .leftBrace then blockStatement nestedStatement state
-  else if isKeyword state .breakKw then breakStatement state
-  else if isKeyword state .continueKw then continueStatement state
-  else assignmentOrExpressionStatement expression state
+    recognizedStatementOrFallback
+      (ifStatement nestedStatement expression) fallback state
+  else if isKeyword state .assemblyKw then
+    recognizedStatementOrFallback assemblyStatement fallback state
+  else if isSymbol state .leftBrace then
+    recognizedStatementOrFallback
+      (blockStatement nestedStatement) fallback state
+  else if isKeyword state .breakKw then
+    recognizedStatementOrFallback breakStatement fallback state
+  else if isKeyword state .continueKw then
+    recognizedStatementOrFallback continueStatement fallback state
+  else fallback state
 
 mutual
 
