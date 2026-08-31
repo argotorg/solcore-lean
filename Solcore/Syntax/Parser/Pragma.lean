@@ -185,6 +185,64 @@ private theorem pragmaItems_ok_state_shape {input next : State}
         exact ⟨tailShape.1.trans itemTokens,
           Nat.le_trans (by omega) tailShape.2⟩
 
+private theorem pragmaItemsTail_preservesTokenWindow :
+    ∀ fuel itemsRev,
+      Parser.PreservesTokenWindow (pragmaItemsTail fuel itemsRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro itemsRev input
+      trivial
+  | succ fuel inductionHypothesis =>
+      intro itemsRev input
+      unfold pragmaItemsTail
+      split
+      · have commaShape :=
+          symbol_preservesTokenWindow .comma .pragmaDecl input
+        cases commaResult : symbol .comma .pragmaDecl input with
+        | invariant error =>
+            simp only [Reply.PreservesTokenWindow]
+        | reject failure rejected =>
+            rw [commaResult] at commaShape
+            simpa only [Reply.PreservesTokenWindow] using commaShape
+        | ok comma afterComma =>
+            rw [commaResult] at commaShape
+            simp only
+            split
+            · exact commaShape
+            · have itemShape :=
+                identifier_preservesTokenWindow .pragmaDecl afterComma
+              cases itemResult : identifier .pragmaDecl afterComma with
+              | invariant error =>
+                  simp only [Reply.PreservesTokenWindow]
+              | reject failure rejected =>
+                  rw [itemResult] at itemShape
+                  simpa only [Reply.PreservesTokenWindow] using
+                    itemShape.trans commaShape
+              | ok item next =>
+                  rw [itemResult] at itemShape
+                  simpa only using
+                    (inductionHypothesis (item :: itemsRev) next).trans
+                      (itemShape.trans commaShape)
+      · exact ⟨rfl, rfl⟩
+
+private theorem pragmaItems_preservesTokenWindow :
+    Parser.PreservesTokenWindow pragmaItems := by
+  intro input
+  unfold pragmaItems
+  split
+  · exact ⟨rfl, rfl⟩
+  · have itemShape := identifier_preservesTokenWindow .pragmaDecl input
+    cases itemResult : identifier .pragmaDecl input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        rw [itemResult] at itemShape
+        exact itemShape
+    | ok item next =>
+        rw [itemResult] at itemShape
+        exact (pragmaItemsTail_preservesTokenWindow
+          (next.remainingCount + 1) [item] next).trans itemShape
+
 /-- Parse one canonical provisional pragma declaration. -/
 def pragmaDecl : Parser PragmaDecl := do
   let pragmaKeyword ← keyword .pragmaKw .pragmaDecl
@@ -348,6 +406,23 @@ theorem pragmaDecl_preservesTokensOnSuccess :
                       semicolonResult
                   exact semicolonTokens.trans
                     (itemsTokens.trans (nameTokens.trans keywordTokens))
+
+/-- Pragma parsing preserves every ordinary token window. -/
+theorem pragmaDecl_preservesTokenWindow :
+    Parser.PreservesTokenWindow pragmaDecl := by
+  unfold pragmaDecl
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .pragmaKw .pragmaDecl)
+  intro pragmaKeyword
+  apply Parser.bind_preservesTokenWindow
+    (rawIdentifier_preservesTokenWindow .pragmaDecl)
+  intro name
+  apply Parser.bind_preservesTokenWindow pragmaItems_preservesTokenWindow
+  intro items
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .semicolon .pragmaDecl)
+  intro semicolon
+  exact Parser.pure_preservesTokenWindow _
 
 /-- A pragma declaration starts at its retained `pragma` keyword token. -/
 theorem pragmaDecl_startsAtCurrentTokenOnSuccess :
