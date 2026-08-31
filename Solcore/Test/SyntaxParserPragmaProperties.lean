@@ -12,6 +12,8 @@ open Solcore.Syntax.Parser
 example := @PragmaDecl.ValidFor
 example := @pragmaDecl_validFor
 example := @pragmaDecl_preservesTokensOnSuccess
+example := @pragmaDecl_cursor_lt_onSuccess
+example := @pragmaDecl_cursorMonotoneOnSuccess
 
 example (file : SourceFile) (declaration : PragmaDecl)
     (valid : PragmaDecl.ValidFor file declaration) :

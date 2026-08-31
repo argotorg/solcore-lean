@@ -362,4 +362,69 @@ theorem pragmaDecl_preservesTokensOnSuccess :
                   exact semicolonTokens.trans
                     (itemsTokens.trans (nameTokens.trans keywordTokens))
 
+/-- Every successful pragma consumes its keyword, name, and terminator. -/
+theorem pragmaDecl_cursor_lt_onSuccess {input next : State}
+    {declaration : PragmaDecl}
+    (result : pragmaDecl input = .ok declaration next) :
+    input.cursor < next.cursor := by
+  unfold pragmaDecl at result
+  cases keywordResult : keyword .pragmaKw .pragmaDecl input with
+  | invariant error =>
+      simp only [bind, keywordResult] at result
+      contradiction
+  | reject failure rejected =>
+      simp only [bind, keywordResult] at result
+      contradiction
+  | ok pragmaKeyword afterKeyword =>
+      simp only [keywordResult, bind] at result
+      cases nameResult : rawIdentifier .pragmaDecl afterKeyword with
+      | invariant error => simp [nameResult] at result
+      | reject failure rejected => simp [nameResult] at result
+      | ok name afterName =>
+          simp only [nameResult] at result
+          cases itemsResult : pragmaItems afterName with
+          | invariant error => simp [itemsResult] at result
+          | reject failure rejected => simp [itemsResult] at result
+          | ok items afterItems =>
+              simp only [itemsResult] at result
+              cases semicolonResult :
+                  symbol .semicolon .pragmaDecl afterItems with
+              | invariant error => simp [semicolonResult] at result
+              | reject failure rejected => simp [semicolonResult] at result
+              | ok semicolon final =>
+                  simp only [semicolonResult] at result
+                  cases result
+                  have keywordCursor :=
+                    (acceptToken_ok_state_shape (.keyword .pragmaKw)
+                      .pragmaDecl (· == .keyword .pragmaKw)
+                      keywordResult).2
+                  have nameCursor :=
+                    rawIdentifier_ok_state_shape .pragmaDecl nameResult
+                  have itemsCursor :=
+                    (pragmaItems_ok_state_shape itemsResult).2
+                  have semicolonCursor :=
+                    (symbol_ok_state_shape .semicolon .pragmaDecl
+                      semicolonResult).2
+                  have keywordProgress :
+                      input.cursor < afterKeyword.cursor := by
+                    rw [keywordCursor]
+                    simp
+                  have nameProgress :
+                      afterKeyword.cursor < afterName.cursor := by
+                    rw [nameCursor]
+                    simp
+                  have semicolonProgress :
+                      afterItems.cursor < next.cursor := by
+                    rw [semicolonCursor]
+                    simp
+                  exact Nat.lt_trans keywordProgress
+                    (Nat.lt_trans nameProgress
+                      (Nat.lt_of_le_of_lt itemsCursor semicolonProgress))
+
+/-- Successful pragma parsing never moves the parser cursor backwards. -/
+theorem pragmaDecl_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess pragmaDecl := by
+  intro input declaration next result
+  exact Nat.le_of_lt (pragmaDecl_cursor_lt_onSuccess result)
+
 end Solcore.Syntax.Parser
