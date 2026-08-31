@@ -167,6 +167,11 @@ def ValidFor (expressionValid : SourceFile → Expr → Prop)
       operator.span.ValidFor file ∧ expressionValid file right
   | .bitNot operator => operator.ValidFor file
 
+/-- The first source span consumed by an assignment suffix. -/
+def startSpan : AssignmentTail → SourceSpan
+  | .value operator _ => operator.span
+  | .bitNot operator => operator
+
 end AssignmentTail
 
 /-- Assignment tails retain operator and nested-expression provenance. -/
@@ -231,6 +236,101 @@ theorem optionalAssignmentTail_validFor (expression : Parser Expr)
         exact ⟨by simpa only [Option.ValidFor] using tailValid,
           nextValid, rfl⟩)) input inputValid
   · exact ⟨trivial, inputValid, rfl⟩
+
+/-- Assignment tails start at their written assignment operator. -/
+theorem assignmentTail_startsAtCurrentTokenOnSuccess
+    (expression : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess (assignmentTail expression)
+      AssignmentTail.startSpan := by
+  intro input tail final parsed
+  unfold assignmentTail at parsed
+  split at parsed
+  · rcases simpleBind_ok_components parsed with
+      ⟨operator, afterOperator, operatorResult, finished⟩
+    have starts := symbol_startsAtCurrentTokenOnSuccess
+      .tildeEqual .statement input operator afterOperator operatorResult
+    cases finished
+    exact starts
+  · cases selected : input.peekKind?.bind valueAssignOp? with
+    | none =>
+        simp only [selected] at parsed
+        unfold rejectAt at parsed
+        contradiction
+    | some selectedOperator =>
+        simp only [selected] at parsed
+        rcases simpleBind_ok_components parsed with
+          ⟨operator, afterOperator, operatorResult, rest⟩
+        rcases simpleBind_ok_components rest with
+          ⟨right, afterRight, _rightResult, finished⟩
+        have starts := valueAssignOperator_startsAtCurrentTokenOnSuccess
+          input operator afterOperator operatorResult
+        cases finished
+        exact starts
+
+/-- Every successful assignment tail consumes its operator token. -/
+theorem assignmentTail_cursor_lt_onSuccess (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression)
+    {input final : State} {tail : AssignmentTail}
+    (parsed : assignmentTail expression input = .ok tail final) :
+    input.cursor < final.cursor := by
+  unfold assignmentTail at parsed
+  split at parsed
+  · rcases simpleBind_ok_components parsed with
+      ⟨operator, afterOperator, operatorResult, finished⟩
+    have strict : input.cursor < afterOperator.cursor := by
+      rw [(symbol_ok_state_shape .tildeEqual .statement operatorResult).2]
+      simp
+    cases finished
+    exact strict
+  · cases selected : input.peekKind?.bind valueAssignOp? with
+    | none =>
+        simp only [selected] at parsed
+        unfold rejectAt at parsed
+        contradiction
+    | some selectedOperator =>
+        simp only [selected] at parsed
+        rcases simpleBind_ok_components parsed with
+          ⟨operator, afterOperator, operatorResult, rest⟩
+        rcases simpleBind_ok_components rest with
+          ⟨right, afterRight, rightResult, finished⟩
+        have strict : input.cursor < afterOperator.cursor := by
+          rw [(valueAssignOperator_ok_state_shape
+            operatorResult).choose_spec.2.2]
+          simp
+        have rightMonotone := expressionCursor afterOperator right
+          afterRight rightResult
+        cases finished
+        exact Nat.lt_of_lt_of_le strict rightMonotone
+
+/-- A present optional tail exposes the operator at the caller's cursor. -/
+theorem optionalAssignmentTail_some_startsAtCurrentTokenOnSuccess
+    (expression : Parser Expr) {input final : State}
+    {tail : AssignmentTail}
+    (parsed : optionalAssignmentTail expression input =
+      .ok (some tail) final) :
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte = tail.startSpan.startByte := by
+  unfold optionalAssignmentTail at parsed
+  split at parsed
+  · rcases simpleBind_ok_components parsed with
+      ⟨parsedTail, afterTail, tailResult, finished⟩
+    have starts := assignmentTail_startsAtCurrentTokenOnSuccess expression
+      input parsedTail afterTail tailResult
+    cases finished
+    exact starts
+  · cases parsed
+
+/-- A valid assignment tail has a valid final endpoint span. -/
+theorem assignmentEnd_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    {file : SourceFile} {tail : AssignmentTail}
+    (valid : tail.ValidFor expressionValueValid file) :
+    (assignmentEnd tail).ValidFor file := by
+  cases tail with
+  | value operator right => exact expressionSpan file right valid.2
+  | bitNot operator => exact valid
 
 /-- Assignment tails preserve token windows when nested expressions do. -/
 theorem assignmentTail_preservesTokenWindow (expression : Parser Expr)

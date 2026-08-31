@@ -22,8 +22,15 @@ example :=
 example :=
   @StatementSimpleInternals.valueAssignOperator_startsAtCurrentTokenOnSuccess
 example := @StatementSimpleInternals.AssignmentTail.ValidFor
+example := @StatementSimpleInternals.AssignmentTail.startSpan
 example := @StatementSimpleInternals.assignmentTail_validFor
 example := @StatementSimpleInternals.optionalAssignmentTail_validFor
+example :=
+  @StatementSimpleInternals.assignmentTail_startsAtCurrentTokenOnSuccess
+example := @StatementSimpleInternals.assignmentTail_cursor_lt_onSuccess
+example :=
+  @StatementSimpleInternals.optionalAssignmentTail_some_startsAtCurrentTokenOnSuccess
+example := @StatementSimpleInternals.assignmentEnd_validFor
 example := @StatementSimpleInternals.assignmentTail_preservesTokenWindow
 example := @StatementSimpleInternals.assignmentTail_preservesTokensOnSuccess
 example := @StatementSimpleInternals.assignmentTail_cursorMonotoneOnSuccess
