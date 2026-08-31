@@ -65,6 +65,10 @@ inductive ParseConstraint where
   | modifierOutsideContract (keyword : HardKeyword)
   | yulMetaInSource
   | yulSwitchRequiresCase
+  | expressionRequiresSemicolon
+  | assignmentRequiresSemicolon
+  | matchRequiresArm
+  | matchArityMismatch (scrutinees patterns : Nat)
   deriving Repr, BEq, DecidableEq
 
 /-- Bounded recursive syntax dimensions checked before recursive parsing. -/
