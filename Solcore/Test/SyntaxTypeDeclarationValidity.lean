@@ -46,6 +46,13 @@ example := @EnumInternals.enumBody_preservesTokenWindow
 example := @EnumInternals.enumBody_preservesTokensOnSuccess
 example := @EnumInternals.enumBody_cursorMonotoneOnSuccess
 example := @EnumInternals.enumBody_startsAtCurrentTokenOnSuccess
+example := @enumDecl_validFor
+example := @enumDecl_none_validFor
+example := @enumDecl_preservesTokenWindow
+example := @enumDecl_preservesTokensOnSuccess
+example := @enumDecl_cursorMonotoneOnSuccess
+example := @enumDecl_none_startsAtCurrentTokenOnSuccess
+example := @enumDecl_some_preservesDerivedStartOnSuccess
 
 example (file : SourceFile) (declaration : TypeAliasDecl)
     (valid : TypeAliasDecl.ValidFor file declaration) :

@@ -679,4 +679,219 @@ theorem enumBody_startsAtCurrentTokenOnSuccess :
                 parsed).symm⟩
 
 end EnumInternals
+
+/--
+Complete enum declarations preserve all retained syntax. A supplied derive
+attribute must already belong to the input and start no later than the current
+`enum` token.
+-/
+theorem enumDecl_validFor (deriveAttribute : Option DeriveAttribute)
+    {input : State} (inputValid : input.ValidFor)
+    (deriveValid : Option.ValidFor DeriveAttribute.ValidFor input.file
+      deriveAttribute)
+    (deriveStartsBeforeCurrent : ∀ derive ∈ deriveAttribute,
+      derive.span.startByte ≤ input.currentSpan.startByte) :
+    (enumDecl deriveAttribute input).ValidFor input EnumDecl.ValidFor := by
+  have weak : (enumDecl deriveAttribute).ValidFor (fun _ _ => True) := by
+    unfold enumDecl
+    apply Parser.bind_validFor (contextual_validFor .enum .topItem)
+    intro marker
+    apply Parser.bind_validFor (identifier_validFor .topItem)
+    intro name
+    apply Parser.bind_validFor optionalGenericParameters_validFor
+    intro parameters
+    apply Parser.bind_validFor EnumInternals.enumBody_validFor
+    intro body
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  have weakResult := weak input inputValid
+  cases parsed : enumDecl deriveAttribute input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok declaration final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold enumDecl at stages
+      rcases EnumInternals.enumBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases EnumInternals.enumBind_ok_components rest with
+        ⟨name, afterName, nameResult, rest⟩
+      rcases EnumInternals.enumBind_ok_components rest with
+        ⟨parameters, afterParameters, parametersResult, rest⟩
+      rcases EnumInternals.enumBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have markerValid := contextual_validFor .enum .topItem input inputValid
+      rw [markerResult] at markerValid
+      have nameValid := identifier_validFor .topItem afterMarker
+        markerValid.2.1
+      rw [nameResult] at nameValid
+      have parametersValid := optionalGenericParameters_validFor afterName
+        nameValid.2.1
+      rw [parametersResult] at parametersValid
+      have bodyValid := EnumInternals.enumBody_validFor afterParameters
+        parametersValid.2.1
+      rw [bodyResult] at bodyValid
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerValid.1
+      have nameSpanValid : name.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, markerValid.2.2] using nameValid.1
+      have parametersValidInput : Option.ValidFor
+          (NonemptyDelimitedList.ValidFor Located.ValidFor) input.file
+          parameters := by
+        simpa [nameValid.2.2, markerValid.2.2] using parametersValid.1
+      have bodyValidInput : EnumInternals.EnumBody.ValidFor input.file body := by
+        simpa [parametersValid.2.2, nameValid.2.2, markerValid.2.2] using
+          bodyValid.1
+      have markerShape := acceptToken_ok_state_shape (.contextual .enum)
+        .topItem (·.isContextual .enum) markerResult
+      have markerAt := State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+      rcases EnumInternals.enumBody_startsAtCurrentTokenOnSuccess
+          afterParameters body afterBody bodyResult with
+        ⟨opening, openingFound, bodyStart⟩
+      have openingAt : input.tokens[afterParameters.cursor]? = some opening := by
+        have found := State.getElem?_eq_some_of_peek?_eq_some openingFound
+        simpa [optionalGenericParameters_preservesTokensOnSuccess afterName
+            parameters afterParameters parametersResult,
+          identifier_preservesTokensOnSuccess .topItem afterMarker name
+            afterName nameResult,
+          contextual_preservesTokensOnSuccess .enum .topItem input marker
+            afterMarker markerResult] using found
+      have cursorOrder : input.cursor < afterParameters.cursor :=
+        Nat.lt_of_lt_of_le (acceptToken_cursor_lt_onSuccess
+          (.contextual .enum) .topItem (·.isContextual .enum) markerResult)
+          (Nat.le_trans (identifier_cursorMonotoneOnSuccess .topItem
+            afterMarker name afterName nameResult)
+            (optionalGenericParameters_cursorMonotoneOnSuccess afterName
+              parameters afterParameters parametersResult))
+      have markerBeforeBody : marker.span.startByte ≤ body.span.endByte := by
+        have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+          markerAt openingAt cursorOrder
+        exact Nat.le_trans markerSpanValid.2.1 (Nat.le_trans separated (by
+          rw [bodyStart]
+          exact bodyValidInput.1.2.1))
+      let startSpan := deriveAttribute.map (fun derive => derive.span)
+        |>.getD marker.span
+      have startValid : startSpan.ValidFor input.file := by
+        cases deriveAttribute with
+        | none => simpa [startSpan] using markerSpanValid
+        | some derive =>
+            simpa [startSpan, Option.ValidFor] using deriveValid.1
+      have startBeforeBody : startSpan.startByte ≤ body.span.endByte := by
+        cases deriveAttribute with
+        | none => simpa [startSpan] using markerBeforeBody
+        | some derive =>
+            have before := deriveStartsBeforeCurrent derive (by simp)
+            have currentIsMarker : input.currentSpan = marker.span := by
+              simp [State.currentSpan, markerShape.1]
+            rw [currentIsMarker] at before
+            exact Nat.le_trans before markerBeforeBody
+      have outerValid := SourceSpan.cover_validFor startValid bodyValidInput.1
+        startBeforeBody
+      have retainedDerivesValid : ∀ retained ∈ deriveAttribute,
+          DeriveAttribute.ValidFor input.file retained := by
+        intro retained member
+        cases deriveAttribute with
+        | none => simp at member
+        | some derive =>
+            have retainedEq : retained = derive := by simpa using member.symm
+            subst retained
+            simpa only [Option.ValidFor] using deriveValid
+      cases finished
+      refine ⟨⟨outerValid, retainedDerivesValid, nameSpanValid, ?_, ?_,
+        bodyValidInput.1, bodyValidInput.2⟩, weakResult.2.1, weakResult.2.2⟩
+      · cases parameters with
+        | none => simp
+        | some values => simpa [Option.ValidFor] using parametersValidInput.1
+      · cases parameters with
+        | none => simp
+        | some values =>
+            intro retained member parameter parameterMember
+            have retainedEq : retained = values := by simpa using member.symm
+            subst retained
+            exact parametersValidInput.2 parameter parameterMember
+
+/-- The no-derive enum parser has an unconditional declaration contract. -/
+theorem enumDecl_none_validFor :
+    (enumDecl none).ValidFor EnumDecl.ValidFor := by
+  intro input inputValid
+  exact enumDecl_validFor none inputValid (by trivial) (by simp)
+
+/-- Complete enum declarations preserve every ordinary token window. -/
+theorem enumDecl_preservesTokenWindow
+    (deriveAttribute : Option DeriveAttribute) :
+    Parser.PreservesTokenWindow (enumDecl deriveAttribute) := by
+  unfold enumDecl
+  apply Parser.bind_preservesTokenWindow
+    (contextual_preservesTokenWindow .enum .topItem)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (identifier_preservesTokenWindow .topItem)
+  intro name
+  apply Parser.bind_preservesTokenWindow
+    optionalGenericParameters_preservesTokenWindow
+  intro parameters
+  apply Parser.bind_preservesTokenWindow
+    EnumInternals.enumBody_preservesTokenWindow
+  intro body
+  exact Parser.pure_preservesTokenWindow _
+
+theorem enumDecl_preservesTokensOnSuccess
+    (deriveAttribute : Option DeriveAttribute) :
+    Parser.PreservesTokensOnSuccess (enumDecl deriveAttribute) :=
+  (enumDecl_preservesTokenWindow deriveAttribute).preservesTokensOnSuccess
+
+/-- Complete enum declarations never rewind the parser cursor. -/
+theorem enumDecl_cursorMonotoneOnSuccess
+    (deriveAttribute : Option DeriveAttribute) :
+    Parser.CursorMonotoneOnSuccess (enumDecl deriveAttribute) := by
+  unfold enumDecl
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (contextual_cursorMonotoneOnSuccess .enum .topItem)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (identifier_cursorMonotoneOnSuccess .topItem)
+  intro name
+  apply Parser.bind_cursorMonotoneOnSuccess
+    optionalGenericParameters_cursorMonotoneOnSuccess
+  intro parameters
+  apply Parser.bind_cursorMonotoneOnSuccess
+    EnumInternals.enumBody_cursorMonotoneOnSuccess
+  intro body
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- Without a derive attribute, an enum starts at its current `enum` token. -/
+theorem enumDecl_none_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess (enumDecl none) (·.span) := by
+  unfold enumDecl
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (contextual_startsAtCurrentTokenOnSuccess .enum .topItem)
+  intro marker input declaration final parsed
+  rcases EnumInternals.enumBind_ok_components parsed with
+    ⟨name, afterName, _nameResult, rest⟩
+  rcases EnumInternals.enumBind_ok_components rest with
+    ⟨parameters, afterParameters, _parametersResult, rest⟩
+  rcases EnumInternals.enumBind_ok_components rest with
+    ⟨body, afterBody, _bodyResult, finished⟩
+  cases finished
+  rfl
+
+/-- With a derive attribute, the declaration retains its supplied start. -/
+theorem enumDecl_some_preservesDerivedStartOnSuccess
+    (deriveAttribute : DeriveAttribute) {input final : State}
+    {declaration : EnumDecl}
+    (parsed : enumDecl (some deriveAttribute) input = .ok declaration final) :
+    deriveAttribute.span.startByte = declaration.span.startByte := by
+  unfold enumDecl at parsed
+  rcases EnumInternals.enumBind_ok_components parsed with
+    ⟨marker, afterMarker, _markerResult, rest⟩
+  rcases EnumInternals.enumBind_ok_components rest with
+    ⟨name, afterName, _nameResult, rest⟩
+  rcases EnumInternals.enumBind_ok_components rest with
+    ⟨parameters, afterParameters, _parametersResult, rest⟩
+  rcases EnumInternals.enumBind_ok_components rest with
+    ⟨body, afterBody, _bodyResult, finished⟩
+  cases finished
+  rfl
+
 end Solcore.Syntax.Parser
