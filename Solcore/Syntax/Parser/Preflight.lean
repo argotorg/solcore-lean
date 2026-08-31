@@ -19,12 +19,13 @@ private def validateTokens (file : SourceFile) :
         .error (.invalidTokenSpan index token.span)
 
 private def validateComments (file : SourceFile) :
-    Nat → List Comment → Except ParserInvariantError Unit
-  | _, [] => .ok ()
-  | index, comment :: rest =>
+    Nat → Nat → List Comment → Except ParserInvariantError Unit
+  | _, _, [] => .ok ()
+  | index, previousEnd, comment :: rest =>
       if comment.span.isValidFor file &&
+          previousEnd ≤ comment.span.startByte &&
           comment.span.startByte < comment.span.endByte then
-        validateComments file (index + 1) rest
+        validateComments file (index + 1) comment.span.endByte rest
       else
         .error (.invalidCommentSpan index comment.span)
 
@@ -43,7 +44,7 @@ def validateLexed (file : SourceFile)
   if lexed.source != file.id then
     throw (.invalidLexedSource file.id lexed.source)
   validateTokens file 0 0 lexed.tokens
-  validateComments file 0 lexed.comments
+  validateComments file 0 0 lexed.comments
   validateLexicalDiagnostics file 0 lexed.diagnostics
 
 private structure NestingState where

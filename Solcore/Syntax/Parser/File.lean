@@ -2,6 +2,7 @@ import Solcore.Syntax.Parser.Export
 import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.Pragma
 import Solcore.Syntax.Parser.TopLevel
+import Solcore.Syntax.Parser.Trivia
 import Solcore.Syntax.Parser.TypeAlias
 
 set_option autoImplicit false
@@ -125,7 +126,7 @@ def sourceFile (comments : List Comment) : Parser ParsedFile := fun state =>
   | .ok items next => .ok {
       source := state.file.id
       span := SourceSpan.fullFile state.file
-      items
+      items := items.map (attachTopItemComments state.file comments)
       comments
     } next
   | .reject failure next => .reject failure next
