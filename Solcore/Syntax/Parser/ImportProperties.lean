@@ -401,6 +401,107 @@ theorem finishImport_cursorMonotoneOnSuccess (start last : SourceSpan)
   intro endSpan
   exact Parser.pure_cursorMonotoneOnSuccess _
 
+theorem plainImport_preservesTokenWindow (start : SourceSpan) :
+    Parser.PreservesTokenWindow
+      (ImportInternals.plainImport start) := by
+  unfold ImportInternals.plainImport
+  apply Parser.bind_preservesTokenWindow
+    (modulePath_preservesTokenWindow .importDecl)
+  intro path
+  exact finishImport_preservesTokenWindow start path.span (.plain path)
+
+theorem plainImport_cursorMonotoneOnSuccess (start : SourceSpan) :
+    Parser.CursorMonotoneOnSuccess
+      (ImportInternals.plainImport start) := by
+  unfold ImportInternals.plainImport
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (modulePath_cursorMonotoneOnSuccess .importDecl)
+  intro path
+  exact finishImport_cursorMonotoneOnSuccess start path.span (.plain path)
+
+theorem namespaceImport_preservesTokenWindow (start : SourceSpan) :
+    Parser.PreservesTokenWindow
+      (ImportInternals.namespaceImport start) := by
+  unfold ImportInternals.namespaceImport
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .star .importDecl)
+  intro star
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .asKw .importDecl)
+  intro asMarker
+  apply Parser.bind_preservesTokenWindow
+    (identifier_preservesTokenWindow .importDecl)
+  intro alias
+  apply Parser.bind_preservesTokenWindow
+    (contextual_preservesTokenWindow .from .importDecl)
+  intro fromMarker
+  apply Parser.bind_preservesTokenWindow
+    (modulePath_preservesTokenWindow .importDecl)
+  intro path
+  exact finishImport_preservesTokenWindow start path.span
+    (.namespace path alias)
+
+theorem namespaceImport_cursorMonotoneOnSuccess (start : SourceSpan) :
+    Parser.CursorMonotoneOnSuccess
+      (ImportInternals.namespaceImport start) := by
+  unfold ImportInternals.namespaceImport
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .star .importDecl)
+  intro star
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .asKw .importDecl)
+  intro asMarker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (identifier_cursorMonotoneOnSuccess .importDecl)
+  intro alias
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (contextual_cursorMonotoneOnSuccess .from .importDecl)
+  intro fromMarker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (modulePath_cursorMonotoneOnSuccess .importDecl)
+  intro path
+  exact finishImport_cursorMonotoneOnSuccess start path.span
+    (.namespace path alias)
+
+theorem wildcardImport_preservesTokenWindow (start : SourceSpan) :
+    Parser.PreservesTokenWindow
+      (ImportInternals.wildcardImport start) := by
+  unfold ImportInternals.wildcardImport
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .star .importDecl)
+  intro star
+  apply Parser.bind_preservesTokenWindow
+    (contextual_preservesTokenWindow .from .importDecl)
+  intro fromMarker
+  apply Parser.bind_preservesTokenWindow
+    (modulePath_preservesTokenWindow .importDecl)
+  intro path
+  apply Parser.bind_preservesTokenWindow optionalHiding_preservesTokenWindow
+  intro hidden
+  exact finishImport_preservesTokenWindow start
+    (match hidden with | some clause => clause.span | none => path.span)
+    (.wildcard path hidden)
+
+theorem wildcardImport_cursorMonotoneOnSuccess (start : SourceSpan) :
+    Parser.CursorMonotoneOnSuccess
+      (ImportInternals.wildcardImport start) := by
+  unfold ImportInternals.wildcardImport
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .star .importDecl)
+  intro star
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (contextual_cursorMonotoneOnSuccess .from .importDecl)
+  intro fromMarker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (modulePath_cursorMonotoneOnSuccess .importDecl)
+  intro path
+  apply Parser.bind_cursorMonotoneOnSuccess
+    optionalHiding_cursorMonotoneOnSuccess
+  intro hidden
+  exact finishImport_cursorMonotoneOnSuccess start
+    (match hidden with | some clause => clause.span | none => path.span)
+    (.wildcard path hidden)
+
 private theorem selectedAlias_some_components {input next : State}
     {name : Identifier}
     (parsed : ImportInternals.selectedAlias input = .ok (some name) next) :
@@ -665,5 +766,95 @@ theorem selectedImports_startsAtCurrentTokenOnSuccess :
       rw [elements] at parsed
       cases parsed
       rfl
+
+theorem selectiveImport_preservesTokenWindow (start : SourceSpan) :
+    Parser.PreservesTokenWindow
+      (ImportInternals.selectiveImport start) := by
+  unfold ImportInternals.selectiveImport
+  apply Parser.bind_preservesTokenWindow selectedImports_preservesTokenWindow
+  intro selection
+  apply Parser.bind_preservesTokenWindow
+    (contextual_preservesTokenWindow .from .importDecl)
+  intro fromMarker
+  apply Parser.bind_preservesTokenWindow
+    (modulePath_preservesTokenWindow .importDecl)
+  intro path
+  apply Parser.bind_preservesTokenWindow optionalHiding_preservesTokenWindow
+  intro hidden
+  exact finishImport_preservesTokenWindow start
+    (match hidden with | some clause => clause.span | none => path.span)
+    (.selected selection path hidden)
+
+theorem selectiveImport_cursorMonotoneOnSuccess (start : SourceSpan) :
+    Parser.CursorMonotoneOnSuccess
+      (ImportInternals.selectiveImport start) := by
+  unfold ImportInternals.selectiveImport
+  apply Parser.bind_cursorMonotoneOnSuccess
+    selectedImports_cursorMonotoneOnSuccess
+  intro selection
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (contextual_cursorMonotoneOnSuccess .from .importDecl)
+  intro fromMarker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (modulePath_cursorMonotoneOnSuccess .importDecl)
+  intro path
+  apply Parser.bind_cursorMonotoneOnSuccess
+    optionalHiding_cursorMonotoneOnSuccess
+  intro hidden
+  exact finishImport_cursorMonotoneOnSuccess start
+    (match hidden with | some clause => clause.span | none => path.span)
+    (.selected selection path hidden)
+
+/-- Complete import parsing preserves every ordinary token window. -/
+theorem importDecl_preservesTokenWindow :
+    Parser.PreservesTokenWindow importDecl := by
+  unfold importDecl
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .importKw .importDecl)
+  intro importKeyword
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro observed
+  by_cases star : isSymbol observed .star
+  · simp only [star, if_true]
+    by_cases namespaceAlias :
+        observed.peekOffsetKind? 1 == some (.keyword .asKw)
+    · simp only [namespaceAlias, if_true]
+      exact namespaceImport_preservesTokenWindow importKeyword.span
+    · simp only [namespaceAlias]
+      exact wildcardImport_preservesTokenWindow importKeyword.span
+  · simp only [star]
+    by_cases selected : isSymbol observed .leftBrace
+    · simp only [selected, if_true]
+      exact selectiveImport_preservesTokenWindow importKeyword.span
+    · simp only [selected]
+      exact plainImport_preservesTokenWindow importKeyword.span
+
+theorem importDecl_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess importDecl :=
+  importDecl_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Complete import parsing never rewinds the parser cursor. -/
+theorem importDecl_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess importDecl := by
+  unfold importDecl
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .importKw .importDecl)
+  intro importKeyword
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases star : isSymbol observed .star
+  · simp only [star, if_true]
+    by_cases namespaceAlias :
+        observed.peekOffsetKind? 1 == some (.keyword .asKw)
+    · simp only [namespaceAlias, if_true]
+      exact namespaceImport_cursorMonotoneOnSuccess importKeyword.span
+    · simp only [namespaceAlias]
+      exact wildcardImport_cursorMonotoneOnSuccess importKeyword.span
+  · simp only [star]
+    by_cases selected : isSymbol observed .leftBrace
+    · simp only [selected, if_true]
+      exact selectiveImport_cursorMonotoneOnSuccess importKeyword.span
+    · simp only [selected]
+      exact plainImport_cursorMonotoneOnSuccess importKeyword.span
 
 end Solcore.Syntax.Parser

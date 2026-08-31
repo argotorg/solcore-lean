@@ -113,11 +113,15 @@ def finish (start last : SourceSpan)
 
 end ImportInternals
 
-private def plainImport (start : SourceSpan) : Parser ImportDecl := do
+namespace ImportInternals
+
+/-- Parse an unqualified module import payload. -/
+def plainImport (start : SourceSpan) : Parser ImportDecl := do
   let path ← modulePath .importDecl
   ImportInternals.finish start path.span (.plain path)
 
-private def namespaceImport (start : SourceSpan) : Parser ImportDecl := do
+/-- Parse a wildcard namespace alias import payload. -/
+def namespaceImport (start : SourceSpan) : Parser ImportDecl := do
   let _ ← symbol .star .importDecl
   let _ ← keyword .asKw .importDecl
   let alias ← identifier .importDecl
@@ -125,25 +129,29 @@ private def namespaceImport (start : SourceSpan) : Parser ImportDecl := do
   let path ← modulePath .importDecl
   ImportInternals.finish start path.span (.namespace path alias)
 
-private def wildcardImport (start : SourceSpan) : Parser ImportDecl := do
+/-- Parse a wildcard import payload with optional hiding. -/
+def wildcardImport (start : SourceSpan) : Parser ImportDecl := do
   let _ ← symbol .star .importDecl
   let _ ← contextual .from .importDecl
   let path ← modulePath .importDecl
-  let hidden ← ImportInternals.optionalHiding
+  let hidden ← optionalHiding
   let last := match hidden with
     | some clause => clause.span
     | none => path.span
-  ImportInternals.finish start last (.wildcard path hidden)
+  finish start last (.wildcard path hidden)
 
-private def selectiveImport (start : SourceSpan) : Parser ImportDecl := do
-  let selection ← ImportInternals.selectedImports
+/-- Parse a selected import payload with optional hiding. -/
+def selectiveImport (start : SourceSpan) : Parser ImportDecl := do
+  let selection ← selectedImports
   let _ ← contextual .from .importDecl
   let path ← modulePath .importDecl
-  let hidden ← ImportInternals.optionalHiding
+  let hidden ← optionalHiding
   let last := match hidden with
     | some clause => clause.span
     | none => path.span
-  ImportInternals.finish start last (.selected selection path hidden)
+  finish start last (.selected selection path hidden)
+
+end ImportInternals
 
 /-- Parse one canonical import declaration. -/
 def importDecl : Parser ImportDecl := do
@@ -151,12 +159,12 @@ def importDecl : Parser ImportDecl := do
   let state ← getState
   if isSymbol state .star then
     if state.peekOffsetKind? 1 == some (.keyword .asKw) then
-      namespaceImport importKeyword.span
+      ImportInternals.namespaceImport importKeyword.span
     else
-      wildcardImport importKeyword.span
+      ImportInternals.wildcardImport importKeyword.span
   else if isSymbol state .leftBrace then
-    selectiveImport importKeyword.span
+    ImportInternals.selectiveImport importKeyword.span
   else
-    plainImport importKeyword.span
+    ImportInternals.plainImport importKeyword.span
 
 end Solcore.Syntax.Parser
