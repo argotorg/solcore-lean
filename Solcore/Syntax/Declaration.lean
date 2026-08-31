@@ -9,7 +9,7 @@ abbrev DeriveTarget := QualifiedName
 
 /-- Canonical derive attribute attached only to an enum declaration. -/
 structure DeriveAttributeValue where
-  targets : NonemptyDelimitedList DeriveTarget
+  targets : DelimitedList DeriveTarget
   deriving Repr, BEq, DecidableEq
 
 abbrev DeriveAttribute := Located DeriveAttributeValue
@@ -94,6 +94,14 @@ structure TraitDeclValue where
 
 abbrev TraitDecl := Located TraitDeclValue
 
+/-- One impl method plus comments immediately preceding it. -/
+structure ImplMethodValue where
+  leadingComments : List Comment
+  declaration : FunctionDecl
+  deriving Repr, BEq
+
+abbrev ImplMethod := Located ImplMethodValue
+
 /-- Canonical `impl` declaration. -/
 structure ImplDeclValue where
   defaultMarker : Option SourceSpan
@@ -102,7 +110,7 @@ structure ImplDeclValue where
   headArguments : NonemptyDelimitedList TypeExpr
   whereClause : Option WhereClause
   bodySpan : SourceSpan
-  methods : List FunctionDecl
+  methods : List ImplMethod
   deriving Repr, BEq
 
 abbrev ImplDecl := Located ImplDeclValue
