@@ -61,5 +61,10 @@ example := PatternInternals.dotConstructorPattern_preservesTokenWindow
 example := PatternInternals.dotConstructorPattern_preservesTokensOnSuccess
 example := PatternInternals.dotConstructorPattern_cursorMonotoneOnSuccess
 example := PatternInternals.dotConstructorPattern_startsAtCurrentTokenOnSuccess
+example := PatternInternals.qualifiedPattern_validFor
+example := PatternInternals.qualifiedPattern_preservesTokenWindow
+example := PatternInternals.qualifiedPattern_preservesTokensOnSuccess
+example := PatternInternals.qualifiedPattern_cursorMonotoneOnSuccess
+example := PatternInternals.qualifiedPattern_startsAtCurrentTokenOnSuccess
 
 end Tests

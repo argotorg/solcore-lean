@@ -598,5 +598,216 @@ theorem dotConstructorPattern_startsAtCurrentTokenOnSuccess
   cases finished
   rfl
 
+private theorem qualifiedPattern_weakValidFor
+    (nested : Parser Pattern)
+    (expressionValid : SourceFile → Expr → Prop)
+    (nestedValid : nested.ValidFor (Pattern.ValidFor expressionValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (qualifiedPattern nested).ValidFor (fun _ _ => True) := by
+  have argumentsWeak : (optionalConstructorArguments nested).ValidFor
+      (fun _ _ => True) :=
+    (optionalConstructorArguments_validFor nested expressionValid
+      nestedValid nestedPreserves).mono (fun _ _ _ => trivial)
+  unfold qualifiedPattern
+  apply Parser.bind_validFor
+    (qualifiedName_validFor .pattern .pattern)
+  intro path
+  apply Parser.bind_validFor argumentsWeak
+  intro arguments
+  let components := path.value.components.toList
+  cases reversed : components.reverse with
+  | nil =>
+      simp only [components, reversed]
+      intro input inputValid
+      trivial
+  | cons name qualifiersRev =>
+      simp only [components, reversed]
+      split
+      · exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+      · exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+
+/-- Qualified patterns retain binder or constructor component provenance. -/
+theorem qualifiedPattern_validFor (nested : Parser Pattern)
+    (expressionValid : SourceFile → Expr → Prop)
+    (nestedValid : nested.ValidFor (Pattern.ValidFor expressionValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (qualifiedPattern nested).ValidFor
+      (Pattern.ValidFor expressionValid) := by
+  intro input inputValid
+  have weak := qualifiedPattern_weakValidFor nested expressionValid
+    nestedValid nestedPreserves input inputValid
+  cases parsed : qualifiedPattern nested input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weak
+      exact weak
+  | ok result final =>
+      rw [parsed] at weak
+      have stages := parsed
+      unfold qualifiedPattern at stages
+      rcases patternBind_ok_components stages with
+        ⟨path, afterPath, pathResult, rest⟩
+      rcases patternBind_ok_components rest with
+        ⟨arguments, afterArguments, argumentsResult, finished⟩
+      have pathReply := qualifiedName_validFor .pattern .pattern
+        input inputValid
+      rw [pathResult] at pathReply
+      have argumentsReply := optionalConstructorArguments_validFor nested
+        expressionValid nestedValid nestedPreserves afterPath pathReply.2.1
+      rw [argumentsResult] at argumentsReply
+      have pathValid : QualifiedName.ValidFor input.file path := pathReply.1
+      have argumentsValid : Option.ValidFor
+          (NonemptyDelimitedList.ValidFor
+            (Pattern.ValidFor expressionValid)) input.file arguments := by
+        simpa [pathReply.2.2] using argumentsReply.1
+      let components := path.value.components.toList
+      cases reversed : components.reverse with
+      | nil =>
+          simp [components, reversed] at finished
+      | cons name qualifiersRev =>
+          have nameMember : name ∈ components := by
+            have : name ∈ components.reverse := by rw [reversed]; simp
+            simpa using this
+          have nameValid : name.span.ValidFor input.file :=
+            pathValid.2 name (by simpa [components] using nameMember)
+          have qualifiersValid : ∀ qualifier ∈ qualifiersRev.reverse,
+              qualifier.span.ValidFor input.file := by
+            intro qualifier member
+            have tailMember : qualifier ∈ qualifiersRev := by
+              simpa using member
+            have reverseMember : qualifier ∈ components.reverse := by
+              rw [reversed]
+              exact List.mem_cons_of_mem name tailMember
+            exact pathValid.2 qualifier (by
+              simpa [components] using reverseMember)
+          simp only [components, reversed] at finished
+          split at finished
+          · cases finished
+            exact ⟨Pattern.ValidFor.binder pathValid.1 nameValid,
+              weak.2.1, weak.2.2⟩
+          · cases arguments with
+            | none =>
+                cases finished
+                refine ⟨Pattern.ValidFor.constructor
+                  (SourceSpan.cover_validFor pathValid.1 pathValid.1
+                    pathValid.1.2.1) ?_ qualifiersValid nameValid ?_ ?_,
+                  weak.2.1, weak.2.2⟩
+                · simp
+                · simp
+                · simp
+            | some values =>
+                have valuesValid : NonemptyDelimitedList.ValidFor
+                    (Pattern.ValidFor expressionValid) input.file values := by
+                  simpa only [Option.ValidFor] using argumentsValid
+                rcases qualifiedName_startsAtCurrentTokenOnSuccess .pattern
+                    .pattern input path afterPath pathResult with
+                  ⟨first, firstFound, pathStart⟩
+                rcases optionalConstructorArguments_some_startsAtCurrentTokenOnSuccess
+                    nested argumentsResult with
+                  ⟨opening, openingFound, argumentsStart⟩
+                have firstAtAfter :
+                    afterPath.tokens[input.cursor]? = some first := by
+                  rw [qualifiedName_preservesTokensOnSuccess .pattern .pattern
+                    input path afterPath pathResult]
+                  exact State.getElem?_eq_some_of_peek?_eq_some firstFound
+                have openingAt :=
+                  State.getElem?_eq_some_of_peek?_eq_some openingFound
+                have firstBeforeArguments :=
+                  pathReply.2.1.token_end_le_token_start_of_getElem?_lt
+                    firstAtAfter openingAt
+                    (qualifiedName_cursor_lt_onSuccess .pattern .pattern
+                      pathResult)
+                have firstValid :=
+                  pathReply.2.1.token_span_validFor_of_getElem?_eq_some
+                    firstAtAfter
+                have ordered : path.span.startByte ≤ values.span.endByte := by
+                  rw [← pathStart]
+                  exact Nat.le_trans firstValid.2.1
+                    (Nat.le_trans firstBeforeArguments (by
+                      rw [argumentsStart]
+                      exact valuesValid.1.2.1))
+                cases finished
+                refine ⟨Pattern.ValidFor.constructor
+                  (SourceSpan.cover_validFor pathValid.1 valuesValid.1 ordered)
+                  ?_ qualifiersValid nameValid ?_ ?_, weak.2.1, weak.2.2⟩
+                · simp
+                · intro retained member
+                  simp at member
+                  subst retained
+                  exact valuesValid.1
+                · intro retained retainedMember pattern patternMember
+                  simp at retainedMember
+                  subst retained
+                  exact valuesValid.2 pattern patternMember
+
+/-- Qualified patterns preserve every ordinary token window. -/
+theorem qualifiedPattern_preservesTokenWindow (nested : Parser Pattern)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (qualifiedPattern nested) := by
+  unfold qualifiedPattern
+  apply Parser.bind_preservesTokenWindow
+    (qualifiedName_preservesTokenWindow .pattern .pattern)
+  intro path
+  apply Parser.bind_preservesTokenWindow
+    (optionalConstructorArguments_preservesTokenWindow nested nestedPreserves)
+  intro arguments
+  let components := path.value.components.toList
+  cases reversed : components.reverse with
+  | nil =>
+      simp only [components, reversed]
+      intro input
+      trivial
+  | cons name qualifiersRev =>
+      simp only [components, reversed]
+      split <;> exact Parser.pure_preservesTokenWindow _
+
+theorem qualifiedPattern_preservesTokensOnSuccess
+    (nested : Parser Pattern)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokensOnSuccess (qualifiedPattern nested) :=
+  (qualifiedPattern_preservesTokenWindow
+    nested nestedPreserves).preservesTokensOnSuccess
+
+/-- Qualified patterns never rewind the cursor. -/
+theorem qualifiedPattern_cursorMonotoneOnSuccess (nested : Parser Pattern) :
+    Parser.CursorMonotoneOnSuccess (qualifiedPattern nested) := by
+  unfold qualifiedPattern
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (qualifiedName_cursorMonotoneOnSuccess .pattern .pattern)
+  intro path
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (optionalConstructorArguments_cursorMonotoneOnSuccess nested)
+  intro arguments
+  let components := path.value.components.toList
+  cases reversed : components.reverse with
+  | nil =>
+      intro input value final parsed
+      simp only [components, reversed] at parsed
+      contradiction
+  | cons name qualifiersRev =>
+      simp only [components, reversed]
+      split <;> exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A qualified pattern starts at its first path component. -/
+theorem qualifiedPattern_startsAtCurrentTokenOnSuccess
+    (nested : Parser Pattern) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (qualifiedPattern nested) (·.span) := by
+  unfold qualifiedPattern
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (qualifiedName_startsAtCurrentTokenOnSuccess .pattern .pattern)
+  intro path input value final parsed
+  rcases patternBind_ok_components parsed with
+    ⟨arguments, afterArguments, _argumentsResult, finished⟩
+  let components := path.value.components.toList
+  cases reversed : components.reverse with
+  | nil => simp [components, reversed] at finished
+  | cons name qualifiersRev =>
+      simp only [components, reversed] at finished
+      split at finished
+      · cases finished
+        rfl
+      · cases arguments <;> cases finished <;> rfl
+
 end PatternInternals
 end Solcore.Syntax.Parser

@@ -154,7 +154,10 @@ private def startsWithLowercase (name : Identifier) : Bool :=
   | first :: _ => Unicode.isLowercase first
   | [] => true
 
-private def qualifiedPattern (nested : Parser Pattern) : Parser Pattern := do
+namespace PatternInternals
+
+/-- Parse a binder or constructor pattern beginning with a qualified name. -/
+def qualifiedPattern (nested : Parser Pattern) : Parser Pattern := do
   let path ← qualifiedName .pattern .pattern
   let arguments ← PatternInternals.optionalConstructorArguments nested
   let components := path.value.components.toList
@@ -170,6 +173,8 @@ private def qualifiedPattern (nested : Parser Pattern) : Parser Pattern := do
           span := SourceSpan.cover path.span endSpan
           value := .constructor none qualifiersRev.reverse name arguments
         }
+
+end PatternInternals
 
 private def patternCore (nested : Parser Pattern)
     (expression : Parser Expr) : Parser Pattern := fun state =>
@@ -194,7 +199,7 @@ private def patternCore (nested : Parser Pattern)
         | .invariant error => .invariant error
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
-  else if isIdentifier state then qualifiedPattern nested state
+  else if isIdentifier state then PatternInternals.qualifiedPattern nested state
   else rejectAt state { head := .pattern, tail := [] } .pattern
 
 private def isPatternBoundary (state : State) : Bool :=
