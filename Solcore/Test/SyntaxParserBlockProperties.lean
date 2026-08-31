@@ -14,6 +14,7 @@ example := @coreBlock_preservesTokenWindow
 example := @coreBlock_cursor_lt_onSuccess
 example := @coreBlock_cursorMonotoneOnSuccess
 example := @coreBlock_startsAtCurrentTokenOnSuccess
+example := @coreBlock_validFor
 example := @BlockInternals.captureBlockTail_validFor
 example := @BlockInternals.captureBlock?_validFor
 example := @BlockInternals.captureBlock?_startsAtCurrentToken
@@ -34,6 +35,15 @@ example (statement : Parser Statement) (policy : TailExpressionPolicy)
     (statementShape : Parser.PreservesTokensOnSuccess statement) :
     Parser.PreservesTokensOnSuccess (coreBlock statement policy) :=
   coreBlock_preservesTokensOnSuccess statement policy statementShape
+
+example (statementValid : SourceFile → Statement → Prop)
+    (statement : Parser Statement) (policy : TailExpressionPolicy)
+    (valid : statement.ValidFor statementValid)
+    (shape : Parser.PreservesTokensOnSuccess statement)
+    (spanValid : ∀ file retained,
+      statementValid file retained → retained.span.ValidFor file) :
+    (coreBlock statement policy).ValidFor (Block.ValidFor statementValid) :=
+  coreBlock_validFor statementValid statement policy valid shape spanValid
 
 example (statement : Parser Statement) (policy : TailExpressionPolicy)
     (statementShape : Parser.PreservesTokensOnSuccess statement)

@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.CollectionValidity
 import Solcore.Syntax.ExpressionValidity
 
 set_option autoImplicit false
@@ -136,6 +137,83 @@ private theorem validateBlockTails_window_shape :
             (validateExpressionSemicolon first state)).trans
               (validateExpressionSemicolon_window_shape first state)
 
+private theorem validateExpressionSemicolon_file_shape
+    (statement : Statement) (state : State) :
+    (validateExpressionSemicolon statement state).file = state.file := by
+  rcases statement with ⟨span, value⟩
+  cases value <;> try rfl
+  case expression expression trailingSemicolon =>
+    cases trailingSemicolon <;> rfl
+
+private theorem validateBlockTails_file_shape :
+    ∀ policy statements state,
+      (validateBlockTails policy statements state).file = state.file := by
+  intro policy statements
+  induction statements with
+  | nil => intro state; rfl
+  | cons first rest inductionHypothesis =>
+      intro state
+      cases rest with
+      | nil =>
+          cases policy with
+          | allow => rfl
+          | require =>
+              exact validateExpressionSemicolon_file_shape first state
+      | cons second tail =>
+          exact (inductionHypothesis
+            (validateExpressionSemicolon first state)).trans
+              (validateExpressionSemicolon_file_shape first state)
+
+private theorem validateExpressionSemicolon_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (statementSpan : ∀ file statement,
+      statementValid file statement → statement.span.ValidFor file)
+    (statement : Statement) (state : State)
+    (stateValid : state.ValidFor)
+    (retainedValid : statementValid state.file statement) :
+    (validateExpressionSemicolon statement state).ValidFor := by
+  rcases statement with ⟨span, value⟩
+  cases value <;> try exact stateValid
+  case expression expression trailingSemicolon =>
+    cases trailingSemicolon
+    · exact stateValid.emit_validFor _
+        (statementSpan state.file ⟨span, .expression expression false⟩
+          retainedValid)
+    · exact stateValid
+
+private theorem validateBlockTails_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (statementSpan : ∀ file statement,
+      statementValid file statement → statement.span.ValidFor file) :
+    ∀ policy statements state,
+      state.ValidFor →
+      List.ValidFor statementValid state.file statements →
+      (validateBlockTails policy statements state).ValidFor := by
+  intro policy statements
+  induction statements with
+  | nil =>
+      intro state stateValid statementsValid
+      exact stateValid
+  | cons first rest inductionHypothesis =>
+      intro state stateValid statementsValid
+      cases rest with
+      | nil =>
+          cases policy with
+          | allow => exact stateValid
+          | require =>
+              exact validateExpressionSemicolon_validFor statementValid
+                statementSpan first state stateValid
+                (statementsValid first (by simp))
+      | cons second tail =>
+          have updatedValid := validateExpressionSemicolon_validFor
+            statementValid statementSpan first state stateValid
+              (statementsValid first (by simp))
+          apply inductionHypothesis _ updatedValid
+          intro retained member
+          have retainedValid := statementsValid retained (by simp [member])
+          simpa [validateExpressionSemicolon_file_shape first state] using
+            retainedValid
+
 private theorem bind_cursor_lt_onSuccess_of_first {α β : Type}
     {first : Parser α} {next : α → Parser β}
     (firstStrict : ∀ input value afterFirst,
@@ -160,6 +238,59 @@ private theorem bind_cursor_lt_onSuccess_of_first {α β : Type}
       simp [firstResult] at result
   | invariant error =>
       simp [firstResult] at result
+
+private theorem closeCoreBlock_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (statementSpan : ∀ file statement,
+      statementValid file statement → statement.span.ValidFor file)
+    (opening : Token) (policy : TailExpressionPolicy)
+    (bodyRev : List Statement) {input : State} {openingIndex : Nat}
+    (inputValid : input.ValidFor)
+    (openingFound : input.tokens[openingIndex]? = some opening)
+    (openingBefore : openingIndex < input.cursor)
+    (bodyValid : List.ValidFor statementValid input.file bodyRev) :
+    (closeCoreBlock opening policy bodyRev input).ValidFor input
+      (Block.ValidFor statementValid) := by
+  unfold closeCoreBlock
+  simp only [bind]
+  cases closingResult : symbol .rightBrace .statement input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := symbol_validFor .rightBrace .statement input inputValid
+      rw [closingResult] at valid
+      exact valid
+  | ok closing afterClosing =>
+      have closingValid :=
+        symbol_validFor .rightBrace .statement input inputValid
+      rw [closingResult] at closingValid
+      have closingShape := symbol_ok_state_shape .rightBrace .statement
+        closingResult
+      have closingFound :=
+        State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have openingValid :=
+        inputValid.token_span_validFor_of_getElem?_eq_some openingFound
+      have closingSpanValid : closing.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using closingValid.1
+      have openingBeforeClosing :=
+        inputValid.token_end_le_token_start_of_getElem?_lt openingFound
+          closingFound openingBefore
+      have reversedValid : List.ValidFor statementValid afterClosing.file
+          bodyRev.reverse := by
+        intro retained member
+        have retainedValid := bodyValid retained (by simpa using member)
+        simpa [closingValid.2.2] using retainedValid
+      have validated := validateBlockTails_validFor statementValid
+        statementSpan policy bodyRev.reverse afterClosing closingValid.2.1
+          reversedValid
+      simp only [modifyState, pure]
+      refine ⟨⟨SourceSpan.cover_validFor openingValid closingSpanValid
+        (Nat.le_trans openingValid.2.1
+          (Nat.le_trans openingBeforeClosing closingSpanValid.2.1)), ?_⟩,
+        validated, ?_⟩
+      · intro retained member
+        exact bodyValid retained (by simpa using member)
+      · exact (validateBlockTails_file_shape policy bodyRev.reverse
+          afterClosing).trans closingValid.2.2
 
 private theorem closeCoreBlock_preservesTokensOnSuccess (opening : Token)
     (policy : TailExpressionPolicy) (bodyRev : List Statement) :
@@ -321,6 +452,68 @@ private theorem coreBlockItems_ok_state_shape
           | invariant error =>
               simp [statementResult] at result
 
+private theorem coreBlockItems_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (statementSpan : ∀ file statement,
+      statementValid file statement → statement.span.ValidFor file)
+    (statement : Parser Statement)
+    (statementContract : statement.ValidFor statementValid)
+    (statementShape : Parser.PreservesTokensOnSuccess statement)
+    (opening : Token) (policy : TailExpressionPolicy) :
+    ∀ fuel bodyRev input openingIndex,
+      input.ValidFor →
+      input.tokens[openingIndex]? = some opening →
+      openingIndex < input.cursor →
+      List.ValidFor statementValid input.file bodyRev →
+      (coreBlockItems statement opening policy fuel bodyRev input).ValidFor
+        input (Block.ValidFor statementValid) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro bodyRev input openingIndex inputValid openingFound openingBefore
+        bodyValid
+      unfold coreBlockItems
+      split
+      · exact closeCoreBlock_validFor statementValid statementSpan opening
+          policy bodyRev inputValid openingFound openingBefore bodyValid
+      · split
+        · cases closingResult : symbol .rightBrace .statement input with
+          | invariant error => trivial
+          | reject failure rejected =>
+              have valid :=
+                symbol_validFor .rightBrace .statement input inputValid
+              rw [closingResult] at valid
+              exact valid
+          | ok closing next => trivial
+        · cases statementResult : statement input with
+          | invariant error => trivial
+          | reject failure rejected =>
+              have valid := statementContract input inputValid
+              rw [statementResult] at valid
+              exact valid
+          | ok retained next =>
+              have retainedReply := statementContract input inputValid
+              rw [statementResult] at retainedReply
+              simp only
+              split
+              · have tokensEq := statementShape input retained next
+                    statementResult
+                have accumulatedValid : List.ValidFor statementValid
+                    next.file (retained :: bodyRev) := by
+                  intro item member
+                  rcases List.mem_cons.mp member with rfl | member
+                  · simpa [retainedReply.2.2] using retainedReply.1
+                  · have prior := bodyValid item member
+                    simpa [retainedReply.2.2] using prior
+                have recursive := inductionHypothesis (retained :: bodyRev)
+                  next openingIndex retainedReply.2.1
+                    (by simpa [tokensEq] using openingFound)
+                    (Nat.lt_trans openingBefore (by assumption))
+                    accumulatedValid
+                exact recursive.of_file_eq retainedReply.2.2
+              · trivial
+
 private theorem coreBlockItems_cursor_lt_onSuccess
     (statement : Parser Statement) (opening : Token)
     (policy : TailExpressionPolicy) :
@@ -391,6 +584,41 @@ private theorem coreBlockItems_preservesTokenWindow
               rw [statementResult] at itemShape
               exact itemShape
           | invariant error => trivial
+
+/-- A valid, token-preserving statement parser lifts through Core braces. -/
+theorem coreBlock_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (statement : Parser Statement) (policy : TailExpressionPolicy)
+    (statementContract : statement.ValidFor statementValid)
+    (statementShape : Parser.PreservesTokensOnSuccess statement)
+    (statementSpan : ∀ file retained,
+      statementValid file retained → retained.span.ValidFor file) :
+    (coreBlock statement policy).ValidFor
+      (Block.ValidFor statementValid) := by
+  intro input inputValid
+  unfold coreBlock
+  cases openingResult : symbol .leftBrace .statement input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := symbol_validFor .leftBrace .statement input inputValid
+      rw [openingResult] at valid
+      exact valid
+  | ok opening afterOpening =>
+      have openingValid :=
+        symbol_validFor .leftBrace .statement input inputValid
+      rw [openingResult] at openingValid
+      have openingShape :=
+        symbol_ok_state_shape .leftBrace .statement openingResult
+      have openingFound :=
+        State.getElem?_eq_some_of_peek?_eq_some openingShape.1
+      have recursive := coreBlockItems_validFor statementValid statementSpan
+        statement statementContract statementShape opening policy
+          (afterOpening.remainingCount + 1) [] afterOpening input.cursor
+          openingValid.2.1
+          (by simpa [openingShape.2] using openingFound)
+          (by rw [openingShape.2]; simp)
+          (by simp [List.ValidFor])
+      exact recursive.of_file_eq openingValid.2.2
 
 /-- Core-block replies preserve the statement parser's complete token window. -/
 theorem coreBlock_preservesTokenWindow (statement : Parser Statement)
