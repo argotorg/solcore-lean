@@ -51,5 +51,7 @@ example := @assignmentOrExpressionStatement_preservesTokenWindow
 example := @assignmentOrExpressionStatement_preservesTokensOnSuccess
 example := @assignmentOrExpressionStatement_cursorMonotoneOnSuccess
 example := @assignmentOrExpressionStatement_startsAtCurrentTokenOnSuccess
+example := @assignmentOrExpressionStatement_span_validFor_onSuccess
+example := @assignmentOrExpressionStatement_value_validFor_onSuccess
 
 end Tests

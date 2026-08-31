@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Statement.Simple
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.StatementValidity
 
 /-! Contracts for nonrecursive canonical Core-statement components. -/
 
@@ -710,5 +711,222 @@ theorem assignmentOrExpressionStatement_startsAtCurrentTokenOnSuccess
           · simp only [missing] at finished
             cases finished
             rfl
+
+/-- A successful assignment/expression statement has a source-valid outer span. -/
+theorem assignmentOrExpressionStatement_span_validFor_onSuccess
+    (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (expressionCursorLt : ∀ {input next : State} {value : Expr},
+      expression input = .ok value next → input.cursor < next.cursor)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span))
+    {input final : State} {statement : Statement}
+    (inputValid : input.ValidFor)
+    (parsed : assignmentOrExpressionStatement expression input =
+      .ok statement final) :
+    statement.span.ValidFor input.file := by
+  have stages := parsed
+  unfold assignmentOrExpressionStatement at stages
+  rcases StatementSimpleInternals.simpleBind_ok_components stages with
+    ⟨left, afterLeft, leftResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨tail, afterTail, tailResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+  have leftContract := expressionValid input inputValid
+  rw [leftResult] at leftContract
+  have tailContract := StatementSimpleInternals.optionalAssignmentTail_validFor
+    expression expressionValueValid expressionValid afterLeft leftContract.2.1
+  rw [tailResult] at tailContract
+  have semicolonContract := StatementSimpleInternals.optionalSemicolon_validFor
+    afterTail tailContract.2.1
+  rw [semicolonResult] at semicolonContract
+  have leftSpanValid : left.span.ValidFor input.file :=
+    expressionSpan input.file left leftContract.1
+  have tailValid : Option.ValidFor
+      (StatementSimpleInternals.AssignmentTail.ValidFor expressionValueValid)
+      input.file tail := by
+    simpa [leftContract.2.2] using tailContract.1
+  have semicolonValid : Option.ValidFor
+      (fun file span => span.ValidFor file) input.file semicolon := by
+    simpa [tailContract.2.2, leftContract.2.2] using semicolonContract.1
+  have endpointValid := StatementSimpleInternals.statementEnd_validFor
+    expressionValueValid expressionSpan leftContract.1 tailValid semicolonValid
+  rcases expressionStarts input left afterLeft leftResult with
+    ⟨firstToken, firstFound, firstStart⟩
+  have firstAt := State.getElem?_eq_some_of_peek?_eq_some firstFound
+  have firstSpanValid := inputValid.peek?_span_validFor firstFound
+  have afterLeftWindow := expressionWindow input
+  rw [leftResult] at afterLeftWindow
+  have leftStartBefore {later : State} {laterToken : Token}
+      {targetStart : Nat} (tokens : later.tokens = input.tokens)
+      (cursor : input.cursor < later.cursor)
+      (found : later.peek? = some laterToken)
+      (target : laterToken.span.startByte = targetStart) :
+      left.span.startByte ≤ targetStart := by
+    have laterAt : input.tokens[later.cursor]? = some laterToken := by
+      simpa [tokens] using State.getElem?_eq_some_of_peek?_eq_some found
+    have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+      firstAt laterAt cursor
+    exact Nat.le_trans (by simpa [firstStart] using firstSpanValid.2.1)
+      (by simpa [target] using separated)
+  have ordered : left.span.startByte ≤
+      (StatementSimpleInternals.statementEnd left tail semicolon).endByte := by
+    cases semicolon with
+    | some marker =>
+        rcases StatementSimpleInternals.optionalSemicolon_some_startsAtCurrentTokenOnSuccess
+          semicolonResult with ⟨markerToken, markerFound, markerStart⟩
+        have tailWindow :=
+          StatementSimpleInternals.optionalAssignmentTail_preservesTokenWindow
+            expression expressionWindow afterLeft
+        rw [tailResult] at tailWindow
+        have tokens : afterTail.tokens = input.tokens :=
+          tailWindow.1.trans afterLeftWindow.1
+        have cursor : input.cursor < afterTail.cursor :=
+          Nat.lt_of_lt_of_le (expressionCursorLt leftResult)
+            (StatementSimpleInternals.optionalAssignmentTail_cursorMonotoneOnSuccess
+              expression
+              (fun before value after result =>
+                Nat.le_of_lt (expressionCursorLt result))
+              afterLeft tail afterTail tailResult)
+        have beforeMarker := leftStartBefore tokens cursor markerFound markerStart
+        simpa [StatementSimpleInternals.statementEnd] using
+          Nat.le_trans beforeMarker endpointValid.2.1
+    | none =>
+        cases tail with
+        | none =>
+            simpa [StatementSimpleInternals.statementEnd] using leftSpanValid.2.1
+        | some assignment =>
+            rcases StatementSimpleInternals.optionalAssignmentTail_some_startsAtCurrentTokenOnSuccess
+              expression tailResult with ⟨operatorToken, operatorFound, operatorStart⟩
+            have beforeOperator := leftStartBefore afterLeftWindow.1
+              (expressionCursorLt leftResult) operatorFound operatorStart
+            have assignmentResult :
+                StatementSimpleInternals.assignmentTail expression afterLeft =
+                  .ok assignment afterTail := by
+              unfold StatementSimpleInternals.optionalAssignmentTail at tailResult
+              split at tailResult
+              · rcases StatementSimpleInternals.simpleBind_ok_components tailResult with
+                  ⟨parsedTail, next, parsedTailResult, completed⟩
+                cases completed
+                exact parsedTailResult
+              · cases tailResult
+            have assignmentOrdered :=
+              StatementSimpleInternals.assignmentTail_start_le_endOnSuccess
+                expression expressionValueValid expressionValid expressionSpan
+                expressionStarts leftContract.2.1 assignmentResult
+            simpa [StatementSimpleInternals.statementEnd] using
+              Nat.le_trans beforeOperator assignmentOrdered
+  have outerValid := SourceSpan.cover_validFor leftSpanValid endpointValid ordered
+  dsimp only at finished
+  cases tail with
+  | none =>
+      cases finished
+      exact outerValid
+  | some tail =>
+      cases tail with
+      | value operator right =>
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true] at finished
+            rcases StatementSimpleInternals.simpleBind_ok_components finished with
+              ⟨_, afterDiagnostic, _diagnosticResult, completed⟩
+            cases completed
+            exact outerValid
+          · simp only [missing] at finished
+            cases finished
+            exact outerValid
+      | bitNot operator =>
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true] at finished
+            rcases StatementSimpleInternals.simpleBind_ok_components finished with
+              ⟨_, afterDiagnostic, _diagnosticResult, completed⟩
+            cases completed
+            exact outerValid
+          · simp only [missing] at finished
+            cases finished
+            exact outerValid
+
+/-- A successful assignment/expression statement retains all nested provenance. -/
+theorem assignmentOrExpressionStatement_value_validFor_onSuccess
+    (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (expressionCursorLt : ∀ {input next : State} {value : Expr},
+      expression input = .ok value next → input.cursor < next.cursor)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span))
+    {input final : State} {statement : Statement}
+    (inputValid : input.ValidFor)
+    (parsed : assignmentOrExpressionStatement expression input =
+      .ok statement final) :
+    Statement.ValidFor expressionValueValid patternValueValid yulValueValid
+      input.file statement := by
+  have outerValid := assignmentOrExpressionStatement_span_validFor_onSuccess
+    expression expressionValueValid expressionValid expressionSpan
+    expressionWindow expressionCursorLt expressionStarts inputValid parsed
+  have stages := parsed
+  unfold assignmentOrExpressionStatement at stages
+  rcases StatementSimpleInternals.simpleBind_ok_components stages with
+    ⟨left, afterLeft, leftResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨tail, afterTail, tailResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, _semicolonResult, finished⟩
+  have leftContract := expressionValid input inputValid
+  rw [leftResult] at leftContract
+  have tailContract := StatementSimpleInternals.optionalAssignmentTail_validFor
+    expression expressionValueValid expressionValid afterLeft leftContract.2.1
+  rw [tailResult] at tailContract
+  have tailValid : Option.ValidFor
+      (StatementSimpleInternals.AssignmentTail.ValidFor expressionValueValid)
+      input.file tail := by
+    simpa [leftContract.2.2] using tailContract.1
+  dsimp only at finished
+  cases tail with
+  | none =>
+      cases finished
+      exact Statement.ValidFor.expression outerValid leftContract.1
+  | some tail =>
+      cases tail with
+      | value operator right =>
+          have retained : operator.span.ValidFor input.file ∧
+              expressionValueValid input.file right := by
+            simpa [Option.ValidFor,
+              StatementSimpleInternals.AssignmentTail.ValidFor] using tailValid
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true] at finished
+            rcases StatementSimpleInternals.simpleBind_ok_components finished with
+              ⟨_, afterDiagnostic, _diagnosticResult, completed⟩
+            cases completed
+            exact Statement.ValidFor.assignValue outerValid leftContract.1
+              retained.1 retained.2
+          · simp only [missing] at finished
+            cases finished
+            exact Statement.ValidFor.assignValue outerValid leftContract.1
+              retained.1 retained.2
+      | bitNot operator =>
+          have retained : operator.ValidFor input.file := by
+            simpa [Option.ValidFor,
+              StatementSimpleInternals.AssignmentTail.ValidFor] using tailValid
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true] at finished
+            rcases StatementSimpleInternals.simpleBind_ok_components finished with
+              ⟨_, afterDiagnostic, _diagnosticResult, completed⟩
+            cases completed
+            exact Statement.ValidFor.assignBitNot outerValid leftContract.1
+              retained
+          · simp only [missing] at finished
+            cases finished
+            exact Statement.ValidFor.assignBitNot outerValid leftContract.1
+              retained
 
 end Solcore.Syntax.Parser
