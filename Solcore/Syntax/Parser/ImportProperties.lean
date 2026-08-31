@@ -742,6 +742,14 @@ private theorem finishSelectedAfterModulePath_validFor (start : SourceSpan)
           selectionValidAfter.2, pathValidAfter, clausesValid⟩
       exact finished.of_file_eq afterHiddenFile
 
+private theorem plainImport_weakValidFor (start : SourceSpan) :
+    (ImportInternals.plainImport start).ValidFor (fun _ _ => True) := by
+  unfold ImportInternals.plainImport
+  apply Parser.bind_validFor_of_value (modulePath_validFor .importDecl)
+  intro path input inputValid pathValid
+  exact finishImport_weakValidFor start path.span (.plain path)
+    input inputValid pathValid.1
+
 private theorem namespaceImport_weakValidFor (start : SourceSpan) :
     (ImportInternals.namespaceImport start).ValidFor (fun _ _ => True) := by
   unfold ImportInternals.namespaceImport
@@ -1552,6 +1560,89 @@ theorem selectiveImport_validFor (start : SourceSpan) (input : State)
             simpa using finished
           rw [finishedSome] at strong
           exact strong.of_file_eq afterFromFile
+
+private theorem importDecl_weakValidFor :
+    importDecl.ValidFor (fun _ _ => True) := by
+  unfold importDecl
+  apply Parser.bind_validFor (keyword_validFor .importKw .importDecl)
+  intro importKeyword
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases star : isSymbol observed .star
+  · simp only [star, if_true]
+    by_cases namespaceAlias :
+        observed.peekOffsetKind? 1 == some (.keyword .asKw)
+    · simp only [namespaceAlias, if_true]
+      exact namespaceImport_weakValidFor importKeyword.span
+    · simp only [namespaceAlias]
+      exact wildcardImport_weakValidFor importKeyword.span
+  · simp only [star]
+    by_cases selected : isSymbol observed .leftBrace
+    · simp only [selected, if_true]
+      exact selectiveImport_weakValidFor importKeyword.span
+    · simp only [selected]
+      exact plainImport_weakValidFor importKeyword.span
+
+/-- Complete import parsing preserves every retained source range. -/
+theorem importDecl_validFor : importDecl.ValidFor ImportDecl.ValidFor := by
+  intro input inputValid
+  have weak := importDecl_weakValidFor input inputValid
+  cases parsed : importDecl input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weak
+      exact weak
+  | ok result final =>
+      rw [parsed] at weak
+      have stages := parsed
+      unfold importDecl at stages
+      rcases importBind_ok_components stages with
+        ⟨importKeyword, afterKeyword, keywordResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨observed, afterObserved, observedResult, branchResult⟩
+      unfold getState at observedResult
+      cases observedResult
+      have keywordReply := keyword_validFor .importKw .importDecl
+        input inputValid
+      rw [keywordResult] at keywordReply
+      have keywordShape := acceptToken_ok_state_shape
+        (.keyword .importKw) .importDecl (· == .keyword .importKw)
+        keywordResult
+      have startFoundAfter :
+          afterKeyword.tokens[input.cursor]? = some importKeyword := by
+        rw [keywordShape.2]
+        exact State.getElem?_eq_some_of_peek?_eq_some keywordShape.1
+      have startBeforeAfter : input.cursor < afterKeyword.cursor := by
+        rw [keywordShape.2]
+        simp
+      have startValidAfter :
+          importKeyword.span.ValidFor afterKeyword.file := by
+        have validAtInput : importKeyword.span.ValidFor input.file := by
+          simpa only [Located.ValidFor] using keywordReply.1
+        simpa [keywordReply.2.2] using validAtInput
+      split at branchResult
+      · split at branchResult
+        · have strong := namespaceImport_validFor importKeyword.span
+            afterKeyword keywordReply.2.1 startValidAfter startFoundAfter
+            rfl startBeforeAfter
+          rw [branchResult] at strong
+          exact strong.of_file_eq keywordReply.2.2
+        · have strong := wildcardImport_validFor importKeyword.span
+            afterKeyword keywordReply.2.1 startValidAfter startFoundAfter
+            rfl startBeforeAfter
+          rw [branchResult] at strong
+          exact strong.of_file_eq keywordReply.2.2
+      · split at branchResult
+        · have strong := selectiveImport_validFor importKeyword.span
+            afterKeyword keywordReply.2.1 startValidAfter startFoundAfter
+            rfl startBeforeAfter
+          rw [branchResult] at strong
+          exact strong.of_file_eq keywordReply.2.2
+        · have strong := plainImport_validFor importKeyword.span
+            afterKeyword keywordReply.2.1 startValidAfter startFoundAfter
+            rfl startBeforeAfter
+          rw [branchResult] at strong
+          exact strong.of_file_eq keywordReply.2.2
 
 theorem selectiveImport_preservesTokenWindow (start : SourceSpan) :
     Parser.PreservesTokenWindow
