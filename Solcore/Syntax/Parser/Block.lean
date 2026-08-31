@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.ExpressionValidity
 
 set_option autoImplicit false
 
@@ -689,6 +690,92 @@ def isolateBlock (parser : Parser Block) : Parser Block := fun state =>
           .ok { span := captured.span, value := [] }
             (merged.emit failure.toDiagnostic)
       | .invariant error => .invariant error
+
+private theorem parentAfterCapture_validFor {input : State}
+    {captured : CapturedBlock} (inputValid : input.ValidFor)
+    (capturedValid : captured.ValidFor input) :
+    ({ input with cursor := captured.window.endIndex } : State).ValidFor := by
+  exact {
+    tokens := inputValid.tokens
+    cursor_le_endIndex := capturedValid.endIndex_le_window
+    endIndex_le_size := inputValid.endIndex_le_size
+    endByte_le_source := inputValid.endByte_le_source
+    endByte_boundary := inputValid.endByte_boundary
+    diagnosticsRev := inputValid.diagnosticsRev
+  }
+
+private theorem mergeDiagnostics_validFor {parent child : State}
+    (parentValid : parent.ValidFor) (childValid : child.ValidFor)
+    (childFile : child.file = parent.file) :
+    (parent.mergeDiagnostics child).ValidFor := by
+  refine {
+    tokens := parentValid.tokens
+    cursor_le_endIndex := parentValid.cursor_le_endIndex
+    endIndex_le_size := parentValid.endIndex_le_size
+    endByte_le_source := parentValid.endByte_le_source
+    endByte_boundary := parentValid.endByte_boundary
+    diagnosticsRev := ?_
+  }
+  intro diagnostic member
+  change diagnostic ∈ child.diagnosticsRev ++ parent.diagnosticsRev at member
+  change diagnostic.span.ValidFor parent.file
+  rcases List.mem_append.mp member with childMember | parentMember
+  · simpa only [childFile] using
+      childValid.diagnosticsRev diagnostic childMember
+  · exact parentValid.diagnosticsRev diagnostic parentMember
+
+/-- Isolation preserves recursive block and parser-state validity. -/
+theorem isolateBlock_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (parser : Parser Block)
+    (parserValid : parser.ValidFor (Block.ValidFor statementValid)) :
+    (isolateBlock parser).ValidFor (Block.ValidFor statementValid) := by
+  intro input inputValid
+  unfold isolateBlock
+  cases captureResult : captureBlock? input with
+  | none =>
+      simpa only [captureResult] using parserValid input inputValid
+  | some captured =>
+      have capturedValid := captureBlock?_validFor inputValid captureResult
+      have childReplyValid := parserValid
+        (input.enterWindow input.cursor captured.window)
+        capturedValid.entered
+      simp only
+      cases childResult : parser
+          (input.enterWindow input.cursor captured.window) with
+      | ok body childAfter =>
+          rw [childResult] at childReplyValid
+          simp only [Reply.ValidFor]
+          have bodyValid : Block.ValidFor statementValid input.file body := by
+            simpa [State.enterWindow] using childReplyValid.1
+          have parentValid := parentAfterCapture_validFor inputValid
+            capturedValid
+          have childFile : childAfter.file = input.file := by
+            simpa [State.enterWindow] using childReplyValid.2.2
+          have mergedValid := mergeDiagnostics_validFor parentValid
+            childReplyValid.2.1 childFile
+          exact ⟨bodyValid, mergedValid, rfl⟩
+      | reject failure childAfter =>
+          rw [childResult] at childReplyValid
+          simp only [Reply.ValidFor]
+          have emptyValid : Block.ValidFor statementValid input.file {
+              span := captured.span
+              value := []
+            } := ⟨capturedValid.span, by simp⟩
+          have parentValid := parentAfterCapture_validFor inputValid
+            capturedValid
+          have childFile : childAfter.file = input.file := by
+            simpa [State.enterWindow] using childReplyValid.2.2
+          have mergedValid := mergeDiagnostics_validFor parentValid
+            childReplyValid.2.1 childFile
+          have failureValid : failure.span.ValidFor input.file := by
+            simpa [State.enterWindow] using childReplyValid.1
+          have emittedValid := mergedValid.emit_validFor
+            failure.toDiagnostic
+            (failure.toDiagnostic_span_validFor failureValid)
+          exact ⟨emptyValid, emittedValid, rfl⟩
+      | invariant error =>
+          simp only [Reply.ValidFor]
 
 /-- Block isolation preserves the parent token carrier on every success path. -/
 theorem isolateBlock_preservesTokensOnSuccess (parser : Parser Block)
