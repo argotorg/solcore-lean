@@ -19,6 +19,14 @@ inductive YulExprValue where
 
 abbrev YulExpr := Located YulExprValue
 
+/-- Explicit inline-Yul return-name clause introduced by `->`. -/
+structure YulReturnClauseValue where
+  arrow : SourceSpan
+  names : NonemptyList YulIdentifier
+  deriving Repr, BEq
+
+abbrev YulReturnClause := Located YulReturnClauseValue
+
 mutual
 
 /-- Source-preserving inline-Yul statement payload. -/
@@ -46,7 +54,7 @@ inductive YulStmtValue where
   | functionDef
       (name : YulIdentifier)
       (parameters : DelimitedList YulIdentifier)
-      (returns : List YulIdentifier)
+      (returns : Option YulReturnClause)
       (body : List (Located YulStmtValue))
   | leave
   | break
