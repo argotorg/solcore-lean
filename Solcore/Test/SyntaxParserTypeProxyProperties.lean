@@ -27,6 +27,11 @@ example (nested : Parser TypeExpr)
   parseProxyType_preservesTokensOnSuccess nested nestedPreserves
 
 example (nested : Parser TypeExpr)
+    (window : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseProxyType nested) :=
+  parseProxyType_preservesTokenWindow nested window
+
+example (nested : Parser TypeExpr)
     (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
     Parser.CursorMonotoneOnSuccess (parseProxyType nested) :=
   parseProxyType_cursorMonotoneOnSuccess nested nestedMonotone

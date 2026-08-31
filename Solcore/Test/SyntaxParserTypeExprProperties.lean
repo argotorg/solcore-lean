@@ -50,11 +50,14 @@ example (nested : Parser TypeExpr) :
   parseNamedType_startsAtCurrentTokenOnSuccess nested
 
 example := @typeExprWithFuel_validFor
+example := @typeExprWithFuel_preservesTokenWindow
 example := @typeExprWithFuel_preservesTokensOnSuccess
 example := @typeExprWithFuel_cursorMonotoneOnSuccess
 example := @typeExprWithFuel_startsAtCurrentTokenOnSuccess
 
 example : typeExpr.ValidFor TypeExpr.ValidFor := typeExpr_validFor
+example : Parser.PreservesTokenWindow typeExpr :=
+  typeExpr_preservesTokenWindow
 example : Parser.PreservesTokensOnSuccess typeExpr :=
   typeExpr_preservesTokensOnSuccess
 example : Parser.CursorMonotoneOnSuccess typeExpr :=
@@ -75,6 +78,11 @@ example (nested : Parser TypeExpr)
     (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
     Parser.PreservesTokensOnSuccess (parseMappingType nested) :=
   parseMappingType_preservesTokensOnSuccess nested nestedPreserves
+
+example (nested : Parser TypeExpr)
+    (window : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseMappingType nested) :=
+  parseMappingType_preservesTokenWindow nested window
 
 example (nested : Parser TypeExpr)
     (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
@@ -101,6 +109,11 @@ example (nested : Parser TypeExpr)
   parseComptimeType_preservesTokensOnSuccess nested nestedPreserves
 
 example (nested : Parser TypeExpr)
+    (window : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseComptimeType nested) :=
+  parseComptimeType_preservesTokenWindow nested window
+
+example (nested : Parser TypeExpr)
     (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
     Parser.CursorMonotoneOnSuccess (parseComptimeType nested) :=
   parseComptimeType_cursorMonotoneOnSuccess nested nestedMonotone
@@ -121,6 +134,11 @@ example (nested : Parser TypeExpr)
     Parser.PreservesTokensOnSuccess (parseFunctionType nested) :=
       parseFunctionType_preservesTokensOnSuccess nested nestedPreserves
 
+example (nested : Parser TypeExpr)
+    (window : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseFunctionType nested) :=
+  parseFunctionType_preservesTokenWindow nested window
+
 example (nested : Parser TypeExpr) : Parser.CursorMonotoneOnSuccess
     (parseFunctionType nested) := parseFunctionType_cursorMonotoneOnSuccess nested
 
@@ -137,6 +155,11 @@ example (nested : Parser TypeExpr)
     (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
     Parser.PreservesTokensOnSuccess (parseTupleType nested) :=
   parseTupleType_preservesTokensOnSuccess nested nestedPreserves
+
+example (nested : Parser TypeExpr)
+    (window : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseTupleType nested) :=
+  parseTupleType_preservesTokenWindow nested window
 
 example (nested : Parser TypeExpr) :
     Parser.CursorMonotoneOnSuccess (parseTupleType nested) :=

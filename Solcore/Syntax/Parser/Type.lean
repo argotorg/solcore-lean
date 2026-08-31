@@ -288,6 +288,29 @@ theorem parseMappingType_preservesTokensOnSuccess
   intro closing
   exact Parser.pure_preservesTokensOnSuccess _
 
+/-- Mapping parsing preserves the active token window on every reply. -/
+theorem parseMappingType_preservesTokenWindow (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseMappingType nested) := by
+  unfold parseMappingType
+  apply Parser.bind_preservesTokenWindow
+    (contextual_preservesTokenWindow .mapping .typeExpr)
+  intro mapping
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .leftParen .typeExpr)
+  intro opening
+  apply Parser.bind_preservesTokenWindow nestedPreserves
+  intro key
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .fatArrow .typeExpr)
+  intro arrow
+  apply Parser.bind_preservesTokenWindow nestedPreserves
+  intro value
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .rightParen .typeExpr)
+  intro closing
+  exact Parser.pure_preservesTokenWindow _
+
 /-- Mapping parsing is cursor-monotone when its recursive parser is. -/
 theorem parseMappingType_cursorMonotoneOnSuccess
     (nested : Parser TypeExpr)
@@ -500,6 +523,24 @@ theorem parseComptimeType_preservesTokensOnSuccess
   intro closing
   exact Parser.pure_preservesTokensOnSuccess _
 
+/-- Comptime parsing preserves the active token window on every reply. -/
+theorem parseComptimeType_preservesTokenWindow (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseComptimeType nested) := by
+  unfold parseComptimeType
+  apply Parser.bind_preservesTokenWindow
+    (contextual_preservesTokenWindow .comptime .typeExpr)
+  intro comptime
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .less .typeExpr)
+  intro opening
+  apply Parser.bind_preservesTokenWindow nestedPreserves
+  intro inner
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .greater .typeExpr)
+  intro closing
+  exact Parser.pure_preservesTokenWindow _
+
 /-- Comptime parsing is cursor-monotone when its recursive parser is. -/
 theorem parseComptimeType_cursorMonotoneOnSuccess
     (nested : Parser TypeExpr)
@@ -632,6 +673,33 @@ theorem parseProxyType_preservesTokensOnSuccess (nested : Parser TypeExpr)
           cases result
           exact nestedTokens.trans markerTokens
 
+/-- Proxy parsing preserves the active token window on every reply. -/
+theorem parseProxyType_preservesTokenWindow (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseProxyType nested) := by
+  intro input
+  unfold parseProxyType
+  have markerShape := symbol_preservesTokenWindow .at .typeExpr input
+  cases markerResult : symbol .at .typeExpr input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [markerResult] at markerShape
+      exact markerShape
+  | ok marker afterMarker =>
+      rw [markerResult] at markerShape
+      have innerShape := nestedPreserves afterMarker
+      cases innerResult : nested afterMarker with
+      | invariant error =>
+          simp only [innerResult, Reply.PreservesTokenWindow]
+      | reject failure rejected =>
+          rw [innerResult] at innerShape
+          simp only [innerResult]
+          exact innerShape.trans markerShape
+      | ok inner next =>
+          rw [innerResult] at innerShape
+          simp only [innerResult]
+          exact innerShape.trans markerShape
+
 /-- Proxy parsing is cursor-monotone when its recursive parser is. -/
 theorem parseProxyType_cursorMonotoneOnSuccess (nested : Parser TypeExpr)
     (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
@@ -711,6 +779,17 @@ theorem parseTupleType_preservesTokensOnSuccess (nested : Parser TypeExpr)
   · intro tuple
     exact Parser.pure_preservesTokensOnSuccess _
 
+/-- Tuple parsing preserves the active token window on every reply. -/
+theorem parseTupleType_preservesTokenWindow (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseTupleType nested) := by
+  unfold parseTupleType
+  apply Parser.bind_preservesTokenWindow
+    (delimited_preservesTokenWindow .leftParen .rightParen true nested
+      .typeExpr .typeExpr nestedPreserves)
+  intro tuple
+  exact Parser.pure_preservesTokenWindow _
+
 /-- Tuple parsing never moves the parser cursor backwards. -/
 theorem parseTupleType_cursorMonotoneOnSuccess (nested : Parser TypeExpr) :
     Parser.CursorMonotoneOnSuccess (parseTupleType nested) := by
@@ -742,6 +821,31 @@ private def parseFunctionReturns (nested : Parser TypeExpr) : Parser (Option (De
     pure (some values)
   else
     pure none
+
+private theorem getState_preservesTokenWindowForType :
+    Parser.PreservesTokenWindow getState := by
+  intro input
+  exact ⟨rfl, rfl⟩
+
+private theorem parseFunctionReturns_preservesTokenWindow
+    (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseFunctionReturns nested) := by
+  unfold parseFunctionReturns
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindowForType
+  intro state
+  by_cases hasReturns : isContextual state .returns
+  · simp only [hasReturns, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (contextual_preservesTokenWindow .returns .typeExpr)
+    intro returnsKeyword
+    apply Parser.bind_preservesTokenWindow
+      (delimited_preservesTokenWindow .leftParen .rightParen true nested
+        .typeExpr .typeExpr nestedPreserves)
+    intro values
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [hasReturns]
+    exact Parser.pure_preservesTokenWindow none
 
 private theorem parseFunctionReturns_preservesTokensOnSuccess (nested : Parser TypeExpr)
     (nestedPreserves : Parser.PreservesTokensOnSuccess nested) : Parser.PreservesTokensOnSuccess
@@ -980,6 +1084,23 @@ theorem parseFunctionType_preservesTokensOnSuccess
     (parseFunctionReturns_preservesTokensOnSuccess nested nestedPreserves)
   intro returns
   exact Parser.pure_preservesTokensOnSuccess _
+
+/-- Function-type parsing preserves the active window on every reply. -/
+theorem parseFunctionType_preservesTokenWindow (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseFunctionType nested) := by
+  unfold parseFunctionType
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .functionKw .typeExpr)
+  intro functionKeyword
+  apply Parser.bind_preservesTokenWindow
+    (delimited_preservesTokenWindow .leftParen .rightParen true nested
+      .typeExpr .typeExpr nestedPreserves)
+  intro parameters
+  apply Parser.bind_preservesTokenWindow
+    (parseFunctionReturns_preservesTokenWindow nested nestedPreserves)
+  intro returns
+  exact Parser.pure_preservesTokenWindow _
 
 /-- Function-type parsing never moves the parser cursor backwards. -/
 theorem parseFunctionType_cursorMonotoneOnSuccess

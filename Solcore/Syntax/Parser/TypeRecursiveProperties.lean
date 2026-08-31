@@ -8,6 +8,7 @@ namespace Solcore.Syntax.Parser
 
 private theorem typeExprWithFuel_contracts : ∀ fuel,
     (typeExprWithFuel fuel).ValidFor TypeExpr.ValidFor ∧
+    Parser.PreservesTokenWindow (typeExprWithFuel fuel) ∧
     Parser.PreservesTokensOnSuccess (typeExprWithFuel fuel) ∧
     Parser.CursorMonotoneOnSuccess (typeExprWithFuel fuel) ∧
     Parser.StartsAtCurrentTokenOnSuccess
@@ -15,9 +16,11 @@ private theorem typeExprWithFuel_contracts : ∀ fuel,
   intro fuel
   induction fuel with
   | zero =>
-      refine ⟨?_, ?_, ?_, ?_⟩
+      refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro input inputValid
         simp [typeExprWithFuel, Reply.ValidFor]
+      · intro input
+        simp [typeExprWithFuel, Reply.PreservesTokenWindow]
       · intro input value next result
         simp [typeExprWithFuel] at result
       · intro input value next result
@@ -26,8 +29,8 @@ private theorem typeExprWithFuel_contracts : ∀ fuel,
         simp [typeExprWithFuel] at result
   | succ fuel inductionHypothesis =>
       rcases inductionHypothesis with
-        ⟨nestedValid, nestedTokens, nestedCursor, nestedStarts⟩
-      refine ⟨?_, ?_, ?_, ?_⟩
+        ⟨nestedValid, nestedWindow, nestedTokens, nestedCursor, nestedStarts⟩
+      refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro input inputValid
         simp only [typeExprWithFuel]
         split
@@ -50,6 +53,27 @@ private theorem typeExprWithFuel_contracts : ∀ fuel,
                       nestedValid nestedTokens input inputValid
                   · unfold rejectAt Reply.ValidFor
                     exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+      · intro input
+        simp only [typeExprWithFuel]
+        split
+        · exact parseFunctionType_preservesTokenWindow
+            (typeExprWithFuel fuel) nestedWindow input
+        · split
+          · exact parseComptimeType_preservesTokenWindow
+              (typeExprWithFuel fuel) nestedWindow input
+          · split
+            · exact parseMappingType_preservesTokenWindow
+                (typeExprWithFuel fuel) nestedWindow input
+            · split
+              · exact parseProxyType_preservesTokenWindow
+                  (typeExprWithFuel fuel) nestedWindow input
+              · split
+                · exact parseTupleType_preservesTokenWindow
+                    (typeExprWithFuel fuel) nestedWindow input
+                · split
+                  · exact parseNamedType_preservesTokenWindow
+                      (typeExprWithFuel fuel) nestedWindow input
+                  · exact rejectAt_preservesTokenWindow input _ _
       · intro input value next result
         simp only [typeExprWithFuel] at result
         split at result
@@ -125,18 +149,23 @@ theorem typeExprWithFuel_validFor (fuel : Nat) :
 /-- Every successful fuel-bounded type parse retains the token carrier. -/
 theorem typeExprWithFuel_preservesTokensOnSuccess (fuel : Nat) :
     Parser.PreservesTokensOnSuccess (typeExprWithFuel fuel) :=
+  (typeExprWithFuel_contracts fuel).2.2.1
+
+/-- Every fuel-bounded recursive type reply retains its active token window. -/
+theorem typeExprWithFuel_preservesTokenWindow (fuel : Nat) :
+    Parser.PreservesTokenWindow (typeExprWithFuel fuel) :=
   (typeExprWithFuel_contracts fuel).2.1
 
 /-- Every successful fuel-bounded type parse is cursor-monotone. -/
 theorem typeExprWithFuel_cursorMonotoneOnSuccess (fuel : Nat) :
     Parser.CursorMonotoneOnSuccess (typeExprWithFuel fuel) :=
-  (typeExprWithFuel_contracts fuel).2.2.1
+  (typeExprWithFuel_contracts fuel).2.2.2.1
 
 /-- Every successful fuel-bounded type starts at its current token. -/
 theorem typeExprWithFuel_startsAtCurrentTokenOnSuccess (fuel : Nat) :
     Parser.StartsAtCurrentTokenOnSuccess
       (typeExprWithFuel fuel) (·.span) :=
-  (typeExprWithFuel_contracts fuel).2.2.2
+  (typeExprWithFuel_contracts fuel).2.2.2.2
 
 /-- Public recursive type parsing retains source provenance at computed fuel. -/
 theorem typeExpr_validFor : typeExpr.ValidFor TypeExpr.ValidFor := by
@@ -152,6 +181,14 @@ theorem typeExpr_preservesTokensOnSuccess :
   unfold typeExpr at result
   exact typeExprWithFuel_preservesTokensOnSuccess
     (input.remainingCount + 1) input value next result
+
+/-- Public recursive type parsing preserves every ordinary token window. -/
+theorem typeExpr_preservesTokenWindow :
+    Parser.PreservesTokenWindow typeExpr := by
+  intro input
+  unfold typeExpr
+  exact typeExprWithFuel_preservesTokenWindow
+    (input.remainingCount + 1) input
 
 /-- Public recursive type success never rewinds the parser cursor. -/
 theorem typeExpr_cursorMonotoneOnSuccess :
