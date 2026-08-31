@@ -156,13 +156,15 @@ def ContractInternals.contractMemberWithAttribute : Parser ContractMember :=
   else
     ContractInternals.contractMemberCore state
 
-private def atContractRecoveryBoundary (state : State) : Bool :=
+namespace ContractInternals
+
+def atContractRecoveryBoundary (state : State) : Bool :=
   isSymbol state .hash || isKeyword state .functionKw ||
     isKeyword state .constructorKw ||
     isKeyword state .fallbackKw || isKeyword state .typeKw ||
     isSymbol state .rightBrace || isContextual state .enum
 
-private def finishRecoveredMember (first last : SourceSpan)
+def finishRecoveredMember (first last : SourceSpan)
     (state : State) : Reply ContractMember :=
   let span := SourceSpan.cover first last
   .ok { span, leadingComments := [], value := .error } (state.emit {
@@ -170,7 +172,7 @@ private def finishRecoveredMember (first last : SourceSpan)
     kind := .recovered .contractMember
   })
 
-private def recoverContractMemberAux (first last : SourceSpan) :
+def recoverContractMemberAux (first last : SourceSpan) :
     Nat → State → Reply ContractMember
   | 0, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, state =>
@@ -182,12 +184,14 @@ private def recoverContractMemberAux (first last : SourceSpan) :
             recoverContractMemberAux first token.span fuel next
         | none => finishRecoveredMember first last state
 
-private def recoverContractMember (state : State) : Reply ContractMember :=
+def recoverContractMember (state : State) : Reply ContractMember :=
   match state.advance? with
   | some (token, next) =>
       recoverContractMemberAux token.span token.span
         (next.remainingCount + 1) next
   | none => rejectAt state { head := .topItem, tail := [] } .contractMember
+
+end ContractInternals
 
 private structure ContractBody where
   span : SourceSpan
@@ -221,10 +225,10 @@ private def contractMembers (opening : Token) :
               .invariant (.noProgress .topLevel next.currentSpan)
         | .reject failure failedState =>
             let rewound := { failedState with cursor := state.cursor }
-            if atContractRecoveryBoundary state then
+            if ContractInternals.atContractRecoveryBoundary state then
               .reject failure rewound
             else
-              match recoverContractMember rewound with
+              match ContractInternals.recoverContractMember rewound with
               | .ok member next =>
                   contractMembers opening fuel (member :: membersRev) next
               | .reject recoveryFailure next => .reject recoveryFailure next
