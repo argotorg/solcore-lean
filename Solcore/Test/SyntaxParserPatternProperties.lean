@@ -40,5 +40,21 @@ example := PatternInternals.booleanBinderPattern_preservesTokenWindow
 example := PatternInternals.booleanBinderPattern_preservesTokensOnSuccess
 example := PatternInternals.booleanBinderPattern_cursorMonotoneOnSuccess
 example := PatternInternals.booleanBinderPattern_startsAtCurrentTokenOnSuccess
+example := PatternInternals.patternName_validFor
+example := PatternInternals.patternName_preservesTokenWindow
+example := PatternInternals.patternName_preservesTokensOnSuccess
+example := PatternInternals.patternName_cursorMonotoneOnSuccess
+example := PatternInternals.patternName_startsAtCurrentTokenOnSuccess
+example := PatternInternals.requirePatternArguments_validFor
+example := PatternInternals.constructorArguments_validFor
+example := PatternInternals.constructorArguments_preservesTokenWindow
+example := PatternInternals.constructorArguments_preservesTokensOnSuccess
+example := PatternInternals.constructorArguments_cursorMonotoneOnSuccess
+example := PatternInternals.constructorArguments_startsAtCurrentTokenOnSuccess
+example := PatternInternals.optionalConstructorArguments_validFor
+example := PatternInternals.optionalConstructorArguments_preservesTokenWindow
+example :=
+  PatternInternals.optionalConstructorArguments_preservesTokensOnSuccess
+example := PatternInternals.optionalConstructorArguments_cursorMonotoneOnSuccess
 
 end Tests

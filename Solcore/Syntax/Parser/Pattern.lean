@@ -33,11 +33,15 @@ def booleanBinderPattern : Parser Pattern := do
 
 end PatternInternals
 
-private def patternName : Parser Identifier := fun state =>
+namespace PatternInternals
+
+/-- Parse an ordinary or Boolean builtin constructor-pattern name. -/
+def patternName : Parser Identifier := fun state =>
   if isBooleanValue state then booleanIdentifier state
   else identifier .pattern state
 
-private def requirePatternArguments (values : DelimitedList Pattern) :
+/-- Refine a parsed constructor argument list to its nonempty carrier. -/
+def requirePatternArguments (values : DelimitedList Pattern) :
     Parser (NonemptyDelimitedList Pattern) :=
   match values.elements with
   | head :: tail => pure {
@@ -46,13 +50,15 @@ private def requirePatternArguments (values : DelimitedList Pattern) :
     }
   | [] => fun _ => .invariant (.noProgress .pattern values.span)
 
-private def constructorArguments
+/-- Parse a required nonempty constructor-pattern argument list. -/
+def constructorArguments
     (nested : Parser Pattern) : Parser (NonemptyDelimitedList Pattern) := do
   let values ← delimitedNoTrailing .leftParen .rightParen false nested
     .pattern .pattern
   requirePatternArguments values
 
-private def optionalConstructorArguments
+/-- Parse constructor arguments when an opening parenthesis is present. -/
+def optionalConstructorArguments
     (nested : Parser Pattern) : Parser (Option (NonemptyDelimitedList Pattern)) :=
     fun state =>
   if isSymbol state .leftParen then
@@ -61,6 +67,8 @@ private def optionalConstructorArguments
       (pure none) state
   else
     .ok none state
+
+end PatternInternals
 
 private def closePatternTuple (opening : Token)
     (elementsRev : List Pattern) : Parser Pattern := do
@@ -128,8 +136,8 @@ private def parenthesizedPattern (nested : Parser Pattern) : Parser Pattern :=
 private def dotConstructorPattern
     (nested : Parser Pattern) : Parser Pattern := do
   let dot ← symbol .dot .pattern
-  let name ← patternName
-  let arguments ← optionalConstructorArguments nested
+  let name ← PatternInternals.patternName
+  let arguments ← PatternInternals.optionalConstructorArguments nested
   let endSpan := arguments.map (fun values => values.span) |>.getD name.span
   pure {
     span := SourceSpan.cover dot.span endSpan
@@ -143,7 +151,7 @@ private def startsWithLowercase (name : Identifier) : Bool :=
 
 private def qualifiedPattern (nested : Parser Pattern) : Parser Pattern := do
   let path ← qualifiedName .pattern .pattern
-  let arguments ← optionalConstructorArguments nested
+  let arguments ← PatternInternals.optionalConstructorArguments nested
   let components := path.value.components.toList
   match components.reverse with
   | [] => fun _ => .invariant (.noProgress .pattern path.span)
