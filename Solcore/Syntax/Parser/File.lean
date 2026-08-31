@@ -1,0 +1,110 @@
+import Solcore.Syntax.Parser.TypeAlias
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.Parser
+
+/-- Synchronization starts shared with the pinned Rust top-level grammar. -/
+def isTopItemStartKind : TokenKind → Bool
+  | .keyword .importKw | .keyword .exportKw | .keyword .pragmaKw |
+      .keyword .typeKw | .keyword .contractKw | .keyword .functionKw |
+      .keyword .defaultKw | .symbol .hash => true
+  | kind => kind.isContextual .enum || kind.isContextual .trait ||
+      kind.isContextual .impl
+
+def atTopItemStart (state : State) : Bool :=
+  match state.peekKind? with
+  | some kind => isTopItemStartKind kind
+  | none => false
+
+private def wrapTypeAlias (declaration : TypeAliasDecl) : TopItem := {
+  span := declaration.span
+  leadingComments := []
+  value := .typeAlias declaration
+}
+
+/-- Parse the top-level forms implemented by the current vertical slice. -/
+private def topItem : Parser TopItem := fun state =>
+  if isKeyword state .typeKw then
+    match typeAlias state with
+    | .ok declaration next => .ok (wrapTypeAlias declaration) next
+    | .reject failure next => .reject failure next
+    | .invariant error => .invariant error
+  else
+    rejectAt state { head := .topItem, tail := [] } .topItem
+
+private def finishRecoveredTopItem (first last : SourceSpan)
+    (state : State) : Reply TopItem :=
+  let span := SourceSpan.cover first last
+  .ok {
+    span
+    leadingComments := []
+    value := .error
+  } (state.emit {
+    span
+    kind := .recovered .topItem
+  })
+
+private def recoverTopItemAux (first last : SourceSpan) :
+    Nat → State → Reply TopItem
+  | 0, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
+  | fuel + 1, state =>
+      if state.atEnd || atTopItemStart state then
+        finishRecoveredTopItem first last state
+      else
+        match state.advance? with
+        | some (token, next) =>
+            recoverTopItemAux first token.span fuel next
+        | none => finishRecoveredTopItem first last state
+
+private def recoverTopItem (state : State) : Reply TopItem :=
+  match state.advance? with
+  | some (token, next) =>
+      recoverTopItemAux token.span token.span
+        (next.remainingCount + 1) next
+  | none => rejectAt state { head := .topItem, tail := [] } .topItem
+
+private def parseItems :
+    Nat → List TopItem → State → Reply (List TopItem)
+  | 0, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
+  | fuel + 1, itemsRev, state =>
+      if state.atEnd then
+        .ok itemsRev.reverse state
+      else
+        match topItem state with
+        | .ok item next =>
+            if next.cursor > state.cursor then
+              parseItems fuel (item :: itemsRev) next
+            else
+              .invariant (.noProgress .topLevel next.currentSpan)
+        | .reject failure failedState =>
+            let rewound := {
+              failedState with
+              cursor := state.cursor
+            }
+            let diagnosed := rewound.emit failure.toDiagnostic
+            if atTopItemStart state then
+              -- Rust recovery also refuses to consume a recognized item start.
+              .ok itemsRev.reverse diagnosed
+            else
+              match recoverTopItem diagnosed with
+              | .ok item next =>
+                  parseItems fuel (item :: itemsRev) next
+              | .reject recoveryFailure next =>
+                  .reject recoveryFailure next
+              | .invariant error => .invariant error
+        | .invariant error => .invariant error
+
+/-- Parse a complete token window into a source-owned syntax file. -/
+def sourceFile (comments : List Comment) : Parser ParsedFile := fun state =>
+  match parseItems (state.remainingCount + 1) [] state with
+  | .ok items next => .ok {
+      source := state.file.id
+      span := SourceSpan.fullFile state.file
+      items
+      comments
+    } next
+  | .reject failure next => .reject failure next
+  | .invariant error => .invariant error
+
+end Solcore.Syntax.Parser
