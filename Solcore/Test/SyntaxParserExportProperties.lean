@@ -13,5 +13,10 @@ example := @exportPath_preservesTokenWindow
 example := @exportPath_preservesTokensOnSuccess
 example := @exportPath_cursorMonotoneOnSuccess
 example := @exportPath_startsAtCurrentTokenOnSuccess
+example := @constructorSelection_validFor
+example := @constructorSelection_preservesTokenWindow
+example := @constructorSelection_preservesTokensOnSuccess
+example := @constructorSelection_cursorMonotoneOnSuccess
+example := @constructorSelection_startsAtCurrentTokenOnSuccess
 
 end Tests

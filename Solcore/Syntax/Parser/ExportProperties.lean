@@ -7,6 +7,27 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+private theorem exportBind_ok_components {alpha beta : Type}
+    {first : Parser alpha} {next : alpha → Parser beta}
+    {input final : State} {value : beta}
+    (parsed : (first >>= next) input = .ok value final) :
+    ∃ firstValue afterFirst,
+      first input = .ok firstValue afterFirst ∧
+        next firstValue afterFirst = .ok value final := by
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      rw [firstResult] at parsed
+      exact ⟨firstValue, afterFirst, rfl, parsed⟩
+  | reject failure rejected => rw [firstResult] at parsed; contradiction
+  | invariant error => rw [firstResult] at parsed; contradiction
+
+private theorem getState_preservesExportTokenWindow :
+    Parser.PreservesTokenWindow getState := fun _ => ⟨rfl, rfl⟩
+
 private theorem exportPathTail_validFor (first : Identifier) :
     ∀ fuel last tailRev state firstIndex firstToken,
       state.ValidFor →
@@ -311,5 +332,265 @@ theorem exportPath_cursorMonotoneOnSuccess :
           input first afterFirst firstResult)
         (exportPathTail_cursorMonotoneOnSuccess first
           (afterFirst.remainingCount + 1) first [] afterFirst path next result)
+
+private theorem starConstructorSelection_validFor :
+    (do
+      let opening ← symbol .leftParen .exportDecl
+      let marker ← symbol .star .exportDecl
+      let closing ← symbol .rightParen .exportDecl
+      pure ({
+        span := SourceSpan.cover opening.span closing.span
+        value := ConstructorSelectionValue.all marker.span
+      } : ConstructorSelection)).ValidFor ConstructorSelection.ValidFor := by
+  let parser : Parser ConstructorSelection := do
+    let opening ← symbol .leftParen .exportDecl
+    let marker ← symbol .star .exportDecl
+    let closing ← symbol .rightParen .exportDecl
+    pure {
+      span := SourceSpan.cover opening.span closing.span
+      value := .all marker.span
+    }
+  change parser.ValidFor ConstructorSelection.ValidFor
+  have weak : parser.ValidFor (fun _ _ => True) := by
+    dsimp [parser]
+    apply Parser.bind_validFor (symbol_validFor .leftParen .exportDecl)
+    intro opening
+    apply Parser.bind_validFor (symbol_validFor .star .exportDecl)
+    intro marker
+    apply Parser.bind_validFor (symbol_validFor .rightParen .exportDecl)
+    intro closing
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : parser input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok selection final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      dsimp [parser] at stages
+      rcases exportBind_ok_components stages with
+        ⟨opening, afterOpening, openingResult, rest⟩
+      rcases exportBind_ok_components rest with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases exportBind_ok_components rest with
+        ⟨closing, afterClosing, closingResult, finished⟩
+      have openingValid := symbol_validFor .leftParen .exportDecl
+        input inputValid
+      rw [openingResult] at openingValid
+      have markerValid := symbol_validFor .star .exportDecl
+        afterOpening openingValid.2.1
+      rw [markerResult] at markerValid
+      have closingValid := symbol_validFor .rightParen .exportDecl
+        afterMarker markerValid.2.1
+      rw [closingResult] at closingValid
+      have openingSpanValid : opening.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using openingValid.1
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, openingValid.2.2] using markerValid.1
+      have closingSpanValid : closing.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, markerValid.2.2,
+          openingValid.2.2] using closingValid.1
+      have openingShape := symbol_ok_state_shape .leftParen .exportDecl
+        openingResult
+      have closingShape := symbol_ok_state_shape .rightParen .exportDecl
+        closingResult
+      have openingAt :=
+        State.getElem?_eq_some_of_peek?_eq_some openingShape.1
+      have closingAtAfterMarker :=
+        State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have closingAtInput :
+          input.tokens[afterMarker.cursor]? = some closing := by
+        have openingTokens := symbol_preservesTokensOnSuccess
+          .leftParen .exportDecl input opening afterOpening openingResult
+        have markerTokens := symbol_preservesTokensOnSuccess
+          .star .exportDecl afterOpening marker afterMarker markerResult
+        simpa [markerTokens, openingTokens] using closingAtAfterMarker
+      have cursorOrder : input.cursor < afterMarker.cursor :=
+        Nat.lt_trans
+          (acceptToken_cursor_lt_onSuccess (.symbol .leftParen) .exportDecl
+            (· == .symbol .leftParen) openingResult)
+          (acceptToken_cursor_lt_onSuccess (.symbol .star) .exportDecl
+            (· == .symbol .star) markerResult)
+      have openingBeforeClosing :=
+        inputValid.token_end_le_token_start_of_getElem?_lt
+          openingAt closingAtInput cursorOrder
+      have outerValid := SourceSpan.cover_validFor openingSpanValid
+        closingSpanValid (Nat.le_trans openingSpanValid.2.1
+          (Nat.le_trans openingBeforeClosing closingSpanValid.2.1))
+      cases finished
+      exact ⟨⟨outerValid, markerSpanValid⟩,
+        weakResult.2.1, weakResult.2.2⟩
+
+private theorem namedConstructorSelection_validFor :
+    (do
+      let values ← delimitedNoTrailing .leftParen .rightParen false
+        (identifier .exportDecl) .exportDecl .topLevel
+      let constructors ← ExportInternals.requireConstructorNames values
+      pure ({
+        span := values.span
+        value := ConstructorSelectionValue.named constructors
+      } : ConstructorSelection)).ValidFor ConstructorSelection.ValidFor := by
+  apply Parser.bind_validFor_of_value
+    (delimitedNoTrailing_validFor Located.ValidFor .leftParen .rightParen
+      false (identifier .exportDecl) .exportDecl .topLevel
+      (identifier_validFor .exportDecl)
+      (identifier_preservesTokensOnSuccess .exportDecl))
+  intro values input inputValid valuesValid
+  unfold ExportInternals.requireConstructorNames
+  cases elements : values.elements with
+  | nil => trivial
+  | cons head tail =>
+      simp only [bind, pure, Reply.ValidFor,
+        ConstructorSelection.ValidFor]
+      refine ⟨⟨valuesValid.1, ?_⟩, inputValid, trivial⟩
+      intro constructor member
+      exact valuesValid.2 constructor (by
+        simpa [NonemptyList.toList, elements] using member)
+
+/-- Constructor selections retain their delimiter, marker, and name ranges. -/
+theorem constructorSelection_validFor :
+    ExportInternals.constructorSelection.ValidFor
+      ConstructorSelection.ValidFor := by
+  unfold ExportInternals.constructorSelection
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  split
+  · exact starConstructorSelection_validFor
+  · exact namedConstructorSelection_validFor
+
+private theorem requireConstructorNames_preservesTokenWindow
+    (values : DelimitedList Identifier) :
+    Parser.PreservesTokenWindow
+      (ExportInternals.requireConstructorNames values) := by
+  intro input
+  unfold ExportInternals.requireConstructorNames
+  cases values.elements <;> trivial
+
+/-- Constructor selections preserve every ordinary token window. -/
+theorem constructorSelection_preservesTokenWindow :
+    Parser.PreservesTokenWindow
+      ExportInternals.constructorSelection := by
+  unfold ExportInternals.constructorSelection
+  apply Parser.bind_preservesTokenWindow getState_preservesExportTokenWindow
+  intro observed
+  split
+  · apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .leftParen .exportDecl)
+    intro opening
+    apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .star .exportDecl)
+    intro marker
+    apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .rightParen .exportDecl)
+    intro closing
+    exact Parser.pure_preservesTokenWindow _
+  · apply Parser.bind_preservesTokenWindow
+      (delimitedWithPolicy_preservesTokenWindow .leftParen .rightParen false
+        false (identifier .exportDecl) .exportDecl .topLevel
+        (identifier_preservesTokenWindow .exportDecl))
+    intro values
+    apply Parser.bind_preservesTokenWindow
+      (requireConstructorNames_preservesTokenWindow values)
+    intro constructors
+    exact Parser.pure_preservesTokenWindow _
+
+/-- Successful constructor selections retain the lexer token carrier. -/
+theorem constructorSelection_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess
+      ExportInternals.constructorSelection :=
+  constructorSelection_preservesTokenWindow.preservesTokensOnSuccess
+
+private theorem requireConstructorNames_cursorMonotoneOnSuccess
+    (values : DelimitedList Identifier) :
+    Parser.CursorMonotoneOnSuccess
+      (ExportInternals.requireConstructorNames values) := by
+  intro input constructors next parsed
+  unfold ExportInternals.requireConstructorNames at parsed
+  cases elements : values.elements with
+  | nil => simp [elements] at parsed
+  | cons head tail =>
+      simp only [elements] at parsed
+      cases parsed
+      exact Nat.le_refl _
+
+/-- Successful constructor selections never rewind the cursor. -/
+theorem constructorSelection_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess
+      ExportInternals.constructorSelection := by
+  unfold ExportInternals.constructorSelection
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  split
+  · apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .leftParen .exportDecl)
+    intro opening
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .star .exportDecl)
+    intro marker
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .rightParen .exportDecl)
+    intro closing
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · apply Parser.bind_cursorMonotoneOnSuccess
+      (delimitedNoTrailing_cursorMonotoneOnSuccess .leftParen .rightParen
+        false (identifier .exportDecl) .exportDecl .topLevel)
+    intro values
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (requireConstructorNames_cursorMonotoneOnSuccess values)
+    intro constructors
+    exact Parser.pure_cursorMonotoneOnSuccess _
+
+private theorem starConstructorSelection_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess (do
+      let opening ← symbol .leftParen .exportDecl
+      let marker ← symbol .star .exportDecl
+      let closing ← symbol .rightParen .exportDecl
+      pure ({
+        span := SourceSpan.cover opening.span closing.span
+        value := ConstructorSelectionValue.all marker.span
+      } : ConstructorSelection)) (·.span) := by
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (symbol_startsAtCurrentTokenOnSuccess .leftParen .exportDecl)
+  intro opening input selection final parsed
+  rcases exportBind_ok_components parsed with
+    ⟨marker, afterMarker, _markerResult, rest⟩
+  rcases exportBind_ok_components rest with
+    ⟨closing, afterClosing, _closingResult, finished⟩
+  cases finished
+  rfl
+
+private theorem namedConstructorSelection_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess (do
+      let values ← delimitedNoTrailing .leftParen .rightParen false
+        (identifier .exportDecl) .exportDecl .topLevel
+      let constructors ← ExportInternals.requireConstructorNames values
+      pure ({
+        span := values.span
+        value := ConstructorSelectionValue.named constructors
+      } : ConstructorSelection)) (·.span) := by
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (delimitedNoTrailing_startsAtCurrentTokenOnSuccess .leftParen .rightParen
+      false (identifier .exportDecl) .exportDecl .topLevel)
+  intro values input selection final parsed
+  rcases exportBind_ok_components parsed with
+    ⟨constructors, afterConstructors, _constructorsResult, finished⟩
+  cases finished
+  rfl
+
+/-- A constructor selection starts at its opening parenthesis. -/
+theorem constructorSelection_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess
+      ExportInternals.constructorSelection (·.span) := by
+  intro input selection final parsed
+  unfold ExportInternals.constructorSelection at parsed
+  simp only [getState, bind] at parsed
+  split at parsed
+  · exact starConstructorSelection_startsAtCurrentTokenOnSuccess
+      input selection final parsed
+  · exact namedConstructorSelection_startsAtCurrentTokenOnSuccess
+      input selection final parsed
 
 end Solcore.Syntax.Parser

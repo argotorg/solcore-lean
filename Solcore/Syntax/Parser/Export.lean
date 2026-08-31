@@ -53,13 +53,17 @@ def exportPath : Parser QualifiedName := fun state =>
 
 end ExportInternals
 
-private def requireConstructorNames (values : DelimitedList Identifier) :
+namespace ExportInternals
+
+/-- Convert a parsed constructor list to its required nonempty form. -/
+def requireConstructorNames (values : DelimitedList Identifier) :
     Parser (NonemptyList Identifier) :=
   match values.elements with
   | head :: tail => pure { head, tail }
   | [] => fun _ => .invariant (.noProgress .topLevel values.span)
 
-private def constructorSelection : Parser ConstructorSelection := do
+/-- Parse an all-or-named constructor selection following an export name. -/
+def constructorSelection : Parser ConstructorSelection := do
   let state ← getState
   if state.peekOffsetKind? 1 == some (.symbol .star) then
     let opening ← symbol .leftParen .exportDecl
@@ -77,6 +81,8 @@ private def constructorSelection : Parser ConstructorSelection := do
       span := values.span
       value := .named constructors
     }
+
+end ExportInternals
 
 private def exportName : Parser ExportName := fun state =>
   if isSymbol state .star then
@@ -103,7 +109,7 @@ private def exportName : Parser ExportName := fun state =>
     match identifier .exportDecl state with
     | .ok name afterName =>
         if isSymbol afterName .leftParen then
-          match constructorSelection afterName with
+          match ExportInternals.constructorSelection afterName with
           | .ok constructors next => .ok {
               span := SourceSpan.cover name.span constructors.span
               value := .identifier name (some constructors)
