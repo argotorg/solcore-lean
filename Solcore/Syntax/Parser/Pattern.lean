@@ -268,6 +268,7 @@ def patternLayer (nested : Parser Pattern)
 def startsPattern (state : State) : Bool :=
   isSymbol state .underscore || isCoreLiteral state ||
     isBooleanValue state || isSymbol state .leftParen ||
-    isSymbol state .dot || isIdentifier state
+    isSymbol state .dot || isContextual state .comptime ||
+    isIdentifier state
 
 end Solcore.Syntax.Parser

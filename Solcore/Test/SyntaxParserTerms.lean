@@ -358,6 +358,9 @@ private def testPatternForms : IO Unit := do
     (.comptime (bin (ident "x") .add (.literal (.decimal "1"))))
     "comptime expression pattern"
   assertEqual (byteRange comptime.value.span) (0, 14) "comptime pattern span"
+  let comptimeStart ← initialState "comptime pattern start" "comptime x"
+  assertEqual (Parser.startsPattern comptimeStart) true
+    "comptime begins a pattern"
 
 private def testPatternRecovery : IO Unit := do
   let run ← runPattern "pattern recovery" "+ - =>" false
