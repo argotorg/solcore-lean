@@ -13,10 +13,12 @@ import Solcore.Test.SyntaxLexerContractProperties
 import Solcore.Test.SyntaxLexerScannerProperties
 import Solcore.Test.SyntaxLexerStateOrderProperties
 import Solcore.Test.SyntaxLexerStateProperties
+import Solcore.Test.SyntaxParserBlockProperties
 import Solcore.Test.SyntaxParserBodyIsolation
 import Solcore.Test.SyntaxParserContracts
 import Solcore.Test.SyntaxParserDeclarationTrivia
 import Solcore.Test.SyntaxParserDelimitedProperties
+import Solcore.Test.SyntaxParserDeriveAttributeProperties
 import Solcore.Test.SyntaxParserDeriveTargetProperties
 import Solcore.Test.SyntaxParserDiagnosticSuppression
 import Solcore.Test.SyntaxParserEnumTraitImpl
@@ -42,6 +44,8 @@ import Solcore.Test.SyntaxParserStatements
 import Solcore.Test.SyntaxParserTerms
 import Solcore.Test.SyntaxParserTotality
 import Solcore.Test.SyntaxParserTrivia
+import Solcore.Test.SyntaxParserTypeExprProperties
+import Solcore.Test.SyntaxParserTypeProxyProperties
 import Solcore.Test.SyntaxParserTypes
 import Solcore.Test.SyntaxParserUpstreamDiagnosticPolicy
 import Solcore.Test.SyntaxParserUpstreamFixtures
@@ -49,6 +53,7 @@ import Solcore.Test.SyntaxParserValidityProperties
 import Solcore.Test.SyntaxParserYul
 import Solcore.Test.SyntaxParserYulChoiceRecovery
 import Solcore.Test.SyntaxParserYulCommonProperties
+import Solcore.Test.SyntaxParserYulExpressionProperties
 import Solcore.Test.SyntaxParserYulLeafProperties
 import Solcore.Test.SyntaxProvenanceProperties
 import Solcore.Test.SyntaxPreflightProperties
