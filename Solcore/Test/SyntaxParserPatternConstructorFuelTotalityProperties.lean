@@ -1,0 +1,12 @@
+import Solcore.Syntax.Parser.PatternConstructorFuelTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPatternConstructorFuelTotalityProperties
+
+open Solcore.Syntax.Parser.PatternInternals
+
+example := @dotConstructorPattern_ordinary_of_elementFuel
+example := @dotConstructorPattern_ne_invariant_of_elementFuel
+
+end Solcore.Test.SyntaxParserPatternConstructorFuelTotalityProperties
