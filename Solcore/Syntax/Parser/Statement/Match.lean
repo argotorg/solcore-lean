@@ -26,16 +26,14 @@ def matchCase (statement : Parser Statement)
     value := { pattern, body }
   }
 
-end MatchInternals
-
-private def matchCases (statement : Parser Statement)
+def matchCases (statement : Parser Statement)
     (pattern : Parser Pattern) :
     Nat → List MatchCase → State → Reply (List MatchCase)
   | 0, _, state => .invariant (.fuelExhausted .statement state.currentSpan)
   | fuel + 1, casesRev, state =>
       if isKeyword state .caseKw then
         let before := state.cursor
-        match MatchInternals.matchCase statement pattern state with
+        match matchCase statement pattern state with
         | .ok value next =>
             if next.cursor > before then
               matchCases statement pattern fuel (value :: casesRev) next
@@ -45,6 +43,8 @@ private def matchCases (statement : Parser Statement)
         | .invariant error => .invariant error
       else
         .ok casesRev.reverse state
+
+end MatchInternals
 
 private def optionalDefaultBody (statement : Parser Statement) :
     Parser (Option Block) := do
@@ -92,7 +92,8 @@ def matchStatement (statement : Parser Statement)
   let scrutinees ← requireScrutinees scrutineeValues
   let opening ← symbol .leftBrace .statement
   let cases ← fun state =>
-    matchCases statement pattern (state.remainingCount + 1) [] state
+    MatchInternals.matchCases statement pattern
+      (state.remainingCount + 1) [] state
   let defaultBody ← optionalDefaultBody statement
   let closing ← symbol .rightBrace .statement
   let armsSpan := SourceSpan.cover opening.span closing.span

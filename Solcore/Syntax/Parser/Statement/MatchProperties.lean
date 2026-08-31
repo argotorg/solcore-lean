@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Statement.Match
+import Solcore.Syntax.CollectionValidity
 import Solcore.Syntax.StatementValidity
 
 /-! Contracts for canonical Core match-statement components. -/
@@ -185,6 +186,126 @@ theorem matchCase_startsAtCurrentTokenOnSuccess
       afterMarker markerResult with ⟨token, found, starts⟩
   cases finished
   exact ⟨token, found, starts⟩
+
+/-- The fuel loop retains every parsed and previously accumulated case. -/
+theorem matchCases_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop)
+    (statement : Parser Statement) (patternParser : Parser Pattern)
+    (caseValid : (matchCase statement patternParser).ValidFor
+      (MatchCase.ValidFor expressionValueValid patternValueValid
+        yulValueValid)) :
+    ∀ fuel casesRev input,
+      input.ValidFor →
+      List.ValidFor
+        (MatchCase.ValidFor expressionValueValid patternValueValid
+          yulValueValid) input.file casesRev →
+      (matchCases statement patternParser fuel casesRev input).ValidFor input
+        (List.ValidFor (MatchCase.ValidFor expressionValueValid
+          patternValueValid yulValueValid)) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro casesRev input inputValid accumulatedValid
+      unfold matchCases
+      split
+      · cases caseResult : matchCase statement patternParser input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            have reply := caseValid input inputValid
+            rw [caseResult] at reply
+            exact reply
+        | ok retainedCase next =>
+            have reply := caseValid input inputValid
+            rw [caseResult] at reply
+            simp only
+            split
+            · have nextAccumulated : List.ValidFor
+                  (MatchCase.ValidFor expressionValueValid patternValueValid
+                    yulValueValid) next.file (retainedCase :: casesRev) := by
+                intro item member
+                rcases List.mem_cons.mp member with rfl | member
+                · simpa [reply.2.2] using reply.1
+                · have prior := accumulatedValid item member
+                  simpa [reply.2.2] using prior
+              exact (inductionHypothesis (retainedCase :: casesRev) next
+                reply.2.1 nextAccumulated).of_file_eq reply.2.2
+            · trivial
+      · exact ⟨by
+          intro item member
+          exact accumulatedValid item (by simpa using member), inputValid,
+            rfl⟩
+
+/-- The case loop preserves every ordinary token window. -/
+theorem matchCases_preservesTokenWindow
+    (statement : Parser Statement) (patternParser : Parser Pattern)
+    (caseWindow : Parser.PreservesTokenWindow
+      (matchCase statement patternParser)) :
+    ∀ fuel casesRev,
+      Parser.PreservesTokenWindow
+        (matchCases statement patternParser fuel casesRev) := by
+  intro fuel
+  induction fuel with
+  | zero => intro casesRev input; trivial
+  | succ fuel inductionHypothesis =>
+      intro casesRev input
+      unfold matchCases
+      split
+      · have replyShape := caseWindow input
+        cases caseResult : matchCase statement patternParser input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [caseResult] at replyShape
+            exact replyShape
+        | ok retainedCase next =>
+            rw [caseResult] at replyShape
+            simp only
+            split
+            · exact (inductionHypothesis (retainedCase :: casesRev)
+                next).trans replyShape
+            · trivial
+      · exact ⟨rfl, rfl⟩
+
+/-- Successful case-loop parsing preserves the immutable token carrier. -/
+theorem matchCases_preservesTokensOnSuccess
+    (statement : Parser Statement) (patternParser : Parser Pattern)
+    (caseWindow : Parser.PreservesTokenWindow
+      (matchCase statement patternParser)) (fuel : Nat)
+    (casesRev : List MatchCase) :
+    Parser.PreservesTokensOnSuccess
+      (matchCases statement patternParser fuel casesRev) :=
+  (matchCases_preservesTokenWindow statement patternParser caseWindow fuel
+    casesRev).preservesTokensOnSuccess
+
+/-- The case loop either stays put or advances through complete cases. -/
+theorem matchCases_cursorMonotoneOnSuccess
+    (statement : Parser Statement) (patternParser : Parser Pattern) :
+    ∀ fuel casesRev,
+      Parser.CursorMonotoneOnSuccess
+        (matchCases statement patternParser fuel casesRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro casesRev input value final parsed
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro casesRev input value final parsed
+      unfold matchCases at parsed
+      split at parsed
+      · cases caseResult : matchCase statement patternParser input with
+        | invariant error => simp [caseResult] at parsed
+        | reject failure rejected => simp [caseResult] at parsed
+        | ok retainedCase next =>
+            simp only [caseResult] at parsed
+            split at parsed
+            · exact Nat.le_trans (Nat.le_of_lt (by assumption))
+                (inductionHypothesis (retainedCase :: casesRev) next value
+                  final parsed)
+            · contradiction
+      · cases parsed
+        exact Nat.le_refl _
 
 end MatchInternals
 end Solcore.Syntax.Parser
