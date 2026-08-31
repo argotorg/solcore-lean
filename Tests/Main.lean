@@ -28,6 +28,7 @@ import Solcore.Test.SyntaxParserTypes
 import Solcore.Test.SyntaxParserUpstreamFixtures
 import Solcore.Test.SyntaxParserYul
 import Solcore.Test.SyntaxParserYulChoiceRecovery
+import Solcore.Test.SyntaxProvenanceProperties
 import Solcore.Test.SyntaxPublicBoundary
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
