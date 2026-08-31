@@ -10,6 +10,9 @@ open Solcore.Syntax
 open Solcore.Syntax.Parser
 
 example := @TraitInternals.traitMethod_validFor
+example := @TraitInternals.TraitBody.ValidFor
+example := @TraitInternals.traitMethods_validFor
+example := @TraitInternals.traitBody_validFor
 example := @TraitInternals.traitMethod_preservesTokenWindow
 example := @TraitInternals.traitMethods_preservesTokenWindow
 example := @TraitInternals.traitMethods_cursorMonotoneOnSuccess

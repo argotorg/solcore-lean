@@ -26,6 +26,15 @@ private theorem traitBind_ok_components {α β : Type} {first : Parser α}
 
 namespace TraitInternals
 
+namespace TraitBody
+
+/-- Every trait-body range and retained method belongs to one source. -/
+def ValidFor (file : SourceFile) (body : TraitBody) : Prop :=
+  body.span.ValidFor file ∧
+    List.ValidFor TraitMethod.ValidFor file body.methods
+
+end TraitBody
+
 /-- A signature-only trait method retains only ranges from its source. -/
 theorem traitMethod_validFor :
     traitMethod.ValidFor TraitMethod.ValidFor := by
@@ -101,6 +110,123 @@ theorem traitMethod_preservesTokenWindow
     (symbol_preservesTokenWindow .semicolon .topItem)
   intro semicolon
   exact Parser.pure_preservesTokenWindow _
+
+/-- Closing a trait body retains its braces and accumulated methods. -/
+private theorem closeTraitBody_validFor (opening : Token)
+    (methodsRev : List TraitMethod) (input : State) (openingIndex : Nat)
+    (inputValid : input.ValidFor)
+    (openingFound : input.tokens[openingIndex]? = some opening)
+    (openingBefore : openingIndex < input.cursor)
+    (methodsValid : List.ValidFor TraitMethod.ValidFor
+      input.file methodsRev) :
+    (closeTraitBody opening methodsRev input).ValidFor input
+      TraitBody.ValidFor := by
+  unfold closeTraitBody
+  have closingReply := symbol_validFor .rightBrace .topItem input inputValid
+  cases closingResult : symbol .rightBrace .topItem input with
+  | invariant error =>
+      simp only [bind, closingResult]
+      trivial
+  | reject failure rejected =>
+      rw [closingResult] at closingReply
+      simp only [bind, closingResult]
+      exact closingReply
+  | ok closing next =>
+      rw [closingResult] at closingReply
+      simp only [bind, closingResult, pure, Reply.ValidFor]
+      have closingShape := symbol_ok_state_shape .rightBrace .topItem
+        closingResult
+      have closingAt := State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have openingValid :=
+        inputValid.token_span_validFor_of_getElem?_eq_some openingFound
+      have closingValid : closing.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using closingReply.1
+      have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+        openingFound closingAt openingBefore
+      have ordered : opening.span.startByte ≤ closing.span.endByte :=
+        Nat.le_trans openingValid.2.1
+          (Nat.le_trans separated closingValid.2.1)
+      refine ⟨⟨SourceSpan.cover_validFor openingValid closingValid ordered, ?_⟩,
+        closingReply.2.1, closingReply.2.2⟩
+      intro method member
+      exact methodsValid method (by simpa using member)
+
+/-- The fuel-bounded trait loop retains every parsed method and body range. -/
+theorem traitMethods_validFor (opening : Token) :
+    ∀ fuel methodsRev input openingIndex,
+      input.ValidFor →
+      input.tokens[openingIndex]? = some opening →
+      openingIndex < input.cursor →
+      List.ValidFor TraitMethod.ValidFor input.file methodsRev →
+      (traitMethods opening fuel methodsRev input).ValidFor input
+        TraitBody.ValidFor := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro methodsRev input openingIndex inputValid openingFound
+        openingBefore methodsValid
+      unfold traitMethods
+      split
+      · exact closeTraitBody_validFor opening methodsRev input openingIndex
+          inputValid openingFound openingBefore methodsValid
+      · split
+        · have methodReply := traitMethod_validFor input inputValid
+          cases methodResult : traitMethod input with
+          | invariant error => trivial
+          | reject failure rejected =>
+              rw [methodResult] at methodReply
+              exact methodReply
+          | ok method next =>
+              rw [methodResult] at methodReply
+              simp only
+              split
+              · have methodTokens := traitMethod_preservesTokenWindow
+                  (functionSignature_preservesTokenWindow .module)
+                  |>.preservesTokensOnSuccess
+                have openingFoundNext : next.tokens[openingIndex]? =
+                    some opening := by
+                  simpa [methodTokens input method next methodResult] using
+                    openingFound
+                have accumulated : List.ValidFor TraitMethod.ValidFor
+                    next.file (method :: methodsRev) := by
+                  intro retained member
+                  simp only [List.mem_cons] at member
+                  rcases member with retainedEq | retainedMember
+                  · subst retained
+                    simpa [methodReply.2.2] using methodReply.1
+                  · simpa [methodReply.2.2] using
+                      methodsValid retained retainedMember
+                have progress : input.cursor < next.cursor := by omega
+                exact (inductionHypothesis (method :: methodsRev) next
+                  openingIndex methodReply.2.1 openingFoundNext
+                    (Nat.lt_trans openingBefore progress) accumulated
+                      ).of_file_eq methodReply.2.2
+              · trivial
+        · unfold rejectAt Reply.ValidFor
+          exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+
+/-- A complete trait body retains both braces and every method. -/
+theorem traitBody_validFor : traitBody.ValidFor TraitBody.ValidFor := by
+  intro input inputValid
+  unfold traitBody
+  have openingReply := symbol_validFor .leftBrace .topItem input inputValid
+  cases openingResult : symbol .leftBrace .topItem input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [openingResult] at openingReply
+      exact openingReply
+  | ok opening next =>
+      rw [openingResult] at openingReply
+      have openingShape := symbol_ok_state_shape .leftBrace .topItem
+        openingResult
+      have openingAtInput :=
+        State.getElem?_eq_some_of_peek?_eq_some openingShape.1
+      have openingAtNext : next.tokens[input.cursor]? = some opening := by
+        simpa [openingShape.2] using openingAtInput
+      exact (traitMethods_validFor opening (next.remainingCount + 1) [] next
+        input.cursor openingReply.2.1 openingAtNext (by simp [openingShape.2])
+          (by simp [List.ValidFor])).of_file_eq openingReply.2.2
 
 private theorem closeTraitBody_preservesTokenWindow (opening : Token)
     (methodsRev : List TraitMethod) :
