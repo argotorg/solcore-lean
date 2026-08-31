@@ -9,6 +9,7 @@ namespace Tests
 open Solcore.Syntax
 open Solcore.Syntax.Parser
 
+example := @TraitInternals.traitMethod_validFor
 example := @TraitInternals.traitMethod_preservesTokenWindow
 example := @TraitInternals.traitMethods_preservesTokenWindow
 example := @TraitInternals.traitMethods_cursorMonotoneOnSuccess

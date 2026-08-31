@@ -1,4 +1,6 @@
+import Solcore.Syntax.Parser.FunctionProperties
 import Solcore.Syntax.Parser.Trait
+import Solcore.Syntax.CallableDeclarationValidity
 
 /-! Ordinary-result contracts for canonical trait parsing. -/
 
@@ -23,6 +25,69 @@ private theorem traitBind_ok_components {α β : Type} {first : Parser α}
   | invariant error => rw [firstResult] at parsed; contradiction
 
 namespace TraitInternals
+
+/-- A signature-only trait method retains only ranges from its source. -/
+theorem traitMethod_validFor :
+    traitMethod.ValidFor TraitMethod.ValidFor := by
+  intro input inputValid
+  have weak : traitMethod.ValidFor (fun _ _ => True) := by
+    unfold traitMethod
+    apply Parser.bind_validFor (functionSignature_validFor .module)
+    intro signature
+    apply Parser.bind_validFor (symbol_validFor .semicolon .topItem)
+    intro semicolon
+    exact Parser.pure_validFor _ _ (fun _ => trivial)
+  have weakResult := weak input inputValid
+  cases parsed : traitMethod input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok method final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold traitMethod at stages
+      rcases traitBind_ok_components stages with
+        ⟨signature, afterSignature, signatureResult, rest⟩
+      rcases traitBind_ok_components rest with
+        ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+      have signatureReply := functionSignature_validFor .module input inputValid
+      rw [signatureResult] at signatureReply
+      have semicolonReply := symbol_validFor .semicolon .topItem
+        afterSignature signatureReply.2.1
+      rw [semicolonResult] at semicolonReply
+      have signatureValid : FunctionSignature.ValidFor input.file signature := by
+        simpa [signatureReply.2.2] using signatureReply.1
+      have semicolonValid : semicolon.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, semicolonReply.2.2,
+          signatureReply.2.2] using semicolonReply.1
+      rcases functionSignature_startsAtCurrentTokenOnSuccess .module
+          input signature afterSignature signatureResult with
+        ⟨first, firstFound, signatureStart⟩
+      have firstAt := State.getElem?_eq_some_of_peek?_eq_some firstFound
+      have semicolonShape := symbol_ok_state_shape .semicolon .topItem
+        semicolonResult
+      have signatureTokens := functionSignature_preservesTokensOnSuccess .module
+        input signature afterSignature signatureResult
+      have semicolonAt : input.tokens[afterSignature.cursor]? = some semicolon := by
+        simpa [signatureTokens] using
+          State.getElem?_eq_some_of_peek?_eq_some semicolonShape.1
+      have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+        firstAt semicolonAt
+          (FunctionInternals.functionSignature_cursor_lt_onSuccess .module
+            signatureResult)
+      have firstValid := inputValid.peek?_span_validFor firstFound
+      have ordered : signature.span.startByte ≤ semicolon.span.endByte := by
+        calc
+          signature.span.startByte = first.span.startByte := signatureStart.symm
+          _ ≤ first.span.endByte := firstValid.2.1
+          _ ≤ semicolon.span.startByte := separated
+          _ ≤ semicolon.span.endByte := semicolonValid.2.1
+      have outerValid := SourceSpan.cover_validFor signatureValid.1
+        semicolonValid ordered
+      cases finished
+      exact ⟨⟨outerValid, by simp, signatureValid, semicolonValid⟩,
+        weakResult.2.1, weakResult.2.2⟩
 
 /-- Trait methods retain the signature parser's ordinary token window. -/
 theorem traitMethod_preservesTokenWindow
