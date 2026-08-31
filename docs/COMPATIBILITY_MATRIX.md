@@ -9,7 +9,8 @@ Solcore rule.
 | Target | Revision or digest |
 | --- | --- |
 | Haskell argotorg/solcore | 1d490d8bb5f374356f06e0720655496482eb1fb4 |
-| Rust argotorg/solcore-rs | 38f4778ea461edfe59106bdb1f9f08c3307b0fc0 |
+| Rust legacy compatibility baseline | 38f4778ea461edfe59106bdb1f9f08c3307b0fc0 |
+| Rust canonical-syntax source (PR #20) | 18fd9f75d290df0070e21ee56e0a5691f232596f |
 | Canonical upstream standard library | 3f81bebfd1fc161ee08972be9e7a52150d02bdf55dd7449dfa058cd81cfafc22 |
 | Rust standard-library Git tree | c58489d2d544b314b7fa843b331062f6f5129655 |
 | Rust compatibility snapshot | c23c43897bb3f9e8d55abc5369dc9bb1ae984e9da1ef9457440aee642923f430 |
@@ -24,6 +25,7 @@ settings, or different EVM revisions do not belong to this baseline.
 | Semantic Core v2 / Oracle v3 | Neither compiler consumes the Core wire | Lean supplies closed semantic fixtures, not source-level three-way conformance |
 | Semantic Core v3 / Oracle v5 `coreCheck` | Neither compiler consumes Core Wire v3 | Lean can check closed current-Core fixtures; no cross-compiler acceptance claim follows |
 | Surface v1 / Oracle v4 | Parser fixtures can share source text | Restricted parser outcomes can be compared |
+| Canonical Syntax | Lean lexer/parser implementation in progress against pinned PR #20 | Lexical and parser behavior can be compared; source semantic conformance cannot yet be claimed |
 | Workspace identity | Internal Lean values | Logical identity behavior is specified but has no external adapter |
 | Frozen Multi frontend | Internal certified one-file API | Frozen lexical, parse, structural, location, and token behavior can be investigated |
 | Resolution and elaboration | No Lean implementation | No source semantic comparison exists |
@@ -84,10 +86,11 @@ is classified.
 ## Current limitations
 
 The Haskell and Rust compilers do not consume Semantic Core v1, v2, or v3, so
-Core results cannot establish end-to-end source conformance. Oracle v4 stops at
-parsing, while Oracle v5 starts from already structured Core and a scenario.
-There is no Lean resolution, source-typing, or source-to-Core elaboration path
-connecting those interfaces.
+Core results cannot establish end-to-end source conformance. The canonical
+Lean frontend is being implemented against the pinned Rust syntax, but it does
+not yet resolve, source-check, or elaborate programs into Core. Oracle v4
+remains a historical parser, while Oracle v5 starts from already structured
+Core and a scenario.
 
 Consequently there is currently no valid three-way claim about:
 
@@ -99,12 +102,12 @@ Consequently there is currently no valid three-way claim about:
 - cross-compiler source-level storage, transaction commit, or rollback; or
 - EVM execution observations.
 
-## Semantics-first comparison plan
+## Canonical frontend comparison plan
 
 Core v3 fixtures can isolate semantic choices at the checked Core boundary.
-Compiler comparisons can resume at source level only after a stabilized source
-frontend resolves, types, and elaborates programs into the same Core meaning,
-and after each external implementation has an adapter to normalized results.
+Source-level compiler comparison requires the canonical frontend to parse,
+resolve, type, and elaborate programs into the same Core meaning, followed by
+an adapter from each external implementation to normalized results.
 
 For contract execution, every comparison must align:
 
