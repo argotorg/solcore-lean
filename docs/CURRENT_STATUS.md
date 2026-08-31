@@ -288,20 +288,22 @@ recovery, malformed type-alias recovery, pragma item accumulation, and generic
 comma-delimited lists. Their fuel-exhaustion paths are unreachable; the loops
 that require element progress also rule out their no-progress paths.
 
-The complete contract body is now reduced to six explicit member parsers:
-field, contract function, constructor, fallback, type alias, and enum. The
+The complete contract body is now reduced to five explicit member parsers:
+field, contract function, constructor, fallback, and enum. The
 complete file loop, `sourceFile`, `parseLexed`, and public `parse` are reduced
-to seven explicit declaration parsers: export, type alias, module function,
-enum, trait, implementation, and contract. Imports, pragma declarations,
+to six explicit declaration parsers: export, module function, enum, trait,
+implementation, and contract. Imports, type aliases, pragma declarations,
 derive targets, derive attributes, derive recovery, attachment, dispatch, and
-outer accumulation are discharged internally. Recursive named, mapping,
-comptime, proxy, tuple, and function type forms also have local totality
-contracts; the remaining type task is to close their shared recursive parser.
-This is a reduction, not a claim that the six member or seven declaration
-obligations have all been discharged.
+outer accumulation are discharged internally. The complete recursive type
+parser is invariant-free on valid input: its production fuel is proved
+adequate across named, mapping, comptime, proxy, tuple, and function forms.
+Export-path fuel is also discharged; complete export totality is reduced to
+two export-name and delimited-item leaf contracts. This is a reduction, not a
+claim that the five member or six declaration obligations have all been
+discharged.
 
 The remaining formal parser work is to discharge those local obligations
-through the nested declaration, expression, pattern, statement, type, and Yul
+through the nested declaration, expression, pattern, statement, and Yul
 parsers, then relate successful execution to a declarative grammar.
 Parser-wide resource bounds are no longer an undivided open item: the outer
 accumulation, recovery, and generic delimiter bounds above are complete.

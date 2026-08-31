@@ -135,15 +135,14 @@ parse-diagnostic span. Nesting diagnostics also have direct source provenance.
 Totality is being closed from the outside inward. The production bounds for
 top-level and contract-member recovery, malformed type-alias recovery, pragma
 accumulation, and generic comma-delimited lists are proved adequate. The
-complete contract body now exposes six member obligations: field, contract
-function, constructor, fallback, type alias, and enum. The file loop and public
-parser expose seven declaration obligations: export, type alias, module
-function, enum, trait, implementation, and contract. Import, pragma, and the
-complete derive path are already discharged. Named, mapping, comptime, proxy,
-tuple, and function type forms have compositional totality contracts; the next
-proof step is to close their shared recursive type parser, then discharge the
-remaining declaration branches and prove success soundness against a
-declarative grammar.
+complete contract body now exposes five member obligations: field, contract
+function, constructor, fallback, and enum. The file loop and public parser
+expose six declaration obligations: export, module function, enum, trait,
+implementation, and contract. Import, type alias, pragma, and the complete
+derive path are already discharged. The shared recursive type parser is now
+invariant-free with proved production-fuel adequacy across every type form.
+The next proof step is to close export-name leaves and the remaining declaration
+branches, then prove success soundness against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the
