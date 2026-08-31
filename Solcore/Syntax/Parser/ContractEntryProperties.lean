@@ -462,6 +462,302 @@ theorem constructorDecl_startsAtCurrentTokenOnSuccess :
   cases finished
   rfl
 
+/-- A fallback's keyword-to-body cover is source-valid in every parameter branch. -/
+theorem fallbackDecl_span_validOnSuccess
+    (statementValid : SourceFile → Statement → Prop)
+    (bodyValid : (block .require).ValidFor
+      (Block.ValidFor statementValid))
+    {input final : State} {declaration : FallbackDecl}
+    (inputValid : input.ValidFor)
+    (parsed : fallbackDecl input = .ok declaration final) :
+    declaration.span.ValidFor input.file := by
+  have stages := parsed
+  unfold fallbackDecl at stages
+  rcases ContractEntryInternals.entryBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases ContractEntryInternals.entryBind_ok_components rest with
+    ⟨parameters, afterParameters, parametersResult, rest⟩
+  have markerContract := keyword_validFor .fallbackKw .contractMember
+    input inputValid
+  rw [markerResult] at markerContract
+  have parametersContract := ContractEntryInternals.entryParameters_validFor
+    afterMarker markerContract.2.1
+  rw [parametersResult] at parametersContract
+  have markerValidInput : marker.span.ValidFor input.file := by
+    simpa only [Located.ValidFor] using markerContract.1
+  have markerAt := State.getElem?_eq_some_of_peek?_eq_some
+    (acceptToken_ok_state_shape (.keyword .fallbackKw) .contractMember
+      (fun kind => kind == .keyword .fallbackKw) markerResult).1
+  by_cases empty : parameters.elements.isEmpty
+  · simp only [empty, if_true] at rest
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨payableMarker, afterModifiers, modifiersResult, rest⟩
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨body, afterBody, bodyResult, finished⟩
+    have modifiersContract :=
+      ContractEntryInternals.implicitPublicModifiers_validFor .fallbackKw
+        afterParameters parametersContract.2.1
+    rw [modifiersResult] at modifiersContract
+    have bodyContract := isolateBlock_validFor statementValid
+      (block .require) bodyValid afterModifiers modifiersContract.2.1
+    rw [bodyResult] at bodyContract
+    have bodyValidInput : Block.ValidFor statementValid input.file body := by
+      simpa [bodyContract.2.2, modifiersContract.2.2,
+        parametersContract.2.2, markerContract.2.2] using bodyContract.1
+    rcases isolateBlock_startsAtCurrentTokenOnSuccess (block .require)
+        ContractEntryInternals.requiredBlock_startsAtCurrentTokenOnSuccess
+        afterModifiers body afterBody bodyResult with
+      ⟨opening, openingFound, bodyStart⟩
+    have openingAtAfter :=
+      State.getElem?_eq_some_of_peek?_eq_some openingFound
+    have openingAt : input.tokens[afterModifiers.cursor]? = some opening := by
+      simpa [
+        ContractEntryInternals.implicitPublicModifiers_preservesTokensOnSuccess
+          .fallbackKw afterParameters payableMarker afterModifiers
+            modifiersResult,
+        ContractEntryInternals.entryParameters_preservesTokensOnSuccess
+          afterMarker parameters afterParameters parametersResult,
+        keyword_preservesTokensOnSuccess .fallbackKw .contractMember
+          input marker afterMarker markerResult] using openingAtAfter
+    have cursorOrder : input.cursor < afterModifiers.cursor :=
+      Nat.lt_of_lt_of_le
+        (acceptToken_cursor_lt_onSuccess (.keyword .fallbackKw)
+          .contractMember (fun kind => kind == .keyword .fallbackKw)
+          markerResult)
+        (Nat.le_trans
+          (ContractEntryInternals.entryParameters_cursorMonotoneOnSuccess
+            afterMarker parameters afterParameters parametersResult)
+          (ContractEntryInternals.implicitPublicModifiers_cursorMonotoneOnSuccess
+            .fallbackKw afterParameters payableMarker afterModifiers
+              modifiersResult))
+    have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+      markerAt openingAt cursorOrder
+    have ordered : marker.span.startByte ≤ body.span.endByte := by
+      calc
+        marker.span.startByte ≤ marker.span.endByte := markerValidInput.2.1
+        _ ≤ opening.span.startByte := separated
+        _ = body.span.startByte := bodyStart
+        _ ≤ body.span.endByte := bodyValidInput.1.2.1
+    cases finished
+    exact SourceSpan.cover_validFor markerValidInput bodyValidInput.1 ordered
+  · simp only [empty, Bool.false_eq_true, if_false] at rest
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨_, afterValidation, validationResult, rest⟩
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨payableMarker, afterModifiers, modifiersResult, rest⟩
+    rcases ContractEntryInternals.entryBind_ok_components rest with
+      ⟨body, afterBody, bodyResult, finished⟩
+    let diagnostic : ParseDiagnostic := {
+      span := parameters.span
+      kind := .constraintViolation .fallbackRequiresNoParameters
+    }
+    have diagnosticValid : diagnostic.span.ValidFor afterParameters.file := by
+      simpa [diagnostic, parametersContract.2.2] using parametersContract.1.1
+    have validationContract := emitDiagnostic_reply_validFor
+      parametersContract.2.1 diagnostic diagnosticValid
+    rw [validationResult] at validationContract
+    have modifiersContract :=
+      ContractEntryInternals.implicitPublicModifiers_validFor .fallbackKw
+        afterValidation validationContract.2.1
+    rw [modifiersResult] at modifiersContract
+    have bodyContract := isolateBlock_validFor statementValid
+      (block .require) bodyValid afterModifiers modifiersContract.2.1
+    rw [bodyResult] at bodyContract
+    have bodyValidInput : Block.ValidFor statementValid input.file body := by
+      simpa [bodyContract.2.2, modifiersContract.2.2,
+        validationContract.2.2, parametersContract.2.2,
+        markerContract.2.2] using bodyContract.1
+    rcases isolateBlock_startsAtCurrentTokenOnSuccess (block .require)
+        ContractEntryInternals.requiredBlock_startsAtCurrentTokenOnSuccess
+        afterModifiers body afterBody bodyResult with
+      ⟨opening, openingFound, bodyStart⟩
+    have openingAtAfter :=
+      State.getElem?_eq_some_of_peek?_eq_some openingFound
+    have openingAt : input.tokens[afterModifiers.cursor]? = some opening := by
+      simpa [
+        ContractEntryInternals.implicitPublicModifiers_preservesTokensOnSuccess
+          .fallbackKw afterValidation payableMarker afterModifiers
+            modifiersResult,
+        emitDiagnostic_preservesTokensOnSuccess diagnostic afterParameters ()
+          afterValidation validationResult,
+        ContractEntryInternals.entryParameters_preservesTokensOnSuccess
+          afterMarker parameters afterParameters parametersResult,
+        keyword_preservesTokensOnSuccess .fallbackKw .contractMember
+          input marker afterMarker markerResult] using openingAtAfter
+    have cursorOrder : input.cursor < afterModifiers.cursor :=
+      Nat.lt_of_lt_of_le
+        (acceptToken_cursor_lt_onSuccess (.keyword .fallbackKw)
+          .contractMember (fun kind => kind == .keyword .fallbackKw)
+          markerResult)
+        (Nat.le_trans
+          (ContractEntryInternals.entryParameters_cursorMonotoneOnSuccess
+            afterMarker parameters afterParameters parametersResult)
+          (Nat.le_trans
+            (emitDiagnostic_cursorMonotoneOnSuccess diagnostic afterParameters
+              () afterValidation validationResult)
+            (ContractEntryInternals.implicitPublicModifiers_cursorMonotoneOnSuccess
+              .fallbackKw afterValidation payableMarker afterModifiers
+                modifiersResult)))
+    have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+      markerAt openingAt cursorOrder
+    have ordered : marker.span.startByte ≤ body.span.endByte := by
+      calc
+        marker.span.startByte ≤ marker.span.endByte := markerValidInput.2.1
+        _ ≤ opening.span.startByte := separated
+        _ = body.span.startByte := bodyStart
+        _ ≤ body.span.endByte := bodyValidInput.1.2.1
+    cases finished
+    exact SourceSpan.cover_validFor markerValidInput bodyValidInput.1 ordered
+
+/-- Fallback entries retain valid inner syntax across parameter diagnostics. -/
+theorem fallbackDecl_validFor_of_span
+    (statementValid : SourceFile → Statement → Prop)
+    (bodyValid : (isolateBlock (block .require)).ValidFor
+      (Block.ValidFor statementValid))
+    (spanValidOnSuccess : ∀ input declaration next,
+      input.ValidFor → fallbackDecl input = .ok declaration next →
+      declaration.span.ValidFor input.file) :
+    fallbackDecl.ValidFor (FallbackDecl.ValidFor statementValid) := by
+  have weak : fallbackDecl.ValidFor (fun _ _ => True) := by
+    unfold fallbackDecl
+    apply Parser.bind_validFor
+      (keyword_validFor .fallbackKw .contractMember)
+    intro marker
+    apply Parser.bind_validFor_of_value
+      ContractEntryInternals.entryParameters_validFor
+    intro parameters input inputValid parametersValid
+    have remainderValid : (do
+        let payableMarker ←
+          ContractEntryInternals.implicitPublicModifiers .fallbackKw
+        let body ← isolateBlock (block .require)
+        pure (show FallbackDecl from {
+          span := SourceSpan.cover marker.span body.span
+          value := { parameters, payableMarker, body }
+        })).ValidFor (fun _ _ => True) := by
+      apply Parser.bind_validFor
+        (ContractEntryInternals.implicitPublicModifiers_validFor .fallbackKw)
+      intro payableMarker
+      apply Parser.bind_validFor bodyValid
+      intro body
+      exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+    by_cases empty : parameters.elements.isEmpty
+    · simp only [empty, if_true]
+      exact remainderValid input inputValid
+    · simp only [empty, Bool.false_eq_true, if_false]
+      let diagnostic : ParseDiagnostic := {
+        span := parameters.span
+        kind := .constraintViolation .fallbackRequiresNoParameters
+      }
+      have diagnosticValid : diagnostic.span.ValidFor input.file := by simpa [diagnostic] using parametersValid.1
+      have emittedValid := inputValid.emit_validFor diagnostic diagnosticValid
+      have remainderReply := remainderValid (input.emit diagnostic) emittedValid
+      have retargeted := remainderReply.of_file_eq (other := input) (by
+        simp [State.emit])
+      simpa [diagnostic, emitDiagnostic, modifyState, bind, State.emit] using
+        retargeted
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : fallbackDecl input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok declaration final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold fallbackDecl at stages
+      rcases ContractEntryInternals.entryBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases ContractEntryInternals.entryBind_ok_components rest with
+        ⟨parameters, afterParameters, parametersResult, rest⟩
+      have markerContract := keyword_validFor .fallbackKw .contractMember
+        input inputValid
+      rw [markerResult] at markerContract
+      have parametersContract :=
+        ContractEntryInternals.entryParameters_validFor afterMarker
+          markerContract.2.1
+      rw [parametersResult] at parametersContract
+      have parametersValidInput : DelimitedList.ValidFor
+          FunctionParameter.ValidFor input.file parameters := by
+        simpa [parametersContract.2.2, markerContract.2.2] using
+          parametersContract.1
+      have outerValid := spanValidOnSuccess input declaration final inputValid
+        parsed
+      by_cases empty : parameters.elements.isEmpty
+      · simp only [empty, if_true] at rest
+        rcases ContractEntryInternals.entryBind_ok_components rest with
+          ⟨payableMarker, afterModifiers, modifiersResult, rest⟩
+        rcases ContractEntryInternals.entryBind_ok_components rest with
+          ⟨body, afterBody, bodyResult, finished⟩
+        have modifiersContract :=
+          ContractEntryInternals.implicitPublicModifiers_validFor .fallbackKw
+            afterParameters parametersContract.2.1
+        rw [modifiersResult] at modifiersContract
+        have bodyContract := bodyValid afterModifiers modifiersContract.2.1
+        rw [bodyResult] at bodyContract
+        have payableValidInput : Option.ValidFor
+            (fun file span => span.ValidFor file) input.file payableMarker := by
+          simpa [modifiersContract.2.2, parametersContract.2.2,
+            markerContract.2.2] using modifiersContract.1
+        have bodyValidInput : Block.ValidFor statementValid input.file body := by
+          simpa [bodyContract.2.2, modifiersContract.2.2,
+            parametersContract.2.2, markerContract.2.2] using bodyContract.1
+        have payableRetained : ∀ retained ∈ payableMarker, retained.ValidFor input.file := by
+          cases payableMarker <;> simp_all [Option.ValidFor]
+        cases finished
+        exact ⟨⟨outerValid, parametersValidInput.1,
+          parametersValidInput.2, payableRetained, bodyValidInput.1,
+          bodyValidInput.2⟩, weakResult.2.1, weakResult.2.2⟩
+      · simp only [empty, Bool.false_eq_true, if_false] at rest
+        rcases ContractEntryInternals.entryBind_ok_components rest with
+          ⟨_, afterValidation, validationResult, rest⟩
+        rcases ContractEntryInternals.entryBind_ok_components rest with
+          ⟨payableMarker, afterModifiers, modifiersResult, rest⟩
+        rcases ContractEntryInternals.entryBind_ok_components rest with
+          ⟨body, afterBody, bodyResult, finished⟩
+        let diagnostic : ParseDiagnostic := {
+          span := parameters.span
+          kind := .constraintViolation .fallbackRequiresNoParameters
+        }
+        have diagnosticValid : diagnostic.span.ValidFor afterParameters.file := by
+          simpa [diagnostic, parametersContract.2.2] using parametersContract.1.1
+        have validationContract := emitDiagnostic_reply_validFor
+          parametersContract.2.1 diagnostic diagnosticValid
+        rw [validationResult] at validationContract
+        have modifiersContract :=
+          ContractEntryInternals.implicitPublicModifiers_validFor .fallbackKw
+            afterValidation validationContract.2.1
+        rw [modifiersResult] at modifiersContract
+        have bodyContract := bodyValid afterModifiers modifiersContract.2.1
+        rw [bodyResult] at bodyContract
+        have payableValidInput : Option.ValidFor
+            (fun file span => span.ValidFor file) input.file payableMarker := by
+          simpa [modifiersContract.2.2, validationContract.2.2,
+            parametersContract.2.2, markerContract.2.2] using
+            modifiersContract.1
+        have bodyValidInput : Block.ValidFor statementValid input.file body := by
+          simpa [bodyContract.2.2, modifiersContract.2.2,
+            validationContract.2.2, parametersContract.2.2,
+            markerContract.2.2] using bodyContract.1
+        have payableRetained : ∀ retained ∈ payableMarker, retained.ValidFor input.file := by
+          cases payableMarker <;> simp_all [Option.ValidFor]
+        cases finished
+        exact ⟨⟨outerValid, parametersValidInput.1,
+          parametersValidInput.2, payableRetained, bodyValidInput.1,
+          bodyValidInput.2⟩, weakResult.2.1, weakResult.2.2⟩
+
+/-- Complete fallback declarations retain only source-valid syntax. -/
+theorem fallbackDecl_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (bodyValid : (block .require).ValidFor
+      (Block.ValidFor statementValid)) :
+    fallbackDecl.ValidFor (FallbackDecl.ValidFor statementValid) :=
+  fallbackDecl_validFor_of_span statementValid
+    (isolateBlock_validFor statementValid (block .require) bodyValid)
+    (fun _ _ _ inputValid parsed =>
+      fallbackDecl_span_validOnSuccess statementValid bodyValid inputValid
+        parsed)
+
 /-- Fallback parsing preserves windows across its diagnostic branch. -/
 theorem fallbackDecl_preservesTokenWindow
     (bodyShape : Parser.PreservesTokenWindow (block .require)) :
