@@ -37,6 +37,7 @@ import Solcore.Test.SyntaxParserContractRecoveryTotalityProperties
 import Solcore.Test.SyntaxParserDeclarationTrivia
 import Solcore.Test.SyntaxParserDeclarationCanonicalProperties
 import Solcore.Test.SyntaxParserDelimitedProperties
+import Solcore.Test.SyntaxParserDelimitedFuelTotalityProperties
 import Solcore.Test.SyntaxParserDelimitedNonemptyProperties
 import Solcore.Test.SyntaxParserDelimitedTotalityProperties
 import Solcore.Test.SyntaxParserDeriveAttributeProperties
@@ -50,6 +51,8 @@ import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExpressionAtomProperties
 import Solcore.Test.SyntaxParserExpressionProperties
 import Solcore.Test.SyntaxParserExportProperties
+import Solcore.Test.SyntaxParserExportPathTotalityProperties
+import Solcore.Test.SyntaxParserExportTotalityProperties
 import Solcore.Test.SyntaxParserExports
 import Solcore.Test.SyntaxParserFileCanonicalProperties
 import Solcore.Test.SyntaxParserFileCanonicalStateProperties
@@ -119,10 +122,16 @@ import Solcore.Test.SyntaxParserTriviaValidityProperties
 import Solcore.Test.SyntaxParserTypeExprProperties
 import Solcore.Test.SyntaxParserTypeAliasRecoveryTotalityProperties
 import Solcore.Test.SyntaxParserTypeAliasTotalityProperties
+import Solcore.Test.SyntaxParserTypeFuelTotalityProperties
+import Solcore.Test.SyntaxParserTypeFunctionFuelTotalityProperties
 import Solcore.Test.SyntaxParserTypeFunctionInternals
+import Solcore.Test.SyntaxParserTypeFunctionTotalityProperties
+import Solcore.Test.SyntaxParserTypeNamedFuelTotalityProperties
 import Solcore.Test.SyntaxParserTypeNamedTotalityProperties
 import Solcore.Test.SyntaxParserTypeProxyProperties
+import Solcore.Test.SyntaxParserTypeSimpleFuelTotalityProperties
 import Solcore.Test.SyntaxParserTypeSimpleTotalityProperties
+import Solcore.Test.SyntaxParserTypeStrictProperties
 import Solcore.Test.SyntaxParserTypes
 import Solcore.Test.SyntaxParserUpstreamDiagnosticPolicy
 import Solcore.Test.SyntaxParserUpstreamFixtures
