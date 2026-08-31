@@ -193,7 +193,10 @@ private def attachEnumComments (file : SourceFile) (comments : List Comment)
     }
   }
 
-private def attachTraitMethodComments (file : SourceFile)
+/- Proof-visible helpers for declaration-local comment attachment. -/
+namespace TriviaInternals
+
+def attachTraitMethodComments (file : SourceFile)
     (comments : List Comment) (method : TraitMethod) : TraitMethod :=
   { method with value := {
       method.value with
@@ -202,7 +205,7 @@ private def attachTraitMethodComments (file : SourceFile)
     }
   }
 
-private def attachTraitComments (file : SourceFile) (comments : List Comment)
+def attachTraitComments (file : SourceFile) (comments : List Comment)
     (declaration : TraitDecl) : TraitDecl :=
   { declaration with value := {
       declaration.value with
@@ -211,7 +214,7 @@ private def attachTraitComments (file : SourceFile) (comments : List Comment)
     }
   }
 
-private def attachImplMethodComments (file : SourceFile)
+def attachImplMethodComments (file : SourceFile)
     (comments : List Comment) (method : ImplMethod) : ImplMethod :=
   { method with value := {
       method.value with
@@ -220,7 +223,7 @@ private def attachImplMethodComments (file : SourceFile)
     }
   }
 
-private def attachImplComments (file : SourceFile) (comments : List Comment)
+def attachImplComments (file : SourceFile) (comments : List Comment)
     (declaration : ImplDecl) : ImplDecl :=
   { declaration with value := {
       declaration.value with
@@ -228,6 +231,8 @@ private def attachImplComments (file : SourceFile) (comments : List Comment)
         (attachImplMethodComments file comments)
     }
   }
+
+end TriviaInternals
 
 private def attachContractMemberComments (file : SourceFile)
     (comments : List Comment) (member : ContractMember) : ContractMember :=
@@ -254,8 +259,10 @@ def attachTopItemComments (file : SourceFile) (comments : List Comment)
     (item : TopItem) : TopItem :=
   let value := match item.value with
     | .enum declaration => .enum (attachEnumComments file comments declaration)
-    | .trait declaration => .trait (attachTraitComments file comments declaration)
-    | .impl declaration => .impl (attachImplComments file comments declaration)
+    | .trait declaration =>
+        .trait (TriviaInternals.attachTraitComments file comments declaration)
+    | .impl declaration =>
+        .impl (TriviaInternals.attachImplComments file comments declaration)
     | .contract declaration =>
         .contract (attachContractComments file comments declaration)
     | other => other
