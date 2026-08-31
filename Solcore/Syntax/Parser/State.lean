@@ -49,6 +49,17 @@ def peek? (state : State) : Option Token :=
 def peekKind? (state : State) : Option TokenKind :=
   state.peek?.map (·.value)
 
+/-- Look ahead within the active window without changing the cursor. -/
+def peekOffset? (state : State) (offset : Nat) : Option Token :=
+  let index := state.cursor + offset
+  if index < state.window.endIndex then
+    state.tokens[index]?
+  else
+    none
+
+def peekOffsetKind? (state : State) (offset : Nat) : Option TokenKind :=
+  (state.peekOffset? offset).map (·.value)
+
 def atEnd (state : State) : Bool :=
   state.cursor ≥ state.window.endIndex
 
