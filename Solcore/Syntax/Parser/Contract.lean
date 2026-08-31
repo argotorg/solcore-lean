@@ -63,6 +63,19 @@ private def wrapContractEnum (declaration : EnumDecl) : ContractMember := {
   value := .enum declaration
 }
 
+private def extendContractMemberStart (prefixSpan : SourceSpan)
+    (member : ContractMember) : ContractMember :=
+  let span := SourceSpan.cover prefixSpan member.span
+  let value := match member.value with
+    | .field declaration => .field { declaration with span }
+    | .function declaration => .function { declaration with span }
+    | .constructor declaration => .constructor { declaration with span }
+    | .fallback declaration => .fallback { declaration with span }
+    | .typeAlias declaration => .typeAlias { declaration with span }
+    | .enum declaration => .enum { declaration with span }
+    | .error => .error
+  { member with span, value }
+
 private def startsContractField (state : State) : Bool :=
   isIdentifier state && state.peekOffsetKind? 1 == some (.symbol .colon)
 
@@ -119,7 +132,7 @@ private def attachContractDerive (derive : DeriveAttribute)
         span := derive.span
         kind := .constraintViolation .deriveOnlyEnum
       }
-      pure { member with span := SourceSpan.cover derive.span member.span }
+      pure (extendContractMemberStart derive.span member)
 
 private def contractMemberWithAttribute : Parser ContractMember := fun state =>
   if isSymbol state .hash then

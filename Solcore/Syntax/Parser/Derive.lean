@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Delimited
+import Solcore.Syntax.Parser.TopLevel
 
 set_option autoImplicit false
 
@@ -61,8 +62,7 @@ def deriveTarget : Parser DeriveTarget := fun state =>
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
-/-- Parse one well-delimited canonical `#[derive(...)]` attribute. -/
-def deriveAttribute : Parser DeriveAttribute := do
+private def validDeriveAttribute : Parser DeriveAttribute := do
   let hash ← symbol .hash .topItem
   let _ ← symbol .leftBracket .topItem
   let _ ← contextual .derive .topItem
@@ -78,5 +78,59 @@ def deriveAttribute : Parser DeriveAttribute := do
   else
     pure ()
   pure { span, value := { targets } }
+
+private def startsDeriveContractField (state : State) : Bool :=
+  isIdentifier state && state.peekOffsetKind? 1 == some (.symbol .colon)
+
+private def atDeriveDeclarationBoundary (state : State) : Bool :=
+  atTopItemStart state || startsDeriveContractField state ||
+    isSymbol state .rightBrace
+
+private def finishRecoveredDerive (hash last : SourceSpan)
+    (constraint : ParseConstraint) (state : State) : Reply DeriveAttribute :=
+  let span := SourceSpan.cover hash last
+  .ok {
+    span
+    value := { targets := { span, elements := [] } }
+  } (state.emit { span, kind := .constraintViolation constraint })
+
+private def recoverDeriveTail (hash last : SourceSpan) :
+    Nat → State → Reply DeriveAttribute
+  | 0, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
+  | fuel + 1, state =>
+      if isSymbol state .rightBracket then
+        match symbol .rightBracket .topItem state with
+        | .ok closing next =>
+            finishRecoveredDerive hash closing.span
+              .malformedDeriveAttribute next
+        | .reject failure next => .reject failure next
+        | .invariant error => .invariant error
+      else if state.atEnd || atDeriveDeclarationBoundary state then
+        finishRecoveredDerive hash last .unclosedDeriveAttribute state
+      else
+        match state.advance? with
+        | some (token, next) =>
+            recoverDeriveTail hash token.span fuel next
+        | none => finishRecoveredDerive hash last .unclosedDeriveAttribute state
+
+private def recoveredDeriveAttribute : Parser DeriveAttribute := fun state =>
+  match symbol .hash .topItem state with
+  | .ok hash afterHash =>
+      match symbol .leftBracket .topItem afterHash with
+      | .ok opening next =>
+          recoverDeriveTail hash.span opening.span
+            (next.remainingCount + 1) next
+      | .reject failure next => .reject failure next
+      | .invariant error => .invariant error
+  | .reject failure next => .reject failure next
+  | .invariant error => .invariant error
+
+/--
+Parse one canonical derive attribute. Once `#[` has been consumed, malformed
+and unclosed forms become empty recovered attributes without consuming the next
+declaration boundary.
+-/
+def deriveAttribute : Parser DeriveAttribute :=
+  orElse validDeriveAttribute recoveredDeriveAttribute
 
 end Solcore.Syntax.Parser

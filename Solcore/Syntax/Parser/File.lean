@@ -69,6 +69,22 @@ private def wrapContract (declaration : ContractDecl) : TopItem := {
   value := .contract declaration
 }
 
+private def extendTopItemStart (prefixSpan : SourceSpan)
+    (item : TopItem) : TopItem :=
+  let span := SourceSpan.cover prefixSpan item.span
+  let value := match item.value with
+    | .importDecl declaration => .importDecl { declaration with span }
+    | .exportDecl declaration => .exportDecl { declaration with span }
+    | .pragmaDecl declaration => .pragmaDecl { declaration with span }
+    | .typeAlias declaration => .typeAlias { declaration with span }
+    | .enum declaration => .enum { declaration with span }
+    | .trait declaration => .trait { declaration with span }
+    | .impl declaration => .impl { declaration with span }
+    | .contract declaration => .contract { declaration with span }
+    | .function declaration => .function { declaration with span }
+    | .error => .error
+  { item with span, value }
+
 private def plainTopItem : Parser TopItem := fun state =>
   if isKeyword state .importKw then
     match importDecl state with
@@ -139,7 +155,7 @@ private def attachDeriveAttribute (derive : DeriveAttribute)
         span := derive.span
         kind := .constraintViolation .deriveOnlyEnum
       }
-      pure { item with span := SourceSpan.cover derive.span item.span }
+      pure (extendTopItemStart derive.span item)
 
 /-- Parse one top-level form, including an optional derive attribute. -/
 private def topItem : Parser TopItem := fun state =>
