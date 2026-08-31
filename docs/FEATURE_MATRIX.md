@@ -39,12 +39,12 @@ published through Oracle v4.
 
 | Feature | Status | Missing work | Syntax coupling |
 | --- | --- | --- | --- |
-| Source identity and UTF-8 byte spans | Complete executable carrier with public lexer/parser carrier proofs | Deep AST spans and workspace admission policy | High |
+| Source identity and UTF-8 byte spans | Complete executable carrier; public lexer results have nonempty, ordered, nonoverlapping UTF-8-valid token and comment spans, and valid diagnostic spans | Deeper recursive AST spans and workspace admission policy | High |
 | Token and parsed AST catalog | Complete executable representation | Contextual well-formedness layer | High |
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
-| Canonical lexer | Complete executable boundary; every step preserves valid carrier spans and strict progress, the public fuel bound succeeds, and the exceptional branch is unreachable | Cross-carrier order | High |
-| Canonical parser | Complete executable source-to-AST boundary | Declarative grammar soundness and deeper output invariants | High |
-| Canonical frontend proofs | Active | Lexer totality, source/carrier spans, token/comment and cursor order, exact retention, and qualified-name spans are proved; deeper AST spans, parser diagnostics, parser bounds/invariants, and grammar soundness remain | High |
+| Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
+| Canonical parser | Complete executable source-to-AST boundary; public errors occur only after successful lexing and preflight | Declarative grammar soundness and deeper output invariants | High |
+| Canonical frontend proofs | Active | Lexer totality and preflight equivalence are complete. Compositional span/carrier/cursor laws cover qualified names, module paths, selectors, literals and primitives, delimiters, pragmas, Yul leaves, and derive targets. Deeper recursive ASTs, parser diagnostics, grammar invariants, resource bounds, and declarative soundness remain | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 

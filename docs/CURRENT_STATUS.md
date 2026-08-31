@@ -189,26 +189,31 @@ Lean retains an additional explicit recovery diagnostic; exact diagnostic
 kinds, byte ranges, order, and recovery ASTs are now regression-tested.
 
 Formal provenance laws prove source identity, the exact full-file span, and
-exact retention of the lexer carriers. Successful parser preflight proves that
-tokens and comments are nonempty, source ordered, nonoverlapping, and valid at
-UTF-8 boundaries, and that every retained lexical diagnostic has a valid span.
-Those guarantees are exposed directly for successful public parser results.
-The lexer proof layer now connects exact character-prefix consumption to all
-canonical step branches. Every step preserves source ownership and UTF-8-valid
-carrier spans, and those guarantees lift to every successful public lexer
-result. Parser state and primitive token consumers preserve valid spans and
-file ownership; cursor and lookahead laws also expose the source order between
-consumed and remaining tokens. Diagnostic filtering can only remove
-diagnostics and preserves span validity. The character-count fuel bound is now
-proved sufficient, so the public lexer always returns a successful carrier and
-its exceptional `internalFuelExhausted` branch is unreachable. Qualified names
-are the first deep parsed form with a proved covering span and valid component
-spans.
+exact retention of the lexer carriers. The public lexer is proved total: its
+character-count fuel bound always suffices, so the reserved
+`internalFuelExhausted` result cannot occur. Every returned `LexedFile`
+satisfies the complete lexical contract. Its tokens and comments have
+nonempty, UTF-8-valid spans in source order without overlap, and every retained
+lexical diagnostic has a valid source span.
 
-Deep AST-span validity beyond qualified names, validity of every
-parser-generated diagnostic, parser invariant-branch unreachability and
-resource bounds, and soundness against a declarative grammar remain active
-proof work.
+Parser preflight is proved equivalent to that lexical contract, and every
+result from the public lexer passes it. Consequently, a public parser error
+cannot originate in lexing or preflight; it occurs only after both have
+succeeded and the grammar parser has started. Successful public parses expose
+the same carrier guarantees directly.
+
+Parser state, primitive consumers, and cursor/lookahead laws preserve valid
+spans, file ownership, the immutable token carrier, and the relevant source
+order. These compositional guarantees now cover qualified names, module paths,
+selector and operator names, literals and primitive token parsers, generic
+delimited lists, pragma declarations, Yul name and literal leaves, and derive
+targets. Diagnostic filtering can only remove diagnostics and preserves span
+validity.
+
+The remaining proof work covers the deeper recursive AST, validity of every
+parser-generated diagnostic, provenance and unreachability of grammar
+invariant failures, parser resource bounds, and soundness against a
+declarative grammar.
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.

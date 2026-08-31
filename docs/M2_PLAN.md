@@ -54,18 +54,26 @@ source-AST gap. The four diagnostic-cardinality differences are frozen by
 exact malformed-fixture regressions and preserve the same rejection/recovery
 behavior.
 
-Source and full-file-span provenance, exact lexer-carrier retention, public
-token/comment/lexical-diagnostic span validity, and token/comment source order
-are complete. Exact-prefix scanner proofs feed a preservation theorem for every
-lexer step, and successful public lexer results expose valid spans for all
-tokens, comments, and lexical diagnostics. Parser state, cursor/lookahead laws,
-and primitive consumers preserve span validity, source ownership, and token
-order. Strict decrease of the remaining character suffix proves the public
-lexer fuel bound sufficient and makes its exceptional branch unreachable.
-Qualified names also preserve their covering and component spans. The
-remaining proof boundary is deeper AST-span validity, parser-generated
-diagnostic validity, parser invariant-branch unreachability and resource
-bounds, and parser success soundness against a declarative grammar.
+Source and full-file-span provenance and exact lexer-carrier retention are
+complete. The public lexer is proved total and always returns a `LexedFile`
+whose tokens and comments are nonempty, source ordered, nonoverlapping, and
+valid at UTF-8 byte boundaries; its lexical diagnostics also have valid source
+spans. Exact-prefix scanner proofs and the strict decrease of the unconsumed
+suffix establish this contract for every lexer branch and rule out the
+exceptional fuel result.
+
+Parser preflight accepts exactly the lexer results satisfying that contract,
+and every public lexer result passes preflight. Any public parser error
+therefore occurs only after successful lexing and preflight. Parser state,
+primitive consumers, carrier-preservation rules, and cursor/order laws support
+compositional proofs for qualified names, module paths, selector and operator
+names, literals and primitive parsers, generic delimited lists, pragma
+declarations, Yul name and literal leaves, and derive targets.
+
+The remaining proof boundary covers deeper recursive AST forms,
+parser-generated diagnostic validity, provenance and unreachability of grammar
+invariant failures, parser resource bounds, and parser success soundness
+against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the

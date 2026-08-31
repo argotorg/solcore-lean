@@ -168,15 +168,22 @@ execution are subsequent frontend milestones. They target the already checked
 Semantic Core and Oracle v5 execution boundary rather than changing its
 meaning.
 
-The implemented proof boundary currently establishes exact source ownership,
-full-file provenance, retained carrier identity, token/comment source order,
-UTF-8-valid lexical spans, all-branch lexer-step preservation, successful public
-lexer carrier validity, strict lexer progress and public fuel sufficiency,
-exact-prefix scanner progress, parser-state cursor and lookahead order,
-primitive token-consumer preservation, qualified-name spans, and
-diagnostic-filter span preservation. Deeper AST spans, all parser-produced
-diagnostics, parser invariant-branch unreachability and resource bounds, and
-declarative grammar soundness remain intentionally separate follow-up proofs.
+The implemented proof boundary establishes exact source ownership,
+full-file provenance, retained carrier identity, exact-prefix scanner progress,
+and preservation across every lexer branch. The public lexer is total and
+always returns tokens and comments with nonempty, ordered, nonoverlapping,
+UTF-8-valid spans, together with valid lexical-diagnostic spans. Parser
+preflight accepts exactly these valid lexer results, every public lexer result
+passes it, and any public parse error therefore occurs after preflight.
+
+The compositional parser laws preserve source ownership, valid spans, the
+token carrier, and the cursor/order facts needed by surrounding parsers. They
+currently cover qualified names, module paths, selector and operator names,
+literals and primitive parsers, generic delimited lists, pragma declarations,
+Yul name and literal leaves, and derive targets. Diagnostic filtering also
+preserves span validity. Deeper recursive AST spans, validity of all
+parser-produced diagnostics, grammar-invariant provenance and unreachability,
+resource bounds, and declarative grammar soundness remain follow-up proof work.
 
 ## Consequences
 
