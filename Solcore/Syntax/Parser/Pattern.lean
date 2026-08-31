@@ -227,12 +227,16 @@ def patternCore (nested : Parser Pattern)
 
 end PatternInternals
 
-private def isPatternBoundary (state : State) : Bool :=
+namespace PatternInternals
+
+/-- Whether pattern recovery must stop before the current token. -/
+def isPatternBoundary (state : State) : Bool :=
   state.atEnd ||
     [.comma, .rightParen, .fatArrow, .pipe, .rightBrace].any
       (isSymbol state)
 
-private def finishRecoveredPattern (first last : SourceSpan)
+/-- Finish recovery with one error pattern spanning the consumed tokens. -/
+def finishRecoveredPattern (first last : SourceSpan)
     (state : State) : Reply Pattern :=
   let span := SourceSpan.cover first last
   .ok { span, value := .error } (state.emit {
@@ -240,7 +244,8 @@ private def finishRecoveredPattern (first last : SourceSpan)
     kind := .recovered .pattern
   })
 
-private def recoverPatternAux (first last : SourceSpan) :
+/-- Consume malformed pattern tokens until a canonical boundary is reached. -/
+def recoverPatternAux (first last : SourceSpan) :
     Nat → State → Reply Pattern
   | 0, state => .invariant (.fuelExhausted .pattern state.currentSpan)
   | fuel + 1, state =>
@@ -251,6 +256,8 @@ private def recoverPatternAux (first last : SourceSpan) :
         | some (token, next) => recoverPatternAux first token.span fuel next
         | none => finishRecoveredPattern first last state
 
+end PatternInternals
+
 /-- Build one pattern recursion layer with a supplied comptime expression. -/
 def patternLayer (nested : Parser Pattern)
     (expression : Parser Expr) : Parser Pattern := fun state =>
@@ -258,12 +265,12 @@ def patternLayer (nested : Parser Pattern)
   | .ok value next => .ok value next
   | .reject failure failedState =>
       let rewound := { failedState with cursor := state.cursor }
-      if isPatternBoundary rewound then
+      if PatternInternals.isPatternBoundary rewound then
         .reject failure rewound
       else
         match rewound.advance? with
         | some (token, next) =>
-            recoverPatternAux token.span token.span
+            PatternInternals.recoverPatternAux token.span token.span
               (next.remainingCount + 1)
               (next.emit failure.toDiagnostic)
         | none => .reject failure rewound

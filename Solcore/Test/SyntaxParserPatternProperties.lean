@@ -92,5 +92,21 @@ example := PatternInternals.patternCore_preservesTokenWindow
 example := PatternInternals.patternCore_preservesTokensOnSuccess
 example := PatternInternals.patternCore_cursorMonotoneOnSuccess
 example := PatternInternals.patternCore_startsAtCurrentTokenOnSuccess
+example := PatternInternals.finishRecoveredPattern_validFor
+example := PatternInternals.recoverPatternAux_validFor
+example := PatternInternals.finishRecoveredPattern_preservesTokenWindow
+example := PatternInternals.recoverPatternAux_preservesTokenWindow
+example := PatternInternals.recoverPatternAux_preservesTokensOnSuccess
+example := PatternInternals.recoverPatternAux_cursorMonotoneOnSuccess
+example := PatternInternals.recoverPatternAux_startsAtFirstSpanOnSuccess
+example {input afterToken next : State} {token : Token} {pattern : Pattern}
+    (last : SourceSpan) (fuel : Nat)
+    (advanced : input.advance? = some (token, afterToken))
+    (parsed : PatternInternals.recoverPatternAux token.span last fuel
+      afterToken = .ok pattern next) :
+    ∃ firstToken, input.peek? = some firstToken ∧
+      firstToken.span.startByte = pattern.span.startByte :=
+  PatternInternals.recoverPatternAux_startsAtAdvancedCurrentTokenOnSuccess
+    last fuel advanced parsed
 
 end Tests

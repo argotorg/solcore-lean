@@ -9,6 +9,18 @@ set_option autoImplicit false
 namespace Solcore.Syntax.Parser
 namespace PatternInternals
 
+private theorem advance?_state_shape {input next : State} {token : Token}
+    (advanced : input.advance? = some (token, next)) :
+    input.peek? = some token ∧
+      next = { input with cursor := input.cursor + 1 } := by
+  unfold State.advance? at advanced
+  cases found : input.peek? with
+  | none => simp [found] at advanced
+  | some current =>
+      simp only [found, Option.map_some] at advanced
+      cases advanced
+      exact ⟨rfl, rfl⟩
+
 private theorem patternBind_ok_components {alpha beta : Type}
     {first : Parser alpha} {next : alpha → Parser beta}
     {input final : State} {value : beta}
@@ -1650,6 +1662,162 @@ theorem patternCore_startsAtCurrentTokenOnSuccess
                   input pattern next parsed
               · unfold rejectAt at parsed
                 contradiction
+
+/-- Finishing pattern recovery retains one source-valid error range. -/
+theorem finishRecoveredPattern_validFor
+    (expressionValid : SourceFile → Expr → Prop)
+    (first last : SourceSpan) (state : State)
+    (stateValid : state.ValidFor)
+    (firstValid : first.ValidFor state.file)
+    (lastValid : last.ValidFor state.file)
+    (ordered : first.startByte ≤ last.endByte) :
+    (finishRecoveredPattern first last state).ValidFor state
+      (Pattern.ValidFor expressionValid) := by
+  have spanValid := SourceSpan.cover_validFor firstValid lastValid ordered
+  unfold finishRecoveredPattern Reply.ValidFor
+  exact ⟨.error spanValid, stateValid.emit_validFor _ spanValid, rfl⟩
+
+/-- Pattern recovery preserves provenance while consuming malformed tokens. -/
+theorem recoverPatternAux_validFor
+    (expressionValid : SourceFile → Expr → Prop) (first : SourceSpan) :
+    ∀ fuel last state lastIndex lastToken,
+      state.ValidFor → first.ValidFor state.file →
+      last.ValidFor state.file → first.startByte ≤ last.endByte →
+      state.tokens[lastIndex]? = some lastToken → lastToken.span = last →
+      lastIndex < state.cursor →
+      (recoverPatternAux first last fuel state).ValidFor state
+        (Pattern.ValidFor expressionValid) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro last state lastIndex lastToken stateValid firstValid lastValid
+        ordered lastFound lastSpan lastBefore
+      unfold recoverPatternAux
+      split
+      · exact finishRecoveredPattern_validFor expressionValid first last state
+          stateValid firstValid lastValid ordered
+      · cases advanced : state.advance? with
+        | none =>
+            exact finishRecoveredPattern_validFor expressionValid first last
+              state stateValid firstValid lastValid ordered
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have shape := advance?_state_shape advanced
+            have nextValid := stateValid.advance?_validFor advanced
+            have tokenValid := stateValid.peek?_span_validFor shape.1
+            have currentFound :=
+              State.getElem?_eq_some_of_peek?_eq_some shape.1
+            have lastBeforeCurrent :=
+              stateValid.token_end_le_token_start_of_getElem?_lt lastFound
+                currentFound lastBefore
+            exact (inductionHypothesis token.span next state.cursor token
+              nextValid (by simpa [shape.2] using firstValid)
+              (by simpa [shape.2] using tokenValid)
+              (Nat.le_trans ordered (Nat.le_trans
+                (by simpa [lastSpan] using lastBeforeCurrent)
+                tokenValid.2.1))
+              (by simpa [shape.2] using currentFound) rfl
+              (by simp [shape.2])).of_file_eq (by simp [shape.2])
+
+/-- Finishing recovery leaves the immutable token window unchanged. -/
+theorem finishRecoveredPattern_preservesTokenWindow
+    (first last : SourceSpan) :
+    Parser.PreservesTokenWindow (finishRecoveredPattern first last) := by
+  intro input
+  unfold finishRecoveredPattern Reply.PreservesTokenWindow State.emit
+  exact ⟨rfl, rfl⟩
+
+/-- Pattern recovery preserves the complete immutable token window. -/
+theorem recoverPatternAux_preservesTokenWindow
+    (first last : SourceSpan) (fuel : Nat) :
+    Parser.PreservesTokenWindow (recoverPatternAux first last fuel) := by
+  intro input
+  induction fuel generalizing last input with
+  | zero => trivial
+  | succ fuel inductionHypothesis =>
+      unfold recoverPatternAux
+      split
+      · exact finishRecoveredPattern_preservesTokenWindow first last input
+      · cases advanced : input.advance? with
+        | none =>
+            exact finishRecoveredPattern_preservesTokenWindow first last input
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            exact (inductionHypothesis token.span next).trans (by
+              simp [(advance?_state_shape advanced).2])
+
+/-- Successful pattern recovery retains the immutable token carrier. -/
+theorem recoverPatternAux_preservesTokensOnSuccess
+    (first last : SourceSpan) (fuel : Nat) :
+    Parser.PreservesTokensOnSuccess (recoverPatternAux first last fuel) :=
+  (recoverPatternAux_preservesTokenWindow first last fuel).preservesTokensOnSuccess
+
+/-- Pattern recovery never rewinds the cursor on success. -/
+theorem recoverPatternAux_cursorMonotoneOnSuccess
+    (first last : SourceSpan) (fuel : Nat) :
+    Parser.CursorMonotoneOnSuccess (recoverPatternAux first last fuel) := by
+  intro input value next result
+  induction fuel generalizing last input with
+  | zero => contradiction
+  | succ fuel inductionHypothesis =>
+      unfold recoverPatternAux at result
+      split at result
+      · unfold finishRecoveredPattern at result
+        cases result
+        exact Nat.le_refl _
+      · cases advanced : input.advance? with
+        | none =>
+            simp only [advanced] at result
+            unfold finishRecoveredPattern at result
+            cases result
+            exact Nat.le_refl _
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have advanceCursor : input.cursor ≤ afterToken.cursor := by
+              rw [(advance?_state_shape advanced).2]
+              exact Nat.le_add_right _ 1
+            exact Nat.le_trans advanceCursor
+              (inductionHypothesis token.span afterToken result)
+
+/-- Every recovered error pattern starts at the first consumed token span. -/
+theorem recoverPatternAux_startsAtFirstSpanOnSuccess
+    (first last : SourceSpan) (fuel : Nat) {input next : State}
+    {pattern : Pattern}
+    (parsed : recoverPatternAux first last fuel input = .ok pattern next) :
+    pattern.span.startByte = first.startByte := by
+  induction fuel generalizing last input with
+  | zero => contradiction
+  | succ fuel inductionHypothesis =>
+      unfold recoverPatternAux at parsed
+      split at parsed
+      · unfold finishRecoveredPattern at parsed
+        cases parsed
+        rfl
+      · cases advanced : input.advance? with
+        | none =>
+            simp only [advanced] at parsed
+            unfold finishRecoveredPattern at parsed
+            cases parsed
+            rfl
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at parsed
+            exact inductionHypothesis token.span parsed
+
+/-- Recovery entered by advancing starts at the caller's current token. -/
+theorem recoverPatternAux_startsAtAdvancedCurrentTokenOnSuccess
+    {input afterToken next : State} {token : Token} {pattern : Pattern}
+    (last : SourceSpan) (fuel : Nat)
+    (advanced : input.advance? = some (token, afterToken))
+    (parsed : recoverPatternAux token.span last fuel afterToken =
+      .ok pattern next) :
+    ∃ firstToken, input.peek? = some firstToken ∧
+      firstToken.span.startByte = pattern.span.startByte := by
+  refine ⟨token, (advance?_state_shape advanced).1, ?_⟩
+  exact (recoverPatternAux_startsAtFirstSpanOnSuccess token.span last fuel
+    parsed).symm
 
 end PatternInternals
 end Solcore.Syntax.Parser
