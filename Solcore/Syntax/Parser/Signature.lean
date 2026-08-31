@@ -1,6 +1,8 @@
 import Solcore.Syntax.Parser.Parameter
 import Solcore.Syntax.Parser.Predicate
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Parser.TypeRecursiveProperties
+import Solcore.Syntax.SignatureValidity
 
 set_option autoImplicit false
 
@@ -265,7 +267,8 @@ private def functionModifiers
   let _ ← emitModifierOutsideContract location .payableKw payableMarker
   pure { publicMarker, payableMarker }
 
-private def returnClause : Parser (Option ReturnClause) := do
+/-- Parse an optional canonical function return-type clause. -/
+def returnClause : Parser (Option ReturnClause) := do
   let state ← getState
   if isContextual state .returns then
     let marker ← contextual .returns .typeExpr
@@ -311,5 +314,170 @@ def functionSignature
     returnsClause
     whereClause
   }
+
+private theorem signatureBind_ok_components {α β : Type}
+    {first : Parser α} {next : α → Parser β} {input final : State}
+    {value : β} (parsed : (first >>= next) input = .ok value final) :
+    ∃ firstValue afterFirst, first input = .ok firstValue afterFirst ∧
+      next firstValue afterFirst = .ok value final := by
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      rw [firstResult] at parsed
+      exact ⟨firstValue, afterFirst, rfl, parsed⟩
+  | reject failure rejected => rw [firstResult] at parsed; contradiction
+  | invariant error => rw [firstResult] at parsed; contradiction
+
+/-- Optional return clauses retain their marker, delimiters, and result types. -/
+theorem returnClause_validFor :
+    returnClause.ValidFor (Option.ValidFor ReturnClause.ValidFor) := by
+  have weak : returnClause.ValidFor (fun _ _ => True) := by
+    unfold returnClause
+    apply Parser.bind_validFor getState_validFor
+    intro observed
+    by_cases present : isContextual observed .returns
+    · simp only [present, if_true]
+      apply Parser.bind_validFor (contextual_validFor .returns .typeExpr)
+      intro marker
+      apply Parser.bind_validFor
+        (delimited_validFor TypeExpr.ValidFor .leftParen .rightParen true
+          typeExpr .typeExpr .typeExpr typeExpr_validFor
+          typeExpr_preservesTokensOnSuccess)
+      intro types
+      exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+    · simp only [present]
+      exact Parser.pure_validFor none (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : returnClause input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok result final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold returnClause getState at stages
+      simp only [bind] at stages
+      by_cases present : isContextual input .returns
+      · simp only [present, if_true] at stages
+        rcases signatureBind_ok_components stages with
+          ⟨marker, afterMarker, markerResult, rest⟩
+        rcases signatureBind_ok_components rest with
+          ⟨types, afterTypes, typesResult, finished⟩
+        have markerValid := contextual_validFor .returns .typeExpr input
+          inputValid
+        rw [markerResult] at markerValid
+        have typesValid := delimited_validFor TypeExpr.ValidFor .leftParen
+          .rightParen true typeExpr .typeExpr .typeExpr typeExpr_validFor
+          typeExpr_preservesTokensOnSuccess afterMarker markerValid.2.1
+        rw [typesResult] at typesValid
+        have markerSpanValid : marker.span.ValidFor input.file := by
+          simpa only [Located.ValidFor] using markerValid.1
+        have typesValidInput :
+            DelimitedList.ValidFor TypeExpr.ValidFor input.file types := by
+          simpa [markerValid.2.2] using typesValid.1
+        have markerShape := acceptToken_ok_state_shape
+          (.contextual .returns) .typeExpr (·.isContextual .returns)
+          markerResult
+        have markerAdvanced : input.advance? = some (marker, afterMarker) := by
+          unfold State.advance?
+          rw [markerShape.1, markerShape.2]
+          rfl
+        rcases delimited_startsAtCurrentTokenOnSuccess .leftParen .rightParen
+            true typeExpr .typeExpr .typeExpr afterMarker types afterTypes
+            typesResult with ⟨opening, openingFound, typesStart⟩
+        have markerBeforeTypes :=
+          inputValid.consumed_end_le_peek_start_after_advance markerAdvanced
+            openingFound
+        have ordered : marker.span.startByte ≤ types.span.endByte :=
+          Nat.le_trans markerSpanValid.2.1
+            (Nat.le_trans markerBeforeTypes (by
+              rw [typesStart]
+              exact typesValidInput.1.2.1))
+        have outerValid := SourceSpan.cover_validFor markerSpanValid
+          typesValidInput.1 ordered
+        cases finished
+        exact ⟨by
+            simpa only [Option.ValidFor] using
+              (show ReturnClause.ValidFor input.file {
+                span := SourceSpan.cover marker.span types.span
+                types
+              } from ⟨outerValid, typesValidInput.1, typesValidInput.2⟩),
+          weakResult.2.1, weakResult.2.2⟩
+      · simp only [present, Bool.false_eq_true, if_false] at stages
+        cases stages
+        exact ⟨trivial, inputValid, rfl⟩
+
+private theorem getState_preservesTokenWindowForSignature :
+    Parser.PreservesTokenWindow getState := fun _ => ⟨rfl, rfl⟩
+
+/-- Optional return clauses preserve every ordinary token window. -/
+theorem returnClause_preservesTokenWindow :
+    Parser.PreservesTokenWindow returnClause := by
+  unfold returnClause
+  apply Parser.bind_preservesTokenWindow
+    getState_preservesTokenWindowForSignature
+  intro observed
+  by_cases present : isContextual observed .returns
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (contextual_preservesTokenWindow .returns .typeExpr)
+    intro marker
+    apply Parser.bind_preservesTokenWindow
+      (delimited_preservesTokenWindow .leftParen .rightParen true typeExpr
+        .typeExpr .typeExpr typeExpr_preservesTokenWindow)
+    intro types
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
+theorem returnClause_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess returnClause :=
+  returnClause_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Optional return clauses never rewind the parser cursor. -/
+theorem returnClause_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess returnClause := by
+  unfold returnClause
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isContextual observed .returns
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (contextual_cursorMonotoneOnSuccess .returns .typeExpr)
+    intro marker
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (delimited_cursorMonotoneOnSuccess .leftParen .rightParen true typeExpr
+        .typeExpr .typeExpr)
+    intro types
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
+/-- A present return clause starts at its current `returns` token. -/
+theorem returnClause_some_startsAtCurrentTokenOnSuccess
+    {input next : State} {clause : ReturnClause}
+    (parsed : returnClause input = .ok (some clause) next) :
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte = clause.span.startByte := by
+  unfold returnClause getState at parsed
+  simp only [bind] at parsed
+  by_cases present : isContextual input .returns
+  · simp only [present, if_true] at parsed
+    rcases signatureBind_ok_components parsed with
+      ⟨marker, afterMarker, markerResult, rest⟩
+    rcases signatureBind_ok_components rest with
+      ⟨types, afterTypes, typesResult, finished⟩
+    rcases contextual_startsAtCurrentTokenOnSuccess .returns .typeExpr input
+        marker afterMarker markerResult with ⟨token, found, start⟩
+    cases finished
+    exact ⟨token, found, start⟩
+  · simp only [present, Bool.false_eq_true, if_false] at parsed
+    change Reply.ok none input = .ok (some clause) next at parsed
+    simp at parsed
 
 end Solcore.Syntax.Parser
