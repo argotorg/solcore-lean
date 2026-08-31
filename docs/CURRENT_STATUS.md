@@ -210,12 +210,16 @@ derive attributes, isolated and recursively parsed Core blocks, complete
 function signatures, and the complete recursive type parser. Complete import,
 export, type-alias, and enum declarations retain valid source ranges and satisfy ordinary-result
 token-window, carrier, cursor, and starting-token contracts. A complete
-function declaration has the same provenance guarantee once its recursive body
-parser satisfies the block contract; the generic Core block parser now lifts
-any valid, token-preserving statement parser into that contract. Constructors
-and fallback entries have the corresponding conditional guarantee for non-tail
-bodies. Trait methods, bodies, and complete trait declarations have source,
-token-window, carrier, cursor, strict-progress, and starting-token guarantees.
+function declaration, constructor, fallback entry, and implementation now use
+the canonical recursive Core block contract directly. Their retained bodies
+and implementation methods therefore have unconditional canonical source
+provenance as well as the established parser-state guarantees. Trait methods,
+bodies, and complete trait declarations have source, token-window, carrier,
+cursor, strict-progress, and starting-token guarantees. Contract fields,
+including optional initializers, have complete source and state contracts. The
+plain contract-member core now composes fields, functions, constructors,
+fallback entries, type aliases, enums, and rejection into one canonical
+contract.
 Individual trait predicates satisfy the same boundary, and named function
 parameters retain source provenance through both ordinary parsing and
 recovery. Diagnostic filtering can only remove diagnostics and preserves span
@@ -227,10 +231,9 @@ behavior. At the current proof boundary:
 - the public type and Yul parsers have complete source-validity, token-window,
   carrier, cursor, and starting-token contracts;
 - pattern proofs cover leaves, constructor forms, parenthesized groups and
-  tuples, comptime patterns, dispatch, recovery, and the public fuel-indexed
-  parser. The public lift has source-validity, token-window, carrier, cursor, and
-  starting-token contracts under the documented all-fuel `coreExpression`
-  assumptions;
+  tuples, comptime patterns, dispatch, recovery, and the public parser. The
+  public entry point now has an unconditional canonical source-validity,
+  token-window, carrier, cursor, and starting-token contract;
 - expression proofs cover the established atoms, parenthesized expressions and
   tuples, array literals, the prefix-operator scanner, binary-operator helpers,
   and the complete left- and non-associative layers. Concrete atom parsing,
@@ -252,18 +255,26 @@ behavior. At the current proof boundary:
   patterns, bodies, source ranges, token windows, carriers, and cursor order.
   Optional `default` parsing and the enclosing `match` parser have complete
   source, state, starting-token, and strict-progress contracts; and
-- the fuel-indexed Core expression parser and public `expression` entry point
-  have complete contracts under one explicit assumption: the corresponding
-  statement parser satisfies its source and token-window contract at every
-  fuel. Recognized-statement recovery, including diagnostic reset and
-  re-emission, and the complete eleven-branch statement dispatch are proved
-  independently.
+- expression, pattern, and statement contracts are closed together by one
+  simultaneous fuel induction. A step-indexed canonical validity predicate
+  resolves the lambda-body recursion without an unsafe or assumed fixed point;
+  the public `expression`, `pattern`, `statement`, and both public block modes
+  are instantiated unconditionally; and
+- recognized-statement recovery, including diagnostic reset and re-emission,
+  and the complete eleven-branch statement dispatch are proved independently.
+  Comment selection is also proved to retain only comments from the lexer
+  stream. Comment attachment preserves nested enum, trait, implementation, and
+  contract validity, is proved uniformly for every top-level branch, and lifts
+  to valid item lists and complete `ParsedFile` values. Top-level declaration
+  wrappers and derive attachment preserve canonical provenance and span
+  alignment. Top-level error recovery has canonical source, token-window,
+  carrier, cursor, strict-progress, and starting-token contracts.
 
-The remaining recursive boundary is explicit: expression, pattern, and
-statement fuel contracts must now be closed together by one simultaneous
-induction. Implementation and contract declarations, contract bodies, the
-top-level item loop, and the complete-file parser remain active work. Defining a
-validity predicate is not treated as proof that a parser satisfies it.
+The remaining parser work is concentrated above the Core term layer: contract
+member attributes/recovery and contract bodies, top-level item dispatch,
+the item loop, and the complete-file parser.
+Defining a validity predicate is not treated as proof that a parser satisfies
+it.
 
 Beyond those parser-specific gaps, remaining work includes validity of every
 parser-generated diagnostic, provenance and unreachability of grammar

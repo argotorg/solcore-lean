@@ -72,10 +72,11 @@ body parsers. The generic Core block proof now lifts any valid,
 token-preserving statement parser. Complete imports, exports, type aliases,
 and enums have source-validity, token-window, carrier, cursor, and
 start-position contracts.
-Function declarations reach the same boundary once their recursive block
-parser supplies its validity contract; constructors and fallback entries have
-the corresponding conditional guarantee for non-tail bodies. Trait methods,
-bodies, and complete trait declarations have full source and state contracts.
+Function declarations, constructors, fallback entries, and implementations now
+reach the canonical boundary through the unconditional public Core block
+contract. Trait methods, bodies, and complete trait declarations have full
+source and state contracts. Contract fields and optional initializers also have
+complete source and state contracts.
 Individual trait predicates have reached the same boundary. Named parameters
 preserve provenance through recovery, and their delimited function-parameter
 list has the complete compositional boundary. Public lambda parameters also
@@ -88,9 +89,8 @@ proof implementation currently has the following shape:
 
 - public type and Yul parsers are complete at the compositional boundary;
 - pattern leaves, constructors, groups, tuples, comptime forms, dispatch, and
-  recovery are complete. The public fuel-indexed parser lifts these contracts
-  to source-validity, token-window, carrier, cursor, and starting-token
-  guarantees under the documented all-fuel `coreExpression` assumptions;
+  recovery are complete. The public parser has unconditional canonical
+  source-validity, token-window, carrier, cursor, and starting-token guarantees;
 - established expression atoms, groups, tuples, arrays, operator helpers, and
   the left- and non-associative layers have complete contracts. Concrete atom
   parsing, including lambda and recovery, has source, state, strict-progress,
@@ -114,13 +114,19 @@ proof implementation currently has the following shape:
 - recognized-statement fallback preserves source validity and state across
   primary success, fallback success, rejection, diagnostic reset, and
   diagnostic re-emission. The complete eleven-branch statement dispatch is
-  assembled from those contracts. The public fuel-indexed Core expression
-  contract is complete under an explicit all-fuel Core statement assumption.
+  assembled from those contracts; and
+- expression, pattern, and statement are closed in one simultaneous fuel
+  induction. Step-indexed canonical validity discharges its explicit closure
+  premise, yielding unconditional public contracts for expressions, patterns,
+  statements, and Core blocks.
 
-The next proof work is therefore concrete: close expression, pattern, and
-statement fuel contracts in one simultaneous induction. Implementation and
-contract declarations, the top-level item loop, and the complete-file parser
-follow.
+Plain contract-member dispatch and top-level error recovery now have canonical
+source/state contracts, and comment attachment preserves validity for every
+top-level branch, including nested enum and contract members, item lists, and
+complete parsed-file construction. Top-level declaration wrapping and derive
+attachment also preserve provenance and span alignment. The next proof work is
+therefore concrete: finish contract attributes/recovery and body composition,
+top-level dispatch, the item loop, and the complete-file parser.
 Parser-generated diagnostic validity, grammar-invariant provenance and
 unreachability, resource bounds, and success soundness against a declarative
 grammar remain part of the final boundary.
