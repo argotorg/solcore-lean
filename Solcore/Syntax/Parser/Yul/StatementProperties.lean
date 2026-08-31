@@ -1667,4 +1667,32 @@ theorem yulStatement_startsAtCurrentTokenOnSuccess :
   exact yulStatementWithFuel_startsAtCurrentTokenOnSuccess
     (input.remainingCount + 1) input statement next result
 
+/-- A complete Yul body retains every statement and its enclosing range. -/
+theorem yulBody_validFor :
+    yulBody.ValidFor (YulParsedBlock.ValidFor YulStmt.ValidFor) :=
+  yulBlock_validFor YulStmt.ValidFor yulStatement yulStatement_validFor
+    yulStatement_preservesTokensOnSuccess
+
+/-- Complete Yul bodies preserve every ordinary token window. -/
+theorem yulBody_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulBody :=
+  yulBlock_preservesTokenWindow yulStatement
+    yulStatement_preservesTokenWindow
+
+theorem yulBody_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess yulBody :=
+  yulBody_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Successful Yul-body parsing never rewinds its caller. -/
+theorem yulBody_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess yulBody :=
+  yulBlock_cursorMonotoneOnSuccess yulStatement
+    yulStatement_preservesTokensOnSuccess
+
+/-- A successful Yul body starts at its opening brace token. -/
+theorem yulBody_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess yulBody (·.span) :=
+  yulBlock_startsAtCurrentTokenOnSuccess yulStatement
+    yulStatement_preservesTokensOnSuccess
+
 end Solcore.Syntax.Parser

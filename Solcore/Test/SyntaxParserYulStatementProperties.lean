@@ -87,5 +87,10 @@ example := yulStatement_preservesTokensOnSuccess
 example := yulStatement_validFor
 example := yulStatement_cursorMonotoneOnSuccess
 example := yulStatement_startsAtCurrentTokenOnSuccess
+example := yulBody_validFor
+example := yulBody_preservesTokenWindow
+example := yulBody_preservesTokensOnSuccess
+example := yulBody_cursorMonotoneOnSuccess
+example := yulBody_startsAtCurrentTokenOnSuccess
 
 end Tests
