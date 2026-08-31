@@ -33,7 +33,10 @@ def selectedImport : Parser SelectedImport := do
     value := { source, alias }
   }
 
-private def requireSelected (values : DelimitedList SelectedImport) :
+namespace ImportInternals
+
+/-- Require at least one selected import. -/
+def requireSelected (values : DelimitedList SelectedImport) :
     Parser (NonemptyDelimitedList SelectedImport) :=
   match values.elements with
   | head :: tail => pure {
@@ -42,7 +45,11 @@ private def requireSelected (values : DelimitedList SelectedImport) :
     }
   | [] => fun _ => .invariant (.noProgress .topLevel values.span)
 
-namespace ImportInternals
+/-- Parse a nonempty braced selected-import list. -/
+def selectedImports : Parser (NonemptyDelimitedList SelectedImport) := do
+  let values ← delimited .leftBrace .rightBrace false selectedImport
+    .importDecl .topLevel
+  requireSelected values
 
 /-- Require at least one selector in a hiding clause. -/
 def requireSelectorNames (values : DelimitedList SelectorName) :
@@ -124,9 +131,7 @@ private def wildcardImport (start : SourceSpan) : Parser ImportDecl := do
   finishImport start last (.wildcard path hidden)
 
 private def selectiveImport (start : SourceSpan) : Parser ImportDecl := do
-  let values ← delimited .leftBrace .rightBrace false selectedImport
-    .importDecl .topLevel
-  let selection ← requireSelected values
+  let selection ← ImportInternals.selectedImports
   let _ ← contextual .from .importDecl
   let path ← modulePath .importDecl
   let hidden ← ImportInternals.optionalHiding

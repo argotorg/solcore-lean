@@ -27,5 +27,10 @@ example := selectedImport_preservesTokenWindow
 example := selectedImport_preservesTokensOnSuccess
 example := selectedImport_cursorMonotoneOnSuccess
 example := selectedImport_startsAtCurrentTokenOnSuccess
+example := selectedImports_validFor
+example := selectedImports_preservesTokenWindow
+example := selectedImports_preservesTokensOnSuccess
+example := selectedImports_cursorMonotoneOnSuccess
+example := selectedImports_startsAtCurrentTokenOnSuccess
 
 end Tests

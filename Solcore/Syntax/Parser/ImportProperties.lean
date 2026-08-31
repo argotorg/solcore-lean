@@ -444,4 +444,127 @@ theorem selectedImport_startsAtCurrentTokenOnSuccess :
     ⟨alias, afterAlias, _aliasResult, finished⟩
   cases alias <;> cases finished <;> rfl
 
+private theorem requireSelected_validFor
+    (values : DelimitedList SelectedImport) :
+    (ImportInternals.requireSelected values).ValidFor
+      (fun _ _ => True) := by
+  intro input inputValid
+  unfold ImportInternals.requireSelected
+  cases values.elements with
+  | nil => trivial
+  | cons head tail => exact ⟨trivial, inputValid, rfl⟩
+
+private theorem requireSelected_preservesTokenWindow
+    (values : DelimitedList SelectedImport) :
+    Parser.PreservesTokenWindow
+      (ImportInternals.requireSelected values) := by
+  intro input
+  unfold ImportInternals.requireSelected
+  cases values.elements with
+  | nil => trivial
+  | cons head tail => exact ⟨rfl, rfl⟩
+
+private theorem requireSelected_cursorMonotoneOnSuccess
+    (values : DelimitedList SelectedImport) :
+    Parser.CursorMonotoneOnSuccess
+      (ImportInternals.requireSelected values) := by
+  intro input selection next result
+  unfold ImportInternals.requireSelected at result
+  cases elements : values.elements with
+  | nil =>
+      rw [elements] at result
+      contradiction
+  | cons head tail =>
+      rw [elements] at result
+      cases result
+      exact Nat.le_refl _
+
+/-- A nonempty selected-import list retains delimiters and every item. -/
+theorem selectedImports_validFor :
+    ImportInternals.selectedImports.ValidFor
+      (NonemptyDelimitedList.ValidFor SelectedImport.ValidFor) := by
+  have weak : ImportInternals.selectedImports.ValidFor
+      (fun _ _ => True) := by
+    unfold ImportInternals.selectedImports
+    apply Parser.bind_validFor (delimited_validFor SelectedImport.ValidFor
+      .leftBrace .rightBrace false selectedImport .importDecl .topLevel
+      selectedImport_validFor selectedImport_preservesTokensOnSuccess)
+    intro values
+    exact requireSelected_validFor values
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : ImportInternals.selectedImports input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok selection final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold ImportInternals.selectedImports at stages
+      rcases importBind_ok_components stages with
+        ⟨values, afterValues, valuesResult, selectionResult⟩
+      have valuesValid := delimited_validFor SelectedImport.ValidFor
+        .leftBrace .rightBrace false selectedImport .importDecl .topLevel
+        selectedImport_validFor selectedImport_preservesTokensOnSuccess
+        input inputValid
+      rw [valuesResult] at valuesValid
+      unfold ImportInternals.requireSelected at selectionResult
+      cases elements : values.elements with
+      | nil =>
+          rw [elements] at selectionResult
+          contradiction
+      | cons head tail =>
+          rw [elements] at selectionResult
+          cases selectionResult
+          exact ⟨⟨valuesValid.1.1, by
+              intro item member
+              exact valuesValid.1.2 item (by
+                simpa [NonemptyList.toList, elements] using member)⟩,
+            weakResult.2.1, weakResult.2.2⟩
+
+/-- Selected-import lists preserve every ordinary token window. -/
+theorem selectedImports_preservesTokenWindow :
+    Parser.PreservesTokenWindow ImportInternals.selectedImports := by
+  unfold ImportInternals.selectedImports
+  apply Parser.bind_preservesTokenWindow
+    (delimited_preservesTokenWindow .leftBrace .rightBrace false
+      selectedImport .importDecl .topLevel
+      selectedImport_preservesTokenWindow)
+  intro values
+  exact requireSelected_preservesTokenWindow values
+
+theorem selectedImports_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess ImportInternals.selectedImports :=
+  selectedImports_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Selected-import lists never rewind the parser cursor. -/
+theorem selectedImports_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess ImportInternals.selectedImports := by
+  unfold ImportInternals.selectedImports
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (delimited_cursorMonotoneOnSuccess .leftBrace .rightBrace false
+      selectedImport .importDecl .topLevel)
+  intro values
+  exact requireSelected_cursorMonotoneOnSuccess values
+
+/-- A selected-import list starts at its opening brace. -/
+theorem selectedImports_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess
+      ImportInternals.selectedImports (·.span) := by
+  unfold ImportInternals.selectedImports
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (delimited_startsAtCurrentTokenOnSuccess .leftBrace .rightBrace false
+      selectedImport .importDecl .topLevel)
+  intro values input selection final parsed
+  unfold ImportInternals.requireSelected at parsed
+  cases elements : values.elements with
+  | nil =>
+      rw [elements] at parsed
+      contradiction
+  | cons head tail =>
+      rw [elements] at parsed
+      cases parsed
+      rfl
+
 end Solcore.Syntax.Parser
