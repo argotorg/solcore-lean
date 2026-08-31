@@ -63,21 +63,28 @@ inductive StringScan where
       (startByte : Nat)
       (endByte : Nat)
       (escape : Option Char)
+      (tokenEndByte : Nat)
+      (remaining : List Char)
   | unterminated
   deriving Repr, BEq
 
 /-- Scan after an opening quote, retaining spelling and decoded value. -/
-def scanString : Nat → List Char → List Char → List Char → StringScan
-  | _, [], _, _ => .unterminated
-  | cursor, '"' :: rest, spellingRev, decodedRev =>
-      .closed
-        (cursor + 1)
-        (String.ofList ('"' :: spellingRev).reverse)
-        (String.ofList decodedRev.reverse)
-        rest
-  | cursor, '\\' :: [], _, _ =>
-      .invalidEscape cursor (cursor + 1) none
-  | cursor, '\\' :: escaped :: rest, spellingRev, decodedRev =>
+def scanString :
+    Nat → List Char → List Char → List Char →
+      Option (Nat × Nat × Option Char) → StringScan
+  | _, [], _, _, _ => .unterminated
+  | cursor, '"' :: rest, spellingRev, decodedRev, invalid =>
+      match invalid with
+      | some (startByte, endByte, escape) =>
+          .invalidEscape startByte endByte escape (cursor + 1) rest
+      | none =>
+          .closed
+            (cursor + 1)
+            (String.ofList ('"' :: spellingRev).reverse)
+            (String.ofList decodedRev.reverse)
+            rest
+  | _, '\\' :: [], _, _, _ => .unterminated
+  | cursor, '\\' :: escaped :: rest, spellingRev, decodedRev, invalid =>
       let decoded? :=
         match escaped with
         | 'n' => some '\n'
@@ -85,25 +92,33 @@ def scanString : Nat → List Char → List Char → List Char → StringScan
         | '"' => some '"'
         | '\\' => some '\\'
         | _ => none
-      match decoded? with
-      | none =>
-          .invalidEscape cursor (cursor + 1 + escaped.utf8Size) (some escaped)
-      | some decoded =>
-          scanString
-            (cursor + 1 + escaped.utf8Size)
-            rest
-            (escaped :: '\\' :: spellingRev)
-            (decoded :: decodedRev)
-  | cursor, character :: rest, spellingRev, decodedRev =>
+      let nextInvalid :=
+        match invalid, decoded? with
+        | some prior, _ => some prior
+        | none, none =>
+            some (cursor, cursor + 1 + escaped.utf8Size, some escaped)
+        | none, some _ => none
+      let nextDecodedRev :=
+        match decoded? with
+        | some decoded => decoded :: decodedRev
+        | none => decodedRev
+      scanString
+        (cursor + 1 + escaped.utf8Size)
+        rest
+        (escaped :: '\\' :: spellingRev)
+        nextDecodedRev
+        nextInvalid
+  | cursor, character :: rest, spellingRev, decodedRev, invalid =>
       scanString
         (cursor + character.utf8Size)
         rest
         (character :: spellingRev)
         (character :: decodedRev)
+        invalid
 
 /-- Start a quoted-string scan with the already-consumed opening quote. -/
 def scanQuotedString (startByte : Nat) (remaining : List Char) : StringScan :=
-  scanString (startByte + 1) remaining ['"'] []
+  scanString (startByte + 1) remaining ['"'] [] none
 
 /-- Complete delimited-meta scan used for rejected Yul antiquotes. -/
 structure MetaScan where

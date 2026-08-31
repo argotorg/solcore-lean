@@ -23,9 +23,13 @@ structure LexedFile where
   source : SourceId
   tokens : List Token
   comments : List Comment
+  diagnostics : List LexicalDiagnostic
   deriving Repr, BEq, DecidableEq
 
-/-- Total public result of canonical lexical analysis. -/
+/--
+Total public result. Ordinary lexical errors are accumulated in `LexedFile`;
+the exceptional branch is reserved for an internal executor invariant.
+-/
 abbrev LexResult := Except LexicalDiagnostic LexedFile
 
 namespace Lexer
