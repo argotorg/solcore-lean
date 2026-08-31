@@ -2,7 +2,7 @@
 
 - Status: Active
 - Adopted: 2026-07-23
-- Development policy amended: 2026-08-30
+- Development policy amended: 2026-08-31
 
 This charter defines what counts as Solcore specification work. Revision-local
 progress belongs in [Current status](CURRENT_STATUS.md), not in this document.
@@ -28,6 +28,9 @@ The authority order is:
 5. explanatory documentation and implementation evidence.
 
 Unproved executable behavior is not promoted to a normative semantic rule.
+ADR-0153 pins the Rust parser behavior used as the canonical syntax migration
+target. An intentional difference in accepted Lean syntax requires an explicit
+decision rather than an undocumented compatibility exception.
 
 ## Semantic layers
 
@@ -59,12 +62,14 @@ contract, and conformance corpus.
 
 ## Development direction
 
-New grammar-dependent proof work is paused while concrete syntax is unstable.
-The current completed boundary is syntax-independent Semantic Core v3,
-explicit checked-contract runtime semantics, and Oracle v5 publication.
+Concrete syntax work has resumed under ADR-0153 against the pinned PR #20
+revision. The replacement is independent of the old Surface AST and does not
+alter the completed Core and runtime semantics.
 
-This is an implementation-order decision. It does not deprecate or change any
-published parser, Core language, profile, or result.
+Surface v1 and Oracle v4 remain immutable historical publications. Any new
+source publication is additive. Executable lexer and parser coverage precedes
+new grammar-specific proof depth; resolution, source typing, and elaboration
+then connect the parsed source to checked Semantic Core.
 
 ## Required semantic structure
 
