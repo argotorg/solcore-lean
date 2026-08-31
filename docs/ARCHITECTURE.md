@@ -1162,7 +1162,7 @@ An executable function is not used as its own specification.
 | Semantic Core v2 / Oracle v3 | Frozen Core predecessor | No reinterpretation |
 | Surface v1 / Oracle v4 | Frozen historical parser | No reinterpretation |
 | Internal Multi frontend | Frozen historical grammar reference | Maintenance only |
-| Canonical Syntax | Current internal source frontend | Additive publication only |
+| Canonical Syntax | Public Lean source-to-AST frontend | Future wire publication is additive |
 | Semantic Core v3 / Oracle v5 | Current checked Core and contract execution | No reinterpretation |
 | Later Core/runtime extensions | Outside the current public boundary | Additive publication only |
 

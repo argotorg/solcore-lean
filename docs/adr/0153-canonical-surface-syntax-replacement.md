@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-31
 - Scope: source syntax, lexical tokens, parsed syntax, and frontend migration
-- Implementation: In progress
+- Implementation: Executable parser complete; formal proof boundary active
 
 ## Context
 
@@ -80,9 +80,9 @@ The replacement covers the complete parsed source layer:
 - the supported inline-Yul expressions and statements.
 
 Parser recovery and diagnostics are executable behavior, but exact Rust
-diagnostic prose is not automatically a stable Lean wire contract. Lean will
-first make success/failure, source ranges, error categories, and deterministic
-priority explicit. Publication can freeze display text separately if needed.
+diagnostic prose is not automatically a stable Lean wire contract. Lean makes
+success/failure, source ranges, error categories, and deterministic priority
+explicit. Publication can freeze display text separately if needed.
 
 ## Representation strategy
 
@@ -109,7 +109,8 @@ are decoded only by a later semantic phase.
    patterns, statements and Yul, then declarations and files.
 5. Add focused accepted and rejected fixtures derived from the pinned Rust
    tests and canonical corpus.
-6. Replace the public Lean Surface umbrella with the canonical frontend.
+6. Expose the canonical frontend through `Solcore.Syntax` and `Solcore`, while
+   retaining the old Surface modules only as historical compatibility code.
 7. Define resolution, source typing, and elaboration into checked Core as
    later milestones.
 

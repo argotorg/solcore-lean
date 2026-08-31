@@ -25,7 +25,7 @@ settings, or different EVM revisions do not belong to this baseline.
 | Semantic Core v2 / Oracle v3 | Neither compiler consumes the Core wire | Lean supplies closed semantic fixtures, not source-level three-way conformance |
 | Semantic Core v3 / Oracle v5 `coreCheck` | Neither compiler consumes Core Wire v3 | Lean can check closed current-Core fixtures; no cross-compiler acceptance claim follows |
 | Surface v1 / Oracle v4 | Parser fixtures can share source text | Restricted parser outcomes can be compared |
-| Canonical Syntax | Lean lexer/parser implementation in progress against pinned PR #20 | Lexical and parser behavior can be compared; source semantic conformance cannot yet be claimed |
+| Canonical Syntax | Complete executable Lean lexer/parser against pinned PR #20; 23 embedded fixtures and an external 490-file fixed-revision corpus audit | Lexical and parsed-syntax behavior can be compared; source semantic conformance cannot yet be claimed |
 | Workspace identity | Internal Lean values | Logical identity behavior is specified but has no external adapter |
 | Frozen Multi frontend | Internal certified one-file API | Frozen lexical, parse, structural, location, and token behavior can be investigated |
 | Resolution and elaboration | No Lean implementation | No source semantic comparison exists |
@@ -46,6 +46,11 @@ is not differential evidence.
 The v5 runtime defines its own checked Core, depth-one calls, balances,
 creation, logs, commit, and rollback behavior. It does not assert that those
 rules are equivalent to compiler-generated EVM bytecode or to any EVM revision.
+
+The external fixed-revision syntax audit found no acceptance or source-AST gap
+across the 490 accepted files. Four malformed inputs differed only in
+diagnostic cardinality. This is parser comparison evidence, not resolution,
+typing, elaboration, or execution evidence.
 
 ## Evidence rules
 
@@ -87,8 +92,8 @@ is classified.
 
 The Haskell and Rust compilers do not consume Semantic Core v1, v2, or v3, so
 Core results cannot establish end-to-end source conformance. The canonical
-Lean frontend is being implemented against the pinned Rust syntax, but it does
-not yet resolve, source-check, or elaborate programs into Core. Oracle v4
+Lean lexer and parser implement the pinned Rust syntax, but Lean does not yet
+resolve, source-check, or elaborate those parsed programs into Core. Oracle v4
 remains a historical parser, while Oracle v5 starts from already structured
 Core and a scenario.
 

@@ -39,13 +39,14 @@ published through Oracle v4.
 
 | Feature | Status | Missing work | Syntax coupling |
 | --- | --- | --- | --- |
-| Source identity and UTF-8 byte spans | Complete | Workspace admission policy follows parsing | High |
-| Token and parsed AST catalog | Complete | Executable parser witnesses and well-formedness layer | High |
-| Unicode identifier classification | Complete | Lexer integration tests | High |
-| Canonical lexer | Complete executable boundary | Total scan loop, accumulated diagnostics, exact catalog and Rust-span regressions complete; declarative span and provenance laws follow | High |
-| Canonical parser | Active; total entry point with module declarations, complete types, and type aliases | Expressions, patterns, statements, inline Yul, functions, enums, traits, implementations, and contracts | High |
-| Canonical frontend proofs | Planned after parser | Bounds, spans, provenance, and grammar soundness | High |
-| Public source interface | Planned | New additive protocol after parser and proof boundary close | High |
+| Source identity and UTF-8 byte spans | Complete executable carrier | Element-span proofs and workspace admission policy | High |
+| Token and parsed AST catalog | Complete executable representation | Contextual well-formedness layer | High |
+| Unicode identifier classification | Complete | None at the executable syntax boundary | High |
+| Canonical lexer | Complete executable boundary | Deeper span/order and resource proofs | High |
+| Canonical parser | Complete executable source-to-AST boundary | Declarative grammar soundness and deeper output invariants | High |
+| Canonical frontend proofs | Active | Source, full-file span, and exact lexer-carrier retention are proved; element spans, source order, bounds, and grammar soundness remain | High |
+| Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
+| Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 ## Semantic Core v3 feature inventory
 
@@ -101,7 +102,7 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Parametric polymorphism | Planned | type application and preservation | Low |
 | Tabled class resolution | Planned | evidence language, finite search, inconclusive boundary | Low |
 | Comptime/runtime staging | Blocked | staging decision and effect rules | Low |
-| Canonical Syntax-to-Resolved adapter | Planned after parser | connect parsed declarations and occurrences to structured identity | High |
+| Canonical Syntax-to-Resolved adapter | Planned | connect parsed declarations and occurrences to structured identity | High |
 | Resolved-to-Core elaboration | Planned after source typing | type, effect, and stage preservation | Medium |
 
 ## Contract and runtime semantics

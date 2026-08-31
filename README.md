@@ -15,11 +15,11 @@ The repository provides:
 - versioned compatibility interfaces for previously published formats; and
 - Lean proofs and executable tests for the modeled rules.
 
-Oracle v5 consumes Semantic Core rather than source text. A new canonical
-source parser is available as a Lean library for module declarations, the
-complete type grammar, and type aliases; the remaining source grammar, name
-resolution, source type checking, and elaboration are still in progress. An
-end-to-end source execution interface is not yet public.
+Oracle v5 consumes Semantic Core rather than source text. The canonical source
+lexer and parser are available as a Lean library and cover complete files,
+declarations, types, expressions, patterns, statements, inline Yul, comments,
+diagnostics, and recovery. Name resolution, source type checking, elaboration,
+and end-to-end source execution are not yet implemented.
 
 ## Requirements
 
@@ -105,7 +105,7 @@ Or import the checked-contract Oracle directly:
 import Solcore.Oracle.V5
 ```
 
-To lex and parse the currently supported canonical source forms:
+To lex and parse canonical Solcore source:
 
 ```lean
 import Solcore.Syntax
@@ -120,9 +120,9 @@ def exampleSyntax : ParseResult :=
 ```
 
 Successful results retain tokens, comments, lexical diagnostics, parse
-diagnostics, and the source-preserving AST. Ordinary malformed input is
-reported in those diagnostic lists; the exceptional branch is reserved for
-an internal executor invariant.
+diagnostics, and a source-preserving AST for the complete canonical grammar.
+Ordinary malformed input is reported in those diagnostic lists; the
+exceptional branch is reserved for an internal executor invariant.
 
 To generate a reproducible checked Core program, import the synthesis library:
 

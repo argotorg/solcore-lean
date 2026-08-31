@@ -25,11 +25,12 @@ Oracle v5. Their closed wire catalogs and strict Lean codecs are the current
 normative format definitions. Producing additional schema files is a packaging
 task, not missing executable behavior.
 
-Canonical Solcore syntax is now being implemented as a fresh `Solcore.Syntax`
-layer under ADR-0153. It targets `solcore-rs` PR #20 at commit
-`18fd9f75d290df0070e21ee56e0a5691f232596f` and does not reuse the Surface v1
+Canonical Solcore syntax is implemented as a fresh `Solcore.Syntax` layer
+under ADR-0153. Its executable lexer and parser target `solcore-rs` PR #20 at
+commit `18fd9f75d290df0070e21ee56e0a5691f232596f` and do not reuse the Surface v1
 or Multi AST and parser definitions. Oracle v4 remains available only as a
-frozen historical compatibility interface.
+frozen historical compatibility interface. Formal parser proofs continue
+after the executable grammar; this does not block use of the Lean parser API.
 
 ## What works now
 
@@ -165,32 +166,42 @@ committed effects.
 ## Canonical syntax status
 
 Source identities, UTF-8 byte spans, the complete token catalog, the
-source-preserving parsed AST, exact Unicode identifier classification, and a
-total canonical lexer are implemented under `Solcore.Syntax`. Focused tests
-cover the closed token catalog, maximal munch, retained nested comments,
-strict strings, recovery, diagnostic accumulation, and exact UTF-8 spans.
+source-preserving parsed AST, exact Unicode identifier classification, a
+public identifier validator, and the canonical lexer and parser are
+implemented under `Solcore.Syntax`. `import Solcore` exposes this API.
 
-`Solcore.Syntax.Parser.parse` is now a total source-to-syntax library entry
-point. It validates token and comment provenance, applies the canonical
-delimiter and conditional nesting guard, retains lexical and parse diagnostics,
-and attaches leading comments using the Rust 1.97 Unicode-whitespace rules.
-The executable parser currently covers the complete type grammar, top-level
-type aliases, and import, export, and pragma declarations. Its recovery and
-byte-span behavior are regression-tested against the pinned Rust grammar.
+`Solcore.Syntax.Parser.parse` accepts a complete `SourceFile` and returns its
+tokens, retained nested comments, lexical and parse diagnostics, and parsed
+file. The executable grammar covers imports, exports, pragmas, aliases, enums,
+derive attributes, traits, implementations, contracts, fields, constructors,
+fallbacks, functions, types, expressions, patterns, statements, blocks, and
+inline Yul. It applies the pinned nesting policy, preserves UTF-8 byte ranges
+and written distinctions, and recovers ordinary malformed input without using
+the exceptional result branch.
 
-Expressions, patterns, statements, inline Yul, and the remaining declarations
-are still being implemented, so this is not yet a complete arbitrary-source
-parser. Resolution, source type checking, and elaboration into checked Semantic
-Core follow complete executable parsing. No new frontend result is published
-through Oracle v4; that interface continues to mean only its frozen Surface v1
-format.
+The checked-in suite embeds all 23 dedicated positive fixtures from the pinned
+Rust parser and adds focused acceptance, rejection, recovery, comment, Unicode,
+span, legacy-spelling, and deterministic source-mutation tests. A development
+comparison against the same revision also parsed all 490 `corpus/ok` sources
+without lexical or parse diagnostics. No acceptance or source-AST gap was found
+in the fixed-revision parser audit. Four malformed inputs differed only in
+diagnostic cardinality.
+
+Formal provenance laws prove that successful lexer and parser results
+retain their input source identity, that a parsed file has the exact full-file
+span, and that parsing preserves the lexer's exact token, comment, and lexical
+diagnostic lists. Deeper element-span, source-order, resource, and declarative
+grammar proofs remain active work. Resolution, source type checking, and
+elaboration into checked Semantic Core are separate later stages. No new
+frontend result is published through Oracle v4; that interface continues to
+mean only its frozen Surface v1 format.
 
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary
 Solcore source text. In particular, it does not yet provide:
 
-- source parsing, resolution, typing, elaboration, and execution as one pipeline;
+- source resolution, typing, elaboration, and execution as one pipeline;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;

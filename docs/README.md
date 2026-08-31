@@ -84,10 +84,11 @@ syntax is modeled afresh under `Solcore.Syntax` from the implementation pinned
 by ADR-0153. The replacement does not reuse or extend the old Surface AST and
 parser.
 
-The canonical lexer and parser remain separate from Semantic Core and Oracle
-v5. Name resolution, source type checking, and elaboration into checked Core
-are subsequent stages. This lets the frontend progress without changing the
-meaning of any published Oracle protocol.
+The complete executable canonical lexer and parser remain separate from
+Semantic Core and Oracle v5. They are available through the public Lean
+library. Name resolution, source type checking, and elaboration into checked
+Core are subsequent stages. This separation lets frontend work proceed without
+changing the meaning of any published Oracle protocol.
 
 ## Semantics and verification
 

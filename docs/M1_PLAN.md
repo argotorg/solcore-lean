@@ -21,9 +21,10 @@ semantic boundary. They have three connected public parts:
 3. Oracle v5 validates public JSON, checks Core, runs a scenario, and returns a
    total semantic observation.
 
-Active frontend work now implements the canonical PR #20 syntax as an
-independent source layer. The parser produces source syntax; it does not bypass
-resolution, source typing, or elaboration into checked Core.
+The canonical PR #20 syntax is implemented as an independent source layer, and
+its formal parser proof boundary remains active. The parser produces source
+syntax; it does not bypass resolution, source typing, or elaboration into
+checked Core.
 
 ## Why Core remains separate from source syntax
 
@@ -41,9 +42,9 @@ canonical source frontend
   → Oracle v5 observation
 ```
 
-The last three stages are the current public executable path. The first two are
-implemented independently and will be connected explicitly; accepting Core
-JSON does not simulate source parsing or elaboration.
+The canonical source frontend and the last three stages are implemented as
+separate boundaries. The resolved-and-typed source stage does not yet exist;
+accepting Core JSON does not simulate source resolution or elaboration.
 
 ## Core v3 policy
 
@@ -128,8 +129,8 @@ their decoding, capability reports, result shapes, or command-line behavior.
 
 ADR-0153 ended the parser pause. The active target is the pinned PR #20 syntax,
 implemented afresh under `Solcore.Syntax` without Surface v1 or Multi
-compatibility constraints. Executable lexer and parser coverage comes first,
-followed by resource, span, provenance, and grammar-soundness proofs.
+compatibility constraints. Executable lexer and parser coverage is complete;
+resource, span, provenance, and grammar-soundness proofs now follow it.
 
 Surface v1 and Oracle v4 remain frozen historical interfaces and are not
 reinterpreted. Any public result for the canonical frontend requires a new

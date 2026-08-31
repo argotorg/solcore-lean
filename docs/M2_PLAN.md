@@ -28,29 +28,36 @@ their declarative rules remain the formal specification authority.
    revision and add focused span, comment, recovery, and Unicode cases.
 5. Establish resource bounds, span validity, token provenance, and parser
    success soundness against a declarative grammar.
-6. Publish one canonical Lean frontend umbrella after the executable and proof
-   boundaries are coherent.
+6. Expose one canonical Lean frontend umbrella after executable behavior and
+   its initial provenance boundary are coherent.
 7. Add name resolution, source type checking, and elaboration into checked
    Semantic Core as separate stages.
 
 ## Current executable coverage
 
-The first source-to-AST path is operational. It includes:
+The source-to-AST path is operational and public as a Lean library. It
+includes:
 
 - the total public lexer and parser result;
-- input provenance and UTF-8 span validation;
+- source-identity and exact full-file-span provenance;
 - the Rust-compatible delimiter and conditional nesting guard;
 - leading-comment attachment;
-- all canonical type forms and type-alias recovery; and
-- top-level import, export, pragma, and type-alias declarations.
+- the complete declaration and type grammar;
+- expressions, patterns, statements, blocks, and inline Yul;
+- deterministic recovery and diagnostic filtering;
+- all 23 pinned dedicated positive fixtures plus focused negative cases; and
+- explicit rejection of representative spellings from the replaced grammar.
 
-The next parser work adds parameter and signature syntax, followed by
-expressions, patterns, inline Yul, statements and blocks, and the remaining
-declarations. Corpus expansion and grammar proofs continue alongside those
-executable slices rather than preceding them.
+The external fixed-revision comparison audit also accepts all 490 upstream
+`corpus/ok` sources without lexical or parse diagnostics and found no
+source-AST gap. Four malformed inputs differ only in diagnostic cardinality.
+The next syntax work is the proof boundary: element-span validity, source
+order, public resource bounds, and parser success soundness against a
+declarative grammar. Source and full-file-span provenance plus exact
+lexer-carrier retention are complete.
 
-Executable coverage precedes deep grammar-specific proof regeneration. This
-keeps proofs attached to the syntax that users will write while preserving the
+Executable coverage preceded deep grammar-specific proof regeneration. The
+proof work now targets the completed executable grammar while preserving the
 already completed, syntax-independent execution semantics.
 
 ## Completion conditions
