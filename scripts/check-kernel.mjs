@@ -8,6 +8,7 @@ const kernelRoots = [
   "Solcore/Foundation",
   "Solcore/Semantics",
   "Solcore/Standard",
+  "Solcore/Syntax",
   "Solcore/Surface",
   "Solcore/Surface.lean",
   "Solcore/Workspace",

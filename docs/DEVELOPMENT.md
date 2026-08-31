@@ -1,7 +1,7 @@
 # Development guide
 
-This guide describes the required local checks and the workflow for extending
-the executable semantics.
+This guide describes the required local checks and the workflows for extending
+the executable semantics or canonical source frontend.
 
 ## Build and test
 
@@ -109,29 +109,33 @@ explicit publication:
 | Runtime semantics | Solcore/Semantics | observation and verdict decisions |
 | Public protocol | Solcore/Oracle | schemas, profiles, golden cases |
 | Workspace identity | Solcore/Workspace | workspace ADR and tests |
-| Frozen parser maintenance | Solcore/Surface | Surface publication decisions |
-| Frozen Multi reference | Solcore/Surface/Multi | ADR-0015 and frontend freeze plan |
+| Canonical source syntax | Solcore/Syntax | ADR-0153 and canonical syntax plan |
+| Historical parser maintenance | Solcore/Surface | Surface publication decisions |
+| Historical Multi reference | Solcore/Surface/Multi | ADR-0015 and ADR-0018 |
 
-## Frontend freeze
+## Canonical frontend replacement
 
-Do not expand the current Multi grammar or its proof inventory during the
-semantics-first phase. A necessary maintenance fix must:
+Place new source syntax only under `Solcore/Syntax`. Do not extend the Surface
+v1 or Multi grammars, and do not add an adapter merely to reuse their ASTs.
+They remain historical compatibility boundaries.
 
-- preserve the current grammar version;
-- avoid mixing with Core commits;
-- state whether it affects only an incomplete experiment or the frozen
-  reference;
-- run the relevant parser and full repository checks.
+For an upstream syntax change:
 
-Any restored parser experiment remains outside the stable parser baseline.
-Stage semantic changes explicitly so unrelated frontend work is not committed
-by accident.
+1. update the pinned upstream revision;
+2. classify its token, grammar, recovery, AST, and diagnostic impact;
+3. update the corresponding fixtures; and
+4. run the focused frontend and complete repository checks.
+
+Keep syntax and semantic changes independently reviewable. The canonical
+parser reaches checked Core only through explicit resolution, source typing,
+and elaboration stages. A public source result requires a new additive Oracle
+version.
 
 ## Kernel policy
 
-scripts/check-kernel.mjs scans Core, Semantics, Standard, Surface, and Workspace
-Lean sources. It rejects the language escape hatches named in that script,
-including appearances in comments.
+scripts/check-kernel.mjs scans Core, Semantics, Standard, Syntax, Surface, and
+Workspace Lean sources. It rejects the language escape hatches named in that
+script, including appearances in comments.
 
 This policy is separate from Lean's foundations. Critical theorem axiom reports
 may contain propext, Quot.sound, or Classical.choice and should report the
