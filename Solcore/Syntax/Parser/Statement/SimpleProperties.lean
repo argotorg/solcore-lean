@@ -695,6 +695,132 @@ theorem returnStatement_startsAtCurrentTokenOnSuccess
   cases finished
   rfl
 
+/-- A successful return statement has a valid keyword-to-semicolon range. -/
+theorem returnStatement_span_validOnSuccess (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression)
+    {input final : State} {statement : Statement}
+    (inputValid : input.ValidFor)
+    (parsed : returnStatement expression input = .ok statement final) :
+    statement.span.ValidFor input.file := by
+  have stages := parsed
+  unfold returnStatement at stages
+  rcases StatementSimpleInternals.simpleBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨value, afterValue, valueResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+  have markerContract := keyword_validFor .returnKw .statement input inputValid
+  rw [markerResult] at markerContract
+  have valueContract := StatementSimpleInternals.optionalReturnValue_validFor
+    expression expressionValueValid expressionValid afterMarker
+      markerContract.2.1
+  rw [valueResult] at valueContract
+  have semicolonContract := symbol_validFor .semicolon .statement afterValue
+    valueContract.2.1
+  rw [semicolonResult] at semicolonContract
+  have markerValid : marker.span.ValidFor input.file := by
+    simpa only [Located.ValidFor] using markerContract.1
+  have semicolonValid : semicolon.span.ValidFor input.file := by
+    simpa only [Located.ValidFor, valueContract.2.2,
+      markerContract.2.2] using semicolonContract.1
+  have markerShape := acceptToken_ok_state_shape (.keyword .returnKw)
+    .statement (· == .keyword .returnKw) markerResult
+  have semicolonShape := symbol_ok_state_shape .semicolon .statement
+    semicolonResult
+  have markerAt := State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+  have semicolonAtAfter :=
+    State.getElem?_eq_some_of_peek?_eq_some semicolonShape.1
+  have valueTokens :=
+    StatementSimpleInternals.optionalReturnValue_preservesTokensOnSuccess
+      expression expressionWindow afterMarker value afterValue valueResult
+  have markerTokens := keyword_preservesTokensOnSuccess .returnKw .statement
+    input marker afterMarker markerResult
+  have semicolonAt : input.tokens[afterValue.cursor]? = some semicolon := by
+    simpa [valueTokens, markerTokens] using semicolonAtAfter
+  have cursorOrder : input.cursor < afterValue.cursor :=
+    Nat.lt_of_lt_of_le
+      (acceptToken_cursor_lt_onSuccess (.keyword .returnKw) .statement
+        (· == .keyword .returnKw) markerResult)
+      (StatementSimpleInternals.optionalReturnValue_cursorMonotoneOnSuccess
+        expression expressionCursor afterMarker value afterValue valueResult)
+  have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+    markerAt semicolonAt cursorOrder
+  have ordered : marker.span.startByte ≤ semicolon.span.endByte :=
+    Nat.le_trans markerValid.2.1
+      (Nat.le_trans separated semicolonValid.2.1)
+  cases finished
+  exact SourceSpan.cover_validFor markerValid semicolonValid ordered
+
+/-- Complete return statements retain only source-valid syntax. -/
+theorem returnStatement_validFor (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    (returnStatement expression).ValidFor
+      (Statement.ValidFor expressionValueValid patternValueValid
+        yulValueValid) := by
+  have weak : (returnStatement expression).ValidFor (fun _ _ => True) := by
+    unfold returnStatement
+    apply Parser.bind_validFor (keyword_validFor .returnKw .statement)
+    intro marker
+    apply Parser.bind_validFor
+      (StatementSimpleInternals.optionalReturnValue_validFor expression
+        expressionValueValid expressionValid)
+    intro value
+    apply Parser.bind_validFor (symbol_validFor .semicolon .statement)
+    intro semicolon
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : returnStatement expression input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok statement final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold returnStatement at stages
+      rcases StatementSimpleInternals.simpleBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases StatementSimpleInternals.simpleBind_ok_components rest with
+        ⟨value, afterValue, valueResult, rest⟩
+      rcases StatementSimpleInternals.simpleBind_ok_components rest with
+        ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+      have markerContract := keyword_validFor .returnKw .statement input
+        inputValid
+      rw [markerResult] at markerContract
+      have valueContract :=
+        StatementSimpleInternals.optionalReturnValue_validFor expression
+          expressionValueValid expressionValid afterMarker markerContract.2.1
+      rw [valueResult] at valueContract
+      have valueValidInput : Option.ValidFor expressionValueValid input.file
+          value := by
+        simpa [markerContract.2.2] using valueContract.1
+      have retained : ∀ expression ∈ value,
+          expressionValueValid input.file expression := by
+        cases value with
+        | none => simp
+        | some expression =>
+            intro retained member
+            have retainedEq : retained = expression := by
+              simpa using member.symm
+            subst retained
+            simpa only [Option.ValidFor] using valueValidInput
+      have outerValid := returnStatement_span_validOnSuccess expression
+        expressionValueValid expressionValid expressionWindow expressionCursor
+        inputValid parsed
+      cases finished
+      exact ⟨Statement.ValidFor.returnStmt outerValid retained,
+        weakResult.2.1, weakResult.2.2⟩
+
 /-- Assignment/expression statements preserve nested expression windows. -/
 theorem assignmentOrExpressionStatement_preservesTokenWindow
     (expression : Parser Expr)
