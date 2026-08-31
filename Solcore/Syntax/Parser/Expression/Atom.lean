@@ -5,9 +5,14 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def expressionName : Parser Identifier := fun state =>
+namespace ExpressionAtomInternals
+
+/-- Parse an ordinary identifier or Boolean builtin as an expression name. -/
+def expressionName : Parser Identifier := fun state =>
   if isBooleanValue state then booleanIdentifier state
   else identifier .expression state
+
+end ExpressionAtomInternals
 
 private def closeTuple (opening : Token) (elementsRev : List Expr) :
     Parser Expr := do
@@ -72,7 +77,7 @@ private def parenthesized (nested : Parser Expr) : Parser Expr := fun state =>
 
 private def dotConstructor (nested : Parser Expr) : Parser Expr := do
   let dot ← symbol .dot .expression
-  let name ← expressionName
+  let name ← ExpressionAtomInternals.expressionName
   let state ← getState
   let arguments ←
     if isSymbol state .leftParen then
@@ -122,7 +127,7 @@ private def expressionAtomCore (nested : Parser Expr)
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isBooleanValue state || isIdentifier state then
-    match expressionName state with
+    match ExpressionAtomInternals.expressionName state with
     | .ok name next => .ok { span := name.span, value := .identifier name } next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
