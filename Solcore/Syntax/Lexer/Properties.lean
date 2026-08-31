@@ -1,4 +1,5 @@
 import Solcore.Syntax.Lexer.Core
+import Solcore.Syntax.Lexer.ScanProperties
 
 /-! Source-provenance laws for the total canonical lexer. -/
 

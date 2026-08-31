@@ -55,4 +55,42 @@ example (file : SourceFile) (startByte : Nat) (input : List Char)
   exact suffix.sourceSpan_validFor
     (takeWhile_advances predicate startByte input)
 
+example (file : SourceFile) (cursor : Nat) (characters : List Char)
+    (suffix : CursorSuffix file cursor characters) :
+    let scan := scanLineComment cursor characters
+    (sourceSpan file cursor scan.endByte).ValidFor file := by
+  exact suffix.sourceSpan_validFor
+    (scanLineComment_advances cursor characters)
+
+example (file : SourceFile) (cursor depth : Nat)
+    (characters bodyRev : List Char) (endByte : Nat)
+    (body remaining : List Char)
+    (suffix : CursorSuffix file cursor characters)
+    (result : scanBlockComment cursor depth characters bodyRev =
+      .closed endByte body remaining) :
+    (sourceSpan file cursor endByte).ValidFor file := by
+  exact suffix.sourceSpan_validFor
+    (scanBlockComment_closed_advances cursor depth characters bodyRev
+      endByte body remaining result)
+
+example (file : SourceFile) (closing : Char) (cursor : Nat)
+    (characters spellingRev : List Char) (scan : MetaScan)
+    (suffix : CursorSuffix file cursor characters)
+    (result : scanDelimitedMeta closing cursor characters spellingRev =
+      some scan) :
+    (sourceSpan file cursor scan.endByte).ValidFor file := by
+  exact suffix.sourceSpan_validFor
+    (scanDelimitedMeta_some_advances closing cursor characters spellingRev
+      scan result)
+
+example (file : SourceFile) (startByte endByte : Nat)
+    (input remaining : List Char) (spelling decoded : String)
+    (suffix : CursorSuffix file startByte ('"' :: input))
+    (result : scanQuotedString startByte input =
+      .closed endByte spelling decoded remaining) :
+    (sourceSpan file startByte endByte).ValidFor file := by
+  exact suffix.sourceSpan_validFor
+    (scanQuotedString_closed_advances startByte input endByte spelling
+      decoded remaining result)
+
 end Tests

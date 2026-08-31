@@ -69,6 +69,25 @@ def Advances (startByte : Nat) (input : List Char)
     input = consumed ++ remaining ∧
       endByte = startByte + byteSize consumed
 
+/-- Prefix one consumed character to an exact scanner transition. -/
+theorem Advances.prepend (character : Char)
+    {startByte endByte : Nat} {input remaining : List Char}
+    (progress : Advances (startByte + character.utf8Size)
+      input endByte remaining) :
+    Advances startByte (character :: input) endByte remaining := by
+  rcases progress with ⟨consumed, partition, endEq⟩
+  refine ⟨character :: consumed, by simp [partition], ?_⟩
+  rw [byteSize_cons]
+  simpa [Nat.add_assoc] using endEq
+
+/-- Consuming one character advances by exactly its UTF-8 byte size. -/
+theorem Advances.single (character : Char)
+    (startByte : Nat) (remaining : List Char) :
+    Advances startByte (character :: remaining)
+      (startByte + character.utf8Size) remaining := by
+  refine ⟨[character], by simp, ?_⟩
+  simp [byteSize_cons]
+
 /-- The executable lexer performs at most one main transition per character. -/
 def fuelBound (file : SourceFile) : Nat :=
   file.content.length + 1

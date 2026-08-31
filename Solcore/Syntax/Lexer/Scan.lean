@@ -11,7 +11,6 @@ structure LineCommentScan where
   remaining : List Char
   deriving Repr, BEq
 
-/-- Tail-recursive scan source characters after the opening `//`. -/
 private def scanLineCommentRev :
     Nat → List Char → List Char → LineCommentScan
   | cursor, [], bodyRev => {
@@ -30,6 +29,17 @@ private def scanLineCommentRev :
 
 def scanLineComment (cursor : Nat) (characters : List Char) : LineCommentScan :=
   scanLineCommentRev cursor characters []
+
+/-- A line-comment body scan consumes exactly the prefix before LF or EOF. -/
+theorem scanLineComment_advances (cursor : Nat) (characters : List Char) :
+    let scan := scanLineComment cursor characters
+    Advances cursor characters scan.endByte scan.remaining := by
+  unfold scanLineComment
+  fun_induction scanLineCommentRev cursor characters [] with
+  | case1 => exact ⟨[], rfl, rfl⟩
+  | case2 => exact ⟨[], rfl, rfl⟩
+  | case3 cursor character rest bodyRev _notLineFeed inductionHypothesis =>
+      exact inductionHypothesis.prepend character
 
 /-- Complete outcome of a nested `/* ... */` scan. -/
 inductive BlockCommentScan where
