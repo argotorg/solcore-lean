@@ -87,6 +87,41 @@ private def testDeriveContractFieldBoundary : IO Unit := do
   | items => throw (IO.userError
       s!"derive field contract changed: {reprStr items}")
 
+private def testMalformedFieldRecovery : IO Unit := do
+  let output ← checkedParse "malformed contract field"
+    "contract C { broken: ; function good() {} } function after() {}"
+  assertEqual (output.parseDiagnostics.map fun diagnostic =>
+    (byteRange diagnostic.span, diagnostic.kind)) [
+      ((13, 22), .recovered .contractMember)
+    ] "malformed field diagnostics"
+  match output.parsed.items with
+  | [
+      { span := contractSpan, value := .contract declaration, .. },
+      { span := afterSpan, value := .function after, .. }
+    ] =>
+      assertEqual (byteRange contractSpan) (0, 43)
+        "recovered contract span"
+      assertEqual (byteRange afterSpan) (44, 63)
+        "top item after recovered contract"
+      assertEqual after.value.signature.name.value "after"
+        "function after recovered contract"
+      match declaration.value.members with
+      | [errorMember, goodMember] =>
+          assertEqual (byteRange errorMember.span) (13, 22)
+            "malformed field recovery span"
+          assertEqual errorMember.value .error
+            "malformed field recovery node"
+          match goodMember.value with
+          | .function good =>
+              assertEqual good.value.signature.name.value "good"
+                "member after malformed field"
+          | value => throw (IO.userError
+              s!"member after malformed field changed: {reprStr value}")
+      | members => throw (IO.userError
+          s!"malformed field members changed: {reprStr members}")
+  | items => throw (IO.userError
+      s!"malformed field items changed: {reprStr items}")
+
 private def testContractDeclaration : IO Unit := do
   let source := String.intercalate "\n" [
     "contract Vault<t,> {",
@@ -181,6 +216,7 @@ private def testContractDeclaration : IO Unit := do
 /-- Run canonical contract declaration and entry-point parser regressions. -/
 def testSyntaxParserContracts : IO Unit := do
   testDeriveContractFieldBoundary
+  testMalformedFieldRecovery
   testContractDeclaration
 
 end Tests

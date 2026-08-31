@@ -147,9 +147,9 @@ private def contractMemberWithAttribute : Parser ContractMember := fun state =>
   else
     contractMemberCore state
 
-private def atContractMemberStart (state : State) : Bool :=
-  startsContractField state || isSymbol state .hash ||
-    isKeyword state .functionKw || isKeyword state .constructorKw ||
+private def atContractRecoveryBoundary (state : State) : Bool :=
+  isSymbol state .hash || isKeyword state .functionKw ||
+    isKeyword state .constructorKw ||
     isKeyword state .fallbackKw || isKeyword state .typeKw ||
     isSymbol state .rightBrace || isContextual state .enum
 
@@ -165,7 +165,7 @@ private def recoverContractMemberAux (first last : SourceSpan) :
     Nat → State → Reply ContractMember
   | 0, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, state =>
-      if state.atEnd || atContractMemberStart state then
+      if state.atEnd || atContractRecoveryBoundary state then
         finishRecoveredMember first last state
       else
         match state.advance? with
@@ -212,7 +212,7 @@ private def contractMembers (opening : Token) :
               .invariant (.noProgress .topLevel next.currentSpan)
         | .reject failure failedState =>
             let rewound := { failedState with cursor := state.cursor }
-            if atContractMemberStart state then
+            if atContractRecoveryBoundary state then
               .reject failure rewound
             else
               match recoverContractMember rewound with
