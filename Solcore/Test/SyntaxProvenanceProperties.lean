@@ -28,4 +28,21 @@ example (file : SourceFile) (output : ParseOutput)
     output.parsed.span = SourceSpan.fullFile file :=
   Parser.parse_ok_span file output result
 
+example (file : SourceFile) (lexed : LexedFile) (output : ParseOutput)
+    (result : Parser.parseLexed file lexed = .ok output) :
+    output.tokens = lexed.tokens ∧
+      output.lexicalDiagnostics = lexed.diagnostics ∧
+      output.parsed.comments = lexed.comments :=
+  Parser.parseLexed_ok_retention file lexed output result
+
+example (file : SourceFile) (output : ParseOutput)
+    (result : Parser.parse file = .ok output) :
+    ∃ lexed,
+      Lexer.lex file = .ok lexed ∧
+      Parser.parseLexed file lexed = .ok output ∧
+      output.tokens = lexed.tokens ∧
+      output.lexicalDiagnostics = lexed.diagnostics ∧
+      output.parsed.comments = lexed.comments :=
+  Parser.parse_ok_lexed_provenance file output result
+
 end Tests
