@@ -21,6 +21,16 @@ example := @yulFunctionStatement_validFor
 example := @yulFunctionStatement_preservesTokensOnSuccess
 example := @yulFunctionStatement_cursorMonotoneOnSuccess
 example := @yulFunctionStatement_startsAtCurrentTokenOnSuccess
+example := @yulCase_validFor
+example := @yulCase_preservesTokensOnSuccess
+example := @yulCase_cursorMonotoneOnSuccess
+example := @yulCases_preservesTokensOnSuccess
+example := @yulCases_cursorMonotoneOnSuccess
+example := @yulCase_startsAtCurrentTokenOnSuccess
+example := @yulCase_cursor_lt_onSuccess
+example := @optionalYulDefault_validFor
+example := @optionalYulDefault_preservesTokensOnSuccess
+example := @optionalYulDefault_cursorMonotoneOnSuccess
 
 example (nested : Parser YulStmt)
     (expressionValid : yulExpression.ValidFor YulExpr.ValidFor)

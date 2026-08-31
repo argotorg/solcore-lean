@@ -24,7 +24,10 @@ def yulForStatement (statement : Parser YulStmt) : Parser YulStmt := do
     value := .forLoop initializer.body condition post.body body.body
   }
 
-private def yulCase (statement : Parser YulStmt) : Parser YulCase := do
+namespace YulControl
+
+/-- Parse one `case` arm of a Yul switch. -/
+def caseArm (statement : Parser YulStmt) : Parser YulCase := do
   let marker ← keyword .caseKw .yulStatement
   let literal ← yulLiteral
   let body ← yulBlock statement
@@ -33,16 +36,16 @@ private def yulCase (statement : Parser YulStmt) : Parser YulCase := do
     value := .arm literal body.body
   }
 
-private def yulCases (statement : Parser YulStmt) :
+def caseList (statement : Parser YulStmt) :
     Nat → List YulCase → State → Reply (List YulCase)
   | 0, _, state => .invariant (.fuelExhausted .yul state.currentSpan)
   | fuel + 1, casesRev, state =>
       if isKeyword state .caseKw then
         let before := state.cursor
-        match yulCase statement state with
+        match caseArm statement state with
         | .ok value next =>
             if next.cursor > before then
-              yulCases statement fuel (value :: casesRev) next
+              caseList statement fuel (value :: casesRev) next
             else
               .invariant (.noProgress .yul next.currentSpan)
         | .reject failure next => .reject failure next
@@ -50,7 +53,8 @@ private def yulCases (statement : Parser YulStmt) :
       else
         .ok casesRev.reverse state
 
-private def optionalYulDefault (statement : Parser YulStmt) :
+/-- Parse the optional `default` arm of a Yul switch. -/
+def optionalDefault (statement : Parser YulStmt) :
     Parser (Option YulParsedBlock) := do
   let state ← getState
   if isKeyword state .defaultKw then
@@ -59,12 +63,14 @@ private def optionalYulDefault (statement : Parser YulStmt) :
   else
     pure none
 
+end YulControl
+
 def yulSwitchStatement (statement : Parser YulStmt) : Parser YulStmt := do
   let marker ← keyword .switchKw .yulStatement
   let scrutinee ← yulExpression
   let cases ← fun current =>
-    yulCases statement (current.remainingCount + 1) [] current
-  let defaultBody ← optionalYulDefault statement
+    YulControl.caseList statement (current.remainingCount + 1) [] current
+  let defaultBody ← YulControl.optionalDefault statement
   let endSpan := match defaultBody with
     | some body => body.span
     | none => match cases.reverse with

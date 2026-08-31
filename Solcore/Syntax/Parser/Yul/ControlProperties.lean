@@ -677,4 +677,269 @@ theorem yulFunctionStatement_startsAtCurrentTokenOnSuccess
   cases finished
   rfl
 
+/-- One Yul switch arm retains its literal, body, and outer source ranges. -/
+theorem yulCase_validFor (statement : Parser YulStmt)
+    (statementValid : statement.ValidFor YulStmt.ValidFor)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    (YulControl.caseArm statement).ValidFor YulCase.ValidFor := by
+  have weak : (YulControl.caseArm statement).ValidFor
+      (fun _ _ => True) := by
+    unfold YulControl.caseArm
+    apply Parser.bind_validFor (keyword_validFor .caseKw .yulStatement)
+    intro marker
+    apply Parser.bind_validFor yulLiteral_validFor
+    intro literal
+    apply Parser.bind_validFor
+      (yulBlock_validFor YulStmt.ValidFor statement statementValid
+        statementPreserves)
+    intro body
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : YulControl.caseArm statement input with
+  | invariant error => trivial
+  | reject failure rejected => rw [parsed] at weakResult; exact weakResult
+  | ok result final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold YulControl.caseArm at stages
+      rcases yulBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨literal, afterLiteral, literalResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have markerValid := keyword_validFor .caseKw .yulStatement input inputValid
+      rw [markerResult] at markerValid
+      have literalValid := yulLiteral_validFor afterMarker markerValid.2.1
+      rw [literalResult] at literalValid
+      have bodyValid := yulBlock_validFor YulStmt.ValidFor statement
+        statementValid statementPreserves afterLiteral literalValid.2.1
+      rw [bodyResult] at bodyValid
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerValid.1
+      have bodySpanValid : body.span.ValidFor input.file := by
+        simpa [literalValid.2.2, markerValid.2.2] using bodyValid.1.1
+      have markerShape := acceptToken_ok_state_shape
+        (.keyword .caseKw) .yulStatement (· == .keyword .caseKw) markerResult
+      have markerAt :=
+        State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+      rcases yulBlock_startsAtCurrentTokenOnSuccess statement
+          statementPreserves afterLiteral body afterBody bodyResult with
+        ⟨opening, openingFound, openingStart⟩
+      have openingAtInput : input.tokens[afterLiteral.cursor]? = some opening := by
+        have openingAt := State.getElem?_eq_some_of_peek?_eq_some openingFound
+        simpa [yulLiteral_preservesTokensOnSuccess afterMarker literal
+          afterLiteral literalResult,
+          keyword_preservesTokensOnSuccess .caseKw .yulStatement input marker
+            afterMarker markerResult] using openingAt
+      have literalCursor := yulLiteral_cursorMonotoneOnSuccess afterMarker
+        literal afterLiteral literalResult
+      have markerBeforeOpening : input.cursor < afterLiteral.cursor := by
+        have afterMarkerBefore : input.cursor + 1 ≤ afterLiteral.cursor := by
+          simpa [markerShape.2] using literalCursor
+        omega
+      have markerBeforeBody : marker.span.endByte ≤ body.span.startByte := by
+        rw [← openingStart]
+        exact inputValid.token_end_le_token_start_of_getElem?_lt markerAt
+          openingAtInput markerBeforeOpening
+      have outerValid := SourceSpan.cover_validFor markerSpanValid bodySpanValid
+        (Nat.le_trans markerSpanValid.2.1
+          (Nat.le_trans markerBeforeBody bodySpanValid.2.1))
+      cases finished
+      exact ⟨YulCase.ValidFor.arm outerValid
+          (by simpa [Located.ValidFor, markerValid.2.2] using literalValid.1)
+          (by
+            intro retained member
+            simpa [literalValid.2.2, markerValid.2.2] using
+              bodyValid.1.2 retained member),
+        weakResult.2.1, weakResult.2.2⟩
+
+/-- Yul switch-arm parsing preserves the immutable lexer token carrier. -/
+theorem yulCase_preservesTokensOnSuccess (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    Parser.PreservesTokensOnSuccess (YulControl.caseArm statement) := by
+  unfold YulControl.caseArm
+  apply Parser.bind_preservesTokensOnSuccess
+    (keyword_preservesTokensOnSuccess .caseKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokensOnSuccess yulLiteral_preservesTokensOnSuccess
+  intro literal
+  apply Parser.bind_preservesTokensOnSuccess
+    (yulBlock_preservesTokensOnSuccess statement statementPreserves)
+  intro body
+  exact Parser.pure_preservesTokensOnSuccess _
+
+/-- Yul switch-arm parsing never rewinds the parser cursor. -/
+theorem yulCase_cursorMonotoneOnSuccess (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    Parser.CursorMonotoneOnSuccess (YulControl.caseArm statement) := by
+  unfold YulControl.caseArm
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .caseKw .yulStatement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess yulLiteral_cursorMonotoneOnSuccess
+  intro literal
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (yulBlock_cursorMonotoneOnSuccess statement statementPreserves)
+  intro body
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- Repeated Yul switch arms retain the nested parser's token carrier. -/
+theorem yulCases_preservesTokensOnSuccess (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    ∀ fuel casesRev, Parser.PreservesTokensOnSuccess
+      (YulControl.caseList statement fuel casesRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro casesRev input value next result
+      unfold YulControl.caseList at result
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro casesRev input value next result
+      unfold YulControl.caseList at result
+      split at result
+      · cases armResult : YulControl.caseArm statement input with
+        | ok arm afterArm =>
+            simp only [armResult] at result
+            split at result
+            · exact (inductionHypothesis (arm :: casesRev) afterArm value next
+                result).trans
+                (yulCase_preservesTokensOnSuccess statement statementPreserves
+                  input arm afterArm armResult)
+            · contradiction
+        | reject failure rejected => simp [armResult] at result
+        | invariant error => simp [armResult] at result
+      · cases result
+        rfl
+
+/-- Repeated Yul switch arms never rewind the parser cursor. -/
+theorem yulCases_cursorMonotoneOnSuccess (statement : Parser YulStmt) :
+    ∀ fuel casesRev, Parser.CursorMonotoneOnSuccess
+      (YulControl.caseList statement fuel casesRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro casesRev input value next result
+      unfold YulControl.caseList at result
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro casesRev input value next result
+      unfold YulControl.caseList at result
+      split at result
+      · cases armResult : YulControl.caseArm statement input with
+        | ok arm afterArm =>
+            simp only [armResult] at result
+            split at result
+            · exact Nat.le_trans (Nat.le_of_lt (by assumption))
+                (inductionHypothesis (arm :: casesRev) afterArm value next
+                  result)
+            · contradiction
+        | reject failure rejected => simp [armResult] at result
+        | invariant error => simp [armResult] at result
+      · cases result
+        exact Nat.le_refl _
+
+/-- A successful Yul switch arm starts at its current `case` token. -/
+theorem yulCase_startsAtCurrentTokenOnSuccess (statement : Parser YulStmt) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (YulControl.caseArm statement) (·.span) := by
+  unfold YulControl.caseArm
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess
+      (.keyword .caseKw) .yulStatement (· == .keyword .caseKw))
+  intro marker input value final parsed
+  rcases yulBind_ok_components parsed with ⟨literal, afterLiteral, _, rest⟩
+  rcases yulBind_ok_components rest with ⟨body, afterBody, _, finished⟩
+  cases finished
+  rfl
+
+/-- A successful Yul switch arm consumes its marker, literal, and block. -/
+theorem yulCase_cursor_lt_onSuccess (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement)
+    {input next : State} {arm : YulCase}
+    (result : YulControl.caseArm statement input = .ok arm next) :
+    input.cursor < next.cursor := by
+  have stages := result
+  unfold YulControl.caseArm at stages
+  rcases yulBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases yulBind_ok_components rest with
+    ⟨literal, afterLiteral, literalResult, rest⟩
+  rcases yulBind_ok_components rest with
+    ⟨body, afterBody, bodyResult, finished⟩
+  have markerShape := acceptToken_ok_state_shape
+    (.keyword .caseKw) .yulStatement (· == .keyword .caseKw) markerResult
+  have literalCursor := yulLiteral_cursorMonotoneOnSuccess afterMarker literal
+    afterLiteral literalResult
+  have bodyProgress := yulBlock_cursor_lt_onSuccess statement
+    statementPreserves bodyResult
+  cases finished
+  simp [markerShape.2] at literalCursor
+  omega
+
+/-- Optional Yul defaults preserve their block and statement provenance. -/
+theorem optionalYulDefault_validFor (statement : Parser YulStmt)
+    (statementValid : statement.ValidFor YulStmt.ValidFor)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    (YulControl.optionalDefault statement).ValidFor
+      (Option.ValidFor (YulParsedBlock.ValidFor YulStmt.ValidFor)) := by
+  unfold YulControl.optionalDefault
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isKeyword observed .defaultKw
+  · simp only [present, if_true]
+    apply Parser.bind_validFor (keyword_validFor .defaultKw .yulStatement)
+    intro marker
+    apply Parser.bind_validFor_of_value
+      (yulBlock_validFor YulStmt.ValidFor statement statementValid
+        statementPreserves)
+    intro body input inputValid bodyValid
+    exact ⟨by simpa only [Option.ValidFor] using bodyValid, inputValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional Yul defaults preserve the immutable lexer token carrier. -/
+theorem optionalYulDefault_preservesTokensOnSuccess
+    (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    Parser.PreservesTokensOnSuccess
+      (YulControl.optionalDefault statement) := by
+  unfold YulControl.optionalDefault
+  apply Parser.bind_preservesTokensOnSuccess getState_preservesTokensOnSuccess
+  intro observed
+  by_cases present : isKeyword observed .defaultKw
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokensOnSuccess
+      (keyword_preservesTokensOnSuccess .defaultKw .yulStatement)
+    intro marker
+    apply Parser.bind_preservesTokensOnSuccess
+      (yulBlock_preservesTokensOnSuccess statement statementPreserves)
+    intro body
+    exact Parser.pure_preservesTokensOnSuccess _
+  · simp only [present]
+    exact Parser.pure_preservesTokensOnSuccess none
+
+/-- Optional Yul defaults never rewind the parser cursor. -/
+theorem optionalYulDefault_cursorMonotoneOnSuccess
+    (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    Parser.CursorMonotoneOnSuccess
+      (YulControl.optionalDefault statement) := by
+  unfold YulControl.optionalDefault
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isKeyword observed .defaultKw
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (keyword_cursorMonotoneOnSuccess .defaultKw .yulStatement)
+    intro marker
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (yulBlock_cursorMonotoneOnSuccess statement statementPreserves)
+    intro body
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
 end Solcore.Syntax.Parser
