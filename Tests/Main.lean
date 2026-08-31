@@ -10,6 +10,7 @@ import Solcore.Test.SyntaxIdentifier
 import Solcore.Test.SyntaxDiagnosticFilterProperties
 import Solcore.Test.SyntaxLexer
 import Solcore.Test.SyntaxLexerScannerProperties
+import Solcore.Test.SyntaxLexerStateOrderProperties
 import Solcore.Test.SyntaxLexerStateProperties
 import Solcore.Test.SyntaxParserBodyIsolation
 import Solcore.Test.SyntaxParserContracts
