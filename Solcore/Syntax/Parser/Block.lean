@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
+import Solcore.Syntax.Parser.StateCursorProperties
 
 set_option autoImplicit false
 
@@ -411,11 +412,13 @@ theorem coreBlock_cursorMonotoneOnSuccess (statement : Parser Statement)
   exact Nat.le_of_lt
     (coreBlock_cursor_lt_onSuccess statement policy result)
 
-private structure CapturedBlock where
+namespace BlockInternals
+
+structure CapturedBlock where
   span : SourceSpan
   window : TokenWindow
 
-private def captureBlockTail (state : State) (opening : Token) :
+def captureBlockTail (state : State) (opening : Token) :
     Nat → Nat → Nat → Option CapturedBlock
   | 0, _, _ => none
   | fuel + 1, depth, offset =>
@@ -438,7 +441,7 @@ private def captureBlockTail (state : State) (opening : Token) :
                 captureBlockTail state opening fuel (depth - 1) (offset + 1)
           | _ => captureBlockTail state opening fuel depth (offset + 1)
 
-private def captureBlock? (state : State) : Option CapturedBlock :=
+def captureBlock? (state : State) : Option CapturedBlock :=
   match state.peek? with
   | some opening =>
       if opening.value == .symbol .leftBrace then
@@ -446,6 +449,164 @@ private def captureBlock? (state : State) : Option CapturedBlock :=
       else
         none
   | none => none
+
+namespace CapturedBlock
+
+/-- Source and child-window invariants retained by a balanced capture. -/
+structure ValidFor (input : State) (captured : CapturedBlock) : Prop where
+  span : captured.span.ValidFor input.file
+  cursor_lt_endIndex : input.cursor < captured.window.endIndex
+  endIndex_le_window : captured.window.endIndex ≤ input.window.endIndex
+  endIndex_le_tokens : captured.window.endIndex ≤ input.tokens.size
+  endByte_le_source :
+    captured.window.endByte ≤ input.file.content.utf8ByteSize
+  endByte_boundary :
+    isUtf8Boundary input.file.content captured.window.endByte = true
+  entered :
+    (input.enterWindow input.cursor captured.window).ValidFor
+
+end CapturedBlock
+
+private theorem peekOffset?_index_lt_endIndex {state : State}
+    {offset : Nat} {token : Token}
+    (found : state.peekOffset? offset = some token) :
+    state.cursor + offset < state.window.endIndex := by
+  unfold State.peekOffset? at found
+  dsimp only at found
+  split at found
+  · assumption
+  · contradiction
+
+/-- Every successful tail capture defines a valid nested parser window. -/
+theorem captureBlockTail_validFor (state : State) (opening : Token) :
+    ∀ fuel depth offset captured,
+      state.ValidFor →
+      state.peek? = some opening →
+      0 < offset →
+      captureBlockTail state opening fuel depth offset = some captured →
+      captured.ValidFor state := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro depth offset captured stateValid openingFound offsetPositive result
+      unfold captureBlockTail at result
+      cases found : state.peekOffset? offset with
+      | none => simp [found] at result
+      | some token =>
+          simp only [found] at result
+          rcases token with ⟨closingSpan, kind⟩
+          cases kind with
+          | symbol symbol =>
+              cases symbol <;> try
+                exact inductionHypothesis _ (offset + 1) _ stateValid
+                  openingFound (by omega) result
+              case rightBrace =>
+                by_cases atRoot : depth = 1
+                · subst depth
+                  have capturedEq := Option.some.inj (by
+                    simpa using result)
+                  subst captured
+                  have openingValid := stateValid.peek?_span_validFor
+                    openingFound
+                  have openingAt :=
+                    State.getElem?_eq_some_of_peek?_eq_some openingFound
+                  have closingAt :=
+                    State.getElem?_eq_some_of_peekOffset?_eq_some found
+                  have closingValid :=
+                    stateValid.token_span_validFor_of_getElem?_eq_some
+                      closingAt
+                  have separated :=
+                    stateValid.token_end_le_token_start_of_getElem?_lt
+                      openingAt closingAt (by omega)
+                  have coverOrdered :
+                      opening.span.startByte ≤ closingSpan.endByte :=
+                    Nat.le_trans openingValid.2.1
+                      (Nat.le_trans separated closingValid.2.1)
+                  have spanValid := SourceSpan.cover_validFor openingValid
+                    closingValid coverOrdered
+                  have offsetInWindow :=
+                    peekOffset?_index_lt_endIndex found
+                  have childEndLeWindow :
+                      state.cursor + offset + 1 ≤ state.window.endIndex := by
+                    omega
+                  have childEndLeTokens :
+                      state.cursor + offset + 1 ≤ state.tokens.size :=
+                    Nat.le_trans childEndLeWindow stateValid.endIndex_le_size
+                  have childValid :
+                      (state.enterWindow state.cursor {
+                        endIndex := state.cursor + offset + 1
+                        endByte := closingSpan.endByte
+                      }).ValidFor := by
+                    refine {
+                      tokens := stateValid.tokens
+                      cursor_le_endIndex := by
+                        change state.cursor ≤ state.cursor + offset + 1
+                        omega
+                      endIndex_le_size := childEndLeTokens
+                      endByte_le_source := closingValid.2.2.1
+                      endByte_boundary := closingValid.2.2.2.2
+                      diagnosticsRev := ?_
+                    }
+                    intro diagnostic member
+                    simp [State.enterWindow] at member
+                  exact {
+                    span := spanValid
+                    cursor_lt_endIndex := by
+                      change state.cursor < state.cursor + offset + 1
+                      omega
+                    endIndex_le_window := childEndLeWindow
+                    endIndex_le_tokens := childEndLeTokens
+                    endByte_le_source := closingValid.2.2.1
+                    endByte_boundary := closingValid.2.2.2.2
+                    entered := childValid
+                  }
+                · exact inductionHypothesis (depth - 1) (offset + 1) _
+                    stateValid openingFound (by omega) (by
+                      simpa [atRoot] using result)
+          | keyword keyword =>
+              exact inductionHypothesis _ (offset + 1) _ stateValid
+                openingFound (by omega) result
+          | identifier text =>
+              exact inductionHypothesis _ (offset + 1) _ stateValid
+                openingFound (by omega) result
+          | yulIdentifier text =>
+              exact inductionHypothesis _ (offset + 1) _ stateValid
+                openingFound (by omega) result
+          | decimalLiteral text =>
+              exact inductionHypothesis _ (offset + 1) _ stateValid
+                openingFound (by omega) result
+          | hexadecimalLiteral text =>
+              exact inductionHypothesis _ (offset + 1) _ stateValid
+                openingFound (by omega) result
+          | stringLiteral text =>
+              exact inductionHypothesis _ (offset + 1) _ stateValid
+                openingFound (by omega) result
+          | yulMetaBacktick text =>
+              exact inductionHypothesis _ (offset + 1) _ stateValid
+                openingFound (by omega) result
+          | yulMetaInterpolation text =>
+              exact inductionHypothesis _ (offset + 1) _ stateValid
+                openingFound (by omega) result
+
+/-- A balanced capture from a valid input yields a valid child window. -/
+theorem captureBlock?_validFor {input : State} {captured : CapturedBlock}
+    (inputValid : input.ValidFor)
+    (result : captureBlock? input = some captured) :
+    captured.ValidFor input := by
+  unfold captureBlock? at result
+  cases found : input.peek? with
+  | none => simp [found] at result
+  | some opening =>
+      simp only [found] at result
+      split at result
+      · exact captureBlockTail_validFor input opening input.remainingCount 1 1
+          captured inputValid found (by omega) result
+      · contradiction
+
+end BlockInternals
+
+open BlockInternals
 
 private theorem captureBlockTail_cursor_lt_endIndex
     (state : State) (opening : Token) :
