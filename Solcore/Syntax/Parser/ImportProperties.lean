@@ -413,6 +413,62 @@ theorem finishImport_validFor (start last : SourceSpan)
       exact importTerminator_end_order start last input inputValid startValid
         ordered startFound startSpan startBefore terminatorResult
 
+private theorem finishAfterModulePath_validFor (start : SourceSpan)
+    (input : State) (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    {startIndex : Nat} {startToken : Token}
+    (startFound : input.tokens[startIndex]? = some startToken)
+    (startSpan : startToken.span = start)
+    (startBefore : startIndex < input.cursor)
+    {path : ModulePath} {afterPath : State}
+    (pathResult : modulePath .importDecl input = .ok path afterPath)
+    (value : ImportDeclValue)
+    (valueValid : match value with
+      | .plain modulePath => ModulePath.ValidFor afterPath.file modulePath
+      | .namespace modulePath alias =>
+          ModulePath.ValidFor afterPath.file modulePath ∧
+            alias.span.ValidFor afterPath.file
+      | .wildcard modulePath hidingClause =>
+          ModulePath.ValidFor afterPath.file modulePath ∧
+            ∀ clause ∈ hidingClause, HidingClause.ValidFor afterPath.file clause
+      | .selected selection modulePath hidingClause =>
+          selection.span.ValidFor afterPath.file ∧
+            (∀ item ∈ selection.elements.toList,
+              SelectedImport.ValidFor afterPath.file item) ∧
+            ModulePath.ValidFor afterPath.file modulePath ∧
+            ∀ clause ∈ hidingClause,
+              HidingClause.ValidFor afterPath.file clause) :
+    (ImportInternals.finish start path.span value afterPath).ValidFor input
+      ImportDecl.ValidFor := by
+  have pathReply := modulePath_validFor .importDecl input inputValid
+  rw [pathResult] at pathReply
+  rcases modulePath_startsAtCurrentTokenOnSuccess .importDecl
+      input path afterPath pathResult with ⟨firstToken, firstFound, firstStart⟩
+  have firstAt := State.getElem?_eq_some_of_peek?_eq_some firstFound
+  have startBeforeFirst :=
+    inputValid.token_end_le_token_start_of_getElem?_lt
+      startFound firstAt startBefore
+  have startValidAfter : start.ValidFor afterPath.file := by
+    simpa [pathReply.2.2] using startValid
+  have pathValidAfter : ModulePath.ValidFor afterPath.file path := by
+    simpa [pathReply.2.2] using pathReply.1
+  have startFoundAfter :
+      afterPath.tokens[startIndex]? = some startToken := by
+    simpa [modulePath_preservesTokensOnSuccess .importDecl
+      input path afterPath pathResult] using startFound
+  have startBeforeAfter : startIndex < afterPath.cursor :=
+    Nat.lt_of_lt_of_le startBefore
+      (modulePath_cursorMonotoneOnSuccess .importDecl
+        input path afterPath pathResult)
+  have ordered : start.startByte ≤ path.span.endByte :=
+    Nat.le_trans startValid.2.1
+      (Nat.le_trans (by simpa [startSpan] using startBeforeFirst)
+        (by rw [firstStart]; exact pathReply.1.1.2.1))
+  have finished := finishImport_validFor start path.span value afterPath
+    pathReply.2.1 startValidAfter pathValidAfter.1 ordered startFoundAfter
+    startSpan startBeforeAfter valueValid
+  exact finished.of_file_eq pathReply.2.2
+
 /-- Plain import payloads preserve their module path and complete cover. -/
 theorem plainImport_validFor (start : SourceSpan) (input : State)
     (inputValid : input.ValidFor)
@@ -433,34 +489,12 @@ theorem plainImport_validFor (start : SourceSpan) (input : State)
       simpa only [bind, pathResult, Reply.ValidFor] using pathReply
   | ok path afterPath =>
       rw [pathResult] at pathReply
-      rcases modulePath_startsAtCurrentTokenOnSuccess .importDecl
-          input path afterPath pathResult with
-        ⟨firstToken, firstFound, firstStart⟩
-      have firstAt := State.getElem?_eq_some_of_peek?_eq_some firstFound
-      have startBeforeFirst :=
-        inputValid.token_end_le_token_start_of_getElem?_lt
-          startFound firstAt startBefore
       have pathValidAfter : ModulePath.ValidFor afterPath.file path := by
         simpa [pathReply.2.2] using pathReply.1
-      have startValidAfter : start.ValidFor afterPath.file := by
-        simpa [pathReply.2.2] using startValid
-      have startFoundAfter :
-          afterPath.tokens[startIndex]? = some startToken := by
-        simpa [modulePath_preservesTokensOnSuccess .importDecl
-          input path afterPath pathResult] using startFound
-      have startBeforeAfter : startIndex < afterPath.cursor :=
-        Nat.lt_of_lt_of_le startBefore
-          (modulePath_cursorMonotoneOnSuccess .importDecl
-            input path afterPath pathResult)
-      have ordered : start.startByte ≤ path.span.endByte :=
-        Nat.le_trans startValid.2.1
-          (Nat.le_trans (by simpa [startSpan] using startBeforeFirst)
-            (by rw [firstStart]; exact pathReply.1.1.2.1))
-      have finished := finishImport_validFor start path.span (.plain path)
-        afterPath pathReply.2.1 startValidAfter pathValidAfter.1 ordered
-        startFoundAfter startSpan startBeforeAfter pathValidAfter
       simpa only [bind, pathResult] using
-        finished.of_file_eq pathReply.2.2
+        finishAfterModulePath_validFor start input inputValid startValid
+          startFound startSpan startBefore pathResult (.plain path)
+          pathValidAfter
 
 /-- Import terminators preserve every ordinary token window. -/
 theorem importTerminator_preservesTokenWindow (lastSpan : SourceSpan) :
