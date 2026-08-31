@@ -44,6 +44,20 @@ private theorem requireNonempty_cursorMonotoneOnSuccess {α : Type}
       cases result
       exact Nat.le_refl _
 
+private theorem getState_preservesTokenWindow :
+    Parser.PreservesTokenWindow getState := by
+  intro input
+  exact ⟨rfl, rfl⟩
+
+private theorem requireNonempty_preservesTokenWindow {α : Type}
+    (parsed : DelimitedList α) (phase : ParserPhase) :
+    Parser.PreservesTokenWindow (requireNonempty parsed phase) := by
+  intro input
+  unfold requireNonempty
+  cases parsed.elements with
+  | nil => trivial
+  | cons head tail => exact ⟨rfl, rfl⟩
+
 /-- Optional named-type arguments preserve delimiter and element provenance. -/
 theorem parseNamedTypeArguments_validFor (nested : Parser TypeExpr)
     (nestedValid : nested.ValidFor TypeExpr.ValidFor)
@@ -93,6 +107,27 @@ theorem parseNamedTypeArguments_preservesTokensOnSuccess
     exact Parser.pure_preservesTokensOnSuccess _
   · simp only [present]
     exact Parser.pure_preservesTokensOnSuccess none
+
+/-- Optional named-type arguments preserve every ordinary token window. -/
+theorem parseNamedTypeArguments_preservesTokenWindow
+    (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseNamedTypeArguments nested) := by
+  unfold parseNamedTypeArguments
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro observed
+  by_cases present : isSymbol observed .less
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (delimited_preservesTokenWindow .less .greater false nested
+        .typeExpr .typeExpr nestedPreserves)
+    intro parsed
+    apply Parser.bind_preservesTokenWindow
+      (requireNonempty_preservesTokenWindow parsed .typeExpr)
+    intro nonempty
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
 
 /-- Optional named-type arguments never rewind the recursive cursor. -/
 theorem parseNamedTypeArguments_cursorMonotoneOnSuccess
@@ -228,5 +263,85 @@ theorem parseNamedType_validFor (nested : Parser TypeExpr)
                   nameValidFinal valuesValid.1 valuesValid.2
           exact (finishNamedType_validFor argumentsValid.2.1 valueValid).of_file_eq
             (argumentsValid.2.2.trans nameValid.2.2)
+
+/-- Finishing a named type preserves the full ordinary token window. -/
+theorem finishNamedType_preservesTokenWindow (name : QualifiedName)
+    (arguments : Option (NonemptyDelimitedList TypeExpr)) :
+    Parser.PreservesTokenWindow (finishNamedType name arguments) := by
+  intro input
+  unfold finishNamedType
+  dsimp only
+  split
+  · exact ⟨rfl, rfl⟩
+  · exact ⟨rfl, rfl⟩
+
+/-- Finishing a named type leaves the cursor in place. -/
+theorem finishNamedType_cursorMonotoneOnSuccess (name : QualifiedName)
+    (arguments : Option (NonemptyDelimitedList TypeExpr)) :
+    Parser.CursorMonotoneOnSuccess (finishNamedType name arguments) := by
+  intro input value next result
+  unfold finishNamedType at result
+  dsimp only at result
+  split at result
+  · unfold emitDiagnostic modifyState at result
+    simp only [bind] at result
+    cases result
+    exact Nat.le_refl _
+  · cases result
+    exact Nat.le_refl _
+
+/-- Named-type parsing preserves tokens and its active window on every reply. -/
+theorem parseNamedType_preservesTokenWindow (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseNamedType nested) := by
+  unfold parseNamedType
+  apply Parser.bind_preservesTokenWindow
+    (qualifiedName_preservesTokenWindow .typeExpr .typeExpr)
+  intro name
+  apply Parser.bind_preservesTokenWindow
+    (parseNamedTypeArguments_preservesTokenWindow nested nestedPreserves)
+  intro arguments
+  exact finishNamedType_preservesTokenWindow name arguments
+
+/-- Named-type parsing never rewinds the recursive parser cursor. -/
+theorem parseNamedType_cursorMonotoneOnSuccess (nested : Parser TypeExpr) :
+    Parser.CursorMonotoneOnSuccess (parseNamedType nested) := by
+  unfold parseNamedType
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (qualifiedName_cursorMonotoneOnSuccess .typeExpr .typeExpr)
+  intro name
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (parseNamedTypeArguments_cursorMonotoneOnSuccess nested)
+  intro arguments
+  exact finishNamedType_cursorMonotoneOnSuccess name arguments
+
+private theorem finishNamedType_ok_value {name : QualifiedName}
+    {arguments : Option (NonemptyDelimitedList TypeExpr)}
+    {input next : State} {value : TypeExpr}
+    (result : finishNamedType name arguments input = .ok value next) :
+    value = makeNamedType name arguments := by
+  unfold finishNamedType at result
+  dsimp only at result
+  split at result
+  · unfold emitDiagnostic modifyState at result
+    simp only [bind] at result
+    cases result
+    rfl
+  · cases result
+    rfl
+
+/-- A named type starts at the first component of its qualified name. -/
+theorem parseNamedType_startsAtCurrentTokenOnSuccess
+    (nested : Parser TypeExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (parseNamedType nested) (·.span) := by
+  unfold parseNamedType
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (qualifiedName_startsAtCurrentTokenOnSuccess .typeExpr .typeExpr)
+  intro name input value final parsed
+  rcases bind_ok_components parsed with
+    ⟨arguments, afterArguments, _argumentsResult, finished⟩
+  rw [finishNamedType_ok_value finished]
+  cases arguments <;> rfl
 
 end Solcore.Syntax.Parser

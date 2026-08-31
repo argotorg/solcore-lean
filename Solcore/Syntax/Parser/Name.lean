@@ -273,6 +273,60 @@ theorem qualifiedName_preservesTokensOnSuccess (context : ParseContext)
   intro input name next result
   exact (qualifiedName_ok_state_shape context phase result).choose_spec.2.2
 
+private theorem qualifiedNameTail_preservesTokenWindow
+    (context : ParseContext) (phase : ParserPhase) (first : Identifier) :
+    ∀ fuel last tailRev,
+      Parser.PreservesTokenWindow
+        (qualifiedNameTail context phase first fuel last tailRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro last tailRev input
+      trivial
+  | succ fuel inductionHypothesis =>
+      intro last tailRev input
+      unfold qualifiedNameTail
+      split
+      · have dotShape := symbol_preservesTokenWindow .dot context input
+        cases dotResult : symbol .dot context input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [dotResult] at dotShape
+            exact dotShape
+        | ok dot afterDot =>
+            rw [dotResult] at dotShape
+            have componentShape := identifier_preservesTokenWindow context afterDot
+            cases componentResult : identifier context afterDot with
+            | invariant error =>
+                simp only [componentResult, Reply.PreservesTokenWindow]
+            | reject failure rejected =>
+                rw [componentResult] at componentShape
+                simp only [componentResult]
+                exact componentShape.trans dotShape
+            | ok component afterComponent =>
+                rw [componentResult] at componentShape
+                simp only [componentResult]
+                exact (inductionHypothesis component (component :: tailRev)
+                  afterComponent).trans (componentShape.trans dotShape)
+      · exact ⟨rfl, rfl⟩
+
+/-- Qualified names preserve tokens and the active window on every reply. -/
+theorem qualifiedName_preservesTokenWindow (context : ParseContext)
+    (phase : ParserPhase) :
+    Parser.PreservesTokenWindow (qualifiedName context phase) := by
+  intro input
+  unfold qualifiedName
+  have firstShape := identifier_preservesTokenWindow context input
+  cases firstResult : identifier context input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [firstResult] at firstShape
+      exact firstShape
+  | ok first afterFirst =>
+      rw [firstResult] at firstShape
+      exact (qualifiedNameTail_preservesTokenWindow context phase first
+        (afterFirst.remainingCount + 1) first [] afterFirst).trans firstShape
+
 /-- A qualified name starts at the first identifier token it retains. -/
 theorem qualifiedName_startsAtCurrentTokenOnSuccess
     (context : ParseContext) (phase : ParserPhase) :

@@ -27,6 +27,24 @@ example (nested : Parser TypeExpr) :
   parseNamedTypeArguments_cursorMonotoneOnSuccess nested
 
 example (nested : Parser TypeExpr)
+    (window : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseNamedTypeArguments nested) :=
+  parseNamedTypeArguments_preservesTokenWindow nested window
+
+example (nested : Parser TypeExpr)
+    (window : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (parseNamedType nested) :=
+  parseNamedType_preservesTokenWindow nested window
+
+example (nested : Parser TypeExpr) :
+    Parser.CursorMonotoneOnSuccess (parseNamedType nested) :=
+  parseNamedType_cursorMonotoneOnSuccess nested
+
+example (nested : Parser TypeExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess (parseNamedType nested) (·.span) :=
+  parseNamedType_startsAtCurrentTokenOnSuccess nested
+
+example (nested : Parser TypeExpr)
     (nestedValid : nested.ValidFor TypeExpr.ValidFor)
     (nestedStarts : Parser.StartsAtCurrentTokenOnSuccess nested (·.span))
     (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
