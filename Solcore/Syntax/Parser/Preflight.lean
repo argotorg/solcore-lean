@@ -2,6 +2,76 @@ import Solcore.Syntax.Parser.State
 
 set_option autoImplicit false
 
+namespace Solcore.Syntax
+
+/-- Source-ordered, nonempty spans whose provenance is valid for one file. -/
+def SpanSequence.ValidFor {α : Type} (file : SourceFile)
+    (spanOf : α → SourceSpan) : Nat → List α → Prop
+  | _, [] => True
+  | previousEnd, item :: rest =>
+      (spanOf item).ValidFor file ∧
+        previousEnd ≤ (spanOf item).startByte ∧
+        (spanOf item).startByte < (spanOf item).endByte ∧
+        SpanSequence.ValidFor file spanOf (spanOf item).endByte rest
+
+namespace SpanSequence.ValidFor
+
+/-- Every member of a valid sequence has valid source provenance. -/
+theorem span_valid {α : Type} {file : SourceFile}
+    {spanOf : α → SourceSpan} {previousEnd : Nat} {items : List α}
+    (valid : SpanSequence.ValidFor file spanOf previousEnd items)
+    {item : α} (member : item ∈ items) :
+    (spanOf item).ValidFor file := by
+  induction items generalizing previousEnd with
+  | nil => contradiction
+  | cons head tail ih =>
+      simp only [SpanSequence.ValidFor] at valid
+      rcases valid with ⟨headValid, _afterPrevious, _nonempty, tailValid⟩
+      rcases List.mem_cons.mp member with rfl | member
+      · exact headValid
+      · exact ih tailValid member
+
+end SpanSequence.ValidFor
+
+namespace LexedFile
+
+/--
+Declarative provenance and source-order contract guaranteed by parser
+preflight validation.
+-/
+structure ValidFor (lexed : LexedFile) (file : SourceFile) : Prop where
+  source_eq : lexed.source = file.id
+  tokens : SpanSequence.ValidFor file
+    (fun token : Token => token.span) 0 lexed.tokens
+  comments : SpanSequence.ValidFor file
+    (fun comment : Comment => comment.span) 0 lexed.comments
+  diagnostics : ∀ diagnostic ∈ lexed.diagnostics,
+    diagnostic.span.ValidFor file
+
+namespace ValidFor
+
+theorem token_span {file : SourceFile} {lexed : LexedFile}
+    (valid : lexed.ValidFor file) {token : Token}
+    (member : token ∈ lexed.tokens) : token.span.ValidFor file :=
+  SpanSequence.ValidFor.span_valid valid.tokens member
+
+theorem comment_span {file : SourceFile} {lexed : LexedFile}
+    (valid : lexed.ValidFor file) {comment : Comment}
+    (member : comment ∈ lexed.comments) : comment.span.ValidFor file :=
+  SpanSequence.ValidFor.span_valid valid.comments member
+
+theorem diagnostic_span {file : SourceFile} {lexed : LexedFile}
+    (valid : lexed.ValidFor file) {diagnostic : LexicalDiagnostic}
+    (member : diagnostic ∈ lexed.diagnostics) :
+    diagnostic.span.ValidFor file :=
+  valid.diagnostics diagnostic member
+
+end ValidFor
+
+end LexedFile
+
+end Solcore.Syntax
+
 namespace Solcore.Syntax.Parser
 
 /-- Canonical parser guard applied before recursive token grammar. -/
@@ -38,14 +108,110 @@ private def validateLexicalDiagnostics (file : SourceFile) :
       else
         .error (.invalidLexicalDiagnosticSpan index diagnostic.span)
 
+private theorem validateTokens_sound (file : SourceFile)
+    (index previousEnd : Nat) (tokens : List Token)
+    (result : validateTokens file index previousEnd tokens = .ok ()) :
+    SpanSequence.ValidFor file (fun token : Token => token.span)
+      previousEnd tokens := by
+  induction tokens generalizing index previousEnd with
+  | nil => trivial
+  | cons token rest ih =>
+      simp only [validateTokens] at result
+      split at result
+      · rename_i accepted
+        simp only [Bool.and_eq_true,
+          SourceSpan.isValidFor_eq_true_iff] at accepted
+        rcases accepted with ⟨⟨spanValid, afterPrevious⟩, nonempty⟩
+        exact ⟨spanValid, of_decide_eq_true afterPrevious,
+          of_decide_eq_true nonempty,
+          ih (index := index + 1) (previousEnd := token.span.endByte)
+            result⟩
+      · contradiction
+
+private theorem validateComments_sound (file : SourceFile)
+    (index previousEnd : Nat) (comments : List Comment)
+    (result : validateComments file index previousEnd comments = .ok ()) :
+    SpanSequence.ValidFor file (fun comment : Comment => comment.span)
+      previousEnd comments := by
+  induction comments generalizing index previousEnd with
+  | nil => trivial
+  | cons comment rest ih =>
+      simp only [validateComments] at result
+      split at result
+      · rename_i accepted
+        simp only [Bool.and_eq_true,
+          SourceSpan.isValidFor_eq_true_iff] at accepted
+        rcases accepted with ⟨⟨spanValid, afterPrevious⟩, nonempty⟩
+        exact ⟨spanValid, of_decide_eq_true afterPrevious,
+          of_decide_eq_true nonempty,
+          ih (index := index + 1) (previousEnd := comment.span.endByte)
+            result⟩
+      · contradiction
+
+private theorem validateLexicalDiagnostics_sound (file : SourceFile)
+    (index : Nat) (diagnostics : List LexicalDiagnostic)
+    (result : validateLexicalDiagnostics file index diagnostics = .ok ()) :
+    ∀ diagnostic ∈ diagnostics, diagnostic.span.ValidFor file := by
+  induction diagnostics generalizing index with
+  | nil => simp
+  | cons head tail ih =>
+      simp only [validateLexicalDiagnostics] at result
+      split at result
+      · rename_i accepted
+        intro diagnostic member
+        rcases List.mem_cons.mp member with rfl | member
+        · exact (SourceSpan.isValidFor_eq_true_iff diagnostic.span file).mp
+            accepted
+        · exact ih (index := index + 1) result diagnostic member
+      · contradiction
+
 /-- Validate all provenance consumed or retained by `parseLexed`. -/
 def validateLexed (file : SourceFile)
     (lexed : LexedFile) : Except ParserInvariantError Unit := do
-  if lexed.source != file.id then
+  if lexed.source ≠ file.id then
     throw (.invalidLexedSource file.id lexed.source)
   validateTokens file 0 0 lexed.tokens
   validateComments file 0 0 lexed.comments
   validateLexicalDiagnostics file 0 lexed.diagnostics
+
+/-- Successful parser preflight exposes its complete declarative contract. -/
+theorem validateLexed_ok_validFor (file : SourceFile) (lexed : LexedFile)
+    (result : validateLexed file lexed = .ok ()) :
+    lexed.ValidFor file := by
+  unfold validateLexed at result
+  split at result
+  · contradiction
+  · rename_i sourceAccepted
+    cases tokensResult : validateTokens file 0 0 lexed.tokens with
+    | error error =>
+        rw [tokensResult] at result
+        contradiction
+    | ok witness =>
+        cases witness
+        cases commentsResult : validateComments file 0 0 lexed.comments with
+        | error error =>
+            rw [tokensResult, commentsResult] at result
+            contradiction
+        | ok witness =>
+            cases witness
+            cases diagnosticsResult :
+                validateLexicalDiagnostics file 0 lexed.diagnostics with
+            | error error =>
+                rw [tokensResult, commentsResult, diagnosticsResult] at result
+                contradiction
+            | ok witness =>
+                cases witness
+                refine {
+                  source_eq := ?_
+                  tokens := validateTokens_sound file 0 0 lexed.tokens ?_
+                  comments := validateComments_sound file 0 0 lexed.comments ?_
+                  diagnostics := validateLexicalDiagnostics_sound file 0
+                    lexed.diagnostics ?_
+                }
+                · exact Decidable.of_not_not sourceAccepted
+                · exact tokensResult
+                · exact commentsResult
+                · exact diagnosticsResult
 
 private structure NestingState where
   delimiterDepth : Nat := 0

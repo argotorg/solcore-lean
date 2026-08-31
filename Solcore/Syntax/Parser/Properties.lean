@@ -7,6 +7,20 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+/-- A successful token-to-file parse consumed a preflight-valid lexer result. -/
+theorem parseLexed_ok_input_validFor
+    (file : SourceFile) (lexed : LexedFile) (output : ParseOutput)
+    (result : parseLexed file lexed = .ok output) :
+    lexed.ValidFor file := by
+  unfold parseLexed at result
+  cases validation : validateLexed file lexed with
+  | error error =>
+      rw [validation] at result
+      contradiction
+  | ok witness =>
+      cases witness
+      exact validateLexed_ok_validFor file lexed validation
+
 /-- A successful complete-file grammar result has canonical file provenance. -/
 theorem sourceFile_ok_provenance
     (comments : List Comment) (state next : State) (parsed : ParsedFile)
