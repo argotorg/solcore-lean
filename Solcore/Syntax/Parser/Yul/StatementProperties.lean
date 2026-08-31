@@ -29,6 +29,236 @@ private theorem yulStatementBind_ok_components {α β : Type}
   | reject failure rejected => rw [firstResult] at parsed; contradiction
   | invariant error => rw [firstResult] at parsed; contradiction
 
+private theorem getState_preservesTokenWindow :
+    Parser.PreservesTokenWindow getState := by
+  intro input
+  exact ⟨rfl, rfl⟩
+
+/-- A Yul `let` initializer preserves a present expression's provenance. -/
+theorem yulLetInitializer_validFor :
+    yulLetInitializer.ValidFor (Option.ValidFor YulExpr.ValidFor) := by
+  unfold yulLetInitializer
+  apply Parser.bind_validFor getState_validFor
+  intro state
+  split
+  · apply Parser.bind_validFor
+      (symbol_validFor .colonEqual .yulStatement)
+    intro marker
+    apply Parser.bind_validFor_of_value yulExpression_validFor
+    intro expression input inputValid expressionValid
+    exact ⟨expressionValid, inputValid, rfl⟩
+  · exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional Yul `let` initialization preserves every token window. -/
+theorem yulLetInitializer_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulLetInitializer := by
+  unfold yulLetInitializer
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro state
+  split
+  · apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .colonEqual .yulStatement)
+    intro marker
+    apply Parser.bind_preservesTokenWindow yulExpression_preservesTokenWindow
+    intro expression
+    exact Parser.pure_preservesTokenWindow _
+  · exact Parser.pure_preservesTokenWindow none
+
+/-- Optional Yul `let` initialization never rewinds the cursor. -/
+theorem yulLetInitializer_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess yulLetInitializer := by
+  unfold yulLetInitializer
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro state
+  split
+  · apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .colonEqual .yulStatement)
+    intro marker
+    apply Parser.bind_cursorMonotoneOnSuccess
+      yulExpression_cursorMonotoneOnSuccess
+    intro expression
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · exact Parser.pure_cursorMonotoneOnSuccess none
+
+private theorem yulLetInitializer_some_components {input next : State}
+    {expression : YulExpr}
+    (parsed : yulLetInitializer input = .ok (some expression) next) :
+    ∃ marker afterMarker,
+      symbol .colonEqual .yulStatement input = .ok marker afterMarker ∧
+        yulExpression afterMarker = .ok expression next := by
+  unfold yulLetInitializer at parsed
+  rcases yulStatementBind_ok_components parsed with
+    ⟨state, afterState, stateResult, rest⟩
+  unfold getState at stateResult
+  cases stateResult
+  split at rest
+  · rcases yulStatementBind_ok_components rest with
+      ⟨marker, afterMarker, markerResult, rest⟩
+    rcases yulStatementBind_ok_components rest with
+      ⟨value, afterValue, valueResult, finished⟩
+    cases finished
+    exact ⟨marker, afterMarker, markerResult, valueResult⟩
+  · cases rest
+
+/-- A Yul `let` declaration preserves names, initializer, and outer range. -/
+theorem yulLetStatement_validFor :
+    yulLetStatement.ValidFor YulStmt.ValidFor := by
+  have weak : yulLetStatement.ValidFor (fun _ _ => True) := by
+    unfold yulLetStatement
+    apply Parser.bind_validFor (keyword_validFor .letKw .yulStatement)
+    intro marker
+    apply Parser.bind_validFor yulNames_validFor
+    intro names
+    apply Parser.bind_validFor yulLetInitializer_validFor
+    intro initializer
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : yulLetStatement input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok statement final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold yulLetStatement at stages
+      rcases yulStatementBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases yulStatementBind_ok_components rest with
+        ⟨names, afterNames, namesResult, rest⟩
+      rcases yulStatementBind_ok_components rest with
+        ⟨initializer, afterInitializer, initializerResult, finished⟩
+      have markerValid := keyword_validFor .letKw .yulStatement input inputValid
+      rw [markerResult] at markerValid
+      have namesValid := yulNames_validFor afterMarker markerValid.2.1
+      rw [namesResult] at namesValid
+      have initializerValid := yulLetInitializer_validFor afterNames
+        namesValid.2.1
+      rw [initializerResult] at initializerValid
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerValid.1
+      have namesValidInput : YulNameSequence.ValidFor input.file names := by
+        simpa [markerValid.2.2] using namesValid.1
+      have markerShape := acceptToken_ok_state_shape (.keyword .letKw)
+        .yulStatement (· == .keyword .letKw) markerResult
+      have markerAdvanced : input.advance? = some (marker, afterMarker) := by
+        unfold State.advance?
+        rw [markerShape.1, markerShape.2]
+        rfl
+      rcases yulNames_startsAtCurrentTokenOnSuccess afterMarker names
+          afterNames namesResult with ⟨firstName, firstFound, namesStart⟩
+      cases initializer with
+      | none =>
+          have markerBeforeNames :=
+            inputValid.consumed_end_le_peek_start_after_advance
+              markerAdvanced firstFound
+          have ordered : marker.span.startByte ≤ names.span.endByte :=
+            Nat.le_trans markerSpanValid.2.1
+              (Nat.le_trans markerBeforeNames (by
+                rw [namesStart]
+                exact namesValidInput.1.2.1))
+          cases finished
+          exact ⟨YulStmt.ValidFor.letDecl
+              (SourceSpan.cover_validFor markerSpanValid namesValidInput.1
+                ordered)
+              namesValidInput.2 trivial,
+            weakResult.2.1, weakResult.2.2⟩
+      | some expression =>
+          rcases yulLetInitializer_some_components initializerResult with
+            ⟨assignMarker, afterAssignMarker, assignResult,
+              expressionResult⟩
+          rcases yulExpression_startsAtCurrentTokenOnSuccess
+              afterAssignMarker expression afterInitializer expressionResult with
+            ⟨expressionToken, expressionFound, expressionStart⟩
+          have markerAt :=
+            State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+          have expressionAt : input.tokens[afterAssignMarker.cursor]? =
+              some expressionToken := by
+            have foundAt :=
+              State.getElem?_eq_some_of_peek?_eq_some expressionFound
+            have keywordTokens := keyword_preservesTokensOnSuccess .letKw
+              .yulStatement input marker afterMarker markerResult
+            have namesTokens := yulNames_preservesTokensOnSuccess afterMarker
+              names afterNames namesResult
+            have assignTokens := symbol_preservesTokensOnSuccess .colonEqual
+              .yulStatement afterNames assignMarker afterAssignMarker assignResult
+            simpa [assignTokens, namesTokens, keywordTokens] using foundAt
+          have markerBeforeExpression :
+              marker.span.endByte ≤ expressionToken.span.startByte := by
+            apply inputValid.token_end_le_token_start_of_getElem?_lt markerAt
+              expressionAt
+            have namesProgress :=
+              (yulNames_ok_state_shape namesResult).choose_spec.2.2.2
+            have assignShape := symbol_ok_state_shape .colonEqual .yulStatement
+              assignResult
+            exact Nat.lt_trans (by simp [markerShape.2])
+              (Nat.lt_trans namesProgress (by simp [assignShape.2]))
+          have expressionValidInput :
+              YulExpr.ValidFor input.file expression := by
+            have validAfterNames :
+                YulExpr.ValidFor afterNames.file expression := by
+              simpa only [Option.ValidFor] using initializerValid.1
+            simpa [namesValid.2.2, markerValid.2.2] using validAfterNames
+          have expressionSpanValid := yulExpr_span_valid expressionValidInput
+          have ordered : marker.span.startByte ≤ expression.span.endByte :=
+            Nat.le_trans markerSpanValid.2.1
+              (Nat.le_trans markerBeforeExpression (by
+                rw [expressionStart]
+                exact expressionSpanValid.2.1))
+          cases finished
+          exact ⟨YulStmt.ValidFor.letDecl
+              (SourceSpan.cover_validFor markerSpanValid expressionSpanValid
+                ordered)
+              namesValidInput.2 expressionValidInput,
+            weakResult.2.1, weakResult.2.2⟩
+
+/-- Yul `let` parsing preserves every ordinary token window. -/
+theorem yulLetStatement_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulLetStatement := by
+  unfold yulLetStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .letKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow yulNames_preservesTokenWindow
+  intro names
+  apply Parser.bind_preservesTokenWindow yulLetInitializer_preservesTokenWindow
+  intro initializer
+  exact Parser.pure_preservesTokenWindow _
+
+theorem yulLetStatement_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess yulLetStatement :=
+  yulLetStatement_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Yul `let` parsing never rewinds the cursor. -/
+theorem yulLetStatement_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess yulLetStatement := by
+  unfold yulLetStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .letKw .yulStatement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess yulNames_cursorMonotoneOnSuccess
+  intro names
+  apply Parser.bind_cursorMonotoneOnSuccess
+    yulLetInitializer_cursorMonotoneOnSuccess
+  intro initializer
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A successful Yul `let` declaration starts at its `let` token. -/
+theorem yulLetStatement_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess yulLetStatement (·.span) := by
+  unfold yulLetStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .letKw)
+      .yulStatement (· == .keyword .letKw))
+  intro marker input statement final parsed
+  rcases yulStatementBind_ok_components parsed with
+    ⟨names, afterNames, _namesResult, rest⟩
+  rcases yulStatementBind_ok_components rest with
+    ⟨initializer, afterInitializer, _initializerResult, finished⟩
+  cases finished
+  rfl
+
 /-- A Yul assignment preserves its names, value, and covering range. -/
 theorem yulAssignment_validFor :
     yulAssignment.ValidFor YulStmt.ValidFor := by

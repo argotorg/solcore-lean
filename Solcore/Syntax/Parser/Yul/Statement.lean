@@ -8,16 +8,20 @@ private def yulBlockStatement (statement : Parser YulStmt) : Parser YulStmt := d
   let block ← yulBlock statement
   pure { span := block.span, value := .block block.body }
 
-private def yulLetStatement : Parser YulStmt := do
+/-- Parse an optional initializer following a Yul name sequence. -/
+def yulLetInitializer : Parser (Option YulExpr) := do
+  let state ← getState
+  if isSymbol state .colonEqual then
+    let _ ← symbol .colonEqual .yulStatement
+    pure (some (← yulExpression))
+  else
+    pure none
+
+/-- Parse a Yul `let` declaration. -/
+def yulLetStatement : Parser YulStmt := do
   let marker ← keyword .letKw .yulStatement
   let names ← yulNames
-  let state ← getState
-  let initializer ←
-    if isSymbol state .colonEqual then
-      let _ ← symbol .colonEqual .yulStatement
-      pure (some (← yulExpression))
-    else
-      pure none
+  let initializer ← yulLetInitializer
   let endSpan := initializer.map (fun value => value.span) |>.getD names.span
   pure {
     span := SourceSpan.cover marker.span endSpan

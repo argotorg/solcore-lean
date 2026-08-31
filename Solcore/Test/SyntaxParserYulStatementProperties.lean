@@ -9,6 +9,14 @@ namespace Tests
 open Solcore.Syntax
 open Solcore.Syntax.Parser
 
+example := yulLetInitializer_validFor
+example := yulLetInitializer_preservesTokenWindow
+example := yulLetInitializer_cursorMonotoneOnSuccess
+example := yulLetStatement_validFor
+example := yulLetStatement_preservesTokenWindow
+example := yulLetStatement_preservesTokensOnSuccess
+example := yulLetStatement_cursorMonotoneOnSuccess
+example := yulLetStatement_startsAtCurrentTokenOnSuccess
 example := yulAssignment_validFor
 example := yulAssignment_preservesTokensOnSuccess
 example := yulAssignment_cursorMonotoneOnSuccess
