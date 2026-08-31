@@ -5,7 +5,7 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def requireScrutinees (values : DelimitedList Expr) :
+def MatchInternals.requireScrutinees (values : DelimitedList Expr) :
     Parser (NonemptyDelimitedList Expr) :=
   match values.elements with
   | head :: tail => pure {
@@ -55,7 +55,7 @@ def MatchInternals.optionalDefaultBody (statement : Parser Statement) :
   else
     pure none
 
-private def patternArity (scrutineeCount : Nat)
+def MatchInternals.patternArity (scrutineeCount : Nat)
     (pattern : Pattern) : Nat :=
   if scrutineeCount > 1 then
     match pattern.value with
@@ -64,9 +64,9 @@ private def patternArity (scrutineeCount : Nat)
   else
     1
 
-private def validateMatchCaseArity (scrutineeCount : Nat)
+def MatchInternals.validateMatchCaseArity (scrutineeCount : Nat)
     (case : MatchCase) : Parser Unit :=
-  let count := patternArity scrutineeCount case.value.pattern
+  let count := MatchInternals.patternArity scrutineeCount case.value.pattern
   if count == scrutineeCount then
     pure ()
   else
@@ -76,12 +76,12 @@ private def validateMatchCaseArity (scrutineeCount : Nat)
         (.matchArityMismatch scrutineeCount count)
     }
 
-private def validateMatchArities (scrutineeCount : Nat) :
+def MatchInternals.validateMatchArities (scrutineeCount : Nat) :
     List MatchCase → Parser Unit
   | [] => pure ()
   | case :: rest => do
-      let _ ← validateMatchCaseArity scrutineeCount case
-      validateMatchArities scrutineeCount rest
+      let _ ← MatchInternals.validateMatchCaseArity scrutineeCount case
+      MatchInternals.validateMatchArities scrutineeCount rest
 
 /-- Parse a canonical multi-scrutinee `match` statement. -/
 def matchStatement (statement : Parser Statement)
@@ -89,7 +89,7 @@ def matchStatement (statement : Parser Statement)
   let marker ← keyword .matchKw .statement
   let scrutineeValues ← delimited .leftParen .rightParen false expression
     .expression .statement
-  let scrutinees ← requireScrutinees scrutineeValues
+  let scrutinees ← MatchInternals.requireScrutinees scrutineeValues
   let opening ← symbol .leftBrace .statement
   let cases ← fun state =>
     MatchInternals.matchCases statement pattern
@@ -97,7 +97,8 @@ def matchStatement (statement : Parser Statement)
   let defaultBody ← MatchInternals.optionalDefaultBody statement
   let closing ← symbol .rightBrace .statement
   let armsSpan := SourceSpan.cover opening.span closing.span
-  let _ ← validateMatchArities scrutinees.elements.toList.length cases
+  let _ ← MatchInternals.validateMatchArities
+    scrutinees.elements.toList.length cases
   if cases.isEmpty && defaultBody.isNone then
     let _ ← emitDiagnostic {
       span := SourceSpan.cover marker.span closing.span

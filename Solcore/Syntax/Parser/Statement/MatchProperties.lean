@@ -417,5 +417,247 @@ theorem optionalDefaultBody_some_startsAfterKeyword
     change Reply.ok none input = .ok (some body) final at parsed
     cases parsed
 
+/-- Requiring scrutinees converts a valid nonempty delimited list exactly. -/
+theorem requireScrutinees_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (values : DelimitedList Expr) (input : State)
+    (inputValid : input.ValidFor)
+    (valuesValid : DelimitedList.ValidFor expressionValueValid
+      input.file values) :
+    (requireScrutinees values input).ValidFor input
+      (NonemptyDelimitedList.ValidFor expressionValueValid) := by
+  unfold requireScrutinees
+  cases elements : values.elements with
+  | nil => trivial
+  | cons head tail =>
+      simp only [pure, Reply.ValidFor, NonemptyDelimitedList.ValidFor]
+      refine ⟨⟨valuesValid.1, ?_⟩, inputValid, trivial⟩
+      intro expression member
+      exact valuesValid.2 expression (by
+        simpa [NonemptyList.toList, elements] using member)
+
+/-- Requiring a nonempty scrutinee list does not alter the token window. -/
+theorem requireScrutinees_preservesTokenWindow
+    (values : DelimitedList Expr) :
+    Parser.PreservesTokenWindow (requireScrutinees values) := by
+  intro input
+  unfold requireScrutinees
+  cases values.elements with
+  | nil => trivial
+  | cons head tail => exact ⟨rfl, rfl⟩
+
+/-- Requiring a nonempty scrutinee list never rewinds the cursor. -/
+theorem requireScrutinees_cursorMonotoneOnSuccess
+    (values : DelimitedList Expr) :
+    Parser.CursorMonotoneOnSuccess (requireScrutinees values) := by
+  intro input scrutinees final parsed
+  unfold requireScrutinees at parsed
+  cases elements : values.elements with
+  | nil =>
+      rw [elements] at parsed
+      contradiction
+  | cons head tail =>
+      rw [elements] at parsed
+      cases parsed
+      exact Nat.le_refl _
+
+/-- One arity check preserves the complete token window. -/
+theorem validateMatchCaseArity_preservesTokenWindow
+    (scrutineeCount : Nat) (retainedCase : MatchCase) :
+    Parser.PreservesTokenWindow
+      (validateMatchCaseArity scrutineeCount retainedCase) := by
+  unfold validateMatchCaseArity
+  simp only
+  split
+  · exact Parser.pure_preservesTokenWindow ()
+  · exact emitDiagnostic_preservesTokenWindow _
+
+/-- One arity check leaves the cursor in place. -/
+theorem validateMatchCaseArity_cursorMonotoneOnSuccess
+    (scrutineeCount : Nat) (retainedCase : MatchCase) :
+    Parser.CursorMonotoneOnSuccess
+      (validateMatchCaseArity scrutineeCount retainedCase) := by
+  unfold validateMatchCaseArity
+  simp only
+  split
+  · exact Parser.pure_cursorMonotoneOnSuccess ()
+  · exact emitDiagnostic_cursorMonotoneOnSuccess _
+
+/-- Checking every retained case preserves the complete token window. -/
+theorem validateMatchArities_preservesTokenWindow
+    (scrutineeCount : Nat) : ∀ cases,
+    Parser.PreservesTokenWindow
+      (validateMatchArities scrutineeCount cases)
+  | [] => Parser.pure_preservesTokenWindow ()
+  | retainedCase :: rest => by
+      unfold validateMatchArities
+      apply Parser.bind_preservesTokenWindow
+        (validateMatchCaseArity_preservesTokenWindow scrutineeCount
+          retainedCase)
+      intro _
+      exact validateMatchArities_preservesTokenWindow scrutineeCount rest
+
+/-- Checking every retained case leaves the cursor in place. -/
+theorem validateMatchArities_cursorMonotoneOnSuccess
+    (scrutineeCount : Nat) : ∀ cases,
+    Parser.CursorMonotoneOnSuccess
+      (validateMatchArities scrutineeCount cases)
+  | [] => Parser.pure_cursorMonotoneOnSuccess ()
+  | retainedCase :: rest => by
+      unfold validateMatchArities
+      apply Parser.bind_cursorMonotoneOnSuccess
+        (validateMatchCaseArity_cursorMonotoneOnSuccess scrutineeCount
+          retainedCase)
+      intro _
+      exact validateMatchArities_cursorMonotoneOnSuccess scrutineeCount rest
+
 end MatchInternals
+
+/-- Complete `match` parsing preserves every ordinary token window. -/
+theorem matchStatement_preservesTokenWindow
+    (statement : Parser Statement) (expression : Parser Expr)
+    (pattern : Parser Pattern)
+    (statementWindow : Parser.PreservesTokenWindow statement)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (patternWindow : Parser.PreservesTokenWindow pattern) :
+    Parser.PreservesTokenWindow
+      (matchStatement statement expression pattern) := by
+  have caseWindow := MatchInternals.matchCase_preservesTokenWindow
+    statement pattern statementWindow patternWindow
+  have casesWindow : Parser.PreservesTokenWindow (fun input =>
+      MatchInternals.matchCases statement pattern
+        (input.remainingCount + 1) [] input) := by
+    intro input
+    exact MatchInternals.matchCases_preservesTokenWindow statement pattern
+      caseWindow (input.remainingCount + 1) [] input
+  unfold matchStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .matchKw .statement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (delimited_preservesTokenWindow .leftParen .rightParen false expression
+      .expression .statement expressionWindow)
+  intro values
+  apply Parser.bind_preservesTokenWindow
+    (MatchInternals.requireScrutinees_preservesTokenWindow values)
+  intro scrutinees
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .leftBrace .statement)
+  intro opening
+  apply Parser.bind_preservesTokenWindow casesWindow
+  intro cases
+  apply Parser.bind_preservesTokenWindow
+    (MatchInternals.optionalDefaultBody_preservesTokenWindow statement
+      statementWindow)
+  intro defaultBody
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .rightBrace .statement)
+  intro closing
+  apply Parser.bind_preservesTokenWindow
+    (MatchInternals.validateMatchArities_preservesTokenWindow
+      scrutinees.elements.toList.length cases)
+  intro _
+  by_cases missing : cases.isEmpty && defaultBody.isNone
+  · simp only [missing, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (emitDiagnostic_preservesTokenWindow _)
+    intro _
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [missing]
+    exact Parser.pure_preservesTokenWindow _
+
+/-- Successful `match` parsing preserves the immutable token carrier. -/
+theorem matchStatement_preservesTokensOnSuccess
+    (statement : Parser Statement) (expression : Parser Expr)
+    (pattern : Parser Pattern)
+    (statementWindow : Parser.PreservesTokenWindow statement)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (patternWindow : Parser.PreservesTokenWindow pattern) :
+    Parser.PreservesTokensOnSuccess
+      (matchStatement statement expression pattern) :=
+  (matchStatement_preservesTokenWindow statement expression pattern
+    statementWindow expressionWindow patternWindow).preservesTokensOnSuccess
+
+/-- A successful `match` statement never rewinds the token cursor. -/
+theorem matchStatement_cursorMonotoneOnSuccess
+    (statement : Parser Statement) (expression : Parser Expr)
+    (pattern : Parser Pattern) :
+    Parser.CursorMonotoneOnSuccess
+      (matchStatement statement expression pattern) := by
+  have casesCursor : Parser.CursorMonotoneOnSuccess (fun input =>
+      MatchInternals.matchCases statement pattern
+        (input.remainingCount + 1) [] input) := by
+    intro input cases final parsed
+    exact MatchInternals.matchCases_cursorMonotoneOnSuccess statement pattern
+      (input.remainingCount + 1) [] input cases final parsed
+  unfold matchStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .matchKw .statement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (delimited_cursorMonotoneOnSuccess .leftParen .rightParen false
+      expression .expression .statement)
+  intro values
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (MatchInternals.requireScrutinees_cursorMonotoneOnSuccess values)
+  intro scrutinees
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .leftBrace .statement)
+  intro opening
+  apply Parser.bind_cursorMonotoneOnSuccess casesCursor
+  intro cases
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (MatchInternals.optionalDefaultBody_cursorMonotoneOnSuccess statement)
+  intro defaultBody
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .rightBrace .statement)
+  intro closing
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (MatchInternals.validateMatchArities_cursorMonotoneOnSuccess
+      scrutinees.elements.toList.length cases)
+  intro _
+  by_cases missing : cases.isEmpty && defaultBody.isNone
+  · simp only [missing, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (emitDiagnostic_cursorMonotoneOnSuccess _)
+    intro _
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [missing]
+    exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A complete `match` statement starts at its `match` keyword token. -/
+theorem matchStatement_startsAtCurrentTokenOnSuccess
+    (statement : Parser Statement) (expression : Parser Expr)
+    (pattern : Parser Pattern) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (matchStatement statement expression pattern) (·.span) := by
+  unfold matchStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .matchKw)
+      .statement (fun kind => kind == .keyword .matchKw))
+  intro marker input parsedStatement final parsed
+  rcases matchBind_ok_components parsed with
+    ⟨values, afterValues, valuesResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨scrutinees, afterScrutinees, scrutineesResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨opening, afterOpening, openingResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨cases, afterCases, casesResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨defaultBody, afterDefault, defaultResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨closing, afterClosing, closingResult, rest⟩
+  rcases matchBind_ok_components rest with
+    ⟨validated, afterValidation, validationResult, rest⟩
+  by_cases missing : cases.isEmpty && defaultBody.isNone
+  · simp only [missing, if_true] at rest
+    rcases matchBind_ok_components rest with
+      ⟨presence, afterPresence, presenceResult, finished⟩
+    cases finished
+    rfl
+  · simp only [missing] at rest
+    cases rest
+    rfl
+
 end Solcore.Syntax.Parser

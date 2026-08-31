@@ -23,5 +23,10 @@ example := @MatchInternals.optionalDefaultBody_preservesTokenWindow
 example := @MatchInternals.optionalDefaultBody_preservesTokensOnSuccess
 example := @MatchInternals.optionalDefaultBody_cursorMonotoneOnSuccess
 example := @MatchInternals.optionalDefaultBody_some_startsAfterKeyword
+example := @MatchInternals.requireScrutinees_validFor
+example := @matchStatement_preservesTokenWindow
+example := @matchStatement_preservesTokensOnSuccess
+example := @matchStatement_cursorMonotoneOnSuccess
+example := @matchStatement_startsAtCurrentTokenOnSuccess
 
 end Tests
