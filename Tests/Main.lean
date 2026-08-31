@@ -10,6 +10,7 @@ import Solcore.Test.SyntaxLexer
 import Solcore.Test.SyntaxParserExports
 import Solcore.Test.SyntaxParserModules
 import Solcore.Test.SyntaxParserRecovery
+import Solcore.Test.SyntaxParserSignatures
 import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTypes
 import Solcore.Surface.Multi.Grammar
@@ -5052,6 +5053,7 @@ def run : IO Unit := do
   testSyntaxParserExports
   testSyntaxParserTypes
   testSyntaxParserRecovery
+  testSyntaxParserSignatures
   testSyntaxParserTrivia
   testProfile
   testFeatureMatrix
