@@ -128,7 +128,10 @@ def leftAssociativeTail (operand : Parser Expr)
 
 end ExpressionInternals
 
-private def leftAssociative (operand : Parser Expr)
+namespace ExpressionInternals
+
+/-- Parse one complete left-associative binary precedence layer. -/
+def leftAssociative (operand : Parser Expr)
     (precedence : Nat) : Parser Expr := fun state =>
   match operand state with
   | .ok left next =>
@@ -136,6 +139,8 @@ private def leftAssociative (operand : Parser Expr)
         (next.remainingCount + 1) left next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+end ExpressionInternals
 
 private def nonAssociative (operand : Parser Expr)
     (precedence : Nat) : Parser Expr := fun state =>
@@ -215,15 +220,15 @@ are supplied by the later statement/expression knot with strictly less fuel.
 def expressionLayer (nested : Parser Expr)
     (block : Parser Block) : Parser Expr :=
   let unary := expressionUnary nested block
-  let multiply := leftAssociative unary 8
-  let add := leftAssociative multiply 7
-  let bitAnd := leftAssociative add 6
-  let bitXor := leftAssociative bitAnd 5
-  let bitOr := leftAssociative bitXor 4
+  let multiply := ExpressionInternals.leftAssociative unary 8
+  let add := ExpressionInternals.leftAssociative multiply 7
+  let bitAnd := ExpressionInternals.leftAssociative add 6
+  let bitXor := ExpressionInternals.leftAssociative bitAnd 5
+  let bitOr := ExpressionInternals.leftAssociative bitXor 4
   let relational := nonAssociative bitOr 3
   let equality := nonAssociative relational 2
-  let logicalAnd := leftAssociative equality 1
-  let logicalOr := leftAssociative logicalAnd 0
+  let logicalAnd := ExpressionInternals.leftAssociative equality 1
+  let logicalOr := ExpressionInternals.leftAssociative logicalAnd 0
   conditional nested logicalOr
 
 /-- Whether the current token may begin a canonical Core expression. -/

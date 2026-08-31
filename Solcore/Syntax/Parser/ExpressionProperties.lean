@@ -508,5 +508,116 @@ theorem leftAssociativeTail_validFor
                   exact recursive.of_file_eq
                     (rightReply.2.2.trans consumedReply.2.2)
 
+/-- A complete left-associative layer preserves every ordinary token window. -/
+theorem leftAssociative_preservesTokenWindow (operand : Parser Expr)
+    (operandWindow : Parser.PreservesTokenWindow operand)
+    (precedence : Nat) :
+    Parser.PreservesTokenWindow (leftAssociative operand precedence) := by
+  intro input
+  unfold leftAssociative
+  have operandShape := operandWindow input
+  cases operandResult : operand input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [operandResult] at operandShape
+      exact operandShape
+  | ok left next =>
+      rw [operandResult] at operandShape
+      exact (leftAssociativeTail_preservesTokenWindow operand operandWindow
+        precedence (next.remainingCount + 1) left next).trans operandShape
+
+theorem leftAssociative_preservesTokensOnSuccess (operand : Parser Expr)
+    (operandWindow : Parser.PreservesTokenWindow operand)
+    (precedence : Nat) :
+    Parser.PreservesTokensOnSuccess (leftAssociative operand precedence) :=
+  (leftAssociative_preservesTokenWindow operand operandWindow
+    precedence).preservesTokensOnSuccess
+
+/-- A complete left-associative layer never rewinds the parser cursor. -/
+theorem leftAssociative_cursorMonotoneOnSuccess (operand : Parser Expr)
+    (operandCursor : Parser.CursorMonotoneOnSuccess operand)
+    (precedence : Nat) :
+    Parser.CursorMonotoneOnSuccess (leftAssociative operand precedence) := by
+  intro input expression final parsed
+  unfold leftAssociative at parsed
+  cases operandResult : operand input with
+  | invariant error => simp [operandResult] at parsed
+  | reject failure rejected => simp [operandResult] at parsed
+  | ok left next =>
+      simp only [operandResult] at parsed
+      exact Nat.le_trans (operandCursor input left next operandResult)
+        (leftAssociativeTail_cursorMonotoneOnSuccess operand operandCursor
+          precedence (next.remainingCount + 1) left next expression final
+            parsed)
+
+/-- A complete left-associative layer retains its first operand's token. -/
+theorem leftAssociative_startsAtCurrentTokenOnSuccess
+    (operand : Parser Expr)
+    (operandStarts :
+      Parser.StartsAtCurrentTokenOnSuccess operand (·.span))
+    (precedence : Nat) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (leftAssociative operand precedence) (·.span) := by
+  intro input expression final parsed
+  unfold leftAssociative at parsed
+  cases operandResult : operand input with
+  | invariant error => simp [operandResult] at parsed
+  | reject failure rejected => simp [operandResult] at parsed
+  | ok left next =>
+      simp only [operandResult] at parsed
+      rcases operandStarts input left next operandResult with
+        ⟨first, found, starts⟩
+      have retained := leftAssociativeTail_preservesLeftStartOnSuccess operand
+        precedence (next.remainingCount + 1) left next expression final parsed
+      exact ⟨first, found, starts.trans retained.symm⟩
+
+/-- A complete left-associative layer retains all recursive source ranges. -/
+theorem leftAssociative_validFor
+    (operand : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (operandValid : operand.ValidFor (Expr.ValidFor statementValid))
+    (operandTokens : Parser.PreservesTokensOnSuccess operand)
+    (operandCursorLt : ∀ {input next : State} {value : Expr},
+      operand input = .ok value next → input.cursor < next.cursor)
+    (operandStarts :
+      Parser.StartsAtCurrentTokenOnSuccess operand (·.span))
+    (precedence : Nat) :
+    (leftAssociative operand precedence).ValidFor
+      (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  unfold leftAssociative
+  cases operandResult : operand input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have rejectedValid := operandValid input inputValid
+      rw [operandResult] at rejectedValid
+      exact rejectedValid
+  | ok left next =>
+      have leftReply := operandValid input inputValid
+      rw [operandResult] at leftReply
+      have leftValidNext : Expr.ValidFor statementValid next.file left := by
+        simpa [leftReply.2.2] using leftReply.1
+      have tokensEq := operandTokens input left next operandResult
+      rcases operandStarts input left next operandResult with
+        ⟨first, firstFound, firstStart⟩
+      have firstAt := State.getElem?_eq_some_of_peek?_eq_some firstFound
+      have firstValid := inputValid.peek?_span_validFor firstFound
+      have leftBefore : ∀ token, next.peek? = some token →
+          left.span.startByte ≤ token.span.startByte := by
+        intro token found
+        have tokenAtNext := State.getElem?_eq_some_of_peek?_eq_some found
+        have tokenAt : input.tokens[next.cursor]? = some token := by
+          simpa [tokensEq] using tokenAtNext
+        have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+          firstAt tokenAt (operandCursorLt operandResult)
+        exact Nat.le_trans (by simpa [firstStart] using firstValid.2.1)
+          separated
+      have recursive := leftAssociativeTail_validFor operand statementValid
+        operandValid operandTokens
+          (fun _ _ _ result => Nat.le_of_lt (operandCursorLt result))
+          operandStarts precedence (next.remainingCount + 1) left next
+          leftReply.2.1 leftValidNext leftBefore
+      exact recursive.of_file_eq leftReply.2.2
+
 end ExpressionInternals
 end Solcore.Syntax.Parser

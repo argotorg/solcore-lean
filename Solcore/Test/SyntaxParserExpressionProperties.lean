@@ -30,5 +30,10 @@ example := @ExpressionInternals.leftAssociativeTail_preservesTokensOnSuccess
 example := @ExpressionInternals.leftAssociativeTail_cursorMonotoneOnSuccess
 example := @ExpressionInternals.leftAssociativeTail_preservesLeftStartOnSuccess
 example := @ExpressionInternals.leftAssociativeTail_validFor
+example := @ExpressionInternals.leftAssociative_preservesTokenWindow
+example := @ExpressionInternals.leftAssociative_preservesTokensOnSuccess
+example := @ExpressionInternals.leftAssociative_cursorMonotoneOnSuccess
+example := @ExpressionInternals.leftAssociative_startsAtCurrentTokenOnSuccess
+example := @ExpressionInternals.leftAssociative_validFor
 
 end Tests
