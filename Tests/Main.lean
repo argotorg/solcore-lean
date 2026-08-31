@@ -22,6 +22,7 @@ import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExports
 import Solcore.Test.SyntaxParserInvariantProperties
 import Solcore.Test.SyntaxParserLegacyRejection
+import Solcore.Test.SyntaxParserLiteralProperties
 import Solcore.Test.SyntaxParserModules
 import Solcore.Test.SyntaxParserNameProperties
 import Solcore.Test.SyntaxParserOperatorProperties
