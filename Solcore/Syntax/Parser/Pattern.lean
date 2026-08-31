@@ -205,7 +205,10 @@ def comptimePattern (expression : Parser Expr) : Parser Pattern := fun state =>
 
 end PatternInternals
 
-private def patternCore (nested : Parser Pattern)
+namespace PatternInternals
+
+/-- Dispatch one non-recovering canonical pattern layer. -/
+def patternCore (nested : Parser Pattern)
     (expression : Parser Expr) : Parser Pattern := fun state =>
   if isSymbol state .underscore then
     PatternInternals.wildcardPattern state
@@ -221,6 +224,8 @@ private def patternCore (nested : Parser Pattern)
     PatternInternals.comptimePattern expression state
   else if isIdentifier state then PatternInternals.qualifiedPattern nested state
   else rejectAt state { head := .pattern, tail := [] } .pattern
+
+end PatternInternals
 
 private def isPatternBoundary (state : State) : Bool :=
   state.atEnd ||
@@ -249,7 +254,7 @@ private def recoverPatternAux (first last : SourceSpan) :
 /-- Build one pattern recursion layer with a supplied comptime expression. -/
 def patternLayer (nested : Parser Pattern)
     (expression : Parser Expr) : Parser Pattern := fun state =>
-  match patternCore nested expression state with
+  match PatternInternals.patternCore nested expression state with
   | .ok value next => .ok value next
   | .reject failure failedState =>
       let rewound := { failedState with cursor := state.cursor }

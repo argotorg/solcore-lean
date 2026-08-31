@@ -1497,5 +1497,159 @@ theorem comptimePattern_startsAtCurrentTokenOnSuccess
             ⟨token, found, start⟩
           exact ⟨token, found, start⟩
 
+/-- Non-recovering pattern dispatch preserves source and state validity. -/
+theorem patternCore_validFor (nested : Parser Pattern)
+    (expression : Parser Expr)
+    (expressionValid : SourceFile → Expr → Prop)
+    (nestedValid : nested.ValidFor (Pattern.ValidFor expressionValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (parserValid : expression.ValidFor expressionValid)
+    (spanValid : ∀ {file : SourceFile} {value : Expr},
+      expressionValid file value → value.span.ValidFor file)
+    (starts : Parser.StartsAtCurrentTokenOnSuccess expression (·.span)) :
+    (patternCore nested expression).ValidFor
+      (Pattern.ValidFor expressionValid) := by
+  intro input inputValid
+  unfold patternCore
+  split
+  · exact wildcardPattern_validFor expressionValid input inputValid
+  · split
+    · exact literalPattern_validFor expressionValid input inputValid
+    · split
+      · exact booleanBinderPattern_validFor expressionValid input inputValid
+      · split
+        · exact parenthesizedPattern_validFor nested expressionValid
+            nestedValid nestedPreserves input inputValid
+        · split
+          · exact dotConstructorPattern_validFor nested expressionValid
+              nestedValid nestedPreserves input inputValid
+          · split
+            · exact comptimePattern_validFor expression expressionValid
+                parserValid spanValid starts input inputValid
+            · split
+              · exact qualifiedPattern_validFor nested expressionValid
+                  nestedValid nestedPreserves input inputValid
+              · unfold rejectAt Reply.ValidFor
+                exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+
+/-- Non-recovering pattern dispatch preserves every ordinary token window. -/
+theorem patternCore_preservesTokenWindow (nested : Parser Pattern)
+    (expression : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested)
+    (expressionPreserves : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (patternCore nested expression) := by
+  intro input
+  unfold patternCore
+  split
+  · exact wildcardPattern_preservesTokenWindow input
+  · split
+    · exact literalPattern_preservesTokenWindow input
+    · split
+      · exact booleanBinderPattern_preservesTokenWindow input
+      · split
+        · exact parenthesizedPattern_preservesTokenWindow nested
+            nestedPreserves input
+        · split
+          · exact dotConstructorPattern_preservesTokenWindow nested
+              nestedPreserves input
+          · split
+            · exact comptimePattern_preservesTokenWindow expression
+                expressionPreserves input
+            · split
+              · exact qualifiedPattern_preservesTokenWindow nested
+                  nestedPreserves input
+              · exact rejectAt_preservesTokenWindow input _ _
+
+/-- Non-recovering pattern success preserves the immutable token carrier. -/
+theorem patternCore_preservesTokensOnSuccess (nested : Parser Pattern)
+    (expression : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested)
+    (expressionPreserves : Parser.PreservesTokensOnSuccess expression) :
+    Parser.PreservesTokensOnSuccess (patternCore nested expression) := by
+  intro input pattern next parsed
+  unfold patternCore at parsed
+  split at parsed
+  · exact wildcardPattern_preservesTokensOnSuccess input pattern next parsed
+  · split at parsed
+    · exact literalPattern_preservesTokensOnSuccess input pattern next parsed
+    · split at parsed
+      · exact booleanBinderPattern_preservesTokensOnSuccess
+          input pattern next parsed
+      · split at parsed
+        · exact parenthesizedPattern_preservesTokensOnSuccess nested
+            nestedPreserves input pattern next parsed
+        · split at parsed
+          · exact dotConstructorPattern_preservesTokensOnSuccess nested
+              nestedPreserves input pattern next parsed
+          · split at parsed
+            · exact comptimePattern_preservesTokensOnSuccess expression
+                expressionPreserves input pattern next parsed
+            · split at parsed
+              · exact qualifiedPattern_preservesTokensOnSuccess nested
+                  nestedPreserves input pattern next parsed
+              · unfold rejectAt at parsed
+                contradiction
+
+/-- Non-recovering pattern dispatch never rewinds the parser cursor. -/
+theorem patternCore_cursorMonotoneOnSuccess (nested : Parser Pattern)
+    (expression : Parser Expr)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested)
+    (expressionMonotone : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (patternCore nested expression) := by
+  intro input pattern next parsed
+  unfold patternCore at parsed
+  split at parsed
+  · exact wildcardPattern_cursorMonotoneOnSuccess input pattern next parsed
+  · split at parsed
+    · exact literalPattern_cursorMonotoneOnSuccess input pattern next parsed
+    · split at parsed
+      · exact booleanBinderPattern_cursorMonotoneOnSuccess
+          input pattern next parsed
+      · split at parsed
+        · exact parenthesizedPattern_cursorMonotoneOnSuccess nested
+            nestedMonotone input pattern next parsed
+        · split at parsed
+          · exact dotConstructorPattern_cursorMonotoneOnSuccess nested
+              input pattern next parsed
+          · split at parsed
+            · exact comptimePattern_cursorMonotoneOnSuccess expression
+                expressionMonotone input pattern next parsed
+            · split at parsed
+              · exact qualifiedPattern_cursorMonotoneOnSuccess nested
+                  input pattern next parsed
+              · unfold rejectAt at parsed
+                contradiction
+
+/-- Non-recovering pattern success starts at the selected leading token. -/
+theorem patternCore_startsAtCurrentTokenOnSuccess
+    (nested : Parser Pattern) (expression : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (patternCore nested expression) (·.span) := by
+  intro input pattern next parsed
+  unfold patternCore at parsed
+  split at parsed
+  · exact wildcardPattern_startsAtCurrentTokenOnSuccess
+      input pattern next parsed
+  · split at parsed
+    · exact literalPattern_startsAtCurrentTokenOnSuccess
+        input pattern next parsed
+    · split at parsed
+      · exact booleanBinderPattern_startsAtCurrentTokenOnSuccess
+          input pattern next parsed
+      · split at parsed
+        · exact parenthesizedPattern_startsAtCurrentTokenOnSuccess nested
+            input pattern next parsed
+        · split at parsed
+          · exact dotConstructorPattern_startsAtCurrentTokenOnSuccess nested
+              input pattern next parsed
+          · split at parsed
+            · exact comptimePattern_startsAtCurrentTokenOnSuccess expression
+                input pattern next parsed
+            · split at parsed
+              · exact qualifiedPattern_startsAtCurrentTokenOnSuccess nested
+                  input pattern next parsed
+              · unfold rejectAt at parsed
+                contradiction
+
 end PatternInternals
 end Solcore.Syntax.Parser
