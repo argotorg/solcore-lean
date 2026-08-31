@@ -18,5 +18,8 @@ example :=
 example := @TermInternals.StatementParserContract
 example := @TermInternals.StatementParserContract.preservesTokensOnSuccess
 example := @TermInternals.recognizedStatementOrFallback_contract
+example := @TermInternals.statementLayer
+example := @TermInternals.StatementLayerInputs
+example := @TermInternals.statementLayer_contract
 
 end Tests

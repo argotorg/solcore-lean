@@ -25,43 +25,39 @@ def recognizedStatementOrFallback
       | .invariant error => .invariant error
   | .invariant error => .invariant error
 
-end TermInternals
-
-private def statementLayer (nestedStatement : Parser Statement)
+def statementLayer (nestedStatement : Parser Statement)
     (expression : Parser Expr) (pattern : Parser Pattern) : Parser Statement :=
     fun state =>
   let fallback := assignmentOrExpressionStatement expression
   if isKeyword state .letKw then
-    TermInternals.recognizedStatementOrFallback
+    recognizedStatementOrFallback
       (letStatement expression) fallback state
   else if isKeyword state .returnKw then
-    TermInternals.recognizedStatementOrFallback
+    recognizedStatementOrFallback
       (returnStatement expression) fallback state
   else if isKeyword state .matchKw then
-    TermInternals.recognizedStatementOrFallback
+    recognizedStatementOrFallback
       (matchStatement nestedStatement expression pattern) fallback state
   else if isKeyword state .forKw then
-    TermInternals.recognizedStatementOrFallback
+    recognizedStatementOrFallback
       (forStatement nestedStatement expression) fallback state
   else if isContextual state .while then
-    TermInternals.recognizedStatementOrFallback
+    recognizedStatementOrFallback
       (whileStatement nestedStatement expression) fallback state
   else if isKeyword state .ifKw then
-    TermInternals.recognizedStatementOrFallback
+    recognizedStatementOrFallback
       (ifStatement nestedStatement expression) fallback state
   else if isKeyword state .assemblyKw then
-    TermInternals.recognizedStatementOrFallback
+    recognizedStatementOrFallback
       assemblyStatement fallback state
   else if isSymbol state .leftBrace then
-    TermInternals.recognizedStatementOrFallback
+    recognizedStatementOrFallback
       (blockStatement nestedStatement) fallback state
   else if isKeyword state .breakKw then
-    TermInternals.recognizedStatementOrFallback breakStatement fallback state
+    recognizedStatementOrFallback breakStatement fallback state
   else if isKeyword state .continueKw then
-    TermInternals.recognizedStatementOrFallback continueStatement fallback state
+    recognizedStatementOrFallback continueStatement fallback state
   else fallback state
-
-namespace TermInternals
 
 mutual
 
