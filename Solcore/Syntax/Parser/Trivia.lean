@@ -143,7 +143,10 @@ private def findSeparatorComma (source : String) (comments : List Comment)
   else
     none
 
-private def attachEnumConstructorComments (file : SourceFile)
+/- Proof-visible helpers for declaration-local comment attachment. -/
+namespace TriviaInternals
+
+def attachEnumConstructorComments (file : SourceFile)
     (comments : List Comment) (introducer : SourceSpan)
     (constructor : EnumConstructor) : EnumConstructor :=
   let trailing := commentsDirectlyAfterIntroducer file.content comments
@@ -163,7 +166,7 @@ private def attachEnumConstructorComments (file : SourceFile)
     }
   }
 
-private def attachEnumConstructors (file : SourceFile)
+def attachEnumConstructors (file : SourceFile)
     (comments : List Comment) (bodySpan : SourceSpan) :
     List EnumConstructor → Option SourceSpan → List EnumConstructor
   | [], _ => []
@@ -184,7 +187,7 @@ private def attachEnumConstructors (file : SourceFile)
       updated :: attachEnumConstructors file comments bodySpan rest
         (some constructor.span)
 
-private def attachEnumComments (file : SourceFile) (comments : List Comment)
+def attachEnumComments (file : SourceFile) (comments : List Comment)
     (declaration : EnumDecl) : EnumDecl :=
   { declaration with value := {
       declaration.value with
@@ -192,9 +195,6 @@ private def attachEnumComments (file : SourceFile) (comments : List Comment)
         declaration.value.bodySpan declaration.value.constructors none
     }
   }
-
-/- Proof-visible helpers for declaration-local comment attachment. -/
-namespace TriviaInternals
 
 def attachTraitMethodComments (file : SourceFile)
     (comments : List Comment) (method : TraitMethod) : TraitMethod :=
@@ -232,9 +232,7 @@ def attachImplComments (file : SourceFile) (comments : List Comment)
     }
   }
 
-end TriviaInternals
-
-private def attachContractMemberComments (file : SourceFile)
+def attachContractMemberComments (file : SourceFile)
     (comments : List Comment) (member : ContractMember) : ContractMember :=
   let value := match member.value with
     | .enum declaration => .enum (attachEnumComments file comments declaration)
@@ -245,7 +243,7 @@ private def attachContractMemberComments (file : SourceFile)
     value
   }
 
-private def attachContractComments (file : SourceFile)
+def attachContractComments (file : SourceFile)
     (comments : List Comment) (declaration : ContractDecl) : ContractDecl :=
   { declaration with value := {
       declaration.value with
@@ -254,17 +252,20 @@ private def attachContractComments (file : SourceFile)
     }
   }
 
+end TriviaInternals
+
 /-- Attach top-level and nested declaration comments without changing spans. -/
 def attachTopItemComments (file : SourceFile) (comments : List Comment)
     (item : TopItem) : TopItem :=
   let value := match item.value with
-    | .enum declaration => .enum (attachEnumComments file comments declaration)
+    | .enum declaration =>
+        .enum (TriviaInternals.attachEnumComments file comments declaration)
     | .trait declaration =>
         .trait (TriviaInternals.attachTraitComments file comments declaration)
     | .impl declaration =>
         .impl (TriviaInternals.attachImplComments file comments declaration)
     | .contract declaration =>
-        .contract (attachContractComments file comments declaration)
+        .contract (TriviaInternals.attachContractComments file comments declaration)
     | other => other
   { item with
     leadingComments := commentsDirectlyBefore file.content comments
@@ -306,6 +307,28 @@ private theorem attachBeforeAux_mem_of_mem
               · exact attachedSubset retained priorMember
             · exact member
 
+private theorem commentsDirectlyBeforeSince_mem (source : String)
+    (comments : List Comment) (declarationStart minimumStart : Nat)
+    (allowedLinePrefixEnd : Option Nat)
+    {comment : Comment}
+    (member : comment ∈ commentsDirectlyBeforeSince source comments
+      declarationStart minimumStart allowedLinePrefixEnd) :
+    comment ∈ comments := by
+  unfold commentsDirectlyBeforeSince at member
+  apply attachBeforeAux_mem_of_mem source comments allowedLinePrefixEnd
+    ((comments.filter fun retained =>
+      minimumStart ≤ retained.span.startByte &&
+        retained.span.endByte ≤ declarationStart).reverse)
+    declarationStart []
+  · intro retained retainedMember
+    have filteredMember : retained ∈ comments.filter fun candidate =>
+        minimumStart ≤ candidate.span.startByte &&
+          candidate.span.endByte ≤ declarationStart := by
+      simpa using retainedMember
+    exact (List.mem_filter.mp filteredMember).1
+  · simp
+  · exact member
+
 /-- Every comment selected for a declaration comes from the supplied stream. -/
 theorem commentsDirectlyBefore_mem (source : String)
     (comments : List Comment) (declarationStart : Nat)
@@ -313,19 +336,39 @@ theorem commentsDirectlyBefore_mem (source : String)
     (member : comment ∈ commentsDirectlyBefore source comments
       declarationStart) :
     comment ∈ comments := by
-  unfold commentsDirectlyBefore commentsDirectlyBeforeSince at member
-  apply attachBeforeAux_mem_of_mem source comments none
-    ((comments.filter fun retained =>
-      0 ≤ retained.span.startByte &&
-        retained.span.endByte ≤ declarationStart).reverse)
-    declarationStart []
-  · intro retained retainedMember
-    have filteredMember : retained ∈ comments.filter fun candidate =>
-        0 ≤ candidate.span.startByte &&
-          candidate.span.endByte ≤ declarationStart := by
-      simpa using retainedMember
-    exact (List.mem_filter.mp filteredMember).1
-  · simp
-  · exact member
+  exact commentsDirectlyBeforeSince_mem source comments declarationStart 0
+    none member
+
+private theorem commentsDirectlyAfterIntroducer_mem (source : String)
+    (comments : List Comment) (introducer : SourceSpan)
+    (declarationStart : Nat) {comment : Comment}
+    (member : comment ∈ commentsDirectlyAfterIntroducer source comments
+      introducer declarationStart) :
+    comment ∈ comments := by
+  exact commentsDirectlyBeforeSince_mem source comments declarationStart
+    introducer.endByte (some introducer.endByte) member
+
+/-- Every comment attached to an enum constructor comes from the input stream. -/
+theorem TriviaInternals.attachEnumConstructorComments_mem
+    (file : SourceFile) (comments : List Comment)
+    (introducer : SourceSpan) (constructor : EnumConstructor)
+    {comment : Comment}
+    (member : comment ∈
+      (TriviaInternals.attachEnumConstructorComments file comments introducer
+        constructor).value.leadingComments) :
+    comment ∈ comments := by
+  unfold TriviaInternals.attachEnumConstructorComments at member
+  dsimp only at member
+  split at member
+  · split at member
+    · rcases List.mem_append.mp member with before | after
+      · exact commentsDirectlyBefore_mem file.content comments
+          introducer.startByte before
+      · exact commentsDirectlyAfterIntroducer_mem file.content comments
+          introducer constructor.span.startByte after
+    · exact commentsDirectlyAfterIntroducer_mem file.content comments
+        introducer constructor.span.startByte (by simpa using member)
+  · exact commentsDirectlyAfterIntroducer_mem file.content comments
+      introducer constructor.span.startByte (by simpa using member)
 
 end Solcore.Syntax.Parser
