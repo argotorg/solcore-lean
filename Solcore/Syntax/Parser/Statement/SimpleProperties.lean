@@ -158,6 +158,80 @@ theorem valueAssignOperator_startsAtCurrentTokenOnSuccess :
     ⟨token, found, span, _next⟩
   exact ⟨token, found, congrArg SourceSpan.startByte span⟩
 
+namespace AssignmentTail
+
+/-- Every source range retained by one assignment suffix is valid. -/
+def ValidFor (expressionValid : SourceFile → Expr → Prop)
+    (file : SourceFile) : AssignmentTail → Prop
+  | .value operator right =>
+      operator.span.ValidFor file ∧ expressionValid file right
+  | .bitNot operator => operator.ValidFor file
+
+end AssignmentTail
+
+/-- Assignment tails retain operator and nested-expression provenance. -/
+theorem assignmentTail_validFor (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid) :
+    (assignmentTail expression).ValidFor
+      (AssignmentTail.ValidFor expressionValueValid) := by
+  intro input inputValid
+  unfold assignmentTail
+  split
+  · exact (Parser.bind_validFor_of_value
+      (symbol_validFor .tildeEqual .statement) (by
+        intro operator next nextValid operatorValid
+        exact ⟨by simpa [AssignmentTail.ValidFor, Located.ValidFor] using
+            operatorValid,
+          nextValid, rfl⟩)) input inputValid
+  · cases selected : input.peekKind?.bind valueAssignOp? with
+    | none =>
+        unfold rejectAt Reply.ValidFor
+        exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+    | some selectedOperator =>
+        have branch : (do
+            let operator ← valueAssignOperator
+            let right ← expression
+            pure (AssignmentTail.value operator right)).ValidFor
+            (AssignmentTail.ValidFor expressionValueValid) := by
+          apply Parser.bind_validFor_of_value valueAssignOperator_validFor
+          intro operator afterOperator afterOperatorValid operatorValid
+          change ((expression >>= fun right =>
+            pure (AssignmentTail.value operator right)) afterOperator
+              ).ValidFor afterOperator _
+          simp only [bind]
+          have expressionReply := expressionValid afterOperator
+            afterOperatorValid
+          cases expressionResult : expression afterOperator with
+          | ok right afterExpression =>
+              rw [expressionResult] at expressionReply
+              exact ⟨⟨by simpa only [Located.ValidFor] using operatorValid,
+                expressionReply.1⟩, expressionReply.2.1,
+                expressionReply.2.2⟩
+          | reject failure rejected =>
+              rw [expressionResult] at expressionReply
+              exact ⟨expressionReply.1, expressionReply.2.1,
+                expressionReply.2.2⟩
+          | invariant error => trivial
+        exact branch input inputValid
+
+/-- Optional assignment tails retain provenance whenever present. -/
+theorem optionalAssignmentTail_validFor (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid) :
+    (optionalAssignmentTail expression).ValidFor
+      (Option.ValidFor (AssignmentTail.ValidFor expressionValueValid)) := by
+  intro input inputValid
+  unfold optionalAssignmentTail
+  split
+  · exact (Parser.bind_validFor_of_value
+      (assignmentTail_validFor expression expressionValueValid expressionValid)
+      (by
+        intro tail next nextValid tailValid
+        exact ⟨by simpa only [Option.ValidFor] using tailValid,
+          nextValid, rfl⟩)) input inputValid
+  · exact ⟨trivial, inputValid, rfl⟩
+
 /-- Assignment tails preserve token windows when nested expressions do. -/
 theorem assignmentTail_preservesTokenWindow (expression : Parser Expr)
     (expressionWindow : Parser.PreservesTokenWindow expression) :

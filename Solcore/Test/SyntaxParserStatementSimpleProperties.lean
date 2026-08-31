@@ -21,6 +21,9 @@ example :=
   @StatementSimpleInternals.valueAssignOperator_cursorMonotoneOnSuccess
 example :=
   @StatementSimpleInternals.valueAssignOperator_startsAtCurrentTokenOnSuccess
+example := @StatementSimpleInternals.AssignmentTail.ValidFor
+example := @StatementSimpleInternals.assignmentTail_validFor
+example := @StatementSimpleInternals.optionalAssignmentTail_validFor
 example := @StatementSimpleInternals.assignmentTail_preservesTokenWindow
 example := @StatementSimpleInternals.assignmentTail_preservesTokensOnSuccess
 example := @StatementSimpleInternals.assignmentTail_cursorMonotoneOnSuccess
