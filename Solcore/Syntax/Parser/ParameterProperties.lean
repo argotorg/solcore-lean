@@ -215,6 +215,122 @@ theorem namedParameterTail_validFor (start : SourceSpan)
       input FunctionParameter.ValidFor
     exact errorParameter_validFor errorSpan _ input inputValid errorSpanValid
 
+/-- Ordinary named parameters retain name, type, and outer provenance. -/
+theorem ordinaryNamedParameter_validFor :
+    ordinaryNamedParameter.ValidFor FunctionParameter.ValidFor := by
+  intro input inputValid
+  unfold ordinaryNamedParameter
+  simp only [bind]
+  cases nameResult : identifier .parameter input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := identifier_validFor .parameter input inputValid
+      rw [nameResult] at valid
+      exact valid
+  | ok name afterName =>
+      have nameReply := identifier_validFor .parameter input inputValid
+      rw [nameResult] at nameReply
+      simp only
+      rcases identifier_ok_state_shape .parameter nameResult with
+        ⟨nameToken, nameFound, nameSpan, nameTokens, nameCursor⟩
+      have nameAtInput := State.getElem?_eq_some_of_peek?_eq_some nameFound
+      have nameAtAfter :
+          afterName.tokens[input.cursor]? = some nameToken := by
+        simpa [nameTokens] using nameAtInput
+      have nameValidAfter : name.span.ValidFor afterName.file := by
+        simpa only [Located.ValidFor, nameReply.2.2] using nameReply.1
+      by_cases warned :
+          name.value == ContextualKeyword.comptime.spelling
+      · simp only [warned, if_true, emitDiagnostic, modifyState]
+        let diagnostic : ParseDiagnostic := {
+          span := name.span
+          kind := .constraintViolation .comptimeUsedAsParameterName
+        }
+        change (namedParameterTail name.span none name name.span
+          (afterName.emit diagnostic)).ValidFor input
+            FunctionParameter.ValidFor
+        have emittedValid := nameReply.2.1.emit_validFor diagnostic
+          nameValidAfter
+        exact (namedParameterTail_validFor name.span none name name.span
+          (afterName.emit diagnostic) emittedValid
+          (by simpa [State.emit] using nameValidAfter) (by simp)
+          (by simpa [State.emit] using nameValidAfter)
+          (by simpa [State.emit] using nameValidAfter)
+          (by simpa [State.emit] using nameAtAfter) nameSpan
+          (by simp [State.emit, nameCursor])).of_file_eq
+            (by simpa [State.emit] using nameReply.2.2)
+      · simp only [warned]
+        exact (namedParameterTail_validFor name.span none name name.span
+          afterName nameReply.2.1 nameValidAfter (by simp)
+          nameValidAfter nameValidAfter nameAtAfter nameSpan
+          (by simp [nameCursor])).of_file_eq nameReply.2.2
+
+/-- Comptime named parameters retain marker, name, type, and outer provenance. -/
+theorem comptimeNamedParameter_validFor :
+    comptimeNamedParameter.ValidFor FunctionParameter.ValidFor := by
+  intro input inputValid
+  unfold comptimeNamedParameter
+  simp only [bind]
+  cases markerResult : contextual .comptime .parameter input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := contextual_validFor .comptime .parameter input inputValid
+      rw [markerResult] at valid
+      exact valid
+  | ok marker afterMarker =>
+      have markerReply := contextual_validFor .comptime .parameter input
+        inputValid
+      rw [markerResult] at markerReply
+      simp only
+      cases nameResult : identifier .parameter afterMarker with
+      | invariant error => trivial
+      | reject failure rejected =>
+          have valid := identifier_validFor .parameter afterMarker
+            markerReply.2.1
+          rw [nameResult] at valid
+          exact valid.of_file_eq markerReply.2.2
+      | ok name afterName =>
+          have nameReply := identifier_validFor .parameter afterMarker
+            markerReply.2.1
+          rw [nameResult] at nameReply
+          simp only
+          have markerShape := acceptToken_ok_state_shape
+            (.contextual .comptime) .parameter (·.isContextual .comptime)
+            markerResult
+          rcases identifier_ok_state_shape .parameter nameResult with
+            ⟨nameToken, nameFound, nameSpan, nameTokens, nameCursor⟩
+          have markerAtInput :=
+            State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+          have markerAtAfter :
+              afterName.tokens[input.cursor]? = some marker := by
+            simpa [nameTokens, markerShape.2] using markerAtInput
+          have nameAtAfterMarker :=
+            State.getElem?_eq_some_of_peek?_eq_some nameFound
+          have nameAtInput :
+              input.tokens[afterMarker.cursor]? = some nameToken := by
+            simpa [markerShape.2] using nameAtAfterMarker
+          have markerBeforeName :=
+            inputValid.token_end_le_token_start_of_getElem?_lt markerAtInput
+              nameAtInput (by simp [markerShape.2])
+          have markerValidAfter : marker.span.ValidFor afterName.file := by
+            simpa only [Located.ValidFor, nameReply.2.2,
+              markerReply.2.2] using markerReply.1
+          have nameValidAfter : name.span.ValidFor afterName.file := by
+            simpa only [Located.ValidFor, nameReply.2.2] using nameReply.1
+          have errorSpanValid :
+              (SourceSpan.cover marker.span name.span).ValidFor
+                afterName.file :=
+            SourceSpan.cover_validFor markerValidAfter nameValidAfter
+              (Nat.le_trans markerValidAfter.2.1 (Nat.le_trans
+                (by simpa [nameSpan] using markerBeforeName)
+                nameValidAfter.2.1))
+          exact (namedParameterTail_validFor marker.span (some marker.span)
+            name (SourceSpan.cover marker.span name.span) afterName
+            nameReply.2.1 markerValidAfter (by simp [markerValidAfter])
+            nameValidAfter errorSpanValid markerAtAfter rfl
+            (by simp [markerShape.2, nameCursor]; omega)).of_file_eq
+              (nameReply.2.2.trans markerReply.2.2)
+
 theorem finishTypedParameter_preservesTokenWindow (start : SourceSpan)
     (comptimeMarker : Option SourceSpan) (name : Identifier)
     (type : TypeExpr) :
@@ -287,6 +403,19 @@ theorem comptimeNamedParameter_preservesTokenWindow :
   exact namedParameterTail_preservesTokenWindow marker.span
     (some marker.span) name (SourceSpan.cover marker.span name.span)
 
+/-- The non-recovering parameter choice preserves complete provenance. -/
+theorem namedParameterCore_validFor :
+    namedParameterCore.ValidFor FunctionParameter.ValidFor := by
+  intro input inputValid
+  unfold namedParameterCore
+  split
+  · simp only [Bool.and_true]
+    split
+    · exact comptimeNamedParameter_validFor input inputValid
+    · exact ordinaryNamedParameter_validFor input inputValid
+  · simp only [Bool.and_false, Bool.false_eq_true, if_false]
+    exact ordinaryNamedParameter_validFor input inputValid
+
 theorem namedParameterCore_preservesTokenWindow :
     Parser.PreservesTokenWindow namedParameterCore := by
   intro input
@@ -332,6 +461,52 @@ theorem recoverParameter_preservesTokenWindow :
           simp [(advance?_state_shape advanced).2])
 
 end FunctionParameterInternals
+
+/-- Named parameters retain provenance through parsing and recovery. -/
+theorem namedParameter_validFor :
+    namedParameter.ValidFor FunctionParameter.ValidFor := by
+  intro input inputValid
+  unfold namedParameter
+  cases coreResult : FunctionParameterInternals.namedParameterCore input with
+  | ok parameter next =>
+      have valid := FunctionParameterInternals.namedParameterCore_validFor
+        input inputValid
+      rw [coreResult] at valid
+      exact valid
+  | invariant error => trivial
+  | reject failure failedState =>
+      have coreValid :=
+        FunctionParameterInternals.namedParameterCore_validFor input inputValid
+      rw [coreResult] at coreValid
+      have coreShape :=
+        FunctionParameterInternals.namedParameterCore_preservesTokenWindow input
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have rewoundValid : rewound.ValidFor := {
+        tokens := coreValid.2.1.tokens
+        cursor_le_endIndex := by
+          simpa [rewound, coreShape.2] using inputValid.cursor_le_endIndex
+        endIndex_le_size := coreValid.2.1.endIndex_le_size
+        endByte_le_source := coreValid.2.1.endByte_le_source
+        endByte_boundary := coreValid.2.1.endByte_boundary
+        diagnosticsRev := coreValid.2.1.diagnosticsRev
+      }
+      have rewoundFile : rewound.file = input.file := by
+        simpa [rewound] using coreValid.2.2
+      change (if rewound.atEnd || isSymbol rewound .comma ||
+          isSymbol rewound .rightParen then Reply.reject failure rewound
+        else FunctionParameterInternals.recoverParameter
+          (rewound.emit failure.toDiagnostic)).ValidFor input
+            FunctionParameter.ValidFor
+      split
+      · exact ⟨coreValid.1, rewoundValid, rewoundFile⟩
+      · have failureValid : failure.span.ValidFor rewound.file := by
+          simpa [rewound, coreValid.2.2] using coreValid.1
+        have emittedValid := rewoundValid.emit_validFor failure.toDiagnostic
+          (failure.toDiagnostic_span_validFor failureValid)
+        exact (FunctionParameterInternals.recoverParameter_validFor
+          (rewound.emit failure.toDiagnostic) emittedValid).of_file_eq
+            (by simpa [State.emit] using rewoundFile)
 
 /-- Function-parameter parsing preserves every ordinary token window. -/
 theorem namedParameter_preservesTokenWindow :

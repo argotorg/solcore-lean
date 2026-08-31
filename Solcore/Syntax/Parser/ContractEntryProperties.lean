@@ -20,6 +20,12 @@ theorem entryParameters_validFor_of_namedParameter
     true namedParameter .parameter .topLevel elementContract
       namedParameter_preservesTokensOnSuccess
 
+/-- Contract-entry parameter lists retain every parameter's provenance. -/
+theorem entryParameters_validFor :
+    entryParameters.ValidFor
+      (DelimitedList.ValidFor FunctionParameter.ValidFor) :=
+  entryParameters_validFor_of_namedParameter namedParameter_validFor
+
 /-- Contract-entry parameter lists preserve every ordinary token window. -/
 theorem entryParameters_preservesTokenWindow :
     Parser.PreservesTokenWindow entryParameters := by

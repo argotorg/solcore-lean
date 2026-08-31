@@ -18,11 +18,16 @@ example := @ContractDecl.ValidFor
 
 example := @namedParameter_preservesTokenWindow
 example := @namedParameter_preservesTokensOnSuccess
+example := @namedParameter_validFor
+example := @FunctionParameterInternals.ordinaryNamedParameter_validFor
+example := @FunctionParameterInternals.comptimeNamedParameter_validFor
+example := @FunctionParameterInternals.namedParameterCore_validFor
 example := @FunctionParameterInternals.finishRecoveredParameter_validFor
 example := @FunctionParameterInternals.recoverParameterAux_validFor
 example := @FunctionParameterInternals.recoverParameter_validFor
 example := @FunctionParameterInternals.namedParameterTail_validFor
 example := @ContractEntryInternals.entryParameters_validFor_of_namedParameter
+example := @ContractEntryInternals.entryParameters_validFor
 example := @ContractEntryInternals.entryParameters_preservesTokenWindow
 example := @ContractEntryInternals.entryParameters_preservesTokensOnSuccess
 example :=
