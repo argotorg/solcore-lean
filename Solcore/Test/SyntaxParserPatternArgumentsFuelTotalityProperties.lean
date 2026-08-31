@@ -1,0 +1,15 @@
+import Solcore.Syntax.Parser.PatternArgumentsFuelTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPatternArgumentsFuelTotalityProperties
+
+open Solcore.Syntax.Parser.PatternInternals
+
+example := @requirePatternArguments_ok_of_delimitedNoTrailing_false_ok
+example := @constructorArguments_ordinary_of_elementFuel
+example := @constructorArguments_ne_invariant_of_elementFuel
+example := @optionalConstructorArguments_ordinary_of_elementFuel
+example := @optionalConstructorArguments_ne_invariant_of_elementFuel
+
+end Solcore.Test.SyntaxParserPatternArgumentsFuelTotalityProperties
