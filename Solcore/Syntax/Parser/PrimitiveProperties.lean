@@ -50,6 +50,34 @@ theorem acceptToken_ok_validFor {state next : State} {token : Token}
       · unfold rejectAt at result
         contradiction
 
+/-- Successful token acceptance returns the current token and increments only the cursor. -/
+theorem acceptToken_ok_state_shape {state next : State} {token : Token}
+    (expected : ParseExpectation) (context : ParseContext)
+    (accepts : TokenKind → Bool)
+    (result : acceptToken expected context accepts state = .ok token next) :
+    state.peek? = some token ∧ next = { state with cursor := state.cursor + 1 } := by
+  unfold acceptToken at result
+  cases found : state.peek? with
+  | none =>
+      simp only [found] at result
+      unfold rejectAt at result
+      contradiction
+  | some current =>
+      simp only [found] at result
+      split at result
+      · cases result
+        exact ⟨rfl, rfl⟩
+      · unfold rejectAt at result
+        contradiction
+
+/-- Successful symbol parsing has the generic token-consumer state shape. -/
+theorem symbol_ok_state_shape {state next : State} {token : Token}
+    (value : Symbol) (context : ParseContext)
+    (result : symbol value context state = .ok token next) :
+    state.peek? = some token ∧ next = { state with cursor := state.cursor + 1 } := by
+  exact acceptToken_ok_state_shape (.symbol value) context
+    (· == .symbol value) result
+
 /-- Rejected token acceptance retains a valid failure span and state. -/
 theorem acceptToken_reject_validFor {state next : State}
     {failure : Failure} (valid : state.ValidFor)
@@ -130,6 +158,50 @@ theorem identifier_ok_validFor {state next : State} {name : Identifier}
         simpa [parsedValid.2.2] using parsedValid.1
       · cases result
         exact parsedValid
+
+/-- Successful identifier parsing exposes its input token and cursor advance. -/
+theorem identifier_ok_state_shape {state next : State} {name : Identifier}
+    (context : ParseContext)
+    (result : identifier context state = .ok name next) :
+    ∃ token,
+      state.peek? = some token ∧
+        token.span = name.span ∧
+        next.tokens = state.tokens ∧
+        next.cursor = state.cursor + 1 := by
+  cases raw : rawIdentifier context state with
+  | invariant error =>
+      simp only [identifier, raw] at result
+      contradiction
+  | reject failure rejected =>
+      simp only [identifier, raw] at result
+      contradiction
+  | ok parsed afterName =>
+      simp only [identifier, raw] at result
+      have rawShape : ∃ token,
+          state.peek? = some token ∧
+            token.span = parsed.span ∧
+            afterName.tokens = state.tokens ∧
+            afterName.cursor = state.cursor + 1 := by
+        unfold rawIdentifier at raw
+        cases found : state.peek? with
+        | none =>
+            simp only [found] at raw
+            unfold rejectAt at raw
+            contradiction
+        | some token =>
+            rcases token with ⟨span, kind⟩
+            cases kind <;> simp only [found] at raw
+            all_goals try { unfold rejectAt at raw; contradiction }
+            case identifier text =>
+              cases raw
+              exact ⟨_, rfl, rfl, rfl, rfl⟩
+      rcases rawShape with
+        ⟨token, tokenFound, tokenSpan, tokensEq, cursorEq⟩
+      split at result
+      · cases result
+        exact ⟨token, tokenFound, tokenSpan, tokensEq, cursorEq⟩
+      · cases result
+        exact ⟨token, tokenFound, tokenSpan, tokensEq, cursorEq⟩
 
 /-- Canonical identifier rejection is exactly valid raw rejection. -/
 theorem identifier_reject_validFor {state next : State}
