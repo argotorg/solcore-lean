@@ -75,6 +75,25 @@ def optionalReturnValue
   else
     pure (some (← expression))
 
+/-- Parse an optional `: type` annotation shared by Core `let` forms. -/
+def optionalLetType : Parser (Option TypeExpr) := do
+  let state ← getState
+  if isSymbol state .colon then
+    let _ ← symbol .colon .statement
+    pure (some (← typeExpr))
+  else
+    pure none
+
+/-- Parse an optional `= expression` initializer shared by Core `let` forms. -/
+def optionalLetInitializer
+    (expression : Parser Expr) : Parser (Option Expr) := do
+  let state ← getState
+  if isSymbol state .equal then
+    let _ ← symbol .equal .statement
+    pure (some (← expression))
+  else
+    pure none
+
 def assignmentEnd : AssignmentTail → SourceSpan
   | .value _ right => right.span
   | .bitNot operator => operator
@@ -121,20 +140,9 @@ def assignmentOrExpressionStatement
 def letStatement (expression : Parser Expr) : Parser Statement := do
   let marker ← keyword .letKw .statement
   let name ← identifier .statement
-  let state ← getState
-  let type ←
-    if isSymbol state .colon then
-      let _ ← symbol .colon .statement
-      pure (some (← typeExpr))
-    else
-      pure none
-  let state ← getState
+  let type ← StatementSimpleInternals.optionalLetType
   let initializer ←
-    if isSymbol state .equal then
-      let _ ← symbol .equal .statement
-      pure (some (← expression))
-    else
-      pure none
+    StatementSimpleInternals.optionalLetInitializer expression
   let semicolon ← symbol .semicolon .statement
   pure {
     span := SourceSpan.cover marker.span semicolon.span
@@ -154,18 +162,9 @@ def returnStatement (expression : Parser Expr) : Parser Statement := do
 private def forLetItem (expression : Parser Expr) : Parser ForItem := do
   let marker ← keyword .letKw .statement
   let name ← identifier .statement
-  let state ← getState
-  let type ←
-    if isSymbol state .colon then
-      let _ ← symbol .colon .statement
-      pure (some (← typeExpr))
-    else pure none
-  let state ← getState
+  let type ← StatementSimpleInternals.optionalLetType
   let initializer ←
-    if isSymbol state .equal then
-      let _ ← symbol .equal .statement
-      pure (some (← expression))
-    else pure none
+    StatementSimpleInternals.optionalLetInitializer expression
   let endSpan := initializer.map (fun value => value.span) |>.getD
     (type.map (fun value => value.span) |>.getD name.span)
   pure {

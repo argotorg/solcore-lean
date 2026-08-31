@@ -636,6 +636,126 @@ theorem optionalReturnValue_cursorMonotoneOnSuccess
     intro value
     exact Parser.pure_cursorMonotoneOnSuccess _
 
+/-- Optional `let` types retain their colon-following type provenance. -/
+theorem optionalLetType_validFor :
+    optionalLetType.ValidFor (Option.ValidFor TypeExpr.ValidFor) := by
+  unfold optionalLetType
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isSymbol observed .colon
+  · simp only [present, if_true]
+    apply Parser.bind_validFor (symbol_validFor .colon .statement)
+    intro colon
+    apply Parser.bind_validFor_of_value typeExpr_validFor
+    intro type input inputValid typeValid
+    exact ⟨by simpa only [Option.ValidFor] using typeValid,
+      inputValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional `let` types preserve every ordinary token window. -/
+theorem optionalLetType_preservesTokenWindow :
+    Parser.PreservesTokenWindow optionalLetType := by
+  unfold optionalLetType
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro observed
+  by_cases present : isSymbol observed .colon
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .colon .statement)
+    intro colon
+    apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
+    intro type
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
+theorem optionalLetType_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess optionalLetType :=
+  optionalLetType_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Optional `let` type parsing never rewinds the token cursor. -/
+theorem optionalLetType_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess optionalLetType := by
+  unfold optionalLetType
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isSymbol observed .colon
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .colon .statement)
+    intro colon
+    apply Parser.bind_cursorMonotoneOnSuccess typeExpr_cursorMonotoneOnSuccess
+    intro type
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
+/-- Optional `let` initializers retain nested expression provenance. -/
+theorem optionalLetInitializer_validFor (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid) :
+    (optionalLetInitializer expression).ValidFor
+      (Option.ValidFor expressionValueValid) := by
+  unfold optionalLetInitializer
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isSymbol observed .equal
+  · simp only [present, if_true]
+    apply Parser.bind_validFor (symbol_validFor .equal .statement)
+    intro equal
+    apply Parser.bind_validFor_of_value expressionValid
+    intro value input inputValid valueValid
+    exact ⟨by simpa only [Option.ValidFor] using valueValid,
+      inputValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional `let` initializers preserve every ordinary token window. -/
+theorem optionalLetInitializer_preservesTokenWindow
+    (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (optionalLetInitializer expression) := by
+  unfold optionalLetInitializer
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro observed
+  by_cases present : isSymbol observed .equal
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .equal .statement)
+    intro equal
+    apply Parser.bind_preservesTokenWindow expressionWindow
+    intro value
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
+theorem optionalLetInitializer_preservesTokensOnSuccess
+    (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (optionalLetInitializer expression) :=
+  (optionalLetInitializer_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- Optional `let` initializer parsing never rewinds the token cursor. -/
+theorem optionalLetInitializer_cursorMonotoneOnSuccess
+    (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (optionalLetInitializer expression) := by
+  unfold optionalLetInitializer
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isSymbol observed .equal
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .equal .statement)
+    intro equal
+    apply Parser.bind_cursorMonotoneOnSuccess expressionCursor
+    intro value
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
 end StatementSimpleInternals
 
 /-- Return statements preserve nested expression token windows. -/

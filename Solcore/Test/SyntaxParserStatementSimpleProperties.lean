@@ -53,6 +53,17 @@ example :=
   @StatementSimpleInternals.optionalReturnValue_preservesTokensOnSuccess
 example :=
   @StatementSimpleInternals.optionalReturnValue_cursorMonotoneOnSuccess
+example := @StatementSimpleInternals.optionalLetType_validFor
+example := @StatementSimpleInternals.optionalLetType_preservesTokenWindow
+example := @StatementSimpleInternals.optionalLetType_preservesTokensOnSuccess
+example := @StatementSimpleInternals.optionalLetType_cursorMonotoneOnSuccess
+example := @StatementSimpleInternals.optionalLetInitializer_validFor
+example :=
+  @StatementSimpleInternals.optionalLetInitializer_preservesTokenWindow
+example :=
+  @StatementSimpleInternals.optionalLetInitializer_preservesTokensOnSuccess
+example :=
+  @StatementSimpleInternals.optionalLetInitializer_cursorMonotoneOnSuccess
 example := @returnStatement_preservesTokenWindow
 example := @returnStatement_preservesTokensOnSuccess
 example := @returnStatement_cursorMonotoneOnSuccess
