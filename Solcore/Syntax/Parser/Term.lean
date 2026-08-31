@@ -54,23 +54,25 @@ private def statementLayer (nestedStatement : Parser Statement)
     recognizedStatementOrFallback continueStatement fallback state
   else fallback state
 
+namespace TermInternals
+
 mutual
 
-private def coreExpressionWithFuel : Nat → Parser Expr
+def coreExpressionWithFuel : Nat → Parser Expr
   | 0 => fun state =>
       .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1 => expressionLayer
       (coreExpressionWithFuel fuel)
       (isolateBlock (coreBlock (coreStatementWithFuel fuel) .require))
 
-private def corePatternWithFuel : Nat → Parser Pattern
+def corePatternWithFuel : Nat → Parser Pattern
   | 0 => fun state =>
       .invariant (.fuelExhausted .pattern state.currentSpan)
   | fuel + 1 => patternLayer
       (corePatternWithFuel fuel)
       (coreExpressionWithFuel fuel)
 
-private def coreStatementWithFuel : Nat → Parser Statement
+def coreStatementWithFuel : Nat → Parser Statement
   | 0 => fun state =>
       .invariant (.fuelExhausted .statement state.currentSpan)
   | fuel + 1 => statementLayer
@@ -80,20 +82,24 @@ private def coreStatementWithFuel : Nat → Parser Statement
 
 end
 
+end TermInternals
+
 /-- Parse one complete canonical Core expression. -/
 def expression : Parser Expr := fun state =>
-  coreExpressionWithFuel (state.remainingCount + 1) state
+  TermInternals.coreExpressionWithFuel (state.remainingCount + 1) state
 
 /-- Parse one complete canonical Core pattern. -/
 def pattern : Parser Pattern := fun state =>
-  corePatternWithFuel (state.remainingCount + 1) state
+  TermInternals.corePatternWithFuel (state.remainingCount + 1) state
 
 /-- Parse one complete canonical Core statement. -/
 def statement : Parser Statement := fun state =>
-  coreStatementWithFuel (state.remainingCount + 1) state
+  TermInternals.coreStatementWithFuel (state.remainingCount + 1) state
 
 /-- Parse one canonical Core block with an explicit root-tail policy. -/
 def block (policy : TailExpressionPolicy) : Parser Block := fun state =>
-  coreBlock (coreStatementWithFuel (state.remainingCount + 1)) policy state
+  coreBlock
+    (TermInternals.coreStatementWithFuel (state.remainingCount + 1))
+    policy state
 
 end Solcore.Syntax.Parser

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.PatternProperties
+import Solcore.Syntax.Parser.TermPatternProperties
 
 /-! External consumers for canonical pattern parser contracts. -/
 
@@ -113,5 +113,15 @@ example := PatternInternals.patternLayer_preservesTokenWindow
 example := PatternInternals.patternLayer_preservesTokensOnSuccess
 example := PatternInternals.patternLayer_cursorMonotoneOnSuccess
 example := PatternInternals.patternLayer_startsAtCurrentTokenOnSuccess
+example := TermInternals.corePatternWithFuel_validFor
+example := TermInternals.corePatternWithFuel_preservesTokenWindow
+example := TermInternals.corePatternWithFuel_preservesTokensOnSuccess
+example := TermInternals.corePatternWithFuel_cursorMonotoneOnSuccess
+example := TermInternals.corePatternWithFuel_startsAtCurrentTokenOnSuccess
+example := pattern_validFor_of_coreExpression
+example := pattern_preservesTokenWindow_of_coreExpression
+example := pattern_preservesTokensOnSuccess_of_coreExpression
+example := pattern_cursorMonotoneOnSuccess_of_coreExpression
+example := pattern_startsAtCurrentTokenOnSuccess_of_coreExpression
 
 end Tests
