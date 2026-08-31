@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.File
+import Solcore.Syntax.Parser.DiagnosticFilter
 import Solcore.Syntax.Parser.Preflight
 
 set_option autoImplicit false
@@ -22,7 +23,8 @@ def parseLexed (file : SourceFile)
       parsed := emptyParsedFile file lexed.comments
       tokens := lexed.tokens
       lexicalDiagnostics := lexed.diagnostics
-      parseDiagnostics := [diagnostic]
+      parseDiagnostics :=
+        filterParseDiagnostics file lexed.diagnostics [diagnostic]
     }
   | none =>
       match sourceFile lexed.comments (State.initial file lexed) with
@@ -30,7 +32,9 @@ def parseLexed (file : SourceFile)
           parsed
           tokens := lexed.tokens
           lexicalDiagnostics := lexed.diagnostics
-          parseDiagnostics := finalState.diagnostics
+          parseDiagnostics :=
+            filterParseDiagnostics file lexed.diagnostics
+              finalState.diagnostics
         }
       | .reject failure _ =>
           throw (.noProgress .topLevel failure.span)
