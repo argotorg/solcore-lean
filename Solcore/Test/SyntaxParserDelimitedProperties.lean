@@ -14,6 +14,13 @@ example := @Parser.PreservesTokensOnSuccess
 example := @delimitedWithPolicy_validFor
 example := @delimited_validFor
 example := @delimitedNoTrailing_validFor
+example := @delimitedWithPolicy_preservesTokensOnSuccess
+example := @delimited_preservesTokensOnSuccess
+example := @delimitedNoTrailing_preservesTokensOnSuccess
+example := @delimitedWithPolicy_cursor_lt_onSuccess
+example := @delimitedWithPolicy_cursorMonotoneOnSuccess
+example := @delimited_cursorMonotoneOnSuccess
+example := @delimitedNoTrailing_cursorMonotoneOnSuccess
 
 example {α : Type} (file : SourceFile) (values : DelimitedList α)
     (elementValid : SourceFile → α → Prop)
