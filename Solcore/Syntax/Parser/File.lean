@@ -1,5 +1,6 @@
-import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.TopLevel
+import Solcore.Syntax.Parser.TypeAlias
 
 set_option autoImplicit false
 
@@ -11,9 +12,20 @@ private def wrapTypeAlias (declaration : TypeAliasDecl) : TopItem := {
   value := .typeAlias declaration
 }
 
+private def wrapImport (declaration : ImportDecl) : TopItem := {
+  span := declaration.span
+  leadingComments := []
+  value := .importDecl declaration
+}
+
 /-- Parse the top-level forms implemented by the current vertical slice. -/
 private def topItem : Parser TopItem := fun state =>
-  if isKeyword state .typeKw then
+  if isKeyword state .importKw then
+    match importDecl state with
+    | .ok declaration next => .ok (wrapImport declaration) next
+    | .reject failure next => .reject failure next
+    | .invariant error => .invariant error
+  else if isKeyword state .typeKw then
     match typeAlias state with
     | .ok declaration next => .ok (wrapTypeAlias declaration) next
     | .reject failure next => .reject failure next
