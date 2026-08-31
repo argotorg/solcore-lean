@@ -1819,5 +1819,232 @@ theorem recoverPatternAux_startsAtAdvancedCurrentTokenOnSuccess
   exact (recoverPatternAux_startsAtFirstSpanOnSuccess token.span last fuel
     parsed).symm
 
+/-- One recovering pattern layer preserves recursive source provenance. -/
+theorem patternLayer_validFor (nested : Parser Pattern)
+    (expression : Parser Expr)
+    (expressionValid : SourceFile → Expr → Prop)
+    (nestedValid : nested.ValidFor (Pattern.ValidFor expressionValid))
+    (nestedPreserves : Parser.PreservesTokenWindow nested)
+    (expressionParserValid : expression.ValidFor expressionValid)
+    (expressionSpanValid : ∀ {file : SourceFile} {value : Expr},
+      expressionValid file value → value.span.ValidFor file)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span))
+    (expressionPreserves : Parser.PreservesTokenWindow expression) :
+    (patternLayer nested expression).ValidFor
+      (Pattern.ValidFor expressionValid) := by
+  intro input inputValid
+  unfold patternLayer
+  cases coreResult : patternCore nested expression input with
+  | ok pattern next =>
+      have coreValid := patternCore_validFor nested expression expressionValid
+        nestedValid nestedPreserves.preservesTokensOnSuccess
+        expressionParserValid expressionSpanValid expressionStarts
+        input inputValid
+      rw [coreResult] at coreValid
+      exact coreValid
+  | invariant error => trivial
+  | reject failure failedState =>
+      have coreValid := patternCore_validFor nested expression expressionValid
+        nestedValid nestedPreserves.preservesTokensOnSuccess
+        expressionParserValid expressionSpanValid expressionStarts
+        input inputValid
+      rw [coreResult] at coreValid
+      have coreShape := patternCore_preservesTokenWindow nested expression
+        nestedPreserves expressionPreserves input
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have rewoundValid : rewound.ValidFor := {
+        tokens := coreValid.2.1.tokens
+        cursor_le_endIndex := by
+          simpa [rewound, coreShape.2] using inputValid.cursor_le_endIndex
+        endIndex_le_size := coreValid.2.1.endIndex_le_size
+        endByte_le_source := coreValid.2.1.endByte_le_source
+        endByte_boundary := coreValid.2.1.endByte_boundary
+        diagnosticsRev := coreValid.2.1.diagnosticsRev
+      }
+      have rewoundFile : rewound.file = input.file := by
+        simpa [rewound] using coreValid.2.2
+      have failureValid : failure.span.ValidFor rewound.file := by
+        simpa [rewound, coreValid.2.2] using coreValid.1
+      change (if isPatternBoundary rewound then
+          Reply.reject failure rewound
+        else match rewound.advance? with
+        | some (token, next) =>
+            recoverPatternAux token.span token.span
+              (next.remainingCount + 1) (next.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound).ValidFor input
+          (Pattern.ValidFor expressionValid)
+      split
+      · exact ⟨coreValid.1, rewoundValid, rewoundFile⟩
+      · cases advanced : rewound.advance? with
+        | none => exact ⟨coreValid.1, rewoundValid, rewoundFile⟩
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have advanceShape := advance?_state_shape advanced
+            have nextValid := rewoundValid.advance?_validFor advanced
+            have tokenValid : token.span.ValidFor next.file := by
+              rw [advanceShape.2]
+              exact rewoundValid.peek?_span_validFor advanceShape.1
+            have emittedValid := nextValid.emit_validFor failure.toDiagnostic
+              (by simpa [advanceShape.2] using
+                failure.toDiagnostic_span_validFor failureValid)
+            have currentFound :
+                (next.emit failure.toDiagnostic).tokens[rewound.cursor]? =
+                  some token := by
+              simpa [advanceShape.2, State.emit] using
+                State.getElem?_eq_some_of_peek?_eq_some advanceShape.1
+            have recovered := recoverPatternAux_validFor expressionValid
+              token.span (next.remainingCount + 1) token.span
+              (next.emit failure.toDiagnostic) rewound.cursor token
+              emittedValid (by simpa [State.emit] using tokenValid)
+              (by simpa [State.emit] using tokenValid) tokenValid.2.1
+              currentFound rfl (by simp [advanceShape.2, State.emit])
+            exact recovered.of_file_eq (by
+              simpa [advanceShape.2, State.emit] using rewoundFile)
+
+/-- A recovering pattern layer preserves every ordinary token window. -/
+theorem patternLayer_preservesTokenWindow (nested : Parser Pattern)
+    (expression : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested)
+    (expressionPreserves : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (patternLayer nested expression) := by
+  intro input
+  unfold patternLayer
+  cases coreResult : patternCore nested expression input with
+  | invariant error => trivial
+  | ok pattern next =>
+      have coreShape := patternCore_preservesTokenWindow nested expression
+        nestedPreserves expressionPreserves input
+      rw [coreResult] at coreShape
+      exact coreShape
+  | reject failure failedState =>
+      have coreShape := patternCore_preservesTokenWindow nested expression
+        nestedPreserves expressionPreserves input
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have failedShape : failedState.tokens = input.tokens ∧
+          failedState.window = input.window := by
+        simpa only [Reply.PreservesTokenWindow] using coreShape
+      have rewoundShape : rewound.tokens = input.tokens ∧
+          rewound.window = input.window := by
+        simpa [rewound] using failedShape
+      change (if isPatternBoundary rewound then
+          Reply.reject failure rewound
+        else match rewound.advance? with
+        | some (token, next) =>
+            recoverPatternAux token.span token.span
+              (next.remainingCount + 1) (next.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound).PreservesTokenWindow input
+      split
+      · exact rewoundShape
+      · cases advanced : rewound.advance? with
+        | none => exact rewoundShape
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have recovered := recoverPatternAux_preservesTokenWindow
+              token.span token.span (next.remainingCount + 1)
+              (next.emit failure.toDiagnostic)
+            exact recovered.trans (by
+              simpa [State.emit, (advance?_state_shape advanced).2] using
+                rewoundShape)
+
+/-- Successful recovering pattern parsing retains the token carrier. -/
+theorem patternLayer_preservesTokensOnSuccess (nested : Parser Pattern)
+    (expression : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested)
+    (expressionPreserves : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (patternLayer nested expression) :=
+  (patternLayer_preservesTokenWindow nested expression nestedPreserves
+    expressionPreserves).preservesTokensOnSuccess
+
+/-- A recovering pattern layer never rewinds its caller's cursor. -/
+theorem patternLayer_cursorMonotoneOnSuccess (nested : Parser Pattern)
+    (expression : Parser Expr)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested)
+    (expressionMonotone : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (patternLayer nested expression) := by
+  intro input pattern next result
+  unfold patternLayer at result
+  cases coreResult : patternCore nested expression input with
+  | invariant error => simp [coreResult] at result
+  | ok value afterCore =>
+      simp only [coreResult] at result
+      have monotone := patternCore_cursorMonotoneOnSuccess nested expression
+        nestedMonotone expressionMonotone input value afterCore coreResult
+      cases result
+      exact monotone
+  | reject failure failedState =>
+      simp only [coreResult] at result
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if isPatternBoundary rewound then
+          Reply.reject failure rewound
+        else match rewound.advance? with
+        | some (token, afterToken) =>
+            recoverPatternAux token.span token.span
+              (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound) = .ok pattern next at result
+      split at result
+      · contradiction
+      · cases advanced : rewound.advance? with
+        | none => simp [advanced] at result
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have recovered := recoverPatternAux_cursorMonotoneOnSuccess
+              token.span token.span (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic) pattern next result
+            exact Nat.le_trans
+              (by simp [(advance?_state_shape advanced).2,
+                State.emit, rewound]) recovered
+
+/-- A successful recovering layer starts at its caller's current token. -/
+theorem patternLayer_startsAtCurrentTokenOnSuccess
+    (nested : Parser Pattern) (expression : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested)
+    (expressionPreserves : Parser.PreservesTokenWindow expression) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (patternLayer nested expression) (·.span) := by
+  intro input pattern next result
+  unfold patternLayer at result
+  cases coreResult : patternCore nested expression input with
+  | invariant error => simp [coreResult] at result
+  | ok value afterCore =>
+      simp only [coreResult] at result
+      have starts := patternCore_startsAtCurrentTokenOnSuccess
+        nested expression input value afterCore coreResult
+      cases result
+      simpa using starts
+  | reject failure failedState =>
+      simp only [coreResult] at result
+      have coreShape := patternCore_preservesTokenWindow nested expression
+        nestedPreserves expressionPreserves input
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if isPatternBoundary rewound then
+          Reply.reject failure rewound
+        else match rewound.advance? with
+        | some (token, afterToken) =>
+            recoverPatternAux token.span token.span
+              (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound) = .ok pattern next at result
+      split at result
+      · contradiction
+      · cases advanced : rewound.advance? with
+        | none => simp [advanced] at result
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have advanceShape := advance?_state_shape advanced
+            have found : input.peek? = some token := by
+              have rewoundFound := advanceShape.1
+              unfold State.peek? at rewoundFound ⊢
+              simpa [rewound, coreShape.1, coreShape.2] using rewoundFound
+            have recovered := recoverPatternAux_startsAtFirstSpanOnSuccess
+              token.span token.span (afterToken.remainingCount + 1) result
+            exact ⟨token, found, recovered.symm⟩
+
 end PatternInternals
 end Solcore.Syntax.Parser

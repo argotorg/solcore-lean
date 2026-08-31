@@ -108,5 +108,10 @@ example {input afterToken next : State} {token : Token} {pattern : Pattern}
       firstToken.span.startByte = pattern.span.startByte :=
   PatternInternals.recoverPatternAux_startsAtAdvancedCurrentTokenOnSuccess
     last fuel advanced parsed
+example := PatternInternals.patternLayer_validFor
+example := PatternInternals.patternLayer_preservesTokenWindow
+example := PatternInternals.patternLayer_preservesTokensOnSuccess
+example := PatternInternals.patternLayer_cursorMonotoneOnSuccess
+example := PatternInternals.patternLayer_startsAtCurrentTokenOnSuccess
 
 end Tests
