@@ -30,6 +30,7 @@ import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExportProperties
 import Solcore.Test.SyntaxParserExports
 import Solcore.Test.SyntaxParserFunctionSignatureProperties
+import Solcore.Test.SyntaxParserFunctionProperties
 import Solcore.Test.SyntaxParserGenericParameterProperties
 import Solcore.Test.SyntaxParserImportProperties
 import Solcore.Test.SyntaxParserInvariantProperties
