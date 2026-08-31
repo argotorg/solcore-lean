@@ -46,7 +46,7 @@ def matchCases (statement : Parser Statement)
 
 end MatchInternals
 
-private def optionalDefaultBody (statement : Parser Statement) :
+def MatchInternals.optionalDefaultBody (statement : Parser Statement) :
     Parser (Option Block) := do
   let state ← getState
   if isKeyword state .defaultKw then
@@ -94,7 +94,7 @@ def matchStatement (statement : Parser Statement)
   let cases ← fun state =>
     MatchInternals.matchCases statement pattern
       (state.remainingCount + 1) [] state
-  let defaultBody ← optionalDefaultBody statement
+  let defaultBody ← MatchInternals.optionalDefaultBody statement
   let closing ← symbol .rightBrace .statement
   let armsSpan := SourceSpan.cover opening.span closing.span
   let _ ← validateMatchArities scrutinees.elements.toList.length cases

@@ -18,5 +18,10 @@ example := @MatchInternals.matchCases_validFor
 example := @MatchInternals.matchCases_preservesTokenWindow
 example := @MatchInternals.matchCases_preservesTokensOnSuccess
 example := @MatchInternals.matchCases_cursorMonotoneOnSuccess
+example := @MatchInternals.optionalDefaultBody_validFor
+example := @MatchInternals.optionalDefaultBody_preservesTokenWindow
+example := @MatchInternals.optionalDefaultBody_preservesTokensOnSuccess
+example := @MatchInternals.optionalDefaultBody_cursorMonotoneOnSuccess
+example := @MatchInternals.optionalDefaultBody_some_startsAfterKeyword
 
 end Tests
