@@ -8,6 +8,7 @@ import Solcore.Oracle.Stream
 import Solcore.Standard.CanonicalData
 import Solcore.Test.SyntaxCallableDeclarationValidity
 import Solcore.Test.SyntaxContractDeclarationValidity
+import Solcore.Test.SyntaxCoreTermValidity
 import Solcore.Test.SyntaxIdentifier
 import Solcore.Test.SyntaxExpressionValidity
 import Solcore.Test.SyntaxFileValidity
