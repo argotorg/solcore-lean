@@ -59,6 +59,11 @@ example (file : SourceFile) (state : State) (valid : state.ValidFor file) :
     (step file state).ValidFor file :=
   step_validFor file state valid
 
+example (file : SourceFile) (state : State)
+    (nonempty : state.remaining ≠ []) :
+    (step file state).remaining.length < state.remaining.length :=
+  step_remaining_length_lt file nonempty
+
 example (file : SourceFile) (lexed : LexedFile)
     (result : lex file = .ok lexed) :
     lexed.source = file.id ∧
@@ -67,5 +72,22 @@ example (file : SourceFile) (lexed : LexedFile)
       (∀ diagnostic ∈ lexed.diagnostics,
         diagnostic.span.ValidFor file) :=
   lex_ok_carrier_spans file lexed result
+
+example (file : SourceFile) : ∃ lexed, lex file = .ok lexed :=
+  lex_exists_ok file
+
+example (file : SourceFile) (diagnostic : LexicalDiagnostic)
+    (result : lex file = .error diagnostic) : False :=
+  lex_error_impossible file diagnostic result
+
+example (file : SourceFile) :
+    ∃ lexed,
+      lex file = .ok lexed ∧
+      lexed.source = file.id ∧
+      (∀ token ∈ lexed.tokens, token.span.ValidFor file) ∧
+      (∀ comment ∈ lexed.comments, comment.span.ValidFor file) ∧
+      (∀ diagnostic ∈ lexed.diagnostics,
+        diagnostic.span.ValidFor file) :=
+  lex_total_carrier_spans file
 
 end Tests
