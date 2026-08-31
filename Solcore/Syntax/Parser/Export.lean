@@ -161,7 +161,10 @@ def localExportItem : Parser LocalExportItem := fun state =>
 
 end ExportInternals
 
-private def exportSelection : Parser ExportSelection := fun state =>
+namespace ExportInternals
+
+/-- Parse a wildcard or braced selection following an export module path. -/
+def exportSelection : Parser ExportSelection := fun state =>
   if isSymbol state .star then
     match symbol .star .exportDecl state with
     | .ok marker next => .ok {
@@ -179,6 +182,8 @@ private def exportSelection : Parser ExportSelection := fun state =>
       } next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
+
+end ExportInternals
 
 private def finishExport (start : SourceSpan)
     (value : ExportDeclValue) : Parser ExportDecl := do
@@ -199,7 +204,7 @@ private def pathExport (start : SourceSpan) : Parser ExportDecl := do
   let state ← getState
   if isSymbol state .dot then
     let _ ← symbol .dot .exportDecl
-    let selection ← exportSelection
+    let selection ← ExportInternals.exportSelection
     finishExport start (.itemsFrom path selection)
   else if isKeyword state .asKw then
     let _ ← keyword .asKw .exportDecl

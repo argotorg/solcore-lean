@@ -28,5 +28,10 @@ example := @localExportItem_preservesTokenWindow
 example := @localExportItem_preservesTokensOnSuccess
 example := @localExportItem_cursorMonotoneOnSuccess
 example := @localExportItem_startsAtCurrentTokenOnSuccess
+example := @exportSelection_validFor
+example := @exportSelection_preservesTokenWindow
+example := @exportSelection_preservesTokensOnSuccess
+example := @exportSelection_cursorMonotoneOnSuccess
+example := @exportSelection_startsAtCurrentTokenOnSuccess
 
 end Tests

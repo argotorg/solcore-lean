@@ -1070,4 +1070,128 @@ theorem localExportItem_startsAtCurrentTokenOnSuccess :
         exact exportName_startsAtCurrentTokenOnSuccess
           input name next nameResult
 
+/-- Export selections retain their wildcard or selected-name ranges. -/
+theorem exportSelection_validFor :
+    ExportInternals.exportSelection.ValidFor ExportSelection.ValidFor := by
+  intro input inputValid
+  unfold ExportInternals.exportSelection
+  split
+  · cases markerResult : symbol .star .exportDecl input with
+    | invariant error => simp only [Reply.ValidFor]
+    | reject failure rejected =>
+        have markerValid := symbol_validFor .star .exportDecl input inputValid
+        rw [markerResult] at markerValid
+        simpa only [Reply.ValidFor] using markerValid
+    | ok marker next =>
+        have markerValid := symbol_validFor .star .exportDecl input inputValid
+        rw [markerResult] at markerValid
+        have markerSpanValid : marker.span.ValidFor input.file := by
+          simpa only [Located.ValidFor] using markerValid.1
+        simp only [Reply.ValidFor, ExportSelection.ValidFor]
+        exact ⟨⟨markerSpanValid, markerSpanValid⟩,
+          markerValid.2.1, markerValid.2.2⟩
+  · cases itemsResult : delimited .leftBrace .rightBrace true
+        ExportInternals.exportName .exportDecl .topLevel input with
+    | invariant error => simp only [Reply.ValidFor]
+    | reject failure rejected =>
+        have itemsValid := delimited_validFor ExportName.ValidFor
+          .leftBrace .rightBrace true ExportInternals.exportName
+          .exportDecl .topLevel exportName_validFor
+          exportName_preservesTokensOnSuccess input inputValid
+        rw [itemsResult] at itemsValid
+        simpa only [Reply.ValidFor] using itemsValid
+    | ok items next =>
+        have itemsValid := delimited_validFor ExportName.ValidFor
+          .leftBrace .rightBrace true ExportInternals.exportName
+          .exportDecl .topLevel exportName_validFor
+          exportName_preservesTokensOnSuccess input inputValid
+        rw [itemsResult] at itemsValid
+        simp only [Reply.ValidFor, ExportSelection.ValidFor]
+        exact ⟨⟨itemsValid.1.1, itemsValid.1.1, itemsValid.1.2⟩,
+          itemsValid.2.1, itemsValid.2.2⟩
+
+/-- Export selections preserve every ordinary token window. -/
+theorem exportSelection_preservesTokenWindow :
+    Parser.PreservesTokenWindow ExportInternals.exportSelection := by
+  intro input
+  unfold ExportInternals.exportSelection
+  split
+  · have markerShape := symbol_preservesTokenWindow .star .exportDecl input
+    cases markerResult : symbol .star .exportDecl input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        rw [markerResult] at markerShape
+        exact markerShape
+    | ok marker next =>
+        rw [markerResult] at markerShape
+        exact markerShape
+  · have itemsShape := delimited_preservesTokenWindow .leftBrace
+      .rightBrace true ExportInternals.exportName .exportDecl .topLevel
+      exportName_preservesTokenWindow input
+    cases itemsResult : delimited .leftBrace .rightBrace true
+        ExportInternals.exportName .exportDecl .topLevel input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        rw [itemsResult] at itemsShape
+        exact itemsShape
+    | ok items next =>
+        rw [itemsResult] at itemsShape
+        exact itemsShape
+
+/-- Successful export selections retain the lexer token carrier. -/
+theorem exportSelection_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess ExportInternals.exportSelection :=
+  exportSelection_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Successful export selections never rewind the cursor. -/
+theorem exportSelection_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess ExportInternals.exportSelection := by
+  intro input selection next parsed
+  unfold ExportInternals.exportSelection at parsed
+  split at parsed
+  · cases markerResult : symbol .star .exportDecl input with
+    | invariant error => simp [markerResult] at parsed
+    | reject failure rejected => simp [markerResult] at parsed
+    | ok marker afterMarker =>
+        simp only [markerResult] at parsed
+        cases parsed
+        exact symbol_cursorMonotoneOnSuccess .star .exportDecl
+          input marker next markerResult
+  · cases itemsResult : delimited .leftBrace .rightBrace true
+        ExportInternals.exportName .exportDecl .topLevel input with
+    | invariant error => simp [itemsResult] at parsed
+    | reject failure rejected => simp [itemsResult] at parsed
+    | ok items afterItems =>
+        simp only [itemsResult] at parsed
+        cases parsed
+        exact delimited_cursorMonotoneOnSuccess .leftBrace .rightBrace true
+          ExportInternals.exportName .exportDecl .topLevel
+          input items next itemsResult
+
+/-- An export selection starts at its wildcard or opening brace. -/
+theorem exportSelection_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess
+      ExportInternals.exportSelection (·.span) := by
+  intro input selection next parsed
+  unfold ExportInternals.exportSelection at parsed
+  split at parsed
+  · cases markerResult : symbol .star .exportDecl input with
+    | invariant error => simp [markerResult] at parsed
+    | reject failure rejected => simp [markerResult] at parsed
+    | ok marker afterMarker =>
+        simp only [markerResult] at parsed
+        cases parsed
+        exact symbol_startsAtCurrentTokenOnSuccess .star .exportDecl
+          input marker next markerResult
+  · cases itemsResult : delimited .leftBrace .rightBrace true
+        ExportInternals.exportName .exportDecl .topLevel input with
+    | invariant error => simp [itemsResult] at parsed
+    | reject failure rejected => simp [itemsResult] at parsed
+    | ok items afterItems =>
+        simp only [itemsResult] at parsed
+        cases parsed
+        exact delimited_startsAtCurrentTokenOnSuccess .leftBrace .rightBrace
+          true ExportInternals.exportName .exportDecl .topLevel
+          input items next itemsResult
+
 end Solcore.Syntax.Parser
