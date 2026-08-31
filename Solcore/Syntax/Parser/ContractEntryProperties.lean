@@ -1,6 +1,7 @@
 import Solcore.Syntax.Parser.ContractEntry
 import Solcore.Syntax.Parser.ParameterProperties
 import Solcore.Syntax.CollectionValidity
+import Solcore.Syntax.ContractDeclarationValidity
 import Solcore.Syntax.ParameterValidity
 
 /-! Contracts for modifiers shared by constructors and fallback entries. -/
@@ -217,7 +218,187 @@ theorem implicitPublicModifiers_cursorMonotoneOnSuccess
       intro _
       exact optionalModifier_cursorMonotoneOnSuccess .payableKw
 
+/-- The state-indexed required-body parser retains its opening-brace start. -/
+theorem requiredBlock_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess (block .require) (·.span) := by
+  intro input body next parsed
+  unfold block at parsed
+  exact coreBlock_startsAtCurrentTokenOnSuccess _ .require
+    input body next parsed
+
 end ContractEntryInternals
+
+/-- A constructor's keyword-to-body cover is source-valid. -/
+theorem constructorDecl_span_validOnSuccess
+    (statementValid : SourceFile → Statement → Prop)
+    (bodyValid : (block .require).ValidFor
+      (Block.ValidFor statementValid))
+    {input final : State} {declaration : ConstructorDecl}
+    (inputValid : input.ValidFor)
+    (parsed : constructorDecl input = .ok declaration final) :
+    declaration.span.ValidFor input.file := by
+  have stages := parsed
+  unfold constructorDecl at stages
+  rcases ContractEntryInternals.entryBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases ContractEntryInternals.entryBind_ok_components rest with
+    ⟨parameters, afterParameters, parametersResult, rest⟩
+  rcases ContractEntryInternals.entryBind_ok_components rest with
+    ⟨payableMarker, afterModifiers, modifiersResult, rest⟩
+  rcases ContractEntryInternals.entryBind_ok_components rest with
+    ⟨body, afterBody, bodyResult, finished⟩
+  have markerContract := keyword_validFor .constructorKw .contractMember
+    input inputValid
+  rw [markerResult] at markerContract
+  have parametersContract := ContractEntryInternals.entryParameters_validFor
+    afterMarker markerContract.2.1
+  rw [parametersResult] at parametersContract
+  have modifiersContract :=
+    ContractEntryInternals.implicitPublicModifiers_validFor .constructorKw
+      afterParameters parametersContract.2.1
+  rw [modifiersResult] at modifiersContract
+  have isolatedValid := isolateBlock_validFor statementValid
+    (block .require) bodyValid
+  have bodyContract := isolatedValid afterModifiers modifiersContract.2.1
+  rw [bodyResult] at bodyContract
+  have markerValidInput : marker.span.ValidFor input.file := by
+    simpa only [Located.ValidFor] using markerContract.1
+  have bodyValidInput : Block.ValidFor statementValid input.file body := by
+    simpa [bodyContract.2.2, modifiersContract.2.2,
+      parametersContract.2.2, markerContract.2.2] using bodyContract.1
+  rcases isolateBlock_startsAtCurrentTokenOnSuccess (block .require)
+      ContractEntryInternals.requiredBlock_startsAtCurrentTokenOnSuccess
+      afterModifiers body afterBody bodyResult with
+    ⟨opening, openingFound, bodyStart⟩
+  have markerAt := State.getElem?_eq_some_of_peek?_eq_some
+    (acceptToken_ok_state_shape (.keyword .constructorKw) .contractMember
+      (fun kind => kind == .keyword .constructorKw) markerResult).1
+  have openingAtAfter :=
+    State.getElem?_eq_some_of_peek?_eq_some openingFound
+  have openingAt : input.tokens[afterModifiers.cursor]? = some opening := by
+    simpa [
+      ContractEntryInternals.implicitPublicModifiers_preservesTokensOnSuccess
+        .constructorKw afterParameters payableMarker afterModifiers
+          modifiersResult,
+      ContractEntryInternals.entryParameters_preservesTokensOnSuccess
+        afterMarker parameters afterParameters parametersResult,
+      keyword_preservesTokensOnSuccess .constructorKw .contractMember
+        input marker afterMarker markerResult] using openingAtAfter
+  have cursorOrder : input.cursor < afterModifiers.cursor :=
+    Nat.lt_of_lt_of_le
+      (acceptToken_cursor_lt_onSuccess (.keyword .constructorKw)
+        .contractMember (fun kind => kind == .keyword .constructorKw)
+        markerResult)
+      (Nat.le_trans
+        (ContractEntryInternals.entryParameters_cursorMonotoneOnSuccess
+          afterMarker parameters afterParameters parametersResult)
+        (ContractEntryInternals.implicitPublicModifiers_cursorMonotoneOnSuccess
+          .constructorKw afterParameters payableMarker afterModifiers
+            modifiersResult))
+  have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+    markerAt openingAt cursorOrder
+  have ordered : marker.span.startByte ≤ body.span.endByte := by
+    calc
+      marker.span.startByte ≤ marker.span.endByte := markerValidInput.2.1
+      _ ≤ opening.span.startByte := separated
+      _ = body.span.startByte := bodyStart
+      _ ≤ body.span.endByte := bodyValidInput.1.2.1
+  cases finished
+  exact SourceSpan.cover_validFor markerValidInput bodyValidInput.1 ordered
+
+/-- Constructors retain valid inner syntax when their isolated body does. -/
+theorem constructorDecl_validFor_of_span
+    (statementValid : SourceFile → Statement → Prop)
+    (bodyValid : (isolateBlock (block .require)).ValidFor
+      (Block.ValidFor statementValid))
+    (spanValidOnSuccess : ∀ input declaration next,
+      input.ValidFor → constructorDecl input = .ok declaration next →
+      declaration.span.ValidFor input.file) :
+    constructorDecl.ValidFor (ConstructorDecl.ValidFor statementValid) := by
+  have weak : constructorDecl.ValidFor (fun _ _ => True) := by
+    unfold constructorDecl
+    apply Parser.bind_validFor
+      (keyword_validFor .constructorKw .contractMember)
+    intro marker
+    apply Parser.bind_validFor
+      ContractEntryInternals.entryParameters_validFor
+    intro parameters
+    apply Parser.bind_validFor
+      (ContractEntryInternals.implicitPublicModifiers_validFor .constructorKw)
+    intro payableMarker
+    apply Parser.bind_validFor bodyValid
+    intro body
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : constructorDecl input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok declaration final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold constructorDecl at stages
+      rcases ContractEntryInternals.entryBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases ContractEntryInternals.entryBind_ok_components rest with
+        ⟨parameters, afterParameters, parametersResult, rest⟩
+      rcases ContractEntryInternals.entryBind_ok_components rest with
+        ⟨payableMarker, afterModifiers, modifiersResult, rest⟩
+      rcases ContractEntryInternals.entryBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have markerContract := keyword_validFor .constructorKw .contractMember
+        input inputValid
+      rw [markerResult] at markerContract
+      have parametersContract :=
+        ContractEntryInternals.entryParameters_validFor afterMarker
+          markerContract.2.1
+      rw [parametersResult] at parametersContract
+      have modifiersContract :=
+        ContractEntryInternals.implicitPublicModifiers_validFor .constructorKw
+          afterParameters parametersContract.2.1
+      rw [modifiersResult] at modifiersContract
+      have bodyContract := bodyValid afterModifiers modifiersContract.2.1
+      rw [bodyResult] at bodyContract
+      have parametersValidInput : DelimitedList.ValidFor
+          FunctionParameter.ValidFor input.file parameters := by
+        simpa [parametersContract.2.2, markerContract.2.2] using
+          parametersContract.1
+      have payableValidInput : Option.ValidFor
+          (fun file span => span.ValidFor file) input.file payableMarker := by
+        simpa [modifiersContract.2.2, parametersContract.2.2,
+          markerContract.2.2] using modifiersContract.1
+      have bodyValidInput : Block.ValidFor statementValid input.file body := by
+        simpa [bodyContract.2.2, modifiersContract.2.2,
+          parametersContract.2.2, markerContract.2.2] using bodyContract.1
+      have payableRetained : ∀ retained ∈ payableMarker,
+          retained.ValidFor input.file := by
+        cases payableMarker with
+        | none => simp
+        | some marker =>
+            intro retained member
+            have retainedEq : retained = marker := by simpa using member.symm
+            subst retained
+            simpa only [Option.ValidFor] using payableValidInput
+      have outerValid := spanValidOnSuccess input declaration final inputValid
+        parsed
+      cases finished
+      exact ⟨⟨outerValid, parametersValidInput.1,
+        parametersValidInput.2, payableRetained, bodyValidInput.1,
+        bodyValidInput.2⟩, weakResult.2.1, weakResult.2.2⟩
+
+/-- Complete constructors retain only source-valid syntax. -/
+theorem constructorDecl_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (bodyValid : (block .require).ValidFor
+      (Block.ValidFor statementValid)) :
+    constructorDecl.ValidFor (ConstructorDecl.ValidFor statementValid) :=
+  constructorDecl_validFor_of_span statementValid
+    (isolateBlock_validFor statementValid (block .require) bodyValid)
+    (fun _ _ _ inputValid parsed =>
+      constructorDecl_span_validOnSuccess statementValid bodyValid inputValid
+        parsed)
 
 /-- Constructor parsing preserves every ordinary token window. -/
 theorem constructorDecl_preservesTokenWindow
