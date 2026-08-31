@@ -12,6 +12,22 @@ def expressionName : Parser Identifier := fun state =>
   if isBooleanValue state then booleanIdentifier state
   else identifier .expression state
 
+/-- Parse one canonical literal expression leaf. -/
+def literalExpression : Parser Expr := do
+  let literal ← coreLiteral
+  pure {
+    span := literal.span
+    value := .literal literal
+  }
+
+/-- Parse one canonical identifier expression leaf. -/
+def identifierExpression : Parser Expr := do
+  let name ← expressionName
+  pure {
+    span := name.span
+    value := .identifier name
+  }
+
 end ExpressionAtomInternals
 
 private def closeTuple (opening : Token) (elementsRev : List Expr) :
@@ -119,18 +135,9 @@ private def lambdaExpression (block : Parser Block) : Parser Expr := do
 private def expressionAtomCore (nested : Parser Expr)
     (block : Parser Block) : Parser Expr := fun state =>
   if isCoreLiteral state then
-    match coreLiteral state with
-    | .ok literal next => .ok {
-        span := literal.span
-        value := .literal literal
-      } next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    ExpressionAtomInternals.literalExpression state
   else if isBooleanValue state || isIdentifier state then
-    match ExpressionAtomInternals.expressionName state with
-    | .ok name next => .ok { span := name.span, value := .identifier name } next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    ExpressionAtomInternals.identifierExpression state
   else if isSymbol state .dot then dotConstructor nested state
   else if isSymbol state .at then proxyExpression state
   else if isSymbol state .leftParen then parenthesized nested state

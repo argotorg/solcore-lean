@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Expression.Atom
 import Solcore.Syntax.Parser.LiteralProperties
+import Solcore.Syntax.ExpressionValidity
 
 /-! Provenance and state contracts for canonical Core expression atoms. -/
 
@@ -79,6 +80,86 @@ theorem expressionName_startsAtCurrentTokenOnSuccess :
   · rcases identifier_ok_state_shape .expression parsed with
       ⟨token, found, span, _tokens, _cursor⟩
     exact ⟨token, found, congrArg SourceSpan.startByte span⟩
+
+/-- Literal-expression parsing retains both equal literal ranges. -/
+theorem literalExpression_validFor
+    (statementValid : SourceFile → Statement → Prop) :
+    literalExpression.ValidFor (Expr.ValidFor statementValid) := by
+  unfold literalExpression
+  apply Parser.bind_validFor_of_value coreLiteral_validFor
+  intro literal input inputValid literalValid
+  exact ⟨Expr.ValidFor.literal literalValid literalValid, inputValid, rfl⟩
+
+/-- Literal expressions preserve every ordinary token window. -/
+theorem literalExpression_preservesTokenWindow :
+    Parser.PreservesTokenWindow literalExpression := by
+  unfold literalExpression
+  apply Parser.bind_preservesTokenWindow coreLiteral_preservesTokenWindow
+  intro literal
+  exact Parser.pure_preservesTokenWindow _
+
+theorem literalExpression_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess literalExpression :=
+  literalExpression_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Literal-expression parsing never rewinds the cursor. -/
+theorem literalExpression_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess literalExpression := by
+  unfold literalExpression
+  apply Parser.bind_cursorMonotoneOnSuccess
+    coreLiteral_cursorMonotoneOnSuccess
+  intro literal
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A literal expression starts at its literal token. -/
+theorem literalExpression_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess literalExpression (·.span) := by
+  unfold literalExpression
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    coreLiteral_startsAtCurrentTokenOnSuccess
+  intro literal input value final parsed
+  cases parsed
+  rfl
+
+/-- Identifier-expression parsing retains both equal name ranges. -/
+theorem identifierExpression_validFor
+    (statementValid : SourceFile → Statement → Prop) :
+    identifierExpression.ValidFor (Expr.ValidFor statementValid) := by
+  unfold identifierExpression
+  apply Parser.bind_validFor_of_value expressionName_validFor
+  intro name input inputValid nameValid
+  exact ⟨Expr.ValidFor.identifier nameValid nameValid, inputValid, rfl⟩
+
+/-- Identifier expressions preserve every ordinary token window. -/
+theorem identifierExpression_preservesTokenWindow :
+    Parser.PreservesTokenWindow identifierExpression := by
+  unfold identifierExpression
+  apply Parser.bind_preservesTokenWindow expressionName_preservesTokenWindow
+  intro name
+  exact Parser.pure_preservesTokenWindow _
+
+theorem identifierExpression_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess identifierExpression :=
+  identifierExpression_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Identifier-expression parsing never rewinds the cursor. -/
+theorem identifierExpression_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess identifierExpression := by
+  unfold identifierExpression
+  apply Parser.bind_cursorMonotoneOnSuccess
+    expressionName_cursorMonotoneOnSuccess
+  intro name
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- An identifier expression starts at its name token. -/
+theorem identifierExpression_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess identifierExpression (·.span) := by
+  unfold identifierExpression
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    expressionName_startsAtCurrentTokenOnSuccess
+  intro name input value final parsed
+  cases parsed
+  rfl
 
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser

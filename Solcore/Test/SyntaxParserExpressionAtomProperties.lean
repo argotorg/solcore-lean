@@ -15,5 +15,15 @@ example := @ExpressionAtomInternals.expressionName_ok_state_shape
 example := @ExpressionAtomInternals.expressionName_cursorMonotoneOnSuccess
 example := @ExpressionAtomInternals.expressionName_cursor_lt_onSuccess
 example := @ExpressionAtomInternals.expressionName_startsAtCurrentTokenOnSuccess
+example := @ExpressionAtomInternals.literalExpression_validFor
+example := @ExpressionAtomInternals.literalExpression_preservesTokenWindow
+example := @ExpressionAtomInternals.literalExpression_preservesTokensOnSuccess
+example := @ExpressionAtomInternals.literalExpression_cursorMonotoneOnSuccess
+example := @ExpressionAtomInternals.literalExpression_startsAtCurrentTokenOnSuccess
+example := @ExpressionAtomInternals.identifierExpression_validFor
+example := @ExpressionAtomInternals.identifierExpression_preservesTokenWindow
+example := @ExpressionAtomInternals.identifierExpression_preservesTokensOnSuccess
+example := @ExpressionAtomInternals.identifierExpression_cursorMonotoneOnSuccess
+example := @ExpressionAtomInternals.identifierExpression_startsAtCurrentTokenOnSuccess
 
 end Tests
