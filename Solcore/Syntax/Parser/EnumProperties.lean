@@ -510,5 +510,173 @@ theorem enumConstructors_preservesOpeningStartOnSuccess (opening : Token) :
       · exact closeEnumBody_preservesOpeningStartOnSuccess opening
           constructorsRev parsed
 
+/-- Enum body parsing preserves its brace range and every constructor. -/
+theorem enumBody_validFor : enumBody.ValidFor EnumBody.ValidFor := by
+  intro input inputValid
+  unfold enumBody
+  cases openingResult : symbol .leftBrace .topItem input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := symbol_validFor .leftBrace .topItem input inputValid
+      rw [openingResult] at valid
+      exact valid
+  | ok opening afterOpening =>
+      have openingValid := symbol_validFor .leftBrace .topItem input inputValid
+      rw [openingResult] at openingValid
+      have openingShape := symbol_ok_state_shape .leftBrace .topItem
+        openingResult
+      have openingFound := State.getElem?_eq_some_of_peek?_eq_some
+        openingShape.1
+      have openingFoundAfter :
+          afterOpening.tokens[input.cursor]? = some opening := by
+        simpa [openingShape.2] using openingFound
+      have openingBeforeAfter : input.cursor < afterOpening.cursor := by
+        simp [openingShape.2]
+      change (if isSymbol afterOpening .rightBrace then
+          closeEnumBody opening [] afterOpening
+        else match enumConstructor afterOpening with
+          | .ok first afterFirst => enumConstructors opening
+              (afterFirst.remainingCount + 1) [first] afterFirst
+          | .reject failure failed => .reject failure failed
+          | .invariant error => .invariant error).ValidFor input
+            EnumBody.ValidFor
+      split
+      · exact Reply.ValidFor.of_file_eq
+          (closeEnumBody_validFor opening [] openingValid.2.1
+            openingFoundAfter openingBeforeAfter (by simp [List.ValidFor]))
+          openingValid.2.2
+      · cases firstResult : enumConstructor afterOpening with
+        | invariant error =>
+            change (Reply.invariant error).ValidFor input EnumBody.ValidFor
+            trivial
+        | reject failure rejected =>
+            change (Reply.reject failure rejected).ValidFor input
+              EnumBody.ValidFor
+            have valid := enumConstructor_validFor afterOpening
+              openingValid.2.1
+            rw [firstResult] at valid
+            exact valid.of_file_eq openingValid.2.2
+        | ok first afterFirst =>
+            change (enumConstructors opening
+              (afterFirst.remainingCount + 1) [first] afterFirst).ValidFor
+                input EnumBody.ValidFor
+            have firstValid := enumConstructor_validFor afterOpening
+              openingValid.2.1
+            rw [firstResult] at firstValid
+            have openingFoundFirst :
+                afterFirst.tokens[input.cursor]? = some opening := by
+              simpa [enumConstructor_preservesTokensOnSuccess afterOpening
+                first afterFirst firstResult] using openingFoundAfter
+            have firstAccumulated : List.ValidFor EnumConstructor.ValidFor
+                afterFirst.file [first] := by
+              intro constructor member
+              simp only [List.mem_singleton] at member
+              subst constructor
+              simpa [firstValid.2.2] using firstValid.1
+            exact (enumConstructors_validFor opening
+              (afterFirst.remainingCount + 1) [first] afterFirst input.cursor
+              firstValid.2.1 openingFoundFirst
+              (Nat.lt_of_lt_of_le openingBeforeAfter
+                (enumConstructor_cursorMonotoneOnSuccess afterOpening first
+                  afterFirst firstResult)) firstAccumulated).of_file_eq
+                (firstValid.2.2.trans openingValid.2.2)
+
+/-- Enum body parsing preserves every ordinary token window. -/
+theorem enumBody_preservesTokenWindow :
+    Parser.PreservesTokenWindow enumBody := by
+  intro input
+  unfold enumBody
+  have openingShape := symbol_preservesTokenWindow .leftBrace .topItem input
+  cases openingResult : symbol .leftBrace .topItem input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [openingResult] at openingShape
+      exact openingShape
+  | ok opening afterOpening =>
+      rw [openingResult] at openingShape
+      change (if isSymbol afterOpening .rightBrace then
+          closeEnumBody opening [] afterOpening
+        else match enumConstructor afterOpening with
+          | .ok first afterFirst => enumConstructors opening
+              (afterFirst.remainingCount + 1) [first] afterFirst
+          | .reject failure failed => .reject failure failed
+          | .invariant error => .invariant error).PreservesTokenWindow input
+      split
+      · exact Reply.PreservesTokenWindow.trans
+          (closeEnumBody_preservesTokenWindow opening [] afterOpening)
+          openingShape
+      · have firstShape := enumConstructor_preservesTokenWindow afterOpening
+        cases firstResult : enumConstructor afterOpening with
+        | invariant error =>
+            change (Reply.invariant error).PreservesTokenWindow input
+            trivial
+        | reject failure rejected =>
+            change (Reply.reject failure rejected).PreservesTokenWindow input
+            rw [firstResult] at firstShape
+            exact firstShape.trans openingShape
+        | ok first afterFirst =>
+            change Reply.PreservesTokenWindow (enumConstructors opening
+              (afterFirst.remainingCount + 1) [first] afterFirst) input
+            rw [firstResult] at firstShape
+            exact (enumConstructors_preservesTokenWindow opening
+              (afterFirst.remainingCount + 1) [first] afterFirst).trans
+                (firstShape.trans openingShape)
+
+theorem enumBody_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess enumBody :=
+  enumBody_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Enum body parsing never rewinds the parser cursor. -/
+theorem enumBody_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess enumBody := by
+  intro input body final parsed
+  unfold enumBody at parsed
+  cases openingResult : symbol .leftBrace .topItem input with
+  | invariant error => simp [openingResult] at parsed
+  | reject failure rejected => simp [openingResult] at parsed
+  | ok opening afterOpening =>
+      simp only [openingResult] at parsed
+      have openingMonotone := symbol_cursorMonotoneOnSuccess .leftBrace
+        .topItem input opening afterOpening openingResult
+      split at parsed
+      · exact Nat.le_trans openingMonotone
+          (closeEnumBody_cursorMonotoneOnSuccess opening [] afterOpening body
+            final parsed)
+      · cases firstResult : enumConstructor afterOpening with
+        | invariant error => simp [firstResult] at parsed
+        | reject failure rejected => simp [firstResult] at parsed
+        | ok first afterFirst =>
+            simp only [firstResult] at parsed
+            exact Nat.le_trans openingMonotone (Nat.le_trans
+              (enumConstructor_cursorMonotoneOnSuccess afterOpening first
+                afterFirst firstResult)
+              (enumConstructors_cursorMonotoneOnSuccess opening
+                (afterFirst.remainingCount + 1) [first] afterFirst body final
+                parsed))
+
+/-- An enum body starts at its current opening-brace token. -/
+theorem enumBody_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess enumBody (·.span) := by
+  intro input body final parsed
+  unfold enumBody at parsed
+  cases openingResult : symbol .leftBrace .topItem input with
+  | invariant error => simp [openingResult] at parsed
+  | reject failure rejected => simp [openingResult] at parsed
+  | ok opening afterOpening =>
+      simp only [openingResult] at parsed
+      have found := (symbol_ok_state_shape .leftBrace .topItem openingResult).1
+      split at parsed
+      · exact ⟨opening, found,
+          (closeEnumBody_preservesOpeningStartOnSuccess opening [] parsed).symm⟩
+      · cases firstResult : enumConstructor afterOpening with
+        | invariant error => simp [firstResult] at parsed
+        | reject failure rejected => simp [firstResult] at parsed
+        | ok first afterFirst =>
+            simp only [firstResult] at parsed
+            exact ⟨opening, found,
+              (enumConstructors_preservesOpeningStartOnSuccess opening
+                (afterFirst.remainingCount + 1) [first] afterFirst body final
+                parsed).symm⟩
+
 end EnumInternals
 end Solcore.Syntax.Parser
