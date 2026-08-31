@@ -16,6 +16,7 @@ import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExports
 import Solcore.Test.SyntaxParserModules
 import Solcore.Test.SyntaxParserRecovery
+import Solcore.Test.SyntaxParserReservedWords
 import Solcore.Test.SyntaxParserSignatures
 import Solcore.Test.SyntaxParserStatementFallback
 import Solcore.Test.SyntaxParserStatements
@@ -5072,6 +5073,7 @@ def run : IO Unit := do
   testSyntaxParserYul
   testSyntaxParserYulChoiceRecovery
   testSyntaxParserRecovery
+  testSyntaxParserReservedWords
   testSyntaxParserSignatures
   testSyntaxParserStatementFallback
   testSyntaxParserStatements
