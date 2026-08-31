@@ -11,8 +11,8 @@ For public data shapes, see [Core Wire v3](CORE_WIRE_V3.md) and
 
 ## Current objective and boundary
 
-The current objective is a syntax-independent executable formal specification.
-That objective has three connected public parts:
+The checked Semantic Core and contract runtime are the completed executable
+semantic boundary. They have three connected public parts:
 
 1. Semantic Core v3 represents the checked language independently of source
    spelling.
@@ -21,30 +21,29 @@ That objective has three connected public parts:
 3. Oracle v5 validates public JSON, checks Core, runs a scenario, and returns a
    total semantic observation.
 
-This is the present completion boundary. Work within it should close defects,
-keep the public codecs and semantics aligned, strengthen proofs and tests where
-they protect observable behavior, and keep documentation accurate. Expansion
-beyond it requires a separate decision about scope and priority.
+Active frontend work now implements the canonical PR #20 syntax as an
+independent source layer. The parser produces source syntax; it does not bypass
+resolution, source typing, or elaboration into checked Core.
 
-## Why Core comes before source syntax
+## Why Core remains separate from source syntax
 
-Concrete Solcore syntax may change substantially. Encoding runtime meaning in
-the current parser or AST would make semantic work depend on unstable spelling.
-Semantic Core instead gives typing and execution a small, explicit input that a
-future frontend can target.
+Runtime meaning does not depend on source spelling. Semantic Core gives typing
+and execution a small, explicit input while the canonical frontend retains
+tokens, comments, grouping, and source spans in its own representation.
 
 The separation is:
 
 ```text
-future source frontend
+canonical source frontend
   → resolved and typed source
   → Semantic Core v3
   → checked-contract runtime
   → Oracle v5 observation
 ```
 
-Only the last three stages are part of the current executable path. No source
-frontend is implicitly simulated by accepting Core JSON.
+The last three stages are the current public executable path. The first two are
+implemented independently and will be connected explicitly; accepting Core
+JSON does not simulate source parsing or elaboration.
 
 ## Core v3 policy
 
@@ -127,17 +126,14 @@ their decoding, capability reports, result shapes, or command-line behavior.
 
 ## Parser policy
 
-Surface v1 and Oracle v4 remain supported. New concrete grammar work and
-parser-specific proof expansion are paused until Solcore syntax stabilizes.
+ADR-0153 ended the parser pause. The active target is the pinned PR #20 syntax,
+implemented afresh under `Solcore.Syntax` without Surface v1 or Multi
+compatibility constraints. Executable lexer and parser coverage comes first,
+followed by resource, span, provenance, and grammar-soundness proofs.
 
-Parser work may resume only when there is an explicit source-language target
-and a clear adapter boundary into checked Core. Resumption should preserve old
-Surface and Oracle versions and publish a new version when observable syntax or
-results change.
-
-The parser is therefore neither deleted nor the current implementation target.
-Its frozen tests remain useful regression evidence, but they do not define the
-shape of a future Solcore frontend.
+Surface v1 and Oracle v4 remain frozen historical interfaces and are not
+reinterpreted. Any public result for the canonical frontend requires a new
+additive version.
 
 ## Work outside the current boundary
 
