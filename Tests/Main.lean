@@ -32,6 +32,7 @@ import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTypes
 import Solcore.Test.SyntaxParserUpstreamDiagnosticPolicy
 import Solcore.Test.SyntaxParserUpstreamFixtures
+import Solcore.Test.SyntaxParserValidityProperties
 import Solcore.Test.SyntaxParserYul
 import Solcore.Test.SyntaxParserYulChoiceRecovery
 import Solcore.Test.SyntaxProvenanceProperties
