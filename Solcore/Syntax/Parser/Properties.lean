@@ -7,6 +7,23 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+/-- Every result produced by the public lexer passes parser preflight. -/
+theorem lex_ok_validateLexed
+    (file : SourceFile) (lexed : LexedFile)
+    (result : Lexer.lex file = .ok lexed) :
+    validateLexed file lexed = .ok () :=
+  validateLexed_validFor_ok file lexed
+    (Lexer.lex_ok_validFor file lexed result)
+
+/-- Parser preflight cannot reject a result produced by the public lexer. -/
+theorem lex_ok_validateLexed_error_impossible
+    (file : SourceFile) (lexed : LexedFile)
+    (lexing : Lexer.lex file = .ok lexed)
+    (error : ParserInvariantError)
+    (validation : validateLexed file lexed = .error error) : False := by
+  rw [lex_ok_validateLexed file lexed lexing] at validation
+  contradiction
+
 /-- A successful token-to-file parse consumed a preflight-valid lexer result. -/
 theorem parseLexed_ok_input_validFor
     (file : SourceFile) (lexed : LexedFile) (output : ParseOutput)
@@ -221,6 +238,24 @@ theorem parse_error_parserInvariant
       cases result
       exact ⟨lexed, parserError, lexing, parsing, rfl⟩
   | ok output => simp [parsing] at result
+
+/--
+Every public parser error occurs after both public lexing and parser preflight
+have succeeded. This classifies the failing stage without assuming a global
+constructor-provenance theorem for grammar invariants.
+-/
+theorem parse_error_after_preflight
+    (file : SourceFile) (error : SyntaxInvariantError)
+    (result : parse file = .error error) :
+    ∃ lexed parserError,
+      Lexer.lex file = .ok lexed ∧
+      validateLexed file lexed = .ok () ∧
+      parseLexed file lexed = .error parserError ∧
+      error = .parserInvariant parserError := by
+  rcases parse_error_parserInvariant file error result with
+    ⟨lexed, parserError, lexing, parsing, definition⟩
+  exact ⟨lexed, parserError, lexing,
+    lex_ok_validateLexed file lexed lexing, parsing, definition⟩
 
 /--
 Every successful public parse exposes a successful lexer/parser composition and

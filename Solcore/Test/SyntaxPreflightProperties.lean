@@ -9,6 +9,17 @@ namespace Tests
 open Solcore.Syntax
 open Solcore.Syntax.Parser
 
+example (file : SourceFile) (lexed : LexedFile)
+    (result : Lexer.lex file = .ok lexed) :
+    validateLexed file lexed = .ok () :=
+  lex_ok_validateLexed file lexed result
+
+example (file : SourceFile) (lexed : LexedFile)
+    (lexing : Lexer.lex file = .ok lexed)
+    (error : ParserInvariantError)
+    (validation : validateLexed file lexed = .error error) : False :=
+  lex_ok_validateLexed_error_impossible file lexed lexing error validation
+
 example (file : SourceFile) (lexed : LexedFile) :
     validateLexed file lexed = .ok () ↔ lexed.ValidFor file :=
   validateLexed_ok_iff_validFor file lexed

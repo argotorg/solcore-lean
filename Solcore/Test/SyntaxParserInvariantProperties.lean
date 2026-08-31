@@ -21,4 +21,13 @@ example (file : SourceFile) (error : SyntaxInvariantError)
       error = .parserInvariant parserError :=
   parse_error_parserInvariant file error result
 
+example (file : SourceFile) (error : SyntaxInvariantError)
+    (result : parse file = .error error) :
+    ∃ lexed parserError,
+      Lexer.lex file = .ok lexed ∧
+      validateLexed file lexed = .ok () ∧
+      parseLexed file lexed = .error parserError ∧
+      error = .parserInvariant parserError :=
+  parse_error_after_preflight file error result
+
 end Tests
