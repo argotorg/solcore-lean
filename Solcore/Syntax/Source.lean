@@ -1,10 +1,36 @@
-import Solcore.Workspace.Syntax
-
 set_option autoImplicit false
 
 namespace Solcore.Syntax
 
-open Solcore.Workspace
+/-- Logical source owner, independent of the spelling of a module path. -/
+inductive SourceOrigin where
+  | main
+  | standard
+  | external (name : String)
+  deriving Repr, BEq, DecidableEq
+
+/--
+Stable identity of one canonical source. `path` is retained verbatim here;
+workspace construction will separately validate the `.sol` path policy.
+-/
+structure SourceId where
+  origin : SourceOrigin
+  path : String
+  deriving Repr, BEq, DecidableEq
+
+/-- One canonical source file presented to the lexer or parser. -/
+structure SourceFile where
+  id : SourceId
+  content : String
+  deriving Repr, BEq, DecidableEq
+
+namespace SourceFile
+
+/-- Number of UTF-8 content bytes charged to this source. -/
+def sourceBytes (file : SourceFile) : Nat :=
+  file.content.utf8ByteSize
+
+end SourceFile
 
 /-- True exactly when a byte can occur only as a UTF-8 continuation byte. -/
 def isUtf8ContinuationByte (byte : UInt8) : Bool :=
@@ -43,7 +69,7 @@ def length (span : SourceSpan) : Nat :=
   span.endByte - span.startByte
 
 /-- Exact ownership, ordering, bounds, and UTF-8 boundary requirements. -/
-def ValidFor (span : SourceSpan) (file : WorkspaceFile) : Prop :=
+def ValidFor (span : SourceSpan) (file : SourceFile) : Prop :=
   span.source = file.id ∧
     span.startByte ≤ span.endByte ∧
     span.endByte ≤ file.content.utf8ByteSize ∧
@@ -51,14 +77,14 @@ def ValidFor (span : SourceSpan) (file : WorkspaceFile) : Prop :=
     isUtf8Boundary file.content span.endByte = true
 
 /-- Executable decision procedure for `ValidFor`. -/
-def isValidFor (span : SourceSpan) (file : WorkspaceFile) : Bool :=
+def isValidFor (span : SourceSpan) (file : SourceFile) : Bool :=
   decide (span.source = file.id) &&
     span.startByte ≤ span.endByte &&
     span.endByte ≤ file.content.utf8ByteSize &&
     isUtf8Boundary file.content span.startByte &&
     isUtf8Boundary file.content span.endByte
 
-theorem isValidFor_eq_true_iff (span : SourceSpan) (file : WorkspaceFile) :
+theorem isValidFor_eq_true_iff (span : SourceSpan) (file : SourceFile) :
     span.isValidFor file = true ↔ span.ValidFor file := by
   simp [isValidFor, ValidFor, and_assoc]
 
@@ -81,17 +107,17 @@ theorem contains_eq_true_iff (outer inner : SourceSpan) :
   simp [contains, Contains, and_assoc]
 
 /-- The exact span of all UTF-8 bytes in a source. -/
-def fullFile (file : WorkspaceFile) : SourceSpan := {
+def fullFile (file : SourceFile) : SourceSpan := {
   source := file.id
   startByte := 0
   endByte := file.content.utf8ByteSize
 }
 
-@[simp] theorem fullFile_validFor (file : WorkspaceFile) :
+@[simp] theorem fullFile_validFor (file : SourceFile) :
     (fullFile file).ValidFor file := by
   simp [fullFile, ValidFor]
 
-theorem fullFile_contains_of_validFor {file : WorkspaceFile}
+theorem fullFile_contains_of_validFor {file : SourceFile}
     {span : SourceSpan} (valid : span.ValidFor file) :
     (fullFile file).Contains span := by
   rcases valid with ⟨owned, ordered, bounded, _startBoundary, _endBoundary⟩
