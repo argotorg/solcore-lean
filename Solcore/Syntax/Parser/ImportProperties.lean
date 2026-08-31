@@ -302,6 +302,105 @@ theorem optionalHiding_cursorMonotoneOnSuccess :
     exact Parser.pure_cursorMonotoneOnSuccess _
   · exact Parser.pure_cursorMonotoneOnSuccess none
 
+/-- Import terminators retain a semicolon or the validated recovery span. -/
+theorem importTerminator_validFor (lastSpan : SourceSpan)
+    (input : State) (inputValid : input.ValidFor)
+    (lastValid : lastSpan.ValidFor input.file) :
+    (ImportInternals.terminator lastSpan input).ValidFor input
+      (fun file span => span.ValidFor file) := by
+  unfold ImportInternals.terminator
+  split
+  · cases semicolonResult : symbol .semicolon .importDecl input with
+    | invariant error => simp only [Reply.ValidFor]
+    | reject failure rejected =>
+        have valid := symbol_validFor .semicolon .importDecl input inputValid
+        rw [semicolonResult] at valid
+        simpa only [Reply.ValidFor] using valid
+    | ok token next =>
+        have valid := symbol_validFor .semicolon .importDecl input inputValid
+        rw [semicolonResult] at valid
+        exact ⟨by simpa only [Located.ValidFor] using valid.1,
+          valid.2.1, valid.2.2⟩
+  · split
+    · exact ⟨lastValid,
+        inputValid.emit_validFor _ inputValid.currentSpan_validFor, rfl⟩
+    · unfold rejectAt Reply.ValidFor
+      exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+
+/-- Import terminators preserve every ordinary token window. -/
+theorem importTerminator_preservesTokenWindow (lastSpan : SourceSpan) :
+    Parser.PreservesTokenWindow
+      (ImportInternals.terminator lastSpan) := by
+  intro input
+  unfold ImportInternals.terminator
+  split
+  · have shape := symbol_preservesTokenWindow .semicolon .importDecl input
+    cases semicolonResult : symbol .semicolon .importDecl input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        rw [semicolonResult] at shape
+        exact shape
+    | ok token next =>
+        rw [semicolonResult] at shape
+        exact shape
+  · split
+    · exact ⟨rfl, rfl⟩
+    · exact rejectAt_preservesTokenWindow input _ _
+
+theorem importTerminator_preservesTokensOnSuccess (lastSpan : SourceSpan) :
+    Parser.PreservesTokensOnSuccess
+      (ImportInternals.terminator lastSpan) :=
+  (importTerminator_preservesTokenWindow lastSpan).preservesTokensOnSuccess
+
+/-- Import terminators either consume `;` or leave the cursor in place. -/
+theorem importTerminator_cursorMonotoneOnSuccess (lastSpan : SourceSpan) :
+    Parser.CursorMonotoneOnSuccess
+      (ImportInternals.terminator lastSpan) := by
+  intro input endSpan next parsed
+  unfold ImportInternals.terminator at parsed
+  split at parsed
+  · cases semicolonResult : symbol .semicolon .importDecl input with
+    | invariant error => simp [semicolonResult] at parsed
+    | reject failure rejected => simp [semicolonResult] at parsed
+    | ok token afterToken =>
+        simp only [semicolonResult] at parsed
+        cases parsed
+        exact symbol_cursorMonotoneOnSuccess .semicolon .importDecl
+          input token next semicolonResult
+  · split at parsed
+    · cases parsed
+      exact Nat.le_refl _
+    · unfold rejectAt at parsed
+      contradiction
+
+/-- Finishing an import preserves every ordinary token window. -/
+theorem finishImport_preservesTokenWindow (start last : SourceSpan)
+    (value : ImportDeclValue) :
+    Parser.PreservesTokenWindow
+      (ImportInternals.finish start last value) := by
+  unfold ImportInternals.finish
+  apply Parser.bind_preservesTokenWindow
+    (importTerminator_preservesTokenWindow last)
+  intro endSpan
+  exact Parser.pure_preservesTokenWindow _
+
+theorem finishImport_preservesTokensOnSuccess (start last : SourceSpan)
+    (value : ImportDeclValue) :
+    Parser.PreservesTokensOnSuccess
+      (ImportInternals.finish start last value) :=
+  (finishImport_preservesTokenWindow start last value).preservesTokensOnSuccess
+
+/-- Finishing an import never rewinds the parser cursor. -/
+theorem finishImport_cursorMonotoneOnSuccess (start last : SourceSpan)
+    (value : ImportDeclValue) :
+    Parser.CursorMonotoneOnSuccess
+      (ImportInternals.finish start last value) := by
+  unfold ImportInternals.finish
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (importTerminator_cursorMonotoneOnSuccess last)
+  intro endSpan
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
 private theorem selectedAlias_some_components {input next : State}
     {name : Identifier}
     (parsed : ImportInternals.selectedAlias input = .ok (some name) next) :

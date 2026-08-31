@@ -80,11 +80,13 @@ def optionalHiding : Parser (Option HidingClause) := do
 
 end ImportInternals
 
+namespace ImportInternals
+
 /--
 Imports uniquely preserve a missing semicolon when another top-level start
 immediately follows; every other missing terminator rejects the declaration.
 -/
-private def importTerminator (lastSpan : SourceSpan) : Parser SourceSpan :=
+def terminator (lastSpan : SourceSpan) : Parser SourceSpan :=
     fun state =>
   if isSymbol state .semicolon then
     match symbol .semicolon .importDecl state with
@@ -100,17 +102,20 @@ private def importTerminator (lastSpan : SourceSpan) : Parser SourceSpan :=
   else
     rejectAt state { head := .symbol .semicolon, tail := [] } .importDecl
 
-private def finishImport (start last : SourceSpan)
+/-- Finish an import payload with its required or recovered terminator. -/
+def finish (start last : SourceSpan)
     (value : ImportDeclValue) : Parser ImportDecl := do
-  let endSpan ← importTerminator last
+  let endSpan ← terminator last
   pure {
     span := SourceSpan.cover start endSpan
     value
   }
 
+end ImportInternals
+
 private def plainImport (start : SourceSpan) : Parser ImportDecl := do
   let path ← modulePath .importDecl
-  finishImport start path.span (.plain path)
+  ImportInternals.finish start path.span (.plain path)
 
 private def namespaceImport (start : SourceSpan) : Parser ImportDecl := do
   let _ ← symbol .star .importDecl
@@ -118,7 +123,7 @@ private def namespaceImport (start : SourceSpan) : Parser ImportDecl := do
   let alias ← identifier .importDecl
   let _ ← contextual .from .importDecl
   let path ← modulePath .importDecl
-  finishImport start path.span (.namespace path alias)
+  ImportInternals.finish start path.span (.namespace path alias)
 
 private def wildcardImport (start : SourceSpan) : Parser ImportDecl := do
   let _ ← symbol .star .importDecl
@@ -128,7 +133,7 @@ private def wildcardImport (start : SourceSpan) : Parser ImportDecl := do
   let last := match hidden with
     | some clause => clause.span
     | none => path.span
-  finishImport start last (.wildcard path hidden)
+  ImportInternals.finish start last (.wildcard path hidden)
 
 private def selectiveImport (start : SourceSpan) : Parser ImportDecl := do
   let selection ← ImportInternals.selectedImports
@@ -138,7 +143,7 @@ private def selectiveImport (start : SourceSpan) : Parser ImportDecl := do
   let last := match hidden with
     | some clause => clause.span
     | none => path.span
-  finishImport start last (.selected selection path hidden)
+  ImportInternals.finish start last (.selected selection path hidden)
 
 /-- Parse one canonical import declaration. -/
 def importDecl : Parser ImportDecl := do
