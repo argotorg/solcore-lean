@@ -23,6 +23,7 @@ import Solcore.Test.SyntaxParserBlockProperties
 import Solcore.Test.SyntaxParserBodyIsolation
 import Solcore.Test.SyntaxParserContracts
 import Solcore.Test.SyntaxParserDeclarationTrivia
+import Solcore.Test.SyntaxParserDeclarationCanonicalProperties
 import Solcore.Test.SyntaxParserDelimitedProperties
 import Solcore.Test.SyntaxParserDeriveAttributeProperties
 import Solcore.Test.SyntaxParserDeriveTargetProperties
