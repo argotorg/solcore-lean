@@ -68,20 +68,25 @@ therefore occurs only after successful lexing and preflight. Parser state,
 primitive consumers, carrier-preservation rules, and cursor/order laws now
 support compositional proofs for names, selectors, literals, delimiters,
 pragmas, derive attributes, Core blocks, the complete recursive type parser,
-and the public Yul expression, statement, and body parsers. Complete imports,
-exports, type aliases, and enums have source-validity, token-window, carrier,
-cursor, and start-position contracts. Individual trait predicates have reached
-the same boundary. Named parameters preserve provenance through recovery, and
-their delimited function-parameter list has the complete compositional
-boundary.
+complete function signatures, and the public Yul expression, statement, and
+body parsers. Complete imports, exports, type aliases, and enums have
+source-validity, token-window, carrier, cursor, and start-position contracts.
+Function declarations reach the same boundary once their recursive block
+parser supplies its validity contract; constructors have the corresponding
+conditional guarantee for non-tail bodies. Individual trait predicates have
+reached the same boundary. Named parameters preserve provenance through
+recovery, and their delimited function-parameter list has the complete
+compositional boundary.
 
 The recursive validity contracts for types, Yul syntax, Core expressions,
 patterns, and Core statements are defined independently of parser control
 flow. Type and Yul lifting are complete at their public parser boundaries.
-Pattern lifting covers wildcard, literal, and Boolean-builtin leaves; recursive
-constructors, tuples, comptime patterns, and recovery remain. The active proof
-work also connects the remaining Core expression, statement, declaration, and
-complete-file parsers to those contracts.
+Pattern lifting covers wildcard, literal and Boolean leaves, both constructor
+forms, parenthesized groups and tuples, and comptime patterns. Their common
+non-recovering dispatch also satisfies the compositional contracts; recovery
+remains. Assignment and expression statements now have their complete
+ordinary-result contract. The remaining Core expression, statement,
+declaration, and complete-file parsers are active work.
 
 The remaining proof boundary also includes parser-generated diagnostic
 validity, provenance and unreachability of grammar invariant failures, parser

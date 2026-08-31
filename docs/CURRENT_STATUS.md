@@ -206,25 +206,32 @@ Parser state, primitive consumers, and cursor/lookahead laws preserve valid
 spans, file ownership, the immutable token carrier, and the relevant source
 order. These compositional guarantees cover qualified names, module paths,
 selectors, literals, primitive token parsers, generic delimited lists, pragmas,
-derive attributes, isolated Core blocks, and the complete recursive type
-parser. Complete import, export, type-alias, and enum declarations retain valid
-source ranges and satisfy ordinary-result token-window, carrier, cursor, and
-starting-token contracts. Individual trait predicates satisfy the same
-boundary, and named function parameters retain source provenance through both
-ordinary parsing and recovery. Diagnostic filtering can only remove
-diagnostics and preserves span validity.
+derive attributes, isolated Core blocks, complete function signatures, and the
+complete recursive type parser. Complete import, export, type-alias, and enum
+declarations retain valid source ranges and satisfy ordinary-result
+token-window, carrier, cursor, and starting-token contracts. A complete
+function declaration has the same provenance guarantee once its recursive body
+parser satisfies the block contract; constructors have the corresponding
+conditional guarantee for non-tail bodies. Individual trait predicates satisfy
+the same boundary, and named function parameters retain source provenance
+through both ordinary parsing and recovery. Diagnostic filtering can only
+remove diagnostics and preserves span validity.
 
 Reusable recursive contracts now state what it means for every retained range
 inside a type, Yul expression or statement, Core expression, pattern, or Core
 statement to belong to the original source. The public Yul expression,
 statement, and body parsers now satisfy the full provenance, token-window,
 carrier, cursor, and starting-token boundary. Type syntax has likewise been
-lifted through its public recursive parser. Pattern lifting now covers
-wildcard, literal, and Boolean-builtin leaves while the recursive constructor,
-tuple, comptime, and recovery layers remain active. Proof lifting also remains
-active for Core expressions, statements, several declaration families, and
-the complete-file parser; defining a validity predicate alone is not treated
-as proof that a parser satisfies it.
+lifted through its public recursive parser. Pattern lifting now covers the
+wildcard, literal and Boolean leaves, qualified and leading-dot constructors,
+parenthesized groups and tuples, and comptime patterns. Their common dispatch
+also satisfies those contracts; its recovery layer remains active work. The
+assignment/expression statement parser now has the full provenance,
+token-window, carrier, cursor, and starting-token boundary. Lifting the other
+recursive statement forms is still in progress. Proof lifting also remains
+active for Core expressions, other declarations, and the complete-file parser;
+defining a validity predicate alone is not treated as proof that a parser
+satisfies it.
 
 The remaining proof work includes those unclosed recursive and declaration
 parsers, validity of every parser-generated diagnostic, provenance and
