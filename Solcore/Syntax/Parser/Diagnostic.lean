@@ -91,6 +91,8 @@ inductive ParserPhase where
 
 /-- Failures of the total parser implementation rather than source errors. -/
 inductive ParserInvariantError where
+  | invalidLexedSource (expected actual : SourceId)
+  | invalidTokenSpan (index : Nat) (span : SourceSpan)
   | invalidWindow
       (cursor : Nat)
       (endIndex : Nat)
