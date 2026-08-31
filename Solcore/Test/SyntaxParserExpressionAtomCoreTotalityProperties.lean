@@ -1,0 +1,14 @@
+import Solcore.Syntax.Parser.Expression.AtomCoreTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserExpressionAtomCoreTotalityProperties
+
+open Solcore.Syntax.Parser.ExpressionAtomInternals
+
+example := @expressionAtomCore_ordinary_of_elementFuel
+example := @expressionAtomCore_ne_invariant_of_elementFuel
+example := @expressionAtom_ordinary_of_elementFuel
+example := @expressionAtom_ne_invariant_of_elementFuel
+
+end Solcore.Test.SyntaxParserExpressionAtomCoreTotalityProperties
