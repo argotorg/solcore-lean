@@ -53,19 +53,21 @@ def parseAliasValue : Parser TypeExpr := fun state =>
 
 end TypeAliasInternals
 
+/-- Parse the optional parenthesized parameter list of a type alias. -/
+def parseTypeAliasParameters : Parser (Option (DelimitedList Identifier)) := do
+  let state ← getState
+  if isSymbol state .leftParen then
+    let values ← delimited .leftParen .rightParen true
+      (identifier .parameter) .typeAlias .typeAlias
+    pure (some values)
+  else
+    pure none
+
 /-- Parse one canonical transparent type-alias declaration. -/
 def typeAlias : Parser TypeAliasDecl := do
   let typeKeyword ← keyword .typeKw .typeAlias
   let name ← identifier .typeAlias
-  let state ← getState
-  let parameters ←
-    if isSymbol state .leftParen then
-      do
-        let values ← delimited .leftParen .rightParen true
-          (identifier .parameter) .typeAlias .typeAlias
-        pure (some values)
-    else
-      pure none
+  let parameters ← parseTypeAliasParameters
   let _ ← symbol .equal .typeAlias
   let value ← TypeAliasInternals.parseAliasValue
   let semicolon ← symbol .semicolon .typeAlias

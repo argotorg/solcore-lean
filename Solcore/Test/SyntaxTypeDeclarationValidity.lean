@@ -16,6 +16,12 @@ example := @TypeAliasInternals.parseAliasValue_validFor
 example := @TypeAliasInternals.parseAliasValue_preservesTokenWindow
 example := @TypeAliasInternals.parseAliasValue_preservesTokensOnSuccess
 example := @TypeAliasInternals.parseAliasValue_cursorMonotoneOnSuccess
+example := @parseTypeAliasParameters_validFor
+example := @typeAlias_validFor
+example := @typeAlias_preservesTokenWindow
+example := @typeAlias_preservesTokensOnSuccess
+example := @typeAlias_cursorMonotoneOnSuccess
+example := @typeAlias_startsAtCurrentTokenOnSuccess
 example := @EnumConstructor.ValidFor
 example := @EnumDecl.ValidFor
 

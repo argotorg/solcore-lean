@@ -272,4 +272,278 @@ theorem parseAliasValue_cursorMonotoneOnSuccess :
             (rewound.emit failure.toDiagnostic) value next result)
 
 end TypeAliasInternals
+
+private theorem typeAliasBind_ok_components {α β : Type}
+    {first : Parser α} {next : α → Parser β} {input final : State}
+    {value : β} (parsed : (first >>= next) input = .ok value final) :
+    ∃ firstValue afterFirst,
+      first input = .ok firstValue afterFirst ∧
+        next firstValue afterFirst = .ok value final := by
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      rw [firstResult] at parsed
+      exact ⟨firstValue, afterFirst, rfl, parsed⟩
+  | reject failure rejected => rw [firstResult] at parsed; contradiction
+  | invariant error => rw [firstResult] at parsed; contradiction
+
+private theorem getState_preservesTokenWindowForTypeAlias :
+    Parser.PreservesTokenWindow getState := by
+  exact fun _ => ⟨rfl, rfl⟩
+
+/-- Optional alias parameters preserve delimiter and identifier provenance. -/
+theorem parseTypeAliasParameters_validFor :
+    parseTypeAliasParameters.ValidFor
+      (Option.ValidFor (DelimitedList.ValidFor Located.ValidFor)) := by
+  unfold parseTypeAliasParameters
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isSymbol observed .leftParen
+  · simp only [present, if_true]
+    apply Parser.bind_validFor_of_value
+      (delimited_validFor Located.ValidFor .leftParen .rightParen true
+        (identifier .parameter) .typeAlias .typeAlias
+        (identifier_validFor .parameter)
+        (identifier_preservesTokensOnSuccess .parameter))
+    intro values input inputValid valuesValid
+    exact ⟨by simpa only [Option.ValidFor] using valuesValid,
+      inputValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional alias parameters preserve every ordinary token window. -/
+theorem parseTypeAliasParameters_preservesTokenWindow :
+    Parser.PreservesTokenWindow parseTypeAliasParameters := by
+  unfold parseTypeAliasParameters
+  apply Parser.bind_preservesTokenWindow
+    getState_preservesTokenWindowForTypeAlias
+  intro observed
+  by_cases present : isSymbol observed .leftParen
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (delimited_preservesTokenWindow .leftParen .rightParen true
+        (identifier .parameter) .typeAlias .typeAlias
+        (identifier_preservesTokenWindow .parameter))
+    intro values
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
+/-- Successful alias-parameter parsing retains the token carrier. -/
+theorem parseTypeAliasParameters_preservesTokensOnSuccess : Parser.PreservesTokensOnSuccess parseTypeAliasParameters :=
+  parseTypeAliasParameters_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Optional alias parameters never rewind the parser cursor. -/
+theorem parseTypeAliasParameters_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess parseTypeAliasParameters := by
+  unfold parseTypeAliasParameters
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isSymbol observed .leftParen
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (delimited_cursorMonotoneOnSuccess .leftParen .rightParen true
+        (identifier .parameter) .typeAlias .typeAlias)
+    intro values
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
+/-- A complete type alias retains every declaration and type source range. -/
+theorem typeAlias_validFor : typeAlias.ValidFor TypeAliasDecl.ValidFor := by
+  have weak : typeAlias.ValidFor (fun _ _ => True) := by
+    unfold typeAlias
+    apply Parser.bind_validFor (keyword_validFor .typeKw .typeAlias)
+    intro typeKeyword
+    apply Parser.bind_validFor (identifier_validFor .typeAlias)
+    intro name
+    apply Parser.bind_validFor parseTypeAliasParameters_validFor
+    intro parameters
+    apply Parser.bind_validFor (symbol_validFor .equal .typeAlias)
+    intro equal
+    apply Parser.bind_validFor TypeAliasInternals.parseAliasValue_validFor
+    intro value
+    apply Parser.bind_validFor (symbol_validFor .semicolon .typeAlias)
+    intro semicolon
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : typeAlias input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok declaration final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold typeAlias at stages
+      rcases typeAliasBind_ok_components stages with
+        ⟨typeKeyword, afterKeyword, keywordResult, rest⟩
+      rcases typeAliasBind_ok_components rest with
+        ⟨name, afterName, nameResult, rest⟩
+      rcases typeAliasBind_ok_components rest with
+        ⟨parameters, afterParameters, parametersResult, rest⟩
+      rcases typeAliasBind_ok_components rest with
+        ⟨equal, afterEqual, equalResult, rest⟩
+      rcases typeAliasBind_ok_components rest with
+        ⟨value, afterValue, valueResult, rest⟩
+      rcases typeAliasBind_ok_components rest with
+        ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+      have keywordValid := keyword_validFor .typeKw .typeAlias input inputValid
+      rw [keywordResult] at keywordValid
+      have nameValid := identifier_validFor .typeAlias afterKeyword
+        keywordValid.2.1
+      rw [nameResult] at nameValid
+      have parametersValid := parseTypeAliasParameters_validFor afterName
+        nameValid.2.1
+      rw [parametersResult] at parametersValid
+      have equalValid := symbol_validFor .equal .typeAlias afterParameters
+        parametersValid.2.1
+      rw [equalResult] at equalValid
+      have valueValid := TypeAliasInternals.parseAliasValue_validFor afterEqual
+        equalValid.2.1
+      rw [valueResult] at valueValid
+      have semicolonValid := symbol_validFor .semicolon .typeAlias afterValue
+        valueValid.2.1
+      rw [semicolonResult] at semicolonValid
+      have keywordSpanValid : typeKeyword.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using keywordValid.1
+      have nameValidInput : name.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, keywordValid.2.2] using nameValid.1
+      have parametersValidInput : Option.ValidFor
+          (DelimitedList.ValidFor Located.ValidFor) input.file parameters := by
+        simpa [nameValid.2.2, keywordValid.2.2] using parametersValid.1
+      have valueValidInput : TypeExpr.ValidFor input.file value := by
+        simpa [equalValid.2.2, parametersValid.2.2, nameValid.2.2,
+          keywordValid.2.2] using valueValid.1
+      have semicolonSpanValid : semicolon.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, valueValid.2.2, equalValid.2.2,
+          parametersValid.2.2,
+          nameValid.2.2, keywordValid.2.2] using semicolonValid.1
+      have keywordShape := acceptToken_ok_state_shape (.keyword .typeKw)
+        .typeAlias (· == .keyword .typeKw) keywordResult
+      have keywordAt := State.getElem?_eq_some_of_peek?_eq_some keywordShape.1
+      have semicolonShape := symbol_ok_state_shape .semicolon .typeAlias
+        semicolonResult
+      have semicolonAt : input.tokens[afterValue.cursor]? = some semicolon := by
+        have found := State.getElem?_eq_some_of_peek?_eq_some semicolonShape.1
+        simpa [TypeAliasInternals.parseAliasValue_preservesTokensOnSuccess
+            afterEqual value afterValue valueResult,
+          symbol_preservesTokensOnSuccess .equal .typeAlias afterParameters
+            equal afterEqual equalResult,
+          parseTypeAliasParameters_preservesTokensOnSuccess afterName parameters
+            afterParameters parametersResult,
+          identifier_preservesTokensOnSuccess .typeAlias afterKeyword name
+            afterName nameResult,
+          keyword_preservesTokensOnSuccess .typeKw .typeAlias input typeKeyword
+            afterKeyword keywordResult] using found
+      have cursorOrder : input.cursor < afterValue.cursor := by
+        apply Nat.lt_of_lt_of_le (acceptToken_cursor_lt_onSuccess
+          (.keyword .typeKw) .typeAlias (· == .keyword .typeKw) keywordResult)
+        exact Nat.le_trans (identifier_cursorMonotoneOnSuccess .typeAlias
+          afterKeyword name afterName nameResult) (Nat.le_trans
+            (parseTypeAliasParameters_cursorMonotoneOnSuccess afterName
+              parameters afterParameters parametersResult) (Nat.le_trans
+                (symbol_cursorMonotoneOnSuccess .equal .typeAlias
+                  afterParameters equal afterEqual equalResult)
+                (TypeAliasInternals.parseAliasValue_cursorMonotoneOnSuccess
+                  afterEqual value afterValue valueResult)))
+      have keywordBeforeSemicolon :=
+        inputValid.token_end_le_token_start_of_getElem?_lt
+          keywordAt semicolonAt cursorOrder
+      have outerValid : SourceSpan.ValidFor
+          (SourceSpan.cover typeKeyword.span semicolon.span) input.file :=
+        SourceSpan.cover_validFor keywordSpanValid semicolonSpanValid
+          (Nat.le_trans keywordSpanValid.2.1
+            (Nat.le_trans keywordBeforeSemicolon semicolonSpanValid.2.1))
+      cases finished
+      refine ⟨⟨outerValid, nameValidInput, ?_, ?_, valueValidInput⟩,
+        weakResult.2.1, weakResult.2.2⟩
+      · cases parameters with
+        | none => simp
+        | some values => simpa [Option.ValidFor] using parametersValidInput.1
+      · cases parameters with
+        | none => simp
+        | some values =>
+            intro retained member parameter parameterMember
+            have retainedEq : retained = values := by simpa using member.symm
+            subst retained
+            exact parametersValidInput.2 parameter parameterMember
+
+/-- Complete type-alias parsing preserves every ordinary token window. -/
+theorem typeAlias_preservesTokenWindow :
+    Parser.PreservesTokenWindow typeAlias := by
+  unfold typeAlias
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .typeKw .typeAlias)
+  intro typeKeyword
+  apply Parser.bind_preservesTokenWindow
+    (identifier_preservesTokenWindow .typeAlias)
+  intro name
+  apply Parser.bind_preservesTokenWindow
+    parseTypeAliasParameters_preservesTokenWindow
+  intro parameters
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .equal .typeAlias)
+  intro equal
+  apply Parser.bind_preservesTokenWindow
+    TypeAliasInternals.parseAliasValue_preservesTokenWindow
+  intro value
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .semicolon .typeAlias)
+  intro semicolon
+  exact Parser.pure_preservesTokenWindow _
+
+/-- Successful type-alias parsing retains the immutable token carrier. -/
+theorem typeAlias_preservesTokensOnSuccess : Parser.PreservesTokensOnSuccess typeAlias :=
+  typeAlias_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Complete type-alias parsing never rewinds the parser cursor. -/
+theorem typeAlias_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess typeAlias := by
+  unfold typeAlias
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .typeKw .typeAlias)
+  intro typeKeyword
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (identifier_cursorMonotoneOnSuccess .typeAlias)
+  intro name
+  apply Parser.bind_cursorMonotoneOnSuccess
+    parseTypeAliasParameters_cursorMonotoneOnSuccess
+  intro parameters
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .equal .typeAlias)
+  intro equal
+  apply Parser.bind_cursorMonotoneOnSuccess
+    TypeAliasInternals.parseAliasValue_cursorMonotoneOnSuccess
+  intro value
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .semicolon .typeAlias)
+  intro semicolon
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A complete type alias starts at its leading `type` token. -/
+theorem typeAlias_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess typeAlias (·.span) := by
+  unfold typeAlias
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess
+      (.keyword .typeKw) .typeAlias (· == .keyword .typeKw))
+  intro typeKeyword input declaration final parsed
+  rcases typeAliasBind_ok_components parsed with
+    ⟨name, afterName, _nameResult, rest⟩
+  rcases typeAliasBind_ok_components rest with
+    ⟨parameters, afterParameters, _parametersResult, rest⟩
+  rcases typeAliasBind_ok_components rest with
+    ⟨equal, afterEqual, _equalResult, rest⟩
+  rcases typeAliasBind_ok_components rest with
+    ⟨value, afterValue, _valueResult, rest⟩
+  rcases typeAliasBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, _semicolonResult, finished⟩
+  cases finished
+  rfl
+
 end Solcore.Syntax.Parser
