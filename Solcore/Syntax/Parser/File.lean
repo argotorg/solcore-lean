@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Export
 import Solcore.Syntax.Parser.Enum
+import Solcore.Syntax.Parser.Derive
 import Solcore.Syntax.Parser.Function
 import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.Pragma
@@ -47,8 +48,7 @@ private def wrapEnum (declaration : EnumDecl) : TopItem := {
   value := .enum declaration
 }
 
-/-- Parse the top-level forms implemented by the current vertical slice. -/
-private def topItem : Parser TopItem := fun state =>
+private def plainTopItem : Parser TopItem := fun state =>
   if isKeyword state .importKw then
     match importDecl state with
     | .ok declaration next => .ok (wrapImport declaration) next
@@ -81,6 +81,43 @@ private def topItem : Parser TopItem := fun state =>
     | .invariant error => .invariant error
   else
     rejectAt state { head := .topItem, tail := [] } .topItem
+
+private def attachDeriveAttribute (derive : DeriveAttribute)
+    (item : TopItem) : Parser TopItem :=
+  match item.value with
+  | .enum declaration =>
+      let span := SourceSpan.cover derive.span declaration.span
+      pure {
+        item with
+        span
+        value := .enum {
+          declaration with
+          span
+          value := { declaration.value with
+            deriveAttribute := some derive
+          }
+        }
+      }
+  | _ => do
+      let _ ← emitDiagnostic {
+        span := derive.span
+        kind := .constraintViolation .deriveOnlyEnum
+      }
+      pure { item with span := SourceSpan.cover derive.span item.span }
+
+/-- Parse one top-level form, including an optional derive attribute. -/
+private def topItem : Parser TopItem := fun state =>
+  if isSymbol state .hash then
+    match deriveAttribute state with
+    | .ok derive afterDerive =>
+        match plainTopItem afterDerive with
+        | .ok item next => attachDeriveAttribute derive item next
+        | .reject failure next => .reject failure next
+        | .invariant error => .invariant error
+    | .reject failure next => .reject failure next
+    | .invariant error => .invariant error
+  else
+    plainTopItem state
 
 private def finishRecoveredTopItem (first last : SourceSpan)
     (state : State) : Reply TopItem :=

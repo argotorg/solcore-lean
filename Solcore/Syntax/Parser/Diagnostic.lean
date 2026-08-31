@@ -69,6 +69,11 @@ inductive ParseConstraint where
   | assignmentRequiresSemicolon
   | matchRequiresArm
   | matchArityMismatch (scrutinees patterns : Nat)
+  | reservedDeriveTarget (keyword : HardKeyword)
+  | deriveRequiresTarget
+  | malformedDeriveAttribute
+  | unclosedDeriveAttribute
+  | deriveOnlyEnum
   deriving Repr, BEq, DecidableEq
 
 /-- Bounded recursive syntax dimensions checked before recursive parsing. -/
