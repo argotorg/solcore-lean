@@ -4,6 +4,22 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+instance : Monad Parser where
+  pure value := fun state => .ok value state
+  bind parser next := fun state =>
+    match parser state with
+    | .ok value nextState => next value nextState
+    | .reject failure nextState => .reject failure nextState
+    | .invariant error => .invariant error
+
+def getState : Parser State := fun state => .ok state state
+
+def modifyState (update : State → State) : Parser Unit := fun state =>
+  .ok () (update state)
+
+def emitDiagnostic (diagnostic : ParseDiagnostic) : Parser Unit :=
+  modifyState (·.emit diagnostic)
+
 /-- Build one uncommitted rejection at the current cursor. -/
 def rejectAt {α : Type} (state : State)
     (expected : NonemptyList ParseExpectation)
