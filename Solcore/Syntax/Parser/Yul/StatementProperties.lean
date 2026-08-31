@@ -53,6 +53,16 @@ theorem yulBlockStatement_preservesTokensOnSuccess
   intro block
   exact Parser.pure_preservesTokensOnSuccess _
 
+/-- Block statements preserve the nested parser's ordinary token window. -/
+theorem yulBlockStatement_preservesTokenWindow (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (yulBlockStatement statement) := by
+  unfold yulBlockStatement
+  apply Parser.bind_preservesTokenWindow
+    (yulBlock_preservesTokenWindow statement statementShape)
+  intro block
+  exact Parser.pure_preservesTokenWindow _
+
 theorem yulBlockStatement_cursorMonotoneOnSuccess
     (statement : Parser YulStmt)
     (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
@@ -391,6 +401,19 @@ theorem yulAssignment_preservesTokensOnSuccess :
     yulExpression_preservesTokensOnSuccess
   intro value
   exact Parser.pure_preservesTokensOnSuccess _
+
+/-- Yul assignments preserve every ordinary token window. -/
+theorem yulAssignment_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulAssignment := by
+  unfold yulAssignment
+  apply Parser.bind_preservesTokenWindow yulNames_preservesTokenWindow
+  intro names
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .colonEqual .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow yulExpression_preservesTokenWindow
+  intro value
+  exact Parser.pure_preservesTokenWindow _
 
 /-- A Yul assignment never rewinds the parser cursor. -/
 theorem yulAssignment_cursorMonotoneOnSuccess :
@@ -1009,6 +1032,61 @@ theorem yulStatementCore_startsAtCurrentTokenOnSuccess
     Parser.StartsAtCurrentTokenOnSuccess (yulStatementCore nested) (·.span) :=
   (yulStatementCore_contracts nested nestedValid nestedPreserves).startsAtToken
 
+/-- Every non-terminating statement choice preserves recursive token windows. -/
+theorem yulStatementCore_preservesTokenWindow (nested : Parser YulStmt)
+    (nestedShape : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (yulStatementCore nested) := by
+  intro input
+  unfold yulStatementCore
+  split
+  · exact recognizedYulStatementOrFallback_preservesTokenWindow _ _
+      (yulBlockStatement_preservesTokenWindow nested nestedShape)
+      yulExpressionStatement_preservesTokenWindow input
+  · split
+    · exact recognizedYulStatementOrFallback_preservesTokenWindow _ _
+        yulLetStatement_preservesTokenWindow
+        yulExpressionStatement_preservesTokenWindow input
+    · split
+      · exact recognizedYulStatementOrFallback_preservesTokenWindow _ _
+          (yulIfStatement_preservesTokenWindow nested
+            yulExpression_preservesTokenWindow nestedShape)
+          yulExpressionStatement_preservesTokenWindow input
+      · split
+        · exact recognizedYulStatementOrFallback_preservesTokenWindow _ _
+            (yulForStatement_preservesTokenWindow nested
+              yulExpression_preservesTokenWindow nestedShape)
+            yulExpressionStatement_preservesTokenWindow input
+        · split
+          · exact recognizedYulStatementOrFallback_preservesTokenWindow _ _
+              (yulSwitchStatement_preservesTokenWindow nested nestedShape)
+              yulExpressionStatement_preservesTokenWindow input
+          · split
+            · exact recognizedYulStatementOrFallback_preservesTokenWindow _ _
+                (yulFunctionStatement_preservesTokenWindow nested nestedShape)
+                yulExpressionStatement_preservesTokenWindow input
+            · split
+              · exact recognizedYulStatementOrFallback_preservesTokenWindow _ _
+                  yulReturnBuiltin_preservesTokenWindow
+                  yulExpressionStatement_preservesTokenWindow input
+              · split
+                · exact recognizedYulStatementOrFallback_preservesTokenWindow _ _
+                    (yulControlToken_preservesTokenWindow .leaveKw .leave)
+                    yulExpressionStatement_preservesTokenWindow input
+                · split
+                  · exact recognizedYulStatementOrFallback_preservesTokenWindow
+                      _ _ (yulControlToken_preservesTokenWindow .breakKw .break)
+                      yulExpressionStatement_preservesTokenWindow input
+                  · split
+                    · exact recognizedYulStatementOrFallback_preservesTokenWindow
+                        _ _ (yulControlToken_preservesTokenWindow
+                          .continueKw .continue)
+                        yulExpressionStatement_preservesTokenWindow input
+                    · split
+                      · exact Parser.orElse_preservesTokenWindow
+                          yulAssignment_preservesTokenWindow
+                          yulExpressionStatement_preservesTokenWindow input
+                      · exact yulExpressionStatement_preservesTokenWindow input
+
 /-- Optional semicolon parsing preserves a supplied valid statement. -/
 theorem optionalYulSemicolon_validForAt (value : YulStmt) (input : State)
     (inputValid : input.ValidFor) (valueValid : YulStmt.ValidFor input.file value) :
@@ -1492,37 +1570,37 @@ theorem yulStatementLayer_startsAtCurrentTokenOnSuccess
               (afterToken.emit failure.toDiagnostic) statement next result
             exact ⟨token, found, recovered.2.2.symm⟩
 
-/-- Fuel-bounded statements preserve windows once each core layer does. -/
-theorem yulStatementWithFuel_preservesTokenWindow
-    (coreShape : ∀ fuel, Parser.PreservesTokenWindow
-      (yulStatementCore (yulStatementWithFuel fuel))) :
+/-- Every fuel-bounded statement parser preserves ordinary token windows. -/
+theorem yulStatementWithFuel_preservesTokenWindow :
     ∀ fuel, Parser.PreservesTokenWindow (yulStatementWithFuel fuel) := by
   intro fuel
   induction fuel with
   | zero => intro input; trivial
   | succ fuel inductionHypothesis =>
       exact yulStatementLayer_preservesTokenWindow
-        (yulStatementWithFuel fuel) (coreShape fuel)
+        (yulStatementWithFuel fuel)
+        (yulStatementCore_preservesTokenWindow
+          (yulStatementWithFuel fuel) inductionHypothesis)
 
-/-- Fuel-bounded statements retain provenance under the same core seam. -/
-theorem yulStatementWithFuel_validFor
-    (coreShape : ∀ fuel, Parser.PreservesTokenWindow
-      (yulStatementCore (yulStatementWithFuel fuel))) :
+theorem yulStatementWithFuel_preservesTokensOnSuccess (fuel : Nat) :
+    Parser.PreservesTokensOnSuccess (yulStatementWithFuel fuel) :=
+  (yulStatementWithFuel_preservesTokenWindow fuel).preservesTokensOnSuccess
+
+/-- Every fuel-bounded statement parser retains source provenance. -/
+theorem yulStatementWithFuel_validFor :
     ∀ fuel, (yulStatementWithFuel fuel).ValidFor YulStmt.ValidFor := by
   intro fuel
   induction fuel with
   | zero => intro input inputValid; trivial
   | succ fuel inductionHypothesis =>
-      have nestedShape :=
-        yulStatementWithFuel_preservesTokenWindow coreShape fuel
+      have nestedShape := yulStatementWithFuel_preservesTokenWindow fuel
       exact yulStatementLayer_validFor (yulStatementWithFuel fuel)
         inductionHypothesis nestedShape.preservesTokensOnSuccess
-        (coreShape fuel)
+        (yulStatementCore_preservesTokenWindow
+          (yulStatementWithFuel fuel) nestedShape)
 
 /-- Fuel-bounded statement successes never rewind their caller. -/
-theorem yulStatementWithFuel_cursorMonotoneOnSuccess
-    (coreShape : ∀ fuel, Parser.PreservesTokenWindow
-      (yulStatementCore (yulStatementWithFuel fuel))) :
+theorem yulStatementWithFuel_cursorMonotoneOnSuccess :
     ∀ fuel, Parser.CursorMonotoneOnSuccess (yulStatementWithFuel fuel) := by
   intro fuel
   induction fuel with
@@ -1530,17 +1608,14 @@ theorem yulStatementWithFuel_cursorMonotoneOnSuccess
       intro input statement next result
       simp [yulStatementWithFuel] at result
   | succ fuel inductionHypothesis =>
-      have nestedShape :=
-        yulStatementWithFuel_preservesTokenWindow coreShape fuel
+      have nestedShape := yulStatementWithFuel_preservesTokenWindow fuel
       exact yulStatementLayer_cursorMonotoneOnSuccess
         (yulStatementWithFuel fuel)
-        (yulStatementWithFuel_validFor coreShape fuel)
+        (yulStatementWithFuel_validFor fuel)
         nestedShape.preservesTokensOnSuccess
 
 /-- Fuel-bounded statement successes begin at the current token. -/
-theorem yulStatementWithFuel_startsAtCurrentTokenOnSuccess
-    (coreShape : ∀ fuel, Parser.PreservesTokenWindow
-      (yulStatementCore (yulStatementWithFuel fuel))) :
+theorem yulStatementWithFuel_startsAtCurrentTokenOnSuccess :
     ∀ fuel, Parser.StartsAtCurrentTokenOnSuccess
       (yulStatementWithFuel fuel) (·.span) := by
   intro fuel
@@ -1549,11 +1624,47 @@ theorem yulStatementWithFuel_startsAtCurrentTokenOnSuccess
       intro input statement next result
       simp [yulStatementWithFuel] at result
   | succ fuel inductionHypothesis =>
-      have nestedShape :=
-        yulStatementWithFuel_preservesTokenWindow coreShape fuel
+      have nestedShape := yulStatementWithFuel_preservesTokenWindow fuel
       exact yulStatementLayer_startsAtCurrentTokenOnSuccess
         (yulStatementWithFuel fuel)
-        (yulStatementWithFuel_validFor coreShape fuel)
-        nestedShape.preservesTokensOnSuccess (coreShape fuel)
+        (yulStatementWithFuel_validFor fuel)
+        nestedShape.preservesTokensOnSuccess
+        (yulStatementCore_preservesTokenWindow
+          (yulStatementWithFuel fuel) nestedShape)
+
+/-- Public Yul statement parsing preserves every ordinary token window. -/
+theorem yulStatement_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulStatement := by
+  intro input
+  unfold yulStatement
+  exact yulStatementWithFuel_preservesTokenWindow
+    (input.remainingCount + 1) input
+
+theorem yulStatement_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess yulStatement :=
+  yulStatement_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Public Yul statement parsing retains source provenance. -/
+theorem yulStatement_validFor : yulStatement.ValidFor YulStmt.ValidFor := by
+  intro input inputValid
+  unfold yulStatement
+  exact yulStatementWithFuel_validFor (input.remainingCount + 1)
+    input inputValid
+
+/-- Public Yul statement successes never rewind their caller. -/
+theorem yulStatement_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess yulStatement := by
+  intro input statement next result
+  unfold yulStatement at result
+  exact yulStatementWithFuel_cursorMonotoneOnSuccess
+    (input.remainingCount + 1) input statement next result
+
+/-- Public Yul statement successes begin at the current token. -/
+theorem yulStatement_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess yulStatement (·.span) := by
+  intro input statement next result
+  unfold yulStatement at result
+  exact yulStatementWithFuel_startsAtCurrentTokenOnSuccess
+    (input.remainingCount + 1) input statement next result
 
 end Solcore.Syntax.Parser

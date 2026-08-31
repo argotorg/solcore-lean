@@ -75,8 +75,17 @@ example := @yulStatementLayer_preservesTokensOnSuccess
 example := @yulStatementLayer_cursorMonotoneOnSuccess
 example := @yulStatementLayer_startsAtCurrentTokenOnSuccess
 example := @yulStatementWithFuel_preservesTokenWindow
+example := @yulStatementWithFuel_preservesTokensOnSuccess
 example := @yulStatementWithFuel_validFor
 example := @yulStatementWithFuel_cursorMonotoneOnSuccess
 example := @yulStatementWithFuel_startsAtCurrentTokenOnSuccess
+example := @yulBlockStatement_preservesTokenWindow
+example := @yulAssignment_preservesTokenWindow
+example := @yulStatementCore_preservesTokenWindow
+example := yulStatement_preservesTokenWindow
+example := yulStatement_preservesTokensOnSuccess
+example := yulStatement_validFor
+example := yulStatement_cursorMonotoneOnSuccess
+example := yulStatement_startsAtCurrentTokenOnSuccess
 
 end Tests
