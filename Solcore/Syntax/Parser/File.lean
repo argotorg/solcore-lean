@@ -1,6 +1,7 @@
 import Solcore.Syntax.Parser.Export
 import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.Derive
+import Solcore.Syntax.Parser.Contract
 import Solcore.Syntax.Parser.Function
 import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.Impl
@@ -62,6 +63,12 @@ private def wrapImpl (declaration : ImplDecl) : TopItem := {
   value := .impl declaration
 }
 
+private def wrapContract (declaration : ContractDecl) : TopItem := {
+  span := declaration.span
+  leadingComments := []
+  value := .contract declaration
+}
+
 private def plainTopItem : Parser TopItem := fun state =>
   if isKeyword state .importKw then
     match importDecl state with
@@ -101,6 +108,11 @@ private def plainTopItem : Parser TopItem := fun state =>
   else if isContextual state .impl || isKeyword state .defaultKw then
     match implDecl state with
     | .ok declaration next => .ok (wrapImpl declaration) next
+    | .reject failure next => .reject failure next
+    | .invariant error => .invariant error
+  else if isKeyword state .contractKw then
+    match contractDecl state with
+    | .ok declaration next => .ok (wrapContract declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else
