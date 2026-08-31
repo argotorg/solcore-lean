@@ -194,15 +194,16 @@ private def testMetaAndRecovery : IO Unit := do
   ] "Yul expression recovery diagnostics"
 
   let statement ← runStatement "Yul statement recovery" "let , }" false
-  assertEqual (statementShape statement.value) .error "Yul recovered statement"
-  assertEqual (byteRange statement.value.span) (0, 5) "Yul statement recovery span"
-  assertEqual statement.state.peekKind? (some (.symbol .rightBrace))
+  assertEqual (statementShape statement.value) (.expression .error)
+    "Yul recognized-statement fallback"
+  assertEqual (byteRange statement.value.span) (0, 3)
+    "Yul recognized-statement fallback span"
+  assertEqual statement.state.peekKind? (some (.symbol .comma))
     "Yul statement recovery boundary"
   assertEqual (statement.state.diagnostics.map fun item => item.kind) [
     .unexpected (some (.symbol .comma))
-      { head := .yulIdentifier, tail := [] } .yulExpression,
-    .recovered .yulStatement
-  ] "Yul statement recovery diagnostics"
+      { head := .yulIdentifier, tail := [] } .yulExpression
+  ] "Yul recognized-statement primary diagnostic"
 
 private def testAllStatements : IO Unit := do
   let source := "{ {} let a, b := pair(1, 2,) a, b := pair() ping(a) " ++
@@ -233,12 +234,19 @@ private def testAllStatements : IO Unit := do
   ] "all Yul statement shapes"
 
 private def testPoliciesAndSpans : IO Unit := do
-  for source in ["let a, := x", "function f() -> r, {}"] do
+  for (source, found, boundary) in [
+      ("let a, := x", TokenKind.symbol .colonEqual, Symbol.comma),
+      ("function f() -> r, {}", TokenKind.symbol .leftBrace, Symbol.rightParen)
+    ] do
     let run ← runStatement s!"rejected Yul trailing comma {source}" source false
-    assertEqual (statementShape run.value) .error s!"Yul trailing comma node {source}"
-    unless run.state.diagnostics.any (fun item =>
-        item.kind == .recovered .yulStatement) do
-      throw (IO.userError s!"{source}: missing Yul statement recovery")
+    assertEqual (statementShape run.value) (.expression .error)
+      s!"Yul trailing comma fallback {source}"
+    assertEqual run.state.peekKind? (some (.symbol boundary))
+      s!"Yul trailing comma boundary {source}"
+    assertEqual (run.state.diagnostics.map fun item => item.kind) [
+      .unexpected (some found)
+        { head := .yulIdentifier, tail := [] } .yulExpression
+    ] s!"Yul trailing comma primary diagnostic {source}"
 
   let assignment ← runStatement "rejected Yul assignment trailing comma"
     "a, := x" false
