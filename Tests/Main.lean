@@ -7,6 +7,7 @@ import Solcore.Oracle.V4
 import Solcore.Oracle.Stream
 import Solcore.Standard.CanonicalData
 import Solcore.Test.SyntaxIdentifier
+import Solcore.Test.SyntaxDiagnosticFilterProperties
 import Solcore.Test.SyntaxLexer
 import Solcore.Test.SyntaxLexerScannerProperties
 import Solcore.Test.SyntaxParserBodyIsolation

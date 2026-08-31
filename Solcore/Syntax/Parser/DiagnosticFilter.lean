@@ -61,4 +61,24 @@ def filterParseDiagnostics (file : SourceFile)
     (parsed : List ParseDiagnostic) : List ParseDiagnostic :=
   suppressLexicalCascades file.content lexical parsed
 
+/-- Diagnostic normalization can only remove parser diagnostics. -/
+theorem mem_of_mem_filterParseDiagnostics
+    (file : SourceFile) (lexical : List LexicalDiagnostic)
+    (parsed : List ParseDiagnostic) (diagnostic : ParseDiagnostic)
+    (member : diagnostic ∈ filterParseDiagnostics file lexical parsed) :
+    diagnostic ∈ parsed := by
+  unfold filterParseDiagnostics suppressLexicalCascades at member
+  exact (List.mem_filter.mp member).1
+
+/-- Filtering lexical cascades preserves validity of every retained span. -/
+theorem filterParseDiagnostics_spans_validFor
+    (file : SourceFile) (lexical : List LexicalDiagnostic)
+    (parsed : List ParseDiagnostic)
+    (valid : ∀ diagnostic ∈ parsed, diagnostic.span.ValidFor file) :
+    ∀ diagnostic ∈ filterParseDiagnostics file lexical parsed,
+      diagnostic.span.ValidFor file := by
+  intro diagnostic member
+  exact valid diagnostic
+    (mem_of_mem_filterParseDiagnostics file lexical parsed diagnostic member)
+
 end Solcore.Syntax.Parser
