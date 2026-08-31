@@ -1,3 +1,4 @@
+import Solcore.Syntax.Lexer.Contract
 import Solcore.Syntax.Lexer.State
 
 /-! Source-order invariants for the lexer's reverse accumulators. -/
@@ -76,6 +77,40 @@ theorem initial_orderedValidFor (file : SourceFile) :
   }
 
 namespace OrderedValidFor
+
+/-- Materializing an ordered state satisfies the public lexer contract. -/
+theorem finish_validFor {file : SourceFile} {state : State}
+    (ordered : state.OrderedValidFor file) :
+    (state.finish file).ValidFor file := by
+  refine {
+    source_eq := rfl
+    tokens := ?_
+    comments := ?_
+    diagnostics := ?_
+  }
+  · apply SpanSequence.ValidFor.of_forall_pairwise
+    · intro token member
+      apply ordered.validFor.tokensRev token
+      simpa only [State.finish, List.mem_reverse] using member
+    · intro token _member
+      exact Nat.zero_le token.span.startByte
+    · intro token member
+      apply ordered.tokensRev_nonempty token
+      simpa only [State.finish, List.mem_reverse] using member
+    · exact List.pairwise_reverse.mpr ordered.tokensRev_pairwise
+  · apply SpanSequence.ValidFor.of_forall_pairwise
+    · intro comment member
+      apply ordered.validFor.commentsRev comment
+      simpa only [State.finish, List.mem_reverse] using member
+    · intro comment _member
+      exact Nat.zero_le comment.span.startByte
+    · intro comment member
+      apply ordered.commentsRev_nonempty comment
+      simpa only [State.finish, List.mem_reverse] using member
+    · exact List.pairwise_reverse.mpr ordered.commentsRev_pairwise
+  · intro diagnostic member
+    apply ordered.validFor.diagnosticsRev diagnostic
+    simpa only [State.finish, List.mem_reverse] using member
 
 /-- Exact cursor-only progress preserves reverse-accumulator ordering. -/
 theorem skipTo {file : SourceFile} {state : State}

@@ -16,6 +16,35 @@ def SpanSequence.ValidFor {α : Type} (file : SourceFile)
 
 namespace SpanSequence.ValidFor
 
+/--
+Build a valid sequence from pointwise span laws and written-order
+nonoverlap, including the incoming boundary before the first item.
+-/
+theorem of_forall_pairwise {α : Type} {file : SourceFile}
+    {spanOf : α → SourceSpan} {previousEnd : Nat} {items : List α}
+    (spanValid : ∀ item ∈ items, (spanOf item).ValidFor file)
+    (afterPrevious : ∀ item ∈ items,
+      previousEnd ≤ (spanOf item).startByte)
+    (spanNonempty : ∀ item ∈ items,
+      (spanOf item).startByte < (spanOf item).endByte)
+    (ordered : items.Pairwise fun left right =>
+      (spanOf left).endByte ≤ (spanOf right).startByte) :
+    SpanSequence.ValidFor file spanOf previousEnd items := by
+  induction items generalizing previousEnd with
+  | nil => trivial
+  | cons head tail inductionHypothesis =>
+      cases ordered with
+      | cons headBeforeTail tailOrdered =>
+          refine ⟨spanValid head (by simp), afterPrevious head (by simp),
+            spanNonempty head (by simp), ?_⟩
+          apply inductionHypothesis
+          · intro item member
+            exact spanValid item (List.mem_cons_of_mem head member)
+          · exact headBeforeTail
+          · intro item member
+            exact spanNonempty item (List.mem_cons_of_mem head member)
+          · exact tailOrdered
+
 /-- Every member of a valid sequence has valid source provenance. -/
 theorem span_valid {α : Type} {file : SourceFile}
     {spanOf : α → SourceSpan} {previousEnd : Nat} {items : List α}

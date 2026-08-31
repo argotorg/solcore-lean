@@ -77,6 +77,29 @@ theorem lexLoop_ok_carrier_spans
                   diagnostics⟩)
                 (step_validFor file _ stateValid) result
 
+/-- Every successful executor result satisfies the public lexer contract. -/
+theorem lexLoop_ok_validFor
+    (file : SourceFile) (fuel : Nat) (state : State) (lexed : LexedFile)
+    (stateValid : state.OrderedValidFor file)
+    (result : lexLoop file fuel state = .ok lexed) :
+    lexed.ValidFor file := by
+  induction fuel generalizing state with
+  | zero => simp [lexLoop] at result
+  | succ fuel inductionHypothesis =>
+      cases state with
+      | mk cursor remaining tokens comments diagnostics =>
+          cases remaining with
+          | nil =>
+              simp only [lexLoop] at result
+              cases result
+              exact stateValid.finish_validFor
+          | cons character rest =>
+              simp only [lexLoop] at result
+              exact inductionHypothesis
+                (step file ⟨cursor, character :: rest, tokens, comments,
+                  diagnostics⟩)
+                (step_orderedValidFor file _ stateValid) result
+
 /-- More fuel than remaining characters always reaches a successful result. -/
 theorem lexLoop_exists_ok_of_remaining_lt_fuel
     (file : SourceFile) (fuel : Nat) (state : State)
@@ -145,6 +168,14 @@ theorem lex_ok_carrier_spans
   lexLoop_ok_carrier_spans file (fuelBound file) (State.initial file) lexed
     (State.initial_validFor file) result
 
+/-- A successful public lex satisfies the complete lexical contract. -/
+theorem lex_ok_validFor
+    (file : SourceFile) (lexed : LexedFile)
+    (result : lex file = .ok lexed) :
+    lexed.ValidFor file :=
+  lexLoop_ok_validFor file (fuelBound file) (State.initial file) lexed
+    (State.initial_orderedValidFor file) result
+
 /-- Public lexing always returns source-owned, valid lexical carriers. -/
 theorem lex_total_carrier_spans (file : SourceFile) :
     ∃ lexed,
@@ -156,5 +187,11 @@ theorem lex_total_carrier_spans (file : SourceFile) :
         diagnostic.span.ValidFor file) := by
   rcases lex_exists_ok file with ⟨lexed, result⟩
   exact ⟨lexed, result, lex_ok_carrier_spans file lexed result⟩
+
+/-- Public lexing always returns a value satisfying its complete contract. -/
+theorem lex_total_validFor (file : SourceFile) :
+    ∃ lexed, lex file = .ok lexed ∧ lexed.ValidFor file := by
+  rcases lex_exists_ok file with ⟨lexed, result⟩
+  exact ⟨lexed, result, lex_ok_validFor file lexed result⟩
 
 end Solcore.Syntax.Lexer
