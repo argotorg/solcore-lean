@@ -14,7 +14,9 @@ private def requireScrutinees (values : DelimitedList Expr) :
     }
   | [] => fun _ => .invariant (.noProgress .statement values.span)
 
-private def matchCase (statement : Parser Statement)
+namespace MatchInternals
+
+def matchCase (statement : Parser Statement)
     (pattern : Parser Pattern) : Parser MatchCase := do
   let marker ← keyword .caseKw .statement
   let pattern ← pattern
@@ -24,6 +26,8 @@ private def matchCase (statement : Parser Statement)
     value := { pattern, body }
   }
 
+end MatchInternals
+
 private def matchCases (statement : Parser Statement)
     (pattern : Parser Pattern) :
     Nat → List MatchCase → State → Reply (List MatchCase)
@@ -31,7 +35,7 @@ private def matchCases (statement : Parser Statement)
   | fuel + 1, casesRev, state =>
       if isKeyword state .caseKw then
         let before := state.cursor
-        match matchCase statement pattern state with
+        match MatchInternals.matchCase statement pattern state with
         | .ok value next =>
             if next.cursor > before then
               matchCases statement pattern fuel (value :: casesRev) next

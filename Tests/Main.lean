@@ -54,6 +54,7 @@ import Solcore.Test.SyntaxParserStateCursorProperties
 import Solcore.Test.SyntaxParserStateProperties
 import Solcore.Test.SyntaxParserStatementControlProperties
 import Solcore.Test.SyntaxParserStatementFallback
+import Solcore.Test.SyntaxParserStatementMatchProperties
 import Solcore.Test.SyntaxParserStatementSimpleProperties
 import Solcore.Test.SyntaxParserStatements
 import Solcore.Test.SyntaxParserTerms
