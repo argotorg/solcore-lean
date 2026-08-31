@@ -6,6 +6,7 @@ namespace Solcore.Test.SyntaxParserYulStatementFallbackFuelTotalityProperties
 
 open Solcore.Syntax.Parser
 
+example := @FuelYulStatementTotalityContract.weaken
 example := @FuelYulStatementTotalityContract.ne_invariant
 example := @FuelYulStatementTotalityContract.ofTotality
 example := @recognizedYulStatementOrFallback_ordinary_of_fuels

@@ -204,6 +204,19 @@ structure FuelStatementTotalityContract
 
 namespace FuelStatementTotalityContract
 
+/-- A statement contract at a larger fuel bound proves every smaller bound. -/
+theorem weaken
+    {valueValid : SourceFile → Statement → Prop}
+    {parser : Parser Statement} {smallFuel largeFuel : Nat}
+    (contract : FuelStatementTotalityContract valueValid parser largeFuel)
+    (bound : smallFuel ≤ largeFuel) :
+    FuelStatementTotalityContract valueValid parser smallFuel := {
+  toStatementParserContract := contract.toStatementParserContract
+  ordinary := fun input inputValid adequate =>
+    contract.ordinary input inputValid
+      (Nat.lt_of_lt_of_le adequate bound)
+}
+
 /-- Adequate fuel excludes every statement-parser invariant. -/
 theorem ne_invariant
     {valueValid : SourceFile → Statement → Prop}

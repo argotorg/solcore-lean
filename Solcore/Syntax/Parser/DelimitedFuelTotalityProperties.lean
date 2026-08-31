@@ -24,6 +24,20 @@ structure FuelElementTotalityContract {α : Type}
 
 namespace FuelElementTotalityContract
 
+/-- A contract at a larger fuel bound also proves every smaller bound. -/
+theorem weaken {α : Type} {element : Parser α}
+    {smallFuel largeFuel : Nat}
+    (contract : FuelElementTotalityContract element largeFuel)
+    (bound : smallFuel ≤ largeFuel) :
+    FuelElementTotalityContract element smallFuel := {
+  validFor := contract.validFor
+  preservesTokenWindow := contract.preservesTokenWindow
+  cursorLtOnSuccess := contract.cursorLtOnSuccess
+  ordinary := fun input inputValid adequate =>
+    contract.ordinary input inputValid
+      (Nat.lt_of_lt_of_le adequate bound)
+}
+
 theorem ne_invariant {α : Type} {element : Parser α} {fuel : Nat}
     (contract : FuelElementTotalityContract element fuel)
     (input : State) (inputValid : input.ValidFor)

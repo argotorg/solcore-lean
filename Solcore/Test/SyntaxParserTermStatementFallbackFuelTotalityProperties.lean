@@ -14,6 +14,7 @@ example := @assignmentOrExpressionStatement_ordinary_of_expressionFuel
 example := @assignmentOrExpressionStatement_ne_invariant_of_expressionFuel
 example := @TermInternals.FuelStatementTotalityContract
 example := @TermInternals.FuelStatementTotalityContract.ordinary
+example := @TermInternals.FuelStatementTotalityContract.weaken
 example := @TermInternals.FuelStatementTotalityContract.ne_invariant
 example := @assignmentOrExpressionStatement_fuelTotalityContract
 

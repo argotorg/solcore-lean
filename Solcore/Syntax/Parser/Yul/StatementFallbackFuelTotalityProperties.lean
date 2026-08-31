@@ -17,6 +17,18 @@ structure FuelYulStatementTotalityContract
 
 namespace FuelYulStatementTotalityContract
 
+/-- A Yul statement contract at a larger fuel bound proves every smaller bound. -/
+theorem weaken {parser : Parser YulStmt} {smallFuel largeFuel : Nat}
+    (contract : FuelYulStatementTotalityContract parser largeFuel)
+    (bound : smallFuel ≤ largeFuel) :
+    FuelYulStatementTotalityContract parser smallFuel := {
+  toYulStatementParserContracts := contract.toYulStatementParserContracts
+  preservesTokenWindow := contract.preservesTokenWindow
+  ordinary := fun input inputValid adequate =>
+    contract.ordinary input inputValid
+      (Nat.lt_of_lt_of_le adequate bound)
+}
+
 theorem ne_invariant {parser : Parser YulStmt} {fuel : Nat}
     (contract : FuelYulStatementTotalityContract parser fuel)
     (input : State) (inputValid : input.ValidFor)
