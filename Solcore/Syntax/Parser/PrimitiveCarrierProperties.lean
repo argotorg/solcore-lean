@@ -87,6 +87,12 @@ theorem contextual_cursorMonotoneOnSuccess
   acceptToken_cursorMonotoneOnSuccess (.contextual value) context
     (·.isContextual value)
 
+theorem contextual_startsAtCurrentTokenOnSuccess
+    (value : ContextualKeyword) (context : ParseContext) :
+    Parser.StartsAtCurrentTokenOnSuccess (contextual value context) (·.span) :=
+  acceptToken_startsAtCurrentTokenOnSuccess (.contextual value) context
+    (·.isContextual value)
+
 /-- Raw identifier success changes only the parser cursor. -/
 theorem rawIdentifier_ok_state_shape (context : ParseContext)
     {input next : State} {name : Identifier}

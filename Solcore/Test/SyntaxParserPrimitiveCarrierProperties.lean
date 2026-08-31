@@ -18,6 +18,7 @@ example := @symbol_preservesTokensOnSuccess
 example := @symbol_cursorMonotoneOnSuccess
 example := @contextual_preservesTokensOnSuccess
 example := @contextual_cursorMonotoneOnSuccess
+example := @contextual_startsAtCurrentTokenOnSuccess
 example := @rawIdentifier_ok_state_shape
 example := @rawIdentifier_preservesTokensOnSuccess
 example := @rawIdentifier_cursorMonotoneOnSuccess

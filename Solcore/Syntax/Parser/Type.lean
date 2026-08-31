@@ -6,6 +6,27 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+private theorem bind_ok_components {α β : Type} {first : Parser α}
+    {next : α → Parser β} {input final : State} {value : β}
+    (parsed : (first >>= next) input = .ok value final) :
+    ∃ firstValue afterFirst,
+      first input = .ok firstValue afterFirst ∧
+        next firstValue afterFirst = .ok value final := by
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      rw [firstResult] at parsed
+      exact ⟨firstValue, afterFirst, rfl, parsed⟩
+  | reject failure rejected =>
+      rw [firstResult] at parsed
+      contradiction
+  | invariant error =>
+      rw [firstResult] at parsed
+      contradiction
+
 private def requireNonempty {α : Type} (parsed : DelimitedList α)
     (phase : ParserPhase) : Parser (NonemptyDelimitedList α) :=
   match parsed.elements with
@@ -57,7 +78,8 @@ private def parseMappingType (nested : Parser TypeExpr) : Parser TypeExpr := do
       (SourceSpan.cover opening.span closing.span) key value
   }
 
-private def parseComptimeType (nested : Parser TypeExpr) : Parser TypeExpr := do
+/-- Parse a `comptime<...>` type using the supplied recursive parser. -/
+def parseComptimeType (nested : Parser TypeExpr) : Parser TypeExpr := do
   let comptime ← contextual .comptime .typeExpr
   let opening ← symbol .less .typeExpr
   let inner ← nested
@@ -67,6 +89,202 @@ private def parseComptimeType (nested : Parser TypeExpr) : Parser TypeExpr := do
     value := .comptime comptime.span
       (SourceSpan.cover opening.span closing.span) inner
   }
+
+/-- Comptime parsing retains valid outer, delimiter, and inner provenance. -/
+theorem parseComptimeType_validFor (nested : Parser TypeExpr)
+    (nestedValid : nested.ValidFor TypeExpr.ValidFor)
+    (nestedStarts : Parser.StartsAtCurrentTokenOnSuccess nested (·.span))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
+    (parseComptimeType nested).ValidFor TypeExpr.ValidFor := by
+  have weak : (parseComptimeType nested).ValidFor (fun _ _ => True) := by
+    unfold parseComptimeType
+    apply Parser.bind_validFor
+      (contextual_validFor .comptime .typeExpr)
+    intro comptime
+    apply Parser.bind_validFor (symbol_validFor .less .typeExpr)
+    intro opening
+    apply Parser.bind_validFor nestedValid
+    intro inner
+    apply Parser.bind_validFor (symbol_validFor .greater .typeExpr)
+    intro closing
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : parseComptimeType nested input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok value final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold parseComptimeType at stages
+      rcases bind_ok_components stages with
+        ⟨comptime, afterComptime, comptimeResult, afterComptimeResult⟩
+      rcases bind_ok_components afterComptimeResult with
+        ⟨opening, afterOpening, openingResult, afterOpeningResult⟩
+      rcases bind_ok_components afterOpeningResult with
+        ⟨inner, afterInner, innerResult, afterInnerResult⟩
+      rcases bind_ok_components afterInnerResult with
+        ⟨closing, afterClosing, closingResult, finished⟩
+      cases finished
+      have comptimeValid :=
+        contextual_validFor .comptime .typeExpr input inputValid
+      rw [comptimeResult] at comptimeValid
+      have openingValid :=
+        symbol_validFor .less .typeExpr afterComptime comptimeValid.2.1
+      rw [openingResult] at openingValid
+      have innerValid := nestedValid afterOpening openingValid.2.1
+      rw [innerResult] at innerValid
+      have closingValid :=
+        symbol_validFor .greater .typeExpr afterInner innerValid.2.1
+      rw [closingResult] at closingValid
+      have comptimeSpanValid : comptime.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using comptimeValid.1
+      have openingSpanValid : opening.span.ValidFor input.file := by
+        have : opening.span.ValidFor afterComptime.file := by
+          simpa only [Located.ValidFor] using openingValid.1
+        simpa [comptimeValid.2.2] using this
+      have innerValidInput : TypeExpr.ValidFor input.file inner := by
+        simpa [openingValid.2.2, comptimeValid.2.2] using innerValid.1
+      have closingSpanValid : closing.span.ValidFor input.file := by
+        have : closing.span.ValidFor afterInner.file := by
+          simpa only [Located.ValidFor] using closingValid.1
+        simpa [innerValid.2.2, openingValid.2.2,
+          comptimeValid.2.2] using this
+      have comptimeShape := acceptToken_ok_state_shape
+        (.contextual .comptime) .typeExpr (·.isContextual .comptime)
+        comptimeResult
+      have comptimeAdvanced :
+          input.advance? = some (comptime, afterComptime) := by
+        unfold State.advance?
+        rw [comptimeShape.1, comptimeShape.2]
+        rfl
+      have openingShape :=
+        symbol_ok_state_shape .less .typeExpr openingResult
+      have comptimeBeforeOpening :=
+        inputValid.consumed_end_le_peek_start_after_advance
+          comptimeAdvanced openingShape.1
+      have openingAdvanced :
+          afterComptime.advance? = some (opening, afterOpening) := by
+        unfold State.advance?
+        rw [openingShape.1, openingShape.2]
+        rfl
+      rcases nestedStarts afterOpening inner afterInner innerResult with
+        ⟨innerToken, innerFound, innerStart⟩
+      have openingBeforeInnerToken :=
+        comptimeValid.2.1.consumed_end_le_peek_start_after_advance
+          openingAdvanced innerFound
+      have openingBeforeInner :
+          opening.span.endByte ≤ inner.span.startByte := by
+        rw [← innerStart]
+        exact openingBeforeInnerToken
+      have innerAtAfterOpening :=
+        State.getElem?_eq_some_of_peek?_eq_some innerFound
+      have nestedTokens :=
+        nestedPreserves afterOpening inner afterInner innerResult
+      have innerAtAfterInner :
+          afterInner.tokens[afterOpening.cursor]? = some innerToken := by
+        rw [nestedTokens]
+        exact innerAtAfterOpening
+      have closingShape :=
+        symbol_ok_state_shape .greater .typeExpr closingResult
+      have closingAtAfterInner :=
+        State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have nestedCursor :=
+        nestedMonotone afterOpening inner afterInner innerResult
+      have innerTokenStartLeClosingEnd :
+          innerToken.span.startByte ≤ closing.span.endByte := by
+        rcases Nat.eq_or_lt_of_le nestedCursor with cursorEq | cursorLt
+        · have tokenEq : innerToken = closing := by
+            apply Option.some.inj
+            rw [← innerAtAfterInner, ← closingAtAfterInner, cursorEq]
+          rw [tokenEq]
+          exact closingSpanValid.2.1
+        · have innerSpanNonempty :=
+            innerValid.2.1.token_span_nonempty_of_getElem?_eq_some
+              innerAtAfterInner
+          have ordered :=
+            innerValid.2.1.token_end_le_token_start_of_getElem?_lt
+              innerAtAfterInner closingAtAfterInner cursorLt
+          exact Nat.le_trans (Nat.le_of_lt innerSpanNonempty)
+            (Nat.le_trans ordered closingSpanValid.2.1)
+      have innerStartLeClosingEnd :
+          inner.span.startByte ≤ closing.span.endByte := by
+        rw [← innerStart]
+        exact innerTokenStartLeClosingEnd
+      have argumentsOrdered :
+          opening.span.startByte ≤ closing.span.endByte :=
+        Nat.le_trans openingSpanValid.2.1
+          (Nat.le_trans openingBeforeInner innerStartLeClosingEnd)
+      have outerOrdered :
+          comptime.span.startByte ≤ closing.span.endByte :=
+        Nat.le_trans comptimeSpanValid.2.1
+          (Nat.le_trans comptimeBeforeOpening argumentsOrdered)
+      have outerValid := SourceSpan.cover_validFor comptimeSpanValid
+        closingSpanValid outerOrdered
+      have argumentsValid := SourceSpan.cover_validFor openingSpanValid
+        closingSpanValid argumentsOrdered
+      exact ⟨.comptime outerValid comptimeSpanValid argumentsValid
+          innerValidInput,
+        weakResult.2.1, weakResult.2.2⟩
+
+/-- Comptime parsing preserves the immutable recursive token carrier. -/
+theorem parseComptimeType_preservesTokensOnSuccess
+    (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (parseComptimeType nested) := by
+  unfold parseComptimeType
+  apply Parser.bind_preservesTokensOnSuccess
+    (contextual_preservesTokensOnSuccess .comptime .typeExpr)
+  intro comptime
+  apply Parser.bind_preservesTokensOnSuccess
+    (symbol_preservesTokensOnSuccess .less .typeExpr)
+  intro opening
+  apply Parser.bind_preservesTokensOnSuccess nestedPreserves
+  intro inner
+  apply Parser.bind_preservesTokensOnSuccess
+    (symbol_preservesTokensOnSuccess .greater .typeExpr)
+  intro closing
+  exact Parser.pure_preservesTokensOnSuccess _
+
+/-- Comptime parsing is cursor-monotone when its recursive parser is. -/
+theorem parseComptimeType_cursorMonotoneOnSuccess
+    (nested : Parser TypeExpr)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (parseComptimeType nested) := by
+  unfold parseComptimeType
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (contextual_cursorMonotoneOnSuccess .comptime .typeExpr)
+  intro comptime
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .less .typeExpr)
+  intro opening
+  apply Parser.bind_cursorMonotoneOnSuccess nestedMonotone
+  intro inner
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .greater .typeExpr)
+  intro closing
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A comptime type starts at its current `comptime` token. -/
+theorem parseComptimeType_startsAtCurrentTokenOnSuccess
+    (nested : Parser TypeExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (parseComptimeType nested) (·.span) := by
+  unfold parseComptimeType
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (contextual_startsAtCurrentTokenOnSuccess .comptime .typeExpr)
+  intro comptime input value final parsed
+  rcases bind_ok_components parsed with
+    ⟨opening, afterOpening, _openingResult, afterOpeningResult⟩
+  rcases bind_ok_components afterOpeningResult with
+    ⟨inner, afterInner, _innerResult, afterInnerResult⟩
+  rcases bind_ok_components afterInnerResult with
+    ⟨closing, afterClosing, _closingResult, finished⟩
+  cases finished
+  rfl
 
 /-- Parse a proxy type whose outer range begins at its `@` marker. -/
 def parseProxyType (nested : Parser TypeExpr) : Parser TypeExpr := fun input =>
