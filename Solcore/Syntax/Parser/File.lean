@@ -6,6 +6,7 @@ import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.Pragma
 import Solcore.Syntax.Parser.TopLevel
 import Solcore.Syntax.Parser.Trivia
+import Solcore.Syntax.Parser.Trait
 import Solcore.Syntax.Parser.TypeAlias
 
 set_option autoImplicit false
@@ -48,6 +49,12 @@ private def wrapEnum (declaration : EnumDecl) : TopItem := {
   value := .enum declaration
 }
 
+private def wrapTrait (declaration : TraitDecl) : TopItem := {
+  span := declaration.span
+  leadingComments := []
+  value := .trait declaration
+}
+
 private def plainTopItem : Parser TopItem := fun state =>
   if isKeyword state .importKw then
     match importDecl state with
@@ -77,6 +84,11 @@ private def plainTopItem : Parser TopItem := fun state =>
   else if isContextual state .enum then
     match enumDecl none state with
     | .ok declaration next => .ok (wrapEnum declaration) next
+    | .reject failure next => .reject failure next
+    | .invariant error => .invariant error
+  else if isContextual state .trait then
+    match traitDecl state with
+    | .ok declaration next => .ok (wrapTrait declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else
