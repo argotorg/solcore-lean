@@ -120,13 +120,14 @@ proof implementation currently has the following shape:
   premise, yielding unconditional public contracts for expressions, patterns,
   statements, and Core blocks.
 
-Plain contract-member dispatch and top-level error recovery now have canonical
-source/state contracts, and comment attachment preserves validity for every
-top-level branch, including nested enum and contract members, item lists, and
-complete parsed-file construction. Top-level declaration wrapping and derive
-attachment also preserve provenance and span alignment. The next proof work is
-therefore concrete: finish contract attributes/recovery and body composition,
-top-level dispatch, the item loop, and the complete-file parser.
+Contract-member dispatch, derive attachment, recovery, and top-level recovery
+now have canonical source/state contracts. Comment attachment preserves
+validity for every top-level branch, item lists, and complete parsed-file
+construction. All nine plain top-level declarations and the derive-aware item
+parser are composed under one explicit outer `contractDecl` dependency; that
+same dependency now reaches through the item loop, `sourceFile`, `parseLexed`,
+and public `parse`. The next proof work is therefore concrete: finish contract
+body composition and the outer declaration, then discharge that final input.
 Parser-generated diagnostic validity, grammar-invariant provenance and
 unreachability, resource bounds, and success soundness against a declarative
 grammar remain part of the final boundary.

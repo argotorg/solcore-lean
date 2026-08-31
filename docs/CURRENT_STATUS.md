@@ -270,9 +270,17 @@ behavior. At the current proof boundary:
   alignment. Top-level error recovery has canonical source, token-window,
   carrier, cursor, strict-progress, and starting-token contracts.
 
+Contract-member derive attachment and error recovery now satisfy the same
+canonical source and parser-state boundary. All nine plain top-level branches
+and the derive-aware item parser are composed with one explicit dependency on
+the still-open outer `contractDecl` contract. Under that dependency, the
+fuel-bounded item loop, complete `sourceFile`, `parseLexed`, and public `parse`
+already return canonically valid parsed files.
+
 The remaining parser work is concentrated above the Core term layer: contract
-member attributes/recovery and contract bodies, top-level item dispatch,
-the item loop, and the complete-file parser.
+body composition and the outer contract declaration. Closing that declaration
+will discharge the sole remaining assumption in the complete-file and public
+parser validity path.
 Defining a validity predicate is not treated as proof that a parser satisfies
 it.
 
