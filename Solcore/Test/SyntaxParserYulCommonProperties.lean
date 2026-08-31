@@ -13,6 +13,7 @@ example := @YulNameSequence.ValidFor
 example := @yulNames_validFor
 example := @yulNames_ok_state_shape
 example := @yulNames_preservesTokensOnSuccess
+example := @yulNames_preservesTokenWindow
 example := @yulNames_cursorMonotoneOnSuccess
 example := @yulNames_startsAtCurrentTokenOnSuccess
 example := @YulParsedBlock.ValidFor

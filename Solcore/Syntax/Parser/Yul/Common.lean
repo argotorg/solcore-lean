@@ -525,6 +525,56 @@ theorem yulNames_preservesTokensOnSuccess :
   intro input names next result
   exact (yulNames_ok_state_shape result).choose_spec.2.2.1
 
+private theorem yulNamesTail_preservesTokenWindow (first : YulIdentifier) :
+    ∀ fuel last tailRev, Parser.PreservesTokenWindow
+      (yulNamesTail first fuel last tailRev) := by
+  intro fuel
+  induction fuel with
+  | zero => intro _ _ _; change True; trivial
+  | succ fuel inductionHypothesis =>
+      intro last tailRev input
+      unfold yulNamesTail
+      split
+      · have commaShape :=
+          symbol_preservesTokenWindow .comma .yulStatement input
+        cases commaResult : symbol .comma .yulStatement input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [commaResult] at commaShape
+            exact commaShape
+        | ok comma afterComma =>
+            rw [commaResult] at commaShape
+            have nameShape := yulName_preservesTokenWindow afterComma
+            cases nameResult : yulName afterComma with
+            | invariant error => simp only [nameResult,
+                Reply.PreservesTokenWindow]
+            | reject failure rejected =>
+                rw [nameResult] at nameShape
+                simpa only [commaResult, nameResult, Reply.PreservesTokenWindow]
+                  using nameShape.trans commaShape
+            | ok name next =>
+                rw [nameResult] at nameShape
+                simpa only [commaResult, nameResult, Reply.PreservesTokenWindow]
+                  using (inductionHypothesis name (name :: tailRev) next).trans
+                    (nameShape.trans commaShape)
+      · exact ⟨rfl, rfl⟩
+
+/-- Yul-name parsing preserves every ordinary token window. -/
+theorem yulNames_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulNames := by
+  intro input
+  unfold yulNames
+  have firstShape := yulName_preservesTokenWindow input
+  cases firstResult : yulName input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [firstResult] at firstShape
+      exact firstShape
+  | ok first next =>
+      rw [firstResult] at firstShape
+      exact (yulNamesTail_preservesTokenWindow first
+        (next.remainingCount + 1) first [] next).trans firstShape
+
 /-- Yul-name sequence success never moves the cursor backwards. -/
 theorem yulNames_cursorMonotoneOnSuccess :
     Parser.CursorMonotoneOnSuccess yulNames := by
