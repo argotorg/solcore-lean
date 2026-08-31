@@ -29,6 +29,17 @@ def errorParameter (span : SourceSpan)
   }
   pure { span, value := .error }
 
+def namedParameterTail (start : SourceSpan)
+    (comptimeMarker : Option SourceSpan) (name : Identifier)
+    (errorSpan : SourceSpan) : Parser FunctionParameter := do
+  let state ← getState
+  if isSymbol state .colon then
+    let _ ← symbol .colon .parameter
+    let type ← typeExpr
+    finishTypedParameter start comptimeMarker name type
+  else
+    errorParameter errorSpan .namedParameterRequiresType
+
 def ordinaryNamedParameter : Parser FunctionParameter := do
   let name ← identifier .parameter
   if name.value == ContextualKeyword.comptime.spelling then
@@ -38,25 +49,13 @@ def ordinaryNamedParameter : Parser FunctionParameter := do
     }
   else
     pure ()
-  let state ← getState
-  if isSymbol state .colon then
-    let _ ← symbol .colon .parameter
-    let type ← typeExpr
-    finishTypedParameter name.span none name type
-  else
-    errorParameter name.span .namedParameterRequiresType
+  namedParameterTail name.span none name name.span
 
 def comptimeNamedParameter : Parser FunctionParameter := do
   let marker ← contextual .comptime .parameter
   let name ← identifier .parameter
-  let state ← getState
-  if isSymbol state .colon then
-    let _ ← symbol .colon .parameter
-    let type ← typeExpr
-    finishTypedParameter marker.span (some marker.span) name type
-  else
-    errorParameter (SourceSpan.cover marker.span name.span)
-      .namedParameterRequiresType
+  namedParameterTail marker.span (some marker.span) name
+    (SourceSpan.cover marker.span name.span)
 
 def namedParameterCore : Parser FunctionParameter := fun state =>
   if isContextual state .comptime &&

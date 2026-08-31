@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Parameter
 import Solcore.Syntax.Parser.TypeRecursiveProperties
+import Solcore.Syntax.ParameterValidity
 
 /-! Token-window contracts for recovering function parameters. -/
 
@@ -10,14 +11,15 @@ namespace FunctionParameterInternals
 
 private theorem advance?_state_shape {input next : State} {token : Token}
     (advanced : input.advance? = some (token, next)) :
-    next = { input with cursor := input.cursor + 1 } := by
+    input.peek? = some token ∧
+      next = { input with cursor := input.cursor + 1 } := by
   unfold State.advance? at advanced
   cases found : input.peek? with
   | none => simp [found] at advanced
   | some current =>
       simp only [found, Option.map_some] at advanced
       cases advanced
-      rfl
+      exact ⟨rfl, rfl⟩
 
 private theorem getState_preservesTokenWindowForParameter :
     Parser.PreservesTokenWindow getState := fun _ => ⟨rfl, rfl⟩
@@ -28,6 +30,190 @@ private theorem emitDiagnostic_preservesTokenWindowForParameter
   intro input
   unfold emitDiagnostic modifyState Reply.PreservesTokenWindow
   exact ⟨rfl, rfl⟩
+
+theorem finishRecoveredParameter_validFor (first last : SourceSpan)
+    (state : State) (stateValid : state.ValidFor)
+    (firstValid : first.ValidFor state.file)
+    (lastValid : last.ValidFor state.file)
+    (ordered : first.startByte ≤ last.endByte) :
+    (finishRecoveredParameter first last state).ValidFor state
+      FunctionParameter.ValidFor := by
+  have spanValid := SourceSpan.cover_validFor firstValid lastValid ordered
+  unfold finishRecoveredParameter Reply.ValidFor
+  exact ⟨.error spanValid, stateValid.emit_validFor _ spanValid, rfl⟩
+
+theorem recoverParameterAux_validFor (first : SourceSpan) :
+    ∀ fuel last state lastIndex lastToken,
+      state.ValidFor → first.ValidFor state.file →
+      last.ValidFor state.file → first.startByte ≤ last.endByte →
+      state.tokens[lastIndex]? = some lastToken → lastToken.span = last →
+      lastIndex < state.cursor →
+      (recoverParameterAux first last fuel state).ValidFor state
+        FunctionParameter.ValidFor := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro last state lastIndex lastToken stateValid firstValid lastValid
+        ordered lastFound lastSpan lastBefore
+      unfold recoverParameterAux
+      split
+      · exact finishRecoveredParameter_validFor first last state stateValid
+          firstValid lastValid ordered
+      · cases advanced : state.advance? with
+        | none =>
+            exact finishRecoveredParameter_validFor first last state
+              stateValid firstValid lastValid ordered
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have shape := advance?_state_shape advanced
+            have nextValid := stateValid.advance?_validFor advanced
+            have tokenValid := stateValid.peek?_span_validFor shape.1
+            have currentFound :=
+              State.getElem?_eq_some_of_peek?_eq_some shape.1
+            have lastBeforeCurrent :=
+              stateValid.token_end_le_token_start_of_getElem?_lt lastFound
+                currentFound lastBefore
+            exact (inductionHypothesis token.span next state.cursor token
+              nextValid (by simpa [shape.2] using firstValid)
+              (by simpa [shape.2] using tokenValid)
+              (Nat.le_trans ordered (Nat.le_trans
+                (by simpa [lastSpan] using lastBeforeCurrent)
+                tokenValid.2.1))
+              (by simpa [shape.2] using currentFound) rfl
+              (by simp [shape.2])).of_file_eq (by simp [shape.2])
+
+theorem recoverParameter_validFor (state : State)
+    (stateValid : state.ValidFor) :
+    (recoverParameter state).ValidFor state FunctionParameter.ValidFor := by
+  unfold recoverParameter
+  cases advanced : state.advance? with
+  | none =>
+      unfold rejectAt Reply.ValidFor
+      exact ⟨stateValid.currentSpan_validFor, stateValid, rfl⟩
+  | some pair =>
+      rcases pair with ⟨token, next⟩
+      have shape := advance?_state_shape advanced
+      have nextValid := stateValid.advance?_validFor advanced
+      have tokenValid := stateValid.peek?_span_validFor shape.1
+      have tokenFound := State.getElem?_eq_some_of_peek?_eq_some shape.1
+      exact (recoverParameterAux_validFor token.span
+        (next.remainingCount + 1) token.span next state.cursor token
+        nextValid (by simpa [shape.2] using tokenValid)
+        (by simpa [shape.2] using tokenValid) tokenValid.2.1
+        (by simpa [shape.2] using tokenFound) rfl
+        (by simp [shape.2])).of_file_eq (by simp [shape.2])
+
+private theorem finishTypedParameter_validFor (start : SourceSpan)
+    (comptimeMarker : Option SourceSpan) (name : Identifier)
+    (type : TypeExpr) (input : State) (inputValid : input.ValidFor)
+    (spanValid : (SourceSpan.cover start type.span).ValidFor input.file)
+    (markerValid : ∀ marker ∈ comptimeMarker,
+      marker.ValidFor input.file)
+    (nameValid : name.span.ValidFor input.file)
+    (typeValid : TypeExpr.ValidFor input.file type) :
+    (finishTypedParameter start comptimeMarker name type input).ValidFor
+      input FunctionParameter.ValidFor := by
+  have parameterValid : FunctionParameter.ValidFor input.file {
+      span := SourceSpan.cover start type.span
+      value := .typed comptimeMarker name type
+    } := .typed spanValid markerValid nameValid typeValid
+  cases valueEq : type.value <;>
+    simp only [finishTypedParameter, valueEq, emitDiagnostic, modifyState,
+      bind, pure, Reply.ValidFor]
+  case comptime =>
+    exact And.intro parameterValid (And.intro
+      (inputValid.emit_validFor {
+        span := type.span
+        kind := .constraintViolation .comptimeTypeInParameter
+      } typeValid.span_valid) rfl)
+  all_goals exact And.intro parameterValid (And.intro inputValid trivial)
+
+private theorem errorParameter_validFor (span : SourceSpan)
+    (constraint : ParseConstraint) (input : State)
+    (inputValid : input.ValidFor) (spanValid : span.ValidFor input.file) :
+    (errorParameter span constraint input).ValidFor input
+      FunctionParameter.ValidFor := by
+  unfold errorParameter emitDiagnostic modifyState bind pure Reply.ValidFor
+  exact ⟨.error spanValid, inputValid.emit_validFor _ spanValid, rfl⟩
+
+/-- The shared typed-or-error tail retains parameter provenance. -/
+theorem namedParameterTail_validFor (start : SourceSpan)
+    (comptimeMarker : Option SourceSpan) (name : Identifier)
+    (errorSpan : SourceSpan) {firstIndex : Nat} {firstToken : Token}
+    (input : State) (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    (markerValid : ∀ marker ∈ comptimeMarker,
+      marker.ValidFor input.file)
+    (nameValid : name.span.ValidFor input.file)
+    (errorSpanValid : errorSpan.ValidFor input.file)
+    (firstFound : input.tokens[firstIndex]? = some firstToken)
+    (firstSpan : firstToken.span = start)
+    (firstBefore : firstIndex < input.cursor) :
+    (namedParameterTail start comptimeMarker name errorSpan input).ValidFor
+      input FunctionParameter.ValidFor := by
+  unfold namedParameterTail getState
+  simp only [bind]
+  by_cases typed : isSymbol input .colon
+  · simp only [typed, if_true]
+    cases colonResult : symbol .colon .parameter input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        have valid := symbol_validFor .colon .parameter input inputValid
+        rw [colonResult] at valid
+        exact valid
+    | ok colon afterColon =>
+        have colonValid := symbol_validFor .colon .parameter input inputValid
+        rw [colonResult] at colonValid
+        simp only
+        cases typeResult : typeExpr afterColon with
+        | invariant error =>
+            change (Reply.invariant error).ValidFor input
+              FunctionParameter.ValidFor
+            trivial
+        | reject failure rejected =>
+            change (Reply.reject failure rejected).ValidFor input
+              FunctionParameter.ValidFor
+            have valid := typeExpr_validFor afterColon colonValid.2.1
+            rw [typeResult] at valid
+            exact valid.of_file_eq colonValid.2.2
+        | ok type afterType =>
+            change (finishTypedParameter start comptimeMarker name type
+              afterType).ValidFor input FunctionParameter.ValidFor
+            have typeReply := typeExpr_validFor afterColon colonValid.2.1
+            rw [typeResult] at typeReply
+            have typeValid : TypeExpr.ValidFor input.file type := by
+              simpa [colonValid.2.2] using typeReply.1
+            rcases typeExpr_startsAtCurrentTokenOnSuccess afterColon type
+                afterType typeResult with ⟨typeToken, typeFound, typeStart⟩
+            have colonShape := symbol_ok_state_shape .colon .parameter
+              colonResult
+            have typeAtInput :
+                input.tokens[afterColon.cursor]? = some typeToken := by
+              simpa [colonShape.2] using
+                State.getElem?_eq_some_of_peek?_eq_some typeFound
+            have beforeType :=
+              inputValid.token_end_le_token_start_of_getElem?_lt firstFound
+                typeAtInput (Nat.lt_trans firstBefore (by
+                  simp [colonShape.2]))
+            have ordered : start.startByte ≤ type.span.endByte :=
+              Nat.le_trans startValid.2.1 (Nat.le_trans
+                (by simpa [firstSpan, typeStart] using beforeType)
+                typeValid.span_valid.2.1)
+            exact (finishTypedParameter_validFor start comptimeMarker name
+              type afterType typeReply.2.1
+              (by simpa [typeReply.2.2, colonValid.2.2] using
+                (SourceSpan.cover_validFor startValid typeValid.span_valid
+                  ordered))
+              (by simpa [typeReply.2.2, colonValid.2.2] using markerValid)
+              (by simpa [typeReply.2.2, colonValid.2.2] using nameValid)
+              (by simpa [typeReply.2.2, colonValid.2.2] using
+                typeValid)).of_file_eq
+                  (typeReply.2.2.trans colonValid.2.2)
+  · simp only [typed]
+    change (errorParameter errorSpan .namedParameterRequiresType input).ValidFor
+      input FunctionParameter.ValidFor
+    exact errorParameter_validFor errorSpan _ input inputValid errorSpanValid
 
 theorem finishTypedParameter_preservesTokenWindow (start : SourceSpan)
     (comptimeMarker : Option SourceSpan) (name : Identifier)
@@ -51,6 +237,27 @@ theorem errorParameter_preservesTokenWindow (span : SourceSpan)
   intro _
   exact Parser.pure_preservesTokenWindow _
 
+theorem namedParameterTail_preservesTokenWindow (start : SourceSpan)
+    (comptimeMarker : Option SourceSpan) (name : Identifier)
+    (errorSpan : SourceSpan) :
+    Parser.PreservesTokenWindow
+      (namedParameterTail start comptimeMarker name errorSpan) := by
+  unfold namedParameterTail
+  apply Parser.bind_preservesTokenWindow
+    getState_preservesTokenWindowForParameter
+  intro observed
+  by_cases typed : isSymbol observed .colon
+  · simp only [typed, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .colon .parameter)
+    intro _
+    apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
+    intro type
+    exact finishTypedParameter_preservesTokenWindow start
+      comptimeMarker name type
+  · simp only [typed]
+    exact errorParameter_preservesTokenWindow errorSpan _
+
 theorem ordinaryNamedParameter_preservesTokenWindow :
     Parser.PreservesTokenWindow ordinaryNamedParameter := by
   unfold ordinaryNamedParameter
@@ -62,33 +269,11 @@ theorem ordinaryNamedParameter_preservesTokenWindow :
     apply Parser.bind_preservesTokenWindow
       (emitDiagnostic_preservesTokenWindowForParameter _)
     intro _
-    apply Parser.bind_preservesTokenWindow
-      getState_preservesTokenWindowForParameter
-    intro observed
-    by_cases typed : isSymbol observed .colon
-    · simp only [typed, if_true]
-      apply Parser.bind_preservesTokenWindow
-        (symbol_preservesTokenWindow .colon .parameter)
-      intro _
-      apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
-      intro type
-      exact finishTypedParameter_preservesTokenWindow name.span none name type
-    · simp only [typed]
-      exact errorParameter_preservesTokenWindow name.span _
+    exact namedParameterTail_preservesTokenWindow
+      name.span none name name.span
   · simp only [warned]
-    apply Parser.bind_preservesTokenWindow
-      getState_preservesTokenWindowForParameter
-    intro observed
-    by_cases typed : isSymbol observed .colon
-    · simp only [typed, if_true]
-      apply Parser.bind_preservesTokenWindow
-        (symbol_preservesTokenWindow .colon .parameter)
-      intro _
-      apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
-      intro type
-      exact finishTypedParameter_preservesTokenWindow name.span none name type
-    · simp only [typed]
-      exact errorParameter_preservesTokenWindow name.span _
+    exact namedParameterTail_preservesTokenWindow
+      name.span none name name.span
 
 theorem comptimeNamedParameter_preservesTokenWindow :
     Parser.PreservesTokenWindow comptimeNamedParameter := by
@@ -99,21 +284,8 @@ theorem comptimeNamedParameter_preservesTokenWindow :
   apply Parser.bind_preservesTokenWindow
     (identifier_preservesTokenWindow .parameter)
   intro name
-  apply Parser.bind_preservesTokenWindow
-    getState_preservesTokenWindowForParameter
-  intro observed
-  by_cases typed : isSymbol observed .colon
-  · simp only [typed, if_true]
-    apply Parser.bind_preservesTokenWindow
-      (symbol_preservesTokenWindow .colon .parameter)
-    intro _
-    apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
-    intro type
-    exact finishTypedParameter_preservesTokenWindow marker.span
-      (some marker.span) name type
-  · simp only [typed]
-    exact errorParameter_preservesTokenWindow
-      (SourceSpan.cover marker.span name.span) _
+  exact namedParameterTail_preservesTokenWindow marker.span
+    (some marker.span) name (SourceSpan.cover marker.span name.span)
 
 theorem namedParameterCore_preservesTokenWindow :
     Parser.PreservesTokenWindow namedParameterCore := by
@@ -145,7 +317,7 @@ theorem recoverParameterAux_preservesTokenWindow
         | some pair =>
             rcases pair with ⟨token, afterToken⟩
             exact (inductionHypothesis token.span afterToken).trans (by
-              simp [advance?_state_shape advanced])
+              simp [(advance?_state_shape advanced).2])
 
 theorem recoverParameter_preservesTokenWindow :
     Parser.PreservesTokenWindow recoverParameter := by
@@ -157,7 +329,7 @@ theorem recoverParameter_preservesTokenWindow :
       rcases pair with ⟨token, afterToken⟩
       exact (recoverParameterAux_preservesTokenWindow token.span token.span
         (afterToken.remainingCount + 1) afterToken).trans (by
-          simp [advance?_state_shape advanced])
+          simp [(advance?_state_shape advanced).2])
 
 end FunctionParameterInternals
 
