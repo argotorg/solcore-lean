@@ -1,0 +1,16 @@
+import Solcore.Syntax.Parser.Yul.ControlSwitchStatementFuelTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserYulControlSwitchStatementFuelTotalityProperties
+
+open Solcore.Syntax
+open Solcore.Syntax.Parser
+
+example := @yulSwitchStatement_ordinary_of_statementFuel
+example := @yulSwitchStatement_ne_invariant_of_statementFuel
+example := @yulSwitchStatement_cursor_lt_onSuccess
+example := @yulSwitchStatement_fuelElementTotalityContract
+example := @yulSwitchStatement_fuelTotalityContract
+
+end Solcore.Test.SyntaxParserYulControlSwitchStatementFuelTotalityProperties
