@@ -54,5 +54,11 @@ example := @ExpressionAtomInternals.parenthesized_preservesTokensOnSuccess
 example := @ExpressionAtomInternals.parenthesized_cursorMonotoneOnSuccess
 example := @ExpressionAtomInternals.parenthesized_startsAtCurrentTokenOnSuccess
 example := @ExpressionAtomInternals.parenthesized_endsAtLastConsumedTokenOnSuccess
+example := @ExpressionAtomInternals.arrayLiteral_validFor
+example := @ExpressionAtomInternals.arrayLiteral_preservesTokenWindow
+example := @ExpressionAtomInternals.arrayLiteral_preservesTokensOnSuccess
+example := @ExpressionAtomInternals.arrayLiteral_cursorMonotoneOnSuccess
+example := @ExpressionAtomInternals.arrayLiteral_startsAtCurrentTokenOnSuccess
+example := @ExpressionAtomInternals.arrayLiteral_retainsDelimitedEndOnSuccess
 
 end Tests

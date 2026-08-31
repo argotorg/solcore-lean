@@ -133,6 +133,16 @@ def parenthesized (nested : Parser Expr) : Parser Expr := fun state =>
 
 end ExpressionAtomInternals
 
+namespace ExpressionAtomInternals
+
+/-- Parse a bracketed array literal. -/
+def arrayLiteral (nested : Parser Expr) : Parser Expr := do
+  let values ← delimitedNoTrailing .leftBracket .rightBracket true nested
+    .expression .expression
+  pure { span := values.span, value := .array values }
+
+end ExpressionAtomInternals
+
 private def lambdaExpression (block : Parser Block) : Parser Expr := do
   let marker ← keyword .lamKw .expression
   let parameters ← delimited .leftParen .rightParen true
@@ -163,11 +173,7 @@ private def expressionAtomCore (nested : Parser Expr)
   else if isSymbol state .leftParen then
     ExpressionAtomInternals.parenthesized nested state
   else if isSymbol state .leftBracket then
-    match delimitedNoTrailing .leftBracket .rightBracket true nested
-        .expression .expression state with
-    | .ok values next => .ok { span := values.span, value := .array values } next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    ExpressionAtomInternals.arrayLiteral nested state
   else if isKeyword state .lamKw then lambdaExpression block state
   else rejectAt state { head := .expression, tail := [] } .expression
 

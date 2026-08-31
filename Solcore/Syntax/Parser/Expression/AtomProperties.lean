@@ -1117,5 +1117,74 @@ theorem parenthesized_endsAtLastConsumedTokenOnSuccess
               · exact closeTuple_endsAtLastConsumedTokenOnSuccess
                   opening [first] parsed
 
+/-- Array literals retain their delimiters and every nested expression. -/
+theorem arrayLiteral_validFor (nested : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (arrayLiteral nested).ValidFor (Expr.ValidFor statementValid) := by
+  unfold arrayLiteral
+  apply Parser.bind_validFor_of_value
+    (delimitedNoTrailing_validFor (Expr.ValidFor statementValid)
+      .leftBracket .rightBracket true nested .expression .expression
+      nestedValid nestedPreserves)
+  intro values input inputValid valuesValid
+  exact ⟨Expr.ValidFor.array valuesValid.1 valuesValid.1 valuesValid.2,
+    inputValid, rfl⟩
+
+/-- Array-literal parsing preserves every ordinary token window. -/
+theorem arrayLiteral_preservesTokenWindow (nested : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (arrayLiteral nested) := by
+  have valuesWindow : Parser.PreservesTokenWindow
+      (delimitedNoTrailing .leftBracket .rightBracket true nested
+        .expression .expression) := by
+    exact delimitedWithPolicy_preservesTokenWindow .leftBracket .rightBracket
+      true false nested .expression .expression nestedPreserves
+  unfold arrayLiteral
+  apply Parser.bind_preservesTokenWindow valuesWindow
+  intro values
+  exact Parser.pure_preservesTokenWindow _
+
+theorem arrayLiteral_preservesTokensOnSuccess (nested : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokensOnSuccess (arrayLiteral nested) :=
+  (arrayLiteral_preservesTokenWindow nested
+    nestedPreserves).preservesTokensOnSuccess
+
+/-- Array-literal parsing never rewinds the parser cursor. -/
+theorem arrayLiteral_cursorMonotoneOnSuccess (nested : Parser Expr) :
+    Parser.CursorMonotoneOnSuccess (arrayLiteral nested) := by
+  unfold arrayLiteral
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (delimitedNoTrailing_cursorMonotoneOnSuccess .leftBracket .rightBracket
+      true nested .expression .expression)
+  intro values
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- An array literal starts at its current opening bracket. -/
+theorem arrayLiteral_startsAtCurrentTokenOnSuccess (nested : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (arrayLiteral nested) (fun expression => expression.span) := by
+  unfold arrayLiteral
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (delimitedNoTrailing_startsAtCurrentTokenOnSuccess .leftBracket
+      .rightBracket true nested .expression .expression)
+  intro values input expression final parsed
+  cases parsed
+  rfl
+
+/-- The array expression retains the complete delimited-list endpoint. -/
+theorem arrayLiteral_retainsDelimitedEndOnSuccess (nested : Parser Expr)
+    {input final : State} {expression : Expr}
+    (parsed : arrayLiteral nested input = .ok expression final) :
+    ∃ values, expression.value = .array values ∧
+      expression.span.endByte = values.span.endByte := by
+  unfold arrayLiteral at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨values, afterValues, _valuesResult, finished⟩
+  cases finished
+  exact ⟨values, rfl, rfl⟩
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser
