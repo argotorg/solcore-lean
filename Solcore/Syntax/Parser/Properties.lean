@@ -219,6 +219,66 @@ theorem parse_ok_lexed_provenance
           exact ⟨lexed, rfl, parsing,
             parseLexed_ok_retention file lexed parsedOutput parsing⟩
 
+/--
+A successful public parse exposes one preflight-valid lexer carrier together
+with all exact carriers retained by the parser output.
+-/
+theorem parse_ok_valid_lexed_provenance
+    (file : SourceFile) (output : ParseOutput)
+    (result : parse file = .ok output) :
+    ∃ lexed,
+      Lexer.lex file = .ok lexed ∧
+      parseLexed file lexed = .ok output ∧
+      lexed.ValidFor file ∧
+      output.tokens = lexed.tokens ∧
+      output.lexicalDiagnostics = lexed.diagnostics ∧
+      output.parsed.comments = lexed.comments := by
+  rcases parse_ok_lexed_provenance file output result with
+    ⟨lexed, lexing, parsing, tokens, diagnostics, comments⟩
+  exact ⟨lexed, lexing, parsing,
+    parseLexed_ok_input_validFor file lexed output parsing,
+    tokens, diagnostics, comments⟩
+
+/-- Every retained lexical carrier of a successful parse has valid provenance. -/
+theorem parse_ok_retained_spans_validFor
+    (file : SourceFile) (output : ParseOutput)
+    (result : parse file = .ok output) :
+    (∀ token ∈ output.tokens, token.span.ValidFor file) ∧
+      (∀ comment ∈ output.parsed.comments, comment.span.ValidFor file) ∧
+      (∀ diagnostic ∈ output.lexicalDiagnostics,
+        diagnostic.span.ValidFor file) := by
+  rcases parse_ok_valid_lexed_provenance file output result with
+    ⟨lexed, _lexing, _parsing, valid, tokens, diagnostics, comments⟩
+  refine ⟨?_, ?_, ?_⟩
+  · intro token member
+    exact valid.token_span (by simpa only [tokens] using member)
+  · intro comment member
+    exact valid.comment_span (by simpa only [comments] using member)
+  · intro diagnostic member
+    exact valid.diagnostic_span (by simpa only [diagnostics] using member)
+
+/-- Every output token of a successful public parse has a valid source span. -/
+theorem parse_ok_tokens_validFor
+    (file : SourceFile) (output : ParseOutput)
+    (result : parse file = .ok output) :
+    ∀ token ∈ output.tokens, token.span.ValidFor file :=
+  (parse_ok_retained_spans_validFor file output result).1
+
+/-- Every retained comment of a successful public parse has a valid span. -/
+theorem parse_ok_comments_validFor
+    (file : SourceFile) (output : ParseOutput)
+    (result : parse file = .ok output) :
+    ∀ comment ∈ output.parsed.comments, comment.span.ValidFor file :=
+  (parse_ok_retained_spans_validFor file output result).2.1
+
+/-- Every lexical diagnostic of a successful public parse has a valid span. -/
+theorem parse_ok_lexicalDiagnostics_validFor
+    (file : SourceFile) (output : ParseOutput)
+    (result : parse file = .ok output) :
+    ∀ diagnostic ∈ output.lexicalDiagnostics,
+      diagnostic.span.ValidFor file :=
+  (parse_ok_retained_spans_validFor file output result).2.2
+
 theorem parse_ok_source
     (file : SourceFile) (output : ParseOutput)
     (result : parse file = .ok output) :

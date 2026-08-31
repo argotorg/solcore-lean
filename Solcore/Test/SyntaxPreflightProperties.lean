@@ -57,4 +57,34 @@ example (file : SourceFile) (lexed : LexedFile) (output : ParseOutput)
     lexed.ValidFor file :=
   parseLexed_ok_input_validFor file lexed output parsed
 
+example (file : SourceFile) (output : ParseOutput)
+    (parsed : parse file = .ok output) :
+    ∃ lexed,
+      Lexer.lex file = .ok lexed ∧
+      parseLexed file lexed = .ok output ∧
+      lexed.ValidFor file ∧
+      output.tokens = lexed.tokens ∧
+      output.lexicalDiagnostics = lexed.diagnostics ∧
+      output.parsed.comments = lexed.comments :=
+  parse_ok_valid_lexed_provenance file output parsed
+
+example (file : SourceFile) (output : ParseOutput)
+    (parsed : parse file = .ok output)
+    (token : Token) (member : token ∈ output.tokens) :
+    token.span.ValidFor file :=
+  parse_ok_tokens_validFor file output parsed token member
+
+example (file : SourceFile) (output : ParseOutput)
+    (parsed : parse file = .ok output)
+    (comment : Comment) (member : comment ∈ output.parsed.comments) :
+    comment.span.ValidFor file :=
+  parse_ok_comments_validFor file output parsed comment member
+
+example (file : SourceFile) (output : ParseOutput)
+    (parsed : parse file = .ok output)
+    (diagnostic : LexicalDiagnostic)
+    (member : diagnostic ∈ output.lexicalDiagnostics) :
+    diagnostic.span.ValidFor file :=
+  parse_ok_lexicalDiagnostics_validFor file output parsed diagnostic member
+
 end Tests
