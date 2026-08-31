@@ -9,6 +9,81 @@ set_option autoImplicit false
 namespace Solcore.Syntax.Parser
 namespace ExpressionInternals
 
+namespace ConditionalHead
+
+/-- Every range retained by a pending conditional prefix belongs to one source. -/
+def ValidFor (statementValid : SourceFile → Statement → Prop)
+    (file : SourceFile) (head : ConditionalHead) : Prop :=
+  Expr.ValidFor statementValid file head.condition ∧
+    head.question.ValidFor file ∧
+    Expr.ValidFor statementValid file head.thenBranch ∧
+    head.colon.ValidFor file
+
+end ConditionalHead
+
+/-- Attaching one conditional prefix preserves the else branch's source end. -/
+theorem foldConditionalHead_preservesElseEnd
+    (elseBranch : Expr) (head : ConditionalHead) :
+    (foldConditionalHead elseBranch head).span.endByte =
+      elseBranch.span.endByte := by
+  rfl
+
+/-- Attaching a valid conditional prefix retains every recursive source range. -/
+theorem foldConditionalHead_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (file : SourceFile) (elseBranch : Expr) (head : ConditionalHead)
+    (headValid : head.ValidFor statementValid file)
+    (elseValid : Expr.ValidFor statementValid file elseBranch)
+    (ordered : head.condition.span.startByte ≤
+      elseBranch.span.endByte) :
+    Expr.ValidFor statementValid file
+      (foldConditionalHead elseBranch head) := by
+  rcases headValid with
+    ⟨conditionValid, questionValid, thenValid, colonValid⟩
+  have outerValid := SourceSpan.cover_validFor conditionValid.span_valid
+    elseValid.span_valid ordered
+  exact Expr.ValidFor.conditional outerValid conditionValid questionValid
+    thenValid colonValid elseValid
+
+/-- Folding pending prefixes preserves the final else branch's source end. -/
+theorem foldConditionalHeads_preservesBaseEnd
+    (heads : List ConditionalHead) (base : Expr) :
+    (heads.foldl foldConditionalHead base).span.endByte =
+      base.span.endByte := by
+  induction heads generalizing base with
+  | nil => rfl
+  | cons head rest inductionHypothesis =>
+      simpa only [List.foldl] using
+        (inductionHypothesis (foldConditionalHead base head)).trans
+          (foldConditionalHead_preservesElseEnd base head)
+
+/-- Folding valid pending prefixes retains every recursive source range. -/
+theorem foldConditionalHeads_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (file : SourceFile) (heads : List ConditionalHead) (base : Expr)
+    (headsValid : List.ValidFor
+      (ConditionalHead.ValidFor statementValid) file heads)
+    (baseValid : Expr.ValidFor statementValid file base)
+    (ordered : ∀ head ∈ heads,
+      head.condition.span.startByte ≤ base.span.endByte) :
+    Expr.ValidFor statementValid file
+      (heads.foldl foldConditionalHead base) := by
+  induction heads generalizing base with
+  | nil => simpa only [List.foldl] using baseValid
+  | cons head rest inductionHypothesis =>
+      have headValid := headsValid head (by simp)
+      have restValid : List.ValidFor
+          (ConditionalHead.ValidFor statementValid) file rest := by
+        intro retained member
+        exact headsValid retained (by simp [member])
+      have attachedValid := foldConditionalHead_validFor statementValid file
+        base head headValid baseValid (ordered head (by simp))
+      apply inductionHypothesis (foldConditionalHead base head) restValid
+        attachedValid
+      intro retained member
+      rw [foldConditionalHead_preservesElseEnd]
+      exact ordered retained (by simp [member])
+
 /-- Prefix unary scanning preserves operator spans and parser-state validity. -/
 theorem unaryOperators_validFor :
     ∀ fuel operatorsRev input,

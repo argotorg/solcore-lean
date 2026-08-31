@@ -166,21 +166,28 @@ def nonAssociative (operand : Parser Expr)
 
 end ExpressionInternals
 
-private structure ConditionalHead where
+namespace ExpressionInternals
+
+/-- One parsed `condition ? then :` prefix awaiting its else branch. -/
+structure ConditionalHead where
   condition : Expr
   question : SourceSpan
   thenBranch : Expr
   colon : SourceSpan
 
-private def foldConditionalHead (elseBranch : Expr)
+/-- Attach an else branch to one previously parsed conditional prefix. -/
+def foldConditionalHead (elseBranch : Expr)
     (head : ConditionalHead) : Expr := {
   span := SourceSpan.cover head.condition.span elseBranch.span
   value := .conditional head.condition head.question
     head.thenBranch head.colon elseBranch
 }
 
+end ExpressionInternals
+
 private def conditionalTail (nested alternative : Parser Expr) :
-    Nat → List ConditionalHead → Expr → State → Reply Expr
+    Nat → List ExpressionInternals.ConditionalHead →
+      Expr → State → Reply Expr
   | 0, _, _, state => .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1, headsRev, condition, state =>
       if isSymbol state .question then
@@ -207,7 +214,8 @@ private def conditionalTail (nested alternative : Parser Expr) :
         | .reject failure failed => .reject failure failed
         | .invariant error => .invariant error
       else
-        .ok (headsRev.foldl foldConditionalHead condition) state
+        .ok (headsRev.foldl ExpressionInternals.foldConditionalHead condition)
+          state
 
 private def conditional (nested alternative : Parser Expr) : Parser Expr :=
     fun state =>
