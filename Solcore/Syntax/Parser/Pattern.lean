@@ -15,6 +15,22 @@ def wildcardPattern : Parser Pattern := do
     value := .wildcard marker.span
   }
 
+/-- Parse one canonical literal pattern leaf. -/
+def literalPattern : Parser Pattern := do
+  let literal ← coreLiteral
+  pure {
+    span := literal.span
+    value := .literal literal
+  }
+
+/-- Parse `true` or `false` as a binder-shaped builtin pattern. -/
+def booleanBinderPattern : Parser Pattern := do
+  let name ← booleanIdentifier
+  pure {
+    span := name.span
+    value := .binder name
+  }
+
 end PatternInternals
 
 private def patternName : Parser Identifier := fun state =>
@@ -147,18 +163,9 @@ private def patternCore (nested : Parser Pattern)
   if isSymbol state .underscore then
     PatternInternals.wildcardPattern state
   else if isCoreLiteral state then
-    match coreLiteral state with
-    | .ok literal next => .ok {
-        span := literal.span
-        value := .literal literal
-      } next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    PatternInternals.literalPattern state
   else if isBooleanValue state then
-    match booleanIdentifier state with
-    | .ok name next => .ok { span := name.span, value := .binder name } next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    PatternInternals.booleanBinderPattern state
   else if isSymbol state .leftParen then parenthesizedPattern nested state
   else if isSymbol state .dot then dotConstructorPattern nested state
   else if isContextual state .comptime then

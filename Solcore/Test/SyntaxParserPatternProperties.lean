@@ -30,4 +30,15 @@ example : Parser.StartsAtCurrentTokenOnSuccess
     PatternInternals.wildcardPattern (·.span) :=
   PatternInternals.wildcardPattern_startsAtCurrentTokenOnSuccess
 
+example := PatternInternals.literalPattern_validFor
+example := PatternInternals.literalPattern_preservesTokenWindow
+example := PatternInternals.literalPattern_preservesTokensOnSuccess
+example := PatternInternals.literalPattern_cursorMonotoneOnSuccess
+example := PatternInternals.literalPattern_startsAtCurrentTokenOnSuccess
+example := PatternInternals.booleanBinderPattern_validFor
+example := PatternInternals.booleanBinderPattern_preservesTokenWindow
+example := PatternInternals.booleanBinderPattern_preservesTokensOnSuccess
+example := PatternInternals.booleanBinderPattern_cursorMonotoneOnSuccess
+example := PatternInternals.booleanBinderPattern_startsAtCurrentTokenOnSuccess
+
 end Tests
