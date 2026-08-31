@@ -321,7 +321,10 @@ def returnClause : Parser (Option ReturnClause) := do
   else
     pure none
 
-private def signatureEnd (parameters : DelimitedList FunctionParameter)
+namespace SignatureInternals
+
+/-- Select the last source span retained by a function signature. -/
+def signatureEnd (parameters : DelimitedList FunctionParameter)
     (modifiers : FunctionModifiers) (returnsClause : Option ReturnClause)
     (whereClause : Option WhereClause) : SourceSpan :=
   match whereClause with
@@ -333,6 +336,65 @@ private def signatureEnd (parameters : DelimitedList FunctionParameter)
       | none => match modifiers.publicMarker with
         | some span => span
         | none => parameters.span
+
+@[simp] theorem signatureEnd_where (parameters)
+    (modifiers : FunctionModifiers) (returnsClause : Option ReturnClause)
+    (clause : WhereClause) :
+    signatureEnd parameters modifiers returnsClause (some clause) = clause.span :=
+  rfl
+
+@[simp] theorem signatureEnd_returns (parameters)
+    (modifiers : FunctionModifiers) (clause : ReturnClause) :
+    signatureEnd parameters modifiers (some clause) none = clause.span :=
+  rfl
+
+@[simp] theorem signatureEnd_payable (parameters)
+    (publicMarker : Option SourceSpan) (span : SourceSpan) :
+    signatureEnd parameters { publicMarker, payableMarker := some span }
+      none none = span :=
+  rfl
+
+@[simp] theorem signatureEnd_public (parameters) (span : SourceSpan) :
+    signatureEnd parameters { publicMarker := some span, payableMarker := none }
+      none none = span :=
+  rfl
+
+@[simp] theorem signatureEnd_parameters (parameters) :
+    signatureEnd parameters { publicMarker := none, payableMarker := none }
+      none none = parameters.span :=
+  rfl
+
+/-- The selected endpoint is valid whenever every possible endpoint is valid. -/
+theorem signatureEnd_validFor {file : SourceFile}
+    {parameters : DelimitedList FunctionParameter}
+    {modifiers : FunctionModifiers} {returnsClause : Option ReturnClause}
+    {whereClause : Option WhereClause}
+    (parametersValid : parameters.span.ValidFor file)
+    (modifiersValid : FunctionModifiers.ValidFor file modifiers)
+    (returnsValid : Option.ValidFor ReturnClause.ValidFor file returnsClause)
+    (whereValid : Option.ValidFor WhereClause.ValidFor file whereClause) :
+    (signatureEnd parameters modifiers returnsClause whereClause).ValidFor file := by
+  cases whereClause with
+  | some clause =>
+      simpa [Option.ValidFor] using whereValid.1
+  | none =>
+      cases returnsClause with
+      | some clause =>
+          simpa [Option.ValidFor] using returnsValid.1
+      | none =>
+          cases payable : modifiers.payableMarker with
+          | some span =>
+              have valid := modifiersValid.2 span (by simp [payable])
+              simpa [signatureEnd, payable] using valid
+          | none =>
+              cases publicEq : modifiers.publicMarker with
+              | some span =>
+                  have valid := modifiersValid.1 span (by simp [publicEq])
+                  simpa [signatureEnd, payable, publicEq] using valid
+              | none =>
+                  simpa [signatureEnd, payable, publicEq] using parametersValid
+
+end SignatureInternals
 
 /-- Parse a complete named-function signature, excluding its body. -/
 def functionSignature
@@ -346,7 +408,8 @@ def functionSignature
   let whereClause ← whereClause
   pure {
     span := SourceSpan.cover functionToken.span
-      (signatureEnd parameters modifiers returnsClause whereClause)
+      (SignatureInternals.signatureEnd parameters modifiers returnsClause
+        whereClause)
     name
     genericParameters
     parameters
