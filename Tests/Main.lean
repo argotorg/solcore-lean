@@ -23,6 +23,7 @@ import Solcore.Test.SyntaxParserStatements
 import Solcore.Test.SyntaxParserTerms
 import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTypes
+import Solcore.Test.SyntaxParserUpstreamFixtures
 import Solcore.Test.SyntaxParserYul
 import Solcore.Test.SyntaxParserYulChoiceRecovery
 import Solcore.Surface.Multi.Grammar
@@ -5079,6 +5080,7 @@ def run : IO Unit := do
   testSyntaxParserStatements
   testSyntaxParserTerms
   testSyntaxParserTrivia
+  testSyntaxParserUpstreamFixtures
   testProfile
   testFeatureMatrix
   testAbiKeccak256
