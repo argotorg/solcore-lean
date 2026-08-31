@@ -25,8 +25,11 @@ Oracle v5. Their closed wire catalogs and strict Lean codecs are the current
 normative format definitions. Producing additional schema files is a packaging
 task, not missing executable behavior.
 
-The Surface v1 parser remains supported through Oracle v4. New grammar and
-parser-proof work is paused because Solcore syntax may change substantially.
+Canonical Solcore syntax is now being implemented as a fresh `Solcore.Syntax`
+layer under ADR-0153. It targets `solcore-rs` PR #20 at commit
+`18fd9f75d290df0070e21ee56e0a5691f232596f` and does not reuse the Surface v1
+or Multi AST and parser definitions. Oracle v4 remains available only as a
+frozen historical compatibility interface.
 
 ## What works now
 
@@ -130,7 +133,7 @@ requests.
 | Oracle v1 | Legacy general envelope and capability discovery | Frozen compatibility interface |
 | Oracle v2 | Semantic Core v1 checking and evaluation | Frozen |
 | Oracle v3 | Semantic Core v2 checking and evaluation | Frozen and supported |
-| Oracle v4 | Surface v1 restricted single-file parsing | Frozen and supported |
+| Oracle v4 | Surface v1 restricted single-file parsing | Frozen historical compatibility interface |
 | Oracle v5 | Core v3 checking and checked-contract execution | Implemented and public |
 
 Oracle v5 publishes three queries:
@@ -159,16 +162,17 @@ strict decoders. They reject unknown or duplicate fields, query/verdict
 mismatches, invalid catalog entries, and rollback observations that claim
 committed effects.
 
-## Parser status
+## Canonical syntax status
 
-Surface v1 and Oracle v4 remain available exactly as published. They cover a
-restricted single-file grammar and return a syntax tree with source spans.
-They do not resolve imports or names, type-check source programs, elaborate
-source into Semantic Core, or execute contracts.
+Source identities, UTF-8 byte spans, the complete token catalog, the
+source-preserving parsed AST, exact Unicode identifier classification, and
+lexer foundations are implemented under `Solcore.Syntax`.
 
-Grammar extensions and new parser-specific proofs are paused. Once syntax is
-stable, frontend work can resume as a versioned adapter into checked Core; v4
-will remain frozen rather than silently changing meaning.
+The complete lexer, parser, canonical fixture corpus, and public source
+interface remain under implementation. Resolution, source type checking, and
+elaboration into checked Semantic Core follow executable parsing. No new
+frontend result is published through Oracle v4; that interface continues to
+mean only its frozen Surface v1 format.
 
 ## What is not yet claimed
 
