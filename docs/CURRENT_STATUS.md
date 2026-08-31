@@ -193,11 +193,13 @@ exact retention of the lexer carriers. Successful parser preflight proves that
 tokens and comments are nonempty, source ordered, nonoverlapping, and valid at
 UTF-8 boundaries, and that every retained lexical diagnostic has a valid span.
 Those guarantees are exposed directly for successful public parser results.
-The lexer proof layer now connects exact character-prefix consumption to
-UTF-8-valid spans for comments, meta forms, strings, and identifiers. Parser
-state and primitive token consumers preserve valid spans and file ownership,
-and diagnostic filtering can only remove diagnostics and preserves span
-validity.
+The lexer proof layer now connects exact character-prefix consumption to all
+canonical step branches. Every step preserves source ownership and UTF-8-valid
+carrier spans, and those guarantees lift to every successful public lexer
+result. Parser state and primitive token consumers preserve valid spans and
+file ownership; cursor and lookahead laws also expose the source order between
+consumed and remaining tokens. Diagnostic filtering can only remove
+diagnostics and preserves span validity.
 
 Deep AST-span validity, validity of every parser-generated diagnostic,
 unreachability of the lexer/parser invariant branches, public resource bounds,

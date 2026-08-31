@@ -56,11 +56,13 @@ behavior.
 
 Source and full-file-span provenance, exact lexer-carrier retention, public
 token/comment/lexical-diagnostic span validity, and token/comment source order
-are complete. Exact-prefix scanner proofs cover comments, meta forms, strings,
-and identifiers. Parser state and primitive consumers preserve span validity
-and source ownership. The remaining proof boundary is deep AST-span validity,
-parser-generated diagnostic validity, invariant-branch unreachability, public
-resource bounds, and parser success soundness against a declarative grammar.
+are complete. Exact-prefix scanner proofs feed a preservation theorem for every
+lexer step, and successful public lexer results expose valid spans for all
+tokens, comments, and lexical diagnostics. Parser state, cursor/lookahead laws,
+and primitive consumers preserve span validity, source ownership, and token
+order. The remaining proof boundary is deep AST-span validity, parser-generated
+diagnostic validity, invariant-branch unreachability, public resource bounds,
+and parser success soundness against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the
