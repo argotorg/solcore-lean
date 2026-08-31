@@ -172,7 +172,9 @@ private def forLetItem (expression : Parser Expr) : Parser ForItem := do
     value := .letDecl name type initializer
   }
 
-private def forAssignmentOrExpression
+namespace StatementSimpleInternals
+
+def forAssignmentOrExpression
     (expression : Parser Expr) : Parser ForItem := do
   let left ← expression
   let tail ← StatementSimpleInternals.optionalAssignmentTail expression
@@ -187,9 +189,11 @@ private def forAssignmentOrExpression
     }
   | none => pure { span := left.span, value := .expression left }
 
+end StatementSimpleInternals
+
 /-- Restricted item accepted in one canonical `for` header list. -/
 def forItem (expression : Parser Expr) : Parser ForItem := fun state =>
   if isKeyword state .letKw then forLetItem expression state
-  else forAssignmentOrExpression expression state
+  else StatementSimpleInternals.forAssignmentOrExpression expression state
 
 end Solcore.Syntax.Parser

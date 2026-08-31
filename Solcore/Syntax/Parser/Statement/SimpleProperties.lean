@@ -756,6 +756,171 @@ theorem optionalLetInitializer_cursorMonotoneOnSuccess
   · simp only [present]
     exact Parser.pure_cursorMonotoneOnSuccess none
 
+/-- For-header assignment/expression items preserve nested token windows. -/
+theorem forAssignmentOrExpression_preservesTokenWindow
+    (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow
+      (forAssignmentOrExpression expression) := by
+  unfold forAssignmentOrExpression
+  apply Parser.bind_preservesTokenWindow expressionWindow
+  intro left
+  apply Parser.bind_preservesTokenWindow
+    (optionalAssignmentTail_preservesTokenWindow expression expressionWindow)
+  intro tail
+  cases tail with
+  | none => exact Parser.pure_preservesTokenWindow _
+  | some tail =>
+      cases tail <;> exact Parser.pure_preservesTokenWindow _
+
+theorem forAssignmentOrExpression_preservesTokensOnSuccess
+    (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess
+      (forAssignmentOrExpression expression) :=
+  (forAssignmentOrExpression_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- For-header assignment/expression items never rewind the token cursor. -/
+theorem forAssignmentOrExpression_cursorMonotoneOnSuccess
+    (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess
+      (forAssignmentOrExpression expression) := by
+  unfold forAssignmentOrExpression
+  apply Parser.bind_cursorMonotoneOnSuccess expressionCursor
+  intro left
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (optionalAssignmentTail_cursorMonotoneOnSuccess expression
+      expressionCursor)
+  intro tail
+  cases tail with
+  | none => exact Parser.pure_cursorMonotoneOnSuccess _
+  | some tail =>
+      cases tail <;> exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A for-header assignment/expression item starts at its left expression. -/
+theorem forAssignmentOrExpression_startsAtCurrentTokenOnSuccess
+    (expression : Parser Expr)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span)) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (forAssignmentOrExpression expression) (·.span) := by
+  unfold forAssignmentOrExpression
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first expressionStarts
+  intro left input item final parsed
+  rcases simpleBind_ok_components parsed with
+    ⟨tail, afterTail, _tailResult, finished⟩
+  cases tail with
+  | none => cases finished; rfl
+  | some tail => cases tail <;> cases finished <;> rfl
+
+/-- For-header assignment/expression items retain every nested source range. -/
+theorem forAssignmentOrExpression_validFor
+    (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (expressionCursorLt : ∀ {input next : State} {value : Expr},
+      expression input = .ok value next → input.cursor < next.cursor)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span)) :
+    (forAssignmentOrExpression expression).ValidFor
+      (ForItem.ValidFor expressionValueValid) := by
+  have weak : (forAssignmentOrExpression expression).ValidFor
+      (fun _ _ => True) := by
+    unfold forAssignmentOrExpression
+    apply Parser.bind_validFor expressionValid
+    intro left
+    apply Parser.bind_validFor
+      (optionalAssignmentTail_validFor expression expressionValueValid
+        expressionValid)
+    intro tail
+    cases tail with
+    | none => exact Parser.pure_validFor _ _ (fun _ => trivial)
+    | some tail =>
+        cases tail <;> exact Parser.pure_validFor _ _ (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : forAssignmentOrExpression expression input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok item final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold forAssignmentOrExpression at stages
+      rcases simpleBind_ok_components stages with
+        ⟨left, afterLeft, leftResult, rest⟩
+      rcases simpleBind_ok_components rest with
+        ⟨tail, afterTail, tailResult, finished⟩
+      have leftContract := expressionValid input inputValid
+      rw [leftResult] at leftContract
+      have tailContract := optionalAssignmentTail_validFor expression
+        expressionValueValid expressionValid afterLeft leftContract.2.1
+      rw [tailResult] at tailContract
+      have leftSpanValid := expressionSpan input.file left leftContract.1
+      have tailValidInput : Option.ValidFor
+          (AssignmentTail.ValidFor expressionValueValid) input.file tail := by
+        simpa [leftContract.2.2] using tailContract.1
+      cases tail with
+      | none =>
+          cases finished
+          exact ⟨ForItem.ValidFor.expression leftSpanValid leftContract.1,
+            weakResult.2.1, weakResult.2.2⟩
+      | some assignment =>
+          have assignmentValid : AssignmentTail.ValidFor expressionValueValid
+              input.file assignment := by
+            simpa only [Option.ValidFor] using tailValidInput
+          have endpointValid := assignmentEnd_validFor expressionValueValid
+            expressionSpan assignmentValid
+          rcases expressionStarts input left afterLeft leftResult with
+            ⟨firstToken, firstFound, firstStart⟩
+          have firstAt := State.getElem?_eq_some_of_peek?_eq_some firstFound
+          have firstSpanValid := inputValid.peek?_span_validFor firstFound
+          have leftWindow := expressionWindow input
+          rw [leftResult] at leftWindow
+          rcases optionalAssignmentTail_some_startsAtCurrentTokenOnSuccess
+            expression tailResult with
+            ⟨operatorToken, operatorFound, operatorStart⟩
+          have operatorAt : input.tokens[afterLeft.cursor]? =
+              some operatorToken := by
+            simpa [leftWindow.1] using
+              State.getElem?_eq_some_of_peek?_eq_some operatorFound
+          have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+            firstAt operatorAt (expressionCursorLt leftResult)
+          have beforeOperator : left.span.startByte ≤
+              assignment.startSpan.startByte :=
+            Nat.le_trans (by simpa [firstStart] using firstSpanValid.2.1)
+              (by simpa [operatorStart] using separated)
+          have assignmentResult : assignmentTail expression afterLeft =
+              .ok assignment afterTail := by
+            unfold optionalAssignmentTail at tailResult
+            split at tailResult
+            · rcases simpleBind_ok_components tailResult with
+                ⟨parsedTail, next, parsedTailResult, completed⟩
+              cases completed
+              exact parsedTailResult
+            · cases tailResult
+          have endpointOrder := assignmentTail_start_le_endOnSuccess expression
+            expressionValueValid expressionValid expressionSpan
+              expressionStarts leftContract.2.1 assignmentResult
+          have outerValid := SourceSpan.cover_validFor leftSpanValid
+            endpointValid (Nat.le_trans beforeOperator endpointOrder)
+          cases assignment with
+          | value operator right =>
+              cases finished
+              exact ⟨ForItem.ValidFor.assignValue outerValid leftContract.1
+                assignmentValid.1 assignmentValid.2,
+                weakResult.2.1, weakResult.2.2⟩
+          | bitNot operator =>
+              cases finished
+              exact ⟨ForItem.ValidFor.assignBitNot outerValid leftContract.1
+                assignmentValid, weakResult.2.1, weakResult.2.2⟩
+
 end StatementSimpleInternals
 
 /-- Let statements preserve nested expression token windows. -/
