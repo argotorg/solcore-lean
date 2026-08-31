@@ -5,6 +5,18 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+namespace PatternInternals
+
+/-- Parse the canonical wildcard pattern leaf. -/
+def wildcardPattern : Parser Pattern := do
+  let marker ← symbol .underscore .pattern
+  pure {
+    span := marker.span
+    value := .wildcard marker.span
+  }
+
+end PatternInternals
+
 private def patternName : Parser Identifier := fun state =>
   if isBooleanValue state then booleanIdentifier state
   else identifier .pattern state
@@ -133,13 +145,7 @@ private def qualifiedPattern (nested : Parser Pattern) : Parser Pattern := do
 private def patternCore (nested : Parser Pattern)
     (expression : Parser Expr) : Parser Pattern := fun state =>
   if isSymbol state .underscore then
-    match symbol .underscore .pattern state with
-    | .ok marker next => .ok {
-        span := marker.span
-        value := .wildcard marker.span
-      } next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    PatternInternals.wildcardPattern state
   else if isCoreLiteral state then
     match coreLiteral state with
     | .ok literal next => .ok {

@@ -39,6 +39,7 @@ import Solcore.Test.SyntaxParserModulePathProperties
 import Solcore.Test.SyntaxParserModules
 import Solcore.Test.SyntaxParserNameProperties
 import Solcore.Test.SyntaxParserOperatorProperties
+import Solcore.Test.SyntaxParserPatternProperties
 import Solcore.Test.SyntaxParserPragmaProperties
 import Solcore.Test.SyntaxParserPrimitiveProperties
 import Solcore.Test.SyntaxParserPrimitiveCarrierProperties
