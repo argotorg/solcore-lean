@@ -719,20 +719,70 @@ theorem parseTupleType_startsAtCurrentTokenOnSuccess
     cases parsed
     rfl
 
-private def parseFunctionType (nested : Parser TypeExpr) : Parser TypeExpr := do
-  let functionKeyword ← keyword .functionKw .typeExpr
-  let parameters ← delimited .leftParen .rightParen true nested
-    .typeExpr .typeExpr
+private def parseFunctionReturns (nested : Parser TypeExpr) : Parser (Option (DelimitedList TypeExpr)) := do
   let state ← getState
-  let returns ←
-    if isContextual state .returns then
-      do
-        let _ ← contextual .returns .typeExpr
-        let values ← delimited .leftParen .rightParen true nested
-          .typeExpr .typeExpr
-        pure (some values)
-    else
-      pure none
+  if isContextual state .returns then
+    let _ ← contextual .returns .typeExpr
+    let values ← delimited .leftParen .rightParen true nested .typeExpr .typeExpr
+    pure (some values)
+  else
+    pure none
+
+private theorem parseFunctionReturns_preservesTokensOnSuccess (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) : Parser.PreservesTokensOnSuccess
+      (parseFunctionReturns nested) := by
+  unfold parseFunctionReturns
+  apply Parser.bind_preservesTokensOnSuccess getState_preservesTokensOnSuccess
+  intro state
+  by_cases hasReturns : isContextual state .returns
+  · simp only [hasReturns, if_true]
+    apply Parser.bind_preservesTokensOnSuccess (contextual_preservesTokensOnSuccess .returns .typeExpr)
+    intro returnsKeyword
+    apply Parser.bind_preservesTokensOnSuccess (delimited_preservesTokensOnSuccess
+      .leftParen .rightParen true nested .typeExpr .typeExpr nestedPreserves)
+    intro values
+    exact Parser.pure_preservesTokensOnSuccess _
+  · simp only [hasReturns]
+    exact Parser.pure_preservesTokensOnSuccess none
+
+private theorem parseFunctionReturns_cursorMonotoneOnSuccess (nested : Parser TypeExpr) : Parser.CursorMonotoneOnSuccess (parseFunctionReturns nested) := by
+  unfold parseFunctionReturns
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro state
+  by_cases hasReturns : isContextual state .returns
+  · simp only [hasReturns, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess (contextual_cursorMonotoneOnSuccess .returns .typeExpr)
+    intro returnsKeyword
+    apply Parser.bind_cursorMonotoneOnSuccess (delimited_cursorMonotoneOnSuccess
+      .leftParen .rightParen true nested .typeExpr .typeExpr)
+    intro values
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [hasReturns]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
+private theorem parseFunctionReturns_validFor (nested : Parser TypeExpr)
+    (nestedValid : nested.ValidFor TypeExpr.ValidFor) (nestedPreserves : Parser.PreservesTokensOnSuccess nested) : (parseFunctionReturns nested).ValidFor
+      (Option.ValidFor (DelimitedList.ValidFor TypeExpr.ValidFor)) := by
+  unfold parseFunctionReturns
+  apply Parser.bind_validFor getState_validFor
+  intro state
+  by_cases hasReturns : isContextual state .returns
+  · simp only [hasReturns, if_true]
+    apply Parser.bind_validFor (contextual_validFor .returns .typeExpr)
+    intro returnsKeyword
+    apply Parser.bind_validFor_of_value (delimited_validFor TypeExpr.ValidFor
+      .leftParen .rightParen true nested .typeExpr .typeExpr nestedValid nestedPreserves)
+    intro values input inputValid valuesValid
+    exact ⟨by simpa only [Option.ValidFor] using valuesValid,
+      inputValid, rfl⟩
+  · simp only [hasReturns]
+    exact Parser.pure_validFor none (Option.ValidFor (DelimitedList.ValidFor TypeExpr.ValidFor)) (fun _ => trivial)
+
+/-- Parse a function type, including its optional `returns` type list. -/
+def parseFunctionType (nested : Parser TypeExpr) : Parser TypeExpr := do
+  let functionKeyword ← keyword .functionKw .typeExpr
+  let parameters ← delimited .leftParen .rightParen true nested .typeExpr .typeExpr
+  let returns ← parseFunctionReturns nested
   let endSpan := match returns with
     | some values => values.span
     | none => parameters.span
@@ -740,6 +790,213 @@ private def parseFunctionType (nested : Parser TypeExpr) : Parser TypeExpr := do
     span := SourceSpan.cover functionKeyword.span endSpan
     value := .function functionKeyword.span parameters returns
   }
+
+/-- Function-type parsing retains valid keyword, parameter, and result ranges. -/
+theorem parseFunctionType_validFor (nested : Parser TypeExpr)
+    (nestedValid : nested.ValidFor TypeExpr.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (parseFunctionType nested).ValidFor TypeExpr.ValidFor := by
+  have weak : (parseFunctionType nested).ValidFor (fun _ _ => True) := by
+    unfold parseFunctionType
+    apply Parser.bind_validFor (keyword_validFor .functionKw .typeExpr)
+    intro functionKeyword
+    apply Parser.bind_validFor
+      (delimited_validFor TypeExpr.ValidFor .leftParen .rightParen true
+        nested .typeExpr .typeExpr nestedValid nestedPreserves)
+    intro parameters
+    apply Parser.bind_validFor (parseFunctionReturns_validFor nested nestedValid nestedPreserves)
+    intro returns
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : parseFunctionType nested input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok result final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold parseFunctionType at stages
+      rcases bind_ok_components stages with
+        ⟨functionKeyword, afterKeyword, keywordResult, rest⟩
+      rcases bind_ok_components rest with ⟨parameters, afterParameters,
+        parametersResult, rest⟩
+      rcases bind_ok_components rest with
+        ⟨returns, afterReturns, returnsResult, finished⟩
+      cases finished
+      have keywordValid := keyword_validFor .functionKw .typeExpr input inputValid
+      rw [keywordResult] at keywordValid
+      have parametersValid := delimited_validFor TypeExpr.ValidFor
+        .leftParen .rightParen true nested .typeExpr .typeExpr
+        nestedValid nestedPreserves afterKeyword keywordValid.2.1
+      rw [parametersResult] at parametersValid
+      have returnsValid := parseFunctionReturns_validFor nested nestedValid
+        nestedPreserves afterParameters parametersValid.2.1
+      rw [returnsResult] at returnsValid
+      have keywordSpanValid : functionKeyword.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using keywordValid.1
+      have parametersValidInput : DelimitedList.ValidFor TypeExpr.ValidFor
+          input.file parameters := by
+        simpa only [keywordValid.2.2] using parametersValid.1
+      have keywordShape := acceptToken_ok_state_shape (.keyword .functionKw) .typeExpr
+        (· == .keyword .functionKw) keywordResult
+      have keywordAdvanced : input.advance? = some (functionKeyword, afterKeyword) := by
+        unfold State.advance?
+        rw [keywordShape.1, keywordShape.2]
+        rfl
+      cases returns with
+      | none =>
+          rcases delimited_startsAtCurrentTokenOnSuccess .leftParen .rightParen
+              true nested .typeExpr .typeExpr afterKeyword parameters
+              afterParameters parametersResult with
+            ⟨opening, openingFound, openingStart⟩
+          have keywordBeforeParameters : functionKeyword.span.endByte ≤
+              parameters.span.startByte := by
+            rw [← openingStart]
+            exact inputValid.consumed_end_le_peek_start_after_advance
+              keywordAdvanced openingFound
+          have outerOrdered : functionKeyword.span.startByte ≤
+              parameters.span.endByte :=
+            Nat.le_trans keywordSpanValid.2.1
+              (Nat.le_trans keywordBeforeParameters
+                parametersValidInput.1.2.1)
+          exact ⟨.functionWithoutReturns
+              (SourceSpan.cover_validFor keywordSpanValid
+                parametersValidInput.1 outerOrdered)
+              keywordSpanValid parametersValidInput.1
+              parametersValidInput.2,
+            weakResult.2.1, weakResult.2.2⟩
+      | some values =>
+          have returnsValidInput : DelimitedList.ValidFor TypeExpr.ValidFor
+              input.file values := by
+            simpa only [Option.ValidFor, parametersValid.2.2,
+              keywordValid.2.2] using returnsValid.1
+          have returnsStages := returnsResult
+          unfold parseFunctionReturns at returnsStages
+          rcases bind_ok_components returnsStages with
+            ⟨observed, afterObserved, observedResult, returnsRest⟩
+          unfold getState at observedResult
+          cases observedResult
+          by_cases hasReturns : isContextual afterParameters .returns
+          · simp only [hasReturns, if_true] at returnsRest
+            rcases bind_ok_components returnsRest with
+              ⟨returnsKeyword, afterReturnsKeyword,
+                returnsKeywordResult, valuesRest⟩
+            rcases bind_ok_components valuesRest with
+              ⟨parsedValues, afterValues, valuesResult, returnsFinished⟩
+            cases returnsFinished
+            have returnsKeywordValid := contextual_validFor .returns .typeExpr
+              afterParameters parametersValid.2.1
+            rw [returnsKeywordResult] at returnsKeywordValid
+            rcases delimited_startsAtCurrentTokenOnSuccess .leftParen
+                .rightParen true nested .typeExpr .typeExpr
+                afterReturnsKeyword values final valuesResult with
+              ⟨opening, openingFound, openingStart⟩
+            have keywordFound :=
+              State.getElem?_eq_some_of_peek?_eq_some keywordShape.1
+            have openingAtReturns :=
+              State.getElem?_eq_some_of_peek?_eq_some openingFound
+            have keywordTokens := keyword_preservesTokensOnSuccess
+              .functionKw .typeExpr input functionKeyword afterKeyword
+              keywordResult
+            have parameterTokens := delimited_preservesTokensOnSuccess
+              .leftParen .rightParen true nested .typeExpr .typeExpr
+              nestedPreserves afterKeyword parameters afterParameters
+              parametersResult
+            have returnsKeywordTokens :=
+              contextual_preservesTokensOnSuccess .returns .typeExpr
+                afterParameters returnsKeyword afterReturnsKeyword
+                returnsKeywordResult
+            have keywordAtReturns : afterReturnsKeyword.tokens[input.cursor]? =
+                some functionKeyword := by
+              rw [returnsKeywordTokens, parameterTokens, keywordTokens]
+              exact keywordFound
+            have keywordProgress := acceptToken_cursor_lt_onSuccess
+              (.keyword .functionKw) .typeExpr
+              (· == .keyword .functionKw) keywordResult
+            have parametersMonotone :=
+              delimited_cursorMonotoneOnSuccess .leftParen .rightParen true
+                nested .typeExpr .typeExpr afterKeyword parameters
+                afterParameters parametersResult
+            have returnsKeywordProgress := acceptToken_cursor_lt_onSuccess
+              (.contextual .returns) .typeExpr (·.isContextual .returns)
+              returnsKeywordResult
+            have cursorOrder : input.cursor < afterReturnsKeyword.cursor :=
+              Nat.lt_trans
+                (Nat.lt_of_lt_of_le keywordProgress parametersMonotone)
+                returnsKeywordProgress
+            have keywordBeforeOpening :=
+              returnsKeywordValid.2.1.token_end_le_token_start_of_getElem?_lt
+                keywordAtReturns openingAtReturns cursorOrder
+            have keywordBeforeReturns : functionKeyword.span.endByte ≤
+                values.span.startByte := by
+              rw [← openingStart]
+              exact keywordBeforeOpening
+            have outerOrdered : functionKeyword.span.startByte ≤
+                values.span.endByte :=
+              Nat.le_trans keywordSpanValid.2.1
+                (Nat.le_trans keywordBeforeReturns
+                  returnsValidInput.1.2.1)
+            exact ⟨.functionWithReturns
+                (SourceSpan.cover_validFor keywordSpanValid
+                  returnsValidInput.1 outerOrdered)
+                keywordSpanValid parametersValidInput.1
+                parametersValidInput.2 returnsValidInput.1
+                returnsValidInput.2,
+              weakResult.2.1, weakResult.2.2⟩
+          · simp only [hasReturns] at returnsRest
+            cases returnsRest
+
+/-- Function-type parsing preserves the immutable recursive token carrier. -/
+theorem parseFunctionType_preservesTokensOnSuccess
+    (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (parseFunctionType nested) := by
+  unfold parseFunctionType
+  apply Parser.bind_preservesTokensOnSuccess
+    (keyword_preservesTokensOnSuccess .functionKw .typeExpr)
+  intro functionKeyword
+  apply Parser.bind_preservesTokensOnSuccess
+    (delimited_preservesTokensOnSuccess .leftParen .rightParen true
+      nested .typeExpr .typeExpr nestedPreserves)
+  intro parameters
+  apply Parser.bind_preservesTokensOnSuccess
+    (parseFunctionReturns_preservesTokensOnSuccess nested nestedPreserves)
+  intro returns
+  exact Parser.pure_preservesTokensOnSuccess _
+
+/-- Function-type parsing never moves the parser cursor backwards. -/
+theorem parseFunctionType_cursorMonotoneOnSuccess
+    (nested : Parser TypeExpr) :
+    Parser.CursorMonotoneOnSuccess (parseFunctionType nested) := by
+  unfold parseFunctionType
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .functionKw .typeExpr)
+  intro functionKeyword
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (delimited_cursorMonotoneOnSuccess .leftParen .rightParen true
+      nested .typeExpr .typeExpr)
+  intro parameters
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (parseFunctionReturns_cursorMonotoneOnSuccess nested)
+  intro returns
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A function type starts at its current `function` keyword token. -/
+theorem parseFunctionType_startsAtCurrentTokenOnSuccess (nested : Parser TypeExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (parseFunctionType nested) (·.span) := by
+  unfold parseFunctionType
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess
+      (.keyword .functionKw) .typeExpr (· == .keyword .functionKw))
+  intro functionKeyword input value final parsed
+  rcases bind_ok_components parsed with
+    ⟨parameters, afterParameters, _, rest⟩
+  rcases bind_ok_components rest with ⟨returns, afterReturns, _, finished⟩
+  cases finished
+  rfl
 
 private def hasFollowingSymbol (state : State) (value : Symbol) : Bool :=
   state.peekOffsetKind? 1 == some (.symbol value)
