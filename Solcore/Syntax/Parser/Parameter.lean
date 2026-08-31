@@ -106,4 +106,83 @@ def namedParameter : Parser FunctionParameter := fun state =>
         recoverParameter (rewound.emit failure.toDiagnostic)
   | .invariant error => .invariant error
 
+private def finishLambdaTyped (start : SourceSpan)
+    (comptimeMarker : Option SourceSpan) (name : Identifier)
+    (type : TypeExpr) : Parser LambdaParameter := do
+  match type.value with
+  | .comptime .. =>
+      let _ ← emitDiagnostic {
+        span := type.span
+        kind := .constraintViolation .comptimeTypeInParameter
+      }
+  | _ => pure ()
+  pure {
+    span := SourceSpan.cover start type.span
+    value := .typed comptimeMarker name type
+  }
+
+private def ordinaryLambdaParameter : Parser LambdaParameter := do
+  let name ← identifier .parameter
+  if name.value == ContextualKeyword.comptime.spelling then
+    let _ ← emitDiagnostic {
+      span := name.span
+      kind := .constraintViolation .comptimeUsedAsParameterName
+    }
+  else
+    pure ()
+  let state ← getState
+  if isSymbol state .colon then
+    let _ ← symbol .colon .parameter
+    let type ← typeExpr
+    finishLambdaTyped name.span none name type
+  else
+    pure { span := name.span, value := .inferred name }
+
+private def comptimeLambdaParameter : Parser LambdaParameter := do
+  let marker ← contextual .comptime .parameter
+  let name ← identifier .parameter
+  let state ← getState
+  if isSymbol state .colon then
+    let _ ← symbol .colon .parameter
+    let type ← typeExpr
+    finishLambdaTyped marker.span (some marker.span) name type
+  else
+    let span := SourceSpan.cover marker.span name.span
+    let _ ← emitDiagnostic {
+      span
+      kind := .constraintViolation .comptimeParameterRequiresType
+    }
+    pure { span, value := .error }
+
+private def lambdaParameterCore : Parser LambdaParameter := fun state =>
+  if isContextual state .comptime &&
+      match state.peekOffsetKind? 1 with
+      | some (.identifier _) => true
+      | _ => false then
+    comptimeLambdaParameter state
+  else
+    ordinaryLambdaParameter state
+
+private def recoverLambdaParameter (state : State) : Reply LambdaParameter :=
+  match recoverParameter state with
+  | .ok recovered next => .ok {
+      span := recovered.span
+      value := .error
+    } next
+  | .reject failure next => .reject failure next
+  | .invariant error => .invariant error
+
+/-- Lambda parameter, retaining inference only for ordinary unmodified names. -/
+def lambdaParameter : Parser LambdaParameter := fun state =>
+  match lambdaParameterCore state with
+  | .ok value next => .ok value next
+  | .reject failure failedState =>
+      let rewound := { failedState with cursor := state.cursor }
+      if rewound.atEnd || isSymbol rewound .comma ||
+          isSymbol rewound .rightParen then
+        .reject failure rewound
+      else
+        recoverLambdaParameter (rewound.emit failure.toDiagnostic)
+  | .invariant error => .invariant error
+
 end Solcore.Syntax.Parser

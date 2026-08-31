@@ -59,6 +59,7 @@ inductive ParseConstraint where
   | mappingRequiresCanonicalForm
   | trailingSemicolonRequired (context : ParseContext)
   | namedParameterRequiresType
+  | comptimeParameterRequiresType
   | comptimeTypeInParameter
   | comptimeUsedAsParameterName
   | modifierOutsideContract (keyword : HardKeyword)
