@@ -33,7 +33,7 @@ private def validateBlockTails (policy : TailExpressionPolicy) :
       validateBlockTails policy rest
         (validateExpressionSemicolon first state)
 
-private def closeCoreBlock (opening : Token)
+def closeCoreBlock (opening : Token)
     (policy : TailExpressionPolicy) (bodyRev : List Statement) :
     Parser Block := do
   let closing ← symbol .rightBrace .statement
@@ -44,7 +44,7 @@ private def closeCoreBlock (opening : Token)
     value := body
   }
 
-private def coreBlockItems (statement : Parser Statement)
+def coreBlockItems (statement : Parser Statement)
     (opening : Token) (policy : TailExpressionPolicy) :
     Nat → List Statement → State → Reply Block
   | 0, _, state => .invariant (.fuelExhausted .statement state.currentSpan)
