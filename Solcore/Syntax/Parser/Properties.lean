@@ -299,6 +299,22 @@ theorem parse_ok_comments_sequence_validFor
     ⟨lexed, _lexing, _parsing, valid, _tokens, _diagnostics, comments⟩
   simpa only [comments] using valid.comments
 
+/-- Public parser tokens are pairwise nonoverlapping in written order. -/
+theorem parse_ok_tokens_pairwise_nonoverlap
+    (file : SourceFile) (output : ParseOutput)
+    (result : parse file = .ok output) :
+    output.tokens.Pairwise fun left right =>
+      left.span.endByte ≤ right.span.startByte :=
+  (parse_ok_tokens_sequence_validFor file output result).pairwise_nonoverlap
+
+/-- Retained comments are pairwise nonoverlapping in written order. -/
+theorem parse_ok_comments_pairwise_nonoverlap
+    (file : SourceFile) (output : ParseOutput)
+    (result : parse file = .ok output) :
+    output.parsed.comments.Pairwise fun left right =>
+      left.span.endByte ≤ right.span.startByte :=
+  (parse_ok_comments_sequence_validFor file output result).pairwise_nonoverlap
+
 theorem parse_ok_source
     (file : SourceFile) (output : ParseOutput)
     (result : parse file = .ok output) :

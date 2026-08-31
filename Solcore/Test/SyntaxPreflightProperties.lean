@@ -106,4 +106,16 @@ example (file : SourceFile) (tokens : List Token)
       token.span.startByte < token.span.endByte :=
   ⟨valid.previousEnd_le_start member, valid.span_nonempty member⟩
 
+example (file : SourceFile) (output : ParseOutput)
+    (parsed : parse file = .ok output) :
+    output.tokens.Pairwise fun left right =>
+      left.span.endByte ≤ right.span.startByte :=
+  parse_ok_tokens_pairwise_nonoverlap file output parsed
+
+example (file : SourceFile) (output : ParseOutput)
+    (parsed : parse file = .ok output) :
+    output.parsed.comments.Pairwise fun left right =>
+      left.span.endByte ≤ right.span.startByte :=
+  parse_ok_comments_pairwise_nonoverlap file output parsed
+
 end Tests

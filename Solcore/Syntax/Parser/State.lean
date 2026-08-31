@@ -65,6 +65,23 @@ theorem span_nonempty {α : Type} {file : SourceFile}
       · exact headNonempty
       · exact ih tailValid member
 
+/-- Sequence order implies pairwise nonoverlap in written order. -/
+theorem pairwise_nonoverlap {α : Type} {file : SourceFile}
+    {spanOf : α → SourceSpan} {previousEnd : Nat} {items : List α}
+    (valid : SpanSequence.ValidFor file spanOf previousEnd items) :
+    items.Pairwise fun left right =>
+      (spanOf left).endByte ≤ (spanOf right).startByte := by
+  induction items generalizing previousEnd with
+  | nil => exact .nil
+  | cons head tail ih =>
+      simp only [SpanSequence.ValidFor] at valid
+      rcases valid with
+        ⟨_headValid, _afterPrevious, _headNonempty, tailValid⟩
+      apply List.Pairwise.cons
+      · intro item member
+        exact tailValid.previousEnd_le_start member
+      · exact ih tailValid
+
 end SpanSequence.ValidFor
 
 end Solcore.Syntax
