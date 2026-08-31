@@ -385,5 +385,128 @@ theorem leftAssociativeTail_preservesLeftStartOnSuccess
                     (binaryNode left operator right) next expression final
                       parsed
 
+/-- A left-associative tail retains every operand and operator source range. -/
+theorem leftAssociativeTail_validFor
+    (operand : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (operandValid : operand.ValidFor (Expr.ValidFor statementValid))
+    (operandTokens : Parser.PreservesTokensOnSuccess operand)
+    (operandCursor : Parser.CursorMonotoneOnSuccess operand)
+    (operandStarts :
+      Parser.StartsAtCurrentTokenOnSuccess operand (·.span))
+    (precedence : Nat) : ∀ fuel left input,
+    input.ValidFor →
+    Expr.ValidFor statementValid input.file left →
+    (∀ token, input.peek? = some token →
+      left.span.startByte ≤ token.span.startByte) →
+    (leftAssociativeTail operand precedence fuel left input).ValidFor input
+      (Expr.ValidFor statementValid) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro left input inputValid leftValid leftBefore
+      unfold leftAssociativeTail
+      cases operatorResult : binaryAtPrecedence? input precedence with
+      | none => exact ⟨leftValid, inputValid, rfl⟩
+      | some operator =>
+          simp only
+          rcases binaryAtPrecedence?_some_state_shape operatorResult with
+            ⟨operatorToken, operatorFound, _decoded, _operatorSpan⟩
+          have operatorValid := binaryAtPrecedence?_validFor inputValid
+            operatorResult
+          have consumedReply := consumeBinary_reply_validFor operator
+            inputValid operatorFound
+          cases consumedResult : consumeBinary operator input with
+          | invariant error => trivial
+          | reject failure rejected =>
+              rw [consumedResult] at consumedReply
+              simp only
+              exact consumedReply
+          | ok value afterOperator =>
+              rw [consumedResult] at consumedReply
+              have exactConsumed := consumeBinary_ok_state_shape operator input
+              rw [consumedResult] at exactConsumed
+              cases exactConsumed
+              simp only
+              cases operandResult : operand
+                  { input with cursor := input.cursor + 1 } with
+              | invariant error => trivial
+              | reject failure rejected =>
+                  have rejectedValid := operandValid
+                    { input with cursor := input.cursor + 1 }
+                    consumedReply.2.1
+                  rw [operandResult] at rejectedValid
+                  simp only
+                  exact rejectedValid.of_file_eq consumedReply.2.2
+              | ok right next =>
+                  have rightReply := operandValid
+                    { input with cursor := input.cursor + 1 }
+                    consumedReply.2.1
+                  rw [operandResult] at rightReply
+                  have rightValidInput :
+                      Expr.ValidFor statementValid input.file right := by
+                    simpa [rightReply.2.2, consumedReply.2.2] using rightReply.1
+                  rcases operandStarts
+                      { input with cursor := input.cursor + 1 } right next
+                      operandResult with
+                    ⟨rightToken, rightFound, rightStart⟩
+                  have operatorAt :=
+                    State.getElem?_eq_some_of_peek?_eq_some operatorFound
+                  have rightAt : input.tokens[input.cursor + 1]? =
+                      some rightToken := by
+                    simpa using
+                      State.getElem?_eq_some_of_peek?_eq_some rightFound
+                  have separated :=
+                    inputValid.token_end_le_token_start_of_getElem?_lt
+                      operatorAt rightAt (by omega)
+                  have operatorSpanValid :
+                      operatorToken.span.ValidFor input.file :=
+                    inputValid.peek?_span_validFor operatorFound
+                  have ordered : left.span.startByte ≤ right.span.endByte := by
+                    calc
+                      left.span.startByte ≤ operatorToken.span.startByte :=
+                        leftBefore operatorToken operatorFound
+                      _ ≤ operatorToken.span.endByte := operatorSpanValid.2.1
+                      _ ≤ rightToken.span.startByte := separated
+                      _ = right.span.startByte := rightStart
+                      _ ≤ right.span.endByte := rightValidInput.span_valid.2.1
+                  have combinedValidInput := binaryNode_validFor statementValid
+                    input.file left operator right leftValid operatorValid
+                      rightValidInput ordered
+                  have combinedValidNext : Expr.ValidFor statementValid
+                      next.file (binaryNode left operator right) := by
+                    simpa [rightReply.2.2, consumedReply.2.2] using
+                      combinedValidInput
+                  have tokensEq := operandTokens
+                    { input with cursor := input.cursor + 1 } right next
+                      operandResult
+                  have cursorOrder : input.cursor < next.cursor :=
+                    Nat.lt_of_lt_of_le (by simp)
+                      (operandCursor
+                        { input with cursor := input.cursor + 1 } right next
+                          operandResult)
+                  have combinedBefore : ∀ future,
+                      next.peek? = some future →
+                      (binaryNode left operator right).span.startByte ≤
+                        future.span.startByte := by
+                    intro future futureFound
+                    have futureAtNext :=
+                      State.getElem?_eq_some_of_peek?_eq_some futureFound
+                    have futureAt : input.tokens[next.cursor]? = some future := by
+                      simpa [tokensEq] using futureAtNext
+                    have beforeFuture :=
+                      inputValid.token_end_le_token_start_of_getElem?_lt
+                        operatorAt futureAt cursorOrder
+                    rw [binaryNode_startByte]
+                    exact Nat.le_trans (leftBefore operatorToken operatorFound)
+                      (Nat.le_trans operatorSpanValid.2.1 beforeFuture)
+                  have recursive := inductionHypothesis
+                    (binaryNode left operator right) next rightReply.2.1
+                      combinedValidNext combinedBefore
+                  simp only
+                  exact recursive.of_file_eq
+                    (rightReply.2.2.trans consumedReply.2.2)
+
 end ExpressionInternals
 end Solcore.Syntax.Parser

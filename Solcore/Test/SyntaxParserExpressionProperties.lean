@@ -29,5 +29,6 @@ example := @ExpressionInternals.leftAssociativeTail_preservesTokenWindow
 example := @ExpressionInternals.leftAssociativeTail_preservesTokensOnSuccess
 example := @ExpressionInternals.leftAssociativeTail_cursorMonotoneOnSuccess
 example := @ExpressionInternals.leftAssociativeTail_preservesLeftStartOnSuccess
+example := @ExpressionInternals.leftAssociativeTail_validFor
 
 end Tests
