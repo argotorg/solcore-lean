@@ -1,0 +1,14 @@
+import Solcore.Syntax.Parser.ExpressionLeftAssociativeTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserExpressionLeftAssociativeTotalityProperties
+
+open Solcore.Syntax.Parser.ExpressionInternals
+
+example := @leftAssociativeTail_ordinary_of_fuels
+example := @leftAssociativeTail_ne_invariant_of_fuels
+example := @leftAssociative_ordinary_of_elementFuel
+example := @leftAssociative_ne_invariant_of_elementFuel
+
+end Solcore.Test.SyntaxParserExpressionLeftAssociativeTotalityProperties
