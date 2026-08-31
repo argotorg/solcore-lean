@@ -52,7 +52,21 @@ private theorem closeDelimited_ordinary {α : Type}
       unfold closeDelimited
       simp only [result]⟩
 
-private theorem remainingCount_lt_after_strict_progress
+/-- Cursor-monotone steps in one token window preserve a remaining-count bound. -/
+theorem remainingCount_lt_of_cursor_le
+    {input next : State} {fuel : Nat}
+    (windowEq : next.window = input.window)
+    (cursorLe : input.cursor ≤ next.cursor)
+    (adequate : input.remainingCount < fuel) :
+    next.remainingCount < fuel := by
+  have endIndexEq : next.window.endIndex = input.window.endIndex :=
+    congrArg TokenWindow.endIndex windowEq
+  simp only [State.remainingCount] at adequate ⊢
+  rw [endIndexEq]
+  omega
+
+/-- One strict cursor step spends one unit of a remaining-count fuel bound. -/
+theorem remainingCount_lt_after_strict_progress
     {input next : State} {fuel : Nat}
     (nextValid : next.ValidFor) (windowEq : next.window = input.window)
     (progress : input.cursor < next.cursor)
