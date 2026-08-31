@@ -308,18 +308,29 @@ recursive pattern family lifts those contracts through every fuel level, and
 the public pattern parser has an `ElementTotalityContract` whenever the
 corresponding recursive expression family contracts are supplied.
 
-On the statement side, assignment/expression fallback, `let`, `return`,
-`break`, and `continue` have ordinary-result contracts, and the fallback also
-has a recursive-fuel contract. Core block iteration and balanced-block
-isolation are invariant-free when their statement parser is invariant-free.
-The remaining mutual closure is the fuel-aware statement/block control-flow
-family and inline Yul; therefore this is not yet a claim that public
-expression and statement parsing are unconditionally invariant-free.
+On the statement side, assignment/expression fallback, `let`, `return`, Core
+blocks, braced statements, `while`, `if`, and `for` now have recursive-fuel
+contracts. Both `for` item forms and the comma-separated item loops have
+separate fixed element-fuel and decreasing loop-fuel proofs. `break` and
+`continue` remain unconditionally ordinary leaves.
 
-The remaining formal parser work is to finish the mutually recursive
-expression/statement/block and inline-Yul fuel contracts, use them to discharge
-the five declaration and five contract-member obligations, and then relate
-successful execution to a declarative grammar.
+Inline Yul now has an unconditional public expression contract. Name lists,
+function signatures, statement leaves, and optional termination are total;
+statement leaves also have strict-progress element contracts. Recursive Yul
+blocks and the block, `if`, `for`, and function statement forms have explicit
+fuel contracts. Transactional fallback and state-selected choice preserve
+those contracts. Switch helpers, statement recovery, and the final recursive
+statement family are the remaining Yul closure work.
+
+The remaining mutual Core closure is concentrated in `match`, inline
+`assembly`, the ordered statement dispatcher, and the simultaneous public
+expression/statement fuel induction. This is therefore not yet a claim that
+public Core expression and statement parsing are unconditionally
+invariant-free.
+
+After that closure, the five declaration and five contract-member obligations
+must be discharged before successful parsing is related to a declarative
+grammar.
 Parser-wide resource bounds are no longer an undivided open item: the outer
 accumulation, recovery, and generic delimiter bounds above are complete.
 

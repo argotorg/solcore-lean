@@ -150,11 +150,17 @@ Pattern totality lifts through the recursive fuel family and reaches the public
 parser under the matching expression-family premises.
 
 Statement totality covers assignment/expression fallback, `let`, `return`,
-`break`, `continue`, and Core block iteration/isolation. Fuel-aware fallback is
-also complete. The next proof step is to finish fuel-aware blocks, recursive
-control statements, and inline Yul, close the simultaneous expression and
-statement families, discharge the remaining declaration branches, and then
-prove success soundness against a declarative grammar.
+`break`, `continue`, fuel-aware Core block iteration/isolation, and the
+braced, `while`, `if`, and `for` control forms. Both `for` item variants and
+their list loop have explicit contracts.
+
+Inline-Yul expression, names, signatures, statement leaves, blocks, and the
+block, `if`, `for`, and function statement forms now have totality and strict
+progress contracts. Fallback, state choice, transactional choice, and optional
+termination have fuel-preserving composition laws. The next proof step is to
+close Yul switch and recovery, then Core `match`, `assembly`, ordered statement
+dispatch, and the simultaneous expression/statement families. The remaining
+declaration branches and declarative grammar soundness follow that closure.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the
