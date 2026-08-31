@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Export
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 
-/-! Provenance, token-window, and cursor contracts for export paths. -/
+/-! Provenance, token-window, and cursor contracts for export subparsers. -/
 
 set_option autoImplicit false
 
@@ -592,5 +592,262 @@ theorem constructorSelection_startsAtCurrentTokenOnSuccess :
       input selection final parsed
   · exact namedConstructorSelection_startsAtCurrentTokenOnSuccess
       input selection final parsed
+
+/-- Export names retain every marker, identifier, and constructor range. -/
+theorem exportName_validFor :
+    ExportInternals.exportName.ValidFor ExportName.ValidFor := by
+  intro input inputValid
+  unfold ExportInternals.exportName
+  split
+  · cases markerResult : symbol .star .exportDecl input with
+    | invariant error => simp only [Reply.ValidFor]
+    | reject failure rejected =>
+        have markerValid := symbol_validFor .star .exportDecl input inputValid
+        rw [markerResult] at markerValid
+        simpa only [Reply.ValidFor] using markerValid
+    | ok marker next =>
+        have markerValid := symbol_validFor .star .exportDecl input inputValid
+        rw [markerResult] at markerValid
+        simp only [Reply.ValidFor, ExportName.ValidFor]
+        exact ⟨⟨by simpa only [Located.ValidFor] using markerValid.1,
+          by simpa only [Located.ValidFor] using markerValid.1⟩,
+          markerValid.2.1, markerValid.2.2⟩
+  · split
+    · cases selectedResult : operatorSelector .exportDecl input with
+      | invariant error => simp only [Reply.ValidFor]
+      | reject failure rejected =>
+          have selectedValid := operatorSelector_validFor .exportDecl
+            input inputValid
+          rw [selectedResult] at selectedValid
+          simpa only [Reply.ValidFor] using selectedValid
+      | ok selected next =>
+          have selectedValid := operatorSelector_validFor .exportDecl
+            input inputValid
+          rw [selectedResult] at selectedValid
+          cases selectedValue : selected.value with
+          | identifier name => simp only [selectedValue, Reply.ValidFor]
+          | operator spelling =>
+              simp only [selectedValue, Reply.ValidFor, ExportName.ValidFor]
+              exact ⟨⟨selectedValid.1.1, selectedValid.1.1⟩,
+                selectedValid.2.1, selectedValid.2.2⟩
+    · cases nameResult : identifier .exportDecl input with
+      | invariant error => simp only [Reply.ValidFor]
+      | reject failure rejected =>
+          have nameValid := identifier_validFor .exportDecl input inputValid
+          rw [nameResult] at nameValid
+          simpa only [Reply.ValidFor] using nameValid
+      | ok name afterName =>
+          have nameValid := identifier_validFor .exportDecl input inputValid
+          rw [nameResult] at nameValid
+          have nameSpanValid : name.span.ValidFor input.file := by
+            simpa only [Located.ValidFor] using nameValid.1
+          simp only
+          split
+          · cases constructorsResult :
+                ExportInternals.constructorSelection afterName with
+            | invariant error => simp only [Reply.ValidFor]
+            | reject failure rejected =>
+                have constructorsValid := constructorSelection_validFor
+                  afterName nameValid.2.1
+                rw [constructorsResult] at constructorsValid
+                simpa only [Reply.ValidFor] using
+                  constructorsValid.of_file_eq nameValid.2.2
+            | ok constructors next =>
+                have constructorsValid := constructorSelection_validFor
+                  afterName nameValid.2.1
+                rw [constructorsResult] at constructorsValid
+                have constructorsValidInput :
+                    ConstructorSelection.ValidFor input.file constructors := by
+                  simpa [nameValid.2.2] using constructorsValid.1
+                rcases identifier_ok_state_shape .exportDecl nameResult with
+                  ⟨nameToken, nameFound, nameTokenSpan, nameTokens,
+                    nameCursor⟩
+                rcases constructorSelection_startsAtCurrentTokenOnSuccess
+                    afterName constructors next constructorsResult with
+                  ⟨opening, openingFound, openingStart⟩
+                have nameAt :=
+                  State.getElem?_eq_some_of_peek?_eq_some nameFound
+                have openingAtAfterName :=
+                  State.getElem?_eq_some_of_peek?_eq_some openingFound
+                have openingAtInput :
+                    input.tokens[afterName.cursor]? = some opening := by
+                  simpa [nameTokens] using openingAtAfterName
+                have nameBeforeOpening :=
+                  inputValid.token_end_le_token_start_of_getElem?_lt
+                    nameAt openingAtInput (by rw [nameCursor]; simp)
+                have ordered : name.span.startByte ≤ constructors.span.endByte :=
+                  Nat.le_trans nameSpanValid.2.1 (Nat.le_trans
+                    (by simpa [nameTokenSpan] using nameBeforeOpening)
+                    (by rw [openingStart]; exact constructorsValidInput.1.2.1))
+                have outerValid := SourceSpan.cover_validFor nameSpanValid
+                  constructorsValidInput.1 ordered
+                simp only [Reply.ValidFor, ExportName.ValidFor]
+                refine ⟨⟨outerValid, nameSpanValid, ?_⟩,
+                  constructorsValid.2.1,
+                  constructorsValid.2.2.trans nameValid.2.2⟩
+                intro retained member
+                have retainedEq : retained = constructors := by
+                  simpa using member.symm
+                subst retained
+                exact constructorsValidInput
+          · simp only [Reply.ValidFor, ExportName.ValidFor]
+            exact ⟨⟨nameSpanValid, nameSpanValid, by simp⟩,
+              nameValid.2.1, nameValid.2.2⟩
+
+/-- Export-name parsing preserves every ordinary token window. -/
+theorem exportName_preservesTokenWindow :
+    Parser.PreservesTokenWindow ExportInternals.exportName := by
+  intro input
+  unfold ExportInternals.exportName
+  split
+  · have markerShape := symbol_preservesTokenWindow .star .exportDecl input
+    cases markerResult : symbol .star .exportDecl input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        rw [markerResult] at markerShape
+        exact markerShape
+    | ok marker next =>
+        rw [markerResult] at markerShape
+        exact markerShape
+  · split
+    · have selectedShape :=
+        operatorSelector_preservesTokenWindow .exportDecl input
+      cases selectedResult : operatorSelector .exportDecl input with
+      | invariant error => trivial
+      | reject failure rejected =>
+          rw [selectedResult] at selectedShape
+          exact selectedShape
+      | ok selected next =>
+          rw [selectedResult] at selectedShape
+          cases selectedValue : selected.value with
+          | identifier name =>
+              simp only [selectedValue, Reply.PreservesTokenWindow]
+          | operator spelling =>
+              simpa only [selectedValue, Reply.PreservesTokenWindow] using
+                selectedShape
+    · have nameShape := identifier_preservesTokenWindow .exportDecl input
+      cases nameResult : identifier .exportDecl input with
+      | invariant error => trivial
+      | reject failure rejected =>
+          rw [nameResult] at nameShape
+          exact nameShape
+      | ok name afterName =>
+          rw [nameResult] at nameShape
+          simp only
+          split
+          · have constructorsShape :=
+              constructorSelection_preservesTokenWindow afterName
+            cases constructorsResult :
+                ExportInternals.constructorSelection afterName with
+            | invariant error => trivial
+            | reject failure rejected =>
+                rw [constructorsResult] at constructorsShape
+                exact constructorsShape.trans nameShape
+            | ok constructors next =>
+                rw [constructorsResult] at constructorsShape
+                exact constructorsShape.trans nameShape
+          · exact nameShape
+
+/-- Successful export names retain the immutable lexer token carrier. -/
+theorem exportName_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess ExportInternals.exportName :=
+  exportName_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Successful export-name parsing never rewinds the cursor. -/
+theorem exportName_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess ExportInternals.exportName := by
+  intro input exported next parsed
+  unfold ExportInternals.exportName at parsed
+  split at parsed
+  · cases markerResult : symbol .star .exportDecl input with
+    | invariant error => simp [markerResult] at parsed
+    | reject failure rejected => simp [markerResult] at parsed
+    | ok marker afterMarker =>
+        simp only [markerResult] at parsed
+        cases parsed
+        exact symbol_cursorMonotoneOnSuccess .star .exportDecl
+          input marker next markerResult
+  · split at parsed
+    · cases selectedResult : operatorSelector .exportDecl input with
+      | invariant error => simp [selectedResult] at parsed
+      | reject failure rejected => simp [selectedResult] at parsed
+      | ok selected afterSelected =>
+          simp only [selectedResult] at parsed
+          cases selectedValue : selected.value with
+          | identifier name => simp [selectedValue] at parsed
+          | operator spelling =>
+            simp only [selectedValue] at parsed
+            cases parsed
+            exact operatorSelector_cursorMonotoneOnSuccess .exportDecl
+              input selected next selectedResult
+    · cases nameResult : identifier .exportDecl input with
+      | invariant error => simp [nameResult] at parsed
+      | reject failure rejected => simp [nameResult] at parsed
+      | ok name afterName =>
+          simp only [nameResult] at parsed
+          split at parsed
+          · cases constructorsResult :
+                ExportInternals.constructorSelection afterName with
+            | invariant error => simp [constructorsResult] at parsed
+            | reject failure rejected => simp [constructorsResult] at parsed
+            | ok constructors afterConstructors =>
+                simp only [constructorsResult] at parsed
+                cases parsed
+                exact Nat.le_trans
+                  (identifier_cursorMonotoneOnSuccess .exportDecl
+                    input name afterName nameResult)
+                  (constructorSelection_cursorMonotoneOnSuccess
+                    afterName constructors next constructorsResult)
+          · cases parsed
+            exact identifier_cursorMonotoneOnSuccess .exportDecl
+              input name next nameResult
+
+/-- An export name starts at its wildcard, operator, or identifier token. -/
+theorem exportName_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess
+      ExportInternals.exportName (·.span) := by
+  intro input exported next parsed
+  unfold ExportInternals.exportName at parsed
+  split at parsed
+  · cases markerResult : symbol .star .exportDecl input with
+    | invariant error => simp [markerResult] at parsed
+    | reject failure rejected => simp [markerResult] at parsed
+    | ok marker afterMarker =>
+        simp only [markerResult] at parsed
+        cases parsed
+        exact symbol_startsAtCurrentTokenOnSuccess .star .exportDecl
+          input marker next markerResult
+  · split at parsed
+    · cases selectedResult : operatorSelector .exportDecl input with
+      | invariant error => simp [selectedResult] at parsed
+      | reject failure rejected => simp [selectedResult] at parsed
+      | ok selected afterSelected =>
+          simp only [selectedResult] at parsed
+          cases selectedValue : selected.value with
+          | identifier name => simp [selectedValue] at parsed
+          | operator spelling =>
+            simp only [selectedValue] at parsed
+            cases parsed
+            exact operatorSelector_startsAtCurrentTokenOnSuccess .exportDecl
+              input selected next selectedResult
+    · cases nameResult : identifier .exportDecl input with
+      | invariant error => simp [nameResult] at parsed
+      | reject failure rejected => simp [nameResult] at parsed
+      | ok name afterName =>
+          simp only [nameResult] at parsed
+          rcases identifier_ok_state_shape .exportDecl nameResult with
+            ⟨token, found, tokenSpan, _tokens, _cursor⟩
+          split at parsed
+          · cases constructorsResult :
+                ExportInternals.constructorSelection afterName with
+            | invariant error => simp [constructorsResult] at parsed
+            | reject failure rejected => simp [constructorsResult] at parsed
+            | ok constructors afterConstructors =>
+                simp only [constructorsResult] at parsed
+                cases parsed
+                exact ⟨token, found, by
+                  simp [SourceSpan.cover, tokenSpan]⟩
+          · cases parsed
+            exact ⟨token, found, congrArg SourceSpan.startByte tokenSpan⟩
 
 end Solcore.Syntax.Parser

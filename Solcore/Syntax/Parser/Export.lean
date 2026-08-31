@@ -84,7 +84,10 @@ def constructorSelection : Parser ConstructorSelection := do
 
 end ExportInternals
 
-private def exportName : Parser ExportName := fun state =>
+namespace ExportInternals
+
+/-- Parse one wildcard, operator, or identifier export name. -/
+def exportName : Parser ExportName := fun state =>
   if isSymbol state .star then
     match symbol .star .exportDecl state with
     | .ok marker next => .ok {
@@ -124,6 +127,8 @@ private def exportName : Parser ExportName := fun state =>
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
 
+end ExportInternals
+
 private def localExportItem : Parser LocalExportItem := fun state =>
   if isIdentifier state && isSymbol
       { state with cursor := state.cursor + 1 } .dot then
@@ -143,7 +148,7 @@ private def localExportItem : Parser LocalExportItem := fun state =>
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else
-    match exportName state with
+    match ExportInternals.exportName state with
     | .ok name next => .ok {
         span := name.span
         value := .name name
@@ -161,7 +166,7 @@ private def exportSelection : Parser ExportSelection := fun state =>
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else
-    match delimited .leftBrace .rightBrace true exportName
+    match delimited .leftBrace .rightBrace true ExportInternals.exportName
         .exportDecl .topLevel state with
     | .ok items next => .ok {
         span := items.span

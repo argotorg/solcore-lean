@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ExportProperties
 
-/-! External consumers for canonical export-path shape contracts. -/
+/-! External consumers for canonical export parser contracts. -/
 
 set_option autoImplicit false
 
@@ -18,5 +18,10 @@ example := @constructorSelection_preservesTokenWindow
 example := @constructorSelection_preservesTokensOnSuccess
 example := @constructorSelection_cursorMonotoneOnSuccess
 example := @constructorSelection_startsAtCurrentTokenOnSuccess
+example := @exportName_validFor
+example := @exportName_preservesTokenWindow
+example := @exportName_preservesTokensOnSuccess
+example := @exportName_cursorMonotoneOnSuccess
+example := @exportName_startsAtCurrentTokenOnSuccess
 
 end Tests
