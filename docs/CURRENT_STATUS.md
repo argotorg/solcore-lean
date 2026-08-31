@@ -291,12 +291,14 @@ that require element progress also rule out their no-progress paths.
 The complete contract body is now reduced to six explicit member parsers:
 field, contract function, constructor, fallback, type alias, and enum. The
 complete file loop, `sourceFile`, `parseLexed`, and public `parse` are reduced
-to eight explicit declaration parsers: import, export, type alias, module
-function, enum, trait, implementation, and contract. Pragma declarations,
+to seven explicit declaration parsers: export, type alias, module function,
+enum, trait, implementation, and contract. Imports, pragma declarations,
 derive targets, derive attributes, derive recovery, attachment, dispatch, and
-outer accumulation are discharged internally. This is a reduction, not a
-claim that the six member or eight declaration obligations have all been
-discharged.
+outer accumulation are discharged internally. Recursive named, mapping,
+comptime, proxy, tuple, and function type forms also have local totality
+contracts; the remaining type task is to close their shared recursive parser.
+This is a reduction, not a claim that the six member or seven declaration
+obligations have all been discharged.
 
 The remaining formal parser work is to discharge those local obligations
 through the nested declaration, expression, pattern, statement, type, and Yul

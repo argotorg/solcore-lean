@@ -137,11 +137,13 @@ top-level and contract-member recovery, malformed type-alias recovery, pragma
 accumulation, and generic comma-delimited lists are proved adequate. The
 complete contract body now exposes six member obligations: field, contract
 function, constructor, fallback, type alias, and enum. The file loop and public
-parser expose eight declaration obligations: import, export, type alias,
-module function, enum, trait, implementation, and contract. Pragma and the
-complete derive path are already discharged. The next proof work is to close
-those explicit branches through their nested parsers, followed by success
-soundness against a declarative grammar.
+parser expose seven declaration obligations: export, type alias, module
+function, enum, trait, implementation, and contract. Import, pragma, and the
+complete derive path are already discharged. Named, mapping, comptime, proxy,
+tuple, and function type forms have compositional totality contracts; the next
+proof step is to close their shared recursive type parser, then discharge the
+remaining declaration branches and prove success soundness against a
+declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the
