@@ -652,6 +652,91 @@ theorem recoverLambdaParameter_validFor (input : State)
       rw [parsed] at valid
       exact ⟨.error valid.1.span_valid, valid.2.1, valid.2.2⟩
 
+theorem ordinaryLambdaParameterTail_preservesTokenWindow (name : Identifier) :
+    Parser.PreservesTokenWindow (ordinaryLambdaParameterTail name) := by
+  unfold ordinaryLambdaParameterTail
+  apply Parser.bind_preservesTokenWindow
+    getState_preservesTokenWindow
+  intro observed
+  by_cases typed : isSymbol observed .colon
+  · simp only [typed, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (FunctionParameterInternals.namedParameterTail_preservesTokenWindow
+        name.span none name name.span)
+    intro _
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [typed]
+    exact Parser.pure_preservesTokenWindow _
+
+theorem comptimeLambdaParameterTail_preservesTokenWindow (marker : Token)
+    (name : Identifier) : Parser.PreservesTokenWindow
+      (comptimeLambdaParameterTail marker name) := by
+  unfold comptimeLambdaParameterTail
+  apply Parser.bind_preservesTokenWindow
+    getState_preservesTokenWindow
+  intro observed
+  by_cases typed : isSymbol observed .colon
+  · simp only [typed, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (FunctionParameterInternals.namedParameterTail_preservesTokenWindow
+        marker.span (some marker.span) name
+          (SourceSpan.cover marker.span name.span))
+    intro _
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [typed]
+    apply Parser.bind_preservesTokenWindow
+      (FunctionParameterInternals.errorParameter_preservesTokenWindow
+        (SourceSpan.cover marker.span name.span) _)
+    intro _
+    exact Parser.pure_preservesTokenWindow _
+
+theorem ordinaryLambdaParameter_preservesTokenWindow :
+    Parser.PreservesTokenWindow ordinaryLambdaParameter := by
+  unfold ordinaryLambdaParameter
+  apply Parser.bind_preservesTokenWindow
+    (identifier_preservesTokenWindow .parameter)
+  intro name
+  by_cases warned : name.value == ContextualKeyword.comptime.spelling
+  · simp only [warned, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (emitDiagnostic_preservesTokenWindow _)
+    intro _
+    exact ordinaryLambdaParameterTail_preservesTokenWindow name
+  · simp only [warned]
+    exact ordinaryLambdaParameterTail_preservesTokenWindow name
+
+theorem comptimeLambdaParameter_preservesTokenWindow :
+    Parser.PreservesTokenWindow comptimeLambdaParameter := by
+  unfold comptimeLambdaParameter
+  apply Parser.bind_preservesTokenWindow
+    (contextual_preservesTokenWindow .comptime .parameter)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (identifier_preservesTokenWindow .parameter)
+  intro name
+  exact comptimeLambdaParameterTail_preservesTokenWindow marker name
+
+theorem lambdaParameterCore_preservesTokenWindow :
+    Parser.PreservesTokenWindow lambdaParameterCore := by
+  intro input
+  unfold lambdaParameterCore
+  split
+  · simp only [Bool.and_true]
+    split
+    · exact comptimeLambdaParameter_preservesTokenWindow input
+    · exact ordinaryLambdaParameter_preservesTokenWindow input
+  · simp only [Bool.and_false, Bool.false_eq_true, if_false]
+    exact ordinaryLambdaParameter_preservesTokenWindow input
+
+theorem recoverLambdaParameter_preservesTokenWindow :
+    Parser.PreservesTokenWindow recoverLambdaParameter := by
+  intro input
+  unfold recoverLambdaParameter
+  have shape :=
+    FunctionParameterInternals.recoverParameter_preservesTokenWindow input
+  cases parsed : FunctionParameterInternals.recoverParameter input <;>
+    rw [parsed] at shape <;> exact shape
+
 end LambdaParameterInternals
 
 /-- Named parameters retain provenance through parsing and recovery. -/
@@ -730,5 +815,81 @@ theorem namedParameter_preservesTokenWindow :
 theorem namedParameter_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess namedParameter :=
   namedParameter_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Lambda parameters retain provenance through parsing and recovery. -/
+theorem lambdaParameter_validFor :
+    lambdaParameter.ValidFor LambdaParameter.ValidFor := by
+  intro input inputValid
+  unfold lambdaParameter
+  cases coreResult : LambdaParameterInternals.lambdaParameterCore input with
+  | ok parameter next =>
+      have valid := LambdaParameterInternals.lambdaParameterCore_validFor
+        input inputValid
+      rw [coreResult] at valid
+      exact valid
+  | invariant error => trivial
+  | reject failure failedState =>
+      have coreValid := LambdaParameterInternals.lambdaParameterCore_validFor
+        input inputValid
+      rw [coreResult] at coreValid
+      have coreShape :=
+        LambdaParameterInternals.lambdaParameterCore_preservesTokenWindow input
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have rewoundValid : rewound.ValidFor := {
+        tokens := coreValid.2.1.tokens
+        cursor_le_endIndex := by
+          simpa [rewound, coreShape.2] using inputValid.cursor_le_endIndex
+        endIndex_le_size := coreValid.2.1.endIndex_le_size
+        endByte_le_source := coreValid.2.1.endByte_le_source
+        endByte_boundary := coreValid.2.1.endByte_boundary
+        diagnosticsRev := coreValid.2.1.diagnosticsRev
+      }
+      have rewoundFile : rewound.file = input.file := by
+        simpa [rewound] using coreValid.2.2
+      change (if rewound.atEnd || isSymbol rewound .comma ||
+          isSymbol rewound .rightParen then Reply.reject failure rewound
+        else LambdaParameterInternals.recoverLambdaParameter
+          (rewound.emit failure.toDiagnostic)).ValidFor input
+            LambdaParameter.ValidFor
+      split
+      · exact ⟨coreValid.1, rewoundValid, rewoundFile⟩
+      · have failureValid : failure.span.ValidFor rewound.file := by
+          simpa [rewound, coreValid.2.2] using coreValid.1
+        have emittedValid := rewoundValid.emit_validFor failure.toDiagnostic
+          (failure.toDiagnostic_span_validFor failureValid)
+        exact (LambdaParameterInternals.recoverLambdaParameter_validFor
+          (rewound.emit failure.toDiagnostic) emittedValid).of_file_eq
+            (by simpa [State.emit] using rewoundFile)
+
+/-- Lambda-parameter recovery preserves every ordinary token window. -/
+theorem lambdaParameter_preservesTokenWindow :
+    Parser.PreservesTokenWindow lambdaParameter := by
+  intro input
+  unfold lambdaParameter
+  have coreShape :=
+    LambdaParameterInternals.lambdaParameterCore_preservesTokenWindow input
+  cases coreResult : LambdaParameterInternals.lambdaParameterCore input with
+  | ok parameter next => rw [coreResult] at coreShape; exact coreShape
+  | invariant error => trivial
+  | reject failure failedState =>
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have rewoundShape : rewound.tokens = input.tokens ∧
+          rewound.window = input.window := ⟨by simp [rewound, coreShape.1],
+        by simp [rewound, coreShape.2]⟩
+      change (if rewound.atEnd || isSymbol rewound .comma ||
+          isSymbol rewound .rightParen then Reply.reject failure rewound
+        else LambdaParameterInternals.recoverLambdaParameter
+          (rewound.emit failure.toDiagnostic)).PreservesTokenWindow input
+      split
+      · exact rewoundShape
+      · exact (LambdaParameterInternals.recoverLambdaParameter_preservesTokenWindow
+          (rewound.emit failure.toDiagnostic)).trans (by
+            simpa [State.emit] using rewoundShape)
+
+theorem lambdaParameter_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess lambdaParameter :=
+  lambdaParameter_preservesTokenWindow.preservesTokensOnSuccess
 
 end Solcore.Syntax.Parser
