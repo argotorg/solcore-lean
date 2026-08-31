@@ -65,7 +65,8 @@ private def parseNamedType (nested : Parser TypeExpr) : Parser TypeExpr := do
     pure ()
   pure ty
 
-private def parseMappingType (nested : Parser TypeExpr) : Parser TypeExpr := do
+/-- Parse the canonical `mapping(key => value)` type form. -/
+def parseMappingType (nested : Parser TypeExpr) : Parser TypeExpr := do
   let mapping ← contextual .mapping .typeExpr
   let opening ← symbol .leftParen .typeExpr
   let key ← nested
@@ -77,6 +78,241 @@ private def parseMappingType (nested : Parser TypeExpr) : Parser TypeExpr := do
     value := .mapping mapping.span
       (SourceSpan.cover opening.span closing.span) key value
   }
+
+private theorem nested_start_le_following_end
+    {nested : Parser TypeExpr}
+    (nestedStarts : Parser.StartsAtCurrentTokenOnSuccess nested (·.span))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested)
+    (followingSymbol : Symbol)
+    {input after final : State} {value : TypeExpr} {following : Token}
+    (afterValid : after.ValidFor)
+    (nestedResult : nested input = .ok value after)
+    (followingResult : symbol followingSymbol .typeExpr after =
+      .ok following final) :
+    value.span.startByte ≤ following.span.endByte := by
+  rcases nestedStarts input value after nestedResult with
+    ⟨first, firstFound, firstStart⟩
+  have firstAtInput := State.getElem?_eq_some_of_peek?_eq_some firstFound
+  have firstAtAfter : after.tokens[input.cursor]? = some first := by
+    rw [nestedPreserves input value after nestedResult]
+    exact firstAtInput
+  have followingShape := acceptToken_ok_state_shape
+    (.symbol followingSymbol) .typeExpr
+    (· == .symbol followingSymbol) followingResult
+  have followingAtAfter :=
+    State.getElem?_eq_some_of_peek?_eq_some followingShape.1
+  rw [← firstStart]
+  rcases Nat.eq_or_lt_of_le
+      (nestedMonotone input value after nestedResult) with cursorEq | cursorLt
+  · have tokenEq : first = following := by
+      apply Option.some.inj
+      rw [← firstAtAfter, ← followingAtAfter, cursorEq]
+    rw [tokenEq]
+    exact (afterValid.token_span_validFor_of_getElem?_eq_some
+      followingAtAfter).2.1
+  · have firstNonempty :=
+      afterValid.token_span_nonempty_of_getElem?_eq_some firstAtAfter
+    have ordered := afterValid.token_end_le_token_start_of_getElem?_lt
+      firstAtAfter followingAtAfter cursorLt
+    have followingValid :=
+      afterValid.token_span_validFor_of_getElem?_eq_some followingAtAfter
+    exact Nat.le_trans (Nat.le_of_lt firstNonempty)
+      (Nat.le_trans ordered followingValid.2.1)
+
+/-- Mapping parsing retains valid outer, delimiter, key, and value ranges. -/
+theorem parseMappingType_validFor (nested : Parser TypeExpr)
+    (nestedValid : nested.ValidFor TypeExpr.ValidFor)
+    (nestedStarts : Parser.StartsAtCurrentTokenOnSuccess nested (·.span))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
+    (parseMappingType nested).ValidFor TypeExpr.ValidFor := by
+  have weak : (parseMappingType nested).ValidFor (fun _ _ => True) := by
+    unfold parseMappingType
+    apply Parser.bind_validFor (contextual_validFor .mapping .typeExpr)
+    intro mapping
+    apply Parser.bind_validFor (symbol_validFor .leftParen .typeExpr)
+    intro opening
+    apply Parser.bind_validFor nestedValid
+    intro key
+    apply Parser.bind_validFor (symbol_validFor .fatArrow .typeExpr)
+    intro arrow
+    apply Parser.bind_validFor nestedValid
+    intro value
+    apply Parser.bind_validFor (symbol_validFor .rightParen .typeExpr)
+    intro closing
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : parseMappingType nested input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok result final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold parseMappingType at stages
+      rcases bind_ok_components stages with
+        ⟨mapping, afterMapping, mappingResult, rest⟩
+      rcases bind_ok_components rest with
+        ⟨opening, afterOpening, openingResult, rest⟩
+      rcases bind_ok_components rest with
+        ⟨key, afterKey, keyResult, rest⟩
+      rcases bind_ok_components rest with
+        ⟨arrow, afterArrow, arrowResult, rest⟩
+      rcases bind_ok_components rest with
+        ⟨value, afterValue, valueResult, rest⟩
+      rcases bind_ok_components rest with
+        ⟨closing, afterClosing, closingResult, finished⟩
+      cases finished
+      have mappingValid := contextual_validFor .mapping .typeExpr input inputValid
+      rw [mappingResult] at mappingValid
+      have openingValid := symbol_validFor .leftParen .typeExpr afterMapping
+        mappingValid.2.1
+      rw [openingResult] at openingValid
+      have keyValid := nestedValid afterOpening openingValid.2.1
+      rw [keyResult] at keyValid
+      have arrowValid := symbol_validFor .fatArrow .typeExpr afterKey keyValid.2.1
+      rw [arrowResult] at arrowValid
+      have valueValid := nestedValid afterArrow arrowValid.2.1
+      rw [valueResult] at valueValid
+      have closingValid := symbol_validFor .rightParen .typeExpr afterValue
+        valueValid.2.1
+      rw [closingResult] at closingValid
+      have mappingSpanValid : mapping.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using mappingValid.1
+      have openingSpanValid : opening.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, mappingValid.2.2] using openingValid.1
+      have keyValidInput : TypeExpr.ValidFor input.file key := by
+        simpa [openingValid.2.2, mappingValid.2.2] using keyValid.1
+      have arrowSpanValid : arrow.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, keyValid.2.2, openingValid.2.2,
+          mappingValid.2.2] using arrowValid.1
+      have valueValidInput : TypeExpr.ValidFor input.file value := by
+        simpa [arrowValid.2.2, keyValid.2.2, openingValid.2.2,
+          mappingValid.2.2] using valueValid.1
+      have closingSpanValid : closing.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, valueValid.2.2, arrowValid.2.2,
+          keyValid.2.2, openingValid.2.2, mappingValid.2.2] using closingValid.1
+      have mappingShape := acceptToken_ok_state_shape
+        (.contextual .mapping) .typeExpr (·.isContextual .mapping) mappingResult
+      have mappingAdvanced : input.advance? = some (mapping, afterMapping) := by
+        unfold State.advance?
+        rw [mappingShape.1, mappingShape.2]
+        rfl
+      have openingShape := symbol_ok_state_shape .leftParen .typeExpr openingResult
+      have mappingBeforeOpening :=
+        inputValid.consumed_end_le_peek_start_after_advance
+          mappingAdvanced openingShape.1
+      have openingAdvanced :
+          afterMapping.advance? = some (opening, afterOpening) := by
+        unfold State.advance?
+        rw [openingShape.1, openingShape.2]
+        rfl
+      rcases nestedStarts afterOpening key afterKey keyResult with
+        ⟨keyToken, keyFound, keyStart⟩
+      have openingBeforeKey : opening.span.endByte ≤ key.span.startByte := by
+        rw [← keyStart]
+        exact mappingValid.2.1.consumed_end_le_peek_start_after_advance
+          openingAdvanced keyFound
+      have keyStartLeArrowEnd := nested_start_le_following_end
+        nestedStarts nestedPreserves nestedMonotone .fatArrow keyValid.2.1
+        keyResult arrowResult
+      have arrowShape := symbol_ok_state_shape .fatArrow .typeExpr arrowResult
+      have arrowAdvanced : afterKey.advance? = some (arrow, afterArrow) := by
+        unfold State.advance?
+        rw [arrowShape.1, arrowShape.2]
+        rfl
+      rcases nestedStarts afterArrow value afterValue valueResult with
+        ⟨valueToken, valueFound, valueStart⟩
+      have arrowBeforeValue : arrow.span.endByte ≤ value.span.startByte := by
+        rw [← valueStart]
+        exact keyValid.2.1.consumed_end_le_peek_start_after_advance
+          arrowAdvanced valueFound
+      have valueStartLeClosingEnd := nested_start_le_following_end
+        nestedStarts nestedPreserves nestedMonotone .rightParen valueValid.2.1
+        valueResult closingResult
+      have argumentsOrdered : opening.span.startByte ≤ closing.span.endByte :=
+        Nat.le_trans openingSpanValid.2.1
+          (Nat.le_trans openingBeforeKey
+            (Nat.le_trans keyStartLeArrowEnd
+              (Nat.le_trans arrowBeforeValue valueStartLeClosingEnd)))
+      have outerOrdered : mapping.span.startByte ≤ closing.span.endByte :=
+        Nat.le_trans mappingSpanValid.2.1
+          (Nat.le_trans mappingBeforeOpening argumentsOrdered)
+      exact ⟨.mapping
+          (SourceSpan.cover_validFor mappingSpanValid closingSpanValid outerOrdered)
+          mappingSpanValid
+          (SourceSpan.cover_validFor openingSpanValid closingSpanValid
+            argumentsOrdered)
+          keyValidInput valueValidInput,
+        weakResult.2.1, weakResult.2.2⟩
+
+/-- Mapping parsing preserves the immutable recursive token carrier. -/
+theorem parseMappingType_preservesTokensOnSuccess
+    (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (parseMappingType nested) := by
+  unfold parseMappingType
+  apply Parser.bind_preservesTokensOnSuccess
+    (contextual_preservesTokensOnSuccess .mapping .typeExpr)
+  intro mapping
+  apply Parser.bind_preservesTokensOnSuccess
+    (symbol_preservesTokensOnSuccess .leftParen .typeExpr)
+  intro opening
+  apply Parser.bind_preservesTokensOnSuccess nestedPreserves
+  intro key
+  apply Parser.bind_preservesTokensOnSuccess
+    (symbol_preservesTokensOnSuccess .fatArrow .typeExpr)
+  intro arrow
+  apply Parser.bind_preservesTokensOnSuccess nestedPreserves
+  intro value
+  apply Parser.bind_preservesTokensOnSuccess
+    (symbol_preservesTokensOnSuccess .rightParen .typeExpr)
+  intro closing
+  exact Parser.pure_preservesTokensOnSuccess _
+
+/-- Mapping parsing is cursor-monotone when its recursive parser is. -/
+theorem parseMappingType_cursorMonotoneOnSuccess
+    (nested : Parser TypeExpr)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (parseMappingType nested) := by
+  unfold parseMappingType
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (contextual_cursorMonotoneOnSuccess .mapping .typeExpr)
+  intro mapping
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .leftParen .typeExpr)
+  intro opening
+  apply Parser.bind_cursorMonotoneOnSuccess nestedMonotone
+  intro key
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .fatArrow .typeExpr)
+  intro arrow
+  apply Parser.bind_cursorMonotoneOnSuccess nestedMonotone
+  intro value
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .rightParen .typeExpr)
+  intro closing
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A mapping type starts at its current `mapping` token. -/
+theorem parseMappingType_startsAtCurrentTokenOnSuccess
+    (nested : Parser TypeExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (parseMappingType nested) (·.span) := by
+  unfold parseMappingType
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (contextual_startsAtCurrentTokenOnSuccess .mapping .typeExpr)
+  intro mapping input value final parsed
+  rcases bind_ok_components parsed with ⟨opening, afterOpening, _, rest⟩
+  rcases bind_ok_components rest with ⟨key, afterKey, _, rest⟩
+  rcases bind_ok_components rest with ⟨arrow, afterArrow, _, rest⟩
+  rcases bind_ok_components rest with ⟨inner, afterInner, _, rest⟩
+  rcases bind_ok_components rest with ⟨closing, afterClosing, _, finished⟩
+  cases finished
+  rfl
 
 /-- Parse a `comptime<...>` type using the supplied recursive parser. -/
 def parseComptimeType (nested : Parser TypeExpr) : Parser TypeExpr := do

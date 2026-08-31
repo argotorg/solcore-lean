@@ -16,6 +16,30 @@ example (nested : Parser TypeExpr)
     (nestedStarts : Parser.StartsAtCurrentTokenOnSuccess nested (·.span))
     (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
     (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
+    (parseMappingType nested).ValidFor TypeExpr.ValidFor :=
+  parseMappingType_validFor nested nestedValid nestedStarts
+    nestedPreserves nestedMonotone
+
+example (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (parseMappingType nested) :=
+  parseMappingType_preservesTokensOnSuccess nested nestedPreserves
+
+example (nested : Parser TypeExpr)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (parseMappingType nested) :=
+  parseMappingType_cursorMonotoneOnSuccess nested nestedMonotone
+
+example (nested : Parser TypeExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (parseMappingType nested) (·.span) :=
+  parseMappingType_startsAtCurrentTokenOnSuccess nested
+
+example (nested : Parser TypeExpr)
+    (nestedValid : nested.ValidFor TypeExpr.ValidFor)
+    (nestedStarts : Parser.StartsAtCurrentTokenOnSuccess nested (·.span))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
     (parseComptimeType nested).ValidFor TypeExpr.ValidFor :=
   parseComptimeType_validFor nested nestedValid nestedStarts
     nestedPreserves nestedMonotone
