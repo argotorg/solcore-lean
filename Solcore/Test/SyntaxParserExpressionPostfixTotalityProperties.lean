@@ -1,0 +1,12 @@
+import Solcore.Syntax.Parser.Expression.PostfixTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserExpressionPostfixTotalityProperties
+
+open Solcore.Syntax.Parser.ExpressionAtomInternals
+
+example := @expressionPostfix_ordinary_of_elementFuel
+example := @expressionPostfix_ne_invariant_of_elementFuel
+
+end Solcore.Test.SyntaxParserExpressionPostfixTotalityProperties
