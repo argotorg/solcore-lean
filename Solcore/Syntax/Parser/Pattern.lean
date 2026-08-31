@@ -70,7 +70,10 @@ def optionalConstructorArguments
 
 end PatternInternals
 
-private def closePatternTuple (opening : Token)
+namespace PatternInternals
+
+/-- Close a parenthesized pattern after its elements have been accumulated. -/
+def closePatternTuple (opening : Token)
     (elementsRev : List Pattern) : Parser Pattern := do
   let closing ← symbol .rightParen .pattern
   let span := SourceSpan.cover opening.span closing.span
@@ -81,6 +84,8 @@ private def closePatternTuple (opening : Token)
       value := .tuple { span, elements := elementsRev.reverse }
     }
 
+end PatternInternals
+
 private def patternTupleTail (nested : Parser Pattern) (opening : Token) :
     Nat → List Pattern → State → Reply Pattern
   | 0, _, state => .invariant (.fuelExhausted .pattern state.currentSpan)
@@ -88,7 +93,7 @@ private def patternTupleTail (nested : Parser Pattern) (opening : Token) :
       match symbol .comma .pattern state with
       | .ok _ afterComma =>
           if isSymbol afterComma .rightParen then
-            closePatternTuple opening elementsRev afterComma
+            PatternInternals.closePatternTuple opening elementsRev afterComma
           else
             let before := afterComma.cursor
             match nested afterComma with
@@ -99,7 +104,8 @@ private def patternTupleTail (nested : Parser Pattern) (opening : Token) :
                   patternTupleTail nested opening fuel
                     (value :: elementsRev) next
                 else
-                  closePatternTuple opening (value :: elementsRev) next
+                  PatternInternals.closePatternTuple opening
+                    (value :: elementsRev) next
             | .reject failure next => .reject failure next
             | .invariant error => .invariant error
       | .reject failure next => .reject failure next
@@ -110,7 +116,7 @@ private def parenthesizedPattern (nested : Parser Pattern) : Parser Pattern :=
   match symbol .leftParen .pattern state with
   | .ok opening afterOpening =>
       if isSymbol afterOpening .rightParen then
-        closePatternTuple opening [] afterOpening
+        PatternInternals.closePatternTuple opening [] afterOpening
       else
         let before := afterOpening.cursor
         match nested afterOpening with

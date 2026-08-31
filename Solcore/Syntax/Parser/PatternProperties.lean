@@ -420,6 +420,134 @@ theorem optionalConstructorArguments_cursorMonotoneOnSuccess
   · cases parsed
     exact Nat.le_refl _
 
+/-- Closing a tuple retains its opening token and accumulated patterns. -/
+theorem closePatternTuple_validFor
+    (expressionValid : SourceFile → Expr → Prop)
+    (opening : Token) (elementsRev : List Pattern) {input : State}
+    {openingIndex : Nat} (inputValid : input.ValidFor)
+    (openingFound : input.tokens[openingIndex]? = some opening)
+    (openingBefore : openingIndex < input.cursor)
+    (elementsValid : List.ValidFor (Pattern.ValidFor expressionValid)
+      input.file elementsRev) :
+    (closePatternTuple opening elementsRev input).ValidFor input
+      (Pattern.ValidFor expressionValid) := by
+  unfold closePatternTuple
+  simp only [bind]
+  cases closingResult : symbol .rightParen .pattern input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := symbol_validFor .rightParen .pattern input inputValid
+      rw [closingResult] at valid
+      exact valid
+  | ok closing afterClosing =>
+      have closingValid := symbol_validFor .rightParen .pattern
+        input inputValid
+      rw [closingResult] at closingValid
+      have closingShape := symbol_ok_state_shape .rightParen .pattern
+        closingResult
+      have closingFound :=
+        State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have openingValid :=
+        inputValid.token_span_validFor_of_getElem?_eq_some openingFound
+      have closingSpanValid : closing.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using closingValid.1
+      have openingBeforeClosing :=
+        inputValid.token_end_le_token_start_of_getElem?_lt openingFound
+          closingFound openingBefore
+      have outerValid := SourceSpan.cover_validFor openingValid
+        closingSpanValid (Nat.le_trans openingValid.2.1
+          (Nat.le_trans openingBeforeClosing closingSpanValid.2.1))
+      cases elementsRev with
+      | nil =>
+          exact ⟨Pattern.ValidFor.tuple outerValid outerValid
+            (by simp), closingValid.2.1, closingValid.2.2⟩
+      | cons only tail =>
+          cases tail with
+          | nil =>
+              exact ⟨Pattern.ValidFor.group outerValid
+                (elementsValid only (by simp)), closingValid.2.1,
+                closingValid.2.2⟩
+          | cons second rest =>
+              exact ⟨Pattern.ValidFor.tuple outerValid outerValid
+                (by
+                  intro element member
+                  exact elementsValid element (by
+                    simpa only [List.mem_reverse] using member)),
+                closingValid.2.1, closingValid.2.2⟩
+
+/-- Closing a pattern tuple preserves every ordinary token window. -/
+theorem closePatternTuple_preservesTokenWindow (opening : Token)
+    (elementsRev : List Pattern) :
+    Parser.PreservesTokenWindow
+      (closePatternTuple opening elementsRev) := by
+  unfold closePatternTuple
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .rightParen .pattern)
+  intro closing
+  cases elementsRev with
+  | nil => exact Parser.pure_preservesTokenWindow _
+  | cons only tail =>
+      cases tail <;> exact Parser.pure_preservesTokenWindow _
+
+theorem closePatternTuple_preservesTokensOnSuccess (opening : Token)
+    (elementsRev : List Pattern) :
+    Parser.PreservesTokensOnSuccess
+      (closePatternTuple opening elementsRev) :=
+  (closePatternTuple_preservesTokenWindow opening elementsRev).preservesTokensOnSuccess
+
+/-- Closing a pattern tuple never rewinds the cursor. -/
+theorem closePatternTuple_cursorMonotoneOnSuccess (opening : Token)
+    (elementsRev : List Pattern) :
+    Parser.CursorMonotoneOnSuccess
+      (closePatternTuple opening elementsRev) := by
+  unfold closePatternTuple
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .rightParen .pattern)
+  intro closing
+  cases elementsRev with
+  | nil => exact Parser.pure_cursorMonotoneOnSuccess _
+  | cons only tail =>
+      cases tail <;> exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- Closing retains the opening parenthesis as the result start. -/
+theorem closePatternTuple_preservesOpeningStartOnSuccess
+    (opening : Token) (elementsRev : List Pattern)
+    {input final : State} {pattern : Pattern}
+    (parsed : closePatternTuple opening elementsRev input =
+      .ok pattern final) :
+    pattern.span.startByte = opening.span.startByte := by
+  unfold closePatternTuple at parsed
+  rcases patternBind_ok_components parsed with
+    ⟨closing, afterClosing, _closingResult, finished⟩
+  cases elementsRev with
+  | nil => cases finished; rfl
+  | cons only tail =>
+      cases tail with
+      | nil => cases finished; rfl
+      | cons second rest => cases finished; rfl
+
+/-- The result ends at the current closing-parenthesis token. -/
+theorem closePatternTuple_endsAtCurrentTokenOnSuccess
+    (opening : Token) (elementsRev : List Pattern)
+    {input final : State} {pattern : Pattern}
+    (parsed : closePatternTuple opening elementsRev input =
+      .ok pattern final) :
+    ∃ closing, input.peek? = some closing ∧
+      closing.span.endByte = pattern.span.endByte := by
+  unfold closePatternTuple at parsed
+  rcases patternBind_ok_components parsed with
+    ⟨closing, afterClosing, closingResult, finished⟩
+  have found :=
+    (symbol_ok_state_shape .rightParen .pattern closingResult).1
+  cases elementsRev with
+  | nil => cases finished; exact ⟨closing, found, rfl⟩
+  | cons only tail =>
+      cases tail with
+      | nil => cases finished; exact ⟨closing, found, rfl⟩
+      | cons second rest =>
+          cases finished
+          exact ⟨closing, found, rfl⟩
+
 private theorem dotConstructorPattern_weakValidFor
     (nested : Parser Pattern)
     (expressionValid : SourceFile → Expr → Prop)

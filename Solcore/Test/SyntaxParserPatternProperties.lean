@@ -56,6 +56,12 @@ example := PatternInternals.optionalConstructorArguments_preservesTokenWindow
 example :=
   PatternInternals.optionalConstructorArguments_preservesTokensOnSuccess
 example := PatternInternals.optionalConstructorArguments_cursorMonotoneOnSuccess
+example := PatternInternals.closePatternTuple_validFor
+example := PatternInternals.closePatternTuple_preservesTokenWindow
+example := PatternInternals.closePatternTuple_preservesTokensOnSuccess
+example := PatternInternals.closePatternTuple_cursorMonotoneOnSuccess
+example := PatternInternals.closePatternTuple_preservesOpeningStartOnSuccess
+example := PatternInternals.closePatternTuple_endsAtCurrentTokenOnSuccess
 example := PatternInternals.dotConstructorPattern_validFor
 example := PatternInternals.dotConstructorPattern_preservesTokenWindow
 example := PatternInternals.dotConstructorPattern_preservesTokensOnSuccess
