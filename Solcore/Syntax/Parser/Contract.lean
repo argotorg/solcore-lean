@@ -7,22 +7,29 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def contractField : Parser ContractField := do
+namespace ContractInternals
+
+def optionalFieldInitializer
+    (expression : Parser Expr) : Parser (Option Expr) := do
+  let state ← getState
+  if isSymbol state .equal then
+    let _ ← symbol .equal .contractMember
+    pure (some (← expression))
+  else
+    pure none
+
+def contractField (expression : Parser Expr) : Parser ContractField := do
   let name ← identifier .contractMember
   let _ ← symbol .colon .contractMember
   let type ← typeExpr
-  let state ← getState
-  let initializer ←
-    if isSymbol state .equal then
-      let _ ← symbol .equal .contractMember
-      pure (some (← expression))
-    else
-      pure none
+  let initializer ← optionalFieldInitializer expression
   let semicolon ← symbol .semicolon .contractMember
   pure {
     span := SourceSpan.cover name.span semicolon.span
     value := { name, type, initializer }
   }
+
+end ContractInternals
 
 private def wrapField (declaration : ContractField) : ContractMember := {
   span := declaration.span
@@ -81,7 +88,7 @@ private def startsContractField (state : State) : Bool :=
 
 private def contractMemberCore : Parser ContractMember := fun state =>
   if startsContractField state then
-    match contractField state with
+    match ContractInternals.contractField expression state with
     | .ok value next => .ok (wrapField value) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
