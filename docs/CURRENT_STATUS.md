@@ -165,14 +165,16 @@ committed effects.
 ## Canonical syntax status
 
 Source identities, UTF-8 byte spans, the complete token catalog, the
-source-preserving parsed AST, exact Unicode identifier classification, and
-lexer foundations are implemented under `Solcore.Syntax`.
+source-preserving parsed AST, exact Unicode identifier classification, and a
+total canonical lexer are implemented under `Solcore.Syntax`. Focused tests
+cover the closed token catalog, maximal munch, retained nested comments,
+strict strings, recovery, diagnostic accumulation, and exact UTF-8 spans.
 
-The complete lexer, parser, canonical fixture corpus, and public source
-interface remain under implementation. Resolution, source type checking, and
-elaboration into checked Semantic Core follow executable parsing. No new
-frontend result is published through Oracle v4; that interface continues to
-mean only its frozen Surface v1 format.
+The parser, canonical parser fixture corpus, and public source interface remain
+under implementation. Resolution, source type checking, and elaboration into
+checked Semantic Core follow executable parsing. No new frontend result is
+published through Oracle v4; that interface continues to mean only its frozen
+Surface v1 format.
 
 ## What is not yet claimed
 

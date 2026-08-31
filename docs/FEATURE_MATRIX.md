@@ -42,7 +42,7 @@ published through Oracle v4.
 | Source identity and UTF-8 byte spans | Complete | Workspace admission policy follows parsing | High |
 | Token and parsed AST catalog | Complete | Executable parser witnesses and well-formedness layer | High |
 | Unicode identifier classification | Complete | Lexer integration tests | High |
-| Canonical lexer | Active | Complete scan loop, diagnostics, conformance corpus, and span laws | High |
+| Canonical lexer | Complete executable boundary | Total scan loop, accumulated diagnostics, exact catalog and Rust-span regressions complete; declarative span and provenance laws follow | High |
 | Canonical parser | Planned after lexer | Types, terms, statements, inline Yul, declarations, recovery, and files | High |
 | Canonical frontend proofs | Planned after parser | Bounds, spans, provenance, and grammar soundness | High |
 | Public source interface | Planned | New additive protocol after parser and proof boundary close | High |
