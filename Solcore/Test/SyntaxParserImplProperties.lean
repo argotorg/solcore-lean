@@ -33,5 +33,6 @@ example := @ImplInternals.implMethods_validFor
 example := @ImplInternals.implBody_validFor
 example := @ImplInternals.implBody_startsAtCurrentTokenOnSuccess
 example := @ImplInternals.implDefaultMarker_validFor
+example := @implDecl_validFor
 
 end Tests

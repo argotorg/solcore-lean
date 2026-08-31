@@ -620,4 +620,229 @@ theorem implDefaultMarker_validFor :
 
 end ImplInternals
 
+/-- Complete implementation declarations retain only source-valid syntax. -/
+theorem implDecl_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (blockValid : (block .allow).ValidFor
+      (Block.ValidFor statementValid))
+    (bodyWindow : Parser.PreservesTokenWindow (block .allow)) :
+    implDecl.ValidFor (ImplDecl.ValidFor statementValid) := by
+  intro input inputValid
+  have weak : implDecl.ValidFor (fun _ _ => True) := by
+    unfold implDecl
+    apply Parser.bind_validFor ImplInternals.implDefaultMarker_validFor
+    intro defaultMarker
+    unfold ImplInternals.implDeclAfterDefault
+    apply Parser.bind_validFor (contextual_validFor .impl .topItem)
+    intro marker
+    apply Parser.bind_validFor optionalGenericParameters_validFor
+    intro genericParameters
+    apply Parser.bind_validFor (identifier_validFor .topItem)
+    intro traitName
+    apply Parser.bind_validFor
+      (delimited_validFor TypeExpr.ValidFor .less .greater false typeExpr
+        .typeExpr .topLevel typeExpr_validFor
+        typeExpr_preservesTokensOnSuccess)
+    intro arguments
+    have requireWeak : (ImplInternals.requireImplArguments arguments).ValidFor
+        (fun _ _ => True) := by
+      intro state stateValid
+      unfold ImplInternals.requireImplArguments
+      cases arguments.elements with
+      | nil => trivial
+      | cons head tail => exact ⟨trivial, stateValid, rfl⟩
+    apply Parser.bind_validFor requireWeak
+    intro headArguments
+    apply Parser.bind_validFor whereClause_validFor
+    intro parsedWhereClause
+    apply Parser.bind_validFor
+      (ImplInternals.implBody_validFor statementValid blockValid bodyWindow)
+    intro body
+    exact Parser.pure_validFor _ _ (fun _ => trivial)
+  have weakResult := weak input inputValid
+  cases parsed : implDecl input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok declaration final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold implDecl at stages
+      rcases implBind_ok_components stages with
+        ⟨defaultMarker, afterDefault, defaultResult, suffix⟩
+      unfold ImplInternals.implDeclAfterDefault at suffix
+      rcases implBind_ok_components suffix with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases implBind_ok_components rest with
+        ⟨genericParameters, afterGenerics, genericsResult, rest⟩
+      rcases implBind_ok_components rest with
+        ⟨traitName, afterName, nameResult, rest⟩
+      rcases implBind_ok_components rest with
+        ⟨arguments, afterArguments, argumentsResult, rest⟩
+      rcases implBind_ok_components rest with
+        ⟨headArguments, afterHead, headResult, rest⟩
+      rcases implBind_ok_components rest with
+        ⟨parsedWhereClause, afterWhere, whereResult, rest⟩
+      rcases implBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have defaultReply := ImplInternals.implDefaultMarker_validFor input
+        inputValid
+      rw [defaultResult] at defaultReply
+      have markerReply := contextual_validFor .impl .topItem afterDefault
+        defaultReply.2.1
+      rw [markerResult] at markerReply
+      have genericsReply := optionalGenericParameters_validFor afterMarker
+        markerReply.2.1
+      rw [genericsResult] at genericsReply
+      have nameReply := identifier_validFor .topItem afterGenerics
+        genericsReply.2.1
+      rw [nameResult] at nameReply
+      have argumentsReply := delimited_validFor TypeExpr.ValidFor .less
+        .greater false typeExpr .typeExpr .topLevel typeExpr_validFor
+        typeExpr_preservesTokensOnSuccess afterName nameReply.2.1
+      rw [argumentsResult] at argumentsReply
+      have argumentsValidAfter : DelimitedList.ValidFor TypeExpr.ValidFor
+          afterArguments.file arguments := by
+        simpa [argumentsReply.2.2] using argumentsReply.1
+      have headReply := ImplInternals.requireImplArguments_reply_validFor
+        arguments afterArguments argumentsReply.2.1 argumentsValidAfter
+      rw [headResult] at headReply
+      have whereReply := whereClause_validFor afterHead headReply.2.1
+      rw [whereResult] at whereReply
+      have bodyReply := ImplInternals.implBody_validFor statementValid
+        blockValid bodyWindow afterWhere whereReply.2.1
+      rw [bodyResult] at bodyReply
+      have defaultValid : Option.ValidFor
+          (fun file span => span.ValidFor file) input.file defaultMarker := by
+        exact defaultReply.1
+      have markerValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, defaultReply.2.2] using markerReply.1
+      have genericsValid : Option.ValidFor
+          (NonemptyDelimitedList.ValidFor Located.ValidFor) input.file
+          genericParameters := by
+        simpa [markerReply.2.2, defaultReply.2.2] using genericsReply.1
+      have nameValid : traitName.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, genericsReply.2.2,
+          markerReply.2.2, defaultReply.2.2] using nameReply.1
+      have headValid : NonemptyDelimitedList.ValidFor TypeExpr.ValidFor
+          input.file headArguments := by
+        simpa [headReply.2.2, argumentsReply.2.2, nameReply.2.2,
+          genericsReply.2.2, markerReply.2.2, defaultReply.2.2] using
+          headReply.1
+      have whereValid : Option.ValidFor WhereClause.ValidFor input.file
+          parsedWhereClause := by
+        simpa [headReply.2.2, argumentsReply.2.2, nameReply.2.2,
+          genericsReply.2.2, markerReply.2.2, defaultReply.2.2] using
+          whereReply.1
+      have bodyValid : ImplInternals.ImplBody.ValidFor statementValid
+          input.file body := by
+        simpa [whereReply.2.2, headReply.2.2, argumentsReply.2.2,
+          nameReply.2.2, genericsReply.2.2, markerReply.2.2,
+          defaultReply.2.2] using bodyReply.1
+      rcases ImplInternals.implBody_startsAtCurrentTokenOnSuccess afterWhere
+          body afterBody bodyResult with
+        ⟨opening, openingFound, bodyStart⟩
+      have openingAtAfter :=
+        State.getElem?_eq_some_of_peek?_eq_some openingFound
+      have defaultTokens :=
+        ImplInternals.implDefaultMarker_preservesTokensOnSuccess input
+          defaultMarker afterDefault defaultResult
+      have markerTokens := contextual_preservesTokensOnSuccess .impl .topItem
+        afterDefault marker afterMarker markerResult
+      have genericsTokens := optionalGenericParameters_preservesTokensOnSuccess
+        afterMarker genericParameters afterGenerics genericsResult
+      have nameTokens := identifier_preservesTokensOnSuccess .topItem
+        afterGenerics traitName afterName nameResult
+      have argumentsTokens := delimited_preservesTokensOnSuccess .less .greater
+        false typeExpr .typeExpr .topLevel typeExpr_preservesTokensOnSuccess
+        afterName arguments afterArguments argumentsResult
+      have headTokens :=
+        (ImplInternals.requireImplArguments_preservesTokenWindow arguments
+          ).preservesTokensOnSuccess afterArguments headArguments afterHead
+            headResult
+      have whereTokens := whereClause_preservesTokensOnSuccess afterHead
+        parsedWhereClause afterWhere whereResult
+      have openingAt : input.tokens[afterWhere.cursor]? = some opening := by
+        simpa [whereTokens, headTokens, argumentsTokens, nameTokens,
+          genericsTokens, markerTokens, defaultTokens] using openingAtAfter
+      have progress : input.cursor < afterWhere.cursor :=
+        Nat.lt_of_le_of_lt
+          (ImplInternals.implDefaultMarker_cursorMonotoneOnSuccess input
+            defaultMarker afterDefault defaultResult)
+          (Nat.lt_of_lt_of_le
+            (acceptToken_cursor_lt_onSuccess (.contextual .impl) .topItem
+              (fun kind => kind.isContextual .impl) markerResult)
+            (Nat.le_trans
+              (optionalGenericParameters_cursorMonotoneOnSuccess afterMarker
+                genericParameters afterGenerics genericsResult)
+              (Nat.le_trans
+                (identifier_cursorMonotoneOnSuccess .topItem afterGenerics
+                  traitName afterName nameResult)
+                (Nat.le_trans
+                  (delimited_cursorMonotoneOnSuccess .less .greater false
+                    typeExpr .typeExpr .topLevel afterName arguments
+                    afterArguments argumentsResult)
+                  (Nat.le_trans
+                    (ImplInternals.requireImplArguments_cursorMonotoneOnSuccess
+                      arguments afterArguments headArguments afterHead
+                      headResult)
+                    (whereClause_cursorMonotoneOnSuccess afterHead
+                      parsedWhereClause afterWhere whereResult))))))
+      rcases implDecl_startsAtCurrentTokenOnSuccess input declaration final
+          parsed with ⟨startToken, startFound, declarationStart⟩
+      cases finished
+      have startAt := State.getElem?_eq_some_of_peek?_eq_some startFound
+      have startTokenValid := inputValid.peek?_span_validFor startFound
+      have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+        startAt openingAt progress
+      let startSpan := defaultMarker.getD marker.span
+      have startValid : startSpan.ValidFor input.file := by
+        cases defaultMarker with
+        | none => simpa [startSpan] using markerValid
+        | some retained =>
+            simpa [startSpan, Option.ValidFor] using defaultValid
+      have startTokenStart :
+          startToken.span.startByte = startSpan.startByte := by
+        simpa [startSpan, SourceSpan.cover] using declarationStart
+      have ordered : startSpan.startByte ≤ body.span.endByte := by
+        calc
+          startSpan.startByte = startToken.span.startByte := startTokenStart.symm
+          _ ≤ startToken.span.endByte := startTokenValid.2.1
+          _ ≤ opening.span.startByte := separated
+          _ = body.span.startByte := bodyStart
+          _ ≤ body.span.endByte := bodyValid.1.2.1
+      have outerValid := SourceSpan.cover_validFor startValid bodyValid.1 ordered
+      refine ⟨⟨outerValid, ?_, ?_, ?_, nameValid, headValid.1,
+        headValid.2, ?_, bodyValid.1, bodyValid.2⟩,
+        weakResult.2.1, weakResult.2.2⟩
+      · intro retained member
+        cases defaultMarker with
+        | none => simp at member
+        | some marker =>
+            have retainedEq : retained = marker := by simpa using member.symm
+            subst retained
+            simpa [Option.ValidFor] using defaultValid
+      · intro retained member
+        cases genericParameters with
+        | none => simp at member
+        | some parameters =>
+            have retainedEq : retained = parameters := by simpa using member.symm
+            subst retained
+            simpa [Option.ValidFor] using genericsValid.1
+      · intro retained member parameter parameterMember
+        cases genericParameters with
+        | none => simp at member
+        | some parameters =>
+            have retainedEq : retained = parameters := by simpa using member.symm
+            subst retained
+            exact genericsValid.2 parameter parameterMember
+      · intro clause member
+        cases parsedWhereClause with
+        | none => simp at member
+        | some retained =>
+            simp at member
+            subst clause
+            simpa [Option.ValidFor] using whereValid
+
 end Solcore.Syntax.Parser
