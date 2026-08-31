@@ -149,8 +149,10 @@ def attachDeriveAttribute (derive : DeriveAttribute)
 
 end FileInternals
 
+namespace FileInternals
+
 /-- Parse one top-level form, including an optional derive attribute. -/
-private def topItem : Parser TopItem := fun state =>
+def topItem : Parser TopItem := fun state =>
   if isSymbol state .hash then
     match deriveAttribute state with
     | .ok derive afterDerive =>
@@ -162,6 +164,8 @@ private def topItem : Parser TopItem := fun state =>
     | .invariant error => .invariant error
   else
     FileInternals.plainTopItem state
+
+end FileInternals
 
 namespace FileInternals
 
