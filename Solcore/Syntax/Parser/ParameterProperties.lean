@@ -460,6 +460,103 @@ theorem recoverParameter_preservesTokenWindow :
         (afterToken.remainingCount + 1) afterToken).trans (by
           simp [(advance?_state_shape advanced).2])
 
+private theorem finishTypedParameter_ok_state_shape (start : SourceSpan)
+    (marker : Option SourceSpan) (name : Identifier) (type : TypeExpr)
+    {input final : State} {value : FunctionParameter}
+    (parsed : finishTypedParameter start marker name type input = .ok value final) :
+    input.cursor = final.cursor ∧ start.startByte = value.span.startByte := by
+  cases valueEq : type.value <;>
+    simp only [finishTypedParameter, valueEq, emitDiagnostic, modifyState,
+      bind, pure] at parsed <;> cases parsed <;> exact ⟨rfl, rfl⟩
+
+theorem errorParameter_ok_state_shape (span : SourceSpan)
+    (constraint : ParseConstraint) {input final : State}
+    {value : FunctionParameter}
+    (parsed : errorParameter span constraint input = .ok value final) :
+    input.cursor = final.cursor ∧ value.span = span := by
+  unfold errorParameter emitDiagnostic modifyState at parsed
+  simp only [bind, pure] at parsed
+  cases parsed
+  exact ⟨rfl, rfl⟩
+
+theorem namedParameterTail_ok_state_shape (start : SourceSpan)
+    (marker : Option SourceSpan) (name : Identifier) (errorSpan : SourceSpan)
+    (errorStart : errorSpan.startByte = start.startByte) {input final : State}
+    {value : FunctionParameter}
+    (parsed : namedParameterTail start marker name errorSpan input = .ok value final) :
+    input.cursor ≤ final.cursor ∧ start.startByte = value.span.startByte := by
+  unfold namedParameterTail getState at parsed
+  simp only [bind] at parsed
+  by_cases typed : isSymbol input .colon
+  · simp only [typed, if_true] at parsed
+    cases colonResult : symbol .colon .parameter input with
+    | ok colon afterColon =>
+        simp only [colonResult] at parsed
+        cases typeResult : typeExpr afterColon with
+        | ok type afterType =>
+            simp only [typeResult] at parsed
+            have finished := finishTypedParameter_ok_state_shape
+              start marker name type parsed
+            exact ⟨Nat.le_trans
+              (symbol_cursorMonotoneOnSuccess .colon .parameter
+                input colon afterColon colonResult)
+              (Nat.le_trans (typeExpr_cursorMonotoneOnSuccess
+                afterColon type afterType typeResult)
+                (Nat.le_of_eq finished.1)), finished.2⟩
+        | reject failure rejected => simp [typeResult] at parsed
+        | invariant error => simp [typeResult] at parsed
+    | reject failure rejected => simp [colonResult] at parsed
+    | invariant error => simp [colonResult] at parsed
+  · simp only [typed] at parsed
+    have failed := errorParameter_ok_state_shape errorSpan
+      .namedParameterRequiresType parsed
+    exact ⟨Nat.le_of_eq failed.1,
+      errorStart.symm.trans (congrArg _ failed.2).symm⟩
+
+private theorem recoverParameterAux_ok_state_shape (first last : SourceSpan) :
+    ∀ fuel, ∀ {input final : State} {value : FunctionParameter},
+      recoverParameterAux first last fuel input = .ok value final →
+      input.cursor ≤ final.cursor ∧ first.startByte = value.span.startByte := by
+  intro fuel
+  induction fuel generalizing last with
+  | zero => simp [recoverParameterAux]
+  | succ fuel inductionHypothesis =>
+      intro input final value parsed
+      unfold recoverParameterAux at parsed
+      split at parsed
+      · unfold finishRecoveredParameter at parsed
+        cases parsed
+        exact ⟨Nat.le_refl _, rfl⟩
+      · cases advanced : input.advance? with
+        | none =>
+            simp only [advanced] at parsed
+            unfold finishRecoveredParameter at parsed
+            cases parsed
+            exact ⟨Nat.le_refl _, rfl⟩
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at parsed
+            have recursive := inductionHypothesis token.span parsed
+            exact ⟨Nat.le_trans (by
+              simp [(advance?_state_shape advanced).2]) recursive.1,
+              recursive.2⟩
+
+theorem recoverParameter_ok_state_shape {input final : State}
+    {value : FunctionParameter} (parsed : recoverParameter input =
+      .ok value final) : input.cursor ≤ final.cursor ∧
+      ∃ token, input.peek? = some token ∧
+        token.span.startByte = value.span.startByte := by
+  unfold recoverParameter at parsed
+  cases advanced : input.advance? with
+  | none => simp [advanced, rejectAt] at parsed
+  | some pair =>
+      rcases pair with ⟨token, afterToken⟩
+      simp only [advanced] at parsed
+      have recovered := recoverParameterAux_ok_state_shape token.span
+        token.span (afterToken.remainingCount + 1) parsed
+      exact ⟨Nat.le_trans (by simp [(advance?_state_shape advanced).2])
+        recovered.1, token, (advance?_state_shape advanced).1, recovered.2⟩
+
 end FunctionParameterInternals
 
 namespace LambdaParameterInternals
@@ -737,6 +834,144 @@ theorem recoverLambdaParameter_preservesTokenWindow :
   cases parsed : FunctionParameterInternals.recoverParameter input <;>
     rw [parsed] at shape <;> exact shape
 
+private theorem ordinaryLambdaParameterTail_ok_state_shape (name : Identifier)
+    {input final : State} {value : LambdaParameter}
+    (parsed : ordinaryLambdaParameterTail name input = .ok value final) :
+    input.cursor ≤ final.cursor ∧ name.span.startByte = value.span.startByte := by
+  unfold ordinaryLambdaParameterTail getState at parsed
+  simp only [bind] at parsed
+  by_cases typed : isSymbol input .colon
+  · simp only [typed, if_true] at parsed
+    cases tailResult : FunctionParameterInternals.namedParameterTail
+        name.span none name name.span input with
+    | ok parameter afterParameter =>
+        simp only [tailResult, pure] at parsed
+        have shape := FunctionParameterInternals.namedParameterTail_ok_state_shape
+          name.span none name name.span rfl tailResult
+        cases parsed
+        exact shape
+    | reject failure rejected => simp [tailResult] at parsed
+    | invariant error => simp [tailResult] at parsed
+  · simp only [typed, pure] at parsed
+    cases parsed
+    exact ⟨Nat.le_refl _, rfl⟩
+
+private theorem comptimeLambdaParameterTail_ok_state_shape (marker : Token)
+    (name : Identifier) {input final : State} {value : LambdaParameter}
+    (parsed : comptimeLambdaParameterTail marker name input = .ok value final) :
+    input.cursor ≤ final.cursor ∧ marker.span.startByte = value.span.startByte := by
+  unfold comptimeLambdaParameterTail getState at parsed
+  simp only [bind] at parsed
+  by_cases typed : isSymbol input .colon
+  · simp only [typed, if_true] at parsed
+    cases tailResult : FunctionParameterInternals.namedParameterTail marker.span
+        (some marker.span) name (SourceSpan.cover marker.span name.span) input with
+    | ok parameter afterParameter =>
+        simp only [tailResult, pure] at parsed
+        have shape := FunctionParameterInternals.namedParameterTail_ok_state_shape
+          marker.span (some marker.span) name
+            (SourceSpan.cover marker.span name.span) rfl tailResult
+        cases parsed
+        exact shape
+    | reject failure rejected => simp [tailResult] at parsed
+    | invariant error => simp [tailResult] at parsed
+  · simp only [typed] at parsed
+    cases errorResult : FunctionParameterInternals.errorParameter
+        (SourceSpan.cover marker.span name.span)
+          .comptimeParameterRequiresType input with
+    | ok parameter afterParameter =>
+        simp only [pure] at parsed
+        cases parsed
+        exact ⟨by simp [State.emit], rfl⟩
+    | reject failure rejected => simp [errorResult] at parsed
+    | invariant error => simp [errorResult] at parsed
+
+private theorem ordinaryLambdaParameter_ok_state_shape {input final : State}
+    {value : LambdaParameter} (parsed : ordinaryLambdaParameter input =
+      .ok value final) : input.cursor ≤ final.cursor ∧
+      ∃ token, input.peek? = some token ∧
+        token.span.startByte = value.span.startByte := by
+  unfold ordinaryLambdaParameter at parsed
+  simp only [bind] at parsed
+  cases nameResult : identifier .parameter input with
+  | ok name afterName =>
+      simp only [nameResult] at parsed
+      rcases identifier_ok_state_shape .parameter nameResult with
+        ⟨token, found, nameSpan, _tokens, _cursor⟩
+      have nameMonotone := identifier_cursorMonotoneOnSuccess .parameter
+        input name afterName nameResult
+      by_cases warned : name.value == ContextualKeyword.comptime.spelling
+      · simp only [warned, if_true, emitDiagnostic, modifyState] at parsed
+        have tail := ordinaryLambdaParameterTail_ok_state_shape name parsed
+        exact ⟨Nat.le_trans nameMonotone (by
+          simpa [State.emit] using tail.1), token, found,
+          (congrArg SourceSpan.startByte nameSpan).trans tail.2⟩
+      · simp only [warned] at parsed
+        have tail := ordinaryLambdaParameterTail_ok_state_shape name parsed
+        exact ⟨Nat.le_trans nameMonotone tail.1, token, found,
+          (congrArg SourceSpan.startByte nameSpan).trans tail.2⟩
+  | reject failure rejected => simp [nameResult] at parsed
+  | invariant error => simp [nameResult] at parsed
+
+private theorem comptimeLambdaParameter_ok_state_shape {input final : State}
+    {value : LambdaParameter} (parsed : comptimeLambdaParameter input =
+      .ok value final) : input.cursor ≤ final.cursor ∧
+      ∃ token, input.peek? = some token ∧
+        token.span.startByte = value.span.startByte := by
+  unfold comptimeLambdaParameter at parsed
+  simp only [bind] at parsed
+  cases markerResult : contextual .comptime .parameter input with
+  | ok marker afterMarker =>
+      simp only [markerResult] at parsed
+      cases nameResult : identifier .parameter afterMarker with
+      | ok name afterName =>
+          simp only [nameResult] at parsed
+          have tail := comptimeLambdaParameterTail_ok_state_shape
+            marker name parsed
+          have markerShape := acceptToken_ok_state_shape
+            (.contextual .comptime) .parameter (fun kind =>
+              kind.isContextual .comptime) markerResult
+          exact ⟨Nat.le_trans
+            (contextual_cursorMonotoneOnSuccess .comptime .parameter
+              input marker afterMarker markerResult)
+            (Nat.le_trans (identifier_cursorMonotoneOnSuccess .parameter
+              afterMarker name afterName nameResult) tail.1),
+            marker, markerShape.1, tail.2⟩
+      | reject failure rejected => simp [nameResult] at parsed
+      | invariant error => simp [nameResult] at parsed
+  | reject failure rejected => simp [markerResult] at parsed
+  | invariant error => simp [markerResult] at parsed
+
+theorem lambdaParameterCore_ok_state_shape {input final : State}
+    {value : LambdaParameter} (parsed : lambdaParameterCore input =
+      .ok value final) : input.cursor ≤ final.cursor ∧
+      ∃ token, input.peek? = some token ∧
+        token.span.startByte = value.span.startByte := by
+  unfold lambdaParameterCore at parsed
+  split at parsed
+  · simp only [Bool.and_true] at parsed
+    split at parsed
+    · exact comptimeLambdaParameter_ok_state_shape parsed
+    · exact ordinaryLambdaParameter_ok_state_shape parsed
+  · simp only [Bool.and_false, Bool.false_eq_true, if_false] at parsed
+    exact ordinaryLambdaParameter_ok_state_shape parsed
+
+theorem recoverLambdaParameter_ok_state_shape {input final : State}
+    {value : LambdaParameter} (parsed : recoverLambdaParameter input =
+      .ok value final) : input.cursor ≤ final.cursor ∧
+      ∃ token, input.peek? = some token ∧
+        token.span.startByte = value.span.startByte := by
+  unfold recoverLambdaParameter at parsed
+  cases recovery : FunctionParameterInternals.recoverParameter input with
+  | ok recovered next =>
+      simp only [recovery] at parsed
+      have shape := FunctionParameterInternals.recoverParameter_ok_state_shape
+        recovery
+      cases parsed
+      exact shape
+  | reject failure next => simp [recovery] at parsed
+  | invariant error => simp [recovery] at parsed
+
 end LambdaParameterInternals
 
 /-- Named parameters retain provenance through parsing and recovery. -/
@@ -891,5 +1126,50 @@ theorem lambdaParameter_preservesTokenWindow :
 theorem lambdaParameter_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess lambdaParameter :=
   lambdaParameter_preservesTokenWindow.preservesTokensOnSuccess
+
+theorem lambdaParameter_ok_state_shape {input final : State}
+    {value : LambdaParameter} (parsed : lambdaParameter input =
+      .ok value final) : input.cursor ≤ final.cursor ∧
+      ∃ token, input.peek? = some token ∧
+        token.span.startByte = value.span.startByte := by
+  unfold lambdaParameter at parsed
+  cases coreResult : LambdaParameterInternals.lambdaParameterCore input with
+  | invariant error => simp [coreResult] at parsed
+  | ok coreValue afterCore =>
+      simp only [coreResult] at parsed
+      have shape := LambdaParameterInternals.lambdaParameterCore_ok_state_shape
+        coreResult
+      cases parsed
+      exact shape
+  | reject failure failedState =>
+      simp only [coreResult] at parsed
+      have coreShape :=
+        LambdaParameterInternals.lambdaParameterCore_preservesTokenWindow input
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if rewound.atEnd || isSymbol rewound .comma ||
+          isSymbol rewound .rightParen then Reply.reject failure rewound
+        else LambdaParameterInternals.recoverLambdaParameter
+          (rewound.emit failure.toDiagnostic)) = .ok value final at parsed
+      split at parsed
+      · contradiction
+      · have recovered :=
+          LambdaParameterInternals.recoverLambdaParameter_ok_state_shape parsed
+        rcases recovered.2 with ⟨token, found, start⟩
+        refine ⟨by simpa [State.emit, rewound] using recovered.1,
+          token, ?_, start⟩
+        unfold State.peek? at found ⊢
+        simpa [State.emit, rewound, coreShape.1, coreShape.2] using found
+
+/-- Successful lambda-parameter parsing never rewinds the caller. -/
+theorem lambdaParameter_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess lambdaParameter :=
+  fun _ _ _ parsed => (lambdaParameter_ok_state_shape parsed).1
+
+/-- Successful lambda parameters start at the caller's current token. -/
+theorem lambdaParameter_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess lambdaParameter (fun value =>
+      value.span) :=
+  fun _ _ _ parsed => (lambdaParameter_ok_state_shape parsed).2
 
 end Solcore.Syntax.Parser
