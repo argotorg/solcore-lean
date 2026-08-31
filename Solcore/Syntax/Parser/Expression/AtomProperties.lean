@@ -1472,6 +1472,142 @@ theorem lambdaExpression_validFor (block : Parser Block)
           subst type
           simpa [Option.ValidFor] using returnTypeValid
 
+/-- Literal atoms consume their literal token. -/
+theorem literalExpression_cursor_lt_onSuccess {input next : State}
+    {expression : Expr}
+    (parsed : literalExpression input = .ok expression next) :
+    input.cursor < next.cursor := by
+  unfold literalExpression at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨literal, afterLiteral, literalResult, finished⟩
+  cases finished
+  exact coreLiteral_cursor_lt_onSuccess literalResult
+
+/-- Identifier atoms consume their name token. -/
+theorem identifierExpression_cursor_lt_onSuccess {input next : State}
+    {expression : Expr}
+    (parsed : identifierExpression input = .ok expression next) :
+    input.cursor < next.cursor := by
+  unfold identifierExpression at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨name, afterName, nameResult, finished⟩
+  cases finished
+  exact expressionName_cursor_lt_onSuccess nameResult
+
+/-- Proxy atoms consume `@` before parsing their type. -/
+theorem proxyExpression_cursor_lt_onSuccess {input next : State}
+    {expression : Expr}
+    (parsed : proxyExpression input = .ok expression next) :
+    input.cursor < next.cursor := by
+  unfold proxyExpression at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨type, afterType, typeResult, finished⟩
+  cases finished
+  exact Nat.lt_of_lt_of_le
+    (acceptToken_cursor_lt_onSuccess (.symbol .at) .expression
+      (· == .symbol .at) markerResult)
+    (typeExpr_cursorMonotoneOnSuccess afterMarker type next typeResult)
+
+/-- Leading-dot atoms consume their dot before all optional arguments. -/
+theorem dotConstructor_cursor_lt_onSuccess (nested : Parser Expr)
+    {input next : State} {expression : Expr}
+    (parsed : dotConstructor nested input = .ok expression next) :
+    input.cursor < next.cursor := by
+  unfold dotConstructor at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨dot, afterDot, dotResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨name, afterName, nameResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨arguments, afterArguments, argumentsResult, finished⟩
+  cases finished
+  exact Nat.lt_of_lt_of_le
+    (acceptToken_cursor_lt_onSuccess (.symbol .dot) .expression
+      (· == .symbol .dot) dotResult)
+    (Nat.le_trans (expressionName_cursorMonotoneOnSuccess afterDot name
+      afterName nameResult)
+      (optionalDotConstructorArguments_cursorMonotoneOnSuccess nested
+        afterName arguments next argumentsResult))
+
+/-- Parenthesized atoms consume their opening parenthesis. -/
+theorem parenthesized_cursor_lt_onSuccess (nested : Parser Expr)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested)
+    {input next : State} {expression : Expr}
+    (parsed : parenthesized nested input = .ok expression next) :
+    input.cursor < next.cursor := by
+  unfold parenthesized at parsed
+  cases openingResult : symbol .leftParen .expression input with
+  | invariant error => simp [openingResult] at parsed
+  | reject failure rejected => simp [openingResult] at parsed
+  | ok opening afterOpening =>
+      simp only [openingResult] at parsed
+      have openingStrict := acceptToken_cursor_lt_onSuccess
+        (.symbol .leftParen) .expression (· == .symbol .leftParen)
+          openingResult
+      split at parsed
+      · exact Nat.lt_of_lt_of_le openingStrict
+          (closeTuple_cursorMonotoneOnSuccess opening []
+            afterOpening expression next parsed)
+      · cases nestedResult : nested afterOpening with
+        | invariant error => simp [nestedResult] at parsed
+        | reject failure rejected => simp [nestedResult] at parsed
+        | ok first afterFirst =>
+            simp only [nestedResult] at parsed
+            have firstMonotone := nestedMonotone afterOpening first afterFirst
+              nestedResult
+            split at parsed
+            · contradiction
+            · split at parsed
+              · exact Nat.lt_of_lt_of_le openingStrict
+                  (Nat.le_trans firstMonotone
+                    (tupleTail_cursorMonotoneOnSuccess nested nestedMonotone
+                      opening (afterFirst.remainingCount + 1) [first]
+                        afterFirst expression next parsed))
+              · exact Nat.lt_of_lt_of_le openingStrict
+                  (Nat.le_trans firstMonotone
+                    (closeTuple_cursorMonotoneOnSuccess opening [first]
+                      afterFirst expression next parsed))
+
+/-- Array atoms consume their complete bracketed list. -/
+theorem arrayLiteral_cursor_lt_onSuccess (nested : Parser Expr)
+    {input next : State} {expression : Expr}
+    (parsed : arrayLiteral nested input = .ok expression next) :
+    input.cursor < next.cursor := by
+  unfold arrayLiteral at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨values, afterValues, valuesResult, finished⟩
+  cases finished
+  exact delimitedWithPolicy_cursor_lt_onSuccess .leftBracket .rightBracket
+    true false nested .expression .expression valuesResult
+
+/-- Lambda atoms consume `lam` before their remaining syntax. -/
+theorem lambdaExpression_cursor_lt_onSuccess (block : Parser Block)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block)
+    {input next : State} {expression : Expr}
+    (parsed : lambdaExpression block input = .ok expression next) :
+    input.cursor < next.cursor := by
+  unfold lambdaExpression at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨parameters, afterParameters, parametersResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨returnType, afterReturnType, returnTypeResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨body, afterBody, bodyResult, finished⟩
+  cases finished
+  exact Nat.lt_of_lt_of_le
+    (acceptToken_cursor_lt_onSuccess (.keyword .lamKw) .expression
+      (· == .keyword .lamKw) markerResult)
+    (Nat.le_trans (delimited_cursorMonotoneOnSuccess .leftParen .rightParen
+      true lambdaParameter .parameter .expression afterMarker parameters
+        afterParameters parametersResult)
+      (Nat.le_trans (optionalLambdaReturnType_cursorMonotoneOnSuccess
+        afterParameters returnType afterReturnType returnTypeResult)
+        (blockCursor afterReturnType body next bodyResult)))
+
 /-- Atom dispatch preserves recursive source provenance in every branch. -/
 theorem expressionAtomCore_validFor
     (nested : Parser Expr) (block : Parser Block)
@@ -1557,6 +1693,32 @@ theorem expressionAtomCore_cursorMonotoneOnSuccess
               · exact lambdaExpression_cursorMonotoneOnSuccess block blockCursor
                   input value next result
               · simp [rejectAt] at result
+
+/-- Every successful dispatched atom consumes at least one token. -/
+theorem expressionAtomCore_cursor_lt_onSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block)
+    {input next : State} {value : Expr}
+    (parsed : expressionAtomCore nested block input = .ok value next) :
+    input.cursor < next.cursor := by
+  unfold expressionAtomCore at parsed
+  split at parsed
+  · exact literalExpression_cursor_lt_onSuccess parsed
+  · split at parsed
+    · exact identifierExpression_cursor_lt_onSuccess parsed
+    · split at parsed
+      · exact dotConstructor_cursor_lt_onSuccess nested parsed
+      · split at parsed
+        · exact proxyExpression_cursor_lt_onSuccess parsed
+        · split at parsed
+          · exact parenthesized_cursor_lt_onSuccess nested nestedMonotone parsed
+          · split at parsed
+            · exact arrayLiteral_cursor_lt_onSuccess nested parsed
+            · split at parsed
+              · exact lambdaExpression_cursor_lt_onSuccess block blockCursor
+                  parsed
+              · simp [rejectAt] at parsed
 
 /-- Every successful atom branch starts at the dispatch input token. -/
 theorem expressionAtomCore_startsAtCurrentTokenOnSuccess
@@ -1748,6 +1910,20 @@ theorem recoverAtom_ok_state_shape {input final : State} {value : Expr}
       exact ⟨Nat.le_trans (by simp [(advance?_state_shape advanced).2])
         recovered.1, token, (advance?_state_shape advanced).1, recovered.2⟩
 
+/-- Successful recovery strictly consumes its first malformed token. -/
+theorem recoverAtom_cursor_lt_onSuccess {input final : State} {value : Expr}
+    (parsed : recoverAtom input = .ok value final) :
+    input.cursor < final.cursor := by
+  unfold recoverAtom at parsed
+  cases advanced : input.advance? with
+  | none => simp [advanced, rejectAt] at parsed
+  | some pair =>
+      rcases pair with ⟨token, afterToken⟩
+      simp only [advanced] at parsed
+      exact Nat.lt_of_lt_of_le (by simp [(advance?_state_shape advanced).2])
+        (recoverAtomAux_ok_state_shape token.span token.span
+          (afterToken.remainingCount + 1) parsed).1
+
 /-- Public atom parsing preserves token windows through dispatch and recovery. -/
 theorem expressionAtom_preservesTokenWindow
     (nested : Parser Expr) (block : Parser Block)
@@ -1860,6 +2036,34 @@ theorem expressionAtom_cursorMonotoneOnSuccess
       · contradiction
       · exact (by simpa [rewound, State.emit] using
           (recoverAtom_ok_state_shape result).1)
+
+/-- Every successful public atom parse consumes at least one token. -/
+theorem expressionAtom_cursor_lt_onSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block)
+    {input next : State} {value : Expr}
+    (parsed : expressionAtom nested block input = .ok value next) :
+    input.cursor < next.cursor := by
+  unfold expressionAtom at parsed
+  cases coreResult : expressionAtomCore nested block input with
+  | invariant error => simp [coreResult] at parsed
+  | ok coreValue afterCore =>
+      simp only [coreResult] at parsed
+      have strict := expressionAtomCore_cursor_lt_onSuccess nested block
+        nestedMonotone blockCursor coreResult
+      cases parsed
+      exact strict
+  | reject failure failedState =>
+      simp only [coreResult] at parsed
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if isAtomBoundary rewound then Reply.reject failure rewound
+        else recoverAtom (rewound.emit failure.toDiagnostic)) =
+          .ok value next at parsed
+      split at parsed
+      · contradiction
+      · simpa [rewound, State.emit] using
+          recoverAtom_cursor_lt_onSuccess parsed
 
 /-- Public atom success starts at its caller's current token. -/
 theorem expressionAtom_startsAtCurrentTokenOnSuccess
@@ -2202,6 +2406,26 @@ theorem expressionPostfix_cursorMonotoneOnSuccess
   | ok base next =>
       simp only [atomResult] at parsed
       exact Nat.le_trans (atomCursor input base next atomResult)
+        (postfixTail_cursorMonotoneOnSuccess nested block nestedCursor
+          (next.remainingCount + 1) base next expression final parsed)
+
+/-- Concrete postfix success is strict because its atom is strict. -/
+theorem expressionPostfix_cursor_lt_onSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block)
+    {input final : State} {expression : Expr}
+    (parsed : expressionPostfix nested block input = .ok expression final) :
+    input.cursor < final.cursor := by
+  unfold expressionPostfix at parsed
+  cases atomResult : expressionAtom nested block input with
+  | invariant error => simp [atomResult] at parsed
+  | reject failure rejected => simp [atomResult] at parsed
+  | ok base next =>
+      simp only [atomResult] at parsed
+      exact Nat.lt_of_lt_of_le
+        (expressionAtom_cursor_lt_onSuccess nested block nestedCursor
+          blockCursor atomResult)
         (postfixTail_cursorMonotoneOnSuccess nested block nestedCursor
           (next.remainingCount + 1) base next expression final parsed)
 

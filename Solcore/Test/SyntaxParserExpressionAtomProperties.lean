@@ -80,5 +80,16 @@ example := @ExpressionAtomInternals.expressionAtom_preservesTokenWindow
 example := @ExpressionAtomInternals.expressionAtom_preservesTokensOnSuccess
 example := @ExpressionAtomInternals.expressionAtom_cursorMonotoneOnSuccess
 example := @ExpressionAtomInternals.expressionAtom_startsAtCurrentTokenOnSuccess
+example := @ExpressionAtomInternals.literalExpression_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.identifierExpression_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.dotConstructor_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.proxyExpression_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.parenthesized_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.arrayLiteral_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.lambdaExpression_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.expressionAtomCore_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.recoverAtom_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.expressionAtom_cursor_lt_onSuccess
+example := @ExpressionAtomInternals.expressionPostfix_cursor_lt_onSuccess
 
 end Tests
