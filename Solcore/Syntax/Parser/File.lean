@@ -171,7 +171,9 @@ private def topItem : Parser TopItem := fun state =>
   else
     plainTopItem state
 
-private def finishRecoveredTopItem (first last : SourceSpan)
+namespace FileInternals
+
+def finishRecoveredTopItem (first last : SourceSpan)
     (state : State) : Reply TopItem :=
   let span := SourceSpan.cover first last
   .ok {
@@ -183,7 +185,7 @@ private def finishRecoveredTopItem (first last : SourceSpan)
     kind := .recovered .topItem
   })
 
-private def recoverTopItemAux (first last : SourceSpan) :
+def recoverTopItemAux (first last : SourceSpan) :
     Nat → State → Reply TopItem
   | 0, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, state =>
@@ -195,12 +197,14 @@ private def recoverTopItemAux (first last : SourceSpan) :
             recoverTopItemAux first token.span fuel next
         | none => finishRecoveredTopItem first last state
 
-private def recoverTopItem (state : State) : Reply TopItem :=
+def recoverTopItem (state : State) : Reply TopItem :=
   match state.advance? with
   | some (token, next) =>
       recoverTopItemAux token.span token.span
         (next.remainingCount + 1) next
   | none => rejectAt state { head := .topItem, tail := [] } .topItem
+
+end FileInternals
 
 private def parseItems :
     Nat → List TopItem → State → Reply (List TopItem)
@@ -225,7 +229,7 @@ private def parseItems :
               .ok itemsRev.reverse (rewound.emit failure.toDiagnostic)
             else
               -- The enclosing recovery diagnostic replaces its inner failure.
-              match recoverTopItem rewound with
+              match FileInternals.recoverTopItem rewound with
               | .ok item next =>
                   parseItems fuel (item :: itemsRev) next
               | .reject recoveryFailure next =>
