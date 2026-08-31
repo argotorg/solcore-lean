@@ -447,4 +447,248 @@ theorem yulExpressionCore_cursorMonotoneOnSuccess
   intro input expression next result
   exact Nat.le_of_lt (yulExpressionCore_cursor_lt_onSuccess nested result)
 
+namespace YulExpressionInternals
+
+private theorem advance?_state_shape {input next : State} {token : Token}
+    (advanced : input.advance? = some (token, next)) :
+    input.peek? = some token ∧
+      next = { input with cursor := input.cursor + 1 } := by
+  unfold State.advance? at advanced
+  cases found : input.peek? with
+  | none => simp [found] at advanced
+  | some current =>
+      simp only [found, Option.map_some] at advanced
+      cases advanced
+      exact ⟨rfl, rfl⟩
+
+/-- Finishing Yul-expression recovery retains a source-valid error range. -/
+theorem finishRecovered_validFor (first last : SourceSpan) (state : State)
+    (stateValid : state.ValidFor) (firstValid : first.ValidFor state.file)
+    (lastValid : last.ValidFor state.file)
+    (ordered : first.startByte ≤ last.endByte) :
+    (finishRecovered first last state).ValidFor state YulExpr.ValidFor := by
+  have spanValid := SourceSpan.cover_validFor firstValid lastValid ordered
+  unfold finishRecovered Reply.ValidFor
+  exact ⟨YulExpr.ValidFor.error spanValid,
+    stateValid.emit_validFor _ spanValid, rfl⟩
+
+/--
+Recovery preserves recursive expression provenance.  The final hypotheses
+record the already-consumed token whose span is `last`; they make the source
+ordering needed by the next recovery step explicit.
+-/
+theorem recoverAux_validFor (first : SourceSpan) :
+    ∀ fuel last state lastIndex lastToken,
+      state.ValidFor → first.ValidFor state.file →
+      last.ValidFor state.file → first.startByte ≤ last.endByte →
+      state.tokens[lastIndex]? = some lastToken → lastToken.span = last →
+      lastIndex < state.cursor →
+      (recoverAux first last fuel state).ValidFor state YulExpr.ValidFor := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro last state lastIndex lastToken stateValid firstValid lastValid
+        ordered lastFound lastSpan lastBefore
+      unfold recoverAux
+      split
+      · exact finishRecovered_validFor first last state stateValid firstValid
+          lastValid ordered
+      · cases advanced : state.advance? with
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have nextValid := stateValid.advance?_validFor advanced
+            unfold State.advance? at advanced
+            cases found : state.peek? with
+            | none => simp [found] at advanced
+            | some current =>
+                simp only [found, Option.map_some] at advanced
+                cases advanced
+                have tokenValid := stateValid.peek?_span_validFor found
+                have currentFound :=
+                  State.getElem?_eq_some_of_peek?_eq_some found
+                have lastBeforeCurrent :=
+                  stateValid.token_end_le_token_start_of_getElem?_lt
+                    lastFound currentFound lastBefore
+                have recursive := inductionHypothesis token.span
+                  { state with cursor := state.cursor + 1 } state.cursor token
+                  nextValid (by simpa using firstValid)
+                  (by simpa using tokenValid)
+                  (Nat.le_trans ordered (Nat.le_trans
+                    (by simpa [lastSpan] using lastBeforeCurrent)
+                    tokenValid.2.1))
+                  currentFound rfl (by simp)
+                exact recursive.of_file_eq rfl
+        | none =>
+            exact finishRecovered_validFor first last state stateValid
+              firstValid lastValid ordered
+
+/-- Successful recovery preserves tokens, cursor order, and its first byte. -/
+theorem recoverAux_ok_state_shape (first : SourceSpan) :
+    ∀ fuel last input expression next,
+      recoverAux first last fuel input = .ok expression next →
+      next.tokens = input.tokens ∧ input.cursor ≤ next.cursor ∧
+        expression.span.startByte = first.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro last input expression next result
+      unfold recoverAux at result
+      split at result
+      · unfold finishRecovered at result
+        cases result
+        exact ⟨rfl, Nat.le_refl _, rfl⟩
+      · cases advanced : input.advance? with
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have recursive := inductionHypothesis token.span afterToken
+              expression next result
+            unfold State.advance? at advanced
+            cases found : input.peek? with
+            | none => simp [found] at advanced
+            | some current =>
+                simp only [found, Option.map_some] at advanced
+                cases advanced
+                exact ⟨recursive.1,
+                  Nat.le_trans (Nat.le_add_right input.cursor 1)
+                    recursive.2.1,
+                  recursive.2.2⟩
+        | none =>
+            simp only [advanced] at result
+            unfold finishRecovered at result
+            cases result
+            exact ⟨rfl, Nat.le_refl _, rfl⟩
+
+/-- Yul recovery preserves the immutable lexer token carrier on success. -/
+theorem recoverAux_preservesTokensOnSuccess (first last : SourceSpan)
+    (fuel : Nat) :
+    Parser.PreservesTokensOnSuccess (recoverAux first last fuel) := by
+  intro input expression next result
+  exact (recoverAux_ok_state_shape first fuel last input expression next
+    result).1
+
+/-- Yul recovery never rewinds the cursor on success. -/
+theorem recoverAux_cursorMonotoneOnSuccess (first last : SourceSpan)
+    (fuel : Nat) :
+    Parser.CursorMonotoneOnSuccess (recoverAux first last fuel) := by
+  intro input expression next result
+  exact (recoverAux_ok_state_shape first fuel last input expression next
+    result).2.1
+
+/-- One recovering Yul-expression layer preserves recursive provenance. -/
+theorem layer_validFor (nested : Parser YulExpr)
+    (nestedValid : nested.ValidFor YulExpr.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (coreRejectShape : ∀ input failure failedState,
+      yulExpressionCore nested input = .reject failure failedState →
+      failedState.tokens = input.tokens ∧ failedState.window = input.window) :
+    (layer nested).ValidFor YulExpr.ValidFor := by
+  intro input inputValid
+  unfold layer
+  cases coreResult : yulExpressionCore nested input with
+  | ok expression next =>
+      have valid := yulExpressionCore_validFor nested nestedValid
+        nestedPreserves input inputValid
+      rw [coreResult] at valid
+      exact valid
+  | invariant error => trivial
+  | reject failure failedState =>
+      have coreValid := yulExpressionCore_validFor nested nestedValid
+        nestedPreserves input inputValid
+      rw [coreResult] at coreValid
+      have rejectedShape := coreRejectShape input failure failedState coreResult
+      let rewound : State := { failedState with cursor := input.cursor }
+      have rewoundValid : rewound.ValidFor := {
+        tokens := coreValid.2.1.tokens
+        cursor_le_endIndex := by
+          simpa [rewound, rejectedShape.2] using inputValid.cursor_le_endIndex
+        endIndex_le_size := coreValid.2.1.endIndex_le_size
+        endByte_le_source := coreValid.2.1.endByte_le_source
+        endByte_boundary := coreValid.2.1.endByte_boundary
+        diagnosticsRev := coreValid.2.1.diagnosticsRev
+      }
+      have rewoundFile : rewound.file = input.file := by
+        simpa [rewound] using coreValid.2.2
+      have failureValid : failure.span.ValidFor rewound.file := by
+        simpa [rewound, coreValid.2.2] using coreValid.1
+      change (if isBoundary rewound then Reply.reject failure rewound else
+        match rewound.advance? with
+        | some (token, next) =>
+            recoverAux token.span token.span (next.remainingCount + 1)
+              (next.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound).ValidFor input YulExpr.ValidFor
+      split
+      · exact ⟨coreValid.1, rewoundValid, rewoundFile⟩
+      · cases advanced : rewound.advance? with
+        | none => exact ⟨coreValid.1, rewoundValid, rewoundFile⟩
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have advanceShape := advance?_state_shape advanced
+            have nextValid := rewoundValid.advance?_validFor advanced
+            have tokenValid : token.span.ValidFor next.file := by
+              rw [advanceShape.2]
+              exact rewoundValid.peek?_span_validFor advanceShape.1
+            have emittedValid := nextValid.emit_validFor failure.toDiagnostic
+              (by simpa [advanceShape.2] using
+                failure.toDiagnostic_span_validFor failureValid)
+            have currentFound :
+                (next.emit failure.toDiagnostic).tokens[rewound.cursor]? =
+                  some token := by
+              simpa [advanceShape.2, State.emit] using
+                State.getElem?_eq_some_of_peek?_eq_some advanceShape.1
+            have recovered := recoverAux_validFor token.span
+              (next.remainingCount + 1) token.span
+              (next.emit failure.toDiagnostic) rewound.cursor token emittedValid
+              (by simpa [State.emit] using tokenValid)
+              (by simpa [State.emit] using tokenValid)
+              tokenValid.2.1 currentFound rfl (by
+                simp [advanceShape.2, State.emit])
+            exact recovered.of_file_eq (by
+              simpa [advanceShape.2, State.emit] using rewoundFile)
+
+/-- A recovering Yul layer preserves tokens when rejection does as well. -/
+theorem layer_preservesTokensOnSuccess (nested : Parser YulExpr)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (coreRejectPreserves : ∀ input failure failedState,
+      yulExpressionCore nested input = .reject failure failedState →
+      failedState.tokens = input.tokens) :
+    Parser.PreservesTokensOnSuccess (layer nested) := by
+  intro input expression next result
+  unfold layer at result
+  cases coreResult : yulExpressionCore nested input with
+  | ok value afterCore =>
+      simp only [coreResult] at result
+      have preserved := yulExpressionCore_preservesTokensOnSuccess nested
+        nestedPreserves input value afterCore coreResult
+      cases result
+      exact preserved
+  | invariant error => simp [coreResult] at result
+  | reject failure failedState =>
+      simp only [coreResult] at result
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if isBoundary rewound then Reply.reject failure rewound else
+        match rewound.advance? with
+        | some (token, afterToken) =>
+            recoverAux token.span token.span (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound) = .ok expression next at result
+      split at result
+      · contradiction
+      · cases advanced : rewound.advance? with
+        | none => simp [advanced] at result
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have recovered := recoverAux_ok_state_shape token.span
+              (afterToken.remainingCount + 1) token.span
+              (afterToken.emit failure.toDiagnostic) expression next result
+            have advanceShape := advance?_state_shape advanced
+            exact recovered.1.trans (by
+              simpa [advanceShape.2, State.emit, rewound] using
+                coreRejectPreserves input failure failedState coreResult)
+
+end YulExpressionInternals
+
 end Solcore.Syntax.Parser

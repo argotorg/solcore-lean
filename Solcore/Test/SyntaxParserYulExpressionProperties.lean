@@ -48,4 +48,27 @@ example (nested : Parser YulExpr) {input next : State} {expression : YulExpr}
     input.cursor < next.cursor :=
   yulExpressionCore_cursor_lt_onSuccess nested parsed
 
+example := @YulExpressionInternals.finishRecovered_validFor
+example := @YulExpressionInternals.recoverAux_validFor
+example := @YulExpressionInternals.recoverAux_ok_state_shape
+
+example (first last : SourceSpan) (fuel : Nat) :
+    Parser.PreservesTokensOnSuccess
+      (YulExpressionInternals.recoverAux first last fuel) :=
+  YulExpressionInternals.recoverAux_preservesTokensOnSuccess first last fuel
+
+example (first last : SourceSpan) (fuel : Nat) :
+    Parser.CursorMonotoneOnSuccess
+      (YulExpressionInternals.recoverAux first last fuel) :=
+  YulExpressionInternals.recoverAux_cursorMonotoneOnSuccess first last fuel
+
+example (nested : Parser YulExpr)
+    (valid : nested.ValidFor YulExpr.ValidFor)
+    (preserves : Parser.PreservesTokensOnSuccess nested)
+    (rejectShape : ∀ input failure failedState,
+      yulExpressionCore nested input = .reject failure failedState →
+      failedState.tokens = input.tokens ∧ failedState.window = input.window) :
+    (YulExpressionInternals.layer nested).ValidFor YulExpr.ValidFor :=
+  YulExpressionInternals.layer_validFor nested valid preserves rejectShape
+
 end Tests

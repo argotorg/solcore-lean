@@ -109,10 +109,12 @@ def yulExpressionCore (nested : Parser YulExpr) : Parser YulExpr :=
         tail := [.yulLiteral]
       } .yulExpression
 
-private def isYulExpressionBoundary (state : State) : Bool :=
+namespace YulExpressionInternals
+
+def isBoundary (state : State) : Bool :=
   state.atEnd || [.comma, .rightParen, .rightBrace].any (isSymbol state)
 
-private def finishRecoveredYulExpression (first last : SourceSpan)
+def finishRecovered (first last : SourceSpan)
     (state : State) : Reply YulExpr :=
   let span := SourceSpan.cover first last
   .ok { span, value := .error } (state.emit {
@@ -120,41 +122,43 @@ private def finishRecoveredYulExpression (first last : SourceSpan)
     kind := .recovered .yulExpression
   })
 
-private def recoverYulExpressionAux (first last : SourceSpan) :
+def recoverAux (first last : SourceSpan) :
     Nat → State → Reply YulExpr
   | 0, state => .invariant (.fuelExhausted .yul state.currentSpan)
   | fuel + 1, state =>
-      if isYulExpressionBoundary state then
-        finishRecoveredYulExpression first last state
+      if isBoundary state then
+        finishRecovered first last state
       else
         match state.advance? with
         | some (token, next) =>
-            recoverYulExpressionAux first token.span fuel next
-        | none => finishRecoveredYulExpression first last state
+            recoverAux first token.span fuel next
+        | none => finishRecovered first last state
 
-private def yulExpressionLayer (nested : Parser YulExpr) : Parser YulExpr :=
+def layer (nested : Parser YulExpr) : Parser YulExpr :=
     fun state =>
   match yulExpressionCore nested state with
   | .ok value next => .ok value next
   | .reject failure failedState =>
       let rewound := { failedState with cursor := state.cursor }
-      if isYulExpressionBoundary rewound then
+      if isBoundary rewound then
         .reject failure rewound
       else
         match rewound.advance? with
         | some (token, next) =>
-            recoverYulExpressionAux token.span token.span
+            recoverAux token.span token.span
               (next.remainingCount + 1)
               (next.emit failure.toDiagnostic)
         | none => .reject failure rewound
   | .invariant error => .invariant error
 
-private def yulExpressionWithFuel : Nat → Parser YulExpr
+def withFuel : Nat → Parser YulExpr
   | 0 => fun state => .invariant (.fuelExhausted .yul state.currentSpan)
-  | fuel + 1 => yulExpressionLayer (yulExpressionWithFuel fuel)
+  | fuel + 1 => layer (withFuel fuel)
+
+end YulExpressionInternals
 
 /-- Parse one complete recursive inline-Yul expression. -/
 def yulExpression : Parser YulExpr := fun state =>
-  yulExpressionWithFuel (state.remainingCount + 1) state
+  YulExpressionInternals.withFuel (state.remainingCount + 1) state
 
 end Solcore.Syntax.Parser
