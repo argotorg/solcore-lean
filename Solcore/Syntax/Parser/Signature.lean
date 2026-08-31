@@ -774,4 +774,250 @@ theorem functionModifiers_cursorMonotoneOnSuccess (location : FunctionLocation) 
   intro _
   exact Parser.pure_cursorMonotoneOnSuccess _
 
+theorem optionalFunctionModifier_some_startsAtCurrentTokenOnSuccess
+    (keywordValue : HardKeyword) {input next : State} {span : SourceSpan}
+    (parsed : optionalFunctionModifier keywordValue input =
+      .ok (some span) next) :
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte = span.startByte := by
+  unfold optionalFunctionModifier getState at parsed
+  simp only [bind] at parsed
+  by_cases present : isKeyword input keywordValue
+  · simp only [present, if_true] at parsed
+    rcases signatureBind_ok_components parsed with
+      ⟨marker, afterMarker, markerResult, finished⟩
+    have starts := acceptToken_startsAtCurrentTokenOnSuccess
+      (.keyword keywordValue) .parameter (· == .keyword keywordValue)
+      input marker afterMarker markerResult
+    cases finished
+    exact starts
+  · simp only [present] at parsed
+    change Reply.ok none input = .ok (some span) next at parsed
+    cases parsed
+
+private theorem anchor_start_le_span_end {state : State}
+    {anchorIndex : Nat} {anchor current : Token} {span : SourceSpan}
+    (stateValid : state.ValidFor)
+    (anchorFound : state.tokens[anchorIndex]? = some anchor)
+    (anchorBefore : anchorIndex < state.cursor)
+    (anchorValid : anchor.span.ValidFor state.file)
+    (spanValid : span.ValidFor state.file)
+    (starts : state.peek? = some current ∧
+      current.span.startByte = span.startByte) :
+    anchor.span.startByte ≤ span.endByte := by
+  have currentFound := State.getElem?_eq_some_of_peek?_eq_some starts.1
+  have separated := stateValid.token_end_le_token_start_of_getElem?_lt
+    anchorFound currentFound anchorBefore
+  exact Nat.le_trans anchorValid.2.1 (Nat.le_trans separated
+    (Nat.le_trans (by simp [starts.2]) spanValid.2.1))
+
+/--
+Complete signature provenance, conditional only on the outer-span endpoint
+law and the independently developed `where` parser contract.
+-/
+theorem functionSignature_validFor_of_span (location : FunctionLocation)
+    (whereValid : whereClause.ValidFor
+      (Option.ValidFor WhereClause.ValidFor))
+    (spanValidOnSuccess : ∀ input signature next,
+      input.ValidFor → functionSignature location input = .ok signature next →
+      signature.span.ValidFor input.file) :
+    (functionSignature location).ValidFor FunctionSignature.ValidFor := by
+  have weak : (functionSignature location).ValidFor (fun _ _ => True) := by
+    unfold functionSignature
+    apply Parser.bind_validFor (keyword_validFor .functionKw .topItem)
+    intro functionToken
+    apply Parser.bind_validFor (identifier_validFor .topItem)
+    intro name
+    apply Parser.bind_validFor optionalGenericParameters_validFor
+    intro genericParameters
+    apply Parser.bind_validFor functionParameters_validFor
+    intro parameters
+    apply Parser.bind_validFor (functionModifiers_validFor location)
+    intro modifiers
+    apply Parser.bind_validFor returnClause_validFor
+    intro returnsClause
+    apply Parser.bind_validFor whereValid
+    intro parsedWhereClause
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : functionSignature location input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok signature final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold functionSignature at stages
+      rcases signatureBind_ok_components stages with
+        ⟨functionToken, afterKeyword, keywordResult, rest⟩
+      rcases signatureBind_ok_components rest with
+        ⟨name, afterName, nameResult, rest⟩
+      rcases signatureBind_ok_components rest with
+        ⟨genericParameters, afterGenerics, genericResult, rest⟩
+      rcases signatureBind_ok_components rest with
+        ⟨parameters, afterParameters, parametersResult, rest⟩
+      rcases signatureBind_ok_components rest with
+        ⟨modifiers, afterModifiers, modifiersResult, rest⟩
+      rcases signatureBind_ok_components rest with
+        ⟨returnsClause, afterReturns, returnsResult, rest⟩
+      rcases signatureBind_ok_components rest with
+        ⟨parsedWhereClause, afterWhere, whereResult, finished⟩
+      have keywordContract := keyword_validFor .functionKw .topItem input
+        inputValid
+      rw [keywordResult] at keywordContract
+      have nameContract := identifier_validFor .topItem afterKeyword
+        keywordContract.2.1
+      rw [nameResult] at nameContract
+      have genericContract := optionalGenericParameters_validFor afterName
+        nameContract.2.1
+      rw [genericResult] at genericContract
+      have parametersContract := functionParameters_validFor afterGenerics
+        genericContract.2.1
+      rw [parametersResult] at parametersContract
+      have modifiersContract := functionModifiers_validFor location
+        afterParameters parametersContract.2.1
+      rw [modifiersResult] at modifiersContract
+      have returnsContract := returnClause_validFor afterModifiers
+        modifiersContract.2.1
+      rw [returnsResult] at returnsContract
+      have whereContract := whereValid afterReturns returnsContract.2.1
+      rw [whereResult] at whereContract
+      have nameValidInput : name.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, keywordContract.2.2] using nameContract.1
+      have genericValidInput : Option.ValidFor
+          (NonemptyDelimitedList.ValidFor Located.ValidFor) input.file
+          genericParameters := by
+        simpa [nameContract.2.2, keywordContract.2.2] using genericContract.1
+      have parametersValidInput : DelimitedList.ValidFor
+          FunctionParameter.ValidFor input.file parameters := by
+        simpa [genericContract.2.2, nameContract.2.2,
+          keywordContract.2.2] using parametersContract.1
+      have modifiersValidInput : FunctionModifiers.ValidFor input.file
+          modifiers := by
+        simpa [parametersContract.2.2, genericContract.2.2,
+          nameContract.2.2, keywordContract.2.2] using modifiersContract.1
+      have returnsValidInput : Option.ValidFor ReturnClause.ValidFor input.file
+          returnsClause := by
+        simpa [modifiersContract.2.2, parametersContract.2.2,
+          genericContract.2.2, nameContract.2.2,
+          keywordContract.2.2] using returnsContract.1
+      have whereValidInput : Option.ValidFor WhereClause.ValidFor input.file
+          parsedWhereClause := by
+        simpa [returnsContract.2.2, modifiersContract.2.2,
+          parametersContract.2.2, genericContract.2.2,
+          nameContract.2.2, keywordContract.2.2] using whereContract.1
+      have returnsMembers : ∀ clause ∈ returnsClause,
+          ReturnClause.ValidFor input.file clause := by
+        cases returnsClause <;> simp_all [Option.ValidFor]
+      have whereMembers : ∀ clause ∈ parsedWhereClause,
+          WhereClause.ValidFor input.file clause := by
+        cases parsedWhereClause <;> simp_all [Option.ValidFor]
+      have outerValid := spanValidOnSuccess input signature final inputValid
+        parsed
+      cases finished
+      refine ⟨⟨outerValid,
+        nameValidInput, ?_, ?_, parametersValidInput.1,
+        parametersValidInput.2, modifiersValidInput, returnsMembers,
+        whereMembers⟩, weakResult.2.1, weakResult.2.2⟩
+      · intro values member
+        cases genericParameters with
+        | none => simp at member
+        | some present =>
+            have valuesEq : values = present := by simpa using member.symm
+            subst values
+            simpa [Option.ValidFor] using genericValidInput.1
+      · intro values member parameter parameterMember
+        cases genericParameters with
+        | none => simp at member
+        | some present =>
+            have valuesEq : values = present := by simpa using member.symm
+            subst values
+            exact genericValidInput.2 parameter parameterMember
+
+/-- Complete signatures preserve token windows when `where` parsing does. -/
+theorem functionSignature_preservesTokenWindow (location : FunctionLocation)
+    (whereWindow : Parser.PreservesTokenWindow whereClause) :
+    Parser.PreservesTokenWindow (functionSignature location) := by
+  unfold functionSignature
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .functionKw .topItem)
+  intro functionToken
+  apply Parser.bind_preservesTokenWindow
+    (identifier_preservesTokenWindow .topItem)
+  intro name
+  apply Parser.bind_preservesTokenWindow
+    optionalGenericParameters_preservesTokenWindow
+  intro genericParameters
+  apply Parser.bind_preservesTokenWindow functionParameters_preservesTokenWindow
+  intro parameters
+  apply Parser.bind_preservesTokenWindow
+    (functionModifiers_preservesTokenWindow location)
+  intro modifiers
+  apply Parser.bind_preservesTokenWindow returnClause_preservesTokenWindow
+  intro returnsClause
+  apply Parser.bind_preservesTokenWindow whereWindow
+  intro parsedWhereClause
+  exact Parser.pure_preservesTokenWindow _
+
+theorem functionSignature_preservesTokensOnSuccess
+    (location : FunctionLocation)
+    (whereWindow : Parser.PreservesTokenWindow whereClause) :
+    Parser.PreservesTokensOnSuccess (functionSignature location) :=
+  (functionSignature_preservesTokenWindow location whereWindow
+    ).preservesTokensOnSuccess
+
+/-- Complete signatures never rewind when `where` parsing is monotone. -/
+theorem functionSignature_cursorMonotoneOnSuccess
+    (location : FunctionLocation)
+    (whereCursor : Parser.CursorMonotoneOnSuccess whereClause) :
+    Parser.CursorMonotoneOnSuccess (functionSignature location) := by
+  unfold functionSignature
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .functionKw .topItem)
+  intro functionToken
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (identifier_cursorMonotoneOnSuccess .topItem)
+  intro name
+  apply Parser.bind_cursorMonotoneOnSuccess
+    optionalGenericParameters_cursorMonotoneOnSuccess
+  intro genericParameters
+  apply Parser.bind_cursorMonotoneOnSuccess
+    functionParameters_cursorMonotoneOnSuccess
+  intro parameters
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (functionModifiers_cursorMonotoneOnSuccess location)
+  intro modifiers
+  apply Parser.bind_cursorMonotoneOnSuccess
+    returnClause_cursorMonotoneOnSuccess
+  intro returnsClause
+  apply Parser.bind_cursorMonotoneOnSuccess whereCursor
+  intro parsedWhereClause
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- Complete signatures start at their `function` keyword. -/
+theorem functionSignature_startsAtCurrentTokenOnSuccess
+    (location : FunctionLocation) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (functionSignature location) (·.span) := by
+  unfold functionSignature
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .functionKw)
+      .topItem (· == .keyword .functionKw))
+  intro functionToken input signature final parsed
+  rcases signatureBind_ok_components parsed with ⟨name, afterName, _, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨genericParameters, afterGenerics, _, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨parameters, afterParameters, _, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨modifiers, afterModifiers, _, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨returnsClause, afterReturns, _, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨parsedWhereClause, afterWhere, _, finished⟩
+  cases finished
+  rfl
+
 end Solcore.Syntax.Parser
