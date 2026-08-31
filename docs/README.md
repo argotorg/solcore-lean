@@ -17,7 +17,7 @@ background material, not a progress log.
 | Understand the semantic layers | [Architecture](ARCHITECTURE.md) |
 | Understand what is normative | [Specification charter](SPEC_CHARTER.md) |
 | Compare with the Haskell or Rust compiler | [Compatibility matrix](COMPATIBILITY_MATRIX.md) |
-| Understand why parser work is paused | [Frontend freeze plan](M2_PLAN.md) |
+| Follow canonical source frontend work | [Canonical syntax plan](M2_PLAN.md) |
 | Build and review a change | [Development guide](DEVELOPMENT.md) |
 
 The [feature matrix](FEATURE_MATRIX.md) is a detailed inventory. Use it when
@@ -79,17 +79,15 @@ than this overview.
 
 ## Source parsing is separate
 
-Surface v1 and Oracle v4 remain supported as frozen public interfaces. They
-parse one restricted source file and return source-aware syntax. They do not
-resolve names, check source types, elaborate to Semantic Core, or run a
-contract.
+Oracle v4 and Surface v1 are frozen historical interfaces. Current Solcore
+syntax is modeled afresh under `Solcore.Syntax` from the implementation pinned
+by ADR-0153. The replacement does not reuse or extend the old Surface AST and
+parser.
 
-New grammar-dependent implementation and parser-proof work is paused while
-Solcore syntax may change. The preserved frontend boundary and the conditions
-for resuming it are described in the [frontend freeze plan](M2_PLAN.md).
-
-This separation is intentional: a future frontend can target the checked Core
-boundary without changing the meaning of Oracle v5 or any older protocol.
+The canonical lexer and parser remain separate from Semantic Core and Oracle
+v5. Name resolution, source type checking, and elaboration into checked Core
+are subsequent stages. This lets the frontend progress without changing the
+meaning of any published Oracle protocol.
 
 ## Semantics and verification
 
