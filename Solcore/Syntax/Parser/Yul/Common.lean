@@ -44,13 +44,25 @@ structure YulParsedBlock where
   span : SourceSpan
   body : List YulStmt
 
+namespace YulParsedBlock
+
+/-- A Yul block and every retained statement belong to one input file. -/
+def ValidFor (statementValid : SourceFile → YulStmt → Prop)
+    (file : SourceFile) (block : YulParsedBlock) : Prop :=
+  block.span.ValidFor file ∧
+    ∀ statement ∈ block.body, statementValid file statement
+
+end YulParsedBlock
+
 private def closeYulBlock (opening : Token)
-    (bodyRev : List YulStmt) : Parser YulParsedBlock := do
-  let closing ← symbol .rightBrace .yulStatement
-  pure {
-    span := SourceSpan.cover opening.span closing.span
-    body := bodyRev.reverse
-  }
+    (bodyRev : List YulStmt) : Parser YulParsedBlock := fun state =>
+  match symbol .rightBrace .yulStatement state with
+  | .ok closing next => .ok {
+      span := SourceSpan.cover opening.span closing.span
+      body := bodyRev.reverse
+    } next
+  | .reject failure next => .reject failure next
+  | .invariant error => .invariant error
 
 private def yulBlockItems (statement : Parser YulStmt)
     (opening : Token) : Nat → List YulStmt → State → Reply YulParsedBlock
@@ -81,6 +93,241 @@ def yulBlock (statement : Parser YulStmt) : Parser YulParsedBlock := fun state =
       yulBlockItems statement opening (next.remainingCount + 1) [] next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+private theorem closeYulBlock_validFor
+    (statementValid : SourceFile → YulStmt → Prop)
+    (opening : Token) (bodyRev : List YulStmt) (state : State)
+    (openingIndex : Nat) (stateValid : state.ValidFor)
+    (openingValid : opening.span.ValidFor state.file)
+    (bodyValid : ∀ item ∈ bodyRev, statementValid state.file item)
+    (openingFound : state.tokens[openingIndex]? = some opening)
+    (openingBeforeCursor : openingIndex < state.cursor) :
+    (closeYulBlock opening bodyRev state).ValidFor state
+      (YulParsedBlock.ValidFor statementValid) := by
+  unfold closeYulBlock
+  cases closingResult : symbol .rightBrace .yulStatement state with
+  | invariant error => simp only [Reply.ValidFor]
+  | reject failure rejected =>
+      have valid := symbol_validFor .rightBrace .yulStatement state stateValid
+      rw [closingResult] at valid
+      simpa only [closingResult, Reply.ValidFor] using valid
+  | ok closing next =>
+      have closingValid :=
+        symbol_validFor .rightBrace .yulStatement state stateValid
+      rw [closingResult] at closingValid
+      have closingShape :=
+        symbol_ok_state_shape .rightBrace .yulStatement closingResult
+      have closingFound :=
+        State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have openingBeforeClosing :=
+        stateValid.token_end_le_token_start_of_getElem?_lt
+          openingFound closingFound openingBeforeCursor
+      have closingSpanValid : closing.span.ValidFor state.file := by
+        simpa only [Located.ValidFor] using closingValid.1
+      unfold Reply.ValidFor YulParsedBlock.ValidFor
+      refine ⟨⟨SourceSpan.cover_validFor openingValid closingSpanValid
+        (Nat.le_trans openingValid.2.1
+          (Nat.le_trans openingBeforeClosing closingSpanValid.2.1)), ?_⟩,
+        closingValid.2.1, closingValid.2.2⟩
+      intro item member
+      exact bodyValid item (by simpa using member)
+
+private theorem yulBlockItems_validFor
+    (statementValid : SourceFile → YulStmt → Prop)
+    (statement : Parser YulStmt)
+    (statementContract : statement.ValidFor statementValid)
+    (statementShape : Parser.PreservesTokensOnSuccess statement)
+    (opening : Token) :
+    ∀ fuel bodyRev state openingIndex,
+      state.ValidFor →
+      opening.span.ValidFor state.file →
+      (∀ item ∈ bodyRev, statementValid state.file item) →
+      state.tokens[openingIndex]? = some opening →
+      openingIndex < state.cursor →
+      (yulBlockItems statement opening fuel bodyRev state).ValidFor state
+        (YulParsedBlock.ValidFor statementValid) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro bodyRev state openingIndex stateValid openingValid bodyValid
+        openingFound openingBeforeCursor
+      unfold yulBlockItems
+      split
+      · exact closeYulBlock_validFor statementValid opening bodyRev state
+          openingIndex stateValid openingValid bodyValid openingFound
+          openingBeforeCursor
+      · split
+        · cases closingResult : symbol .rightBrace .yulStatement state with
+          | invariant error => trivial
+          | reject failure rejected =>
+              have valid :=
+                symbol_validFor .rightBrace .yulStatement state stateValid
+              rw [closingResult] at valid
+              exact valid
+          | ok closing next => simp only [Reply.ValidFor]
+        · cases itemResult : statement state with
+          | invariant error => trivial
+          | reject failure rejected =>
+              have valid := statementContract state stateValid
+              rw [itemResult] at valid
+              exact valid
+          | ok item next =>
+              have itemValid := statementContract state stateValid
+              rw [itemResult] at itemValid
+              simp only
+              split
+              · have tokensEq := statementShape state item next itemResult
+                have recursive := inductionHypothesis (item :: bodyRev) next
+                  openingIndex itemValid.2.1
+                  (by simpa [itemValid.2.2] using openingValid)
+                  (by
+                    intro retained member
+                    rcases List.mem_cons.mp member with rfl | member
+                    · simpa [itemValid.2.2] using itemValid.1
+                    · simpa [itemValid.2.2] using
+                        bodyValid retained member)
+                  (by simpa [tokensEq] using openingFound)
+                  (Nat.lt_trans openingBeforeCursor (by assumption))
+                exact recursive.of_file_eq itemValid.2.2
+              · trivial
+
+/-- A valid, token-preserving statement parser lifts through Yul braces. -/
+theorem yulBlock_validFor
+    (statementValid : SourceFile → YulStmt → Prop)
+    (statement : Parser YulStmt)
+    (statementContract : statement.ValidFor statementValid)
+    (statementShape : Parser.PreservesTokensOnSuccess statement) :
+    (yulBlock statement).ValidFor
+      (YulParsedBlock.ValidFor statementValid) := by
+  intro input inputValid
+  unfold yulBlock
+  cases openingResult : symbol .leftBrace .yulStatement input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := symbol_validFor .leftBrace .yulStatement input inputValid
+      rw [openingResult] at valid
+      exact valid
+  | ok opening afterOpening =>
+      have openingValid :=
+        symbol_validFor .leftBrace .yulStatement input inputValid
+      rw [openingResult] at openingValid
+      have openingShape :=
+        symbol_ok_state_shape .leftBrace .yulStatement openingResult
+      have openingFound :=
+        State.getElem?_eq_some_of_peek?_eq_some openingShape.1
+      have recursive := yulBlockItems_validFor statementValid statement
+        statementContract statementShape opening
+        (afterOpening.remainingCount + 1) [] afterOpening input.cursor
+        openingValid.2.1
+        (by simpa only [Located.ValidFor, openingValid.2.2] using
+          openingValid.1)
+        (by simp) (by simpa [openingShape.2] using openingFound)
+        (by rw [openingShape.2]; simp)
+      exact recursive.of_file_eq openingValid.2.2
+
+private theorem closeYulBlock_ok_state_shape (opening : Token)
+    (bodyRev : List YulStmt) {input next : State} {body : YulParsedBlock}
+    (result : closeYulBlock opening bodyRev input = .ok body next) :
+    next.tokens = input.tokens ∧ input.cursor < next.cursor ∧
+      body.span.startByte = opening.span.startByte := by
+  unfold closeYulBlock at result
+  cases closingResult : symbol .rightBrace .yulStatement input with
+  | ok closing afterClosing =>
+      simp only [closingResult] at result
+      cases result
+      have shape :=
+        symbol_ok_state_shape .rightBrace .yulStatement closingResult
+      exact ⟨by rw [shape.2], by rw [shape.2]; simp, rfl⟩
+  | reject failure rejected => simp [closingResult] at result
+  | invariant error => simp [closingResult] at result
+
+private theorem yulBlockItems_ok_state_shape (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokensOnSuccess statement)
+    (opening : Token) :
+    ∀ fuel bodyRev input body next,
+      yulBlockItems statement opening fuel bodyRev input = .ok body next →
+      next.tokens = input.tokens ∧ input.cursor < next.cursor ∧
+        body.span.startByte = opening.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro bodyRev input body next result
+      unfold yulBlockItems at result
+      split at result
+      · exact closeYulBlock_ok_state_shape opening bodyRev result
+      · split at result
+        · cases closingResult : symbol .rightBrace .yulStatement input <;>
+            simp [closingResult] at result
+        · cases itemResult : statement input with
+          | ok item afterItem =>
+              simp only [itemResult] at result
+              split at result
+              · have recursive := inductionHypothesis (item :: bodyRev)
+                    afterItem body next result
+                exact ⟨recursive.1.trans
+                    (statementShape input item afterItem itemResult),
+                  Nat.lt_trans (by assumption) recursive.2.1,
+                  recursive.2.2⟩
+              · contradiction
+          | reject failure rejected => simp [itemResult] at result
+          | invariant error => simp [itemResult] at result
+
+/-- Successful Yul-block parsing exposes its opening and total progress. -/
+theorem yulBlock_ok_state_shape (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokensOnSuccess statement)
+    {input next : State} {body : YulParsedBlock}
+    (result : yulBlock statement input = .ok body next) :
+    ∃ opening, input.peek? = some opening ∧
+      next.tokens = input.tokens ∧ input.cursor < next.cursor ∧
+      opening.span.startByte = body.span.startByte := by
+  unfold yulBlock at result
+  cases openingResult : symbol .leftBrace .yulStatement input with
+  | ok opening afterOpening =>
+      simp only [openingResult] at result
+      have recursive := yulBlockItems_ok_state_shape statement statementShape
+        opening (afterOpening.remainingCount + 1) [] afterOpening body next
+          result
+      have openingShape :=
+        symbol_ok_state_shape .leftBrace .yulStatement openingResult
+      exact ⟨opening, openingShape.1,
+        recursive.1.trans (by rw [openingShape.2]),
+        Nat.lt_trans (by rw [openingShape.2]; simp) recursive.2.1,
+        recursive.2.2.symm⟩
+  | reject failure rejected => simp [openingResult] at result
+  | invariant error => simp [openingResult] at result
+
+/-- Yul-block success preserves the immutable token carrier. -/
+theorem yulBlock_preservesTokensOnSuccess (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokensOnSuccess statement) :
+    Parser.PreservesTokensOnSuccess (yulBlock statement) := by
+  intro input body next result
+  exact (yulBlock_ok_state_shape statement statementShape result).choose_spec.2.1
+
+/-- Every successful Yul block consumes both braces. -/
+theorem yulBlock_cursor_lt_onSuccess (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokensOnSuccess statement)
+    {input next : State} {body : YulParsedBlock}
+    (result : yulBlock statement input = .ok body next) :
+    input.cursor < next.cursor :=
+  (yulBlock_ok_state_shape statement statementShape result).choose_spec.2.2.1
+
+/-- Successful Yul-block parsing never rewinds the token cursor. -/
+theorem yulBlock_cursorMonotoneOnSuccess (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokensOnSuccess statement) :
+    Parser.CursorMonotoneOnSuccess (yulBlock statement) := by
+  intro input body next result
+  exact Nat.le_of_lt (yulBlock_cursor_lt_onSuccess statement statementShape result)
+
+/-- A successful Yul block starts at its opening brace token. -/
+theorem yulBlock_startsAtCurrentTokenOnSuccess (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokensOnSuccess statement) :
+    Parser.StartsAtCurrentTokenOnSuccess (yulBlock statement) (·.span) := by
+  intro input body next result
+  rcases yulBlock_ok_state_shape statement statementShape result with
+    ⟨opening, found, _tokens, _progress, start⟩
+  exact ⟨opening, found, start⟩
 
 /-- Empty/trailing parameter list used by inline-Yul function definitions. -/
 def yulParameters : Parser (DelimitedList YulIdentifier) :=
@@ -284,6 +531,14 @@ theorem yulNames_cursorMonotoneOnSuccess :
   intro input names next result
   exact Nat.le_of_lt (yulNames_ok_state_shape result).choose_spec.2.2.2
 
+/-- A successful Yul-name sequence starts at its first name token. -/
+theorem yulNames_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess yulNames (·.span) := by
+  intro input names next result
+  rcases yulNames_ok_state_shape result with
+    ⟨first, found, start, _tokens, _progress⟩
+  exact ⟨first, found, start⟩
+
 /-- Yul parameter lists preserve their delimiter and element provenance. -/
 theorem yulParameters_validFor :
     yulParameters.ValidFor (DelimitedList.ValidFor Located.ValidFor) := by
@@ -309,6 +564,12 @@ theorem yulParameters_cursor_lt_onSuccess {input next : State}
 theorem yulParameters_cursorMonotoneOnSuccess :
     Parser.CursorMonotoneOnSuccess yulParameters := by
   exact delimited_cursorMonotoneOnSuccess .leftParen .rightParen true
+    yulName .yulStatement .yul
+
+/-- A successful Yul parameter list starts at its opening parenthesis. -/
+theorem yulParameters_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess yulParameters (·.span) :=
+  delimited_startsAtCurrentTokenOnSuccess .leftParen .rightParen true
     yulName .yulStatement .yul
 
 end Solcore.Syntax.Parser
