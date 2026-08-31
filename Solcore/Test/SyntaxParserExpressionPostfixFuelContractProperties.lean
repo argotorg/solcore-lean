@@ -1,0 +1,11 @@
+import Solcore.Syntax.Parser.Expression.PostfixFuelContractProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserExpressionPostfixFuelContractProperties
+
+open Solcore.Syntax.Parser.ExpressionInternals
+
+example := @expressionPostfix_fuelTotalityContract
+
+end Solcore.Test.SyntaxParserExpressionPostfixFuelContractProperties
