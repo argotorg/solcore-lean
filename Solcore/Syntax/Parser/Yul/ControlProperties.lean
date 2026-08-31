@@ -841,8 +841,58 @@ theorem yulCases_cursorMonotoneOnSuccess (statement : Parser YulStmt) :
       · cases result
         exact Nat.le_refl _
 
-/-- A successful Yul switch arm starts at its current `case` token. -/
-theorem yulCase_startsAtCurrentTokenOnSuccess (statement : Parser YulStmt) :
+private theorem yulCases_validFor_aux (statement : Parser YulStmt)
+    (statementValid : statement.ValidFor YulStmt.ValidFor)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    ∀ fuel casesRev input,
+      input.ValidFor →
+      List.ValidFor YulCase.ValidFor input.file casesRev →
+      (YulControl.caseList statement fuel casesRev input).ValidFor input
+        (List.ValidFor YulCase.ValidFor) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro casesRev input inputValid casesValid
+      unfold YulControl.caseList
+      split
+      · cases armResult : YulControl.caseArm statement input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            have valid := yulCase_validFor statement statementValid
+              statementPreserves input inputValid
+            rw [armResult] at valid
+            exact valid
+        | ok arm afterArm =>
+            have armValid := yulCase_validFor statement statementValid
+              statementPreserves input inputValid
+            rw [armResult] at armValid
+            simp only
+            split
+            · apply (inductionHypothesis (arm :: casesRev) afterArm
+                  armValid.2.1 ?_).of_file_eq armValid.2.2
+              intro retained member
+              rcases List.mem_cons.mp member with rfl | member
+              · simpa [armValid.2.2] using armValid.1
+              · simpa [armValid.2.2] using casesValid retained member
+            · trivial
+      · exact ⟨by
+            intro arm member
+            exact casesValid arm (by simpa using member),
+          inputValid, rfl⟩
+
+/-- Repeated Yul switch arms preserve every recursively retained range. -/
+theorem yulCases_validFor (statement : Parser YulStmt)
+    (statementValid : statement.ValidFor YulStmt.ValidFor)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement)
+    (fuel : Nat) :
+    Parser.ValidFor (YulControl.caseList statement fuel [])
+      (List.ValidFor YulCase.ValidFor) := by
+  intro input inputValid
+  exact yulCases_validFor_aux statement statementValid statementPreserves
+    fuel [] input inputValid (by simp [List.ValidFor])
+
+private theorem yulCase_starts_aux (statement : Parser YulStmt) :
     Parser.StartsAtCurrentTokenOnSuccess
       (YulControl.caseArm statement) (·.span) := by
   unfold YulControl.caseArm
@@ -854,6 +904,100 @@ theorem yulCase_startsAtCurrentTokenOnSuccess (statement : Parser YulStmt) :
   rcases yulBind_ok_components rest with ⟨body, afterBody, _, finished⟩
   cases finished
   rfl
+
+/-- Every accumulated switch arm begins after a supplied consumed token. -/
+theorem yulCases_ordered_after (statement : Parser YulStmt)
+    (statementValid : statement.ValidFor YulStmt.ValidFor)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    ∀ fuel casesRev input output next anchorIndex anchor,
+      input.ValidFor →
+      input.tokens[anchorIndex]? = some anchor →
+      anchorIndex < input.cursor →
+      (∀ arm ∈ casesRev,
+        anchor.span.endByte ≤ arm.span.startByte) →
+      YulControl.caseList statement fuel casesRev input = .ok output next →
+      ∀ arm ∈ output, anchor.span.endByte ≤ arm.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro casesRev input output next anchorIndex anchor inputValid
+        anchorFound anchorBeforeCursor casesOrdered result
+      unfold YulControl.caseList at result
+      split at result
+      · cases armResult : YulControl.caseArm statement input with
+        | ok arm afterArm =>
+            simp only [armResult] at result
+            have armValid := yulCase_validFor statement statementValid
+              statementPreserves input inputValid
+            rw [armResult] at armValid
+            split at result
+            · rcases yulCase_starts_aux statement input arm
+                  afterArm armResult with ⟨marker, markerFound, armStart⟩
+              apply inductionHypothesis (arm :: casesRev) afterArm output next
+                anchorIndex anchor armValid.2.1
+              · simpa [yulCase_preservesTokensOnSuccess statement
+                    statementPreserves input arm afterArm armResult] using
+                  anchorFound
+              · omega
+              · intro retained member
+                rcases List.mem_cons.mp member with rfl | member
+                · rw [← armStart]
+                  exact inputValid.token_end_le_token_start_of_getElem?_lt
+                    anchorFound
+                    (State.getElem?_eq_some_of_peek?_eq_some markerFound)
+                    anchorBeforeCursor
+                · exact casesOrdered retained member
+              · exact result
+            · contradiction
+        | reject failure rejected => simp [armResult] at result
+        | invariant error => simp [armResult] at result
+      · intro arm member
+        cases result
+        exact casesOrdered arm (by simpa using member)
+
+/-- A present default block begins after every earlier consumed token. -/
+theorem optionalYulDefault_some_ordered_after
+    (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement)
+    {input next : State} {body : YulParsedBlock}
+    {anchorIndex : Nat} {anchor : Token}
+    (inputValid : input.ValidFor)
+    (anchorFound : input.tokens[anchorIndex]? = some anchor)
+    (anchorBeforeCursor : anchorIndex < input.cursor)
+    (result : YulControl.optionalDefault statement input = .ok (some body) next) :
+    anchor.span.endByte ≤ body.span.startByte := by
+  unfold YulControl.optionalDefault getState at result
+  simp only [bind] at result
+  by_cases present : isKeyword input .defaultKw
+  · simp only [present, if_true] at result
+    rcases yulBind_ok_components result with
+      ⟨marker, afterMarker, markerResult, rest⟩
+    rcases yulBind_ok_components rest with
+      ⟨parsedBody, afterBody, bodyResult, finished⟩
+    have bodyStarts := yulBlock_startsAtCurrentTokenOnSuccess statement
+      statementPreserves afterMarker parsedBody afterBody bodyResult
+    cases finished
+    rcases bodyStarts with
+      ⟨opening, openingFound, openingStart⟩
+    rw [← openingStart]
+    apply inputValid.token_end_le_token_start_of_getElem?_lt anchorFound
+    · simpa [keyword_preservesTokensOnSuccess .defaultKw .yulStatement
+          input marker afterMarker markerResult] using
+        State.getElem?_eq_some_of_peek?_eq_some openingFound
+    · have shape := acceptToken_ok_state_shape
+          (.keyword .defaultKw) .yulStatement
+          (· == .keyword .defaultKw) markerResult
+      simpa [shape.2] using
+        Nat.lt_trans anchorBeforeCursor (Nat.lt_succ_self input.cursor)
+  · simp only [present, Bool.false_eq_true, if_false] at result
+    cases result
+
+/-- A successful Yul switch arm starts at its current `case` token. -/
+theorem yulCase_startsAtCurrentTokenOnSuccess (statement : Parser YulStmt) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (YulControl.caseArm statement) (·.span) :=
+  yulCase_starts_aux statement
 
 /-- A successful Yul switch arm consumes its marker, literal, and block. -/
 theorem yulCase_cursor_lt_onSuccess (statement : Parser YulStmt)
@@ -941,5 +1085,6 @@ theorem optionalYulDefault_cursorMonotoneOnSuccess
     exact Parser.pure_cursorMonotoneOnSuccess _
   · simp only [present]
     exact Parser.pure_cursorMonotoneOnSuccess none
+
 
 end Solcore.Syntax.Parser
