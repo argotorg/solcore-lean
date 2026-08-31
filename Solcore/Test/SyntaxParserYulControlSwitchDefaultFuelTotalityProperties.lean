@@ -1,0 +1,14 @@
+import Solcore.Syntax.Parser.Yul.ControlSwitchDefaultFuelTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserYulControlSwitchDefaultFuelTotalityProperties
+
+open Solcore.Syntax
+open Solcore.Syntax.Parser
+
+example := @optionalYulDefault_ordinary_of_statementFuel
+example := @optionalYulDefault_ne_invariant_of_statementFuel
+example := @optionalYulDefault_fuelTotalityContract
+
+end Solcore.Test.SyntaxParserYulControlSwitchDefaultFuelTotalityProperties
