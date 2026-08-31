@@ -21,6 +21,7 @@ import Solcore.Test.SyntaxParserDeriveTargetProperties
 import Solcore.Test.SyntaxParserDiagnosticSuppression
 import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExports
+import Solcore.Test.SyntaxParserGenericParameterProperties
 import Solcore.Test.SyntaxParserInvariantProperties
 import Solcore.Test.SyntaxParserLegacyRejection
 import Solcore.Test.SyntaxParserLiteralProperties

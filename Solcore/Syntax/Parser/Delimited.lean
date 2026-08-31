@@ -1,21 +1,8 @@
+import Solcore.Syntax.CollectionValidity
 import Solcore.Syntax.Parser.Validity
 import Solcore.Syntax.Parser.StateCursorProperties
 
 set_option autoImplicit false
-
-namespace Solcore.Syntax
-
-namespace DelimitedList
-
-/-- The delimiter range and every retained element belong to one input file. -/
-def ValidFor {α : Type} (elementValid : SourceFile → α → Prop)
-    (file : SourceFile) (values : DelimitedList α) : Prop :=
-  values.span.ValidFor file ∧
-    ∀ element ∈ values.elements, elementValid file element
-
-end DelimitedList
-
-end Solcore.Syntax
 
 namespace Solcore.Syntax.Parser
 

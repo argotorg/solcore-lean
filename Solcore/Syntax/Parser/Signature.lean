@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Parameter
 import Solcore.Syntax.Parser.Predicate
+import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 
 set_option autoImplicit false
 
@@ -33,6 +34,152 @@ def optionalGenericParameters : Parser (Option GenericParameters) := do
     pure (some (← genericParameters))
   else
     pure none
+
+private theorem requireGenericParameters_reply_validFor
+    (values : DelimitedList Identifier) (input : State)
+    (inputValid : input.ValidFor)
+    (valuesValid : values.ValidFor Located.ValidFor input.file) :
+    (requireGenericParameters values input).ValidFor input
+      (NonemptyDelimitedList.ValidFor Located.ValidFor) := by
+  unfold requireGenericParameters
+  cases elements : values.elements with
+  | nil => trivial
+  | cons head tail =>
+      simp only [Reply.ValidFor, NonemptyDelimitedList.ValidFor]
+      refine ⟨⟨valuesValid.1, ?_⟩, inputValid, rfl⟩
+      intro element member
+      apply valuesValid.2 element
+      simpa [NonemptyList.toList, elements] using member
+
+private theorem requireGenericParameters_preservesTokensOnSuccess
+    (values : DelimitedList Identifier) :
+    Parser.PreservesTokensOnSuccess (requireGenericParameters values) := by
+  intro input result next parsed
+  unfold requireGenericParameters at parsed
+  cases elements : values.elements with
+  | nil =>
+      simp only [elements] at parsed
+      contradiction
+  | cons head tail =>
+      simp only [elements] at parsed
+      cases parsed
+      rfl
+
+private theorem requireGenericParameters_cursorMonotoneOnSuccess
+    (values : DelimitedList Identifier) :
+    Parser.CursorMonotoneOnSuccess (requireGenericParameters values) := by
+  intro input result next parsed
+  unfold requireGenericParameters at parsed
+  cases elements : values.elements with
+  | nil =>
+      simp only [elements] at parsed
+      contradiction
+  | cons head tail =>
+      simp only [elements] at parsed
+      cases parsed
+      exact Nat.le_refl _
+
+/-- Generic parameter parsing preserves delimiter and identifier provenance. -/
+theorem genericParameters_validFor :
+    genericParameters.ValidFor
+      (NonemptyDelimitedList.ValidFor Located.ValidFor) := by
+  unfold genericParameters
+  apply Parser.bind_validFor_of_value
+    (delimited_validFor Located.ValidFor .less .greater false
+      (identifier .parameter) .parameter .topLevel
+      (identifier_validFor .parameter)
+      (identifier_preservesTokensOnSuccess .parameter))
+  intro values input inputValid valuesValid
+  exact requireGenericParameters_reply_validFor values input inputValid
+    valuesValid
+
+/-- Generic parameter parsing preserves the immutable lexer token carrier. -/
+theorem genericParameters_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess genericParameters := by
+  unfold genericParameters
+  apply Parser.bind_preservesTokensOnSuccess
+  · exact delimited_preservesTokensOnSuccess .less .greater false
+      (identifier .parameter) .parameter .topLevel
+      (identifier_preservesTokensOnSuccess .parameter)
+  · exact requireGenericParameters_preservesTokensOnSuccess
+
+/-- Generic parameter parsing never moves the parser cursor backwards. -/
+theorem genericParameters_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess genericParameters := by
+  unfold genericParameters
+  apply Parser.bind_cursorMonotoneOnSuccess
+  · exact delimited_cursorMonotoneOnSuccess .less .greater false
+      (identifier .parameter) .parameter .topLevel
+  · exact requireGenericParameters_cursorMonotoneOnSuccess
+
+private theorem someGenericParameters_validFor :
+    (do
+      let values ← genericParameters
+      pure (some values)).ValidFor
+        (Option.ValidFor
+          (NonemptyDelimitedList.ValidFor Located.ValidFor)) := by
+  apply Parser.bind_validFor_of_value genericParameters_validFor
+  intro values input inputValid valuesValid
+  exact ⟨valuesValid, inputValid, rfl⟩
+
+private theorem someGenericParameters_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess (do
+      let values ← genericParameters
+      pure (some values)) := by
+  apply Parser.bind_preservesTokensOnSuccess
+  · exact genericParameters_preservesTokensOnSuccess
+  · intro values
+    exact Parser.pure_preservesTokensOnSuccess (some values)
+
+private theorem someGenericParameters_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess (do
+      let values ← genericParameters
+      pure (some values)) := by
+  apply Parser.bind_cursorMonotoneOnSuccess
+  · exact genericParameters_cursorMonotoneOnSuccess
+  · intro values
+    exact Parser.pure_cursorMonotoneOnSuccess (some values)
+
+private theorem getState_bind_apply {α : Type}
+    (next : State → Parser α) (input : State) :
+    ((getState >>= next) input) = next input input := by
+  rfl
+
+/-- Optional generic parameters retain provenance whenever they are present. -/
+theorem optionalGenericParameters_validFor :
+    optionalGenericParameters.ValidFor
+      (Option.ValidFor
+        (NonemptyDelimitedList.ValidFor Located.ValidFor)) := by
+  intro input inputValid
+  unfold optionalGenericParameters
+  rw [getState_bind_apply]
+  split
+  · exact someGenericParameters_validFor input inputValid
+  · exact ⟨trivial, inputValid, rfl⟩
+
+/-- Optional generic parameter parsing preserves the lexer token carrier. -/
+theorem optionalGenericParameters_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess optionalGenericParameters := by
+  intro input values next parsed
+  unfold optionalGenericParameters at parsed
+  rw [getState_bind_apply] at parsed
+  split at parsed
+  · exact someGenericParameters_preservesTokensOnSuccess input values next
+      parsed
+  · cases parsed
+    rfl
+
+/-- Optional generic parameter parsing never rewinds the parser cursor. -/
+theorem optionalGenericParameters_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess optionalGenericParameters := by
+  intro input values next parsed
+  unfold optionalGenericParameters at parsed
+  rw [getState_bind_apply] at parsed
+  split at parsed
+  · exact someGenericParameters_cursorMonotoneOnSuccess input values next
+      parsed
+  · cases parsed
+    exact Nat.le_refl _
 
 private def functionParameters : Parser (DelimitedList FunctionParameter) :=
   delimited .leftParen .rightParen true namedParameter
