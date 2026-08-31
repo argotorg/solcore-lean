@@ -15,61 +15,63 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def wrapTypeAlias (declaration : TypeAliasDecl) : TopItem := {
+namespace FileInternals
+
+def wrapTypeAlias (declaration : TypeAliasDecl) : TopItem := {
   span := declaration.span
   leadingComments := []
   value := .typeAlias declaration
 }
 
-private def wrapImport (declaration : ImportDecl) : TopItem := {
+def wrapImport (declaration : ImportDecl) : TopItem := {
   span := declaration.span
   leadingComments := []
   value := .importDecl declaration
 }
 
-private def wrapExport (declaration : ExportDecl) : TopItem := {
+def wrapExport (declaration : ExportDecl) : TopItem := {
   span := declaration.span
   leadingComments := []
   value := .exportDecl declaration
 }
 
-private def wrapPragma (declaration : PragmaDecl) : TopItem := {
+def wrapPragma (declaration : PragmaDecl) : TopItem := {
   span := declaration.span
   leadingComments := []
   value := .pragmaDecl declaration
 }
 
-private def wrapFunction (declaration : FunctionDecl) : TopItem := {
+def wrapFunction (declaration : FunctionDecl) : TopItem := {
   span := declaration.span
   leadingComments := []
   value := .function declaration
 }
 
-private def wrapEnum (declaration : EnumDecl) : TopItem := {
+def wrapEnum (declaration : EnumDecl) : TopItem := {
   span := declaration.span
   leadingComments := []
   value := .enum declaration
 }
 
-private def wrapTrait (declaration : TraitDecl) : TopItem := {
+def wrapTrait (declaration : TraitDecl) : TopItem := {
   span := declaration.span
   leadingComments := []
   value := .trait declaration
 }
 
-private def wrapImpl (declaration : ImplDecl) : TopItem := {
+def wrapImpl (declaration : ImplDecl) : TopItem := {
   span := declaration.span
   leadingComments := []
   value := .impl declaration
 }
 
-private def wrapContract (declaration : ContractDecl) : TopItem := {
+def wrapContract (declaration : ContractDecl) : TopItem := {
   span := declaration.span
   leadingComments := []
   value := .contract declaration
 }
 
-private def extendTopItemStart (prefixSpan : SourceSpan)
+def extendTopItemStart (prefixSpan : SourceSpan)
     (item : TopItem) : TopItem :=
   let span := SourceSpan.cover prefixSpan item.span
   let value := match item.value with
@@ -85,56 +87,61 @@ private def extendTopItemStart (prefixSpan : SourceSpan)
     | .error => .error
   { item with span, value }
 
+end FileInternals
+
 private def plainTopItem : Parser TopItem := fun state =>
   if isKeyword state .importKw then
     match importDecl state with
-    | .ok declaration next => .ok (wrapImport declaration) next
+    | .ok declaration next => .ok (FileInternals.wrapImport declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isKeyword state .exportKw then
     match exportDecl state with
-    | .ok declaration next => .ok (wrapExport declaration) next
+    | .ok declaration next => .ok (FileInternals.wrapExport declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isKeyword state .pragmaKw then
     match pragmaDecl state with
-    | .ok declaration next => .ok (wrapPragma declaration) next
+    | .ok declaration next => .ok (FileInternals.wrapPragma declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isKeyword state .typeKw then
     match typeAlias state with
-    | .ok declaration next => .ok (wrapTypeAlias declaration) next
+    | .ok declaration next =>
+        .ok (FileInternals.wrapTypeAlias declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isKeyword state .functionKw then
     match functionDecl .module state with
-    | .ok declaration next => .ok (wrapFunction declaration) next
+    | .ok declaration next => .ok (FileInternals.wrapFunction declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isContextual state .enum then
     match enumDecl none state with
-    | .ok declaration next => .ok (wrapEnum declaration) next
+    | .ok declaration next => .ok (FileInternals.wrapEnum declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isContextual state .trait then
     match traitDecl state with
-    | .ok declaration next => .ok (wrapTrait declaration) next
+    | .ok declaration next => .ok (FileInternals.wrapTrait declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isContextual state .impl || isKeyword state .defaultKw then
     match implDecl state with
-    | .ok declaration next => .ok (wrapImpl declaration) next
+    | .ok declaration next => .ok (FileInternals.wrapImpl declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else if isKeyword state .contractKw then
     match contractDecl state with
-    | .ok declaration next => .ok (wrapContract declaration) next
+    | .ok declaration next => .ok (FileInternals.wrapContract declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else
     rejectAt state { head := .topItem, tail := [] } .topItem
 
-private def attachDeriveAttribute (derive : DeriveAttribute)
+namespace FileInternals
+
+def attachDeriveAttribute (derive : DeriveAttribute)
     (item : TopItem) : Parser TopItem :=
   match item.value with
   | .enum declaration =>
@@ -157,13 +164,15 @@ private def attachDeriveAttribute (derive : DeriveAttribute)
       }
       pure (extendTopItemStart derive.span item)
 
+end FileInternals
+
 /-- Parse one top-level form, including an optional derive attribute. -/
 private def topItem : Parser TopItem := fun state =>
   if isSymbol state .hash then
     match deriveAttribute state with
     | .ok derive afterDerive =>
         match plainTopItem afterDerive with
-        | .ok item next => attachDeriveAttribute derive item next
+        | .ok item next => FileInternals.attachDeriveAttribute derive item next
         | .reject failure next => .reject failure next
         | .invariant error => .invariant error
     | .reject failure next => .reject failure next
