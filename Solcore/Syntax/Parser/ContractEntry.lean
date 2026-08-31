@@ -4,18 +4,23 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def entryParameters : Parser (DelimitedList FunctionParameter) :=
+namespace ContractEntryInternals
+
+def entryParameters : Parser (DelimitedList FunctionParameter) :=
   delimited .leftParen .rightParen true namedParameter
     .parameter .topLevel
 
-private def implicitPublicModifiers
-    (declaration : HardKeyword) : Parser (Option SourceSpan) := do
+/-- Parse one optional contract-entry modifier marker. -/
+def optionalModifier (modifier : HardKeyword) : Parser (Option SourceSpan) := do
   let state ← getState
-  let publicMarker ←
-    if isKeyword state .publicKw then
-      pure (some (← keyword .publicKw .contractMember).span)
-    else
-      pure none
+  if isKeyword state modifier then
+    pure (some (← keyword modifier .contractMember).span)
+  else
+    pure none
+
+def implicitPublicModifiers
+    (declaration : HardKeyword) : Parser (Option SourceSpan) := do
+  let publicMarker ← optionalModifier .publicKw
   match publicMarker with
   | some span =>
       let _ ← emitDiagnostic {
@@ -23,17 +28,16 @@ private def implicitPublicModifiers
         kind := .constraintViolation (.implicitPublicModifier declaration)
       }
   | none => pure ()
-  let state ← getState
-  if isKeyword state .payableKw then
-    pure (some (← keyword .payableKw .contractMember).span)
-  else
-    pure none
+  optionalModifier .payableKw
+
+end ContractEntryInternals
 
 /-- Parse a contract constructor with an explicitly non-tail body. -/
 def constructorDecl : Parser ConstructorDecl := do
   let marker ← keyword .constructorKw .contractMember
-  let parameters ← entryParameters
-  let payableMarker ← implicitPublicModifiers .constructorKw
+  let parameters ← ContractEntryInternals.entryParameters
+  let payableMarker ←
+    ContractEntryInternals.implicitPublicModifiers .constructorKw
   let body ← isolateBlock (block .require)
   pure {
     span := SourceSpan.cover marker.span body.span
@@ -43,7 +47,7 @@ def constructorDecl : Parser ConstructorDecl := do
 /-- Parse a fallback entry point while retaining invalid parameters. -/
 def fallbackDecl : Parser FallbackDecl := do
   let marker ← keyword .fallbackKw .contractMember
-  let parameters ← entryParameters
+  let parameters ← ContractEntryInternals.entryParameters
   if parameters.elements.isEmpty then
     pure ()
   else
@@ -51,7 +55,8 @@ def fallbackDecl : Parser FallbackDecl := do
       span := parameters.span
       kind := .constraintViolation .fallbackRequiresNoParameters
     }
-  let payableMarker ← implicitPublicModifiers .fallbackKw
+  let payableMarker ←
+    ContractEntryInternals.implicitPublicModifiers .fallbackKw
   let body ← isolateBlock (block .require)
   pure {
     span := SourceSpan.cover marker.span body.span

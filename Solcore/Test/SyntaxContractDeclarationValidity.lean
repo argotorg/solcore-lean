@@ -1,4 +1,5 @@
 import Solcore.Syntax.ContractDeclarationValidity
+import Solcore.Syntax.Parser.ContractEntryProperties
 
 /-! External consumers for canonical contract declaration validity. -/
 
@@ -7,12 +8,28 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Syntax
+open Solcore.Syntax.Parser
 
 example := @ContractField.ValidFor
 example := @ConstructorDecl.ValidFor
 example := @FallbackDecl.ValidFor
 example := @ContractMember.ValidFor
 example := @ContractDecl.ValidFor
+
+example := @ContractEntryInternals.optionalModifier_validFor
+example := @ContractEntryInternals.optionalModifier_preservesTokenWindow
+example := @ContractEntryInternals.optionalModifier_preservesTokensOnSuccess
+example :=
+  @ContractEntryInternals.optionalModifier_cursorMonotoneOnSuccess
+example :=
+  @ContractEntryInternals.optionalModifier_some_startsAtCurrentTokenOnSuccess
+example := @ContractEntryInternals.implicitPublicModifiers_validFor
+example :=
+  @ContractEntryInternals.implicitPublicModifiers_preservesTokenWindow
+example :=
+  @ContractEntryInternals.implicitPublicModifiers_preservesTokensOnSuccess
+example :=
+  @ContractEntryInternals.implicitPublicModifiers_cursorMonotoneOnSuccess
 
 example (statementValid : SourceFile → Statement → Prop)
     (expressionValid : SourceFile → Expr → Prop)
