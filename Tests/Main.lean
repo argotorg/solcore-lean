@@ -17,6 +17,7 @@ import Solcore.Test.SyntaxParserBodyIsolation
 import Solcore.Test.SyntaxParserContracts
 import Solcore.Test.SyntaxParserDeclarationTrivia
 import Solcore.Test.SyntaxParserDelimitedProperties
+import Solcore.Test.SyntaxParserDeriveTargetProperties
 import Solcore.Test.SyntaxParserDiagnosticSuppression
 import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExports
