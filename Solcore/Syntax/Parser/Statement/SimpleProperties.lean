@@ -302,6 +302,63 @@ theorem assignmentTail_cursor_lt_onSuccess (expression : Parser Expr)
         cases finished
         exact Nat.lt_of_lt_of_le strict rightMonotone
 
+/-- An assignment operator starts no later than its retained endpoint. -/
+theorem assignmentTail_start_le_endOnSuccess
+    (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span))
+    {input final : State} {tail : AssignmentTail}
+    (inputValid : input.ValidFor)
+    (parsed : assignmentTail expression input = .ok tail final) :
+    tail.startSpan.startByte ≤ (assignmentEnd tail).endByte := by
+  unfold assignmentTail at parsed
+  split at parsed
+  · rcases simpleBind_ok_components parsed with
+      ⟨operator, afterOperator, operatorResult, finished⟩
+    have operatorContract := symbol_validFor .tildeEqual .statement input
+      inputValid
+    rw [operatorResult] at operatorContract
+    cases finished
+    exact operatorContract.1.2.1
+  · cases selected : input.peekKind?.bind valueAssignOp? with
+    | none =>
+        simp only [selected] at parsed
+        unfold rejectAt at parsed
+        contradiction
+    | some selectedOperator =>
+        simp only [selected] at parsed
+        rcases simpleBind_ok_components parsed with
+          ⟨operator, afterOperator, operatorResult, rest⟩
+        rcases simpleBind_ok_components rest with
+          ⟨right, afterRight, rightResult, finished⟩
+        have operatorContract := valueAssignOperator_validFor input inputValid
+        rw [operatorResult] at operatorContract
+        have rightContract := expressionValid afterOperator
+          operatorContract.2.1
+        rw [rightResult] at rightContract
+        have rightSpanValid : right.span.ValidFor input.file := by
+          simpa [operatorContract.2.2] using
+            expressionSpan afterOperator.file right rightContract.1
+        rcases valueAssignOperator_ok_state_shape operatorResult with
+          ⟨operatorToken, operatorFound, operatorSpan, afterOperatorEq⟩
+        have advanced : input.advance? =
+            some (operatorToken, afterOperator) := by
+          unfold State.advance?
+          rw [operatorFound, afterOperatorEq]
+          rfl
+        rcases expressionStarts afterOperator right afterRight rightResult with
+          ⟨rightToken, rightFound, rightStart⟩
+        have separated := inputValid.consumed_end_le_peek_start_after_advance
+          advanced rightFound
+        cases finished
+        exact Nat.le_trans operatorContract.1.2.1
+          (Nat.le_trans (by simpa [operatorSpan, rightStart] using separated)
+            rightSpanValid.2.1)
+
 /-- A present optional tail exposes the operator at the caller's cursor. -/
 theorem optionalAssignmentTail_some_startsAtCurrentTokenOnSuccess
     (expression : Parser Expr) {input final : State}
@@ -331,6 +388,28 @@ theorem assignmentEnd_validFor
   cases tail with
   | value operator right => exact expressionSpan file right valid.2
   | bitNot operator => exact valid
+
+/-- The selected statement endpoint is valid in every priority branch. -/
+theorem statementEnd_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    {file : SourceFile} {left : Expr} {tail : Option AssignmentTail}
+    {semicolon : Option SourceSpan}
+    (leftValid : expressionValueValid file left)
+    (tailValid : Option.ValidFor
+      (AssignmentTail.ValidFor expressionValueValid) file tail)
+    (semicolonValid : Option.ValidFor
+      (fun source span => span.ValidFor source) file semicolon) :
+    (statementEnd left tail semicolon).ValidFor file := by
+  cases semicolon with
+  | some marker => simpa [Option.ValidFor, statementEnd] using semicolonValid
+  | none =>
+      cases tail with
+      | some value =>
+          exact assignmentEnd_validFor expressionValueValid expressionSpan
+            (by simpa [Option.ValidFor] using tailValid)
+      | none => exact expressionSpan file left leftValid
 
 /-- Assignment tails preserve token windows when nested expressions do. -/
 theorem assignmentTail_preservesTokenWindow (expression : Parser Expr)

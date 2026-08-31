@@ -70,6 +70,14 @@ def assignmentEnd : AssignmentTail → SourceSpan
   | .value _ right => right.span
   | .bitNot operator => operator
 
+/-- Select the final source span of an assignment or expression statement. -/
+def statementEnd (left : Expr) (tail : Option AssignmentTail)
+    (semicolon : Option SourceSpan) : SourceSpan :=
+  match semicolon, tail with
+  | some marker, _ => marker
+  | none, some value => assignmentEnd value
+  | none, none => left.span
+
 end StatementSimpleInternals
 
 /-- Parse an expression statement or source-preserving assignment. -/
@@ -78,10 +86,7 @@ def assignmentOrExpressionStatement
   let left ← expression
   let tail ← StatementSimpleInternals.optionalAssignmentTail expression
   let semicolon ← StatementSimpleInternals.optionalSemicolon
-  let endSpan := match semicolon, tail with
-    | some marker, _ => marker
-    | none, some value => StatementSimpleInternals.assignmentEnd value
-    | none, none => left.span
+  let endSpan := StatementSimpleInternals.statementEnd left tail semicolon
   let span := SourceSpan.cover left.span endSpan
   match tail with
   | some (.value operator right) =>

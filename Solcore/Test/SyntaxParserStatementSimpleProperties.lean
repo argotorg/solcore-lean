@@ -28,9 +28,11 @@ example := @StatementSimpleInternals.optionalAssignmentTail_validFor
 example :=
   @StatementSimpleInternals.assignmentTail_startsAtCurrentTokenOnSuccess
 example := @StatementSimpleInternals.assignmentTail_cursor_lt_onSuccess
+example := @StatementSimpleInternals.assignmentTail_start_le_endOnSuccess
 example :=
   @StatementSimpleInternals.optionalAssignmentTail_some_startsAtCurrentTokenOnSuccess
 example := @StatementSimpleInternals.assignmentEnd_validFor
+example := @StatementSimpleInternals.statementEnd_validFor
 example := @StatementSimpleInternals.assignmentTail_preservesTokenWindow
 example := @StatementSimpleInternals.assignmentTail_preservesTokensOnSuccess
 example := @StatementSimpleInternals.assignmentTail_cursorMonotoneOnSuccess
