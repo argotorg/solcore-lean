@@ -511,7 +511,301 @@ theorem validateMatchArities_cursorMonotoneOnSuccess
       intro _
       exact validateMatchArities_cursorMonotoneOnSuccess scrutineeCount rest
 
+/-- Arity validation preserves validity when every case range is valid. -/
+theorem validateMatchArities_validFor (scrutineeCount : Nat) :
+    ∀ cases input, input.ValidFor →
+      List.ValidFor (fun file retainedCase => retainedCase.span.ValidFor file)
+        input.file cases →
+      (validateMatchArities scrutineeCount cases input).ValidFor input (fun _ _ => True)
+  | [], input, inputValid, _ => ⟨trivial, inputValid, rfl⟩
+  | retainedCase :: rest, input, inputValid, spansValid => by
+      unfold validateMatchArities validateMatchCaseArity
+      simp only
+      split
+      · exact validateMatchArities_validFor scrutineeCount rest input inputValid
+          (fun item member => spansValid item (by simp [member]))
+      · exact (validateMatchArities_validFor scrutineeCount rest (input.emit _)
+          (inputValid.emit_validFor _ (spansValid retainedCase (by simp)))
+          (fun item member => spansValid item (by simp [member]))).of_file_eq rfl
+
 end MatchInternals
+
+/-- Complete `match` parsing retains only source-valid syntax and diagnostics. -/
+theorem matchStatement_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop)
+    (statement : Parser Statement) (expression : Parser Expr) (pattern : Parser Pattern)
+    (statementValid : statement.ValidFor (Statement.ValidFor expressionValueValid
+      patternValueValid yulValueValid))
+    (statementWindow : Parser.PreservesTokenWindow statement)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionTokens : Parser.PreservesTokensOnSuccess expression)
+    (patternValid : pattern.ValidFor patternValueValid)
+    (patternWindow : Parser.PreservesTokenWindow pattern)
+    (patternCursor : Parser.CursorMonotoneOnSuccess pattern) :
+    (matchStatement statement expression pattern).ValidFor (Statement.ValidFor
+      expressionValueValid patternValueValid yulValueValid) := by
+  have statementTokens := statementWindow.preservesTokensOnSuccess
+  have patternTokens := patternWindow.preservesTokensOnSuccess
+  have caseValid := MatchInternals.matchCase_validFor expressionValueValid
+    patternValueValid yulValueValid statement pattern statementValid statementTokens
+    patternValid patternTokens patternCursor
+  have caseWindow := MatchInternals.matchCase_preservesTokenWindow statement pattern
+    statementWindow patternWindow
+  have valuesValid := delimited_validFor expressionValueValid .leftParen .rightParen
+    false expression .expression .statement expressionValid expressionTokens
+  have defaultValid := MatchInternals.optionalDefaultBody_validFor expressionValueValid
+    patternValueValid yulValueValid statement statementValid statementTokens
+  intro input inputValid
+  unfold matchStatement
+  cases markerResult : keyword .matchKw .statement input with
+  | invariant error => simp only [bind, markerResult, Reply.ValidFor]
+  | reject failure rejected =>
+      have reply := keyword_validFor .matchKw .statement input inputValid
+      rw [markerResult] at reply
+      simpa only [bind, markerResult, Reply.ValidFor] using reply
+  | ok marker afterMarker =>
+      have markerReply := keyword_validFor .matchKw .statement input inputValid
+      rw [markerResult] at markerReply
+      have markerFile : afterMarker.file = input.file := markerReply.2.2
+      simp only [bind, markerResult]
+      cases valuesResult : delimited .leftParen .rightParen false expression .expression
+          .statement afterMarker with
+      | invariant error => trivial
+      | reject failure rejected =>
+          have reply := valuesValid afterMarker markerReply.2.1
+          rw [valuesResult] at reply
+          simpa only [Reply.ValidFor] using reply.of_file_eq markerReply.2.2
+      | ok values afterValues =>
+          have valuesReply := valuesValid afterMarker markerReply.2.1
+          rw [valuesResult] at valuesReply
+          simp only
+          have valuesFile : afterValues.file = input.file := valuesReply.2.2.trans markerFile
+          have requiredReply := MatchInternals.requireScrutinees_validFor expressionValueValid
+            values afterValues valuesReply.2.1 (by simpa [valuesReply.2.2] using valuesReply.1)
+          cases requiredResult : MatchInternals.requireScrutinees values afterValues with
+          | invariant error => trivial
+          | reject failure rejected =>
+              rw [requiredResult] at requiredReply
+              simpa only [Reply.ValidFor] using requiredReply.of_file_eq valuesFile
+          | ok scrutinees afterScrutinees =>
+              rw [requiredResult] at requiredReply
+              simp only
+              have requiredFile : afterScrutinees.file = input.file := requiredReply.2.2.trans valuesFile
+              cases openingResult : symbol .leftBrace .statement afterScrutinees with
+              | invariant error => trivial
+              | reject failure rejected =>
+                  have reply := symbol_validFor .leftBrace .statement
+                    afterScrutinees requiredReply.2.1
+                  rw [openingResult] at reply
+                  simpa only [Reply.ValidFor] using reply.of_file_eq requiredFile
+              | ok opening afterOpening =>
+                  have openingReply := symbol_validFor .leftBrace .statement
+                    afterScrutinees requiredReply.2.1
+                  rw [openingResult] at openingReply
+                  simp only
+                  have openingFile : afterOpening.file = input.file := openingReply.2.2.trans requiredFile
+                  have casesContract := MatchInternals.matchCases_validFor expressionValueValid
+                    patternValueValid yulValueValid statement pattern caseValid
+                    (afterOpening.remainingCount + 1) [] afterOpening openingReply.2.1
+                    (by intro item member; simp at member)
+                  cases casesResult : MatchInternals.matchCases statement pattern
+                      (afterOpening.remainingCount + 1) [] afterOpening with
+                  | invariant error => trivial
+                  | reject failure rejected =>
+                      rw [casesResult] at casesContract
+                      simpa only [Reply.ValidFor] using casesContract.of_file_eq openingFile
+                  | ok cases afterCases =>
+                      rw [casesResult] at casesContract
+                      simp only
+                      have casesFile : afterCases.file = input.file := casesContract.2.2.trans openingFile
+                      cases defaultResult : MatchInternals.optionalDefaultBody statement afterCases with
+                      | invariant error => trivial
+                      | reject failure rejected =>
+                          have reply := defaultValid afterCases
+                            casesContract.2.1
+                          rw [defaultResult] at reply
+                          simpa only [Reply.ValidFor] using reply.of_file_eq casesFile
+                      | ok defaultBody afterDefault =>
+                          have defaultReply := defaultValid afterCases
+                            casesContract.2.1
+                          rw [defaultResult] at defaultReply
+                          simp only
+                          have defaultFile : afterDefault.file = input.file := defaultReply.2.2.trans casesFile
+                          cases closingResult : symbol .rightBrace .statement afterDefault with
+                          | invariant error => trivial
+                          | reject failure rejected =>
+                              have reply := symbol_validFor .rightBrace
+                                .statement afterDefault defaultReply.2.1
+                              rw [closingResult] at reply
+                              simpa only [Reply.ValidFor] using reply.of_file_eq defaultFile
+                          | ok closing afterClosing =>
+                              have closingReply := symbol_validFor .rightBrace
+                                .statement afterDefault defaultReply.2.1
+                              rw [closingResult] at closingReply
+                              simp only
+                              have closingFile : afterClosing.file = input.file := closingReply.2.2.trans defaultFile
+                              have caseSpans : List.ValidFor (fun file retainedCase =>
+                                  retainedCase.span.ValidFor file) afterClosing.file cases := by
+                                intro retained member
+                                have retainedValid := casesContract.1 retained member
+                                cases retainedValid with
+                                | arm spanValid _ _ _ =>
+                                    simpa [closingReply.2.2, defaultReply.2.2,
+                                      casesContract.2.2] using spanValid
+                              have validationReply := MatchInternals.validateMatchArities_validFor
+                                scrutinees.elements.toList.length cases afterClosing
+                                closingReply.2.1 caseSpans
+                              cases validationResult : MatchInternals.validateMatchArities
+                                  scrutinees.elements.toList.length cases afterClosing with
+                              | invariant error => trivial
+                              | reject failure rejected =>
+                                  rw [validationResult] at validationReply
+                                  simpa only [Reply.ValidFor] using validationReply.of_file_eq closingFile
+                              | ok validated afterValidation =>
+                                  rw [validationResult] at validationReply
+                                  simp only
+                                  have validationFile : afterValidation.file = input.file :=
+                                    validationReply.2.2.trans closingFile
+                                  have markerAt := State.getElem?_eq_some_of_peek?_eq_some
+                                    (acceptToken_ok_state_shape (.keyword .matchKw) .statement
+                                      (fun kind => kind == .keyword .matchKw) markerResult).1
+                                  have openingAt := State.getElem?_eq_some_of_peek?_eq_some
+                                    (symbol_ok_state_shape .leftBrace .statement openingResult).1
+                                  have closingAt := State.getElem?_eq_some_of_peek?_eq_some
+                                    (symbol_ok_state_shape .rightBrace .statement closingResult).1
+                                  have casesTokens := MatchInternals.matchCases_preservesTokensOnSuccess
+                                    statement pattern caseWindow (afterOpening.remainingCount + 1) []
+                                    afterOpening cases afterCases casesResult
+                                  have defaultTokens := MatchInternals.optionalDefaultBody_preservesTokensOnSuccess
+                                    statement statementWindow afterCases defaultBody afterDefault defaultResult
+                                  have openTokens := symbol_preservesTokensOnSuccess .leftBrace .statement
+                                    afterScrutinees opening afterOpening openingResult
+                                  have requireTokens :=
+                                    (MatchInternals.requireScrutinees_preservesTokenWindow values).preservesTokensOnSuccess
+                                      afterValues scrutinees afterScrutinees requiredResult
+                                  have valuesTokens := delimited_preservesTokensOnSuccess .leftParen .rightParen
+                                    false expression .expression .statement expressionTokens afterMarker values
+                                    afterValues valuesResult
+                                  have markerTokens := keyword_preservesTokensOnSuccess .matchKw .statement
+                                    input marker afterMarker markerResult
+                                  have openingAtDefault :
+                                      afterDefault.tokens[afterScrutinees.cursor]? =
+                                        some opening := by
+                                    simpa [defaultTokens, casesTokens, openTokens] using openingAt
+                                  have markerAtDefault :
+                                      afterDefault.tokens[input.cursor]? =
+                                        some marker := by
+                                    simpa [defaultTokens, casesTokens, openTokens, requireTokens,
+                                      valuesTokens, markerTokens] using markerAt
+                                  have openCursor := acceptToken_cursor_lt_onSuccess
+                                    (.symbol .leftBrace) .statement
+                                    (fun kind => kind == .symbol .leftBrace) openingResult
+                                  have casesCursor := MatchInternals.matchCases_cursorMonotoneOnSuccess
+                                    statement pattern (afterOpening.remainingCount + 1) [] afterOpening cases
+                                    afterCases casesResult
+                                  have defaultCursor := MatchInternals.optionalDefaultBody_cursorMonotoneOnSuccess
+                                    statement afterCases defaultBody afterDefault defaultResult
+                                  have markerCursor := acceptToken_cursor_lt_onSuccess
+                                    (.keyword .matchKw) .statement
+                                    (fun kind => kind == .keyword .matchKw) markerResult
+                                  have valuesCursor := delimited_cursorMonotoneOnSuccess .leftParen
+                                    .rightParen false expression .expression .statement afterMarker values
+                                    afterValues valuesResult
+                                  have requiredCursor := MatchInternals.requireScrutinees_cursorMonotoneOnSuccess
+                                    values afterValues scrutinees afterScrutinees requiredResult
+                                  have openingBefore : afterScrutinees.cursor <
+                                      afterDefault.cursor := by
+                                    exact Nat.lt_of_lt_of_le openCursor
+                                      (Nat.le_trans casesCursor defaultCursor)
+                                  have markerBefore : input.cursor <
+                                      afterDefault.cursor := by
+                                    exact Nat.lt_trans (Nat.lt_of_lt_of_le markerCursor
+                                      (Nat.le_trans valuesCursor requiredCursor)) openingBefore
+                                  have markerSeparated :=
+                                    defaultReply.2.1.token_end_le_token_start_of_getElem?_lt
+                                      markerAtDefault closingAt markerBefore
+                                  have openingSeparated :=
+                                    defaultReply.2.1.token_end_le_token_start_of_getElem?_lt
+                                      openingAtDefault closingAt openingBefore
+                                  have markerSpan : marker.span.ValidFor
+                                      input.file := by
+                                    simpa only [Located.ValidFor] using
+                                      markerReply.1
+                                  have openingSpan : opening.span.ValidFor
+                                      input.file := by
+                                    simpa only [Located.ValidFor,
+                                      requiredFile] using openingReply.1
+                                  have closingSpan : closing.span.ValidFor
+                                      input.file := by
+                                    simpa only [Located.ValidFor,
+                                      defaultFile] using closingReply.1
+                                  have outerSpan := SourceSpan.cover_validFor
+                                    markerSpan closingSpan (Nat.le_trans
+                                      markerSpan.2.1 (Nat.le_trans
+                                        markerSeparated closingSpan.2.1))
+                                  have armsSpan := SourceSpan.cover_validFor
+                                    openingSpan closingSpan (Nat.le_trans
+                                      openingSpan.2.1 (Nat.le_trans
+                                        openingSeparated closingSpan.2.1))
+                                  have scrutineesValid :
+                                      NonemptyDelimitedList.ValidFor
+                                        expressionValueValid input.file
+                                        scrutinees := by
+                                    simpa [valuesFile] using requiredReply.1
+                                  have casesValid : List.ValidFor
+                                      (MatchCase.ValidFor expressionValueValid
+                                        patternValueValid yulValueValid)
+                                      input.file cases := by
+                                    simpa [openingFile] using casesContract.1
+                                  have defaultBodyValid : Option.ValidFor
+                                      (Block.ValidFor (Statement.ValidFor
+                                        expressionValueValid patternValueValid
+                                        yulValueValid)) input.file
+                                      defaultBody := by
+                                    simpa [casesFile] using defaultReply.1
+                                  have armsValid : MatchArms.ValidFor
+                                      expressionValueValid patternValueValid
+                                      yulValueValid input.file {
+                                        span := SourceSpan.cover opening.span
+                                          closing.span
+                                        value := { cases, defaultBody }
+                                      } := by
+                                    cases defaultBody with
+                                    | none => exact MatchArms.ValidFor.arms (defaultBody := none) armsSpan casesValid (by simp) (by simp)
+                                    | some body =>
+                                        simp only [Option.ValidFor] at defaultBodyValid
+                                        exact MatchArms.ValidFor.arms (defaultBody := some body) armsSpan casesValid (by simpa using defaultBodyValid.1) (by simpa using defaultBodyValid.2)
+                                  have retainedValid :=
+                                    Statement.ValidFor.matchWith outerSpan
+                                      scrutineesValid.1 scrutineesValid.2
+                                      armsValid
+                                  by_cases missing :
+                                      cases.isEmpty && defaultBody.isNone
+                                  · simp only [missing, if_true]
+                                    have emitted := emitDiagnostic_reply_validFor
+                                      (diagnostic := { span := SourceSpan.cover marker.span closing.span, kind := .constraintViolation .matchRequiresArm }) validationReply.2.1 (by
+                                        simpa [validationFile] using outerSpan)
+                                    cases emittedResult : emitDiagnostic { span := SourceSpan.cover marker.span closing.span, kind := .constraintViolation .matchRequiresArm }
+                                        afterValidation with
+                                    | invariant error => trivial
+                                    | reject failure rejected =>
+                                        rw [emittedResult] at emitted
+                                        simpa only [bind, emittedResult,
+                                          Reply.ValidFor] using
+                                            emitted.of_file_eq validationFile
+                                    | ok value afterEmit =>
+                                        rw [emittedResult] at emitted
+                                        simp only
+                                        exact ⟨by simpa [emitted.2.2,
+                                          validationFile] using retainedValid,
+                                          emitted.2.1,
+                                          emitted.2.2.trans validationFile⟩
+                                  · simp only [missing]
+                                    exact ⟨by simpa [validationFile] using
+                                      retainedValid, validationReply.2.1,
+                                        validationFile⟩
 
 /-- Complete `match` parsing preserves every ordinary token window. -/
 theorem matchStatement_preservesTokenWindow
