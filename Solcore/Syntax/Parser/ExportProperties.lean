@@ -1362,4 +1362,237 @@ theorem localExport_keepsStartByte (start : SourceSpan)
     ⟨items, afterItems, _itemsResult, finished⟩
   exact finishExport_keepsStartByte start (.local items) finished
 
+private theorem pathExport_weakValidFor (start : SourceSpan) :
+    (ExportInternals.pathExport start).ValidFor (fun _ _ => True) := by
+  have pathWeak : ExportInternals.exportPath.ValidFor (fun _ _ => True) :=
+    exportPath_validFor.mono (fun _ _ _ => trivial)
+  have selectionWeak : ExportInternals.exportSelection.ValidFor
+      (fun _ _ => True) :=
+    exportSelection_validFor.mono (fun _ _ _ => trivial)
+  unfold ExportInternals.pathExport
+  apply Parser.bind_validFor pathWeak
+  intro path
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  split
+  · apply Parser.bind_validFor (symbol_validFor .dot .exportDecl)
+    intro dot
+    apply Parser.bind_validFor selectionWeak
+    intro selection
+    unfold ExportInternals.finishExport
+    apply Parser.bind_validFor (symbol_validFor .semicolon .exportDecl)
+    intro semicolon
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  · split
+    · apply Parser.bind_validFor (keyword_validFor .asKw .exportDecl)
+      intro asMarker
+      apply Parser.bind_validFor (identifier_validFor .exportDecl)
+      intro alias
+      unfold ExportInternals.finishExport
+      apply Parser.bind_validFor (symbol_validFor .semicolon .exportDecl)
+      intro semicolon
+      exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+    · unfold ExportInternals.finishExport
+      apply Parser.bind_validFor (symbol_validFor .semicolon .exportDecl)
+      intro semicolon
+      exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+
+/-- Path exports retain their path, suffix payload, and declaration cover. -/
+theorem pathExport_validFor (start : SourceSpan) (input : State)
+    (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    {startIndex : Nat} {startToken : Token}
+    (startFound : input.tokens[startIndex]? = some startToken)
+    (startSpan : startToken.span = start)
+    (startBefore : startIndex < input.cursor) :
+    (ExportInternals.pathExport start input).ValidFor input
+      ExportDecl.ValidFor := by
+  have weak := pathExport_weakValidFor start input inputValid
+  cases parsed : ExportInternals.pathExport start input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weak
+      exact weak
+  | ok result final =>
+      rw [parsed] at weak
+      have stages := parsed
+      unfold ExportInternals.pathExport at stages
+      rcases exportBind_ok_components stages with
+        ⟨path, afterPath, pathResult, rest⟩
+      rcases exportBind_ok_components rest with
+        ⟨observed, afterObserved, observedResult, rest⟩
+      unfold getState at observedResult
+      cases observedResult
+      have pathReply := exportPath_validFor input inputValid
+      rw [pathResult] at pathReply
+      have pathTokens := exportPath_preservesTokensOnSuccess
+        input path afterPath pathResult
+      have startFoundAfterPath :
+          afterPath.tokens[startIndex]? = some startToken := by
+        rw [pathTokens]
+        exact startFound
+      have startBeforeAfterPath : startIndex < afterPath.cursor :=
+        Nat.lt_of_lt_of_le startBefore
+          (exportPath_cursorMonotoneOnSuccess
+            input path afterPath pathResult)
+      split at rest
+      · rcases exportBind_ok_components rest with
+          ⟨dot, afterDot, dotResult, rest⟩
+        rcases exportBind_ok_components rest with
+          ⟨selection, afterSelection, selectionResult, finished⟩
+        have dotReply := symbol_validFor .dot .exportDecl
+          afterPath pathReply.2.1
+        rw [dotResult] at dotReply
+        have selectionReply := exportSelection_validFor
+          afterDot dotReply.2.1
+        rw [selectionResult] at selectionReply
+        have finalFile : afterSelection.file = input.file :=
+          selectionReply.2.2.trans (dotReply.2.2.trans pathReply.2.2)
+        have startFoundFinal :
+            afterSelection.tokens[startIndex]? = some startToken := by
+          rw [exportSelection_preservesTokensOnSuccess afterDot selection
+            afterSelection selectionResult]
+          rw [symbol_preservesTokensOnSuccess .dot .exportDecl
+            afterPath dot afterDot dotResult]
+          exact startFoundAfterPath
+        have startBeforeFinal : startIndex < afterSelection.cursor :=
+          Nat.lt_of_lt_of_le startBeforeAfterPath (Nat.le_trans
+            (symbol_cursorMonotoneOnSuccess .dot .exportDecl
+              afterPath dot afterDot dotResult)
+            (exportSelection_cursorMonotoneOnSuccess
+              afterDot selection afterSelection selectionResult))
+        have strong := finishExport_validFor start
+          (.itemsFrom path selection) afterSelection selectionReply.2.1
+          (by simpa [finalFile] using startValid) startFoundFinal startSpan
+          startBeforeFinal ⟨by simpa [finalFile] using pathReply.1,
+            by simpa [selectionReply.2.2] using selectionReply.1⟩
+        rw [finished] at strong
+        exact strong.of_file_eq finalFile
+      · split at rest
+        · rcases exportBind_ok_components rest with
+            ⟨asMarker, afterAs, asResult, rest⟩
+          rcases exportBind_ok_components rest with
+            ⟨alias, afterAlias, aliasResult, finished⟩
+          have asReply := keyword_validFor .asKw .exportDecl
+            afterPath pathReply.2.1
+          rw [asResult] at asReply
+          have aliasReply := identifier_validFor .exportDecl
+            afterAs asReply.2.1
+          rw [aliasResult] at aliasReply
+          have finalFile : afterAlias.file = input.file :=
+            aliasReply.2.2.trans (asReply.2.2.trans pathReply.2.2)
+          have startFoundFinal :
+              afterAlias.tokens[startIndex]? = some startToken := by
+            rw [identifier_preservesTokensOnSuccess .exportDecl
+              afterAs alias afterAlias aliasResult]
+            rw [keyword_preservesTokensOnSuccess .asKw .exportDecl
+              afterPath asMarker afterAs asResult]
+            exact startFoundAfterPath
+          have startBeforeFinal : startIndex < afterAlias.cursor :=
+            Nat.lt_of_lt_of_le startBeforeAfterPath (Nat.le_trans
+              (keyword_cursorMonotoneOnSuccess .asKw .exportDecl
+                afterPath asMarker afterAs asResult)
+              (identifier_cursorMonotoneOnSuccess .exportDecl
+                afterAs alias afterAlias aliasResult))
+          have strong := finishExport_validFor start (.moduleAs path alias)
+            afterAlias aliasReply.2.1 (by simpa [finalFile] using startValid)
+            startFoundFinal startSpan startBeforeFinal
+            ⟨by simpa [finalFile] using pathReply.1,
+              by
+                have aliasSpanValid : alias.span.ValidFor afterAs.file := by
+                  simpa only [Located.ValidFor] using aliasReply.1
+                simpa [aliasReply.2.2] using aliasSpanValid⟩
+          rw [finished] at strong
+          exact strong.of_file_eq finalFile
+        · have strong := finishExport_validFor start (.module path)
+            afterPath pathReply.2.1
+            (by simpa [pathReply.2.2] using startValid)
+            startFoundAfterPath startSpan startBeforeAfterPath
+            (by simpa [pathReply.2.2] using pathReply.1)
+          rw [rest] at strong
+          exact strong.of_file_eq pathReply.2.2
+
+/-- Path exports preserve every ordinary token window. -/
+theorem pathExport_preservesTokenWindow (start : SourceSpan) :
+    Parser.PreservesTokenWindow (ExportInternals.pathExport start) := by
+  unfold ExportInternals.pathExport
+  apply Parser.bind_preservesTokenWindow exportPath_preservesTokenWindow
+  intro path
+  apply Parser.bind_preservesTokenWindow getState_preservesExportTokenWindow
+  intro observed
+  split
+  · apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .dot .exportDecl)
+    intro dot
+    apply Parser.bind_preservesTokenWindow exportSelection_preservesTokenWindow
+    intro selection
+    exact finishExport_preservesTokenWindow start (.itemsFrom path selection)
+  · split
+    · apply Parser.bind_preservesTokenWindow
+        (keyword_preservesTokenWindow .asKw .exportDecl)
+      intro asMarker
+      apply Parser.bind_preservesTokenWindow
+        (identifier_preservesTokenWindow .exportDecl)
+      intro alias
+      exact finishExport_preservesTokenWindow start (.moduleAs path alias)
+    · exact finishExport_preservesTokenWindow start (.module path)
+
+theorem pathExport_preservesTokensOnSuccess (start : SourceSpan) :
+    Parser.PreservesTokensOnSuccess (ExportInternals.pathExport start) :=
+  (pathExport_preservesTokenWindow start).preservesTokensOnSuccess
+
+/-- Successful path exports never rewind the cursor. -/
+theorem pathExport_cursorMonotoneOnSuccess (start : SourceSpan) :
+    Parser.CursorMonotoneOnSuccess (ExportInternals.pathExport start) := by
+  unfold ExportInternals.pathExport
+  apply Parser.bind_cursorMonotoneOnSuccess
+    exportPath_cursorMonotoneOnSuccess
+  intro path
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  split
+  · apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .dot .exportDecl)
+    intro dot
+    apply Parser.bind_cursorMonotoneOnSuccess
+      exportSelection_cursorMonotoneOnSuccess
+    intro selection
+    exact finishExport_cursorMonotoneOnSuccess start
+      (.itemsFrom path selection)
+  · split
+    · apply Parser.bind_cursorMonotoneOnSuccess
+        (keyword_cursorMonotoneOnSuccess .asKw .exportDecl)
+      intro asMarker
+      apply Parser.bind_cursorMonotoneOnSuccess
+        (identifier_cursorMonotoneOnSuccess .exportDecl)
+      intro alias
+      exact finishExport_cursorMonotoneOnSuccess start (.moduleAs path alias)
+    · exact finishExport_cursorMonotoneOnSuccess start (.module path)
+
+theorem pathExport_keepsStartByte (start : SourceSpan)
+    {input next : State} {result : ExportDecl}
+    (parsed : ExportInternals.pathExport start input = .ok result next) :
+    start.startByte = result.span.startByte := by
+  unfold ExportInternals.pathExport at parsed
+  rcases exportBind_ok_components parsed with
+    ⟨path, afterPath, _pathResult, rest⟩
+  rcases exportBind_ok_components rest with
+    ⟨observed, afterObserved, observedResult, rest⟩
+  unfold getState at observedResult
+  cases observedResult
+  split at rest
+  · rcases exportBind_ok_components rest with
+      ⟨dot, afterDot, _dotResult, rest⟩
+    rcases exportBind_ok_components rest with
+      ⟨selection, afterSelection, _selectionResult, finished⟩
+    exact finishExport_keepsStartByte start
+      (.itemsFrom path selection) finished
+  · split at rest
+    · rcases exportBind_ok_components rest with
+        ⟨asMarker, afterAs, _asResult, rest⟩
+      rcases exportBind_ok_components rest with
+        ⟨alias, afterAlias, _aliasResult, finished⟩
+      exact finishExport_keepsStartByte start (.moduleAs path alias) finished
+    · exact finishExport_keepsStartByte start (.module path) rest
+
 end Solcore.Syntax.Parser

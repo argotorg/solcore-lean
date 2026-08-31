@@ -43,5 +43,10 @@ example := @localExport_preservesTokenWindow
 example := @localExport_preservesTokensOnSuccess
 example := @localExport_cursorMonotoneOnSuccess
 example := @localExport_keepsStartByte
+example := @pathExport_validFor
+example := @pathExport_preservesTokenWindow
+example := @pathExport_preservesTokensOnSuccess
+example := @pathExport_cursorMonotoneOnSuccess
+example := @pathExport_keepsStartByte
 
 end Tests

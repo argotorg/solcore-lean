@@ -205,7 +205,10 @@ def localExport (start : SourceSpan) : Parser ExportDecl := do
 
 end ExportInternals
 
-private def pathExport (start : SourceSpan) : Parser ExportDecl := do
+namespace ExportInternals
+
+/-- Parse a module-path export and its optional selection or alias suffix. -/
+def pathExport (start : SourceSpan) : Parser ExportDecl := do
   let path ← ExportInternals.exportPath
   let state ← getState
   if isSymbol state .dot then
@@ -219,6 +222,8 @@ private def pathExport (start : SourceSpan) : Parser ExportDecl := do
   else
     ExportInternals.finishExport start (.module path)
 
+end ExportInternals
+
 /-- Parse one canonical export declaration. -/
 def exportDecl : Parser ExportDecl := do
   let exportKeyword ← keyword .exportKw .exportDecl
@@ -226,6 +231,6 @@ def exportDecl : Parser ExportDecl := do
   if isSymbol state .leftBrace then
     ExportInternals.localExport exportKeyword.span
   else
-    pathExport exportKeyword.span
+    ExportInternals.pathExport exportKeyword.span
 
 end Solcore.Syntax.Parser
