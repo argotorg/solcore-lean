@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Validity
+import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.StateCursorProperties
 
 set_option autoImplicit false
@@ -285,5 +285,69 @@ theorem qualifiedName_preservesTokensOnSuccess (context : ParseContext)
     Parser.PreservesTokensOnSuccess (qualifiedName context phase) := by
   intro input name next result
   exact (qualifiedName_ok_state_shape context phase result).choose_spec.2.2
+
+private theorem qualifiedNameTail_cursorMonotoneOnSuccess
+    (context : ParseContext) (phase : ParserPhase) (first : Identifier) :
+    ∀ fuel last tailRev input name next,
+      qualifiedNameTail context phase first fuel last tailRev input =
+        .ok name next →
+      input.cursor ≤ next.cursor := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro last tailRev input name next result
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro last tailRev input name next result
+      unfold qualifiedNameTail at result
+      split at result
+      · cases dotResult : symbol .dot context input with
+        | invariant error => simp [dotResult] at result
+        | reject failure rejected => simp [dotResult] at result
+        | ok dot afterDot =>
+            simp only [dotResult] at result
+            cases componentResult : identifier context afterDot with
+            | invariant error => simp [componentResult] at result
+            | reject failure rejected => simp [componentResult] at result
+            | ok component afterComponent =>
+                simp only [componentResult] at result
+                have dotMonotone := symbol_cursorMonotoneOnSuccess
+                  .dot context input dot afterDot dotResult
+                have componentMonotone :=
+                  identifier_cursorMonotoneOnSuccess context afterDot
+                    component afterComponent componentResult
+                have recursiveMonotone := inductionHypothesis component
+                  (component :: tailRev) afterComponent name next result
+                exact Nat.le_trans dotMonotone
+                  (Nat.le_trans componentMonotone recursiveMonotone)
+      · unfold finishQualifiedName at result
+        cases result
+        exact Nat.le_refl _
+
+/-- Every successful qualified name consumes its first identifier. -/
+theorem qualifiedName_cursor_lt_onSuccess (context : ParseContext)
+    (phase : ParserPhase) {input next : State} {name : QualifiedName}
+    (result : qualifiedName context phase input = .ok name next) :
+    input.cursor < next.cursor := by
+  unfold qualifiedName at result
+  cases firstResult : identifier context input with
+  | invariant error => simp [firstResult] at result
+  | reject failure rejected => simp [firstResult] at result
+  | ok first afterFirst =>
+      simp only [firstResult] at result
+      have firstProgress : input.cursor < afterFirst.cursor := by
+        rw [(identifier_ok_state_shape context firstResult).choose_spec.2.2.2]
+        simp
+      have tailMonotone := qualifiedNameTail_cursorMonotoneOnSuccess
+        context phase first (afterFirst.remainingCount + 1) first []
+          afterFirst name next result
+      exact Nat.lt_of_lt_of_le firstProgress tailMonotone
+
+/-- Successful qualified-name parsing never rewinds the cursor. -/
+theorem qualifiedName_cursorMonotoneOnSuccess (context : ParseContext)
+    (phase : ParserPhase) :
+    Parser.CursorMonotoneOnSuccess (qualifiedName context phase) := by
+  intro input name next result
+  exact Nat.le_of_lt (qualifiedName_cursor_lt_onSuccess context phase result)
 
 end Solcore.Syntax.Parser

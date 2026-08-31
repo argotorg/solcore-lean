@@ -343,4 +343,70 @@ theorem selectorName_preservesTokensOnSuccess (context : ParseContext) :
           ⟨_token, _found, _span, tokensEq, _cursor⟩
         exact tokensEq
 
+/-- Parenthesized operator selectors consume both delimiters. -/
+theorem operatorSelector_cursor_lt_onSuccess (context : ParseContext)
+    {input next : State} {selector : SelectorName}
+    (result : operatorSelector context input = .ok selector next) :
+    input.cursor < next.cursor := by
+  unfold operatorSelector at result
+  cases openingResult : symbol .leftParen context input with
+  | invariant error => simp [openingResult] at result
+  | reject failure rejected => simp [openingResult] at result
+  | ok opening afterOpening =>
+      simp only [openingResult] at result
+      cases partsResult : operatorParts context
+          (afterOpening.remainingCount + 1) [] afterOpening with
+      | invariant error => simp [partsResult] at result
+      | reject failure rejected => simp [partsResult] at result
+      | ok parts afterParts =>
+          simp only [partsResult] at result
+          cases closingResult : symbol .rightParen context afterParts with
+          | invariant error => simp [closingResult] at result
+          | reject failure rejected => simp [closingResult] at result
+          | ok closing final =>
+              simp only [closingResult] at result
+              cases result
+              have openingProgress : input.cursor < afterOpening.cursor := by
+                rw [(symbol_ok_state_shape .leftParen context
+                  openingResult).2]
+                simp
+              have partsMonotone := (operatorParts_validFor context
+                (afterOpening.remainingCount + 1) [] afterOpening).2
+                  parts afterParts partsResult |>.2
+              have closingProgress : afterParts.cursor < next.cursor := by
+                rw [(symbol_ok_state_shape .rightParen context
+                  closingResult).2]
+                simp
+              exact Nat.lt_trans openingProgress
+                (Nat.lt_of_le_of_lt partsMonotone closingProgress)
+
+/-- Operator-selector success never moves the parser cursor backwards. -/
+theorem operatorSelector_cursorMonotoneOnSuccess (context : ParseContext) :
+    Parser.CursorMonotoneOnSuccess (operatorSelector context) := by
+  intro input selector next result
+  exact Nat.le_of_lt (operatorSelector_cursor_lt_onSuccess context result)
+
+/-- Every successful selector consumes an identifier or operator group. -/
+theorem selectorName_cursor_lt_onSuccess (context : ParseContext)
+    {input next : State} {selector : SelectorName}
+    (result : selectorName context input = .ok selector next) :
+    input.cursor < next.cursor := by
+  unfold selectorName at result
+  split at result
+  · exact operatorSelector_cursor_lt_onSuccess context result
+  · cases identifierResult : identifier context input with
+    | invariant error => simp [identifierResult] at result
+    | reject failure rejected => simp [identifierResult] at result
+    | ok name afterName =>
+        simp only [identifierResult] at result
+        cases result
+        rw [(identifier_ok_state_shape context identifierResult).choose_spec.2.2.2]
+        simp
+
+/-- Selector-name success never moves the parser cursor backwards. -/
+theorem selectorName_cursorMonotoneOnSuccess (context : ParseContext) :
+    Parser.CursorMonotoneOnSuccess (selectorName context) := by
+  intro input selector next result
+  exact Nat.le_of_lt (selectorName_cursor_lt_onSuccess context result)
+
 end Solcore.Syntax.Parser

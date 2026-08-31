@@ -156,4 +156,41 @@ theorem modulePath_preservesTokensOnSuccess (context : ParseContext) :
         exact qualifiedName_preservesTokensOnSuccess context .topLevel
           input name next nameResult
 
+/-- Every successful module path consumes at least its first path token. -/
+theorem modulePath_cursor_lt_onSuccess (context : ParseContext)
+    {input next : State} {path : ModulePath}
+    (result : modulePath context input = .ok path next) :
+    input.cursor < next.cursor := by
+  unfold modulePath at result
+  split at result
+  · cases markerResult : symbol .at context input with
+    | invariant error => simp [markerResult] at result
+    | reject failure rejected => simp [markerResult] at result
+    | ok marker afterMarker =>
+        simp only [markerResult] at result
+        cases nameResult : qualifiedName context .topLevel afterMarker with
+        | invariant error => simp [nameResult] at result
+        | reject failure rejected => simp [nameResult] at result
+        | ok name final =>
+            simp only [nameResult] at result
+            cases result
+            have markerProgress : input.cursor < afterMarker.cursor := by
+              rw [(symbol_ok_state_shape .at context markerResult).2]
+              simp
+            exact Nat.lt_trans markerProgress
+              (qualifiedName_cursor_lt_onSuccess context .topLevel nameResult)
+  · cases nameResult : qualifiedName context .topLevel input with
+    | invariant error => simp [nameResult] at result
+    | reject failure rejected => simp [nameResult] at result
+    | ok name final =>
+        simp only [nameResult] at result
+        cases result
+        exact qualifiedName_cursor_lt_onSuccess context .topLevel nameResult
+
+/-- Successful module-path parsing never rewinds the cursor. -/
+theorem modulePath_cursorMonotoneOnSuccess (context : ParseContext) :
+    Parser.CursorMonotoneOnSuccess (modulePath context) := by
+  intro input path next result
+  exact Nat.le_of_lt (modulePath_cursor_lt_onSuccess context result)
+
 end Solcore.Syntax.Parser

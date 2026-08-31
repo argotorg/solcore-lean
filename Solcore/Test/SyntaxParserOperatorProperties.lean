@@ -15,6 +15,10 @@ example := @operatorSelector_validFor
 example := @selectorName_validFor
 example := @operatorSelector_preservesTokensOnSuccess
 example := @selectorName_preservesTokensOnSuccess
+example := @operatorSelector_cursor_lt_onSuccess
+example := @operatorSelector_cursorMonotoneOnSuccess
+example := @selectorName_cursor_lt_onSuccess
+example := @selectorName_cursorMonotoneOnSuccess
 
 example (file : SourceFile) (span : SourceSpan) (name : Identifier)
     (valid : SelectorName.ValidFor file {

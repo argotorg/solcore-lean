@@ -29,4 +29,9 @@ example (context : ParseContext) (phase : ParserPhase) :
     (qualifiedName context phase).ValidFor QualifiedName.ValidFor :=
   qualifiedName_validFor context phase
 
+example := @qualifiedName_ok_state_shape
+example := @qualifiedName_preservesTokensOnSuccess
+example := @qualifiedName_cursor_lt_onSuccess
+example := @qualifiedName_cursorMonotoneOnSuccess
+
 end Tests

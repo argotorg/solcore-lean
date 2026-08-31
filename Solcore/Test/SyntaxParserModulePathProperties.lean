@@ -14,6 +14,8 @@ example := @qualifiedName_preservesTokensOnSuccess
 example := @ModulePath.ValidFor
 example := @modulePath_validFor
 example := @modulePath_preservesTokensOnSuccess
+example := @modulePath_cursor_lt_onSuccess
+example := @modulePath_cursorMonotoneOnSuccess
 
 example (file : SourceFile) (path : ModulePath)
     (valid : ModulePath.ValidFor file path) :
