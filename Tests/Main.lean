@@ -27,6 +27,7 @@ import Solcore.Test.SyntaxParserModules
 import Solcore.Test.SyntaxParserNameProperties
 import Solcore.Test.SyntaxParserOperatorProperties
 import Solcore.Test.SyntaxParserPrimitiveProperties
+import Solcore.Test.SyntaxParserPrimitiveCarrierProperties
 import Solcore.Test.SyntaxParserRecovery
 import Solcore.Test.SyntaxParserReservedWords
 import Solcore.Test.SyntaxParserSignatures

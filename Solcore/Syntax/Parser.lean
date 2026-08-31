@@ -3,6 +3,7 @@ import Solcore.Syntax.Parser.DiagnosticFilter
 import Solcore.Syntax.Parser.Preflight
 import Solcore.Syntax.Parser.Validity
 import Solcore.Syntax.Parser.LiteralProperties
+import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.StateCursorProperties
 
 set_option autoImplicit false
