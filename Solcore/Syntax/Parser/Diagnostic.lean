@@ -58,6 +58,10 @@ inductive RecoverySite where
 inductive ParseConstraint where
   | mappingRequiresCanonicalForm
   | trailingSemicolonRequired (context : ParseContext)
+  | namedParameterRequiresType
+  | comptimeTypeInParameter
+  | comptimeUsedAsParameterName
+  | modifierOutsideContract (keyword : HardKeyword)
   deriving Repr, BEq, DecidableEq
 
 /-- Bounded recursive syntax dimensions checked before recursive parsing. -/

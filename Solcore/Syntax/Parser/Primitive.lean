@@ -20,6 +20,13 @@ def modifyState (update : State → State) : Parser Unit := fun state =>
 def emitDiagnostic (diagnostic : ParseDiagnostic) : Parser Unit :=
   modifyState (·.emit diagnostic)
 
+/-- Try `first` transactionally, using `second` after an ordinary rejection. -/
+def orElse {α : Type} (first second : Parser α) : Parser α := fun state =>
+  match first state with
+  | .ok value next => .ok value next
+  | .reject _ _ => second state
+  | .invariant error => .invariant error
+
 /-- Build one uncommitted rejection at the current cursor. -/
 def rejectAt {α : Type} (state : State)
     (expected : NonemptyList ParseExpectation)
