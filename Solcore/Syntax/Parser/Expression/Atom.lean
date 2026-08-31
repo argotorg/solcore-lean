@@ -60,7 +60,10 @@ def dotConstructor (nested : Parser Expr) : Parser Expr := do
 
 end ExpressionAtomInternals
 
-private def closeTuple (opening : Token) (elementsRev : List Expr) :
+namespace ExpressionAtomInternals
+
+/-- Close a parenthesized expression after its elements have been accumulated. -/
+def closeTuple (opening : Token) (elementsRev : List Expr) :
     Parser Expr := do
   let closing ← symbol .rightParen .expression
   let span := SourceSpan.cover opening.span closing.span
@@ -71,6 +74,8 @@ private def closeTuple (opening : Token) (elementsRev : List Expr) :
       value := .tuple { span, elements := elementsRev.reverse }
     }
 
+end ExpressionAtomInternals
+
 private def tupleTail (nested : Parser Expr) (opening : Token) :
     Nat → List Expr → State → Reply Expr
   | 0, _, state => .invariant (.fuelExhausted .expression state.currentSpan)
@@ -78,7 +83,7 @@ private def tupleTail (nested : Parser Expr) (opening : Token) :
       match symbol .comma .expression state with
       | .ok _ afterComma =>
           if isSymbol afterComma .rightParen then
-            closeTuple opening elementsRev afterComma
+            ExpressionAtomInternals.closeTuple opening elementsRev afterComma
           else
             let before := afterComma.cursor
             match nested afterComma with
@@ -87,7 +92,8 @@ private def tupleTail (nested : Parser Expr) (opening : Token) :
                   if isSymbol next .comma then
                     tupleTail nested opening fuel (value :: elementsRev) next
                   else
-                    closeTuple opening (value :: elementsRev) next
+                    ExpressionAtomInternals.closeTuple opening
+                      (value :: elementsRev) next
                 else
                   .invariant (.noProgress .expression next.currentSpan)
             | .reject failure next => .reject failure next
@@ -99,7 +105,7 @@ private def parenthesized (nested : Parser Expr) : Parser Expr := fun state =>
   match symbol .leftParen .expression state with
   | .ok opening afterOpening =>
       if isSymbol afterOpening .rightParen then
-        closeTuple opening [] afterOpening
+        ExpressionAtomInternals.closeTuple opening [] afterOpening
       else
         let before := afterOpening.cursor
         match nested afterOpening with

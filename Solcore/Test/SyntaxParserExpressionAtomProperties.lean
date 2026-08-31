@@ -35,5 +35,11 @@ example := @ExpressionAtomInternals.dotConstructor_preservesTokenWindow
 example := @ExpressionAtomInternals.dotConstructor_preservesTokensOnSuccess
 example := @ExpressionAtomInternals.dotConstructor_cursorMonotoneOnSuccess
 example := @ExpressionAtomInternals.dotConstructor_startsAtCurrentTokenOnSuccess
+example := @ExpressionAtomInternals.closeTuple_validFor
+example := @ExpressionAtomInternals.closeTuple_preservesTokenWindow
+example := @ExpressionAtomInternals.closeTuple_preservesTokensOnSuccess
+example := @ExpressionAtomInternals.closeTuple_cursorMonotoneOnSuccess
+example := @ExpressionAtomInternals.closeTuple_preservesOpeningStartOnSuccess
+example := @ExpressionAtomInternals.closeTuple_endsAtCurrentTokenOnSuccess
 
 end Tests

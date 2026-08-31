@@ -512,5 +512,131 @@ theorem dotConstructor_startsAtCurrentTokenOnSuccess
   cases finished
   rfl
 
+/-- Closing a tuple retains its opening token and accumulated expressions. -/
+theorem closeTuple_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (opening : Token) (elementsRev : List Expr) {input : State}
+    {openingIndex : Nat} (inputValid : input.ValidFor)
+    (openingFound : input.tokens[openingIndex]? = some opening)
+    (openingBefore : openingIndex < input.cursor)
+    (elementsValid : List.ValidFor (Expr.ValidFor statementValid)
+      input.file elementsRev) :
+    (closeTuple opening elementsRev input).ValidFor input
+      (Expr.ValidFor statementValid) := by
+  unfold closeTuple
+  simp only [bind]
+  cases closingResult : symbol .rightParen .expression input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := symbol_validFor .rightParen .expression input inputValid
+      rw [closingResult] at valid
+      exact valid
+  | ok closing afterClosing =>
+      have closingValid := symbol_validFor .rightParen .expression
+        input inputValid
+      rw [closingResult] at closingValid
+      have closingShape := symbol_ok_state_shape .rightParen .expression
+        closingResult
+      have closingFound :=
+        State.getElem?_eq_some_of_peek?_eq_some closingShape.1
+      have openingValid :=
+        inputValid.token_span_validFor_of_getElem?_eq_some openingFound
+      have closingSpanValid : closing.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using closingValid.1
+      have openingBeforeClosing :=
+        inputValid.token_end_le_token_start_of_getElem?_lt openingFound
+          closingFound openingBefore
+      have outerValid := SourceSpan.cover_validFor openingValid
+        closingSpanValid (Nat.le_trans openingValid.2.1
+          (Nat.le_trans openingBeforeClosing closingSpanValid.2.1))
+      cases elementsRev with
+      | nil =>
+          exact ⟨Expr.ValidFor.tuple outerValid outerValid
+            (by simp), closingValid.2.1, closingValid.2.2⟩
+      | cons only tail =>
+          cases tail with
+          | nil =>
+              exact ⟨Expr.ValidFor.group outerValid
+                (elementsValid only (by simp)), closingValid.2.1,
+                closingValid.2.2⟩
+          | cons second rest =>
+              exact ⟨Expr.ValidFor.tuple outerValid outerValid
+                (by
+                  intro element member
+                  exact elementsValid element (by
+                    simpa only [List.mem_reverse] using member)),
+                closingValid.2.1, closingValid.2.2⟩
+
+/-- Closing an expression tuple preserves every ordinary token window. -/
+theorem closeTuple_preservesTokenWindow (opening : Token)
+    (elementsRev : List Expr) :
+    Parser.PreservesTokenWindow (closeTuple opening elementsRev) := by
+  unfold closeTuple
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .rightParen .expression)
+  intro closing
+  cases elementsRev with
+  | nil => exact Parser.pure_preservesTokenWindow _
+  | cons only tail =>
+      cases tail <;> exact Parser.pure_preservesTokenWindow _
+
+theorem closeTuple_preservesTokensOnSuccess (opening : Token)
+    (elementsRev : List Expr) :
+    Parser.PreservesTokensOnSuccess (closeTuple opening elementsRev) :=
+  (closeTuple_preservesTokenWindow opening
+    elementsRev).preservesTokensOnSuccess
+
+/-- Closing an expression tuple never rewinds the cursor. -/
+theorem closeTuple_cursorMonotoneOnSuccess (opening : Token)
+    (elementsRev : List Expr) :
+    Parser.CursorMonotoneOnSuccess (closeTuple opening elementsRev) := by
+  unfold closeTuple
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .rightParen .expression)
+  intro closing
+  cases elementsRev with
+  | nil => exact Parser.pure_cursorMonotoneOnSuccess _
+  | cons only tail =>
+      cases tail <;> exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- Closing retains the opening parenthesis as the result start. -/
+theorem closeTuple_preservesOpeningStartOnSuccess
+    (opening : Token) (elementsRev : List Expr)
+    {input final : State} {expression : Expr}
+    (parsed : closeTuple opening elementsRev input =
+      .ok expression final) :
+    expression.span.startByte = opening.span.startByte := by
+  unfold closeTuple at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨closing, afterClosing, _closingResult, finished⟩
+  cases elementsRev with
+  | nil => cases finished; rfl
+  | cons only tail =>
+      cases tail with
+      | nil => cases finished; rfl
+      | cons second rest => cases finished; rfl
+
+/-- The result ends at the current closing-parenthesis token. -/
+theorem closeTuple_endsAtCurrentTokenOnSuccess
+    (opening : Token) (elementsRev : List Expr)
+    {input final : State} {expression : Expr}
+    (parsed : closeTuple opening elementsRev input =
+      .ok expression final) :
+    ∃ closing, input.peek? = some closing ∧
+      closing.span.endByte = expression.span.endByte := by
+  unfold closeTuple at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨closing, afterClosing, closingResult, finished⟩
+  have found :=
+    (symbol_ok_state_shape .rightParen .expression closingResult).1
+  cases elementsRev with
+  | nil => cases finished; exact ⟨closing, found, rfl⟩
+  | cons only tail =>
+      cases tail with
+      | nil => cases finished; exact ⟨closing, found, rfl⟩
+      | cons second rest =>
+          cases finished
+          exact ⟨closing, found, rfl⟩
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser
