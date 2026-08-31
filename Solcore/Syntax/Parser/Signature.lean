@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Parameter
+import Solcore.Syntax.Parser.ParameterProperties
 import Solcore.Syntax.Parser.Predicate
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.TypeRecursiveProperties
@@ -236,9 +236,43 @@ theorem optionalGenericParameters_cursorMonotoneOnSuccess :
   · cases parsed
     exact Nat.le_refl _
 
-private def functionParameters : Parser (DelimitedList FunctionParameter) :=
+def functionParameters : Parser (DelimitedList FunctionParameter) :=
   delimited .leftParen .rightParen true namedParameter
     .parameter .topLevel
+
+/-- Function parameter lists retain delimiter and parameter provenance. -/
+theorem functionParameters_validFor :
+    functionParameters.ValidFor
+      (DelimitedList.ValidFor FunctionParameter.ValidFor) := by
+  unfold functionParameters
+  exact delimited_validFor FunctionParameter.ValidFor .leftParen .rightParen
+    true namedParameter .parameter .topLevel namedParameter_validFor
+      namedParameter_preservesTokensOnSuccess
+
+/-- Function parameter lists preserve every ordinary token window. -/
+theorem functionParameters_preservesTokenWindow :
+    Parser.PreservesTokenWindow functionParameters := by
+  unfold functionParameters
+  exact delimited_preservesTokenWindow .leftParen .rightParen true
+    namedParameter .parameter .topLevel namedParameter_preservesTokenWindow
+
+theorem functionParameters_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess functionParameters :=
+  functionParameters_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Function parameter lists never rewind the parser cursor. -/
+theorem functionParameters_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess functionParameters := by
+  unfold functionParameters
+  exact delimited_cursorMonotoneOnSuccess .leftParen .rightParen true
+    namedParameter .parameter .topLevel
+
+/-- Function parameter lists start at their opening parenthesis. -/
+theorem functionParameters_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess functionParameters (·.span) := by
+  unfold functionParameters
+  exact delimited_startsAtCurrentTokenOnSuccess .leftParen .rightParen true
+    namedParameter .parameter .topLevel
 
 /-- Parse one optional function-modifier marker. -/
 def optionalFunctionModifier
