@@ -1960,5 +1960,58 @@ theorem postfixTail_validFor
           · simp only [field]
             exact ⟨baseValid, inputValid, rfl⟩
 
+/-- A complete postfix parser retains its atom and every suffix source range. -/
+theorem expressionPostfix_validFor
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (atomValid : (expressionAtom nested block).ValidFor
+      (Expr.ValidFor statementValid))
+    (atomTokens : Parser.PreservesTokensOnSuccess
+      (expressionAtom nested block))
+    (atomCursorLt : ∀ {input next : State} {value : Expr},
+      expressionAtom nested block input = .ok value next →
+        input.cursor < next.cursor)
+    (atomStarts : Parser.StartsAtCurrentTokenOnSuccess
+      (expressionAtom nested block) (·.span))
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) :
+    (expressionPostfix nested block).ValidFor
+      (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  unfold expressionPostfix
+  cases atomResult : expressionAtom nested block input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have reply := atomValid input inputValid
+      rw [atomResult] at reply
+      exact reply
+  | ok base next =>
+      have atomReply := atomValid input inputValid
+      rw [atomResult] at atomReply
+      rcases atomStarts input base next atomResult with
+        ⟨first, firstFound, baseStart⟩
+      have firstAt := State.getElem?_eq_some_of_peek?_eq_some firstFound
+      have carrier := atomTokens input base next atomResult
+      have baseBefore : ∀ future, next.peek? = some future →
+          base.span.startByte ≤ future.span.startByte := by
+        intro future futureFound
+        have futureAtNext :=
+          State.getElem?_eq_some_of_peek?_eq_some futureFound
+        have futureAt : input.tokens[next.cursor]? = some future := by
+          simpa [carrier] using futureAtNext
+        have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+          firstAt futureAt (atomCursorLt atomResult)
+        calc
+          base.span.startByte = first.span.startByte := baseStart.symm
+          _ ≤ first.span.endByte :=
+            (inputValid.peek?_span_validFor firstFound).2.1
+          _ ≤ future.span.startByte := separated
+      have recursive := postfixTail_validFor nested block statementValid
+        nestedValid nestedTokens nestedCursor (next.remainingCount + 1) base
+          next atomReply.2.1
+            (by simpa [atomReply.2.2] using atomReply.1) baseBefore
+      exact recursive.of_file_eq atomReply.2.2
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser
