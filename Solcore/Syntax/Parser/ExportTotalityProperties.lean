@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ExportProperties
+import Solcore.Syntax.Parser.ExportPathTotalityProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
 
 /-! Totality boundary for local, path, and public export dispatch. -/
@@ -8,11 +8,10 @@ set_option autoImplicit false
 namespace Solcore.Syntax.Parser
 
 /--
-The three leaf obligations below are exactly the export-specific work below
-public dispatch: path fuel, export-name defenses, and delimited item progress.
+The two leaf obligations below are exactly the export-specific work still below
+public dispatch: export-name defenses and delimited item progress.
 -/
 structure ExportLeafTotalityContract : Prop where
-  exportPathFree : Parser.InvariantFreeOnValid ExportInternals.exportPath
   exportSelectionFree :
     Parser.InvariantFreeOnValid ExportInternals.exportSelection
   localExportItem : ElementTotalityContract ExportInternals.localExportItem
@@ -71,7 +70,7 @@ theorem pathExport_invariantFreeOnValid (contract : ExportLeafTotalityContract)
     Parser.InvariantFreeOnValid (pathExport start) := by
   unfold pathExport
   apply Parser.bind_invariantFreeOnValid exportPath_validFor
-    contract.exportPathFree
+    exportPath_invariantFreeOnValid
   intro path
   apply Parser.bind_invariantFreeOnValid getState_validFor
     Parser.getState_invariantFreeOnValid
