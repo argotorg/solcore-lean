@@ -6,6 +6,7 @@ import Solcore.Oracle.V3.Handler
 import Solcore.Oracle.V4
 import Solcore.Oracle.Stream
 import Solcore.Standard.CanonicalData
+import Solcore.Test.SyntaxLexer
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token
@@ -5041,6 +5042,7 @@ def testCanonicalRawLexing : IO Unit := do
       s!"canonical source {reprStr raw.id} exceeded the lexer bound"
 
 def run : IO Unit := do
+  testSyntaxLexer
   testProfile
   testFeatureMatrix
   testAbiKeccak256
