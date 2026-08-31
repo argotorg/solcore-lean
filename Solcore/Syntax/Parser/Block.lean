@@ -1263,4 +1263,52 @@ theorem isolateBlock_startsAtCurrentTokenOnSuccess (parser : Parser Block)
       | invariant error =>
           simp [childResult] at result
 
+/-- A source-valid Core block remains source-valid inside its capture window. -/
+theorem isolatedCoreBlock_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (statement : Parser Statement) (policy : TailExpressionPolicy)
+    (statementContract : statement.ValidFor statementValid)
+    (statementShape : Parser.PreservesTokensOnSuccess statement)
+    (statementSpan : ∀ file retained,
+      statementValid file retained → retained.span.ValidFor file) :
+    (isolateBlock (coreBlock statement policy)).ValidFor
+      (Block.ValidFor statementValid) :=
+  isolateBlock_validFor statementValid (coreBlock statement policy)
+    (coreBlock_validFor statementValid statement policy statementContract
+      statementShape statementSpan)
+
+/-- Capturing a Core block preserves every ordinary token window. -/
+theorem isolatedCoreBlock_preservesTokenWindow
+    (statement : Parser Statement) (policy : TailExpressionPolicy)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow
+      (isolateBlock (coreBlock statement policy)) :=
+  isolateBlock_preservesTokenWindow (coreBlock statement policy)
+    (coreBlock_preservesTokenWindow statement policy statementShape)
+
+/-- Capturing a Core block preserves its immutable token carrier on success. -/
+theorem isolatedCoreBlock_preservesTokensOnSuccess
+    (statement : Parser Statement) (policy : TailExpressionPolicy)
+    (statementShape : Parser.PreservesTokensOnSuccess statement) :
+    Parser.PreservesTokensOnSuccess
+      (isolateBlock (coreBlock statement policy)) :=
+  isolateBlock_preservesTokensOnSuccess (coreBlock statement policy)
+    (coreBlock_preservesTokensOnSuccess statement policy statementShape)
+
+/-- Captured Core-block success never rewinds the parent cursor. -/
+theorem isolatedCoreBlock_cursorMonotoneOnSuccess
+    (statement : Parser Statement) (policy : TailExpressionPolicy) :
+    Parser.CursorMonotoneOnSuccess
+      (isolateBlock (coreBlock statement policy)) :=
+  isolateBlock_cursorMonotoneOnSuccess (coreBlock statement policy)
+    (coreBlock_cursorMonotoneOnSuccess statement policy)
+
+/-- Captured Core blocks retain the parent input's opening-brace start. -/
+theorem isolatedCoreBlock_startsAtCurrentTokenOnSuccess
+    (statement : Parser Statement) (policy : TailExpressionPolicy) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (isolateBlock (coreBlock statement policy)) (·.span) :=
+  isolateBlock_startsAtCurrentTokenOnSuccess (coreBlock statement policy)
+    (coreBlock_startsAtCurrentTokenOnSuccess statement policy)
+
 end Solcore.Syntax.Parser

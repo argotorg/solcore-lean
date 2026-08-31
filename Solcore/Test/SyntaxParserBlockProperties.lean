@@ -25,6 +25,11 @@ example := @isolateBlock_preservesTokenWindow
 example := @isolateBlock_cursor_lt_onSuccess_of_balancedCapture
 example := @isolateBlock_cursorMonotoneOnSuccess
 example := @isolateBlock_startsAtCurrentTokenOnSuccess
+example := @isolatedCoreBlock_validFor
+example := @isolatedCoreBlock_preservesTokenWindow
+example := @isolatedCoreBlock_preservesTokensOnSuccess
+example := @isolatedCoreBlock_cursorMonotoneOnSuccess
+example := @isolatedCoreBlock_startsAtCurrentTokenOnSuccess
 
 example (statement : Parser Statement) (policy : TailExpressionPolicy)
     (statementShape : Parser.PreservesTokenWindow statement) :
@@ -77,6 +82,17 @@ example (parser : Parser Block)
     (starts : Parser.StartsAtCurrentTokenOnSuccess parser (·.span)) :
     Parser.StartsAtCurrentTokenOnSuccess (isolateBlock parser) (·.span) :=
   isolateBlock_startsAtCurrentTokenOnSuccess parser starts
+
+example (statementValid : SourceFile → Statement → Prop)
+    (statement : Parser Statement) (policy : TailExpressionPolicy)
+    (valid : statement.ValidFor statementValid)
+    (shape : Parser.PreservesTokensOnSuccess statement)
+    (spanValid : ∀ file retained,
+      statementValid file retained → retained.span.ValidFor file) :
+    (isolateBlock (coreBlock statement policy)).ValidFor
+      (Block.ValidFor statementValid) :=
+  isolatedCoreBlock_validFor statementValid statement policy valid shape
+    spanValid
 
 example (parser : Parser Block) {input next : State} {body : Block}
     (captured : hasBalancedBlockCapture input = true)
