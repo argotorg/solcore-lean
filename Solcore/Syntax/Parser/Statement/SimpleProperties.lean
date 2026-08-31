@@ -758,6 +758,257 @@ theorem optionalLetInitializer_cursorMonotoneOnSuccess
 
 end StatementSimpleInternals
 
+/-- Let statements preserve nested expression token windows. -/
+theorem letStatement_preservesTokenWindow (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (letStatement expression) := by
+  unfold letStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .letKw .statement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (identifier_preservesTokenWindow .statement)
+  intro name
+  apply Parser.bind_preservesTokenWindow
+    StatementSimpleInternals.optionalLetType_preservesTokenWindow
+  intro type
+  apply Parser.bind_preservesTokenWindow
+    (StatementSimpleInternals.optionalLetInitializer_preservesTokenWindow
+      expression expressionWindow)
+  intro initializer
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .semicolon .statement)
+  intro semicolon
+  exact Parser.pure_preservesTokenWindow _
+
+theorem letStatement_preservesTokensOnSuccess (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (letStatement expression) :=
+  (letStatement_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- Let-statement parsing never rewinds the token cursor. -/
+theorem letStatement_cursorMonotoneOnSuccess (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (letStatement expression) := by
+  unfold letStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .letKw .statement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (identifier_cursorMonotoneOnSuccess .statement)
+  intro name
+  apply Parser.bind_cursorMonotoneOnSuccess
+    StatementSimpleInternals.optionalLetType_cursorMonotoneOnSuccess
+  intro type
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (StatementSimpleInternals.optionalLetInitializer_cursorMonotoneOnSuccess
+      expression expressionCursor)
+  intro initializer
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .semicolon .statement)
+  intro semicolon
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A let statement starts at its leading `let` keyword. -/
+theorem letStatement_startsAtCurrentTokenOnSuccess
+    (expression : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (letStatement expression) (·.span) := by
+  unfold letStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .letKw)
+      .statement (· == .keyword .letKw))
+  intro marker input statement final parsed
+  rcases StatementSimpleInternals.simpleBind_ok_components parsed with
+    ⟨name, afterName, _nameResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨type, afterType, _typeResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨initializer, afterInitializer, _initializerResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, _semicolonResult, finished⟩
+  cases finished
+  rfl
+
+/-- A successful let statement has a valid keyword-to-semicolon range. -/
+theorem letStatement_span_validOnSuccess (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression)
+    {input final : State} {statement : Statement}
+    (inputValid : input.ValidFor)
+    (parsed : letStatement expression input = .ok statement final) :
+    statement.span.ValidFor input.file := by
+  have stages := parsed
+  unfold letStatement at stages
+  rcases StatementSimpleInternals.simpleBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨name, afterName, nameResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨type, afterType, typeResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨initializer, afterInitializer, initializerResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+  have markerContract := keyword_validFor .letKw .statement input inputValid
+  rw [markerResult] at markerContract
+  have nameContract := identifier_validFor .statement afterMarker
+    markerContract.2.1
+  rw [nameResult] at nameContract
+  have typeContract := StatementSimpleInternals.optionalLetType_validFor
+    afterName nameContract.2.1
+  rw [typeResult] at typeContract
+  have initializerContract :=
+    StatementSimpleInternals.optionalLetInitializer_validFor expression
+      expressionValueValid expressionValid afterType typeContract.2.1
+  rw [initializerResult] at initializerContract
+  have semicolonContract := symbol_validFor .semicolon .statement
+    afterInitializer initializerContract.2.1
+  rw [semicolonResult] at semicolonContract
+  have markerValid : marker.span.ValidFor input.file := by
+    simpa only [Located.ValidFor] using markerContract.1
+  have semicolonValid : semicolon.span.ValidFor input.file := by
+    simpa only [Located.ValidFor, initializerContract.2.2,
+      typeContract.2.2, nameContract.2.2, markerContract.2.2] using
+      semicolonContract.1
+  have markerShape := acceptToken_ok_state_shape (.keyword .letKw)
+    .statement (· == .keyword .letKw) markerResult
+  have semicolonShape := symbol_ok_state_shape .semicolon .statement
+    semicolonResult
+  have markerAt := State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+  have semicolonAtAfter :=
+    State.getElem?_eq_some_of_peek?_eq_some semicolonShape.1
+  have markerTokens := keyword_preservesTokensOnSuccess .letKw .statement
+    input marker afterMarker markerResult
+  have nameTokens := identifier_preservesTokensOnSuccess .statement
+    afterMarker name afterName nameResult
+  have typeTokens :=
+    StatementSimpleInternals.optionalLetType_preservesTokensOnSuccess
+      afterName type afterType typeResult
+  have initializerTokens :=
+    StatementSimpleInternals.optionalLetInitializer_preservesTokensOnSuccess
+      expression expressionWindow afterType initializer afterInitializer
+        initializerResult
+  have semicolonAt : input.tokens[afterInitializer.cursor]? = some semicolon := by
+    simpa [initializerTokens, typeTokens, nameTokens, markerTokens] using
+      semicolonAtAfter
+  have cursorOrder : input.cursor < afterInitializer.cursor :=
+    Nat.lt_of_lt_of_le
+      (acceptToken_cursor_lt_onSuccess (.keyword .letKw) .statement
+        (· == .keyword .letKw) markerResult)
+      (Nat.le_trans
+        (identifier_cursorMonotoneOnSuccess .statement afterMarker name
+          afterName nameResult)
+        (Nat.le_trans
+          (StatementSimpleInternals.optionalLetType_cursorMonotoneOnSuccess
+            afterName type afterType typeResult)
+          (StatementSimpleInternals.optionalLetInitializer_cursorMonotoneOnSuccess
+            expression expressionCursor afterType initializer afterInitializer
+              initializerResult)))
+  have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+    markerAt semicolonAt cursorOrder
+  have ordered : marker.span.startByte ≤ semicolon.span.endByte :=
+    Nat.le_trans markerValid.2.1
+      (Nat.le_trans separated semicolonValid.2.1)
+  cases finished
+  exact SourceSpan.cover_validFor markerValid semicolonValid ordered
+
+/-- Complete let statements retain only source-valid syntax. -/
+theorem letStatement_validFor (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    (letStatement expression).ValidFor
+      (Statement.ValidFor expressionValueValid patternValueValid
+        yulValueValid) := by
+  have weak : (letStatement expression).ValidFor (fun _ _ => True) := by
+    unfold letStatement
+    apply Parser.bind_validFor (keyword_validFor .letKw .statement)
+    intro marker
+    apply Parser.bind_validFor (identifier_validFor .statement)
+    intro name
+    apply Parser.bind_validFor
+      StatementSimpleInternals.optionalLetType_validFor
+    intro type
+    apply Parser.bind_validFor
+      (StatementSimpleInternals.optionalLetInitializer_validFor expression
+        expressionValueValid expressionValid)
+    intro initializer
+    apply Parser.bind_validFor (symbol_validFor .semicolon .statement)
+    intro semicolon
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : letStatement expression input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok statement final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold letStatement at stages
+      rcases StatementSimpleInternals.simpleBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases StatementSimpleInternals.simpleBind_ok_components rest with
+        ⟨name, afterName, nameResult, rest⟩
+      rcases StatementSimpleInternals.simpleBind_ok_components rest with
+        ⟨type, afterType, typeResult, rest⟩
+      rcases StatementSimpleInternals.simpleBind_ok_components rest with
+        ⟨initializer, afterInitializer, initializerResult, rest⟩
+      rcases StatementSimpleInternals.simpleBind_ok_components rest with
+        ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+      have markerContract := keyword_validFor .letKw .statement input inputValid
+      rw [markerResult] at markerContract
+      have nameContract := identifier_validFor .statement afterMarker
+        markerContract.2.1
+      rw [nameResult] at nameContract
+      have typeContract := StatementSimpleInternals.optionalLetType_validFor
+        afterName nameContract.2.1
+      rw [typeResult] at typeContract
+      have initializerContract :=
+        StatementSimpleInternals.optionalLetInitializer_validFor expression
+          expressionValueValid expressionValid afterType typeContract.2.1
+      rw [initializerResult] at initializerContract
+      have nameValid : name.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, markerContract.2.2] using nameContract.1
+      have typeValidInput : Option.ValidFor TypeExpr.ValidFor input.file type := by
+        simpa [nameContract.2.2, markerContract.2.2] using typeContract.1
+      have initializerValidInput : Option.ValidFor expressionValueValid
+          input.file initializer := by
+        simpa [typeContract.2.2, nameContract.2.2,
+          markerContract.2.2] using initializerContract.1
+      have retainedType : ∀ value ∈ type,
+          TypeExpr.ValidFor input.file value := by
+        cases type with
+        | none => simp
+        | some value =>
+            intro retained member
+            have retainedEq : retained = value := by simpa using member.symm
+            subst retained
+            simpa only [Option.ValidFor] using typeValidInput
+      have retainedInitializer : ∀ value ∈ initializer,
+          expressionValueValid input.file value := by
+        cases initializer with
+        | none => simp
+        | some value =>
+            intro retained member
+            have retainedEq : retained = value := by simpa using member.symm
+            subst retained
+            simpa only [Option.ValidFor] using initializerValidInput
+      have outerValid := letStatement_span_validOnSuccess expression
+        expressionValueValid expressionValid expressionWindow expressionCursor
+        inputValid parsed
+      cases finished
+      exact ⟨Statement.ValidFor.letDecl outerValid nameValid retainedType
+        retainedInitializer, weakResult.2.1, weakResult.2.2⟩
+
 /-- Return statements preserve nested expression token windows. -/
 theorem returnStatement_preservesTokenWindow (expression : Parser Expr)
     (expressionWindow : Parser.PreservesTokenWindow expression) :

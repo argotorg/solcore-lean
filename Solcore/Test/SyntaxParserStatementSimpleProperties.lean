@@ -64,6 +64,12 @@ example :=
   @StatementSimpleInternals.optionalLetInitializer_preservesTokensOnSuccess
 example :=
   @StatementSimpleInternals.optionalLetInitializer_cursorMonotoneOnSuccess
+example := @letStatement_preservesTokenWindow
+example := @letStatement_preservesTokensOnSuccess
+example := @letStatement_cursorMonotoneOnSuccess
+example := @letStatement_startsAtCurrentTokenOnSuccess
+example := @letStatement_span_validOnSuccess
+example := @letStatement_validFor
 example := @returnStatement_preservesTokenWindow
 example := @returnStatement_preservesTokensOnSuccess
 example := @returnStatement_cursorMonotoneOnSuccess
