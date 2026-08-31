@@ -1060,6 +1060,80 @@ theorem functionSignature_keyword_start_le_endOnSuccess
                     (functionParameters_startsAtCurrentTokenOnSuccess
                       afterGenerics parameters afterParameters parametersResult)
 
+/-- A successfully parsed function signature has a source-valid outer span. -/
+theorem functionSignature_span_validOnSuccess (location : FunctionLocation)
+    {input final : State} {signature : FunctionSignature}
+    (inputValid : input.ValidFor)
+    (parsed : functionSignature location input = .ok signature final) :
+    signature.span.ValidFor input.file := by
+  have stages := parsed
+  unfold functionSignature at stages
+  rcases signatureBind_ok_components stages with
+    ⟨functionToken, afterKeyword, keywordResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨name, afterName, nameResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨genericParameters, afterGenerics, genericResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨parameters, afterParameters, parametersResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨modifiers, afterModifiers, modifiersResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨returnsClause, afterReturns, returnsResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨parsedWhereClause, afterWhere, whereResult, finished⟩
+  have keywordContract := keyword_validFor .functionKw .topItem input inputValid
+  rw [keywordResult] at keywordContract
+  have nameContract := identifier_validFor .topItem afterKeyword keywordContract.2.1
+  rw [nameResult] at nameContract
+  have genericContract := optionalGenericParameters_validFor afterName nameContract.2.1
+  rw [genericResult] at genericContract
+  have parametersContract := functionParameters_validFor afterGenerics genericContract.2.1
+  rw [parametersResult] at parametersContract
+  have modifiersContract := functionModifiers_validFor location afterParameters
+    parametersContract.2.1
+  rw [modifiersResult] at modifiersContract
+  have returnsContract := returnClause_validFor afterModifiers modifiersContract.2.1
+  rw [returnsResult] at returnsContract
+  have whereContract := whereClause_validFor afterReturns returnsContract.2.1
+  rw [whereResult] at whereContract
+  have keywordValid : functionToken.span.ValidFor input.file := by
+    simpa only [Located.ValidFor] using keywordContract.1
+  have parametersValid : parameters.span.ValidFor input.file := by
+    simpa [genericContract.2.2, nameContract.2.2, keywordContract.2.2]
+      using parametersContract.1.1
+  have modifiersValid : FunctionModifiers.ValidFor input.file modifiers := by
+    simpa [parametersContract.2.2, genericContract.2.2,
+      nameContract.2.2, keywordContract.2.2] using modifiersContract.1
+  have returnsValid : Option.ValidFor ReturnClause.ValidFor input.file returnsClause := by
+    simpa [modifiersContract.2.2, parametersContract.2.2,
+      genericContract.2.2, nameContract.2.2, keywordContract.2.2]
+      using returnsContract.1
+  have whereValid : Option.ValidFor WhereClause.ValidFor input.file parsedWhereClause := by
+    simpa [returnsContract.2.2, modifiersContract.2.2,
+      parametersContract.2.2, genericContract.2.2,
+      nameContract.2.2, keywordContract.2.2] using whereContract.1
+  have endpointValid := SignatureInternals.signatureEnd_validFor parametersValid
+    modifiersValid returnsValid whereValid
+  rcases functionSignature_keyword_start_le_endOnSuccess location inputValid parsed with
+    ⟨anchor, anchorFound, ordered⟩
+  have keywordFound := (acceptToken_ok_state_shape (.keyword .functionKw) .topItem
+    (· == .keyword .functionKw) keywordResult).1
+  have anchorEq : anchor = functionToken := by
+    rw [keywordFound] at anchorFound
+    exact Option.some.inj anchorFound.symm
+  subst anchor
+  have signatureEq : signature = {
+      span := SourceSpan.cover functionToken.span
+        (SignatureInternals.signatureEnd parameters modifiers returnsClause
+          parsedWhereClause)
+      name, genericParameters, parameters, modifiers, returnsClause
+      whereClause := parsedWhereClause } := by
+    cases finished
+    rfl
+  rw [signatureEq] at ordered ⊢
+  exact SourceSpan.cover_validFor keywordValid endpointValid ordered
+
 /--
 Complete signature provenance, conditional only on the outer-span endpoint
 law and the independently developed `where` parser contract.
@@ -1184,6 +1258,13 @@ theorem functionSignature_validFor_of_span (location : FunctionLocation)
             have valuesEq : values = present := by simpa using member.symm
             subst values
             exact genericValidInput.2 parameter parameterMember
+
+/-- Complete function signatures retain only source-valid syntax. -/
+theorem functionSignature_validFor (location : FunctionLocation) :
+    (functionSignature location).ValidFor FunctionSignature.ValidFor :=
+  functionSignature_validFor_of_span location whereClause_validFor
+    (fun _ _ _ inputValid parsed =>
+      functionSignature_span_validOnSuccess location inputValid parsed)
 
 /-- Complete signatures preserve token windows when `where` parsing does. -/
 theorem functionSignature_preservesTokenWindow_of_where (location : FunctionLocation)
