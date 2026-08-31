@@ -1,0 +1,11 @@
+import Solcore.Syntax.Parser.Statement.ControlForFuelContractProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserStatementControlForFuelContractProperties
+
+open Solcore.Syntax.Parser
+
+example := @forStatement_fuelTotalityContract
+
+end Solcore.Test.SyntaxParserStatementControlForFuelContractProperties
