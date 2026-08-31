@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Yul.LeafProperties
+import Solcore.Syntax.YulValidity
 
 /-! Compositional carrier and cursor contracts for one inline-Yul expression layer. -/
 
@@ -87,9 +88,49 @@ theorem optionalYulCallArguments_cursorMonotoneOnSuccess
   · cases result
     exact Nat.le_refl _
 
-/-- Rejected source-level Yul meta syntax retains source provenance. -/
-theorem rejectedMeta_validFor :
-    rejectedMeta.ValidFor Located.ValidFor := by
+/-- Present call arguments start at their opening parenthesis token. -/
+theorem optionalYulCallArguments_some_startsAtCurrentTokenOnSuccess
+    (nested : Parser YulExpr) {input next : State}
+    {arguments : DelimitedList YulExpr}
+    (result : optionalYulCallArguments nested input = .ok (some arguments) next) :
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte = arguments.span.startByte := by
+  unfold optionalYulCallArguments at result
+  split at result
+  · unfold orElse at result
+    cases presentResult : (do
+        pure (some (← delimited .leftParen .rightParen true nested
+          .yulExpression .yul))) input with
+    | invariant error => simp [presentResult] at result
+    | reject failure rejected =>
+        simp only [presentResult] at result
+        change Reply.ok none input = Reply.ok (some arguments) next at result
+        cases result
+    | ok value afterPresent =>
+        simp only [presentResult] at result
+        cases result
+        change (do
+          pure (some (← delimited .leftParen .rightParen true nested
+            .yulExpression .yul))) input = .ok (some arguments) next at presentResult
+        cases argumentsResult : delimited .leftParen .rightParen true nested
+            .yulExpression .yul input with
+        | invariant error =>
+            simp only [bind, argumentsResult] at presentResult
+            contradiction
+        | reject failure rejected =>
+            simp only [bind, argumentsResult] at presentResult
+            contradiction
+        | ok parsed afterArguments =>
+            simp only [bind, argumentsResult] at presentResult
+            cases presentResult
+            exact delimited_startsAtCurrentTokenOnSuccess .leftParen
+              .rightParen true nested .yulExpression .yul input arguments
+              next argumentsResult
+  · cases result
+
+/-- Rejected source-level Yul meta syntax produces a valid error expression. -/
+theorem rejectedMeta_yulExpr_validFor :
+    rejectedMeta.ValidFor YulExpr.ValidFor := by
   apply Parser.validFor_of_ok_reject
   · intro input inputValid expression next result
     unfold rejectedMeta at result
@@ -110,7 +151,7 @@ theorem rejectedMeta_validFor :
         cases kind <;> simp only [found] at result
         all_goals try { unfold rejectAt at result; contradiction }
         all_goals cases result
-        all_goals exact ⟨spanValid,
+        all_goals exact ⟨YulExpr.ValidFor.error spanValid,
           advancedValid.emit_validFor _ spanValid, rfl⟩
   · intro input inputValid failure next result
     unfold rejectedMeta at result
@@ -123,6 +164,13 @@ theorem rejectedMeta_validFor :
         cases kind <;> simp only [found] at result
         all_goals try { exact rejectAt_reject_validFor inputValid _ _ result }
         all_goals contradiction
+
+/-- The outer range of rejected meta syntax remains source-valid. -/
+theorem rejectedMeta_validFor :
+    rejectedMeta.ValidFor Located.ValidFor :=
+  rejectedMeta_yulExpr_validFor.mono (by
+    intro file expression valid
+    cases valid <;> assumption)
 
 /-- Rejected source-level Yul meta syntax preserves the token carrier. -/
 theorem rejectedMeta_preservesTokensOnSuccess :
@@ -140,6 +188,23 @@ theorem rejectedMeta_preservesTokensOnSuccess :
       all_goals try { unfold rejectAt at result; contradiction }
       all_goals cases result
       all_goals rfl
+
+/-- Rejected meta syntax starts at the diagnosed input token. -/
+theorem rejectedMeta_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess rejectedMeta (·.span) := by
+  intro input expression next result
+  unfold rejectedMeta at result
+  cases found : input.peek? with
+  | none =>
+      simp only [found] at result
+      unfold rejectAt at result
+      contradiction
+  | some token =>
+      rcases token with ⟨span, kind⟩
+      cases kind <;> simp only [found] at result
+      all_goals try { unfold rejectAt at result; contradiction }
+      all_goals cases result
+      all_goals exact ⟨_, rfl, rfl⟩
 
 /-- Rejected source-level Yul meta syntax advances by one token. -/
 theorem rejectedMeta_cursor_lt_onSuccess {input next : State}
@@ -163,6 +228,136 @@ theorem rejectedMeta_cursorMonotoneOnSuccess :
     Parser.CursorMonotoneOnSuccess rejectedMeta := by
   intro input expression next result
   exact Nat.le_of_lt (rejectedMeta_cursor_lt_onSuccess result)
+
+/-- One recursive Yul-expression layer preserves all retained source ranges. -/
+theorem yulExpressionCore_validFor
+    (nested : Parser YulExpr)
+    (nestedValid : nested.ValidFor YulExpr.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (yulExpressionCore nested).ValidFor YulExpr.ValidFor := by
+  intro input inputValid
+  unfold yulExpressionCore
+  split
+  · cases literalResult : yulLiteral input with
+    | invariant error => simp only [Reply.ValidFor]
+    | reject failure rejected =>
+        have valid := yulLiteral_validFor input inputValid
+        rw [literalResult] at valid
+        simpa only [Reply.ValidFor] using valid
+    | ok literal afterLiteral =>
+        have valid := yulLiteral_validFor input inputValid
+        rw [literalResult] at valid
+        exact ⟨YulExpr.ValidFor.literal valid.1 valid.1,
+          valid.2.1, valid.2.2⟩
+  · split
+    · cases nameResult : yulName input with
+      | invariant error => simp only [Reply.ValidFor]
+      | reject failure rejected =>
+          have valid := yulName_validFor input inputValid
+          rw [nameResult] at valid
+          simpa only [Reply.ValidFor] using valid
+      | ok name afterName =>
+          have nameValid := yulName_validFor input inputValid
+          rw [nameResult] at nameValid
+          simp only
+          cases argumentsResult : optionalYulCallArguments nested afterName with
+          | invariant error => simp only [Reply.ValidFor]
+          | reject failure rejected =>
+              have valid := optionalYulCallArguments_validFor nested
+                YulExpr.ValidFor nestedValid nestedPreserves afterName
+                nameValid.2.1
+              rw [argumentsResult] at valid
+              exact valid.of_file_eq nameValid.2.2
+          | ok arguments afterArguments =>
+              have argumentsValid := optionalYulCallArguments_validFor nested
+                YulExpr.ValidFor nestedValid nestedPreserves afterName
+                nameValid.2.1
+              rw [argumentsResult] at argumentsValid
+              cases arguments with
+              | none =>
+                  exact ⟨YulExpr.ValidFor.identifier nameValid.1 nameValid.1,
+                    argumentsValid.2.1,
+                    argumentsValid.2.2.trans nameValid.2.2⟩
+              | some arguments =>
+                  have nameSpanValid : name.span.ValidFor input.file := by
+                    simpa only [Located.ValidFor] using nameValid.1
+                  have argumentsSpanValid :
+                      arguments.span.ValidFor input.file := by
+                    simpa only [Option.ValidFor, DelimitedList.ValidFor,
+                      nameValid.2.2] using argumentsValid.1.1
+                  have retainedValid : ∀ argument ∈ arguments.elements,
+                      YulExpr.ValidFor input.file argument := by
+                    intro argument member
+                    simpa only [Option.ValidFor, DelimitedList.ValidFor,
+                      nameValid.2.2] using argumentsValid.1.2 argument member
+                  rcases yulName_ok_state_shape nameResult with
+                    ⟨nameToken, nameFound, nameSpan, nameTokens, nameCursor⟩
+                  rcases optionalYulCallArguments_some_startsAtCurrentTokenOnSuccess
+                      nested argumentsResult with
+                    ⟨openingToken, openingFound, openingStart⟩
+                  have nameAt :=
+                    State.getElem?_eq_some_of_peek?_eq_some nameFound
+                  have openingAt :
+                      input.tokens[afterName.cursor]? = some openingToken := by
+                    have found :=
+                      State.getElem?_eq_some_of_peek?_eq_some openingFound
+                    simpa [nameTokens] using found
+                  have nameEndBeforeArgumentsStart :
+                      name.span.endByte ≤ arguments.span.startByte := by
+                    have ordered :=
+                      inputValid.token_end_le_token_start_of_getElem?_lt
+                        nameAt openingAt (by rw [nameCursor]; simp)
+                    simpa [nameSpan, openingStart] using ordered
+                  have coverValid := SourceSpan.cover_validFor nameSpanValid
+                    argumentsSpanValid (Nat.le_trans nameSpanValid.2.1
+                      (Nat.le_trans nameEndBeforeArgumentsStart
+                        argumentsSpanValid.2.1))
+                  exact ⟨YulExpr.ValidFor.call coverValid nameSpanValid
+                      argumentsSpanValid retainedValid,
+                    argumentsValid.2.1,
+                    argumentsValid.2.2.trans nameValid.2.2⟩
+    · split <;> try { exact
+          rejectedMeta_yulExpr_validFor input inputValid }
+      unfold rejectAt Reply.ValidFor
+      exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+
+/-- A successful Yul-expression layer starts at its leading token. -/
+theorem yulExpressionCore_startsAtCurrentTokenOnSuccess
+    (nested : Parser YulExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (yulExpressionCore nested) (·.span) := by
+  intro input expression next result
+  unfold yulExpressionCore at result
+  split at result
+  · cases literalResult : yulLiteral input with
+    | invariant error => simp [literalResult] at result
+    | reject failure rejected => simp [literalResult] at result
+    | ok literal afterLiteral =>
+        simp only [literalResult] at result
+        have starts := yulLiteral_startsAtCurrentTokenOnSuccess input literal
+          afterLiteral literalResult
+        cases result
+        exact starts
+  · split at result
+    · cases nameResult : yulName input with
+      | invariant error => simp [nameResult] at result
+      | reject failure rejected => simp [nameResult] at result
+      | ok name afterName =>
+          simp only [nameResult] at result
+          cases argumentsResult : optionalYulCallArguments nested afterName with
+          | invariant error => simp [argumentsResult] at result
+          | reject failure rejected => simp [argumentsResult] at result
+          | ok arguments afterArguments =>
+              simp only [argumentsResult] at result
+              rcases yulName_startsAtCurrentTokenOnSuccess input name afterName
+                  nameResult with ⟨token, found, start⟩
+              cases arguments <;> cases result
+              · exact ⟨token, found, start⟩
+              · exact ⟨token, found, start⟩
+    · split at result <;> try { exact
+          rejectedMeta_startsAtCurrentTokenOnSuccess input expression next result }
+      unfold rejectAt at result
+      contradiction
 
 /-- One Yul-expression layer preserves tokens when its recursive parser does. -/
 theorem yulExpressionCore_preservesTokensOnSuccess

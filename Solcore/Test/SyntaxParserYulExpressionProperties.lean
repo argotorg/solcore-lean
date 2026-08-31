@@ -9,8 +9,30 @@ namespace Tests
 open Solcore.Syntax
 open Solcore.Syntax.Parser
 
+example := @YulExpr.ValidFor
 example := @optionalYulCallArguments_validFor
 example := @rejectedMeta_validFor
+example := @rejectedMeta_yulExpr_validFor
+
+example : Parser.StartsAtCurrentTokenOnSuccess yulName (·.span) :=
+  yulName_startsAtCurrentTokenOnSuccess
+
+example : Parser.StartsAtCurrentTokenOnSuccess yulLiteral (·.span) :=
+  yulLiteral_startsAtCurrentTokenOnSuccess
+
+example : Parser.StartsAtCurrentTokenOnSuccess rejectedMeta (·.span) :=
+  rejectedMeta_startsAtCurrentTokenOnSuccess
+
+example (nested : Parser YulExpr)
+    (valid : nested.ValidFor YulExpr.ValidFor)
+    (preserves : Parser.PreservesTokensOnSuccess nested) :
+    (yulExpressionCore nested).ValidFor YulExpr.ValidFor :=
+  yulExpressionCore_validFor nested valid preserves
+
+example (nested : Parser YulExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (yulExpressionCore nested) (·.span) :=
+  yulExpressionCore_startsAtCurrentTokenOnSuccess nested
 
 example (nested : Parser YulExpr)
     (preserves : Parser.PreservesTokensOnSuccess nested) :

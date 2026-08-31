@@ -79,6 +79,35 @@ theorem yulLiteral_ok_state_shape {input next : State}
         all_goals cases result
         all_goals rfl
 
+/-- A successful Yul name starts at the current input token. -/
+theorem yulName_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess yulName (·.span) := by
+  intro input name next result
+  rcases yulName_ok_state_shape result with
+    ⟨token, found, span, _tokens, _cursor⟩
+  exact ⟨token, found, congrArg SourceSpan.startByte span⟩
+
+/-- A successful Yul literal starts at the current input token. -/
+theorem yulLiteral_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess yulLiteral (·.span) := by
+  intro input literal next result
+  unfold yulLiteral at result
+  cases found : input.peek? with
+  | none =>
+      simp only [found] at result
+      unfold rejectAt at result
+      contradiction
+  | some token =>
+      rcases token with ⟨span, kind⟩
+      cases kind <;> simp only [found] at result
+      all_goals try { unfold rejectAt at result; contradiction }
+      all_goals try { cases result; exact ⟨_, rfl, rfl⟩ }
+      case keyword keyword =>
+        cases keyword <;> simp only at result
+        all_goals try { unfold rejectAt at result; contradiction }
+        all_goals cases result
+        all_goals exact ⟨_, rfl, rfl⟩
+
 /-- Yul-name acceptance preserves its located range and parser-state validity. -/
 theorem yulName_ok_validFor {state next : State} {name : YulIdentifier}
     (valid : state.ValidFor) (result : yulName state = .ok name next) :
