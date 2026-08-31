@@ -17,10 +17,34 @@ theorem acceptToken_preservesTokensOnSuccess
     ⟨_found, rfl⟩
   rfl
 
+/-- Generic token acceptance advances by exactly one token on success. -/
+theorem acceptToken_cursor_lt_onSuccess
+    (expected : ParseExpectation) (context : ParseContext)
+    (accepts : TokenKind → Bool) {input next : State} {token : Token}
+    (result : acceptToken expected context accepts input = .ok token next) :
+    input.cursor < next.cursor := by
+  rw [(acceptToken_ok_state_shape expected context accepts result).2]
+  simp
+
+theorem acceptToken_cursorMonotoneOnSuccess
+    (expected : ParseExpectation) (context : ParseContext)
+    (accepts : TokenKind → Bool) :
+    Parser.CursorMonotoneOnSuccess
+      (acceptToken expected context accepts) := by
+  intro input token next result
+  exact Nat.le_of_lt
+    (acceptToken_cursor_lt_onSuccess expected context accepts result)
+
 theorem keyword_preservesTokensOnSuccess
     (value : HardKeyword) (context : ParseContext) :
     Parser.PreservesTokensOnSuccess (keyword value context) :=
   acceptToken_preservesTokensOnSuccess (.keyword value) context
+    (· == .keyword value)
+
+theorem keyword_cursorMonotoneOnSuccess
+    (value : HardKeyword) (context : ParseContext) :
+    Parser.CursorMonotoneOnSuccess (keyword value context) :=
+  acceptToken_cursorMonotoneOnSuccess (.keyword value) context
     (· == .keyword value)
 
 theorem symbol_preservesTokensOnSuccess
@@ -29,10 +53,22 @@ theorem symbol_preservesTokensOnSuccess
   acceptToken_preservesTokensOnSuccess (.symbol value) context
     (· == .symbol value)
 
+theorem symbol_cursorMonotoneOnSuccess
+    (value : Symbol) (context : ParseContext) :
+    Parser.CursorMonotoneOnSuccess (symbol value context) :=
+  acceptToken_cursorMonotoneOnSuccess (.symbol value) context
+    (· == .symbol value)
+
 theorem contextual_preservesTokensOnSuccess
     (value : ContextualKeyword) (context : ParseContext) :
     Parser.PreservesTokensOnSuccess (contextual value context) :=
   acceptToken_preservesTokensOnSuccess (.contextual value) context
+    (·.isContextual value)
+
+theorem contextual_cursorMonotoneOnSuccess
+    (value : ContextualKeyword) (context : ParseContext) :
+    Parser.CursorMonotoneOnSuccess (contextual value context) :=
+  acceptToken_cursorMonotoneOnSuccess (.contextual value) context
     (·.isContextual value)
 
 /-- Raw identifier success changes only the parser cursor. -/
@@ -57,10 +93,22 @@ theorem rawIdentifier_preservesTokensOnSuccess (context : ParseContext) :
   intro input name next result
   rw [rawIdentifier_ok_state_shape context result]
 
+theorem rawIdentifier_cursorMonotoneOnSuccess (context : ParseContext) :
+    Parser.CursorMonotoneOnSuccess (rawIdentifier context) := by
+  intro input name next result
+  rw [rawIdentifier_ok_state_shape context result]
+  simp
+
 theorem identifier_preservesTokensOnSuccess (context : ParseContext) :
     Parser.PreservesTokensOnSuccess (identifier context) := by
   intro input name next result
   exact (identifier_ok_state_shape context result).choose_spec.2.2.1
+
+theorem identifier_cursorMonotoneOnSuccess (context : ParseContext) :
+    Parser.CursorMonotoneOnSuccess (identifier context) := by
+  intro input name next result
+  rw [(identifier_ok_state_shape context result).choose_spec.2.2.2]
+  simp
 
 /-- Yul identifier success changes only the parser cursor. -/
 theorem yulIdentifier_ok_state_shape (context : ParseContext)
@@ -83,5 +131,11 @@ theorem yulIdentifier_preservesTokensOnSuccess (context : ParseContext) :
     Parser.PreservesTokensOnSuccess (yulIdentifier context) := by
   intro input name next result
   rw [yulIdentifier_ok_state_shape context result]
+
+theorem yulIdentifier_cursorMonotoneOnSuccess (context : ParseContext) :
+    Parser.CursorMonotoneOnSuccess (yulIdentifier context) := by
+  intro input name next result
+  rw [yulIdentifier_ok_state_shape context result]
+  simp
 
 end Solcore.Syntax.Parser

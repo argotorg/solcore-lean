@@ -51,10 +51,24 @@ theorem coreLiteral_preservesTokensOnSuccess :
   intro input literal next result
   rw [coreLiteral_ok_state_shape result]
 
+/-- Core-literal success advances by exactly one token. -/
+theorem coreLiteral_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess coreLiteral := by
+  intro input literal next result
+  rw [coreLiteral_ok_state_shape result]
+  simp
+
 /-- Boolean-identifier success preserves the immutable token carrier. -/
 theorem booleanIdentifier_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess booleanIdentifier := by
   intro input name next result
   rw [booleanIdentifier_ok_state_shape result]
+
+/-- Boolean-identifier success advances by exactly one token. -/
+theorem booleanIdentifier_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess booleanIdentifier := by
+  intro input name next result
+  rw [booleanIdentifier_ok_state_shape result]
+  simp
 
 end Solcore.Syntax.Parser
