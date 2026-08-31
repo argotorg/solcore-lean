@@ -32,6 +32,21 @@ The M1c primitive subset contains boolean and word negation, modular word
 addition/subtraction/multiplication, total unsigned division/modulo, word
 equality and greater-than, bitwise operations, and bounded logical shifts.
 
+## Canonical source frontend
+
+This is the active source-language replacement selected by ADR-0153. It is not
+published through Oracle v4.
+
+| Feature | Status | Missing work | Syntax coupling |
+| --- | --- | --- | --- |
+| Source identity and UTF-8 byte spans | Complete | Workspace admission policy follows parsing | High |
+| Token and parsed AST catalog | Complete | Executable parser witnesses and well-formedness layer | High |
+| Unicode identifier classification | Complete | Lexer integration tests | High |
+| Canonical lexer | Active | Complete scan loop, diagnostics, conformance corpus, and span laws | High |
+| Canonical parser | Planned after lexer | Types, terms, statements, inline Yul, declarations, recovery, and files | High |
+| Canonical frontend proofs | Planned after parser | Bounds, spans, provenance, and grammar soundness | High |
+| Public source interface | Planned | New additive protocol after parser and proof boundary close | High |
+
 ## Semantic Core v3 feature inventory
 
 Rows marked Complete in this section are included in the closed Core Wire v3
@@ -86,8 +101,8 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Parametric polymorphism | Planned | type application and preservation | Low |
 | Tabled class resolution | Planned | evidence language, finite search, inconclusive boundary | Low |
 | Comptime/runtime staging | Blocked | staging decision and effect rules | Low |
-| Surface-to-Resolved adapter | Frozen | wait for a stable Surface version | High |
-| Surface-to-Core elaboration | Frozen | adapter plus type/effect/stage preservation | High |
+| Canonical Syntax-to-Resolved adapter | Planned after parser | connect parsed declarations and occurrences to structured identity | High |
+| Resolved-to-Core elaboration | Planned after source typing | type, effect, and stage preservation | Medium |
 
 ## Contract and runtime semantics
 
@@ -177,7 +192,7 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Strict optional input-word BE observation | Complete | [ADR-0135](adr/0135-strict-optional-input-word-be-observation.md) implements exact natural-number full 32-byte big-endian windows with explicit absence for incomplete input and no padding or offset wrap. Internal `inputDataWordBE? : word -> sum unit word` is index 8, with table length 9 and first-unbound index 9. Optional-response safety, full handler context identity, direct present/zero/absent, storage and parent fuel boundaries, triple-option/fold behavior, terminal bytes, and frozen-Wire rejection are proved and tested; ABI, calldata, memory, nested calls, syntax, and publication are excluded | None |
 | Resumable handled fuel slices | Complete | [ADR-0136](adr/0136-resumable-handled-fuel-slices.md) resumes only exhausted results from their exact retained context and Core state. Same-handler split execution equals a single summed-budget run; done and fault remain terminal. Sequential addition covers arbitrary results, actual-run zero identity excludes forged exhausted values, typed results remain safe, and the storage specialization keeps identical `ExecutionInputs` while preserving completed writes and unrelated context. Gas, persistence, changed-handler/input resumption, lifecycle, syntax, and publication are excluded | None |
 | Canonical host capability registry | Complete | [ADR-0137](adr/0137-canonical-host-capability-registry.md) makes `HostFunction.all` the only production order literal and derives both host tables and arbitrary-list typing from it. Its original nine-entry compatibility facts remain valid; ADR-0139 appends index 9, ADR-0146 appends typed call at index 10, ADR-0147 appends value-bearing call at index 11, ADR-0148 appends checked creation at index 12, and ADR-0149 appends word-log emission at index 13. The current tables have length 14 and index 14 is first unbound; all earlier indexes remain compatible | None |
-| Branch-complete resumable parent-indexed selected execution | Complete | [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md) now proves six exact branch laws and checked no-fault for storage absence, code absence, exhaustion, raw fault, unsupported policy, and completion. Exhaustion resumes with exact split, zero, addition, and inversion laws; unsupported remains suspended and accumulates offered fuel. Whole-result erasure preserves the unchanged nested-`Option` API; completion recovers the exact plain continuation and existing return/revert/trap fold. Fuel 9/10/15/16 and terminal regressions pass. Exhaustion and fault receive no frame meaning, and parser/syntax work remains paused | None |
+| Branch-complete resumable parent-indexed selected execution | Complete | [ADR-0138](adr/0138-branch-complete-resumable-parent-indexed-selected-execution.md) proves six exact branch laws and checked no-fault for storage absence, code absence, exhaustion, raw fault, unsupported policy, and completion. Exhaustion resumes with exact split, zero, addition, and inversion laws; unsupported remains suspended and accumulates offered fuel. Whole-result erasure preserves the unchanged nested-`Option` API; completion recovers the exact plain continuation and existing return/revert/trap fold. Fuel 9/10/15/16 and terminal regressions pass. Exhaustion and fault receive no frame meaning; parser and syntax were outside that slice | None |
 | Run-fixed current-address observation | Complete | [ADR-0139](adr/0139-run-fixed-current-address-observation.md) adds explicit immutable `currentAddress` and internal `unit -> word` index 9. Exact read-only variation, absent-Account behavior, direct 4/5 and end-to-end 16/17/23/29/30 fuel, 17+13 and 23+7 resumption, derived write/pair, parent folds, frozen-Wire rejection, and full audits pass. Storage, code, caller, current, and future callee roles remain independent | None |
 | Proof-refined parent-indexed selected-execution session | Complete | [ADR-0140](adr/0140-proof-refined-parent-indexed-selected-execution-session.md) retains one fixed selected-run configuration and certifies its exact result against the one-shot run at cumulative provided fuel. Resumption accepts only an additional `Nat`; whole-session zero/addition, six branches, no-fault, compatibility, folds, and measured 9/10/15/16 and 17+13=30 regressions pass. This is neither consumed gas nor nested invocation, ABI, parser, or public-format policy | None |
 | Checked Word completion to canonical return bytes | Complete | [ADR-0141](adr/0141-checked-word-completion-to-canonical-return-bytes.md) refines checked Word results, retains successful context/Word/Core Store, reuses `HostDriverResult` for raw branches, and builds the canonical 32-byte big-endian returned frame. Checked `none` is exactly exhaustion or unsupported policy; exact fuel 9/10/15/16, split/stability, zero/nontrivial/maximum frame, nonempty-Store, proof-consumer, and full-audit regressions pass. Non-Word fallback, selected-code refinement, ABI, parser, and public changes are excluded | None |
@@ -203,7 +218,7 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Gas observation | Deferred | fork and gas schedule | None |
 | Inline Yul execution | Unsupported | separate future language boundary | High |
 
-## Frozen frontend snapshot
+## Historical frontend snapshot
 
 | Internal component | State at freeze |
 | --- | --- |
@@ -218,8 +233,8 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Structural identity | Accepted design, no implementation |
 | Module/name resolution | Proposed design, no implementation |
 
-No frozen row is a promise that the same AST or grammar will be used by the
-next Surface version.
+These rows describe the old grammar only. Canonical Syntax is implemented
+separately and does not reuse this AST or parser.
 
 ## Public compatibility rule
 
