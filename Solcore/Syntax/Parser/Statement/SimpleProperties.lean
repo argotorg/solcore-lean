@@ -141,5 +141,173 @@ theorem valueAssignOperator_startsAtCurrentTokenOnSuccess :
     ⟨token, found, span, _next⟩
   exact ⟨token, found, congrArg SourceSpan.startByte span⟩
 
+/-- Assignment tails preserve token windows when nested expressions do. -/
+theorem assignmentTail_preservesTokenWindow (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (assignmentTail expression) := by
+  intro input
+  unfold assignmentTail
+  split
+  · apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .tildeEqual .statement)
+    intro operator
+    exact Parser.pure_preservesTokenWindow _
+  · cases selected : input.peekKind?.bind valueAssignOp? with
+    | none => exact rejectAt_preservesTokenWindow input _ _
+    | some operator =>
+        apply Parser.bind_preservesTokenWindow
+          valueAssignOperator_preservesTokenWindow
+        intro parsedOperator
+        apply Parser.bind_preservesTokenWindow expressionWindow
+        intro right
+        exact Parser.pure_preservesTokenWindow _
+
+theorem assignmentTail_preservesTokensOnSuccess (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (assignmentTail expression) :=
+  (assignmentTail_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- Assignment tails never rewind when nested expressions are monotone. -/
+theorem assignmentTail_cursorMonotoneOnSuccess (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (assignmentTail expression) := by
+  intro input tail next parsed
+  unfold assignmentTail at parsed
+  split at parsed
+  · exact (Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .tildeEqual .statement)
+      (fun operator => Parser.pure_cursorMonotoneOnSuccess _))
+        input tail next parsed
+  · cases selected : input.peekKind?.bind valueAssignOp? with
+    | none =>
+        simp only [selected] at parsed
+        unfold rejectAt at parsed
+        contradiction
+    | some operator =>
+        simp only [selected] at parsed
+        exact (Parser.bind_cursorMonotoneOnSuccess
+          valueAssignOperator_cursorMonotoneOnSuccess
+          (fun parsedOperator => Parser.bind_cursorMonotoneOnSuccess
+            expressionCursor
+            (fun right => Parser.pure_cursorMonotoneOnSuccess _)))
+              input tail next parsed
+
+/-- Optional assignment tails retain complete ordinary token windows. -/
+theorem optionalAssignmentTail_preservesTokenWindow
+    (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (optionalAssignmentTail expression) := by
+  intro input
+  unfold optionalAssignmentTail
+  split
+  · apply Parser.bind_preservesTokenWindow
+      (assignmentTail_preservesTokenWindow expression expressionWindow)
+    intro tail
+    exact Parser.pure_preservesTokenWindow _
+  · exact ⟨rfl, rfl⟩
+
+theorem optionalAssignmentTail_preservesTokensOnSuccess
+    (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (optionalAssignmentTail expression) :=
+  (optionalAssignmentTail_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- Optional assignment tails preserve nested cursor monotonicity. -/
+theorem optionalAssignmentTail_cursorMonotoneOnSuccess
+    (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (optionalAssignmentTail expression) := by
+  intro input tail next parsed
+  unfold optionalAssignmentTail at parsed
+  split at parsed
+  · exact (Parser.bind_cursorMonotoneOnSuccess
+      (assignmentTail_cursorMonotoneOnSuccess expression expressionCursor)
+      (fun value => Parser.pure_cursorMonotoneOnSuccess _))
+        input tail next parsed
+  · cases parsed
+    exact Nat.le_refl _
+
+/-- Optional semicolons retain valid marker provenance when present. -/
+theorem optionalSemicolon_validFor :
+    optionalSemicolon.ValidFor
+      (Option.ValidFor (fun file span => span.ValidFor file)) := by
+  unfold optionalSemicolon
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isSymbol observed .semicolon
+  · simp only [present, if_true]
+    apply Parser.bind_validFor_of_value
+      (symbol_validFor .semicolon .statement)
+    intro marker input inputValid markerValid
+    exact ⟨by simpa only [Option.ValidFor, Located.ValidFor] using markerValid,
+      inputValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional semicolons preserve every ordinary token window. -/
+theorem optionalSemicolon_preservesTokenWindow :
+    Parser.PreservesTokenWindow optionalSemicolon := by
+  unfold optionalSemicolon
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro observed
+  by_cases present : isSymbol observed .semicolon
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .semicolon .statement)
+    intro marker
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
+theorem optionalSemicolon_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess optionalSemicolon :=
+  optionalSemicolon_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Optional semicolon parsing never rewinds the token cursor. -/
+theorem optionalSemicolon_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess optionalSemicolon := by
+  unfold optionalSemicolon
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isSymbol observed .semicolon
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .semicolon .statement)
+    intro marker
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
+/-- A present optional semicolon starts at the current semicolon token. -/
+theorem optionalSemicolon_some_startsAtCurrentTokenOnSuccess
+    {input final : State} {span : SourceSpan}
+    (parsed : optionalSemicolon input = .ok (some span) final) :
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte = span.startByte := by
+  unfold optionalSemicolon getState at parsed
+  simp only [bind] at parsed
+  by_cases present : isSymbol input .semicolon
+  · simp only [present, if_true] at parsed
+    change (do
+      let marker ← symbol .semicolon .statement
+      pure (some marker.span)) input = .ok (some span) final at parsed
+    simp only [bind] at parsed
+    cases markerResult : symbol .semicolon .statement input with
+    | ok marker next =>
+        simp only [markerResult] at parsed
+        change Reply.ok (some marker.span) next =
+          Reply.ok (some span) final at parsed
+        have starts := symbol_startsAtCurrentTokenOnSuccess
+          .semicolon .statement input marker next markerResult
+        cases parsed
+        exact starts
+    | reject failure rejected => simp [markerResult] at parsed
+    | invariant error => simp [markerResult] at parsed
+  · simp only [present] at parsed
+    change Reply.ok none input = .ok (some span) final at parsed
+    cases parsed
+
 end StatementSimpleInternals
 end Solcore.Syntax.Parser

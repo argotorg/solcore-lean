@@ -29,60 +29,58 @@ def valueAssignOperator : Parser (Located ValueAssignOp) := fun state =>
 
 end StatementSimpleInternals
 
-private inductive AssignmentTail where
+namespace StatementSimpleInternals
+
+inductive AssignmentTail where
   | value (operator : Located ValueAssignOp) (right : Expr)
   | bitNot (operator : SourceSpan)
 
-private def assignmentTail
+def assignmentTail
     (expression : Parser Expr) : Parser AssignmentTail := fun state =>
   if isSymbol state .tildeEqual then
-    match symbol .tildeEqual .statement state with
-    | .ok operator next => .ok (.bitNot operator.span) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    (do
+      let operator ← symbol .tildeEqual .statement
+      pure (AssignmentTail.bitNot operator.span)) state
   else match state.peekKind?.bind StatementSimpleInternals.valueAssignOp? with
     | some _ =>
-        match StatementSimpleInternals.valueAssignOperator state with
-        | .ok operator afterOperator =>
-            match expression afterOperator with
-            | .ok right next => .ok (.value operator right) next
-            | .reject failure next => .reject failure next
-            | .invariant error => .invariant error
-        | .reject failure next => .reject failure next
-        | .invariant error => .invariant error
+        (do
+          let operator ← StatementSimpleInternals.valueAssignOperator
+          let right ← expression
+          pure (AssignmentTail.value operator right)) state
     | none => rejectAt state { head := .expression, tail := [] } .statement
 
-private def optionalAssignmentTail
+def optionalAssignmentTail
     (expression : Parser Expr) : Parser (Option AssignmentTail) := fun state =>
   if isSymbol state .tildeEqual ||
       (state.peekKind?.bind StatementSimpleInternals.valueAssignOp?).isSome then
-    match assignmentTail expression state with
-    | .ok value next => .ok (some value) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    (do
+      let value ← assignmentTail expression
+      pure (some value)) state
   else
     .ok none state
 
-private def optionalSemicolon : Parser (Option SourceSpan) := do
+def optionalSemicolon : Parser (Option SourceSpan) := do
   let state ← getState
   if isSymbol state .semicolon then
     pure (some (← symbol .semicolon .statement).span)
   else
     pure none
 
-private def assignmentEnd : AssignmentTail → SourceSpan
+def assignmentEnd : AssignmentTail → SourceSpan
   | .value _ right => right.span
   | .bitNot operator => operator
+
+end StatementSimpleInternals
 
 /-- Parse an expression statement or source-preserving assignment. -/
 def assignmentOrExpressionStatement
     (expression : Parser Expr) : Parser Statement := do
   let left ← expression
-  let tail ← optionalAssignmentTail expression
-  let semicolon ← optionalSemicolon
+  let tail ← StatementSimpleInternals.optionalAssignmentTail expression
+  let semicolon ← StatementSimpleInternals.optionalSemicolon
   let endSpan := match semicolon, tail with
     | some marker, _ => marker
-    | none, some value => assignmentEnd value
+    | none, some value => StatementSimpleInternals.assignmentEnd value
     | none, none => left.span
   let span := SourceSpan.cover left.span endSpan
   match tail with
@@ -167,7 +165,7 @@ private def forLetItem (expression : Parser Expr) : Parser ForItem := do
 private def forAssignmentOrExpression
     (expression : Parser Expr) : Parser ForItem := do
   let left ← expression
-  let tail ← optionalAssignmentTail expression
+  let tail ← StatementSimpleInternals.optionalAssignmentTail expression
   match tail with
   | some (.value operator right) => pure {
       span := SourceSpan.cover left.span right.span

@@ -21,5 +21,19 @@ example :=
   @StatementSimpleInternals.valueAssignOperator_cursorMonotoneOnSuccess
 example :=
   @StatementSimpleInternals.valueAssignOperator_startsAtCurrentTokenOnSuccess
+example := @StatementSimpleInternals.assignmentTail_preservesTokenWindow
+example := @StatementSimpleInternals.assignmentTail_preservesTokensOnSuccess
+example := @StatementSimpleInternals.assignmentTail_cursorMonotoneOnSuccess
+example := @StatementSimpleInternals.optionalAssignmentTail_preservesTokenWindow
+example :=
+  @StatementSimpleInternals.optionalAssignmentTail_preservesTokensOnSuccess
+example :=
+  @StatementSimpleInternals.optionalAssignmentTail_cursorMonotoneOnSuccess
+example := @StatementSimpleInternals.optionalSemicolon_validFor
+example := @StatementSimpleInternals.optionalSemicolon_preservesTokenWindow
+example := @StatementSimpleInternals.optionalSemicolon_preservesTokensOnSuccess
+example := @StatementSimpleInternals.optionalSemicolon_cursorMonotoneOnSuccess
+example :=
+  @StatementSimpleInternals.optionalSemicolon_some_startsAtCurrentTokenOnSuccess
 
 end Tests
