@@ -9,6 +9,24 @@ set_option autoImplicit false
 namespace Solcore.Syntax.Parser
 namespace ExpressionAtomInternals
 
+private theorem atomBind_ok_components {alpha beta : Type}
+    {first : Parser alpha} {next : alpha → Parser beta}
+    {input final : State} {value : beta}
+    (parsed : (first >>= next) input = .ok value final) :
+    ∃ firstValue afterFirst,
+      first input = .ok firstValue afterFirst ∧
+        next firstValue afterFirst = .ok value final := by
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      rw [firstResult] at parsed
+      exact ⟨firstValue, afterFirst, rfl, parsed⟩
+  | reject failure rejected => rw [firstResult] at parsed; contradiction
+  | invariant error => rw [firstResult] at parsed; contradiction
+
 /-- Expression names retain the ordinary or Boolean builtin token range. -/
 theorem expressionName_validFor :
     expressionName.ValidFor Located.ValidFor := by
@@ -159,6 +177,103 @@ theorem identifierExpression_startsAtCurrentTokenOnSuccess :
     expressionName_startsAtCurrentTokenOnSuccess
   intro name input value final parsed
   cases parsed
+  rfl
+
+/-- Proxy expressions retain their marker, inner type, and outer cover. -/
+theorem proxyExpression_validFor
+    (statementValid : SourceFile → Statement → Prop) :
+    proxyExpression.ValidFor (Expr.ValidFor statementValid) := by
+  have weak : proxyExpression.ValidFor (fun _ _ => True) := by
+    unfold proxyExpression
+    apply Parser.bind_validFor (symbol_validFor .at .expression)
+    intro marker
+    apply Parser.bind_validFor typeExpr_validFor
+    intro type
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : proxyExpression input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok expression final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold proxyExpression at stages
+      rcases atomBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases atomBind_ok_components rest with
+        ⟨type, afterType, typeResult, finished⟩
+      have markerContract := symbol_validFor .at .expression input inputValid
+      rw [markerResult] at markerContract
+      have typeContract := typeExpr_validFor afterMarker markerContract.2.1
+      rw [typeResult] at typeContract
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerContract.1
+      have typeValidInput : TypeExpr.ValidFor input.file type := by
+        simpa [markerContract.2.2] using typeContract.1
+      rcases typeExpr_startsAtCurrentTokenOnSuccess
+          afterMarker type afterType typeResult with
+        ⟨typeToken, typeFound, typeStart⟩
+      have markerShape :=
+        symbol_ok_state_shape .at .expression markerResult
+      have advanced : input.advance? = some (marker, afterMarker) := by
+        unfold State.advance?
+        rw [markerShape.1, markerShape.2]
+        rfl
+      have markerBeforeType :
+          marker.span.endByte ≤ type.span.startByte := by
+        rw [← typeStart]
+        exact inputValid.consumed_end_le_peek_start_after_advance
+          advanced typeFound
+      have outerValid :
+          (SourceSpan.cover marker.span type.span).ValidFor input.file := by
+        apply SourceSpan.cover_validFor markerSpanValid
+          typeValidInput.span_valid
+        exact Nat.le_trans markerSpanValid.2.1
+          (Nat.le_trans markerBeforeType typeValidInput.span_valid.2.1)
+      cases finished
+      exact ⟨Expr.ValidFor.proxy outerValid markerSpanValid typeValidInput,
+        weakResult.2.1, weakResult.2.2⟩
+
+/-- Proxy-expression parsing preserves every ordinary token window. -/
+theorem proxyExpression_preservesTokenWindow :
+    Parser.PreservesTokenWindow proxyExpression := by
+  unfold proxyExpression
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .at .expression)
+  intro marker
+  apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
+  intro type
+  exact Parser.pure_preservesTokenWindow _
+
+theorem proxyExpression_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess proxyExpression :=
+  proxyExpression_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Successful proxy-expression parsing never rewinds the cursor. -/
+theorem proxyExpression_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess proxyExpression := by
+  unfold proxyExpression
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .at .expression)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    typeExpr_cursorMonotoneOnSuccess
+  intro type
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A proxy expression starts at its current `@` token. -/
+theorem proxyExpression_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess proxyExpression (·.span) := by
+  unfold proxyExpression
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (symbol_startsAtCurrentTokenOnSuccess .at .expression)
+  intro marker input expression final parsed
+  rcases atomBind_ok_components parsed with
+    ⟨type, afterType, typeResult, finished⟩
+  cases finished
   rfl
 
 end ExpressionAtomInternals

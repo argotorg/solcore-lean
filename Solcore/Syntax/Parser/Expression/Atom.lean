@@ -28,6 +28,15 @@ def identifierExpression : Parser Expr := do
     value := .identifier name
   }
 
+/-- Parse a proxy expression whose outer range begins at its `@` marker. -/
+def proxyExpression : Parser Expr := do
+  let marker ← symbol .at .expression
+  let type ← typeExpr
+  pure {
+    span := SourceSpan.cover marker.span type.span
+    value := .proxy marker.span type
+  }
+
 end ExpressionAtomInternals
 
 private def closeTuple (opening : Token) (elementsRev : List Expr) :
@@ -107,14 +116,6 @@ private def dotConstructor (nested : Parser Expr) : Parser Expr := do
     value := .dotConstructor dot.span name arguments
   }
 
-private def proxyExpression : Parser Expr := do
-  let marker ← symbol .at .expression
-  let type ← typeExpr
-  pure {
-    span := SourceSpan.cover marker.span type.span
-    value := .proxy marker.span type
-  }
-
 private def lambdaExpression (block : Parser Block) : Parser Expr := do
   let marker ← keyword .lamKw .expression
   let parameters ← delimited .leftParen .rightParen true
@@ -139,7 +140,8 @@ private def expressionAtomCore (nested : Parser Expr)
   else if isBooleanValue state || isIdentifier state then
     ExpressionAtomInternals.identifierExpression state
   else if isSymbol state .dot then dotConstructor nested state
-  else if isSymbol state .at then proxyExpression state
+  else if isSymbol state .at then
+    ExpressionAtomInternals.proxyExpression state
   else if isSymbol state .leftParen then parenthesized nested state
   else if isSymbol state .leftBracket then
     match delimitedNoTrailing .leftBracket .rightBracket true nested
