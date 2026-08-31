@@ -214,4 +214,76 @@ theorem qualifiedName_validFor (context : ParseContext) (phase : ParserPhase) :
         (by rw [firstCursor]; simp)
       simpa only using tailValid.of_file_eq firstValid.2.2
 
+private theorem qualifiedNameTail_ok_state_shape
+    (context : ParseContext) (phase : ParserPhase) (first : Identifier) :
+    ∀ fuel last tailRev input name next,
+      qualifiedNameTail context phase first fuel last tailRev input =
+        .ok name next →
+      next.tokens = input.tokens ∧
+        name.span.startByte = first.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro last tailRev input name next result
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro last tailRev input name next result
+      unfold qualifiedNameTail at result
+      split at result
+      · cases dotResult : symbol .dot context input with
+        | invariant error => simp [dotResult] at result
+        | reject failure rejected => simp [dotResult] at result
+        | ok dot afterDot =>
+            simp only [dotResult] at result
+            cases componentResult : identifier context afterDot with
+            | invariant error => simp [componentResult] at result
+            | reject failure rejected => simp [componentResult] at result
+            | ok component afterComponent =>
+                simp only [componentResult] at result
+                have recursiveShape := inductionHypothesis component
+                  (component :: tailRev) afterComponent name next result
+                have dotShape :=
+                  symbol_ok_state_shape .dot context dotResult
+                rcases identifier_ok_state_shape context componentResult with
+                  ⟨_token, _found, _span, componentTokens, _cursor⟩
+                have dotTokens : afterDot.tokens = input.tokens := by
+                  rw [dotShape.2]
+                exact ⟨recursiveShape.1.trans
+                    (componentTokens.trans dotTokens), recursiveShape.2⟩
+      · unfold finishQualifiedName at result
+        cases result
+        exact ⟨rfl, rfl⟩
+
+/--
+A successful qualified name starts at its first input token and leaves the
+immutable token carrier unchanged.
+-/
+theorem qualifiedName_ok_state_shape (context : ParseContext)
+    (phase : ParserPhase) {input next : State} {name : QualifiedName}
+    (result : qualifiedName context phase input = .ok name next) :
+    ∃ firstToken,
+      input.peek? = some firstToken ∧
+        firstToken.span.startByte = name.span.startByte ∧
+        next.tokens = input.tokens := by
+  unfold qualifiedName at result
+  cases firstResult : identifier context input with
+  | invariant error => simp [firstResult] at result
+  | reject failure rejected => simp [firstResult] at result
+  | ok first afterFirst =>
+      simp only [firstResult] at result
+      have tailShape := qualifiedNameTail_ok_state_shape context phase first
+        (afterFirst.remainingCount + 1) first [] afterFirst name next result
+      rcases identifier_ok_state_shape context firstResult with
+        ⟨firstToken, found, span, tokens, _cursor⟩
+      refine ⟨firstToken, found, ?_, tailShape.1.trans tokens⟩
+      rw [span]
+      exact tailShape.2.symm
+
+/-- Qualified-name success preserves the immutable token carrier. -/
+theorem qualifiedName_preservesTokensOnSuccess (context : ParseContext)
+    (phase : ParserPhase) :
+    Parser.PreservesTokensOnSuccess (qualifiedName context phase) := by
+  intro input name next result
+  exact (qualifiedName_ok_state_shape context phase result).choose_spec.2.2
+
 end Solcore.Syntax.Parser
