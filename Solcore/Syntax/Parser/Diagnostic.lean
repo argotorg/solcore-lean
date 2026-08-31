@@ -63,6 +63,8 @@ inductive ParseConstraint where
   | comptimeTypeInParameter
   | comptimeUsedAsParameterName
   | modifierOutsideContract (keyword : HardKeyword)
+  | yulMetaInSource
+  | yulSwitchRequiresCase
   deriving Repr, BEq, DecidableEq
 
 /-- Bounded recursive syntax dimensions checked before recursive parsing. -/
