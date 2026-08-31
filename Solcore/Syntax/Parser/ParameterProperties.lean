@@ -462,6 +462,198 @@ theorem recoverParameter_preservesTokenWindow :
 
 end FunctionParameterInternals
 
+namespace LambdaParameterInternals
+
+theorem ofFunctionParameter_validFor {file : SourceFile}
+    {parameter : FunctionParameter}
+    (valid : FunctionParameter.ValidFor file parameter) :
+    LambdaParameter.ValidFor file (ofFunctionParameter parameter) := by
+  cases valid with
+  | typed spanValid markerValid nameValid typeValid =>
+      exact .typed spanValid markerValid nameValid typeValid
+  | error spanValid => exact .error spanValid
+
+private theorem mappedFunctionParameter_validFor (parser : Parser FunctionParameter)
+    {input : State}
+    (valid : (parser input).ValidFor input FunctionParameter.ValidFor) :
+    ((do pure (ofFunctionParameter (← parser))) input).ValidFor input
+      LambdaParameter.ValidFor := by
+  simp only [bind]
+  cases parsed : parser input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      simp only [parsed, Reply.ValidFor] at valid ⊢
+      exact valid
+  | ok parameter final =>
+      simp only [parsed, Reply.ValidFor] at valid ⊢
+      exact ⟨ofFunctionParameter_validFor valid.1, valid.2.1, valid.2.2⟩
+
+theorem ordinaryLambdaParameterTail_validFor (name : Identifier)
+    {firstIndex : Nat} {firstToken : Token} (input : State)
+    (inputValid : input.ValidFor) (nameValid : name.span.ValidFor input.file)
+    (firstFound : input.tokens[firstIndex]? = some firstToken)
+    (firstSpan : firstToken.span = name.span)
+    (firstBefore : firstIndex < input.cursor) :
+    (ordinaryLambdaParameterTail name input).ValidFor input
+      LambdaParameter.ValidFor := by
+  unfold ordinaryLambdaParameterTail getState
+  simp only [bind]
+  by_cases typed : isSymbol input .colon
+  · simp only [typed, if_true]
+    have valid := FunctionParameterInternals.namedParameterTail_validFor name.span
+      none name name.span input inputValid nameValid (by simp) nameValid
+      nameValid firstFound firstSpan firstBefore
+    exact mappedFunctionParameter_validFor _ valid
+  · simp only [typed, pure, Reply.ValidFor]
+    exact ⟨.inferred nameValid nameValid, inputValid, rfl⟩
+
+theorem comptimeLambdaParameterTail_validFor (marker : Token)
+    (name : Identifier) {firstIndex : Nat} (input : State)
+    (inputValid : input.ValidFor) (markerValid : marker.span.ValidFor input.file)
+    (nameValid : name.span.ValidFor input.file)
+    (spanValid : (SourceSpan.cover marker.span name.span).ValidFor input.file)
+    (firstFound : input.tokens[firstIndex]? = some marker)
+    (firstBefore : firstIndex < input.cursor) :
+    (comptimeLambdaParameterTail marker name input).ValidFor input
+      LambdaParameter.ValidFor := by
+  unfold comptimeLambdaParameterTail getState
+  simp only [bind]
+  by_cases typed : isSymbol input .colon
+  · simp only [typed, if_true]
+    have valid := FunctionParameterInternals.namedParameterTail_validFor marker.span
+      (some marker.span) name (SourceSpan.cover marker.span name.span)
+      input inputValid markerValid (by simp [markerValid]) nameValid spanValid
+      firstFound rfl firstBefore
+    exact mappedFunctionParameter_validFor _ valid
+  · simp only [typed, Bool.false_eq_true, if_false]
+    have valid := FunctionParameterInternals.errorParameter_validFor
+      (SourceSpan.cover marker.span name.span)
+      .comptimeParameterRequiresType input inputValid spanValid
+    exact mappedFunctionParameter_validFor _ valid
+
+theorem ordinaryLambdaParameter_validFor :
+    ordinaryLambdaParameter.ValidFor LambdaParameter.ValidFor := by
+  intro input inputValid
+  unfold ordinaryLambdaParameter
+  simp only [bind]
+  cases nameResult : identifier .parameter input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := identifier_validFor .parameter input inputValid
+      rw [nameResult] at valid
+      exact valid
+  | ok name afterName =>
+      have nameReply := identifier_validFor .parameter input inputValid
+      rw [nameResult] at nameReply
+      simp only
+      rcases identifier_ok_state_shape .parameter nameResult with
+        ⟨nameToken, nameFound, nameSpan, nameTokens, nameCursor⟩
+      have nameAt := State.getElem?_eq_some_of_peek?_eq_some nameFound
+      have nameAtAfter : afterName.tokens[input.cursor]? = some nameToken := by
+        simpa [nameTokens] using nameAt
+      have nameValid : name.span.ValidFor afterName.file := by
+        simpa only [Located.ValidFor, nameReply.2.2] using nameReply.1
+      by_cases warned : name.value == ContextualKeyword.comptime.spelling
+      · simp only [warned, if_true, emitDiagnostic, modifyState]
+        let diagnostic : ParseDiagnostic := {
+          span := name.span
+          kind := .constraintViolation .comptimeUsedAsParameterName
+        }
+        change (ordinaryLambdaParameterTail name
+          (afterName.emit diagnostic)).ValidFor input LambdaParameter.ValidFor
+        have emitted := nameReply.2.1.emit_validFor diagnostic nameValid
+        exact (ordinaryLambdaParameterTail_validFor name
+          (afterName.emit diagnostic) emitted
+          (by simpa [State.emit] using nameValid)
+          (by simpa [State.emit] using nameAtAfter) nameSpan
+          (by simp [State.emit, nameCursor])).of_file_eq
+            (by simpa [State.emit] using nameReply.2.2)
+      · simp only [warned]
+        exact (ordinaryLambdaParameterTail_validFor name afterName
+          nameReply.2.1 nameValid nameAtAfter nameSpan
+          (by simp [nameCursor])).of_file_eq nameReply.2.2
+
+theorem comptimeLambdaParameter_validFor :
+    comptimeLambdaParameter.ValidFor LambdaParameter.ValidFor := by
+  intro input inputValid
+  unfold comptimeLambdaParameter
+  simp only [bind]
+  cases markerResult : contextual .comptime .parameter input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := contextual_validFor .comptime .parameter input inputValid
+      rw [markerResult] at valid
+      exact valid
+  | ok marker afterMarker =>
+      have markerReply := contextual_validFor .comptime .parameter input inputValid
+      rw [markerResult] at markerReply
+      simp only
+      cases nameResult : identifier .parameter afterMarker with
+      | invariant error => trivial
+      | reject failure rejected =>
+          have valid := identifier_validFor .parameter afterMarker markerReply.2.1
+          rw [nameResult] at valid
+          exact valid.of_file_eq markerReply.2.2
+      | ok name afterName =>
+          have nameReply := identifier_validFor .parameter afterMarker markerReply.2.1
+          rw [nameResult] at nameReply
+          simp only
+          have markerShape := acceptToken_ok_state_shape
+            (.contextual .comptime) .parameter (·.isContextual .comptime)
+            markerResult
+          rcases identifier_ok_state_shape .parameter nameResult with
+            ⟨nameToken, nameFound, nameSpan, nameTokens, nameCursor⟩
+          have markerAt := State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+          have markerAtAfter : afterName.tokens[input.cursor]? = some marker := by
+            simpa [nameTokens, markerShape.2] using markerAt
+          have nameAt := State.getElem?_eq_some_of_peek?_eq_some nameFound
+          have nameAtInput : input.tokens[afterMarker.cursor]? = some nameToken := by
+            simpa [markerShape.2] using nameAt
+          have beforeName := inputValid.token_end_le_token_start_of_getElem?_lt
+            markerAt nameAtInput (by simp [markerShape.2])
+          have markerValid : marker.span.ValidFor afterName.file := by
+            simpa only [Located.ValidFor, nameReply.2.2, markerReply.2.2]
+              using markerReply.1
+          have nameValid : name.span.ValidFor afterName.file := by
+            simpa only [Located.ValidFor, nameReply.2.2] using nameReply.1
+          have spanValid : (SourceSpan.cover marker.span name.span).ValidFor
+              afterName.file := SourceSpan.cover_validFor markerValid nameValid
+            (Nat.le_trans markerValid.2.1 (Nat.le_trans
+              (by simpa [nameSpan] using beforeName) nameValid.2.1))
+          exact (comptimeLambdaParameterTail_validFor marker name afterName
+            nameReply.2.1 markerValid nameValid spanValid markerAtAfter
+            (by simp [markerShape.2, nameCursor]; omega)).of_file_eq
+              (nameReply.2.2.trans markerReply.2.2)
+
+theorem lambdaParameterCore_validFor :
+    lambdaParameterCore.ValidFor LambdaParameter.ValidFor := by
+  intro input inputValid
+  unfold lambdaParameterCore
+  split
+  · simp only [Bool.and_true]
+    split
+    · exact comptimeLambdaParameter_validFor input inputValid
+    · exact ordinaryLambdaParameter_validFor input inputValid
+  · simp only [Bool.and_false, Bool.false_eq_true, if_false]
+    exact ordinaryLambdaParameter_validFor input inputValid
+
+theorem recoverLambdaParameter_validFor (input : State)
+    (inputValid : input.ValidFor) :
+    (recoverLambdaParameter input).ValidFor input LambdaParameter.ValidFor := by
+  unfold recoverLambdaParameter
+  cases parsed : FunctionParameterInternals.recoverParameter input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := FunctionParameterInternals.recoverParameter_validFor input inputValid
+      rw [parsed] at valid
+      exact valid
+  | ok recovered final =>
+      have valid := FunctionParameterInternals.recoverParameter_validFor input inputValid
+      rw [parsed] at valid
+      exact ⟨.error valid.1.span_valid, valid.2.1, valid.2.2⟩
+
+end LambdaParameterInternals
+
 /-- Named parameters retain provenance through parsing and recovery. -/
 theorem namedParameter_validFor :
     namedParameter.ValidFor FunctionParameter.ValidFor := by

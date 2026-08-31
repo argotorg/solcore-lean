@@ -110,22 +110,26 @@ def namedParameter : Parser FunctionParameter := fun state =>
           (rewound.emit failure.toDiagnostic)
   | .invariant error => .invariant error
 
-private def finishLambdaTyped (start : SourceSpan)
-    (comptimeMarker : Option SourceSpan) (name : Identifier)
-    (type : TypeExpr) : Parser LambdaParameter := do
-  match type.value with
-  | .comptime .. =>
-      let _ ← emitDiagnostic {
-        span := type.span
-        kind := .constraintViolation .comptimeTypeInParameter
-      }
-  | _ => pure ()
-  pure {
-    span := SourceSpan.cover start type.span
-    value := .typed comptimeMarker name type
-  }
+namespace LambdaParameterInternals
 
-private def ordinaryLambdaParameter : Parser LambdaParameter := do
+/-- Retag a named-function parameter while preserving every retained range. -/
+def ofFunctionParameter (parameter : FunctionParameter) : LambdaParameter := {
+  span := parameter.span
+  value := match parameter.value with
+    | .typed comptime name type => .typed comptime name type
+    | .error => .error
+}
+
+def ordinaryLambdaParameterTail (name : Identifier) : Parser LambdaParameter := do
+  let state ← getState
+  if isSymbol state .colon then
+    let parameter ← FunctionParameterInternals.namedParameterTail
+      name.span none name name.span
+    pure (ofFunctionParameter parameter)
+  else
+    pure { span := name.span, value := .inferred name }
+
+def ordinaryLambdaParameter : Parser LambdaParameter := do
   let name ← identifier .parameter
   if name.value == ContextualKeyword.comptime.spelling then
     let _ ← emitDiagnostic {
@@ -134,31 +138,28 @@ private def ordinaryLambdaParameter : Parser LambdaParameter := do
     }
   else
     pure ()
-  let state ← getState
-  if isSymbol state .colon then
-    let _ ← symbol .colon .parameter
-    let type ← typeExpr
-    finishLambdaTyped name.span none name type
-  else
-    pure { span := name.span, value := .inferred name }
+  ordinaryLambdaParameterTail name
 
-private def comptimeLambdaParameter : Parser LambdaParameter := do
-  let marker ← contextual .comptime .parameter
-  let name ← identifier .parameter
+def comptimeLambdaParameterTail (marker : Token)
+    (name : Identifier) : Parser LambdaParameter := do
   let state ← getState
   if isSymbol state .colon then
-    let _ ← symbol .colon .parameter
-    let type ← typeExpr
-    finishLambdaTyped marker.span (some marker.span) name type
+    let parameter ← FunctionParameterInternals.namedParameterTail
+      marker.span (some marker.span) name
+      (SourceSpan.cover marker.span name.span)
+    pure (ofFunctionParameter parameter)
   else
     let span := SourceSpan.cover marker.span name.span
-    let _ ← emitDiagnostic {
-      span
-      kind := .constraintViolation .comptimeParameterRequiresType
-    }
-    pure { span, value := .error }
+    let parameter ← FunctionParameterInternals.errorParameter span
+      .comptimeParameterRequiresType
+    pure (ofFunctionParameter parameter)
 
-private def lambdaParameterCore : Parser LambdaParameter := fun state =>
+def comptimeLambdaParameter : Parser LambdaParameter := do
+  let marker ← contextual .comptime .parameter
+  let name ← identifier .parameter
+  comptimeLambdaParameterTail marker name
+
+def lambdaParameterCore : Parser LambdaParameter := fun state =>
   if isContextual state .comptime &&
       match state.peekOffsetKind? 1 with
       | some (.identifier _) => true
@@ -167,7 +168,7 @@ private def lambdaParameterCore : Parser LambdaParameter := fun state =>
   else
     ordinaryLambdaParameter state
 
-private def recoverLambdaParameter (state : State) : Reply LambdaParameter :=
+def recoverLambdaParameter (state : State) : Reply LambdaParameter :=
   match FunctionParameterInternals.recoverParameter state with
   | .ok recovered next => .ok {
       span := recovered.span
@@ -176,9 +177,11 @@ private def recoverLambdaParameter (state : State) : Reply LambdaParameter :=
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
+end LambdaParameterInternals
+
 /-- Lambda parameter, retaining inference only for ordinary unmodified names. -/
 def lambdaParameter : Parser LambdaParameter := fun state =>
-  match lambdaParameterCore state with
+  match LambdaParameterInternals.lambdaParameterCore state with
   | .ok value next => .ok value next
   | .reject failure failedState =>
       let rewound := { failedState with cursor := state.cursor }
@@ -186,7 +189,8 @@ def lambdaParameter : Parser LambdaParameter := fun state =>
           isSymbol rewound .rightParen then
         .reject failure rewound
       else
-        recoverLambdaParameter (rewound.emit failure.toDiagnostic)
+        LambdaParameterInternals.recoverLambdaParameter
+          (rewound.emit failure.toDiagnostic)
   | .invariant error => .invariant error
 
 end Solcore.Syntax.Parser
