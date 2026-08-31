@@ -13,5 +13,9 @@ example := selectedAlias_validFor
 example := selectedAlias_preservesTokenWindow
 example := selectedAlias_preservesTokensOnSuccess
 example := selectedAlias_cursorMonotoneOnSuccess
+example := selectedImport_preservesTokenWindow
+example := selectedImport_preservesTokensOnSuccess
+example := selectedImport_cursorMonotoneOnSuccess
+example := selectedImport_startsAtCurrentTokenOnSuccess
 
 end Tests

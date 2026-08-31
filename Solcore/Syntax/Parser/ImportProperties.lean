@@ -7,6 +7,23 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+private theorem importBind_ok_components {α β : Type}
+    {first : Parser α} {next : α → Parser β} {input final : State}
+    {value : β} (parsed : (first >>= next) input = .ok value final) :
+    ∃ firstValue afterFirst,
+      first input = .ok firstValue afterFirst ∧
+        next firstValue afterFirst = .ok value final := by
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      rw [firstResult] at parsed
+      exact ⟨firstValue, afterFirst, rfl, parsed⟩
+  | reject failure rejected => rw [firstResult] at parsed; contradiction
+  | invariant error => rw [firstResult] at parsed; contradiction
+
 private theorem getState_preservesTokenWindow :
     Parser.PreservesTokenWindow getState := by
   intro input
@@ -71,5 +88,44 @@ theorem selectedAlias_cursorMonotoneOnSuccess :
     exact Parser.pure_cursorMonotoneOnSuccess _
   · simp only [present]
     exact Parser.pure_cursorMonotoneOnSuccess none
+
+/-- Selected imports preserve every ordinary token window. -/
+theorem selectedImport_preservesTokenWindow :
+    Parser.PreservesTokenWindow selectedImport := by
+  unfold selectedImport
+  apply Parser.bind_preservesTokenWindow
+    (selectorName_preservesTokenWindow .importDecl)
+  intro source
+  apply Parser.bind_preservesTokenWindow selectedAlias_preservesTokenWindow
+  intro alias
+  exact Parser.pure_preservesTokenWindow _
+
+/-- Selected imports preserve the immutable token carrier on success. -/
+theorem selectedImport_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess selectedImport :=
+  selectedImport_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Selected imports never rewind the parser cursor. -/
+theorem selectedImport_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess selectedImport := by
+  unfold selectedImport
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (selectorName_cursorMonotoneOnSuccess .importDecl)
+  intro source
+  apply Parser.bind_cursorMonotoneOnSuccess
+    selectedAlias_cursorMonotoneOnSuccess
+  intro alias
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A selected import starts at its retained selector token. -/
+theorem selectedImport_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess selectedImport (·.span) := by
+  unfold selectedImport
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (selectorName_startsAtCurrentTokenOnSuccess .importDecl)
+  intro source input selection final parsed
+  rcases importBind_ok_components parsed with
+    ⟨alias, afterAlias, _aliasResult, finished⟩
+  cases alias <;> cases finished <;> rfl
 
 end Solcore.Syntax.Parser
