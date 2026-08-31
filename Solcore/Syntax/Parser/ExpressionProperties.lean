@@ -222,6 +222,227 @@ theorem conditionalTail_cursorMonotoneOnSuccess
         cases parsed
         exact Nat.le_refl _
 
+/-- The conditional-prefix loop retains every pending and parsed source range. -/
+theorem conditionalTail_validFor
+    (nested alternative : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    (alternativeValid : alternative.ValidFor
+      (Expr.ValidFor statementValid))
+    (alternativeTokens : Parser.PreservesTokensOnSuccess alternative)
+    (alternativeCursorLt : ∀ {input next : State} {value : Expr},
+      alternative input = .ok value next → input.cursor < next.cursor)
+    (alternativeStarts :
+      Parser.StartsAtCurrentTokenOnSuccess alternative (·.span)) :
+    ∀ fuel heads condition input,
+      input.ValidFor →
+      List.ValidFor (ConditionalHead.ValidFor statementValid)
+        input.file heads →
+      Expr.ValidFor statementValid input.file condition →
+      (∀ head ∈ heads, head.condition.span.startByte ≤
+        condition.span.startByte) →
+      (∀ token, input.peek? = some token →
+        condition.span.startByte ≤ token.span.startByte) →
+      (conditionalTail nested alternative fuel heads condition input).ValidFor
+        input (Expr.ValidFor statementValid) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro heads condition input inputValid headsValid conditionValid
+        headsBefore conditionBefore
+      unfold conditionalTail
+      by_cases present : isSymbol input .question
+      · simp only [present, if_true]
+        cases questionResult : symbol .question .expression input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            have reply := symbol_validFor .question .expression input inputValid
+            rw [questionResult] at reply
+            exact reply
+        | ok question afterQuestion =>
+            have questionReply := symbol_validFor .question .expression input
+              inputValid
+            rw [questionResult] at questionReply
+            simp only
+            cases thenResult : nested afterQuestion with
+            | invariant error => trivial
+            | reject failure rejected =>
+                have reply := nestedValid afterQuestion questionReply.2.1
+                rw [thenResult] at reply
+                exact reply.of_file_eq questionReply.2.2
+            | ok thenBranch afterThen =>
+                have thenReply := nestedValid afterQuestion questionReply.2.1
+                rw [thenResult] at thenReply
+                simp only
+                cases colonResult : symbol .colon .expression afterThen with
+                | invariant error => trivial
+                | reject failure rejected =>
+                    have reply := symbol_validFor .colon .expression afterThen
+                      thenReply.2.1
+                    rw [colonResult] at reply
+                    exact reply.of_file_eq
+                      (thenReply.2.2.trans questionReply.2.2)
+                | ok colon afterColon =>
+                    have colonReply := symbol_validFor .colon .expression
+                      afterThen thenReply.2.1
+                    rw [colonResult] at colonReply
+                    simp only
+                    cases alternativeResult : alternative afterColon with
+                    | invariant error => trivial
+                    | reject failure rejected =>
+                        have reply := alternativeValid afterColon colonReply.2.1
+                        rw [alternativeResult] at reply
+                        exact reply.of_file_eq (colonReply.2.2.trans
+                          (thenReply.2.2.trans questionReply.2.2))
+                    | ok nextCondition next =>
+                        have alternativeReply := alternativeValid afterColon
+                          colonReply.2.1
+                        rw [alternativeResult] at alternativeReply
+                        have questionShape := symbol_ok_state_shape .question
+                          .expression questionResult
+                        have colonShape := symbol_ok_state_shape .colon
+                          .expression colonResult
+                        have questionAt :=
+                          State.getElem?_eq_some_of_peek?_eq_some
+                            questionShape.1
+                        rcases alternativeStarts afterColon nextCondition next
+                            alternativeResult with
+                          ⟨nextToken, nextFound, nextStart⟩
+                        have nextAtAfterColon :=
+                          State.getElem?_eq_some_of_peek?_eq_some nextFound
+                        have questionTokens :=
+                          symbol_preservesTokensOnSuccess .question .expression
+                            input question afterQuestion questionResult
+                        have thenTokens := nestedTokens afterQuestion thenBranch
+                          afterThen thenResult
+                        have colonTokens :=
+                          symbol_preservesTokensOnSuccess .colon .expression
+                            afterThen colon afterColon colonResult
+                        have nextAtInput : input.tokens[afterColon.cursor]? =
+                            some nextToken := by
+                          simpa [colonTokens, thenTokens, questionTokens] using
+                            nextAtAfterColon
+                        have questionBeforeNext :=
+                          inputValid.token_end_le_token_start_of_getElem?_lt
+                            questionAt nextAtInput
+                            (Nat.lt_of_lt_of_le
+                              (acceptToken_cursor_lt_onSuccess
+                                (.symbol .question) .expression
+                                (· == .symbol .question) questionResult)
+                              (Nat.le_trans
+                                (nestedCursor afterQuestion thenBranch afterThen
+                                  thenResult)
+                                (symbol_cursorMonotoneOnSuccess .colon
+                                  .expression afterThen colon afterColon
+                                  colonResult)))
+                        have questionSpan : question.span.ValidFor input.file := by
+                          simpa only [Located.ValidFor] using questionReply.1
+                        have conditionBeforeNext :
+                            condition.span.startByte ≤
+                              nextCondition.span.startByte := by
+                          calc
+                            condition.span.startByte ≤
+                                question.span.startByte :=
+                              conditionBefore question questionShape.1
+                            _ ≤ question.span.endByte := questionSpan.2.1
+                            _ ≤ nextToken.span.startByte := questionBeforeNext
+                            _ = nextCondition.span.startByte := nextStart
+                        have thenValidInput : Expr.ValidFor statementValid
+                            input.file thenBranch := by
+                          simpa [thenReply.2.2, questionReply.2.2] using
+                            thenReply.1
+                        have colonSpan : colon.span.ValidFor input.file := by
+                          simpa only [Located.ValidFor, thenReply.2.2,
+                            questionReply.2.2] using colonReply.1
+                        have nextFileEq : next.file = input.file :=
+                          alternativeReply.2.2.trans (colonReply.2.2.trans
+                            (thenReply.2.2.trans questionReply.2.2))
+                        have nextConditionValidInput :
+                            Expr.ValidFor statementValid input.file
+                              nextCondition := by
+                          simpa [colonReply.2.2, thenReply.2.2,
+                            questionReply.2.2] using alternativeReply.1
+                        have accumulatedInput : List.ValidFor
+                            (ConditionalHead.ValidFor statementValid) input.file
+                            ({
+                              condition
+                              question := question.span
+                              thenBranch
+                              colon := colon.span
+                            } :: heads) := by
+                          intro head member
+                          rcases List.mem_cons.mp member with rfl | member
+                          · exact ⟨conditionValid, questionSpan,
+                              thenValidInput, colonSpan⟩
+                          · exact headsValid head member
+                        have accumulatedNext : List.ValidFor
+                            (ConditionalHead.ValidFor statementValid) next.file
+                            ({
+                              condition
+                              question := question.span
+                              thenBranch
+                              colon := colon.span
+                            } :: heads) := by
+                          simpa [nextFileEq] using accumulatedInput
+                        have headsBeforeNext : ∀ head ∈ ({
+                              condition
+                              question := question.span
+                              thenBranch
+                              colon := colon.span
+                            } :: heads),
+                            head.condition.span.startByte ≤
+                              nextCondition.span.startByte := by
+                          intro head member
+                          rcases List.mem_cons.mp member with rfl | member
+                          · exact conditionBeforeNext
+                          · exact Nat.le_trans (headsBefore head member)
+                              conditionBeforeNext
+                        have nextConditionBefore : ∀ future,
+                            next.peek? = some future →
+                            nextCondition.span.startByte ≤
+                              future.span.startByte := by
+                          intro future futureFound
+                          have nextAt :=
+                            State.getElem?_eq_some_of_peek?_eq_some nextFound
+                          have futureAtNext :=
+                            State.getElem?_eq_some_of_peek?_eq_some futureFound
+                          have alternativeCarrier := alternativeTokens afterColon
+                            nextCondition next alternativeResult
+                          have futureAt : afterColon.tokens[next.cursor]? =
+                              some future := by
+                            simpa [alternativeCarrier] using futureAtNext
+                          have separated :=
+                            colonReply.2.1.token_end_le_token_start_of_getElem?_lt
+                              nextAt futureAt
+                                (alternativeCursorLt alternativeResult)
+                          calc
+                            nextCondition.span.startByte =
+                                nextToken.span.startByte := nextStart.symm
+                            _ ≤ nextToken.span.endByte :=
+                              (colonReply.2.1.peek?_span_validFor nextFound).2.1
+                            _ ≤ future.span.startByte := separated
+                        have recursive := inductionHypothesis ({
+                            condition
+                            question := question.span
+                            thenBranch
+                            colon := colon.span
+                          } :: heads) nextCondition next alternativeReply.2.1
+                            accumulatedNext
+                            (by simpa [nextFileEq] using
+                              nextConditionValidInput)
+                            headsBeforeNext nextConditionBefore
+                        exact recursive.of_file_eq nextFileEq
+      · simp only [present]
+        have folded := foldConditionalHeads_validFor statementValid input.file
+          heads condition headsValid conditionValid (by
+            intro head member
+            exact Nat.le_trans (headsBefore head member)
+              conditionValid.span_valid.2.1)
+        exact ⟨folded, inputValid, rfl⟩
+
 /-- Prefix unary scanning preserves operator spans and parser-state validity. -/
 theorem unaryOperators_validFor :
     ∀ fuel operatorsRev input,
