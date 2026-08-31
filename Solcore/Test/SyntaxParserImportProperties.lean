@@ -27,6 +27,7 @@ example := @finishImport_validFor
 example := @plainImport_validFor
 example := @namespaceImport_validFor
 example := @wildcardImport_validFor
+example := @selectiveImport_validFor
 example := @importTerminator_preservesTokenWindow
 example := @importTerminator_preservesTokensOnSuccess
 example := @importTerminator_cursorMonotoneOnSuccess
