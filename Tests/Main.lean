@@ -47,6 +47,7 @@ import Solcore.Test.SyntaxParserUpstreamFixtures
 import Solcore.Test.SyntaxParserValidityProperties
 import Solcore.Test.SyntaxParserYul
 import Solcore.Test.SyntaxParserYulChoiceRecovery
+import Solcore.Test.SyntaxParserYulCommonProperties
 import Solcore.Test.SyntaxParserYulLeafProperties
 import Solcore.Test.SyntaxProvenanceProperties
 import Solcore.Test.SyntaxPreflightProperties
