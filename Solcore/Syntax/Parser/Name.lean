@@ -6,7 +6,11 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def finishQualifiedName (first last : Identifier)
+/- Proof-visible qualified-name parser components. -/
+namespace QualifiedNameInternals
+
+/-- Finish a qualified name from its first, last, and reversed tail parts. -/
+def finishQualifiedName (first last : Identifier)
     (tailRev : List Identifier) (state : State) : Reply QualifiedName :=
   .ok {
     span := SourceSpan.cover first.span last.span
@@ -18,7 +22,8 @@ private def finishQualifiedName (first last : Identifier)
     }
   } state
 
-private def qualifiedNameTail (context : ParseContext)
+/-- Fuel-bounded dotted tail used by the public qualified-name parser. -/
+def qualifiedNameTail (context : ParseContext)
     (phase : ParserPhase) (first : Identifier) :
     Nat → Identifier → List Identifier → State → Reply QualifiedName
   | 0, _, _, state => .invariant (.fuelExhausted phase state.currentSpan)
@@ -36,6 +41,10 @@ private def qualifiedNameTail (context : ParseContext)
         | .invariant error => .invariant error
       else
         finishQualifiedName first last tailRev state
+
+end QualifiedNameInternals
+
+open QualifiedNameInternals
 
 /-- Parse one nonempty dotted ordinary-identifier path. -/
 def qualifiedName (context : ParseContext)
