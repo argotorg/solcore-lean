@@ -6,7 +6,9 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def pragmaItemsTail :
+namespace PragmaInternals
+
+def pragmaItemsTail :
     Nat → List Identifier → State → Reply (List Identifier)
   | 0, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, itemsRev, state =>
@@ -26,7 +28,7 @@ private def pragmaItemsTail :
       else
         .ok itemsRev.reverse state
 
-private def pragmaItems : Parser (List Identifier) := fun state =>
+def pragmaItems : Parser (List Identifier) := fun state =>
   if isSymbol state .semicolon then
     .ok [] state
   else
@@ -35,6 +37,10 @@ private def pragmaItems : Parser (List Identifier) := fun state =>
         pragmaItemsTail (next.remainingCount + 1) [item] next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
+
+end PragmaInternals
+
+open PragmaInternals
 
 private def pragmaItemsValidFor (file : SourceFile)
     (items : List Identifier) : Prop :=
