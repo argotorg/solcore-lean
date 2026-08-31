@@ -16,6 +16,9 @@ inductive ParseExpectation where
   | pattern
   | statement
   | topItem
+  | modulePath
+  | selectorName
+  | exportName
   | keyword (value : HardKeyword)
   | contextual (value : ContextualKeyword)
   | symbol (value : Symbol)
@@ -26,6 +29,9 @@ inductive ParseContext where
   | sourceFile
   | topItem
   | typeAlias
+  | importDecl
+  | exportDecl
+  | pragmaDecl
   | typeExpr
   | parameter
   | expression
@@ -51,6 +57,7 @@ inductive RecoverySite where
 /-- Context-sensitive grammar conditions that are not token expectations. -/
 inductive ParseConstraint where
   | mappingRequiresCanonicalForm
+  | trailingSemicolonRequired (context : ParseContext)
   deriving Repr, BEq, DecidableEq
 
 /-- Bounded recursive syntax dimensions checked before recursive parsing. -/
