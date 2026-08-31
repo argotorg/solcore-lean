@@ -1,0 +1,12 @@
+import Solcore.Syntax.Parser.Statement.MatchDefaultFuelTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserStatementMatchDefaultFuelTotalityProperties
+
+open Solcore.Syntax.Parser
+
+example := @MatchInternals.optionalDefaultBody_ordinary_of_statementFuel
+example := @MatchInternals.optionalDefaultBody_ne_invariant_of_statementFuel
+
+end Solcore.Test.SyntaxParserStatementMatchDefaultFuelTotalityProperties
