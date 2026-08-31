@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.PredicateSequenceProperties
+import Solcore.Syntax.Parser.WhereClauseProperties
 
 /-! External compile consumers for canonical predicate contracts. -/
 
@@ -26,5 +26,13 @@ example := PredicateInternals.predicateSequence_validFor
 example := PredicateInternals.predicateSequence_preservesTokenWindow
 example := PredicateInternals.predicateSequence_preservesTokensOnSuccess
 example := PredicateInternals.predicateSequence_cursorMonotoneOnSuccess
+example := PredicateInternals.barePredicates_startsAtCurrentTokenOnSuccess
+example := PredicateInternals.groupedPredicates_startsAtCurrentTokenOnSuccess
+example := PredicateInternals.predicateSequence_startsAtCurrentTokenOnSuccess
+example := whereClause_validFor
+example := whereClause_preservesTokenWindow
+example := whereClause_preservesTokensOnSuccess
+example := whereClause_cursorMonotoneOnSuccess
+example := @whereClause_some_startsAtCurrentTokenOnSuccess
 
 end Tests

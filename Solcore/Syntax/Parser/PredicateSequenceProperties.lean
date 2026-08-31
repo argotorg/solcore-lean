@@ -153,5 +153,44 @@ theorem predicateSequence_cursorMonotoneOnSuccess :
       barePredicates_cursorMonotoneOnSuccess input values next parsed
   · exact barePredicates_cursorMonotoneOnSuccess input values next parsed
 
+/-- A bare sequence starts at the first predicate token. -/
+theorem barePredicates_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess barePredicates (·.span) := by
+  intro input values final parsed
+  unfold barePredicates at parsed
+  cases firstResult : predicate input with
+  | invariant error => simp [firstResult] at parsed
+  | reject failure rejected => simp [firstResult] at parsed
+  | ok first next =>
+      simp only [firstResult] at parsed
+      rcases predicate_startsAtCurrentTokenOnSuccess input first next
+          firstResult with ⟨token, found, start⟩
+      exact ⟨token, found, start.trans
+        (barePredicatesTail_preservesFirstStartOnSuccess first
+          (next.remainingCount + 1) first [] next values final parsed).symm⟩
+
+/-- A grouped sequence starts at its opening parenthesis. -/
+theorem groupedPredicates_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess groupedPredicates (·.span) := by
+  unfold groupedPredicates
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (delimited_startsAtCurrentTokenOnSuccess .leftParen .rightParen false
+      predicate .typeExpr .topLevel)
+  intro values input result next parsed
+  cases elements : values.elements with
+  | nil => rw [elements] at parsed; contradiction
+  | cons head tail => rw [elements] at parsed; cases parsed; rfl
+
+/-- Sequence selection starts at its chosen form's current token. -/
+theorem predicateSequence_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess predicateSequence (·.span) := by
+  intro input values next parsed
+  unfold predicateSequence at parsed
+  split at parsed
+  · exact Parser.orElse_startsAtCurrentTokenOnSuccess
+      groupedPredicates_startsAtCurrentTokenOnSuccess
+      barePredicates_startsAtCurrentTokenOnSuccess input values next parsed
+  · exact barePredicates_startsAtCurrentTokenOnSuccess input values next parsed
+
 end PredicateInternals
 end Solcore.Syntax.Parser

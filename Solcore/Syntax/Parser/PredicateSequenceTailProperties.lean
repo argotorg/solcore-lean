@@ -221,3 +221,33 @@ theorem barePredicatesTail_cursorMonotoneOnSuccess
               exact commaMonotone
       · cases parsed
         exact Nat.le_refl _
+
+/-- Every successful bare loop keeps the first predicate's start. -/
+theorem barePredicatesTail_preservesFirstStartOnSuccess
+    (first : Predicate) : ∀ fuel last tailRev input values final,
+      barePredicatesTail first fuel last tailRev input = .ok values final →
+      values.span.startByte = first.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro last tailRev input values final parsed
+      unfold barePredicatesTail at parsed
+      split at parsed
+      · cases commaResult : symbol .comma .typeExpr input with
+        | invariant error => simp [commaResult] at parsed
+        | reject failure rejected => simp [commaResult] at parsed
+        | ok comma afterComma =>
+            simp only [commaResult] at parsed
+            split at parsed
+            · cases valueResult : predicate afterComma with
+              | invariant error => simp [valueResult] at parsed
+              | reject failure rejected => simp [valueResult] at parsed
+              | ok value next =>
+                  simp only [valueResult] at parsed
+                  exact inductionHypothesis value (value :: tailRev) next
+                    values final parsed
+            · cases parsed
+              rfl
+      · cases parsed
+        rfl
