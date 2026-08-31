@@ -1833,5 +1833,113 @@ theorem nonAssociative_validFor
                     rightReply.2.2.trans
                       (consumedReply.2.2.trans leftReply.2.2)⟩
 
+/-- A conditional layer advances whenever its first alternative advances. -/
+theorem conditional_cursor_lt_onSuccess
+    (nested alternative : Parser Expr)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    (alternativeCursorLt : ∀ {input next : State} {value : Expr},
+      alternative input = .ok value next → input.cursor < next.cursor)
+    {input final : State} {expression : Expr}
+    (parsed : conditional nested alternative input = .ok expression final) :
+    input.cursor < final.cursor := by
+  unfold conditional at parsed
+  cases alternativeResult : alternative input with
+  | invariant error => simp [alternativeResult] at parsed
+  | reject failure rejected => simp [alternativeResult] at parsed
+  | ok condition next =>
+      simp only [alternativeResult] at parsed
+      exact Nat.lt_of_lt_of_le (alternativeCursorLt alternativeResult)
+        (conditionalTail_cursorMonotoneOnSuccess nested alternative
+          nestedCursor
+          (fun _ _ _ result => Nat.le_of_lt (alternativeCursorLt result))
+          (next.remainingCount + 1) [] condition next expression final parsed)
+
+/-- Unary parsing advances whenever its postfix base advances. -/
+theorem expressionUnary_cursor_lt_onSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (postfixCursorLt : ∀ {input next : State} {value : Expr},
+      expressionPostfix nested block input = .ok value next →
+        input.cursor < next.cursor)
+    {input final : State} {expression : Expr}
+    (parsed : expressionUnary nested block input = .ok expression final) :
+    input.cursor < final.cursor := by
+  unfold expressionUnary at parsed
+  cases operatorsResult : unaryOperators (input.remainingCount + 1) [] input with
+  | invariant error => simp [operatorsResult] at parsed
+  | reject failure rejected => simp [operatorsResult] at parsed
+  | ok operators afterOperators =>
+      simp only [operatorsResult] at parsed
+      cases postfixResult : expressionPostfix nested block afterOperators with
+      | invariant error => simp [postfixResult] at parsed
+      | reject failure rejected => simp [postfixResult] at parsed
+      | ok base next =>
+          simp only [postfixResult] at parsed
+          cases parsed
+          exact Nat.lt_of_le_of_lt
+            (unaryOperators_cursorMonotoneOnSuccess
+              (input.remainingCount + 1) [] input operators afterOperators
+                operatorsResult)
+            (postfixCursorLt postfixResult)
+
+/-- A left-associative layer advances whenever its first operand advances. -/
+theorem leftAssociative_cursor_lt_onSuccess
+    (operand : Parser Expr)
+    (operandCursorLt : ∀ {input next : State} {value : Expr},
+      operand input = .ok value next → input.cursor < next.cursor)
+    (precedence : Nat) {input final : State} {expression : Expr}
+    (parsed : leftAssociative operand precedence input = .ok expression final) :
+    input.cursor < final.cursor := by
+  unfold leftAssociative at parsed
+  cases operandResult : operand input with
+  | invariant error => simp [operandResult] at parsed
+  | reject failure rejected => simp [operandResult] at parsed
+  | ok left next =>
+      simp only [operandResult] at parsed
+      exact Nat.lt_of_lt_of_le (operandCursorLt operandResult)
+        (leftAssociativeTail_cursorMonotoneOnSuccess operand
+          (fun _ _ _ result => Nat.le_of_lt (operandCursorLt result))
+          precedence (next.remainingCount + 1) left next expression final
+            parsed)
+
+/-- A non-associative layer advances whenever its first operand advances. -/
+theorem nonAssociative_cursor_lt_onSuccess
+    (operand : Parser Expr)
+    (operandCursorLt : ∀ {input next : State} {value : Expr},
+      operand input = .ok value next → input.cursor < next.cursor)
+    (precedence : Nat) {input final : State} {expression : Expr}
+    (parsed : nonAssociative operand precedence input = .ok expression final) :
+    input.cursor < final.cursor := by
+  unfold nonAssociative at parsed
+  cases leftResult : operand input with
+  | invariant error => simp [leftResult] at parsed
+  | reject failure rejected => simp [leftResult] at parsed
+  | ok left next =>
+      simp only [leftResult] at parsed
+      have leftStrict := operandCursorLt leftResult
+      cases operatorResult : binaryAtPrecedence? next precedence with
+      | none =>
+          simp only [operatorResult] at parsed
+          cases parsed
+          exact leftStrict
+      | some operator =>
+          simp only [operatorResult] at parsed
+          cases consumedResult : consumeBinary operator next with
+          | invariant error => simp [consumedResult] at parsed
+          | reject failure rejected => simp [consumedResult] at parsed
+          | ok value afterOperator =>
+              simp only [consumedResult] at parsed
+              have consumedMonotone :=
+                consumeBinary_cursorMonotoneOnSuccess operator next value
+                  afterOperator consumedResult
+              cases rightResult : operand afterOperator with
+              | invariant error => simp [rightResult] at parsed
+              | reject failure rejected => simp [rightResult] at parsed
+              | ok right afterRight =>
+                  simp only [rightResult] at parsed
+                  cases parsed
+                  exact Nat.lt_of_lt_of_le leftStrict
+                    (Nat.le_trans consumedMonotone
+                      (Nat.le_of_lt (operandCursorLt rightResult)))
+
 end ExpressionInternals
 end Solcore.Syntax.Parser

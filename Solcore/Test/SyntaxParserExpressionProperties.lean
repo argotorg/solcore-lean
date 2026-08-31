@@ -40,5 +40,9 @@ example := @ExpressionInternals.nonAssociative_preservesTokensOnSuccess
 example := @ExpressionInternals.nonAssociative_cursorMonotoneOnSuccess
 example := @ExpressionInternals.nonAssociative_startsAtCurrentTokenOnSuccess
 example := @ExpressionInternals.nonAssociative_validFor
+example := @ExpressionInternals.conditional_cursor_lt_onSuccess
+example := @ExpressionInternals.expressionUnary_cursor_lt_onSuccess
+example := @ExpressionInternals.leftAssociative_cursor_lt_onSuccess
+example := @ExpressionInternals.nonAssociative_cursor_lt_onSuccess
 
 end Tests
