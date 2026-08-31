@@ -469,6 +469,42 @@ private theorem finishAfterModulePath_validFor (start : SourceSpan)
     startSpan startBeforeAfter valueValid
   exact finished.of_file_eq pathReply.2.2
 
+private theorem finishImport_weakValidFor (start last : SourceSpan)
+    (value : ImportDeclValue) (input : State)
+    (inputValid : input.ValidFor)
+    (lastValid : last.ValidFor input.file) :
+    (ImportInternals.finish start last value input).ValidFor input
+      (fun _ _ => True) := by
+  have terminatorValid := importTerminator_validFor last input inputValid lastValid
+  unfold ImportInternals.finish
+  cases terminatorResult : ImportInternals.terminator last input with
+  | invariant error =>
+      simp only [bind, terminatorResult, Reply.ValidFor]
+  | reject failure rejected =>
+      rw [terminatorResult] at terminatorValid
+      simpa only [bind, terminatorResult, Reply.ValidFor] using
+        terminatorValid
+  | ok endSpan next =>
+      rw [terminatorResult] at terminatorValid
+      simp only [bind, terminatorResult, Reply.ValidFor]
+      exact ⟨trivial, terminatorValid.2.1, terminatorValid.2.2⟩
+
+private theorem namespaceImport_weakValidFor (start : SourceSpan) :
+    (ImportInternals.namespaceImport start).ValidFor (fun _ _ => True) := by
+  unfold ImportInternals.namespaceImport
+  apply Parser.bind_validFor (symbol_validFor .star .importDecl)
+  intro star
+  apply Parser.bind_validFor (keyword_validFor .asKw .importDecl)
+  intro asMarker
+  apply Parser.bind_validFor (identifier_validFor .importDecl)
+  intro alias
+  apply Parser.bind_validFor (contextual_validFor .from .importDecl)
+  intro fromMarker
+  apply Parser.bind_validFor_of_value (modulePath_validFor .importDecl)
+  intro path input inputValid pathValid
+  exact finishImport_weakValidFor start path.span (.namespace path alias)
+    input inputValid pathValid.1
+
 /-- Plain import payloads preserve their module path and complete cover. -/
 theorem plainImport_validFor (start : SourceSpan) (input : State)
     (inputValid : input.ValidFor)
@@ -495,6 +531,95 @@ theorem plainImport_validFor (start : SourceSpan) (input : State)
         finishAfterModulePath_validFor start input inputValid startValid
           startFound startSpan startBefore pathResult (.plain path)
           pathValidAfter
+
+/-- Namespace import payloads retain their alias, path, and complete cover. -/
+theorem namespaceImport_validFor (start : SourceSpan) (input : State)
+    (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    {startIndex : Nat} {startToken : Token}
+    (startFound : input.tokens[startIndex]? = some startToken)
+    (startSpan : startToken.span = start)
+    (startBefore : startIndex < input.cursor) :
+    (ImportInternals.namespaceImport start input).ValidFor input
+      ImportDecl.ValidFor := by
+  have weak := namespaceImport_weakValidFor start input inputValid
+  cases parsed : ImportInternals.namespaceImport start input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weak
+      exact weak
+  | ok result final =>
+      rw [parsed] at weak
+      have stages := parsed
+      unfold ImportInternals.namespaceImport at stages
+      rcases importBind_ok_components stages with
+        ⟨star, afterStar, starResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨asMarker, afterAs, asResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨alias, afterAlias, aliasResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨fromMarker, afterFrom, fromResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨path, afterPath, pathResult, finished⟩
+      have starValid := symbol_validFor .star .importDecl input inputValid
+      rw [starResult] at starValid
+      have asValid := keyword_validFor .asKw .importDecl
+        afterStar starValid.2.1
+      rw [asResult] at asValid
+      have aliasValid := identifier_validFor .importDecl
+        afterAs asValid.2.1
+      rw [aliasResult] at aliasValid
+      have fromValid := contextual_validFor .from .importDecl
+        afterAlias aliasValid.2.1
+      rw [fromResult] at fromValid
+      have pathValid := modulePath_validFor .importDecl
+        afterFrom fromValid.2.1
+      rw [pathResult] at pathValid
+      have afterFromFile : afterFrom.file = input.file :=
+        fromValid.2.2.trans (aliasValid.2.2.trans
+          (asValid.2.2.trans starValid.2.2))
+      have afterFromTokens : afterFrom.tokens = input.tokens :=
+        (contextual_preservesTokensOnSuccess .from .importDecl
+          afterAlias fromMarker afterFrom fromResult).trans
+          ((identifier_preservesTokensOnSuccess .importDecl
+            afterAs alias afterAlias aliasResult).trans
+            ((keyword_preservesTokensOnSuccess .asKw .importDecl
+              afterStar asMarker afterAs asResult).trans
+              (symbol_preservesTokensOnSuccess .star .importDecl
+                input star afterStar starResult)))
+      have startFoundAfterFrom :
+          afterFrom.tokens[startIndex]? = some startToken := by
+        rw [afterFromTokens]
+        exact startFound
+      have startBeforeAfterFrom : startIndex < afterFrom.cursor := by
+        apply Nat.lt_of_lt_of_le startBefore
+        exact Nat.le_trans
+          (symbol_cursorMonotoneOnSuccess .star .importDecl
+            input star afterStar starResult)
+          (Nat.le_trans
+            (keyword_cursorMonotoneOnSuccess .asKw .importDecl
+              afterStar asMarker afterAs asResult)
+            (Nat.le_trans
+              (identifier_cursorMonotoneOnSuccess .importDecl
+                afterAs alias afterAlias aliasResult)
+              (contextual_cursorMonotoneOnSuccess .from .importDecl
+                afterAlias fromMarker afterFrom fromResult)))
+      have startValidAfterFrom : start.ValidFor afterFrom.file := by
+        simpa [afterFromFile] using startValid
+      have pathValidAfter : ModulePath.ValidFor afterPath.file path := by
+        simpa [pathValid.2.2] using pathValid.1
+      have aliasValidAfter : alias.span.ValidFor afterPath.file := by
+        have aliasSpanValid : alias.span.ValidFor afterAs.file := by
+          simpa only [Located.ValidFor] using aliasValid.1
+        simpa [pathValid.2.2, fromValid.2.2, aliasValid.2.2] using
+          aliasSpanValid
+      have strong := finishAfterModulePath_validFor start afterFrom
+        fromValid.2.1 startValidAfterFrom startFoundAfterFrom startSpan
+        startBeforeAfterFrom pathResult (.namespace path alias)
+        ⟨pathValidAfter, aliasValidAfter⟩
+      rw [finished] at strong
+      exact strong.of_file_eq afterFromFile
 
 /-- Import terminators preserve every ordinary token window. -/
 theorem importTerminator_preservesTokenWindow (lastSpan : SourceSpan) :
