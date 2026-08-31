@@ -288,15 +288,15 @@ recovery, malformed type-alias recovery, pragma item accumulation, and generic
 comma-delimited lists. Their fuel-exhaustion paths are unreachable; the loops
 that require element progress also rule out their no-progress paths.
 
-The complete contract body is ordinary under one remaining premise: each
-valid contract-member invocation must itself avoid an internal invariant. The
-complete file loop, `sourceFile`, `parseLexed`, and public `parse` are now
-reduced further to eight explicit declaration parsers: import, export, type
-alias, module function, enum, trait, implementation, and contract. Pragma
-declarations, derive targets, derive attributes, derive recovery, attachment,
-dispatch, and outer item accumulation are discharged internally. This is a
-reduction, not a claim that the eight declaration obligations or the contract
-member premise have already been discharged.
+The complete contract body is now reduced to six explicit member parsers:
+field, contract function, constructor, fallback, type alias, and enum. The
+complete file loop, `sourceFile`, `parseLexed`, and public `parse` are reduced
+to eight explicit declaration parsers: import, export, type alias, module
+function, enum, trait, implementation, and contract. Pragma declarations,
+derive targets, derive attributes, derive recovery, attachment, dispatch, and
+outer accumulation are discharged internally. This is a reduction, not a
+claim that the six member or eight declaration obligations have all been
+discharged.
 
 The remaining formal parser work is to discharge those local obligations
 through the nested declaration, expression, pattern, statement, type, and Yul
