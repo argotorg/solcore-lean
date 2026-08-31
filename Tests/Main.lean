@@ -52,6 +52,7 @@ import Solcore.Test.SyntaxParserReservedWords
 import Solcore.Test.SyntaxParserSignatures
 import Solcore.Test.SyntaxParserStateCursorProperties
 import Solcore.Test.SyntaxParserStateProperties
+import Solcore.Test.SyntaxParserStatementControlProperties
 import Solcore.Test.SyntaxParserStatementFallback
 import Solcore.Test.SyntaxParserStatementSimpleProperties
 import Solcore.Test.SyntaxParserStatements
