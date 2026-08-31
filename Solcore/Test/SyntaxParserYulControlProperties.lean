@@ -36,6 +36,16 @@ example := @yulSwitchStatement_validFor
 example := @yulSwitchStatement_preservesTokensOnSuccess
 example := @yulSwitchStatement_cursorMonotoneOnSuccess
 example := @yulSwitchStatement_startsAtCurrentTokenOnSuccess
+example := @yulBlock_preservesTokenWindow
+example := @yulParameters_preservesTokenWindow
+example := @yulIfStatement_preservesTokenWindow
+example := @yulForStatement_preservesTokenWindow
+example := @yulReturns_preservesTokenWindow
+example := @yulFunctionStatement_preservesTokenWindow
+example := @yulCase_preservesTokenWindow
+example := @yulCases_preservesTokenWindow
+example := @optionalYulDefault_preservesTokenWindow
+example := @yulSwitchStatement_preservesTokenWindow
 
 example (nested : Parser YulStmt)
     (expressionValid : yulExpression.ValidFor YulExpr.ValidFor)

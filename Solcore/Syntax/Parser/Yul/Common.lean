@@ -226,6 +226,78 @@ theorem yulBlock_validFor
         (by rw [openingShape.2]; simp)
       exact recursive.of_file_eq openingValid.2.2
 
+private theorem closeYulBlock_preservesTokenWindow (opening : Token)
+    (bodyRev : List YulStmt) :
+    Parser.PreservesTokenWindow (closeYulBlock opening bodyRev) := by
+  intro input
+  unfold closeYulBlock
+  have closingShape :=
+    symbol_preservesTokenWindow .rightBrace .yulStatement input
+  cases closingResult : symbol .rightBrace .yulStatement input with
+  | ok closing next => rw [closingResult] at closingShape; exact closingShape
+  | reject failure rejected =>
+      rw [closingResult] at closingShape
+      exact closingShape
+  | invariant error => trivial
+
+private theorem yulBlockItems_preservesTokenWindow
+    (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokenWindow statement)
+    (opening : Token) : ∀ fuel bodyRev,
+      Parser.PreservesTokenWindow
+        (yulBlockItems statement opening fuel bodyRev) := by
+  intro fuel
+  induction fuel with
+  | zero => intro bodyRev input; trivial
+  | succ fuel inductionHypothesis =>
+      intro bodyRev input
+      unfold yulBlockItems
+      split
+      · exact closeYulBlock_preservesTokenWindow opening bodyRev input
+      · split
+        · have closingShape :=
+            symbol_preservesTokenWindow .rightBrace .yulStatement input
+          cases closingResult : symbol .rightBrace .yulStatement input with
+          | ok closing next => trivial
+          | reject failure rejected =>
+              rw [closingResult] at closingShape
+              exact closingShape
+          | invariant error => trivial
+        · have itemShape := statementShape input
+          cases itemResult : statement input with
+          | ok item next =>
+              rw [itemResult] at itemShape
+              change (if next.cursor > input.cursor then
+                yulBlockItems statement opening fuel (item :: bodyRev) next
+                else .invariant (.noProgress .yul next.currentSpan)
+                ).PreservesTokenWindow input
+              split
+              · exact (inductionHypothesis (item :: bodyRev) next).trans
+                  itemShape
+              · trivial
+          | reject failure rejected =>
+              rw [itemResult] at itemShape
+              exact itemShape
+          | invariant error => trivial
+
+/-- Yul-block parsing preserves the nested parser's ordinary token window. -/
+theorem yulBlock_preservesTokenWindow (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (yulBlock statement) := by
+  intro input
+  unfold yulBlock
+  have openingShape :=
+    symbol_preservesTokenWindow .leftBrace .yulStatement input
+  cases openingResult : symbol .leftBrace .yulStatement input with
+  | ok opening next =>
+      rw [openingResult] at openingShape
+      exact (yulBlockItems_preservesTokenWindow statement statementShape
+        opening (next.remainingCount + 1) [] next).trans openingShape
+  | reject failure rejected =>
+      rw [openingResult] at openingShape
+      exact openingShape
+  | invariant error => trivial
+
 private theorem closeYulBlock_ok_state_shape (opening : Token)
     (bodyRev : List YulStmt) {input next : State} {body : YulParsedBlock}
     (result : closeYulBlock opening bodyRev input = .ok body next) :
@@ -601,6 +673,12 @@ theorem yulParameters_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess yulParameters := by
   exact delimited_preservesTokensOnSuccess .leftParen .rightParen true
     yulName .yulStatement .yul yulName_preservesTokensOnSuccess
+
+/-- Yul parameter lists preserve every ordinary token window. -/
+theorem yulParameters_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulParameters := by
+  exact delimited_preservesTokenWindow .leftParen .rightParen true
+    yulName .yulStatement .yul yulName_preservesTokenWindow
 
 /-- Every successful Yul parameter list consumes both delimiters. -/
 theorem yulParameters_cursor_lt_onSuccess {input next : State}

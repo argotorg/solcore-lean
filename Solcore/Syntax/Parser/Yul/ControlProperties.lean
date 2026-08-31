@@ -1086,5 +1086,158 @@ theorem optionalYulDefault_cursorMonotoneOnSuccess
   · simp only [present]
     exact Parser.pure_cursorMonotoneOnSuccess none
 
+private theorem yulControl_getState_preservesTokenWindow :
+    Parser.PreservesTokenWindow getState := by
+  intro input
+  exact ⟨rfl, rfl⟩
+
+/-- Yul `if` parsing preserves every ordinary token window. -/
+theorem yulIfStatement_preservesTokenWindow (statement : Parser YulStmt)
+    (expressionShape : Parser.PreservesTokenWindow yulExpression)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (yulIfStatement statement) := by
+  unfold yulIfStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .ifKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow expressionShape
+  intro condition
+  apply Parser.bind_preservesTokenWindow
+    (yulBlock_preservesTokenWindow statement statementShape)
+  intro body
+  exact Parser.pure_preservesTokenWindow _
+
+/-- Yul `for` parsing preserves every ordinary token window. -/
+theorem yulForStatement_preservesTokenWindow (statement : Parser YulStmt)
+    (expressionShape : Parser.PreservesTokenWindow yulExpression)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (yulForStatement statement) := by
+  unfold yulForStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .forKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (yulBlock_preservesTokenWindow statement statementShape)
+  intro initializer
+  apply Parser.bind_preservesTokenWindow expressionShape
+  intro condition
+  apply Parser.bind_preservesTokenWindow
+    (yulBlock_preservesTokenWindow statement statementShape)
+  intro post
+  apply Parser.bind_preservesTokenWindow
+    (yulBlock_preservesTokenWindow statement statementShape)
+  intro body
+  exact Parser.pure_preservesTokenWindow _
+
+private theorem yulReturnClause_preservesTokenWindow :
+    Parser.PreservesTokenWindow YulControl.returnClause := by
+  unfold YulControl.returnClause
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .arrow .yulStatement)
+  intro arrow
+  apply Parser.bind_preservesTokenWindow yulNames_preservesTokenWindow
+  intro names
+  exact Parser.pure_preservesTokenWindow _
+
+/-- Optional Yul return clauses preserve every ordinary token window. -/
+theorem yulReturns_preservesTokenWindow :
+    Parser.PreservesTokenWindow YulControl.returns := by
+  unfold YulControl.returns
+  apply Parser.bind_preservesTokenWindow yulControl_getState_preservesTokenWindow
+  intro observed
+  by_cases present : isSymbol observed .arrow
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow yulReturnClause_preservesTokenWindow
+    intro clause
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
+/-- Yul function parsing preserves every ordinary token window. -/
+theorem yulFunctionStatement_preservesTokenWindow
+    (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (yulFunctionStatement statement) := by
+  unfold yulFunctionStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .functionKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow yulName_preservesTokenWindow
+  intro name
+  apply Parser.bind_preservesTokenWindow yulParameters_preservesTokenWindow
+  intro parameters
+  apply Parser.bind_preservesTokenWindow yulReturns_preservesTokenWindow
+  intro returns
+  apply Parser.bind_preservesTokenWindow
+    (yulBlock_preservesTokenWindow statement statementShape)
+  intro body
+  exact Parser.pure_preservesTokenWindow _
+
+/-- One Yul switch arm preserves every ordinary token window. -/
+theorem yulCase_preservesTokenWindow (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (YulControl.caseArm statement) := by
+  unfold YulControl.caseArm
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .caseKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow yulLiteral_preservesTokenWindow
+  intro literal
+  apply Parser.bind_preservesTokenWindow
+    (yulBlock_preservesTokenWindow statement statementShape)
+  intro body
+  exact Parser.pure_preservesTokenWindow _
+
+/-- Repeated Yul switch arms preserve every ordinary token window. -/
+theorem yulCases_preservesTokenWindow (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    ∀ fuel casesRev, Parser.PreservesTokenWindow
+      (YulControl.caseList statement fuel casesRev) := by
+  intro fuel
+  induction fuel with
+  | zero => intro casesRev input; trivial
+  | succ fuel inductionHypothesis =>
+      intro casesRev input
+      unfold YulControl.caseList
+      split
+      · have armShape := yulCase_preservesTokenWindow statement
+            statementShape input
+        cases armResult : YulControl.caseArm statement input with
+        | ok arm next =>
+            rw [armResult] at armShape
+            change (if next.cursor > input.cursor then
+              YulControl.caseList statement fuel (arm :: casesRev) next
+              else .invariant (.noProgress .yul next.currentSpan)
+              ).PreservesTokenWindow input
+            split
+            · exact (inductionHypothesis (arm :: casesRev) next).trans
+                armShape
+            · trivial
+        | reject failure rejected =>
+            rw [armResult] at armShape
+            exact armShape
+        | invariant error => trivial
+      · exact ⟨rfl, rfl⟩
+
+/-- Optional Yul default arms preserve every ordinary token window. -/
+theorem optionalYulDefault_preservesTokenWindow
+    (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (YulControl.optionalDefault statement) := by
+  unfold YulControl.optionalDefault
+  apply Parser.bind_preservesTokenWindow yulControl_getState_preservesTokenWindow
+  intro observed
+  by_cases present : isKeyword observed .defaultKw
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (keyword_preservesTokenWindow .defaultKw .yulStatement)
+    intro marker
+    apply Parser.bind_preservesTokenWindow
+      (yulBlock_preservesTokenWindow statement statementShape)
+    intro body
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
 
 end Solcore.Syntax.Parser

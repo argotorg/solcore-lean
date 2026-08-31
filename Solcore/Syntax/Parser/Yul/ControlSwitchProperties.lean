@@ -238,6 +238,40 @@ theorem yulSwitchStatement_preservesTokensOnSuccess
       intro _emitted
       exact Parser.pure_preservesTokensOnSuccess _
 
+private theorem emitDiagnostic_preservesTokenWindowForYulSwitch
+    (diagnostic : ParseDiagnostic) :
+    Parser.PreservesTokenWindow (emitDiagnostic diagnostic) := by
+  intro input
+  unfold emitDiagnostic modifyState Reply.PreservesTokenWindow
+  exact ⟨rfl, rfl⟩
+
+/-- Yul switch parsing preserves every ordinary token window. -/
+theorem yulSwitchStatement_preservesTokenWindow
+    (statement : Parser YulStmt)
+    (statementShape : Parser.PreservesTokenWindow statement) :
+    Parser.PreservesTokenWindow (yulSwitchStatement statement) := by
+  unfold yulSwitchStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .switchKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow yulExpression_preservesTokenWindow
+  intro scrutinee
+  apply Parser.bind_preservesTokenWindow
+  · intro input
+    exact yulCases_preservesTokenWindow statement statementShape
+      (input.remainingCount + 1) [] input
+  intro cases
+  apply Parser.bind_preservesTokenWindow
+    (optionalYulDefault_preservesTokenWindow statement statementShape)
+  intro defaultBody
+  cases cases with
+  | cons head tail => exact Parser.pure_preservesTokenWindow _
+  | nil =>
+      apply Parser.bind_preservesTokenWindow
+        (emitDiagnostic_preservesTokenWindowForYulSwitch _)
+      intro _emitted
+      exact Parser.pure_preservesTokenWindow _
+
 /-- Yul switch parsing never rewinds the parser cursor. -/
 theorem yulSwitchStatement_cursorMonotoneOnSuccess
     (statement : Parser YulStmt)
