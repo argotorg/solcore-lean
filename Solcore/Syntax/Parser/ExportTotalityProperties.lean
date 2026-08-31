@@ -115,7 +115,8 @@ theorem pathExport_ne_invariant (contract : ExportLeafTotalityContract)
 
 end ExportInternals
 
-theorem exportDecl_invariantFreeOnValid (contract : ExportLeafTotalityContract) :
+theorem exportDecl_invariantFreeOnValid_of_leafContract
+    (contract : ExportLeafTotalityContract) :
     Parser.InvariantFreeOnValid exportDecl := by
   unfold exportDecl
   apply Parser.bind_invariantFreeOnValid
@@ -133,17 +134,18 @@ theorem exportDecl_invariantFreeOnValid (contract : ExportLeafTotalityContract) 
     exact ExportInternals.pathExport_invariantFreeOnValid contract
       exportKeyword.span
 
-theorem exportDecl_ordinary (contract : ExportLeafTotalityContract)
+theorem exportDecl_ordinary_of_leafContract (contract : ExportLeafTotalityContract)
     (input : State) (inputValid : input.ValidFor) :
     (∃ value next, exportDecl input = .ok value next) ∨
     (∃ failure next, exportDecl input = .reject failure next) :=
-  exportDecl_invariantFreeOnValid contract input inputValid
+  exportDecl_invariantFreeOnValid_of_leafContract contract input inputValid
 
-theorem exportDecl_ne_invariant (contract : ExportLeafTotalityContract)
+theorem exportDecl_ne_invariant_of_leafContract
+    (contract : ExportLeafTotalityContract)
     (input : State) (inputValid : input.ValidFor)
     (error : ParserInvariantError) :
     exportDecl input ≠ .invariant error :=
-  (exportDecl_invariantFreeOnValid contract).ne_invariant
+  (exportDecl_invariantFreeOnValid_of_leafContract contract).ne_invariant
     input inputValid error
 
 end Solcore.Syntax.Parser
