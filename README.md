@@ -123,6 +123,8 @@ Successful results retain tokens, comments, lexical diagnostics, parse
 diagnostics, and a source-preserving AST for the complete canonical grammar.
 Ordinary malformed input is reported in those diagnostic lists; the
 exceptional branch is reserved for an internal executor invariant.
+`output.isDiagnosticFree` is the executable check that both ordinary
+diagnostic lists are empty.
 
 To generate a reproducible checked Core program, import the synthesis library:
 

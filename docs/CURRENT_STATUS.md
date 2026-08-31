@@ -184,17 +184,27 @@ Rust parser and adds focused acceptance, rejection, recovery, comment, Unicode,
 span, legacy-spelling, and deterministic source-mutation tests. A development
 comparison against the same revision also parsed all 490 `corpus/ok` sources
 without lexical or parse diagnostics. No acceptance or source-AST gap was found
-in the fixed-revision parser audit. Four malformed inputs differed only in
-diagnostic cardinality.
+in the fixed-revision parser audit. Four malformed inputs differ only because
+Lean retains an additional explicit recovery diagnostic; exact diagnostic
+kinds, byte ranges, order, and recovery ASTs are now regression-tested.
 
-Formal provenance laws prove that successful lexer and parser results
-retain their input source identity, that a parsed file has the exact full-file
-span, and that parsing preserves the lexer's exact token, comment, and lexical
-diagnostic lists. Deeper element-span, source-order, resource, and declarative
-grammar proofs remain active work. Resolution, source type checking, and
-elaboration into checked Semantic Core are separate later stages. No new
-frontend result is published through Oracle v4; that interface continues to
-mean only its frozen Surface v1 format.
+Formal provenance laws prove source identity, the exact full-file span, and
+exact retention of the lexer carriers. Successful parser preflight proves that
+tokens and comments are nonempty, source ordered, nonoverlapping, and valid at
+UTF-8 boundaries, and that every retained lexical diagnostic has a valid span.
+Those guarantees are exposed directly for successful public parser results.
+The lexer proof layer now connects exact character-prefix consumption to
+UTF-8-valid spans for comments, meta forms, strings, and identifiers. Parser
+state and primitive token consumers preserve valid spans and file ownership,
+and diagnostic filtering can only remove diagnostics and preserves span
+validity.
+
+Deep AST-span validity, validity of every parser-generated diagnostic,
+unreachability of the lexer/parser invariant branches, public resource bounds,
+and soundness against a declarative grammar remain active proof work.
+Resolution, source type checking, and elaboration into checked Semantic Core
+are separate later stages. No new frontend result is published through Oracle
+v4; that interface continues to mean only its frozen Surface v1 format.
 
 ## What is not yet claimed
 

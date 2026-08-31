@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-31
 - Scope: source syntax, lexical tokens, parsed syntax, and frontend migration
-- Implementation: Executable parser complete; formal proof boundary active
+- Implementation: Executable parser complete; invariant proofs active
 
 ## Context
 
@@ -167,6 +167,14 @@ Source name resolution, source type checking, elaboration, and end-to-end
 execution are subsequent frontend milestones. They target the already checked
 Semantic Core and Oracle v5 execution boundary rather than changing its
 meaning.
+
+The implemented proof boundary currently establishes exact source ownership,
+full-file provenance, retained carrier identity, token/comment source order,
+UTF-8-valid lexical spans, exact-prefix scanner progress, parser-state
+invariants, primitive token-consumer preservation, and diagnostic-filter span
+preservation. Deep AST spans, all parser-produced diagnostics, invariant-branch
+unreachability, and declarative grammar soundness remain intentionally separate
+follow-up proofs.
 
 ## Consequences
 

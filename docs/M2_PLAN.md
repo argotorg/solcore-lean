@@ -50,11 +50,17 @@ includes:
 
 The external fixed-revision comparison audit also accepts all 490 upstream
 `corpus/ok` sources without lexical or parse diagnostics and found no
-source-AST gap. Four malformed inputs differ only in diagnostic cardinality.
-The next syntax work is the proof boundary: element-span validity, source
-order, public resource bounds, and parser success soundness against a
-declarative grammar. Source and full-file-span provenance plus exact
-lexer-carrier retention are complete.
+source-AST gap. The four diagnostic-cardinality differences are frozen by
+exact malformed-fixture regressions and preserve the same rejection/recovery
+behavior.
+
+Source and full-file-span provenance, exact lexer-carrier retention, public
+token/comment/lexical-diagnostic span validity, and token/comment source order
+are complete. Exact-prefix scanner proofs cover comments, meta forms, strings,
+and identifiers. Parser state and primitive consumers preserve span validity
+and source ownership. The remaining proof boundary is deep AST-span validity,
+parser-generated diagnostic validity, invariant-branch unreachability, public
+resource bounds, and parser success soundness against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the

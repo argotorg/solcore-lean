@@ -24,6 +24,11 @@ grouping, recovery nodes, and source spans selected by ADR-0153. It is a fresh
 frontend rather than an extension of the old Surface AST. Surface v1 and the
 larger Multi parser remain historical compatibility references.
 
+The public parser is total for ordinary malformed source: such errors appear
+in retained lexical and parse diagnostic lists rather than the exceptional
+result branch. `ParseOutput.isDiagnosticFree` is the executable admission check
+for later frontend phases; it does not claim name resolution or well-typing.
+
 Source syntax is not semantic identity. A source span cannot stand in for a
 declaration, scope, variable, function, or module identity.
 
