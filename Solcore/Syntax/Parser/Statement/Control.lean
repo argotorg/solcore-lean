@@ -5,7 +5,9 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def forItemsTail (expression : Parser Expr) (stop : Symbol) :
+namespace ControlInternals
+
+def forItemsTail (expression : Parser Expr) (stop : Symbol) :
     Nat → List ForItem → State → Reply (List ForItem)
   | 0, _, state => .invariant (.fuelExhausted .statement state.currentSpan)
   | fuel + 1, itemsRev, state =>
@@ -29,7 +31,7 @@ private def forItemsTail (expression : Parser Expr) (stop : Symbol) :
       else
         .ok itemsRev.reverse state
 
-private def forItems (expression : Parser Expr)
+def forItems (expression : Parser Expr)
     (stop : Symbol) : Parser (List ForItem) := fun state =>
   if isSymbol state stop then
     .ok [] state
@@ -40,15 +42,17 @@ private def forItems (expression : Parser Expr)
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
 
+end ControlInternals
+
 def forStatement (statement : Parser Statement)
     (expression : Parser Expr) : Parser Statement := do
   let marker ← keyword .forKw .statement
   let opening ← symbol .leftParen .statement
-  let initializer ← forItems expression .semicolon
+  let initializer ← ControlInternals.forItems expression .semicolon
   let _ ← symbol .semicolon .statement
   let condition ← expression
   let _ ← symbol .semicolon .statement
-  let post ← forItems expression .rightParen
+  let post ← ControlInternals.forItems expression .rightParen
   let closing ← symbol .rightParen .statement
   let body ← coreBlock statement .require
   pure {

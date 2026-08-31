@@ -9,6 +9,13 @@ namespace Tests
 open Solcore.Syntax
 open Solcore.Syntax.Parser
 
+example := @ControlInternals.forItemsTail_validFor
+example := @ControlInternals.forItemsTail_preservesTokenWindow
+example := @ControlInternals.forItemsTail_cursorMonotoneOnSuccess
+example := @ControlInternals.forItems_validFor
+example := @ControlInternals.forItems_preservesTokenWindow
+example := @ControlInternals.forItems_preservesTokensOnSuccess
+example := @ControlInternals.forItems_cursorMonotoneOnSuccess
 example := @blockStatement_validFor
 example := @blockStatement_preservesTokenWindow
 example := @blockStatement_preservesTokensOnSuccess

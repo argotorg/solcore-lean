@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Statement.Control
+import Solcore.Syntax.Parser.Statement.SimpleProperties
 import Solcore.Syntax.StatementValidity
 
 /-! Contracts for canonical Core control-statement parsers. -/
@@ -23,6 +24,247 @@ private theorem controlBind_ok_components {alpha beta : Type}
       exact ⟨firstValue, afterFirst, rfl, parsed⟩
   | reject failure rejected => rw [firstResult] at parsed; contradiction
   | invariant error => rw [firstResult] at parsed; contradiction
+
+namespace ControlInternals
+
+/-- The comma loop retains every accumulated and newly parsed for item. -/
+theorem forItemsTail_validFor
+    (expression : Parser Expr) (stop : Symbol)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (itemContract : (forItem expression).ValidFor
+      (ForItem.ValidFor expressionValueValid)) :
+    ∀ fuel itemsRev input, input.ValidFor →
+      List.ValidFor (ForItem.ValidFor expressionValueValid)
+        input.file itemsRev →
+      (forItemsTail expression stop fuel itemsRev input).ValidFor input
+        (List.ValidFor (ForItem.ValidFor expressionValueValid)) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro itemsRev input inputValid itemsValid
+      unfold forItemsTail
+      by_cases commaPresent : isSymbol input .comma
+      · simp only [commaPresent, if_true]
+        cases commaResult : symbol .comma .statement input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            have reply := symbol_validFor .comma .statement input inputValid
+            rw [commaResult] at reply
+            exact reply
+        | ok comma afterComma =>
+            have commaReply := symbol_validFor .comma .statement input inputValid
+            rw [commaResult] at commaReply
+            simp only
+            by_cases stopped : isSymbol afterComma stop
+            · simp only [stopped, if_true]
+              have rejected := rejectAt_reject_validFor
+                (α := List ForItem) commaReply.2.1
+                { head := .expression, tail := [] } .statement rfl
+              exact ⟨by simpa [commaReply.2.2] using rejected.1,
+                rejected.2.1, rejected.2.2.trans commaReply.2.2⟩
+            · simp only [stopped]
+              cases itemResult : forItem expression afterComma with
+              | invariant error => trivial
+              | reject failure rejected =>
+                  have reply := itemContract afterComma commaReply.2.1
+                  rw [itemResult] at reply
+                  exact reply.of_file_eq commaReply.2.2
+              | ok item next =>
+                  have itemReply := itemContract afterComma commaReply.2.1
+                  rw [itemResult] at itemReply
+                  by_cases progress : next.cursor > afterComma.cursor
+                  · simp only [progress, if_true]
+                    have accumulated : List.ValidFor
+                        (ForItem.ValidFor expressionValueValid) next.file
+                        (item :: itemsRev) := by
+                      intro retained member
+                      rcases List.mem_cons.mp member with rfl | member
+                      · simpa [itemReply.2.2] using itemReply.1
+                      · simpa [itemReply.2.2, commaReply.2.2] using
+                          itemsValid retained member
+                    exact (inductionHypothesis (item :: itemsRev) next
+                      itemReply.2.1 accumulated).of_file_eq
+                        (itemReply.2.2.trans commaReply.2.2)
+                  · simp only [progress]
+                    trivial
+      · simp only [commaPresent]
+        exact ⟨by
+          intro retained member
+          exact itemsValid retained (by simpa using member), inputValid, rfl⟩
+
+/-- The comma loop preserves complete token windows. -/
+theorem forItemsTail_preservesTokenWindow
+    (expression : Parser Expr) (stop : Symbol)
+    (itemWindow : Parser.PreservesTokenWindow (forItem expression)) :
+    ∀ fuel itemsRev,
+      Parser.PreservesTokenWindow
+        (forItemsTail expression stop fuel itemsRev) := by
+  intro fuel
+  induction fuel with
+  | zero => intro itemsRev input; trivial
+  | succ fuel inductionHypothesis =>
+      intro itemsRev input
+      unfold forItemsTail
+      by_cases commaPresent : isSymbol input .comma
+      · simp only [commaPresent, if_true]
+        have commaWindow := symbol_preservesTokenWindow .comma .statement input
+        cases commaResult : symbol .comma .statement input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [commaResult] at commaWindow
+            exact commaWindow
+        | ok comma afterComma =>
+            rw [commaResult] at commaWindow
+            simp only
+            by_cases stopped : isSymbol afterComma stop
+            · simp only [stopped, if_true]
+              exact (rejectAt_preservesTokenWindow afterComma _ _).trans
+                commaWindow
+            · simp only [stopped]
+              have itemShape := itemWindow afterComma
+              cases itemResult : forItem expression afterComma with
+              | invariant error => trivial
+              | reject failure rejected =>
+                  rw [itemResult] at itemShape
+                  exact itemShape.trans commaWindow
+              | ok item next =>
+                  rw [itemResult] at itemShape
+                  by_cases progress : next.cursor > afterComma.cursor
+                  · simp only [progress, if_true]
+                    exact ((inductionHypothesis (item :: itemsRev) next).trans
+                      itemShape).trans commaWindow
+                  · simp only [progress]
+                    trivial
+      · simp only [commaPresent]
+        exact ⟨rfl, rfl⟩
+
+/-- Successful comma-loop parsing never rewinds its caller. -/
+theorem forItemsTail_cursorMonotoneOnSuccess
+    (expression : Parser Expr) (stop : Symbol)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    ∀ fuel itemsRev,
+      Parser.CursorMonotoneOnSuccess
+        (forItemsTail expression stop fuel itemsRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro itemsRev input items next parsed
+      unfold forItemsTail at parsed
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro itemsRev input items next parsed
+      unfold forItemsTail at parsed
+      by_cases commaPresent : isSymbol input .comma
+      · simp only [commaPresent, if_true] at parsed
+        cases commaResult : symbol .comma .statement input with
+        | invariant error => simp [commaResult] at parsed
+        | reject failure rejected => simp [commaResult] at parsed
+        | ok comma afterComma =>
+            simp only [commaResult] at parsed
+            by_cases stopped : isSymbol afterComma stop
+            · simp [stopped, rejectAt] at parsed
+            · simp only [stopped] at parsed
+              cases itemResult : forItem expression afterComma with
+              | invariant error => simp [itemResult] at parsed
+              | reject failure rejected => simp [itemResult] at parsed
+              | ok item afterItem =>
+                  simp only [itemResult] at parsed
+                  by_cases progress : afterItem.cursor > afterComma.cursor
+                  · simp only [progress, if_true] at parsed
+                    exact Nat.le_trans
+                      (symbol_cursorMonotoneOnSuccess .comma .statement input
+                        comma afterComma commaResult)
+                      (Nat.le_trans
+                        (forItem_cursorMonotoneOnSuccess expression
+                          expressionCursor afterComma item afterItem itemResult)
+                        (inductionHypothesis (item :: itemsRev) afterItem items
+                          next parsed))
+                  · simp [progress] at parsed
+      · simp only [commaPresent] at parsed
+        cases parsed
+        exact Nat.le_refl _
+
+/-- A complete for-item list retains source provenance. -/
+theorem forItems_validFor
+    (expression : Parser Expr) (stop : Symbol)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (itemContract : (forItem expression).ValidFor
+      (ForItem.ValidFor expressionValueValid)) :
+    (forItems expression stop).ValidFor
+      (List.ValidFor (ForItem.ValidFor expressionValueValid)) := by
+  intro input inputValid
+  unfold forItems
+  by_cases stopped : isSymbol input stop
+  · simp only [stopped, if_true]
+    exact ⟨by simp [List.ValidFor], inputValid, rfl⟩
+  · simp only [stopped]
+    cases itemResult : forItem expression input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        have reply := itemContract input inputValid
+        rw [itemResult] at reply
+        exact reply
+    | ok item next =>
+        have itemReply := itemContract input inputValid
+        rw [itemResult] at itemReply
+        exact (forItemsTail_validFor expression stop expressionValueValid
+          itemContract (next.remainingCount + 1) [item] next itemReply.2.1
+          (by simpa [List.ValidFor, itemReply.2.2] using itemReply.1)).of_file_eq
+            itemReply.2.2
+
+/-- Complete for-item lists preserve every ordinary token window. -/
+theorem forItems_preservesTokenWindow
+    (expression : Parser Expr) (stop : Symbol)
+    (itemWindow : Parser.PreservesTokenWindow (forItem expression)) :
+    Parser.PreservesTokenWindow (forItems expression stop) := by
+  intro input
+  unfold forItems
+  by_cases stopped : isSymbol input stop
+  · simp only [stopped, if_true]
+    exact ⟨rfl, rfl⟩
+  · simp only [stopped]
+    have itemShape := itemWindow input
+    cases itemResult : forItem expression input with
+    | invariant error => trivial
+    | reject failure rejected => rw [itemResult] at itemShape; exact itemShape
+    | ok item next =>
+        rw [itemResult] at itemShape
+        exact (forItemsTail_preservesTokenWindow expression stop itemWindow
+          (next.remainingCount + 1) [item] next).trans itemShape
+
+theorem forItems_preservesTokensOnSuccess
+    (expression : Parser Expr) (stop : Symbol)
+    (itemWindow : Parser.PreservesTokenWindow (forItem expression)) :
+    Parser.PreservesTokensOnSuccess (forItems expression stop) :=
+  (forItems_preservesTokenWindow expression stop
+    itemWindow).preservesTokensOnSuccess
+
+/-- Successful complete for-item lists never rewind their caller. -/
+theorem forItems_cursorMonotoneOnSuccess
+    (expression : Parser Expr) (stop : Symbol)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (forItems expression stop) := by
+  intro input items next parsed
+  unfold forItems at parsed
+  by_cases stopped : isSymbol input stop
+  · simp only [stopped, if_true] at parsed
+    cases parsed
+    exact Nat.le_refl _
+  · simp only [stopped] at parsed
+    cases itemResult : forItem expression input with
+    | invariant error => simp [itemResult] at parsed
+    | reject failure rejected => simp [itemResult] at parsed
+    | ok item afterItem =>
+        simp only [itemResult] at parsed
+        exact Nat.le_trans
+          (forItem_cursorMonotoneOnSuccess expression expressionCursor input
+            item afterItem itemResult)
+          (forItemsTail_cursorMonotoneOnSuccess expression stop
+            expressionCursor (afterItem.remainingCount + 1) [item]
+              afterItem items next parsed)
+
+end ControlInternals
 
 /-- A braced statement wrapper retains the block range and every body item. -/
 theorem blockStatement_validFor
