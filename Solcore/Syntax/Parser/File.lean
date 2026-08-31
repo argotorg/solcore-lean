@@ -89,55 +89,38 @@ def extendTopItemStart (prefixSpan : SourceSpan)
 
 end FileInternals
 
-private def plainTopItem : Parser TopItem := fun state =>
+namespace FileInternals
+
+def mapTopItem {alpha : Type} (parser : Parser alpha)
+    (wrap : alpha → TopItem) : Parser TopItem := fun state =>
+  match parser state with
+  | .ok value next => .ok (wrap value) next
+  | .reject failure next => .reject failure next
+  | .invariant error => .invariant error
+
+def plainTopItem : Parser TopItem := fun state =>
   if isKeyword state .importKw then
-    match importDecl state with
-    | .ok declaration next => .ok (FileInternals.wrapImport declaration) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapTopItem importDecl wrapImport state
   else if isKeyword state .exportKw then
-    match exportDecl state with
-    | .ok declaration next => .ok (FileInternals.wrapExport declaration) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapTopItem exportDecl wrapExport state
   else if isKeyword state .pragmaKw then
-    match pragmaDecl state with
-    | .ok declaration next => .ok (FileInternals.wrapPragma declaration) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapTopItem pragmaDecl wrapPragma state
   else if isKeyword state .typeKw then
-    match typeAlias state with
-    | .ok declaration next =>
-        .ok (FileInternals.wrapTypeAlias declaration) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapTopItem typeAlias wrapTypeAlias state
   else if isKeyword state .functionKw then
-    match functionDecl .module state with
-    | .ok declaration next => .ok (FileInternals.wrapFunction declaration) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapTopItem (functionDecl .module) wrapFunction state
   else if isContextual state .enum then
-    match enumDecl none state with
-    | .ok declaration next => .ok (FileInternals.wrapEnum declaration) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapTopItem (enumDecl none) wrapEnum state
   else if isContextual state .trait then
-    match traitDecl state with
-    | .ok declaration next => .ok (FileInternals.wrapTrait declaration) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapTopItem traitDecl wrapTrait state
   else if isContextual state .impl || isKeyword state .defaultKw then
-    match implDecl state with
-    | .ok declaration next => .ok (FileInternals.wrapImpl declaration) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapTopItem implDecl wrapImpl state
   else if isKeyword state .contractKw then
-    match contractDecl state with
-    | .ok declaration next => .ok (FileInternals.wrapContract declaration) next
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    mapTopItem contractDecl wrapContract state
   else
     rejectAt state { head := .topItem, tail := [] } .topItem
+
+end FileInternals
 
 namespace FileInternals
 
@@ -171,14 +154,14 @@ private def topItem : Parser TopItem := fun state =>
   if isSymbol state .hash then
     match deriveAttribute state with
     | .ok derive afterDerive =>
-        match plainTopItem afterDerive with
+        match FileInternals.plainTopItem afterDerive with
         | .ok item next => FileInternals.attachDeriveAttribute derive item next
         | .reject failure next => .reject failure next
         | .invariant error => .invariant error
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else
-    plainTopItem state
+    FileInternals.plainTopItem state
 
 namespace FileInternals
 
@@ -215,14 +198,19 @@ def recoverTopItem (state : State) : Reply TopItem :=
 
 end FileInternals
 
-private def parseItems :
+namespace FileInternals
+
+/-- Proof boundary for the complete derive-aware item parser. -/
+def parseItemsItem : Parser TopItem := topItem
+
+def parseItems :
     Nat → List TopItem → State → Reply (List TopItem)
   | 0, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, itemsRev, state =>
       if state.atEnd then
         .ok itemsRev.reverse state
       else
-        match topItem state with
+        match parseItemsItem state with
         | .ok item next =>
             if next.cursor > state.cursor then
               parseItems fuel (item :: itemsRev) next
@@ -246,9 +234,11 @@ private def parseItems :
               | .invariant error => .invariant error
         | .invariant error => .invariant error
 
+end FileInternals
+
 /-- Parse a complete token window into a source-owned syntax file. -/
 def sourceFile (comments : List Comment) : Parser ParsedFile := fun state =>
-  match parseItems (state.remainingCount + 1) [] state with
+  match FileInternals.parseItems (state.remainingCount + 1) [] state with
   | .ok items next => .ok {
       source := state.file.id
       span := SourceSpan.fullFile state.file
