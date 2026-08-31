@@ -24,7 +24,8 @@ private def yulLetStatement : Parser YulStmt := do
     value := .letDecl names.names initializer
   }
 
-private def yulAssignment : Parser YulStmt := do
+/-- Parse a nonempty Yul assignment. -/
+def yulAssignment : Parser YulStmt := do
   let names ← yulNames
   let _ ← symbol .colonEqual .yulStatement
   let value ← yulExpression
@@ -33,7 +34,8 @@ private def yulAssignment : Parser YulStmt := do
     value := .assign names.names value
   }
 
-private def yulExpressionStatement : Parser YulStmt := do
+/-- Lift a Yul expression into statement position. -/
+def yulExpressionStatement : Parser YulStmt := do
   let expression ← yulExpression
   pure { span := expression.span, value := .expression expression }
 
@@ -49,7 +51,8 @@ private def yulReturnBuiltin : Parser YulStmt := do
   }
   pure { span, value := .expression expression }
 
-private def yulControlToken (value : HardKeyword)
+/-- Parse one keyword-only Yul control statement. -/
+def yulControlToken (value : HardKeyword)
     (result : YulStmtValue) : Parser YulStmt := do
   let marker ← keyword value .yulStatement
   pure { span := marker.span, value := result }

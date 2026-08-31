@@ -60,6 +60,7 @@ import Solcore.Test.SyntaxParserYulCommonProperties
 import Solcore.Test.SyntaxParserYulControlProperties
 import Solcore.Test.SyntaxParserYulExpressionProperties
 import Solcore.Test.SyntaxParserYulLeafProperties
+import Solcore.Test.SyntaxParserYulStatementProperties
 import Solcore.Test.SyntaxPatternValidity
 import Solcore.Test.SyntaxProvenanceProperties
 import Solcore.Test.SyntaxPreflightProperties
