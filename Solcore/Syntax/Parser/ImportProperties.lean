@@ -302,6 +302,23 @@ theorem optionalHiding_cursorMonotoneOnSuccess :
     exact Parser.pure_cursorMonotoneOnSuccess _
   · exact Parser.pure_cursorMonotoneOnSuccess none
 
+private theorem optionalHiding_some_components {input next : State}
+    {clause : HidingClause}
+    (parsed : ImportInternals.optionalHiding input = .ok (some clause) next) :
+    ImportInternals.hidingClause input = .ok clause next := by
+  unfold ImportInternals.optionalHiding at parsed
+  rcases importBind_ok_components parsed with
+    ⟨observed, afterObserved, observedResult, rest⟩
+  unfold getState at observedResult
+  cases observedResult
+  split at rest
+  · rcases importBind_ok_components rest with
+      ⟨parsedClause, afterClause, clauseResult, finished⟩
+    cases finished
+    exact clauseResult
+  · change Reply.ok none input = .ok (some clause) next at rest
+    cases rest
+
 /-- Import terminators retain a semicolon or the validated recovery span. -/
 theorem importTerminator_validFor (lastSpan : SourceSpan)
     (input : State) (inputValid : input.ValidFor)
@@ -489,6 +506,137 @@ private theorem finishImport_weakValidFor (start last : SourceSpan)
       simp only [bind, terminatorResult, Reply.ValidFor]
       exact ⟨trivial, terminatorValid.2.1, terminatorValid.2.2⟩
 
+private theorem optionalHidingFinish_weakValidFor (start : SourceSpan)
+    (path : ModulePath) (makeValue : Option HidingClause → ImportDeclValue)
+    (input : State) (inputValid : input.ValidFor)
+    (pathValid : ModulePath.ValidFor input.file path) :
+    ((ImportInternals.optionalHiding >>= fun hidden =>
+        ImportInternals.finish start
+          (match hidden with
+          | some clause => clause.span
+          | none => path.span)
+          (makeValue hidden)) input).ValidFor input (fun _ _ => True) := by
+  have hiddenReply := optionalHiding_validFor input inputValid
+  cases hiddenResult : ImportInternals.optionalHiding input with
+  | invariant error =>
+      simp only [bind, hiddenResult, Reply.ValidFor]
+  | reject failure rejected =>
+      rw [hiddenResult] at hiddenReply
+      simpa only [bind, hiddenResult, Reply.ValidFor] using hiddenReply
+  | ok hidden afterHidden =>
+      rw [hiddenResult] at hiddenReply
+      have pathValidAfter : ModulePath.ValidFor afterHidden.file path := by
+        simpa [hiddenReply.2.2] using pathValid
+      cases hidden with
+      | none =>
+          have finished := finishImport_weakValidFor start path.span
+            (makeValue none) afterHidden hiddenReply.2.1 pathValidAfter.1
+          simpa only [bind, hiddenResult] using
+            finished.of_file_eq hiddenReply.2.2
+      | some clause =>
+          have clauseValid : HidingClause.ValidFor afterHidden.file clause := by
+            have validAtInput : HidingClause.ValidFor input.file clause := by
+              simpa only [Option.ValidFor] using hiddenReply.1
+            simpa [hiddenReply.2.2] using validAtInput
+          have finished := finishImport_weakValidFor start clause.span
+            (makeValue (some clause)) afterHidden hiddenReply.2.1
+            clauseValid.1
+          simpa only [bind, hiddenResult] using
+            finished.of_file_eq hiddenReply.2.2
+
+private theorem finishWildcardAfterModulePath_validFor (start : SourceSpan)
+    (input : State) (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    {startIndex : Nat} {startToken : Token}
+    (startFound : input.tokens[startIndex]? = some startToken)
+    (startSpan : startToken.span = start)
+    (startBefore : startIndex < input.cursor)
+    {path : ModulePath} {afterPath afterHidden : State}
+    {hidden : Option HidingClause}
+    (pathResult : modulePath .importDecl input = .ok path afterPath)
+    (hiddenResult : ImportInternals.optionalHiding afterPath =
+      .ok hidden afterHidden) :
+    (ImportInternals.finish start
+        (match hidden with
+        | some clause => clause.span
+        | none => path.span)
+        (.wildcard path hidden) afterHidden).ValidFor input
+      ImportDecl.ValidFor := by
+  have pathReply := modulePath_validFor .importDecl input inputValid
+  rw [pathResult] at pathReply
+  have hiddenReply := optionalHiding_validFor afterPath pathReply.2.1
+  rw [hiddenResult] at hiddenReply
+  have afterHiddenFile : afterHidden.file = input.file :=
+    hiddenReply.2.2.trans pathReply.2.2
+  have startValidAfter : start.ValidFor afterHidden.file := by
+    simpa [afterHiddenFile] using startValid
+  have pathValidAfter : ModulePath.ValidFor afterHidden.file path := by
+    simpa [afterHiddenFile] using pathReply.1
+  have pathTokens := modulePath_preservesTokensOnSuccess .importDecl
+    input path afterPath pathResult
+  have hiddenTokens := optionalHiding_preservesTokensOnSuccess
+    afterPath hidden afterHidden hiddenResult
+  have startFoundAfterPath :
+      afterPath.tokens[startIndex]? = some startToken := by
+    rw [pathTokens]
+    exact startFound
+  have startFoundAfter :
+      afterHidden.tokens[startIndex]? = some startToken := by
+    rw [hiddenTokens]
+    exact startFoundAfterPath
+  have startBeforeAfterPath : startIndex < afterPath.cursor :=
+    Nat.lt_of_lt_of_le startBefore
+      (modulePath_cursorMonotoneOnSuccess .importDecl
+        input path afterPath pathResult)
+  have startBeforeAfter : startIndex < afterHidden.cursor :=
+    Nat.lt_of_lt_of_le startBeforeAfterPath
+      (optionalHiding_cursorMonotoneOnSuccess
+        afterPath hidden afterHidden hiddenResult)
+  rcases modulePath_startsAtCurrentTokenOnSuccess .importDecl
+      input path afterPath pathResult with ⟨firstToken, firstFound, firstStart⟩
+  have startBeforeFirst :=
+    inputValid.token_end_le_token_start_of_getElem?_lt startFound
+      (State.getElem?_eq_some_of_peek?_eq_some firstFound) startBefore
+  have orderedPath : start.startByte ≤ path.span.endByte :=
+    Nat.le_trans startValid.2.1
+      (Nat.le_trans (by simpa [startSpan] using startBeforeFirst)
+        (by rw [firstStart]; exact pathReply.1.1.2.1))
+  cases hidden with
+  | none =>
+      have finished := finishImport_validFor start path.span
+        (.wildcard path none) afterHidden hiddenReply.2.1 startValidAfter
+        pathValidAfter.1 orderedPath startFoundAfter startSpan
+        startBeforeAfter ⟨pathValidAfter, by simp⟩
+      exact finished.of_file_eq afterHiddenFile
+  | some clause =>
+      have clauseResult := optionalHiding_some_components hiddenResult
+      rcases hidingClause_startsAtCurrentTokenOnSuccess afterPath clause
+          afterHidden clauseResult with ⟨marker, markerFound, clauseStart⟩
+      have markerAt := State.getElem?_eq_some_of_peek?_eq_some markerFound
+      have startBeforeClause :=
+        pathReply.2.1.token_end_le_token_start_of_getElem?_lt
+          startFoundAfterPath markerAt startBeforeAfterPath
+      have clauseValidAtPath : HidingClause.ValidFor afterPath.file clause := by
+        simpa only [Option.ValidFor] using hiddenReply.1
+      have clauseValidAfter : HidingClause.ValidFor afterHidden.file clause := by
+        simpa [hiddenReply.2.2] using clauseValidAtPath
+      have startValidAtPath : start.ValidFor afterPath.file := by
+        simpa [pathReply.2.2] using startValid
+      have orderedClause : start.startByte ≤ clause.span.endByte :=
+        Nat.le_trans startValidAtPath.2.1
+          (Nat.le_trans (by simpa [startSpan] using startBeforeClause)
+            (by rw [clauseStart]; exact clauseValidAtPath.1.2.1))
+      have finished := finishImport_validFor start clause.span
+        (.wildcard path (some clause)) afterHidden hiddenReply.2.1
+        startValidAfter clauseValidAfter.1 orderedClause startFoundAfter
+        startSpan startBeforeAfter ⟨pathValidAfter, by
+          intro retained member
+          have retainedEq : retained = clause := by
+            have clauseEq : clause = retained := by simpa using member
+            exact clauseEq.symm
+          simpa [retainedEq] using clauseValidAfter⟩
+      exact finished.of_file_eq afterHiddenFile
+
 private theorem namespaceImport_weakValidFor (start : SourceSpan) :
     (ImportInternals.namespaceImport start).ValidFor (fun _ _ => True) := by
   unfold ImportInternals.namespaceImport
@@ -504,6 +652,18 @@ private theorem namespaceImport_weakValidFor (start : SourceSpan) :
   intro path input inputValid pathValid
   exact finishImport_weakValidFor start path.span (.namespace path alias)
     input inputValid pathValid.1
+
+private theorem wildcardImport_weakValidFor (start : SourceSpan) :
+    (ImportInternals.wildcardImport start).ValidFor (fun _ _ => True) := by
+  unfold ImportInternals.wildcardImport
+  apply Parser.bind_validFor (symbol_validFor .star .importDecl)
+  intro star
+  apply Parser.bind_validFor (contextual_validFor .from .importDecl)
+  intro fromMarker
+  apply Parser.bind_validFor_of_value (modulePath_validFor .importDecl)
+  intro path input inputValid pathValid
+  exact optionalHidingFinish_weakValidFor start path
+    (fun hidden => .wildcard path hidden) input inputValid pathValid
 
 /-- Plain import payloads preserve their module path and complete cover. -/
 theorem plainImport_validFor (start : SourceSpan) (input : State)
@@ -620,6 +780,80 @@ theorem namespaceImport_validFor (start : SourceSpan) (input : State)
         ⟨pathValidAfter, aliasValidAfter⟩
       rw [finished] at strong
       exact strong.of_file_eq afterFromFile
+
+/-- Wildcard imports retain their path, optional hiding clause, and cover. -/
+theorem wildcardImport_validFor (start : SourceSpan) (input : State)
+    (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    {startIndex : Nat} {startToken : Token}
+    (startFound : input.tokens[startIndex]? = some startToken)
+    (startSpan : startToken.span = start)
+    (startBefore : startIndex < input.cursor) :
+    (ImportInternals.wildcardImport start input).ValidFor input
+      ImportDecl.ValidFor := by
+  have weak := wildcardImport_weakValidFor start input inputValid
+  cases parsed : ImportInternals.wildcardImport start input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weak
+      exact weak
+  | ok result final =>
+      rw [parsed] at weak
+      have stages := parsed
+      unfold ImportInternals.wildcardImport at stages
+      rcases importBind_ok_components stages with
+        ⟨star, afterStar, starResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨fromMarker, afterFrom, fromResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨path, afterPath, pathResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨hidden, afterHidden, hiddenResult, finished⟩
+      have starValid := symbol_validFor .star .importDecl input inputValid
+      rw [starResult] at starValid
+      have fromValid := contextual_validFor .from .importDecl
+        afterStar starValid.2.1
+      rw [fromResult] at fromValid
+      have afterFromFile : afterFrom.file = input.file :=
+        fromValid.2.2.trans starValid.2.2
+      have afterFromTokens : afterFrom.tokens = input.tokens :=
+        (contextual_preservesTokensOnSuccess .from .importDecl
+          afterStar fromMarker afterFrom fromResult).trans
+          (symbol_preservesTokensOnSuccess .star .importDecl
+            input star afterStar starResult)
+      have startFoundAfterFrom :
+          afterFrom.tokens[startIndex]? = some startToken := by
+        rw [afterFromTokens]
+        exact startFound
+      have startBeforeAfterFrom : startIndex < afterFrom.cursor := by
+        apply Nat.lt_of_lt_of_le startBefore
+        exact Nat.le_trans
+          (symbol_cursorMonotoneOnSuccess .star .importDecl
+            input star afterStar starResult)
+          (contextual_cursorMonotoneOnSuccess .from .importDecl
+            afterStar fromMarker afterFrom fromResult)
+      have startValidAfterFrom : start.ValidFor afterFrom.file := by
+        simpa [afterFromFile] using startValid
+      cases hidden with
+      | none =>
+          have strong := finishWildcardAfterModulePath_validFor start
+            afterFrom fromValid.2.1 startValidAfterFrom startFoundAfterFrom
+            startSpan startBeforeAfterFrom pathResult hiddenResult
+          have finishedNone : ImportInternals.finish start path.span
+              (.wildcard path none) afterHidden = .ok result final := by
+            simpa using finished
+          rw [finishedNone] at strong
+          exact strong.of_file_eq afterFromFile
+      | some clause =>
+          have strong := finishWildcardAfterModulePath_validFor start
+            afterFrom fromValid.2.1 startValidAfterFrom startFoundAfterFrom
+            startSpan startBeforeAfterFrom pathResult hiddenResult
+          have finishedSome : ImportInternals.finish start clause.span
+              (.wildcard path (some clause)) afterHidden =
+                .ok result final := by
+            simpa using finished
+          rw [finishedSome] at strong
+          exact strong.of_file_eq afterFromFile
 
 /-- Import terminators preserve every ordinary token window. -/
 theorem importTerminator_preservesTokenWindow (lastSpan : SourceSpan) :
