@@ -26,6 +26,7 @@ inductive TypeExprValue where
       (argumentsSpan : SourceSpan)
       (inner : Located TypeExprValue)
   | tuple (elements : List (Located TypeExprValue))
+  | error
   deriving Repr, BEq
 
 /-- A complete type expression paired with its outer source range. -/
@@ -42,13 +43,16 @@ structure Predicate where
 /-- Nonempty generic parameter list written between angle brackets. -/
 abbrev GenericParameters := NonemptyDelimitedList Identifier
 
-/-- A required named-function parameter with an explicit type. -/
-structure FunctionParameter where
-  span : SourceSpan
-  comptime : Option SourceSpan
-  name : Identifier
-  type : TypeExpr
+/-- A named-function parameter, including parser recovery placeholders. -/
+inductive FunctionParameterValue where
+  | typed
+      (comptime : Option SourceSpan)
+      (name : Identifier)
+      (type : TypeExpr)
+  | error
   deriving Repr, BEq
+
+abbrev FunctionParameter := Located FunctionParameterValue
 
 /-- A lambda parameter, preserving whether its type was inferred. -/
 inductive LambdaParameterValue where
@@ -57,6 +61,7 @@ inductive LambdaParameterValue where
       (comptime : Option SourceSpan)
       (name : Identifier)
       (type : TypeExpr)
+  | error
   deriving Repr, BEq
 
 abbrev LambdaParameter := Located LambdaParameterValue
