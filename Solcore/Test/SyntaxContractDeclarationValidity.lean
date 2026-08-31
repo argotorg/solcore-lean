@@ -16,6 +16,15 @@ example := @FallbackDecl.ValidFor
 example := @ContractMember.ValidFor
 example := @ContractDecl.ValidFor
 
+example := @namedParameter_preservesTokenWindow
+example := @namedParameter_preservesTokensOnSuccess
+example := @ContractEntryInternals.entryParameters_validFor_of_namedParameter
+example := @ContractEntryInternals.entryParameters_preservesTokenWindow
+example := @ContractEntryInternals.entryParameters_preservesTokensOnSuccess
+example :=
+  @ContractEntryInternals.entryParameters_cursorMonotoneOnSuccess
+example :=
+  @ContractEntryInternals.entryParameters_startsAtCurrentTokenOnSuccess
 example := @ContractEntryInternals.optionalModifier_validFor
 example := @ContractEntryInternals.optionalModifier_preservesTokenWindow
 example := @ContractEntryInternals.optionalModifier_preservesTokensOnSuccess

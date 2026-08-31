@@ -1,5 +1,7 @@
 import Solcore.Syntax.Parser.ContractEntry
+import Solcore.Syntax.Parser.ParameterProperties
 import Solcore.Syntax.CollectionValidity
+import Solcore.Syntax.ParameterValidity
 
 /-! Contracts for modifiers shared by constructors and fallback entries. -/
 
@@ -7,6 +9,41 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 namespace ContractEntryInternals
+
+/-- Element provenance lifts directly to the complete parameter list. -/
+theorem entryParameters_validFor_of_namedParameter
+    (elementContract : namedParameter.ValidFor FunctionParameter.ValidFor) :
+    entryParameters.ValidFor
+      (DelimitedList.ValidFor FunctionParameter.ValidFor) := by
+  unfold entryParameters
+  exact delimited_validFor FunctionParameter.ValidFor .leftParen .rightParen
+    true namedParameter .parameter .topLevel elementContract
+      namedParameter_preservesTokensOnSuccess
+
+/-- Contract-entry parameter lists preserve every ordinary token window. -/
+theorem entryParameters_preservesTokenWindow :
+    Parser.PreservesTokenWindow entryParameters := by
+  unfold entryParameters
+  exact delimited_preservesTokenWindow .leftParen .rightParen true
+    namedParameter .parameter .topLevel namedParameter_preservesTokenWindow
+
+theorem entryParameters_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess entryParameters :=
+  entryParameters_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- A complete parameter list never rewinds its input cursor. -/
+theorem entryParameters_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess entryParameters := by
+  unfold entryParameters
+  exact delimited_cursorMonotoneOnSuccess .leftParen .rightParen true
+    namedParameter .parameter .topLevel
+
+/-- A complete parameter list starts at its opening parenthesis. -/
+theorem entryParameters_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess entryParameters (·.span) := by
+  unfold entryParameters
+  exact delimited_startsAtCurrentTokenOnSuccess .leftParen .rightParen true
+    namedParameter .parameter .topLevel
 
 private theorem entryBind_ok_components {α β : Type} {first : Parser α}
     {next : α → Parser β} {input final : State} {value : β}

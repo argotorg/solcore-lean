@@ -4,7 +4,9 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def finishTypedParameter (start : SourceSpan)
+namespace FunctionParameterInternals
+
+def finishTypedParameter (start : SourceSpan)
     (comptimeMarker : Option SourceSpan) (name : Identifier)
     (type : TypeExpr) : Parser FunctionParameter := do
   match type.value with
@@ -19,7 +21,7 @@ private def finishTypedParameter (start : SourceSpan)
     value := .typed comptimeMarker name type
   }
 
-private def errorParameter (span : SourceSpan)
+def errorParameter (span : SourceSpan)
     (constraint : ParseConstraint) : Parser FunctionParameter := do
   let _ ← emitDiagnostic {
     span
@@ -27,7 +29,7 @@ private def errorParameter (span : SourceSpan)
   }
   pure { span, value := .error }
 
-private def ordinaryNamedParameter : Parser FunctionParameter := do
+def ordinaryNamedParameter : Parser FunctionParameter := do
   let name ← identifier .parameter
   if name.value == ContextualKeyword.comptime.spelling then
     let _ ← emitDiagnostic {
@@ -44,7 +46,7 @@ private def ordinaryNamedParameter : Parser FunctionParameter := do
   else
     errorParameter name.span .namedParameterRequiresType
 
-private def comptimeNamedParameter : Parser FunctionParameter := do
+def comptimeNamedParameter : Parser FunctionParameter := do
   let marker ← contextual .comptime .parameter
   let name ← identifier .parameter
   let state ← getState
@@ -56,7 +58,7 @@ private def comptimeNamedParameter : Parser FunctionParameter := do
     errorParameter (SourceSpan.cover marker.span name.span)
       .namedParameterRequiresType
 
-private def namedParameterCore : Parser FunctionParameter := fun state =>
+def namedParameterCore : Parser FunctionParameter := fun state =>
   if isContextual state .comptime &&
       match state.peekOffsetKind? 1 with
       | some (.identifier _) => true
@@ -65,7 +67,7 @@ private def namedParameterCore : Parser FunctionParameter := fun state =>
   else
     ordinaryNamedParameter state
 
-private def finishRecoveredParameter (first last : SourceSpan)
+def finishRecoveredParameter (first last : SourceSpan)
     (state : State) : Reply FunctionParameter :=
   let span := SourceSpan.cover first last
   .ok { span, value := .error } (state.emit {
@@ -73,7 +75,7 @@ private def finishRecoveredParameter (first last : SourceSpan)
     kind := .recovered .functionParameter
   })
 
-private def recoverParameterAux (first last : SourceSpan) :
+def recoverParameterAux (first last : SourceSpan) :
     Nat → State → Reply FunctionParameter
   | 0, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, state =>
@@ -86,16 +88,18 @@ private def recoverParameterAux (first last : SourceSpan) :
             recoverParameterAux first token.span fuel next
         | none => finishRecoveredParameter first last state
 
-private def recoverParameter (state : State) : Reply FunctionParameter :=
+def recoverParameter (state : State) : Reply FunctionParameter :=
   match state.advance? with
   | some (token, next) =>
       recoverParameterAux token.span token.span
         (next.remainingCount + 1) next
   | none => rejectAt state { head := .identifier, tail := [] } .parameter
 
+end FunctionParameterInternals
+
 /-- Named function-like parameter with comma/right-paren recovery. -/
 def namedParameter : Parser FunctionParameter := fun state =>
-  match namedParameterCore state with
+  match FunctionParameterInternals.namedParameterCore state with
   | .ok value next => .ok value next
   | .reject failure failedState =>
       let rewound := { failedState with cursor := state.cursor }
@@ -103,7 +107,8 @@ def namedParameter : Parser FunctionParameter := fun state =>
           isSymbol rewound .rightParen then
         .reject failure rewound
       else
-        recoverParameter (rewound.emit failure.toDiagnostic)
+        FunctionParameterInternals.recoverParameter
+          (rewound.emit failure.toDiagnostic)
   | .invariant error => .invariant error
 
 private def finishLambdaTyped (start : SourceSpan)
@@ -164,7 +169,7 @@ private def lambdaParameterCore : Parser LambdaParameter := fun state =>
     ordinaryLambdaParameter state
 
 private def recoverLambdaParameter (state : State) : Reply LambdaParameter :=
-  match recoverParameter state with
+  match FunctionParameterInternals.recoverParameter state with
   | .ok recovered next => .ok {
       span := recovered.span
       value := .error
