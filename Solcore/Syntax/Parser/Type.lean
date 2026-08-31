@@ -813,7 +813,11 @@ theorem parseTupleType_startsAtCurrentTokenOnSuccess
     cases parsed
     rfl
 
-private def parseFunctionReturns (nested : Parser TypeExpr) : Parser (Option (DelimitedList TypeExpr)) := do
+namespace TypeFunctionInternals
+
+/-- Parse the optional return list of a function type. -/
+def parseFunctionReturns (nested : Parser TypeExpr) :
+    Parser (Option (DelimitedList TypeExpr)) := do
   let state ← getState
   if isContextual state .returns then
     let _ ← contextual .returns .typeExpr
@@ -821,6 +825,10 @@ private def parseFunctionReturns (nested : Parser TypeExpr) : Parser (Option (De
     pure (some values)
   else
     pure none
+
+end TypeFunctionInternals
+
+open TypeFunctionInternals
 
 private theorem getState_preservesTokenWindowForType :
     Parser.PreservesTokenWindow getState := by
