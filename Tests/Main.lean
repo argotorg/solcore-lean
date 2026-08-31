@@ -35,6 +35,7 @@ import Solcore.Test.SyntaxParserYulChoiceRecovery
 import Solcore.Test.SyntaxProvenanceProperties
 import Solcore.Test.SyntaxPreflightProperties
 import Solcore.Test.SyntaxPublicBoundary
+import Solcore.Test.SyntaxSourceSpanProperties
 import Solcore.Surface.Multi.Grammar
 import Solcore.Surface.Multi.Lexer
 import Solcore.Surface.Multi.Token

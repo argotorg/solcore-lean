@@ -130,6 +130,44 @@ def cover (first last : SourceSpan) : SourceSpan := {
   endByte := last.endByte
 }
 
+/-- Covering two valid endpoints yields a valid span when they are ordered. -/
+theorem cover_validFor {file : SourceFile} {first last : SourceSpan}
+    (firstValid : first.ValidFor file) (lastValid : last.ValidFor file)
+    (ordered : first.startByte ≤ last.endByte) :
+    (cover first last).ValidFor file := by
+  rcases firstValid with
+    ⟨firstOwned, _firstOrdered, _firstBounded,
+      firstStartBoundary, _firstEndBoundary⟩
+  rcases lastValid with
+    ⟨_lastOwned, _lastOrdered, lastBounded,
+      _lastStartBoundary, lastEndBoundary⟩
+  exact ⟨firstOwned, ordered, lastBounded,
+    firstStartBoundary, lastEndBoundary⟩
+
+/-- An ordered cover contains its first endpoint span. -/
+theorem cover_contains_first {file : SourceFile} {first last : SourceSpan}
+    (firstValid : first.ValidFor file)
+    (endOrdered : first.endByte ≤ last.endByte) :
+    (cover first last).Contains first := by
+  rcases firstValid with
+    ⟨_firstOwned, firstOrdered, _firstBounded,
+      _firstStartBoundary, _firstEndBoundary⟩
+  exact ⟨rfl, Nat.le_refl _, firstOrdered, endOrdered⟩
+
+/-- An ordered cover contains its last endpoint span. -/
+theorem cover_contains_last {file : SourceFile} {first last : SourceSpan}
+    (firstValid : first.ValidFor file) (lastValid : last.ValidFor file)
+    (startOrdered : first.startByte ≤ last.startByte) :
+    (cover first last).Contains last := by
+  rcases firstValid with
+    ⟨firstOwned, _firstOrdered, _firstBounded,
+      _firstStartBoundary, _firstEndBoundary⟩
+  rcases lastValid with
+    ⟨lastOwned, lastOrdered, _lastBounded,
+      _lastStartBoundary, _lastEndBoundary⟩
+  exact ⟨firstOwned.trans lastOwned.symm, startOrdered,
+    lastOrdered, Nat.le_refl _⟩
+
 end SourceSpan
 
 /-- A syntax value paired with the exact source range that produced it. -/
