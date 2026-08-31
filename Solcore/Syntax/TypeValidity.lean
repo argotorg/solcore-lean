@@ -84,6 +84,11 @@ inductive ValidFor (file : SourceFile) : TypeExpr → Prop where
   | error {span : SourceSpan} (spanValid : span.ValidFor file) :
       ValidFor file { span, value := .error }
 
+/-- The outer range retained by every valid type expression is source-valid. -/
+theorem ValidFor.span_valid {file : SourceFile} {value : TypeExpr}
+    (valid : ValidFor file value) : value.span.ValidFor file := by
+  cases valid <;> assumption
+
 end TypeExpr
 
 end Solcore.Syntax

@@ -68,13 +68,147 @@ private def parseComptimeType (nested : Parser TypeExpr) : Parser TypeExpr := do
       (SourceSpan.cover opening.span closing.span) inner
   }
 
-private def parseProxyType (nested : Parser TypeExpr) : Parser TypeExpr := do
-  let marker ← symbol .at .typeExpr
-  let inner ← nested
-  pure {
-    span := SourceSpan.cover marker.span inner.span
-    value := .proxy marker.span inner
-  }
+/-- Parse a proxy type whose outer range begins at its `@` marker. -/
+def parseProxyType (nested : Parser TypeExpr) : Parser TypeExpr := fun input =>
+  match symbol .at .typeExpr input with
+  | .ok marker afterMarker =>
+      match nested afterMarker with
+      | .ok inner next => .ok {
+          span := SourceSpan.cover marker.span inner.span
+          value := .proxy marker.span inner
+        } next
+      | .reject failure next => .reject failure next
+      | .invariant error => .invariant error
+  | .reject failure next => .reject failure next
+  | .invariant error => .invariant error
+
+/-- Proxy parsing preserves its marker, inner type, and covering provenance. -/
+theorem parseProxyType_validFor (nested : Parser TypeExpr)
+    (nestedValid : nested.ValidFor TypeExpr.ValidFor)
+    (nestedStarts : Parser.StartsAtCurrentTokenOnSuccess nested (·.span)) :
+    (parseProxyType nested).ValidFor TypeExpr.ValidFor := by
+  intro input inputValid
+  unfold parseProxyType
+  cases markerResult : symbol .at .typeExpr input with
+  | invariant error => simp only [Reply.ValidFor]
+  | reject failure rejected =>
+      have markerValid := symbol_validFor .at .typeExpr input inputValid
+      rw [markerResult] at markerValid
+      simpa only [Reply.ValidFor] using markerValid
+  | ok marker afterMarker =>
+      have markerValid := symbol_validFor .at .typeExpr input inputValid
+      rw [markerResult] at markerValid
+      cases innerResult : nested afterMarker with
+      | invariant error =>
+          simp only [innerResult, Reply.ValidFor]
+      | reject failure rejected =>
+          have innerValid := nestedValid afterMarker markerValid.2.1
+          rw [innerResult] at innerValid
+          simpa only [innerResult, Reply.ValidFor] using
+            innerValid.of_file_eq markerValid.2.2
+      | ok inner next =>
+          have innerValid := nestedValid afterMarker markerValid.2.1
+          rw [innerResult] at innerValid
+          rcases nestedStarts afterMarker inner next innerResult with
+            ⟨innerToken, innerFound, innerStart⟩
+          have markerShape :=
+            symbol_ok_state_shape .at .typeExpr markerResult
+          have advanced : input.advance? = some (marker, afterMarker) := by
+            unfold State.advance?
+            rw [markerShape.1, markerShape.2]
+            rfl
+          have markerBeforeInnerToken :=
+            inputValid.consumed_end_le_peek_start_after_advance
+              advanced innerFound
+          have markerBeforeInner :
+              marker.span.endByte ≤ inner.span.startByte := by
+            rw [← innerStart]
+            exact markerBeforeInnerToken
+          have markerSpanValid : marker.span.ValidFor input.file := by
+            simpa only [Located.ValidFor] using markerValid.1
+          have innerValidInput : TypeExpr.ValidFor input.file inner := by
+            simpa [markerValid.2.2] using innerValid.1
+          have innerSpanValid := innerValidInput.span_valid
+          have coverValid :
+              (SourceSpan.cover marker.span inner.span).ValidFor input.file := by
+            apply SourceSpan.cover_validFor markerSpanValid innerSpanValid
+            exact Nat.le_trans markerSpanValid.2.1
+              (Nat.le_trans markerBeforeInner innerSpanValid.2.1)
+          simp only [innerResult, Reply.ValidFor]
+          exact ⟨.proxy coverValid markerSpanValid innerValidInput,
+            innerValid.2.1,
+            innerValid.2.2.trans markerValid.2.2⟩
+
+/-- Proxy parsing never replaces or reorders the immutable token carrier. -/
+theorem parseProxyType_preservesTokensOnSuccess (nested : Parser TypeExpr)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (parseProxyType nested) := by
+  intro input value next result
+  unfold parseProxyType at result
+  cases markerResult : symbol .at .typeExpr input with
+  | invariant error => simp [markerResult] at result
+  | reject failure rejected => simp [markerResult] at result
+  | ok marker afterMarker =>
+      simp only [markerResult] at result
+      cases innerResult : nested afterMarker with
+      | invariant error => simp [innerResult] at result
+      | reject failure rejected => simp [innerResult] at result
+      | ok inner final =>
+          simp only [innerResult] at result
+          have nestedTokens :=
+            nestedPreserves afterMarker inner final innerResult
+          have markerTokens :=
+            symbol_preservesTokensOnSuccess .at .typeExpr input marker
+              afterMarker markerResult
+          cases result
+          exact nestedTokens.trans markerTokens
+
+/-- Proxy parsing is cursor-monotone when its recursive parser is. -/
+theorem parseProxyType_cursorMonotoneOnSuccess (nested : Parser TypeExpr)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (parseProxyType nested) := by
+  intro input value next result
+  unfold parseProxyType at result
+  cases markerResult : symbol .at .typeExpr input with
+  | invariant error => simp [markerResult] at result
+  | reject failure rejected => simp [markerResult] at result
+  | ok marker afterMarker =>
+      simp only [markerResult] at result
+      cases innerResult : nested afterMarker with
+      | invariant error => simp [innerResult] at result
+      | reject failure rejected => simp [innerResult] at result
+      | ok inner final =>
+          simp only [innerResult] at result
+          have markerMonotone :=
+            symbol_cursorMonotoneOnSuccess .at .typeExpr input marker
+              afterMarker markerResult
+          have innerMonotone :=
+            nestedMonotone afterMarker inner final innerResult
+          cases result
+          exact Nat.le_trans markerMonotone innerMonotone
+
+/-- A proxy type starts at the current `@` token. -/
+theorem parseProxyType_startsAtCurrentTokenOnSuccess
+    (nested : Parser TypeExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (parseProxyType nested) (·.span) := by
+  intro input value next result
+  unfold parseProxyType at result
+  cases markerResult : symbol .at .typeExpr input with
+  | invariant error => simp [markerResult] at result
+  | reject failure rejected => simp [markerResult] at result
+  | ok marker afterMarker =>
+      simp only [markerResult] at result
+      cases innerResult : nested afterMarker with
+      | invariant error => simp [innerResult] at result
+      | reject failure rejected => simp [innerResult] at result
+      | ok inner final =>
+          simp only [innerResult] at result
+          cases result
+          rcases symbol_startsAtCurrentTokenOnSuccess .at .typeExpr
+              input marker afterMarker markerResult with
+            ⟨token, found, start⟩
+          exact ⟨token, found, start⟩
 
 /-- Parse a parenthesized tuple type using the supplied recursive parser. -/
 def parseTupleType (nested : Parser TypeExpr) : Parser TypeExpr := do

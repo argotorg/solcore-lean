@@ -35,6 +35,16 @@ theorem acceptToken_cursorMonotoneOnSuccess
   exact Nat.le_of_lt
     (acceptToken_cursor_lt_onSuccess expected context accepts result)
 
+/-- Generic token acceptance returns a span beginning at the input token. -/
+theorem acceptToken_startsAtCurrentTokenOnSuccess
+    (expected : ParseExpectation) (context : ParseContext)
+    (accepts : TokenKind → Bool) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (acceptToken expected context accepts) (·.span) := by
+  intro input token next result
+  exact ⟨token,
+    (acceptToken_ok_state_shape expected context accepts result).1, rfl⟩
+
 theorem keyword_preservesTokensOnSuccess
     (value : HardKeyword) (context : ParseContext) :
     Parser.PreservesTokensOnSuccess (keyword value context) :=
@@ -57,6 +67,12 @@ theorem symbol_cursorMonotoneOnSuccess
     (value : Symbol) (context : ParseContext) :
     Parser.CursorMonotoneOnSuccess (symbol value context) :=
   acceptToken_cursorMonotoneOnSuccess (.symbol value) context
+    (· == .symbol value)
+
+theorem symbol_startsAtCurrentTokenOnSuccess
+    (value : Symbol) (context : ParseContext) :
+    Parser.StartsAtCurrentTokenOnSuccess (symbol value context) (·.span) :=
+  acceptToken_startsAtCurrentTokenOnSuccess (.symbol value) context
     (· == .symbol value)
 
 theorem contextual_preservesTokensOnSuccess

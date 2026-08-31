@@ -78,6 +78,17 @@ def CursorMonotoneOnSuccess {α : Type} (parser : Parser α) : Prop :=
   ∀ input value next, parser input = .ok value next →
     input.cursor ≤ next.cursor
 
+/--
+A successful located parser starts its result at the current input token.
+Requiring the token itself, rather than only `currentSpan`, excludes a
+spurious success at the end of an input window.
+-/
+def StartsAtCurrentTokenOnSuccess {α : Type} (parser : Parser α)
+    (spanOf : α → SourceSpan) : Prop :=
+  ∀ input value next, parser input = .ok value next →
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte = (spanOf value).startByte
+
 /-- A pure parser leaves the token carrier unchanged. -/
 theorem pure_preservesTokensOnSuccess {α : Type} (value : α) :
     PreservesTokensOnSuccess (pure value : Parser α) := by
@@ -138,6 +149,38 @@ theorem bind_cursorMonotoneOnSuccess {α β : Type} {first : Parser α}
       simp only [firstResult] at parsed
       cases parsed
 
+/--
+A bind starts with its first parser when every successful continuation keeps
+the first value's starting byte. This is the common shape of parsers that
+construct an outer covering span from a leading marker.
+-/
+theorem bind_startsAtCurrentTokenOnSuccess_of_first
+    {α β : Type} {first : Parser α} {next : α → Parser β}
+    {firstSpan : α → SourceSpan} {resultSpan : β → SourceSpan}
+    (firstStarts : StartsAtCurrentTokenOnSuccess first firstSpan)
+    (continuationKeepsStart : ∀ firstValue input value final,
+      next firstValue input = .ok value final →
+      (firstSpan firstValue).startByte = (resultSpan value).startByte) :
+    StartsAtCurrentTokenOnSuccess (first >>= next) resultSpan := by
+  intro input value final parsed
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      simp only [firstResult] at parsed
+      rcases firstStarts input firstValue afterFirst firstResult with
+        ⟨token, found, firstStart⟩
+      exact ⟨token, found,
+        firstStart.trans (continuationKeepsStart _ _ _ _ parsed)⟩
+  | reject failure rejected =>
+      simp only [firstResult] at parsed
+      cases parsed
+  | invariant error =>
+      simp only [firstResult] at parsed
+      cases parsed
+
 /-- Transactional ordered choice preserves a shared carrier contract. -/
 theorem orElse_preservesTokensOnSuccess {α : Type}
     {first second : Parser α}
@@ -177,6 +220,27 @@ theorem orElse_cursorMonotoneOnSuccess {α : Type}
   | reject failure rejected =>
       simp only [firstResult] at parsed
       exact secondMonotone input value next parsed
+  | invariant error =>
+      simp only [firstResult] at parsed
+      cases parsed
+
+/-- Transactional ordered choice preserves a shared result-start contract. -/
+theorem orElse_startsAtCurrentTokenOnSuccess {α : Type}
+    {first second : Parser α} {spanOf : α → SourceSpan}
+    (firstStarts : StartsAtCurrentTokenOnSuccess first spanOf)
+    (secondStarts : StartsAtCurrentTokenOnSuccess second spanOf) :
+    StartsAtCurrentTokenOnSuccess (orElse first second) spanOf := by
+  intro input value next parsed
+  unfold orElse at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      simp only [firstResult] at parsed
+      have starts := firstStarts input firstValue afterFirst firstResult
+      cases parsed
+      exact starts
+  | reject failure rejected =>
+      simp only [firstResult] at parsed
+      exact secondStarts input value next parsed
   | invariant error =>
       simp only [firstResult] at parsed
       cases parsed
