@@ -30,7 +30,7 @@ private def coreExpressionWithFuel : Nat → Parser Expr
       .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1 => expressionLayer
       (coreExpressionWithFuel fuel)
-      (coreBlock (coreStatementWithFuel fuel) .require)
+      (isolateBlock (coreBlock (coreStatementWithFuel fuel) .require))
 
 private def corePatternWithFuel : Nat → Parser Pattern
   | 0 => fun state =>

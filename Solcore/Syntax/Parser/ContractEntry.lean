@@ -34,7 +34,7 @@ def constructorDecl : Parser ConstructorDecl := do
   let marker ← keyword .constructorKw .contractMember
   let parameters ← entryParameters
   let payableMarker ← implicitPublicModifiers .constructorKw
-  let body ← block .require
+  let body ← isolateBlock (block .require)
   pure {
     span := SourceSpan.cover marker.span body.span
     value := { parameters, payableMarker, body }
@@ -52,7 +52,7 @@ def fallbackDecl : Parser FallbackDecl := do
       kind := .constraintViolation .fallbackRequiresNoParameters
     }
   let payableMarker ← implicitPublicModifiers .fallbackKw
-  let body ← block .require
+  let body ← isolateBlock (block .require)
   pure {
     span := SourceSpan.cover marker.span body.span
     value := { parameters, payableMarker, body }

@@ -9,7 +9,7 @@ namespace Solcore.Syntax.Parser
 def functionDecl
     (location : FunctionLocation) : Parser FunctionDecl := do
   let signature ← functionSignature location
-  let body ← block .allow
+  let body ← isolateBlock (block .allow)
   pure {
     span := SourceSpan.cover signature.span body.span
     value := { signature, body }
