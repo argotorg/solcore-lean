@@ -15,6 +15,12 @@ example : coreLiteral.ValidFor Located.ValidFor :=
 example : booleanIdentifier.ValidFor Located.ValidFor :=
   booleanIdentifier_validFor
 
+example : Parser.PreservesTokenWindow coreLiteral :=
+  coreLiteral_preservesTokenWindow
+
+example : Parser.PreservesTokenWindow booleanIdentifier :=
+  booleanIdentifier_preservesTokenWindow
+
 example : Parser.PreservesTokensOnSuccess coreLiteral :=
   coreLiteral_preservesTokensOnSuccess
 
@@ -29,5 +35,11 @@ example : Parser.CursorMonotoneOnSuccess coreLiteral :=
 
 example : Parser.CursorMonotoneOnSuccess booleanIdentifier :=
   booleanIdentifier_cursorMonotoneOnSuccess
+
+example : Parser.StartsAtCurrentTokenOnSuccess coreLiteral (·.span) :=
+  coreLiteral_startsAtCurrentTokenOnSuccess
+
+example : Parser.StartsAtCurrentTokenOnSuccess booleanIdentifier (·.span) :=
+  booleanIdentifier_startsAtCurrentTokenOnSuccess
 
 end Tests

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Validity
+import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 
 /-! Compositional contracts for canonical literal token consumers. -/
 
@@ -45,6 +45,35 @@ theorem booleanIdentifier_ok_state_shape {input next : State}
         all_goals cases result
         all_goals rfl
 
+/-- Core literals preserve the complete token window on every reply. -/
+theorem coreLiteral_preservesTokenWindow :
+    Parser.PreservesTokenWindow coreLiteral := by
+  intro input
+  unfold coreLiteral
+  cases found : input.peek? with
+  | none => exact rejectAt_preservesTokenWindow input _ _
+  | some token =>
+      rcases token with ⟨span, kind⟩
+      cases kind
+      all_goals try { exact rejectAt_preservesTokenWindow input _ _ }
+      all_goals exact ⟨rfl, rfl⟩
+
+/-- Boolean builtin names preserve the complete token window on every reply. -/
+theorem booleanIdentifier_preservesTokenWindow :
+    Parser.PreservesTokenWindow booleanIdentifier := by
+  intro input
+  unfold booleanIdentifier
+  cases found : input.peek? with
+  | none => exact rejectAt_preservesTokenWindow input _ _
+  | some token =>
+      rcases token with ⟨span, kind⟩
+      cases kind
+      all_goals try { exact rejectAt_preservesTokenWindow input _ _ }
+      case keyword keyword =>
+        cases keyword
+        all_goals try { exact rejectAt_preservesTokenWindow input _ _ }
+        all_goals exact ⟨rfl, rfl⟩
+
 /-- Core-literal success preserves the immutable token carrier. -/
 theorem coreLiteral_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess coreLiteral := by
@@ -66,6 +95,23 @@ theorem coreLiteral_cursorMonotoneOnSuccess :
   rw [coreLiteral_ok_state_shape result]
   simp
 
+/-- A core literal starts at the literal token it consumes. -/
+theorem coreLiteral_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess coreLiteral (·.span) := by
+  intro input literal next result
+  unfold coreLiteral at result
+  cases found : input.peek? with
+  | none =>
+      simp only [found] at result
+      unfold rejectAt at result
+      contradiction
+  | some token =>
+      rcases token with ⟨span, kind⟩
+      cases kind <;> simp only [found] at result
+      all_goals try { unfold rejectAt at result; contradiction }
+      all_goals cases result
+      all_goals exact ⟨_, rfl, rfl⟩
+
 /-- Boolean-identifier success preserves the immutable token carrier. -/
 theorem booleanIdentifier_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess booleanIdentifier := by
@@ -86,5 +132,25 @@ theorem booleanIdentifier_cursorMonotoneOnSuccess :
   intro input name next result
   rw [booleanIdentifier_ok_state_shape result]
   simp
+
+/-- A Boolean builtin name starts at its keyword token. -/
+theorem booleanIdentifier_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess booleanIdentifier (·.span) := by
+  intro input name next result
+  unfold booleanIdentifier at result
+  cases found : input.peek? with
+  | none =>
+      simp only [found] at result
+      unfold rejectAt at result
+      contradiction
+  | some token =>
+      rcases token with ⟨span, kind⟩
+      cases kind <;> simp only [found] at result
+      all_goals try { unfold rejectAt at result; contradiction }
+      case keyword keyword =>
+        cases keyword <;> simp only at result
+        all_goals try { unfold rejectAt at result; contradiction }
+        all_goals cases result
+        all_goals exact ⟨_, rfl, rfl⟩
 
 end Solcore.Syntax.Parser
