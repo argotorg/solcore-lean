@@ -875,6 +875,191 @@ private theorem anchor_start_le_span_end {state : State}
   exact Nat.le_trans anchorValid.2.1 (Nat.le_trans separated
     (Nat.le_trans (by simp [starts.2]) spanValid.2.1))
 
+private theorem finishFunctionModifiers_value {location : FunctionLocation}
+    {publicMarker payableMarker : Option SourceSpan} {input final : State}
+    {modifiers : FunctionModifiers}
+    (parsed : finishFunctionModifiers location publicMarker payableMarker input =
+      .ok modifiers final) :
+    modifiers = { publicMarker, payableMarker } := by
+  unfold finishFunctionModifiers emitModifierOutsideContract at parsed
+  cases location <;> cases publicMarker <;> cases payableMarker <;>
+    simp only [bind, emitDiagnostic, modifyState] at parsed <;> cases parsed <;> rfl
+
+/-- A successful signature's `function` token precedes its selected endpoint. -/
+theorem functionSignature_keyword_start_le_endOnSuccess
+    (location : FunctionLocation) {input final : State}
+    {signature : FunctionSignature} (inputValid : input.ValidFor)
+    (parsed : functionSignature location input = .ok signature final) :
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte ≤ signature.span.endByte := by
+  have stages := parsed
+  unfold functionSignature at stages
+  rcases signatureBind_ok_components stages with
+    ⟨functionToken, afterKeyword, keywordResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨name, afterName, nameResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨genericParameters, afterGenerics, genericResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨parameters, afterParameters, parametersResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨modifiers, afterModifiers, modifiersResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨returnsClause, afterReturns, returnsResult, rest⟩
+  rcases signatureBind_ok_components rest with
+    ⟨parsedWhereClause, afterWhere, whereResult, finished⟩
+  have keywordContract := keyword_validFor .functionKw .topItem input inputValid
+  rw [keywordResult] at keywordContract
+  have nameContract := identifier_validFor .topItem afterKeyword keywordContract.2.1
+  rw [nameResult] at nameContract
+  have genericContract := optionalGenericParameters_validFor afterName nameContract.2.1
+  rw [genericResult] at genericContract
+  have parametersContract := functionParameters_validFor afterGenerics genericContract.2.1
+  rw [parametersResult] at parametersContract
+  have modifiersContract := functionModifiers_validFor location afterParameters
+    parametersContract.2.1
+  rw [modifiersResult] at modifiersContract
+  have returnsContract := returnClause_validFor afterModifiers modifiersContract.2.1
+  rw [returnsResult] at returnsContract
+  have whereContract := whereClause_validFor afterReturns returnsContract.2.1
+  rw [whereResult] at whereContract
+  have keywordValid : functionToken.span.ValidFor input.file := by
+    simpa only [Located.ValidFor] using keywordContract.1
+  have parametersValid : parameters.span.ValidFor input.file := by
+    simpa [genericContract.2.2, nameContract.2.2, keywordContract.2.2]
+      using parametersContract.1.1
+  have modifiersValid : FunctionModifiers.ValidFor input.file modifiers := by
+    simpa [parametersContract.2.2, genericContract.2.2,
+      nameContract.2.2, keywordContract.2.2] using modifiersContract.1
+  have returnsValid : Option.ValidFor ReturnClause.ValidFor input.file returnsClause := by
+    simpa [modifiersContract.2.2, parametersContract.2.2,
+      genericContract.2.2, nameContract.2.2, keywordContract.2.2]
+      using returnsContract.1
+  have whereValid : Option.ValidFor WhereClause.ValidFor input.file parsedWhereClause := by
+    simpa [returnsContract.2.2, modifiersContract.2.2,
+      parametersContract.2.2, genericContract.2.2,
+      nameContract.2.2, keywordContract.2.2] using whereContract.1
+  have keywordShape := acceptToken_ok_state_shape (.keyword .functionKw) .topItem
+    (· == .keyword .functionKw) keywordResult
+  have keywordAt := State.getElem?_eq_some_of_peek?_eq_some keywordShape.1
+  have strict : input.cursor < afterKeyword.cursor :=
+    acceptToken_cursor_lt_onSuccess (.keyword .functionKw) .topItem
+      (· == .keyword .functionKw) keywordResult
+  have endpoint {state : State} {span : SourceSpan}
+      (stateValid : state.ValidFor) (tokens : state.tokens = input.tokens)
+      (cursor : input.cursor < state.cursor) (fileEq : state.file = input.file)
+      (spanValid : span.ValidFor input.file)
+      (starts : ∃ token, state.peek? = some token ∧
+        token.span.startByte = span.startByte) :
+      functionToken.span.startByte ≤ span.endByte := by
+    rcases starts with ⟨token, found, start⟩
+    exact anchor_start_le_span_end stateValid
+      (by simpa [tokens] using keywordAt) cursor
+      (by simpa [fileEq] using keywordValid)
+      (by simpa [fileEq] using spanValid) ⟨found, start⟩
+  have tokensGenerics : afterGenerics.tokens = input.tokens := by
+    rw [optionalGenericParameters_preservesTokensOnSuccess afterName genericParameters
+      afterGenerics genericResult,
+      identifier_preservesTokensOnSuccess .topItem afterKeyword name afterName nameResult,
+      keyword_preservesTokensOnSuccess .functionKw .topItem input functionToken
+        afterKeyword keywordResult]
+  have cursorGenerics : input.cursor < afterGenerics.cursor :=
+    Nat.lt_of_lt_of_le strict (Nat.le_trans
+      (identifier_cursorMonotoneOnSuccess .topItem afterKeyword name afterName nameResult)
+      (optionalGenericParameters_cursorMonotoneOnSuccess afterName genericParameters
+        afterGenerics genericResult))
+  have fileGenerics : afterGenerics.file = input.file :=
+    genericContract.2.2.trans (nameContract.2.2.trans keywordContract.2.2)
+  have tokensParameters : afterParameters.tokens = input.tokens := by
+    rw [functionParameters_preservesTokensOnSuccess afterGenerics parameters
+      afterParameters parametersResult, tokensGenerics]
+  have cursorParameters : input.cursor < afterParameters.cursor :=
+    Nat.lt_of_lt_of_le cursorGenerics
+      (functionParameters_cursorMonotoneOnSuccess afterGenerics parameters
+        afterParameters parametersResult)
+  have fileParameters : afterParameters.file = input.file :=
+    parametersContract.2.2.trans fileGenerics
+  have tokensModifiers : afterModifiers.tokens = input.tokens := by
+    rw [functionModifiers_preservesTokensOnSuccess location afterParameters modifiers
+      afterModifiers modifiersResult, tokensParameters]
+  have cursorModifiers : input.cursor < afterModifiers.cursor :=
+    Nat.lt_of_lt_of_le cursorParameters
+      (functionModifiers_cursorMonotoneOnSuccess location afterParameters modifiers
+        afterModifiers modifiersResult)
+  have fileModifiers : afterModifiers.file = input.file :=
+    modifiersContract.2.2.trans fileParameters
+  have tokensReturns : afterReturns.tokens = input.tokens := by
+    rw [returnClause_preservesTokensOnSuccess afterModifiers returnsClause
+      afterReturns returnsResult, tokensModifiers]
+  have cursorReturns : input.cursor < afterReturns.cursor :=
+    Nat.lt_of_lt_of_le cursorModifiers
+      (returnClause_cursorMonotoneOnSuccess afterModifiers returnsClause
+        afterReturns returnsResult)
+  have fileReturns : afterReturns.file = input.file :=
+    returnsContract.2.2.trans fileModifiers
+  refine ⟨functionToken, keywordShape.1, ?_⟩
+  cases finished
+  simp only [SourceSpan.cover]
+  cases parsedWhereClause with
+  | some clause =>
+      exact endpoint returnsContract.2.1 tokensReturns cursorReturns fileReturns
+        (by
+          have valid : WhereClause.ValidFor input.file clause := by
+            simpa [Option.ValidFor] using whereValid
+          exact valid.1)
+        (whereClause_some_startsAtCurrentTokenOnSuccess whereResult)
+  | none =>
+      cases returnsClause with
+      | some clause =>
+          exact endpoint modifiersContract.2.1 tokensModifiers cursorModifiers
+            fileModifiers (by
+              have valid : ReturnClause.ValidFor input.file clause := by
+                simpa [Option.ValidFor] using returnsValid
+              exact valid.1)
+            (returnClause_some_startsAtCurrentTokenOnSuccess returnsResult)
+      | none =>
+          have modifierStages := modifiersResult
+          unfold functionModifiers at modifierStages
+          rcases signatureBind_ok_components modifierStages with
+            ⟨publicMarker, afterPublic, publicResult, rest⟩
+          rcases signatureBind_ok_components rest with
+            ⟨payableMarker, afterPayable, payableResult, finishResult⟩
+          have modifiersEq := finishFunctionModifiers_value finishResult
+          subst modifiers
+          have publicContract := optionalFunctionModifier_validFor .publicKw
+            afterParameters parametersContract.2.1
+          rw [publicResult] at publicContract
+          have tokensPublic : afterPublic.tokens = input.tokens := by
+            rw [optionalFunctionModifier_preservesTokensOnSuccess .publicKw
+              afterParameters publicMarker afterPublic publicResult, tokensParameters]
+          have cursorPublic : input.cursor < afterPublic.cursor :=
+            Nat.lt_of_lt_of_le cursorParameters
+              (optionalFunctionModifier_cursorMonotoneOnSuccess .publicKw
+                afterParameters publicMarker afterPublic publicResult)
+          have filePublic : afterPublic.file = input.file :=
+            publicContract.2.2.trans fileParameters
+          cases payableMarker with
+          | some span =>
+              exact endpoint publicContract.2.1 tokensPublic cursorPublic filePublic
+                (by simpa [FunctionModifiers.ValidFor, Option.ValidFor]
+                  using modifiersValid.2)
+                (optionalFunctionModifier_some_startsAtCurrentTokenOnSuccess
+                  .payableKw payableResult)
+          | none =>
+              cases publicMarker with
+              | some span =>
+                  exact endpoint parametersContract.2.1 tokensParameters
+                    cursorParameters fileParameters
+                    (by simpa [FunctionModifiers.ValidFor, Option.ValidFor]
+                      using modifiersValid.1)
+                    (optionalFunctionModifier_some_startsAtCurrentTokenOnSuccess
+                      .publicKw publicResult)
+              | none =>
+                  exact endpoint genericContract.2.1 tokensGenerics cursorGenerics
+                    fileGenerics parametersValid
+                    (functionParameters_startsAtCurrentTokenOnSuccess
+                      afterGenerics parameters afterParameters parametersResult)
+
 /--
 Complete signature provenance, conditional only on the outer-span endpoint
 law and the independently developed `where` parser contract.

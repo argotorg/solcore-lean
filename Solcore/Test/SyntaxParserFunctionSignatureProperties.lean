@@ -29,6 +29,7 @@ example := @SignatureInternals.signatureEnd_payable
 example := @SignatureInternals.signatureEnd_public
 example := @SignatureInternals.signatureEnd_parameters
 example := @SignatureInternals.signatureEnd_validFor
+example := @functionSignature_keyword_start_le_endOnSuccess
 example := returnClause_validFor
 example := returnClause_preservesTokenWindow
 example := returnClause_preservesTokensOnSuccess
