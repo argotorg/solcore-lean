@@ -6,7 +6,10 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def reservedDeriveKeyword? : TokenKind → Option HardKeyword
+namespace DeriveTargetInternals
+
+/-- Reserved hard keywords accepted with a diagnostic inside derive paths. -/
+def reservedDeriveKeyword? : TokenKind → Option HardKeyword
   | .keyword value => match value with
     | .importKw | .exportKw | .pragmaKw | .typeKw | .dataKw |
         .classKw | .instanceKw | .contractKw | .publicKw | .payableKw |
@@ -15,7 +18,8 @@ private def reservedDeriveKeyword? : TokenKind → Option HardKeyword
     | _ => none
   | _ => none
 
-private def deriveComponent : Parser Identifier := fun state =>
+/-- Parse one proof-visible component of a derive target. -/
+def deriveComponent : Parser Identifier := fun state =>
   match state.peek? with
   | some token => match reservedDeriveKeyword? token.value with
     | some keywordValue =>
@@ -30,14 +34,16 @@ private def deriveComponent : Parser Identifier := fun state =>
     | none => identifier .topItem state
   | none => rejectAt state { head := .identifier, tail := [] } .topItem
 
-private def finishDeriveTarget (first last : Identifier)
+/-- Finish a derive target from its first, last, and reversed tail components. -/
+def finishDeriveTarget (first last : Identifier)
     (tailRev : List Identifier) (state : State) : Reply DeriveTarget :=
   .ok {
     span := SourceSpan.cover first.span last.span
     value := { components := { head := first, tail := tailRev.reverse } }
   } state
 
-private def deriveTargetTail (first : Identifier) :
+/-- Fuel-bounded dotted-tail loop used by the public derive-target parser. -/
+def deriveTargetTail (first : Identifier) :
     Nat → Identifier → List Identifier → State → Reply DeriveTarget
   | 0, _, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, last, tailRev, state =>
@@ -54,6 +60,10 @@ private def deriveTargetTail (first : Identifier) :
         | .invariant error => .invariant error
       else
         finishDeriveTarget first last tailRev state
+
+end DeriveTargetInternals
+
+open DeriveTargetInternals
 
 /-- Parse one dotted trait path inside `derive`. -/
 def deriveTarget : Parser DeriveTarget := fun state =>
