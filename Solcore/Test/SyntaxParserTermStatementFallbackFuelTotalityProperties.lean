@@ -1,0 +1,20 @@
+import Solcore.Syntax.Parser.TermStatementFallbackFuelTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserTermStatementFallbackFuelTotalityProperties
+
+open Solcore.Syntax.Parser
+
+example :=
+  @StatementSimpleInternals.assignmentTail_ordinary_of_expressionFuel
+example :=
+  @StatementSimpleInternals.optionalAssignmentTail_ordinary_of_expressionFuel
+example := @assignmentOrExpressionStatement_ordinary_of_expressionFuel
+example := @assignmentOrExpressionStatement_ne_invariant_of_expressionFuel
+example := @TermInternals.FuelStatementTotalityContract
+example := @TermInternals.FuelStatementTotalityContract.ordinary
+example := @TermInternals.FuelStatementTotalityContract.ne_invariant
+example := @assignmentOrExpressionStatement_fuelTotalityContract
+
+end Solcore.Test.SyntaxParserTermStatementFallbackFuelTotalityProperties
