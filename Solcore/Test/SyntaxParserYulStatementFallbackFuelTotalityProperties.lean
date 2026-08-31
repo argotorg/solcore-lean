@@ -12,6 +12,7 @@ example := @FuelYulStatementTotalityContract.ofTotality
 example := @recognizedYulStatementOrFallback_ordinary_of_fuels
 example := @recognizedYulStatementOrFallback_fuelTotalityContract
 example := @optionalYulSemicolon_ordinary
+example := @yulStatementTerminated_cursor_lt_onSuccess_of_core
 example := @yulStatementTerminated_ordinary_of_coreFuel
 example := @yulStatementTerminated_fuelTotalityContract
 

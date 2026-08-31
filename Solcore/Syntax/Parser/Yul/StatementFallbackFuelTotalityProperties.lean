@@ -134,6 +134,25 @@ theorem optionalYulSemicolon_ordinary (value : YulStmt) :
     · exact Or.inr ⟨failure, rejected, by simp only [markerResult]⟩
   · exact Or.inl ⟨value, input, rfl⟩
 
+/-- Optional termination retains strict progress made by the core statement. -/
+theorem yulStatementTerminated_cursor_lt_onSuccess_of_core
+    (nested : Parser YulStmt)
+    (coreStrict : ∀ {input final : State} {value : YulStmt},
+      yulStatementCore nested input = .ok value final →
+        input.cursor < final.cursor)
+    {input final : State} {value : YulStmt}
+    (parsed : yulStatementTerminated nested input = .ok value final) :
+    input.cursor < final.cursor := by
+  unfold yulStatementTerminated at parsed
+  cases coreResult : yulStatementCore nested input with
+  | invariant error => simp [bind, coreResult] at parsed
+  | reject failure rejected => simp [bind, coreResult] at parsed
+  | ok coreValue afterCore =>
+      simp only [bind, coreResult] at parsed
+      exact Nat.lt_of_lt_of_le (coreStrict coreResult)
+        (optionalYulSemicolon_cursorMonotoneOnSuccess coreValue
+          afterCore value final parsed)
+
 /-- Optional termination preserves the core statement's fuel bound. -/
 theorem yulStatementTerminated_ordinary_of_coreFuel
     (nested : Parser YulStmt) (fuel : Nat)
