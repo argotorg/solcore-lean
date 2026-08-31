@@ -1,4 +1,5 @@
 import Solcore.Syntax.Lexer.State
+import Solcore.Syntax.Lexer.ScanProperties
 
 set_option autoImplicit false
 
@@ -92,6 +93,246 @@ private def emitSymbol (file : SourceFile) (state : State)
     (symbol : Symbol) (remaining : List Char) : State :=
   emitTextToken file state (.symbol symbol) remaining
 
+private theorem Advances.prependPrefix (leading : List Char)
+    {startByte endByte : Nat} {input remaining : List Char}
+    (progress : Advances (startByte + byteSize leading)
+      input endByte remaining) :
+    Advances startByte (leading ++ input) endByte remaining := by
+  rcases progress with ⟨consumed, partition, endEq⟩
+  refine ⟨leading ++ consumed, by simp [partition, List.append_assoc], ?_⟩
+  rw [byteSize_append]
+  simpa [Nat.add_assoc] using endEq
+
+private theorem State.ValidFor.advanceToEnd {file : SourceFile}
+    {state : State} (valid : state.ValidFor file) :
+    Advances state.cursor state.remaining file.content.utf8ByteSize [] := by
+  refine ⟨state.remaining, by simp, ?_⟩
+  exact valid.cursorSuffix.remainingByteSize
+
+private theorem emitTextToken_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (kind : TokenKind)
+    (remaining : List Char)
+    (progress : Advances state.cursor state.remaining
+      (state.cursor + kind.spelling.utf8ByteSize) remaining) :
+    (emitTextToken file state kind remaining).ValidFor file := by
+  exact valid.emitToken _ _ _ progress
+
+private theorem scanLine_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (remaining : List Char)
+    (inputEq : state.remaining = '/' :: '/' :: remaining) :
+    (scanLine file state remaining).ValidFor file := by
+  unfold scanLine
+  let scan := scanLineComment (state.cursor + 2) remaining
+  apply valid.emitComment
+  rw [inputEq]
+  have inner := scanLineComment_advances (state.cursor + 2) remaining
+  simpa [scan, byteSize_cons] using
+    (Advances.prependPrefix ['/', '/'] inner)
+
+private theorem scanBlock_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (remaining : List Char)
+    (inputEq : state.remaining = '/' :: '*' :: remaining) :
+    (scanBlock file state remaining).ValidFor file := by
+  unfold scanBlock
+  cases result : scanBlockComment (state.cursor + 2) 1 remaining [] with
+  | closed endByte body rest =>
+      apply valid.emitComment
+      rw [inputEq]
+      have inner := scanBlockComment_closed_advances
+        (state.cursor + 2) 1 remaining [] endByte body rest result
+      simpa [byteSize_cons] using
+        (Advances.prependPrefix ['/', '*'] inner)
+  | unterminated =>
+      have progress := valid.advanceToEnd
+      exact valid.recover _ _ _ _ _ progress
+        (valid.cursorSuffix.sourceSpan_validFor progress)
+
+private theorem scanBacktick_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (remaining : List Char)
+    (inputEq : state.remaining = '`' :: remaining) :
+    (scanBacktick file state remaining).ValidFor file := by
+  unfold scanBacktick
+  cases result :
+      scanDelimitedMeta '`' (state.cursor + 1) remaining ['`'] with
+  | none =>
+      have progress := valid.advanceToEnd
+      exact valid.recover _ _ _ _ _ progress
+        (valid.cursorSuffix.sourceSpan_validFor progress)
+  | some scan =>
+      apply valid.emitToken
+      rw [inputEq]
+      have inner := scanDelimitedMeta_some_advances '`'
+        (state.cursor + 1) remaining ['`'] scan result
+      simpa [byteSize_cons] using
+        (Advances.prependPrefix ['`'] inner)
+
+private theorem scanInterpolation_some_validFor
+    {file : SourceFile} {state next : State}
+    (valid : state.ValidFor file) (remaining : List Char)
+    (inputEq : state.remaining = '$' :: '{' :: remaining)
+    (result : scanInterpolation file state remaining = some next) :
+    next.ValidFor file := by
+  unfold scanInterpolation at result
+  cases scanResult :
+      scanDelimitedMeta '}' (state.cursor + 2) remaining ['{', '$'] with
+  | none => simp [scanResult] at result
+  | some scan =>
+      simp only [scanResult, Option.some.injEq] at result
+      subst next
+      apply valid.emitToken
+      rw [inputEq]
+      have inner := scanDelimitedMeta_some_advances '}'
+        (state.cursor + 2) remaining ['{', '$'] scan scanResult
+      simpa [byteSize_cons] using
+        (Advances.prependPrefix ['$', '{'] inner)
+
+private theorem scanQuoted_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (remaining : List Char)
+    (inputEq : state.remaining = '"' :: remaining) :
+    (scanQuoted file state remaining).ValidFor file := by
+  unfold scanQuoted
+  cases result : scanQuotedString state.cursor remaining with
+  | closed endByte spelling decoded rest =>
+      apply valid.emitToken
+      rw [inputEq]
+      exact scanQuotedString_closed_advances state.cursor remaining endByte
+        spelling decoded rest result
+  | invalidEscape escapeStart escapeEnd escape tokenEndByte rest =>
+      have progress : Advances state.cursor state.remaining tokenEndByte rest := by
+        rw [inputEq]
+        exact scanQuotedString_invalidEscape_advances state.cursor remaining
+          escapeStart escapeEnd escape tokenEndByte rest result
+      exact valid.recover _ _ _ _ _ progress
+        (valid.cursorSuffix.sourceSpan_validFor progress)
+  | invalidPrefix endByte rest =>
+      have progress : Advances state.cursor state.remaining endByte rest := by
+        rw [inputEq]
+        exact scanQuotedString_invalidPrefix_advances state.cursor remaining
+          endByte rest result
+      exact valid.recover _ _ _ _ _ progress
+        (valid.cursorSuffix.sourceSpan_validFor progress)
+  | unterminated =>
+      have progress := valid.advanceToEnd
+      exact valid.recover _ _ _ _ _ progress
+        (valid.cursorSuffix.sourceSpan_validFor progress)
+
+private theorem scanDecimal_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (characters : List Char)
+    (inputEq : state.remaining = characters) :
+    (scanDecimal file state characters).ValidFor file := by
+  unfold scanDecimal
+  let scan := takeWhile isAsciiDigit characters
+  apply emitTextToken_validFor valid
+  rw [inputEq]
+  simpa [scan, byteSize, TokenKind.spelling] using
+    takeWhile_advances isAsciiDigit state.cursor characters
+
+private theorem scanLetterName_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (first : Char) (remaining : List Char)
+    (inputEq : state.remaining = first :: remaining) :
+    (scanLetterName file state first remaining).ValidFor file := by
+  unfold scanLetterName
+  apply emitTextToken_validFor valid
+  rw [inputEq]
+  exact scanLetterIdentifier_advances state.cursor first remaining
+
+private theorem scanMarkedName_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (first : Char) (remaining : List Char)
+    (inputEq : state.remaining = first :: remaining) :
+    (scanMarkedName file state first remaining).ValidFor file := by
+  unfold scanMarkedName
+  apply emitTextToken_validFor valid
+  rw [inputEq]
+  exact scanMarkedYulIdentifier_advances state.cursor first remaining
+
+private theorem scanHexadecimal?_some_validFor
+    {file : SourceFile} {state next : State}
+    (valid : state.ValidFor file) (remaining : List Char)
+    (inputEq : state.remaining = '0' :: remaining)
+    (result : scanHexadecimal? file state remaining = some next) :
+    next.ValidFor file := by
+  fun_cases scanHexadecimal? file state remaining with
+  | case1 digit rest isHex tail spelling =>
+      simp only [scanHexadecimal?, isHex, if_true, Option.some.injEq] at result
+      subst next
+      apply emitTextToken_validFor valid
+      rw [inputEq]
+      have inner := takeWhile_advances isAsciiHexDigit
+        (state.cursor + byteSize ['0', 'x', digit]) rest
+      simpa [tail, spelling, byteSize, TokenKind.spelling, Nat.add_assoc] using
+        (Advances.prependPrefix ['0', 'x', digit] inner)
+  | case2 => simp_all [scanHexadecimal?]
+  | case3 => simp_all [scanHexadecimal?]
+
+private theorem multiSymbol?_spelling (left right : Char) (symbol : Symbol)
+    (found : multiSymbol? left right = some symbol) :
+    symbol.spelling = String.ofList [left, right] := by
+  fun_cases multiSymbol? left right <;>
+    simp_all [multiSymbol?] <;> cases found <;> rfl
+
+private theorem singleSymbol?_spelling (character : Char) (symbol : Symbol)
+    (found : singleSymbol? character = some symbol) :
+    symbol.spelling = String.ofList [character] := by
+  fun_cases singleSymbol? character <;>
+    simp_all [singleSymbol?] <;> cases found <;> rfl
+
+private theorem emitSymbol_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (symbol : Symbol)
+    (consumed remaining : List Char)
+    (inputEq : state.remaining = consumed ++ remaining)
+    (spelling : symbol.spelling = String.ofList consumed) :
+    (emitSymbol file state symbol remaining).ValidFor file := by
+  unfold emitSymbol
+  apply emitTextToken_validFor valid
+  exact ⟨consumed, inputEq, by simp [byteSize, TokenKind.spelling, spelling]⟩
+
+private theorem recoverCharacter_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (character : Char)
+    (remaining : List Char)
+    (inputEq : state.remaining = character :: remaining) :
+    State.ValidFor
+      (state.recover file state.cursor (state.cursor + character.utf8Size)
+        (state.cursor + character.utf8Size) remaining .invalidToken)
+      file := by
+  have progress : Advances state.cursor state.remaining
+      (state.cursor + character.utf8Size) remaining := by
+    rw [inputEq]
+    exact Advances.single character state.cursor remaining
+  exact valid.recover _ _ _ _ _ progress
+    (valid.cursorSuffix.sourceSpan_validFor progress)
+
+private theorem skipCharacter_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (character : Char)
+    (remaining : List Char)
+    (inputEq : state.remaining = character :: remaining) :
+    State.ValidFor
+      (state.skipTo (state.cursor + character.utf8Size) remaining) file := by
+  apply valid.skipTo
+  rw [inputEq]
+  exact Advances.single character state.cursor remaining
+
+private theorem emitMultiSymbol_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (left right : Char) (after : List Char)
+    (symbol : Symbol) (inputEq : state.remaining = left :: right :: after)
+    (found : multiSymbol? left right = some symbol) :
+    (emitSymbol file state symbol after).ValidFor file :=
+  emitSymbol_validFor valid symbol [left, right] after
+    (by simpa using inputEq) (multiSymbol?_spelling left right symbol found)
+
+private theorem emitSingleSymbol_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (character : Char) (after : List Char)
+    (symbol : Symbol) (inputEq : state.remaining = character :: after)
+    (found : singleSymbol? character = some symbol) :
+    (emitSymbol file state symbol after).ValidFor file :=
+  emitSymbol_validFor valid symbol [character] after
+    (by simpa using inputEq) (singleSymbol?_spelling character symbol found)
+
+private theorem emitUnderscore_validFor {file : SourceFile} {state : State}
+    (valid : state.ValidFor file) (after : List Char)
+    (inputEq : state.remaining = '_' :: after) :
+    (emitSymbol file state .underscore after).ValidFor file :=
+  emitSingleSymbol_validFor valid '_' after .underscore inputEq rfl
+
 /--
 Perform one maximal-munch transition. Callers only use this on nonempty input;
 every branch consumes at least one source character.
@@ -150,5 +391,32 @@ def step (file : SourceFile) (state : State) : State :=
                         (state.cursor + character.utf8Size)
                         (state.cursor + character.utf8Size) []
                         .invalidToken
+
+/-- Every canonical lexer step preserves source and carrier provenance. -/
+theorem step_validFor (file : SourceFile) (state : State)
+    (valid : state.ValidFor file) :
+    (step file state).ValidFor file := by
+  fun_cases step file state
+  case case1 => exact valid
+  case case2 => apply skipCharacter_validFor valid <;> assumption
+  case case3 => apply scanLine_validFor valid <;> assumption
+  case case4 => apply scanBlock_validFor valid <;> assumption
+  case case5 => apply scanBacktick_validFor valid <;> assumption
+  case case6 => apply scanQuoted_validFor valid <;> assumption
+  case case7 => apply scanInterpolation_some_validFor valid <;> assumption
+  case case8 => apply scanMarkedName_validFor valid <;> assumption
+  case case9 => apply scanHexadecimal?_some_validFor valid <;> assumption
+  case case10 => apply scanDecimal_validFor valid <;> assumption
+  case case11 => apply scanDecimal_validFor valid <;> assumption
+  case case12 => apply scanLetterName_validFor valid <;> assumption
+  case case13 => apply scanMarkedName_validFor valid <;> assumption
+  case case14 => apply emitUnderscore_validFor valid <;> assumption
+  case case15 => apply emitUnderscore_validFor valid <;> assumption
+  case case16 => apply scanMarkedName_validFor valid <;> assumption
+  case case17 => apply emitMultiSymbol_validFor valid <;> assumption
+  case case18 => apply emitSingleSymbol_validFor valid <;> assumption
+  case case19 => apply recoverCharacter_validFor valid <;> assumption
+  case case20 => apply emitSingleSymbol_validFor valid <;> assumption
+  case case21 => apply recoverCharacter_validFor valid <;> assumption
 
 end Solcore.Syntax.Lexer
