@@ -15,12 +15,14 @@ example := @coreBlock_cursor_lt_onSuccess
 example := @coreBlock_cursorMonotoneOnSuccess
 example := @BlockInternals.captureBlockTail_validFor
 example := @BlockInternals.captureBlock?_validFor
+example := @BlockInternals.captureBlock?_startsAtCurrentToken
 example := @hasBalancedBlockCapture
 example := @isolateBlock_validFor
 example := @isolateBlock_preservesTokensOnSuccess
 example := @isolateBlock_preservesTokenWindow
 example := @isolateBlock_cursor_lt_onSuccess_of_balancedCapture
 example := @isolateBlock_cursorMonotoneOnSuccess
+example := @isolateBlock_startsAtCurrentTokenOnSuccess
 
 example (statement : Parser Statement) (policy : TailExpressionPolicy)
     (statementShape : Parser.PreservesTokenWindow statement) :
@@ -59,6 +61,11 @@ example (statementValid : SourceFile → Statement → Prop)
     (valid : parser.ValidFor (Block.ValidFor statementValid)) :
     (isolateBlock parser).ValidFor (Block.ValidFor statementValid) :=
   isolateBlock_validFor statementValid parser valid
+
+example (parser : Parser Block)
+    (starts : Parser.StartsAtCurrentTokenOnSuccess parser (·.span)) :
+    Parser.StartsAtCurrentTokenOnSuccess (isolateBlock parser) (·.span) :=
+  isolateBlock_startsAtCurrentTokenOnSuccess parser starts
 
 example (parser : Parser Block) {input next : State} {body : Block}
     (captured : hasBalancedBlockCapture input = true)

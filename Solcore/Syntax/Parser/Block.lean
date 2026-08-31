@@ -605,6 +605,62 @@ theorem captureBlock?_validFor {input : State} {captured : CapturedBlock}
           captured inputValid found (by omega) result
       · contradiction
 
+private theorem captureBlockTail_preservesOpeningStart
+    (state : State) (opening : Token) :
+    ∀ fuel depth offset captured,
+      captureBlockTail state opening fuel depth offset = some captured →
+      opening.span.startByte = captured.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro depth offset captured result
+      unfold captureBlockTail at result
+      cases found : state.peekOffset? offset with
+      | none => simp [found] at result
+      | some token =>
+          simp only [found] at result
+          rcases token with ⟨closingSpan, kind⟩
+          cases kind with
+          | symbol symbol =>
+              cases symbol <;> try
+                exact inductionHypothesis _ _ _ result
+              case rightBrace =>
+                by_cases atRoot : depth = 1
+                · subst depth
+                  have capturedEq := Option.some.inj (by
+                    simpa using result)
+                  subst captured
+                  rfl
+                · exact inductionHypothesis (depth - 1) (offset + 1) _
+                    (by simpa [atRoot] using result)
+          | keyword keyword => exact inductionHypothesis _ _ _ result
+          | identifier text => exact inductionHypothesis _ _ _ result
+          | yulIdentifier text => exact inductionHypothesis _ _ _ result
+          | decimalLiteral text => exact inductionHypothesis _ _ _ result
+          | hexadecimalLiteral text => exact inductionHypothesis _ _ _ result
+          | stringLiteral text => exact inductionHypothesis _ _ _ result
+          | yulMetaBacktick text => exact inductionHypothesis _ _ _ result
+          | yulMetaInterpolation text =>
+              exact inductionHypothesis _ _ _ result
+
+/-- A balanced capture starts at the current opening-brace token. -/
+theorem captureBlock?_startsAtCurrentToken {input : State}
+    {captured : CapturedBlock}
+    (result : captureBlock? input = some captured) :
+    ∃ opening, input.peek? = some opening ∧
+      opening.span.startByte = captured.span.startByte := by
+  unfold captureBlock? at result
+  cases found : input.peek? with
+  | none => simp [found] at result
+  | some opening =>
+      simp only [found] at result
+      split at result
+      · exact ⟨opening, rfl,
+          captureBlockTail_preservesOpeningStart input opening
+            input.remainingCount 1 1 captured result⟩
+      · contradiction
+
 end BlockInternals
 
 open BlockInternals
@@ -869,5 +925,46 @@ theorem isolateBlock_cursorMonotoneOnSuccess (parser : Parser Block)
   | some captured =>
       exact Nat.le_of_lt
         (isolateBlock_cursor_lt_onSuccess_of_capture parser captureResult result)
+
+/-- Block isolation retains the current-token start on every success path. -/
+theorem isolateBlock_startsAtCurrentTokenOnSuccess (parser : Parser Block)
+    (parserStarts :
+      Parser.StartsAtCurrentTokenOnSuccess parser (·.span)) :
+    Parser.StartsAtCurrentTokenOnSuccess (isolateBlock parser) (·.span) := by
+  intro input body next result
+  unfold isolateBlock at result
+  cases captureResult : captureBlock? input with
+  | none =>
+      simp only [captureResult] at result
+      exact parserStarts input body next result
+  | some captured =>
+      rcases captureBlock?_startsAtCurrentToken captureResult with
+        ⟨opening, openingFound, captureStart⟩
+      have capturedProgress := captureBlock?_cursor_lt_endIndex captureResult
+      have inputProgress :=
+        State.cursor_lt_endIndex_of_peek?_eq_some openingFound
+      have childOpening :
+          (input.enterWindow input.cursor captured.window).peek? =
+            some opening := by
+        simpa [State.peek?, State.enterWindow, capturedProgress,
+          inputProgress] using openingFound
+      simp only [captureResult] at result
+      cases childResult : parser
+          (input.enterWindow input.cursor captured.window) with
+      | ok childBody childAfter =>
+          simp only [childResult] at result
+          cases result
+          rcases parserStarts _ _ _ childResult with
+            ⟨token, childFound, childStart⟩
+          have tokenEq : token = opening :=
+            Option.some.inj (childFound.symm.trans childOpening)
+          subst token
+          exact ⟨opening, openingFound, childStart⟩
+      | reject failure childAfter =>
+          simp only [childResult] at result
+          cases result
+          exact ⟨opening, openingFound, captureStart⟩
+      | invariant error =>
+          simp [childResult] at result
 
 end Solcore.Syntax.Parser
