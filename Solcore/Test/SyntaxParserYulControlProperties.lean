@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Yul.ControlProperties
+import Solcore.Syntax.Parser.Yul.ControlSwitchProperties
 
 /-! External compile consumers for inline-Yul `if` parser contracts. -/
 
@@ -26,11 +26,16 @@ example := @yulCase_preservesTokensOnSuccess
 example := @yulCase_cursorMonotoneOnSuccess
 example := @yulCases_preservesTokensOnSuccess
 example := @yulCases_cursorMonotoneOnSuccess
+example := @yulCases_validFor
 example := @yulCase_startsAtCurrentTokenOnSuccess
 example := @yulCase_cursor_lt_onSuccess
 example := @optionalYulDefault_validFor
 example := @optionalYulDefault_preservesTokensOnSuccess
 example := @optionalYulDefault_cursorMonotoneOnSuccess
+example := @yulSwitchStatement_validFor
+example := @yulSwitchStatement_preservesTokensOnSuccess
+example := @yulSwitchStatement_cursorMonotoneOnSuccess
+example := @yulSwitchStatement_startsAtCurrentTokenOnSuccess
 
 example (nested : Parser YulStmt)
     (expressionValid : yulExpression.ValidFor YulExpr.ValidFor)
