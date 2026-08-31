@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.TypeAliasProperties
+import Solcore.Syntax.Parser.EnumProperties
 
 /-! External consumers for type and enum declaration validity. -/
 
@@ -24,6 +25,14 @@ example := @typeAlias_cursorMonotoneOnSuccess
 example := @typeAlias_startsAtCurrentTokenOnSuccess
 example := @EnumConstructor.ValidFor
 example := @EnumDecl.ValidFor
+example := @EnumInternals.enumConstructorFields_validFor
+example := @EnumInternals.enumConstructorFields_preservesTokenWindow
+example := @EnumInternals.enumConstructorFields_cursorMonotoneOnSuccess
+example := @EnumInternals.enumConstructor_validFor
+example := @EnumInternals.enumConstructor_preservesTokenWindow
+example := @EnumInternals.enumConstructor_preservesTokensOnSuccess
+example := @EnumInternals.enumConstructor_cursorMonotoneOnSuccess
+example := @EnumInternals.enumConstructor_startsAtCurrentTokenOnSuccess
 
 example (file : SourceFile) (declaration : TypeAliasDecl)
     (valid : TypeAliasDecl.ValidFor file declaration) :

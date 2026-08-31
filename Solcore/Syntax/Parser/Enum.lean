@@ -4,26 +4,32 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def enumConstructor : Parser EnumConstructor := do
-  let name ← identifier .topItem
+namespace EnumInternals
+
+/-- Parse the optional tuple payload of one enum constructor. -/
+def enumConstructorFields : Parser (Option (DelimitedList TypeExpr)) := do
   let state ← getState
-  let fields ←
-    if isSymbol state .leftParen then
-      pure (some (← delimitedNoTrailing .leftParen .rightParen true typeExpr
-        .typeExpr .topLevel))
-    else
-      pure none
+  if isSymbol state .leftParen then
+    pure (some (← delimitedNoTrailing .leftParen .rightParen true typeExpr
+      .typeExpr .topLevel))
+  else
+    pure none
+
+/-- Parse one enum constructor and its optional tuple payload. -/
+def enumConstructor : Parser EnumConstructor := do
+  let name ← identifier .topItem
+  let fields ← enumConstructorFields
   let endSpan := fields.map (fun values => values.span) |>.getD name.span
   pure {
     span := SourceSpan.cover name.span endSpan
     value := { leadingComments := [], name, fields }
   }
 
-private structure EnumBody where
+structure EnumBody where
   span : SourceSpan
   constructors : List EnumConstructor
 
-private def closeEnumBody (opening : Token)
+def closeEnumBody (opening : Token)
     (constructorsRev : List EnumConstructor) : Parser EnumBody := do
   let closing ← symbol .rightBrace .topItem
   pure {
@@ -31,7 +37,7 @@ private def closeEnumBody (opening : Token)
     constructors := constructorsRev.reverse
   }
 
-private def enumConstructors (opening : Token) :
+def enumConstructors (opening : Token) :
     Nat → List EnumConstructor → State → Reply EnumBody
   | 0, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, constructorsRev, state =>
@@ -55,7 +61,7 @@ private def enumConstructors (opening : Token) :
       else
         closeEnumBody opening constructorsRev state
 
-private def enumBody : Parser EnumBody := fun state =>
+def enumBody : Parser EnumBody := fun state =>
   match symbol .leftBrace .topItem state with
   | .ok opening next =>
       if isSymbol next .rightBrace then
@@ -70,13 +76,15 @@ private def enumBody : Parser EnumBody := fun state =>
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
+end EnumInternals
+
 /-- Parse a canonical algebraic `enum` declaration. -/
 def enumDecl
     (deriveAttribute : Option DeriveAttribute) : Parser EnumDecl := do
   let marker ← contextual .enum .topItem
   let name ← identifier .topItem
   let parameters ← optionalGenericParameters
-  let body ← enumBody
+  let body ← EnumInternals.enumBody
   let startSpan := deriveAttribute.map (fun derive => derive.span)
     |>.getD marker.span
   pure {
