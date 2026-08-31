@@ -93,6 +93,8 @@ inductive ParserPhase where
 inductive ParserInvariantError where
   | invalidLexedSource (expected actual : SourceId)
   | invalidTokenSpan (index : Nat) (span : SourceSpan)
+  | invalidCommentSpan (index : Nat) (span : SourceSpan)
+  | invalidLexicalDiagnosticSpan (index : Nat) (span : SourceSpan)
   | invalidWindow
       (cursor : Nat)
       (endIndex : Nat)
