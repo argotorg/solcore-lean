@@ -25,11 +25,4 @@ example := @importDecl_invariantFreeOnValid
 example : Parser.InvariantFreeOnValid importDecl :=
   importDecl_invariantFreeOnValid
 
-/-- The import field can be populated without an adapter theorem. -/
-example (rest : FileInternals.PlainTopItemTotalityContract) :
-    FileInternals.PlainTopItemTotalityContract := {
-  rest with
-  importDecl := importDecl_invariantFreeOnValid
-}
-
 end Solcore.Test.SyntaxParserImportTotalityProperties

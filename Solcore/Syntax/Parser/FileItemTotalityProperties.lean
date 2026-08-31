@@ -18,7 +18,7 @@ theorem attachDeriveAttribute_invariantFreeOnValid
   cases value <;> left <;>
     simp [attachDeriveAttribute, emitDiagnostic, modifyState, bind, pure]
 
-/-- The derive-aware top-item parser inherits the eight plain branch inputs. -/
+/-- The derive-aware top-item parser inherits the seven plain branch inputs. -/
 theorem topItem_invariantFreeOnValid
     (contract : PlainTopItemTotalityContract) :
     Parser.InvariantFreeOnValid topItem := by
@@ -70,7 +70,7 @@ theorem parseItemsItemInvariantFree_of_plainTopItemContract
   exact (parseItemsItem_invariantFreeOnValid contract).ne_invariant
     input inputValid error
 
-/-- Complete-file parsing succeeds under exactly the eight plain branch inputs. -/
+/-- Complete-file parsing succeeds under exactly the seven plain branch inputs. -/
 theorem sourceFile_exists_ok_of_plainTopItemContract
     (contract : PlainTopItemTotalityContract)
     (comments : List Comment) (input : State) (inputValid : input.ValidFor) :
@@ -83,7 +83,7 @@ end Solcore.Syntax.Parser.FileInternals
 
 namespace Solcore.Syntax.Parser
 
-/-- Valid tokenized input produces output under the eight branch inputs. -/
+/-- Valid tokenized input produces output under the seven branch inputs. -/
 theorem parseLexed_exists_ok_of_plainTopItemContract
     (contract : FileInternals.PlainTopItemTotalityContract)
     (file : SourceFile) (lexed : LexedFile) (lexedValid : lexed.ValidFor file) :
@@ -102,7 +102,7 @@ theorem parseLexed_ne_error_of_plainTopItemContract
     (FileInternals.parseItemsItemInvariantFree_of_plainTopItemContract contract)
     file lexed lexedValid error
 
-/-- Public source parsing succeeds under exactly the eight branch inputs. -/
+/-- Public source parsing succeeds under exactly the seven branch inputs. -/
 theorem parse_exists_ok_of_plainTopItemContract
     (contract : FileInternals.PlainTopItemTotalityContract)
     (file : SourceFile) :
