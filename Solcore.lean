@@ -10,6 +10,7 @@ import Solcore.Oracle.V4
 import Solcore.Oracle.V5
 import Solcore.Oracle.Stream
 import Solcore.Synthesis
+import Solcore.Syntax
 
 /-!
 The public umbrella module for the executable Solcore specification.
