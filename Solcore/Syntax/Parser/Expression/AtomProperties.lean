@@ -1186,5 +1186,173 @@ theorem arrayLiteral_retainsDelimitedEndOnSuccess (nested : Parser Expr)
   cases finished
   exact ⟨values, rfl, rfl⟩
 
+/-- Optional lambda return types retain their arrow-following type syntax. -/
+theorem optionalLambdaReturnType_validFor :
+    optionalLambdaReturnType.ValidFor
+      (Option.ValidFor TypeExpr.ValidFor) := by
+  unfold optionalLambdaReturnType
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isSymbol observed .arrow
+  · simp only [present, if_true]
+    apply Parser.bind_validFor (symbol_validFor .arrow .typeExpr)
+    intro arrow
+    apply Parser.bind_validFor_of_value typeExpr_validFor
+    intro type input inputValid typeValid
+    exact ⟨by simpa only [Option.ValidFor] using typeValid,
+      inputValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional lambda return types preserve every ordinary token window. -/
+theorem optionalLambdaReturnType_preservesTokenWindow :
+    Parser.PreservesTokenWindow optionalLambdaReturnType := by
+  unfold optionalLambdaReturnType
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro observed
+  by_cases present : isSymbol observed .arrow
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (symbol_preservesTokenWindow .arrow .typeExpr)
+    intro arrow
+    apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
+    intro type
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
+theorem optionalLambdaReturnType_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess optionalLambdaReturnType :=
+  optionalLambdaReturnType_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Optional lambda return-type parsing never rewinds the cursor. -/
+theorem optionalLambdaReturnType_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess optionalLambdaReturnType := by
+  unfold optionalLambdaReturnType
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isSymbol observed .arrow
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (symbol_cursorMonotoneOnSuccess .arrow .typeExpr)
+    intro arrow
+    apply Parser.bind_cursorMonotoneOnSuccess
+      typeExpr_cursorMonotoneOnSuccess
+    intro type
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
+/-- A present lambda return type starts at the token after its arrow. -/
+theorem optionalLambdaReturnType_some_startsAfterArrow
+    {input final : State} {type : TypeExpr}
+    (parsed : optionalLambdaReturnType input = .ok (some type) final) :
+    ∃ arrow afterArrow first,
+      symbol .arrow .typeExpr input = .ok arrow afterArrow ∧
+      afterArrow.peek? = some first ∧
+      first.span.startByte = type.span.startByte := by
+  unfold optionalLambdaReturnType getState at parsed
+  simp only [bind] at parsed
+  by_cases present : isSymbol input .arrow
+  · simp only [present, if_true] at parsed
+    rcases atomBind_ok_components parsed with
+      ⟨arrow, afterArrow, arrowResult, rest⟩
+    rcases atomBind_ok_components rest with
+      ⟨parsedType, afterType, typeResult, finished⟩
+    have typeEq : parsedType = type := by cases finished; rfl
+    subst parsedType
+    rcases typeExpr_startsAtCurrentTokenOnSuccess
+        afterArrow type afterType typeResult with
+      ⟨first, firstFound, firstStart⟩
+    exact ⟨arrow, afterArrow, first, arrowResult, firstFound, firstStart⟩
+  · simp only [present] at parsed
+    change Reply.ok none input = .ok (some type) final at parsed
+    cases parsed
+
+/-- Lambda parsing preserves token windows when its recursive leaves do. -/
+theorem lambdaExpression_preservesTokenWindow (block : Parser Block)
+    (parameterWindow : Parser.PreservesTokenWindow lambdaParameter)
+    (blockWindow : Parser.PreservesTokenWindow block) :
+    Parser.PreservesTokenWindow (lambdaExpression block) := by
+  unfold lambdaExpression
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .lamKw .expression)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (delimited_preservesTokenWindow .leftParen .rightParen true
+      lambdaParameter .parameter .expression parameterWindow)
+  intro parameters
+  apply Parser.bind_preservesTokenWindow
+    optionalLambdaReturnType_preservesTokenWindow
+  intro returnType
+  apply Parser.bind_preservesTokenWindow blockWindow
+  intro body
+  exact Parser.pure_preservesTokenWindow _
+
+theorem lambdaExpression_preservesTokensOnSuccess (block : Parser Block)
+    (parameterWindow : Parser.PreservesTokenWindow lambdaParameter)
+    (blockWindow : Parser.PreservesTokenWindow block) :
+    Parser.PreservesTokensOnSuccess (lambdaExpression block) :=
+  (lambdaExpression_preservesTokenWindow block parameterWindow
+    blockWindow).preservesTokensOnSuccess
+
+/-- Lambda parsing never rewinds when its body parser is monotone. -/
+theorem lambdaExpression_cursorMonotoneOnSuccess (block : Parser Block)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block) :
+    Parser.CursorMonotoneOnSuccess (lambdaExpression block) := by
+  unfold lambdaExpression
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .lamKw .expression)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (delimited_cursorMonotoneOnSuccess .leftParen .rightParen true
+      lambdaParameter .parameter .expression)
+  intro parameters
+  apply Parser.bind_cursorMonotoneOnSuccess
+    optionalLambdaReturnType_cursorMonotoneOnSuccess
+  intro returnType
+  apply Parser.bind_cursorMonotoneOnSuccess blockCursor
+  intro body
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A lambda expression starts at its `lam` keyword token. -/
+theorem lambdaExpression_startsAtCurrentTokenOnSuccess
+    (block : Parser Block) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (lambdaExpression block) (fun expression => expression.span) := by
+  unfold lambdaExpression
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .lamKw)
+      .expression (· == .keyword .lamKw))
+  intro marker input expression final parsed
+  rcases atomBind_ok_components parsed with
+    ⟨parameters, afterParameters, _parametersResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨returnType, afterReturnType, _returnTypeResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨body, afterBody, _bodyResult, finished⟩
+  cases finished
+  rfl
+
+/-- A lambda expression retains its parsed body's final endpoint. -/
+theorem lambdaExpression_retainsBodyEndOnSuccess (block : Parser Block)
+    {input final : State} {expression : Expr}
+    (parsed : lambdaExpression block input = .ok expression final) :
+    ∃ (marker : Token) (parameters : DelimitedList LambdaParameter)
+      (returnType : Option TypeExpr) (body : Block),
+      expression.value = .lambda marker.span parameters returnType body ∧
+      expression.span.endByte = body.span.endByte := by
+  unfold lambdaExpression at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨marker, afterMarker, _markerResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨parameters, afterParameters, _parametersResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨returnType, afterReturnType, _returnTypeResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨body, afterBody, _bodyResult, finished⟩
+  cases finished
+  exact ⟨marker, parameters, returnType, body, rfl, rfl⟩
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser

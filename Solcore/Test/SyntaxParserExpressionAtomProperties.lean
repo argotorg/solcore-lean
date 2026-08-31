@@ -60,5 +60,15 @@ example := @ExpressionAtomInternals.arrayLiteral_preservesTokensOnSuccess
 example := @ExpressionAtomInternals.arrayLiteral_cursorMonotoneOnSuccess
 example := @ExpressionAtomInternals.arrayLiteral_startsAtCurrentTokenOnSuccess
 example := @ExpressionAtomInternals.arrayLiteral_retainsDelimitedEndOnSuccess
+example := @ExpressionAtomInternals.optionalLambdaReturnType_validFor
+example := @ExpressionAtomInternals.optionalLambdaReturnType_preservesTokenWindow
+example := @ExpressionAtomInternals.optionalLambdaReturnType_preservesTokensOnSuccess
+example := @ExpressionAtomInternals.optionalLambdaReturnType_cursorMonotoneOnSuccess
+example := @ExpressionAtomInternals.optionalLambdaReturnType_some_startsAfterArrow
+example := @ExpressionAtomInternals.lambdaExpression_preservesTokenWindow
+example := @ExpressionAtomInternals.lambdaExpression_preservesTokensOnSuccess
+example := @ExpressionAtomInternals.lambdaExpression_cursorMonotoneOnSuccess
+example := @ExpressionAtomInternals.lambdaExpression_startsAtCurrentTokenOnSuccess
+example := @ExpressionAtomInternals.lambdaExpression_retainsBodyEndOnSuccess
 
 end Tests

@@ -143,22 +143,34 @@ def arrayLiteral (nested : Parser Expr) : Parser Expr := do
 
 end ExpressionAtomInternals
 
-private def lambdaExpression (block : Parser Block) : Parser Expr := do
+namespace ExpressionAtomInternals
+
+/-- Parse an optional lambda return type introduced by `->`. -/
+def optionalLambdaReturnType : Parser (Option TypeExpr) := do
+  let state ← getState
+  if isSymbol state .arrow then
+    let _ ← symbol .arrow .typeExpr
+    pure (some (← typeExpr))
+  else
+    pure none
+
+end ExpressionAtomInternals
+
+namespace ExpressionAtomInternals
+
+/-- Parse a lambda expression using the supplied recursive block parser. -/
+def lambdaExpression (block : Parser Block) : Parser Expr := do
   let marker ← keyword .lamKw .expression
   let parameters ← delimited .leftParen .rightParen true
     lambdaParameter .parameter .expression
-  let state ← getState
-  let returnType ←
-    if isSymbol state .arrow then
-      let _ ← symbol .arrow .typeExpr
-      pure (some (← typeExpr))
-    else
-      pure none
+  let returnType ← ExpressionAtomInternals.optionalLambdaReturnType
   let body ← block
   pure {
     span := SourceSpan.cover marker.span body.span
     value := .lambda marker.span parameters returnType body
   }
+
+end ExpressionAtomInternals
 
 private def expressionAtomCore (nested : Parser Expr)
     (block : Parser Block) : Parser Expr := fun state =>
@@ -174,7 +186,8 @@ private def expressionAtomCore (nested : Parser Expr)
     ExpressionAtomInternals.parenthesized nested state
   else if isSymbol state .leftBracket then
     ExpressionAtomInternals.arrayLiteral nested state
-  else if isKeyword state .lamKw then lambdaExpression block state
+  else if isKeyword state .lamKw then
+    ExpressionAtomInternals.lambdaExpression block state
   else rejectAt state { head := .expression, tail := [] } .expression
 
 private def isAtomBoundary (state : State) : Bool :=
