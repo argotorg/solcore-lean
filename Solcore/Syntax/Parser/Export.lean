@@ -5,7 +5,10 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def finishExportPath (first last : Identifier)
+namespace ExportInternals
+
+/-- Finish an export path without consuming its following selection suffix. -/
+def finishExportPath (first last : Identifier)
     (tailRev : List Identifier) (state : State) : Reply QualifiedName :=
   .ok {
     span := SourceSpan.cover first.span last.span
@@ -14,14 +17,19 @@ private def finishExportPath (first last : Identifier)
     }
   } state
 
-private def exportPathTail (first : Identifier) :
+/-- Whether a dot is followed by another ordinary export-path component. -/
+def continuesExportPath (state : State) : Bool :=
+  isSymbol state .dot &&
+    match state.peekOffsetKind? 1 with
+    | some (.identifier _) => true
+    | _ => false
+
+/-- Consume the remaining identifier components of an export path. -/
+def exportPathTail (first : Identifier) :
     Nat → Identifier → List Identifier → State → Reply QualifiedName
   | 0, _, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, last, tailRev, state =>
-      if isSymbol state .dot &&
-          match state.peekOffsetKind? 1 with
-          | some (.identifier _) => true
-          | _ => false then
+      if continuesExportPath state then
         match symbol .dot .exportDecl state with
         | .ok _ afterDot =>
             match identifier .exportDecl afterDot with
@@ -36,12 +44,14 @@ private def exportPathTail (first : Identifier) :
         finishExportPath first last tailRev state
 
 /-- Qualified export path that stops before a `.*` or `.{...}` suffix. -/
-private def exportPath : Parser QualifiedName := fun state =>
+def exportPath : Parser QualifiedName := fun state =>
   match identifier .exportDecl state with
   | .ok first next =>
       exportPathTail first (next.remainingCount + 1) first [] next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+end ExportInternals
 
 private def requireConstructorNames (values : DelimitedList Identifier) :
     Parser (NonemptyList Identifier) :=
@@ -111,7 +121,7 @@ private def exportName : Parser ExportName := fun state =>
 private def localExportItem : Parser LocalExportItem := fun state =>
   if isIdentifier state && isSymbol
       { state with cursor := state.cursor + 1 } .dot then
-    match exportPath state with
+    match ExportInternals.exportPath state with
     | .ok path afterPath =>
         match symbol .dot .exportDecl afterPath with
         | .ok _ afterDot =>
@@ -168,7 +178,7 @@ private def localExport (start : SourceSpan) : Parser ExportDecl := do
   finishExport start (.local items)
 
 private def pathExport (start : SourceSpan) : Parser ExportDecl := do
-  let path ← exportPath
+  let path ← ExportInternals.exportPath
   let state ← getState
   if isSymbol state .dot then
     let _ ← symbol .dot .exportDecl
