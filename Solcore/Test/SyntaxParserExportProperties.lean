@@ -23,5 +23,10 @@ example := @exportName_preservesTokenWindow
 example := @exportName_preservesTokensOnSuccess
 example := @exportName_cursorMonotoneOnSuccess
 example := @exportName_startsAtCurrentTokenOnSuccess
+example := @localExportItem_validFor
+example := @localExportItem_preservesTokenWindow
+example := @localExportItem_preservesTokensOnSuccess
+example := @localExportItem_cursorMonotoneOnSuccess
+example := @localExportItem_startsAtCurrentTokenOnSuccess
 
 end Tests

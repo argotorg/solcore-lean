@@ -129,7 +129,10 @@ def exportName : Parser ExportName := fun state =>
 
 end ExportInternals
 
-private def localExportItem : Parser LocalExportItem := fun state =>
+namespace ExportInternals
+
+/-- Parse one local export name or qualified module wildcard. -/
+def localExportItem : Parser LocalExportItem := fun state =>
   if isIdentifier state && isSymbol
       { state with cursor := state.cursor + 1 } .dot then
     match ExportInternals.exportPath state with
@@ -155,6 +158,8 @@ private def localExportItem : Parser LocalExportItem := fun state =>
       } next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
+
+end ExportInternals
 
 private def exportSelection : Parser ExportSelection := fun state =>
   if isSymbol state .star then
@@ -184,7 +189,8 @@ private def finishExport (start : SourceSpan)
   }
 
 private def localExport (start : SourceSpan) : Parser ExportDecl := do
-  let items ← delimited .leftBrace .rightBrace true localExportItem
+  let items ← delimited .leftBrace .rightBrace true
+    ExportInternals.localExportItem
     .exportDecl .topLevel
   finishExport start (.local items)
 

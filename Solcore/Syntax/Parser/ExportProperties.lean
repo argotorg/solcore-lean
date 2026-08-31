@@ -850,4 +850,224 @@ theorem exportName_startsAtCurrentTokenOnSuccess :
           · cases parsed
             exact ⟨token, found, congrArg SourceSpan.startByte tokenSpan⟩
 
+/-- Local export items retain their name or module-wildcard ranges. -/
+theorem localExportItem_validFor :
+    ExportInternals.localExportItem.ValidFor LocalExportItem.ValidFor := by
+  intro input inputValid
+  unfold ExportInternals.localExportItem
+  split
+  · cases pathResult : ExportInternals.exportPath input with
+    | invariant error => simp only [Reply.ValidFor]
+    | reject failure rejected =>
+        have pathValid := exportPath_validFor input inputValid
+        rw [pathResult] at pathValid
+        simpa only [Reply.ValidFor] using pathValid
+    | ok path afterPath =>
+        have pathValid := exportPath_validFor input inputValid
+        rw [pathResult] at pathValid
+        simp only
+        cases dotResult : symbol .dot .exportDecl afterPath with
+        | invariant error => simp only [Reply.ValidFor]
+        | reject failure rejected =>
+            have dotValid := symbol_validFor .dot .exportDecl afterPath
+              pathValid.2.1
+            rw [dotResult] at dotValid
+            simpa only [Reply.ValidFor] using
+              dotValid.of_file_eq pathValid.2.2
+        | ok dot afterDot =>
+            have dotValid := symbol_validFor .dot .exportDecl afterPath
+              pathValid.2.1
+            rw [dotResult] at dotValid
+            simp only
+            cases markerResult : symbol .star .exportDecl afterDot with
+            | invariant error => simp only [Reply.ValidFor]
+            | reject failure rejected =>
+                have markerValid := symbol_validFor .star .exportDecl
+                  afterDot dotValid.2.1
+                rw [markerResult] at markerValid
+                simpa only [Reply.ValidFor] using markerValid.of_file_eq
+                  (dotValid.2.2.trans pathValid.2.2)
+            | ok marker next =>
+                have markerValid := symbol_validFor .star .exportDecl
+                  afterDot dotValid.2.1
+                rw [markerResult] at markerValid
+                have markerSpanValid : marker.span.ValidFor input.file := by
+                  simpa only [Located.ValidFor, dotValid.2.2,
+                    pathValid.2.2] using markerValid.1
+                rcases exportPath_startsAtCurrentTokenOnSuccess
+                    input path afterPath pathResult with
+                  ⟨firstToken, firstFound, firstStart⟩
+                have firstAt :=
+                  State.getElem?_eq_some_of_peek?_eq_some firstFound
+                have markerShape := symbol_ok_state_shape .star .exportDecl
+                  markerResult
+                have markerAtAfterDot :=
+                  State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+                have pathTokens := exportPath_preservesTokensOnSuccess
+                  input path afterPath pathResult
+                have dotTokens := symbol_preservesTokensOnSuccess .dot
+                  .exportDecl afterPath dot afterDot dotResult
+                have markerAtInput :
+                    input.tokens[afterDot.cursor]? = some marker := by
+                  simpa [dotTokens, pathTokens] using markerAtAfterDot
+                have firstBeforeMarker :=
+                  inputValid.token_end_le_token_start_of_getElem?_lt
+                    firstAt markerAtInput (Nat.lt_of_le_of_lt
+                      (exportPath_cursorMonotoneOnSuccess
+                        input path afterPath pathResult)
+                      (acceptToken_cursor_lt_onSuccess (.symbol .dot)
+                        .exportDecl (· == .symbol .dot) dotResult))
+                have firstSpanValid :=
+                  inputValid.peek?_span_validFor firstFound
+                have ordered : path.span.startByte ≤ marker.span.endByte := by
+                  calc
+                    path.span.startByte = firstToken.span.startByte :=
+                      firstStart.symm
+                    _ ≤ firstToken.span.endByte := firstSpanValid.2.1
+                    _ ≤ marker.span.startByte := firstBeforeMarker
+                    _ ≤ marker.span.endByte := markerSpanValid.2.1
+                have outerValid := SourceSpan.cover_validFor pathValid.1.1
+                  markerSpanValid ordered
+                simp only [Reply.ValidFor, LocalExportItem.ValidFor]
+                exact ⟨⟨outerValid, pathValid.1, markerSpanValid⟩,
+                  markerValid.2.1, markerValid.2.2.trans
+                    (dotValid.2.2.trans pathValid.2.2)⟩
+  · cases nameResult : ExportInternals.exportName input with
+    | invariant error => simp only [Reply.ValidFor]
+    | reject failure rejected =>
+        have nameValid := exportName_validFor input inputValid
+        rw [nameResult] at nameValid
+        simpa only [Reply.ValidFor] using nameValid
+    | ok name next =>
+        have nameValid := exportName_validFor input inputValid
+        rw [nameResult] at nameValid
+        simp only [Reply.ValidFor, LocalExportItem.ValidFor]
+        exact ⟨⟨nameValid.1.1, nameValid.1⟩,
+          nameValid.2.1, nameValid.2.2⟩
+
+/-- Local export items preserve every ordinary token window. -/
+theorem localExportItem_preservesTokenWindow :
+    Parser.PreservesTokenWindow ExportInternals.localExportItem := by
+  intro input
+  unfold ExportInternals.localExportItem
+  split
+  · have pathShape := exportPath_preservesTokenWindow input
+    cases pathResult : ExportInternals.exportPath input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        rw [pathResult] at pathShape
+        exact pathShape
+    | ok path afterPath =>
+        rw [pathResult] at pathShape
+        simp only
+        have dotShape := symbol_preservesTokenWindow .dot .exportDecl afterPath
+        cases dotResult : symbol .dot .exportDecl afterPath with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [dotResult] at dotShape
+            exact dotShape.trans pathShape
+        | ok dot afterDot =>
+            rw [dotResult] at dotShape
+            simp only
+            have markerShape :=
+              symbol_preservesTokenWindow .star .exportDecl afterDot
+            cases markerResult : symbol .star .exportDecl afterDot with
+            | invariant error => trivial
+            | reject failure rejected =>
+                rw [markerResult] at markerShape
+                exact markerShape.trans (dotShape.trans pathShape)
+            | ok marker next =>
+                rw [markerResult] at markerShape
+                exact markerShape.trans (dotShape.trans pathShape)
+  · have nameShape := exportName_preservesTokenWindow input
+    cases nameResult : ExportInternals.exportName input with
+    | invariant error => trivial
+    | reject failure rejected =>
+        rw [nameResult] at nameShape
+        exact nameShape
+    | ok name next =>
+        rw [nameResult] at nameShape
+        exact nameShape
+
+/-- Successful local export items retain the lexer token carrier. -/
+theorem localExportItem_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess ExportInternals.localExportItem :=
+  localExportItem_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Successful local export items never rewind the cursor. -/
+theorem localExportItem_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess ExportInternals.localExportItem := by
+  intro input item next parsed
+  unfold ExportInternals.localExportItem at parsed
+  split at parsed
+  · cases pathResult : ExportInternals.exportPath input with
+    | invariant error => simp [pathResult] at parsed
+    | reject failure rejected => simp [pathResult] at parsed
+    | ok path afterPath =>
+        simp only [pathResult] at parsed
+        cases dotResult : symbol .dot .exportDecl afterPath with
+        | invariant error => simp [dotResult] at parsed
+        | reject failure rejected => simp [dotResult] at parsed
+        | ok dot afterDot =>
+            simp only [dotResult] at parsed
+            cases markerResult : symbol .star .exportDecl afterDot with
+            | invariant error => simp [markerResult] at parsed
+            | reject failure rejected => simp [markerResult] at parsed
+            | ok marker afterMarker =>
+                simp only [markerResult] at parsed
+                cases parsed
+                exact Nat.le_trans
+                  (exportPath_cursorMonotoneOnSuccess
+                    input path afterPath pathResult)
+                  (Nat.le_trans
+                    (symbol_cursorMonotoneOnSuccess .dot .exportDecl
+                      afterPath dot afterDot dotResult)
+                    (symbol_cursorMonotoneOnSuccess .star .exportDecl
+                      afterDot marker next markerResult))
+  · cases nameResult : ExportInternals.exportName input with
+    | invariant error => simp [nameResult] at parsed
+    | reject failure rejected => simp [nameResult] at parsed
+    | ok name afterName =>
+        simp only [nameResult] at parsed
+        cases parsed
+        exact exportName_cursorMonotoneOnSuccess
+          input name next nameResult
+
+/-- A local export item starts at its module path or exported name. -/
+theorem localExportItem_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess
+      ExportInternals.localExportItem (·.span) := by
+  intro input item next parsed
+  unfold ExportInternals.localExportItem at parsed
+  split at parsed
+  · cases pathResult : ExportInternals.exportPath input with
+    | invariant error => simp [pathResult] at parsed
+    | reject failure rejected => simp [pathResult] at parsed
+    | ok path afterPath =>
+        simp only [pathResult] at parsed
+        cases dotResult : symbol .dot .exportDecl afterPath with
+        | invariant error => simp [dotResult] at parsed
+        | reject failure rejected => simp [dotResult] at parsed
+        | ok dot afterDot =>
+            simp only [dotResult] at parsed
+            cases markerResult : symbol .star .exportDecl afterDot with
+            | invariant error => simp [markerResult] at parsed
+            | reject failure rejected => simp [markerResult] at parsed
+            | ok marker afterMarker =>
+                simp only [markerResult] at parsed
+                cases parsed
+                rcases exportPath_startsAtCurrentTokenOnSuccess
+                    input path afterPath pathResult with
+                  ⟨token, found, start⟩
+                exact ⟨token, found, by
+                  simpa [SourceSpan.cover] using start⟩
+  · cases nameResult : ExportInternals.exportName input with
+    | invariant error => simp [nameResult] at parsed
+    | reject failure rejected => simp [nameResult] at parsed
+    | ok name afterName =>
+        simp only [nameResult] at parsed
+        cases parsed
+        exact exportName_startsAtCurrentTokenOnSuccess
+          input name next nameResult
+
 end Solcore.Syntax.Parser
