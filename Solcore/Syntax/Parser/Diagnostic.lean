@@ -74,6 +74,8 @@ inductive ParseConstraint where
   | malformedDeriveAttribute
   | unclosedDeriveAttribute
   | deriveOnlyEnum
+  | implicitPublicModifier (declaration : HardKeyword)
+  | fallbackRequiresNoParameters
   deriving Repr, BEq, DecidableEq
 
 /-- Bounded recursive syntax dimensions checked before recursive parsing. -/
