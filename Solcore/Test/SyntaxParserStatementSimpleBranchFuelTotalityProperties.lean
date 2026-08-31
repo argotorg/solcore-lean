@@ -1,0 +1,18 @@
+import Solcore.Syntax.Parser.Statement.SimpleBranchFuelTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserStatementSimpleBranchFuelTotalityProperties
+
+open Solcore.Syntax.Parser
+
+example := @StatementSimpleInternals.optionalLetInitializer_ordinary_of_expressionFuel
+example := @StatementSimpleInternals.optionalReturnValue_ordinary_of_expressionFuel
+example := @letStatement_ordinary_of_expressionFuel
+example := @returnStatement_ordinary_of_expressionFuel
+example := @letStatement_ne_invariant_of_expressionFuel
+example := @returnStatement_ne_invariant_of_expressionFuel
+example := @letStatement_fuelTotalityContract
+example := @returnStatement_fuelTotalityContract
+
+end Solcore.Test.SyntaxParserStatementSimpleBranchFuelTotalityProperties
