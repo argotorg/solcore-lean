@@ -8,6 +8,16 @@ namespace Tests
 
 open Solcore.Syntax
 
+example := @Parser.genericParameters_validFor
+example := @Parser.genericParameters_preservesTokenWindow
+example := @Parser.genericParameters_preservesTokensOnSuccess
+example := @Parser.genericParameters_cursorMonotoneOnSuccess
+example := @Parser.genericParameters_startsAtCurrentTokenOnSuccess
+example := @Parser.optionalGenericParameters_validFor
+example := @Parser.optionalGenericParameters_preservesTokenWindow
+example := @Parser.optionalGenericParameters_preservesTokensOnSuccess
+example := @Parser.optionalGenericParameters_cursorMonotoneOnSuccess
+
 private abbrev ByteRange := Nat × Nat
 
 private def parserSource : SourceId := {

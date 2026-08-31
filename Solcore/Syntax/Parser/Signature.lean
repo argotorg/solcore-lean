@@ -65,6 +65,13 @@ private theorem requireGenericParameters_preservesTokensOnSuccess
       cases parsed
       rfl
 
+private theorem requireGenericParameters_preservesTokenWindow
+    (values : DelimitedList Identifier) :
+    Parser.PreservesTokenWindow (requireGenericParameters values) := by
+  intro input
+  unfold requireGenericParameters
+  cases values.elements <;> trivial
+
 private theorem requireGenericParameters_cursorMonotoneOnSuccess
     (values : DelimitedList Identifier) :
     Parser.CursorMonotoneOnSuccess (requireGenericParameters values) := by
@@ -93,6 +100,16 @@ theorem genericParameters_validFor :
   exact requireGenericParameters_reply_validFor values input inputValid
     valuesValid
 
+/-- Generic parameter parsing preserves every ordinary token window. -/
+theorem genericParameters_preservesTokenWindow :
+    Parser.PreservesTokenWindow genericParameters := by
+  unfold genericParameters
+  apply Parser.bind_preservesTokenWindow
+  · exact delimited_preservesTokenWindow .less .greater false
+      (identifier .parameter) .parameter .topLevel
+      (identifier_preservesTokenWindow .parameter)
+  · exact requireGenericParameters_preservesTokenWindow
+
 /-- Generic parameter parsing preserves the immutable lexer token carrier. -/
 theorem genericParameters_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess genericParameters := by
@@ -112,6 +129,24 @@ theorem genericParameters_cursorMonotoneOnSuccess :
       (identifier .parameter) .parameter .topLevel
   · exact requireGenericParameters_cursorMonotoneOnSuccess
 
+/-- A generic parameter list starts at its opening angle bracket. -/
+theorem genericParameters_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess genericParameters (·.span) := by
+  unfold genericParameters
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (delimited_startsAtCurrentTokenOnSuccess .less .greater false
+      (identifier .parameter) .parameter .topLevel)
+  intro values input result next parsed
+  unfold requireGenericParameters at parsed
+  cases elements : values.elements with
+  | nil =>
+      simp only [elements] at parsed
+      contradiction
+  | cons head tail =>
+      simp only [elements] at parsed
+      cases parsed
+      rfl
+
 private theorem someGenericParameters_validFor :
     (do
       let values ← genericParameters
@@ -130,6 +165,14 @@ private theorem someGenericParameters_preservesTokensOnSuccess :
   · exact genericParameters_preservesTokensOnSuccess
   · intro values
     exact Parser.pure_preservesTokensOnSuccess (some values)
+
+private theorem someGenericParameters_preservesTokenWindow :
+    Parser.PreservesTokenWindow (do
+      let values ← genericParameters
+      pure (some values)) := by
+  apply Parser.bind_preservesTokenWindow genericParameters_preservesTokenWindow
+  intro values
+  exact Parser.pure_preservesTokenWindow (some values)
 
 private theorem someGenericParameters_cursorMonotoneOnSuccess :
     Parser.CursorMonotoneOnSuccess (do
@@ -156,6 +199,16 @@ theorem optionalGenericParameters_validFor :
   split
   · exact someGenericParameters_validFor input inputValid
   · exact ⟨trivial, inputValid, rfl⟩
+
+/-- Optional generic parameter parsing preserves every token window. -/
+theorem optionalGenericParameters_preservesTokenWindow :
+    Parser.PreservesTokenWindow optionalGenericParameters := by
+  intro input
+  unfold optionalGenericParameters
+  rw [getState_bind_apply]
+  split
+  · exact someGenericParameters_preservesTokenWindow input
+  · exact ⟨rfl, rfl⟩
 
 /-- Optional generic parameter parsing preserves the lexer token carrier. -/
 theorem optionalGenericParameters_preservesTokensOnSuccess :
