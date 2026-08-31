@@ -27,7 +27,8 @@ private theorem bind_ok_components {α β : Type} {first : Parser α}
       rw [firstResult] at parsed
       contradiction
 
-private def requireNonempty {α : Type} (parsed : DelimitedList α)
+/-- Convert a successfully parsed list to its required nonempty carrier. -/
+def requireNonempty {α : Type} (parsed : DelimitedList α)
     (phase : ParserPhase) : Parser (NonemptyDelimitedList α) :=
   match parsed.elements with
   | head :: tail => pure {
@@ -36,34 +37,48 @@ private def requireNonempty {α : Type} (parsed : DelimitedList α)
     }
   | [] => fun _ => .invariant (.noProgress phase parsed.span)
 
-private def parseNamedType (nested : Parser TypeExpr) : Parser TypeExpr := do
-  let name ← qualifiedName .typeExpr .typeExpr
+/-- Parse the optional, structurally nonempty arguments of a named type. -/
+def parseNamedTypeArguments (nested : Parser TypeExpr) :
+    Parser (Option (NonemptyDelimitedList TypeExpr)) := do
   let state ← getState
-  let arguments ←
-    if isSymbol state .less then
-      do
-        let parsed ← delimited .less .greater false nested
-          .typeExpr .typeExpr
-        let nonempty ← requireNonempty parsed .typeExpr
-        pure (some nonempty)
-    else
-      pure none
+  if isSymbol state .less then
+    let parsed ← delimited .less .greater false nested
+      .typeExpr .typeExpr
+    let nonempty ← requireNonempty parsed .typeExpr
+    pure (some nonempty)
+  else
+    pure none
+
+/-- Build the source-shaped syntax value retained by named-type parsing. -/
+def makeNamedType (name : QualifiedName)
+    (arguments : Option (NonemptyDelimitedList TypeExpr)) : TypeExpr :=
   let span := match arguments with
     | some values => SourceSpan.cover name.span values.span
     | none => name.span
-  let ty : TypeExpr := {
+  {
     span
     value := .named name arguments
   }
+
+/-- Build a named type and emit the canonical-spelling diagnostic if needed. -/
+def finishNamedType (name : QualifiedName)
+    (arguments : Option (NonemptyDelimitedList TypeExpr)) : Parser TypeExpr := do
+  let ty := makeNamedType name arguments
   if name.value.components.tail.isEmpty &&
       name.value.components.head.value == "mapping" then
     emitDiagnostic {
-      span
+      span := ty.span
       kind := .constraintViolation .mappingRequiresCanonicalForm
     }
   else
     pure ()
   pure ty
+
+/-- Parse an ordinary named type and its optional generic arguments. -/
+def parseNamedType (nested : Parser TypeExpr) : Parser TypeExpr := do
+  let name ← qualifiedName .typeExpr .typeExpr
+  let arguments ← parseNamedTypeArguments nested
+  finishNamedType name arguments
 
 /-- Parse the canonical `mapping(key => value)` type form. -/
 def parseMappingType (nested : Parser TypeExpr) : Parser TypeExpr := do

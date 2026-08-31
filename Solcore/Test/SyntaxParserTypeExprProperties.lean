@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Type
+import Solcore.Syntax.Parser.TypeNamedProperties
 
 /-! External consumers for recursive type-expression and tuple contracts. -/
 
@@ -10,6 +10,21 @@ open Solcore.Syntax
 open Solcore.Syntax.Parser
 
 example := @TypeExpr.ValidFor
+
+example (nested : Parser TypeExpr)
+    (valid : nested.ValidFor TypeExpr.ValidFor)
+    (tokens : Parser.PreservesTokensOnSuccess nested) :
+    (parseNamedType nested).ValidFor TypeExpr.ValidFor :=
+  parseNamedType_validFor nested valid tokens
+
+example (nested : Parser TypeExpr)
+    (tokens : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (parseNamedTypeArguments nested) :=
+  parseNamedTypeArguments_preservesTokensOnSuccess nested tokens
+
+example (nested : Parser TypeExpr) :
+    Parser.CursorMonotoneOnSuccess (parseNamedTypeArguments nested) :=
+  parseNamedTypeArguments_cursorMonotoneOnSuccess nested
 
 example (nested : Parser TypeExpr)
     (nestedValid : nested.ValidFor TypeExpr.ValidFor)
