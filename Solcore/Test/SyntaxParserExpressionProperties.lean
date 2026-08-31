@@ -44,5 +44,19 @@ example := @ExpressionInternals.conditional_cursor_lt_onSuccess
 example := @ExpressionInternals.expressionUnary_cursor_lt_onSuccess
 example := @ExpressionInternals.leftAssociative_cursor_lt_onSuccess
 example := @ExpressionInternals.nonAssociative_cursor_lt_onSuccess
+example := @ExpressionInternals.ExpressionContract
+example := @ExpressionInternals.ExpressionContract.preservesTokensOnSuccess
+example := @ExpressionInternals.ExpressionContract.cursorMonotoneOnSuccess
+example := @ExpressionInternals.ExpressionContract.unary
+example := @ExpressionInternals.ExpressionContract.leftAssociative
+example := @ExpressionInternals.ExpressionContract.nonAssociative
+example := @ExpressionInternals.ExpressionContract.conditional
+example := @ExpressionInternals.expressionLayer_contract
+example := @ExpressionInternals.expressionLayer_validFor
+example := @ExpressionInternals.expressionLayer_preservesTokenWindow
+example := @ExpressionInternals.expressionLayer_preservesTokensOnSuccess
+example := @ExpressionInternals.expressionLayer_cursor_lt_onSuccess
+example := @ExpressionInternals.expressionLayer_cursorMonotoneOnSuccess
+example := @ExpressionInternals.expressionLayer_startsAtCurrentTokenOnSuccess
 
 end Tests

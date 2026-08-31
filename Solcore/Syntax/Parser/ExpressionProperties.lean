@@ -1941,5 +1941,214 @@ theorem nonAssociative_cursor_lt_onSuccess
                     (Nat.le_trans consumedMonotone
                       (Nat.le_of_lt (operandCursorLt rightResult)))
 
+/-- The compositional proof boundary required by one expression parser layer. -/
+structure ExpressionContract
+    (statementValid : SourceFile → Statement → Prop)
+    (parser : Parser Expr) : Prop where
+  validFor : parser.ValidFor (Expr.ValidFor statementValid)
+  preservesTokenWindow : Parser.PreservesTokenWindow parser
+  cursorLtOnSuccess : ∀ {input next : State} {value : Expr},
+    parser input = .ok value next → input.cursor < next.cursor
+  startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess parser (·.span)
+
+namespace ExpressionContract
+
+theorem preservesTokensOnSuccess
+    {statementValid : SourceFile → Statement → Prop} {parser : Parser Expr}
+    (contract : ExpressionContract statementValid parser) :
+    Parser.PreservesTokensOnSuccess parser :=
+  contract.preservesTokenWindow.preservesTokensOnSuccess
+
+theorem cursorMonotoneOnSuccess
+    {statementValid : SourceFile → Statement → Prop} {parser : Parser Expr}
+    (contract : ExpressionContract statementValid parser) :
+    Parser.CursorMonotoneOnSuccess parser := by
+  intro input value next parsed
+  exact Nat.le_of_lt (contract.cursorLtOnSuccess parsed)
+
+/-- Lift a postfix contract through prefix unary parsing. -/
+theorem unary
+    (statementValid : SourceFile → Statement → Prop)
+    (nested : Parser Expr) (block : Parser Block)
+    (postfixContract : ExpressionContract statementValid
+      (expressionPostfix nested block)) :
+    ExpressionContract statementValid (expressionUnary nested block) := {
+  validFor := expressionUnary_validFor nested block statementValid
+    postfixContract.validFor postfixContract.startsAtCurrentTokenOnSuccess
+  preservesTokenWindow := expressionUnary_preservesTokenWindow nested block
+    postfixContract.preservesTokenWindow
+  cursorLtOnSuccess := fun parsed =>
+    expressionUnary_cursor_lt_onSuccess nested block
+      postfixContract.cursorLtOnSuccess parsed
+  startsAtCurrentTokenOnSuccess :=
+    expressionUnary_startsAtCurrentTokenOnSuccess nested block
+      postfixContract.startsAtCurrentTokenOnSuccess
+}
+
+/-- Lift an operand contract through one left-associative precedence. -/
+theorem leftAssociative
+    {statementValid : SourceFile → Statement → Prop} {operand : Parser Expr}
+    (contract : ExpressionContract statementValid operand)
+    (precedence : Nat) :
+    ExpressionContract statementValid
+      (ExpressionInternals.leftAssociative operand precedence) := {
+  validFor := ExpressionInternals.leftAssociative_validFor operand
+    statementValid contract.validFor contract.preservesTokensOnSuccess
+      contract.cursorLtOnSuccess contract.startsAtCurrentTokenOnSuccess
+        precedence
+  preservesTokenWindow :=
+    ExpressionInternals.leftAssociative_preservesTokenWindow operand
+      contract.preservesTokenWindow precedence
+  cursorLtOnSuccess := fun parsed =>
+    ExpressionInternals.leftAssociative_cursor_lt_onSuccess operand
+      contract.cursorLtOnSuccess precedence parsed
+  startsAtCurrentTokenOnSuccess :=
+    ExpressionInternals.leftAssociative_startsAtCurrentTokenOnSuccess operand
+      contract.startsAtCurrentTokenOnSuccess precedence
+}
+
+/-- Lift an operand contract through one non-associative precedence. -/
+theorem nonAssociative
+    {statementValid : SourceFile → Statement → Prop} {operand : Parser Expr}
+    (contract : ExpressionContract statementValid operand)
+    (precedence : Nat) :
+    ExpressionContract statementValid
+      (ExpressionInternals.nonAssociative operand precedence) := {
+  validFor := ExpressionInternals.nonAssociative_validFor operand
+    statementValid contract.validFor contract.preservesTokensOnSuccess
+      contract.cursorLtOnSuccess contract.startsAtCurrentTokenOnSuccess
+        precedence
+  preservesTokenWindow :=
+    ExpressionInternals.nonAssociative_preservesTokenWindow operand
+      contract.preservesTokenWindow precedence
+  cursorLtOnSuccess := fun parsed =>
+    ExpressionInternals.nonAssociative_cursor_lt_onSuccess operand
+      contract.cursorLtOnSuccess precedence parsed
+  startsAtCurrentTokenOnSuccess :=
+    ExpressionInternals.nonAssociative_startsAtCurrentTokenOnSuccess operand
+      contract.startsAtCurrentTokenOnSuccess precedence
+}
+
+/-- Lift recursive and alternative contracts through conditional parsing. -/
+theorem conditional
+    {statementValid : SourceFile → Statement → Prop}
+    {nested alternative : Parser Expr}
+    (nestedContract : ExpressionContract statementValid nested)
+    (alternativeContract : ExpressionContract statementValid alternative) :
+    ExpressionContract statementValid
+      (ExpressionInternals.conditional nested alternative) := {
+  validFor := ExpressionInternals.conditional_validFor nested alternative
+    statementValid nestedContract.validFor
+      nestedContract.preservesTokensOnSuccess
+      nestedContract.cursorMonotoneOnSuccess alternativeContract.validFor
+      alternativeContract.preservesTokensOnSuccess
+      alternativeContract.cursorLtOnSuccess
+      alternativeContract.startsAtCurrentTokenOnSuccess
+  preservesTokenWindow :=
+    ExpressionInternals.conditional_preservesTokenWindow nested alternative
+      nestedContract.preservesTokenWindow
+      alternativeContract.preservesTokenWindow
+  cursorLtOnSuccess := fun parsed =>
+    ExpressionInternals.conditional_cursor_lt_onSuccess nested alternative
+      nestedContract.cursorMonotoneOnSuccess
+      alternativeContract.cursorLtOnSuccess parsed
+  startsAtCurrentTokenOnSuccess :=
+    ExpressionInternals.conditional_startsAtCurrentTokenOnSuccess nested
+      alternative alternativeContract.startsAtCurrentTokenOnSuccess
+}
+
+end ExpressionContract
+
+/-- Assemble the complete precedence and conditional expression contract. -/
+theorem expressionLayer_contract
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedContract : ExpressionContract statementValid nested)
+    (postfixContract : ExpressionContract statementValid
+      (expressionPostfix nested block)) :
+    ExpressionContract statementValid (expressionLayer nested block) := by
+  have unaryContract := ExpressionContract.unary statementValid nested block
+    postfixContract
+  have multiplyContract := ExpressionContract.leftAssociative unaryContract 8
+  have addContract := ExpressionContract.leftAssociative multiplyContract 7
+  have bitAndContract := ExpressionContract.leftAssociative addContract 6
+  have bitXorContract := ExpressionContract.leftAssociative bitAndContract 5
+  have bitOrContract := ExpressionContract.leftAssociative bitXorContract 4
+  have relationalContract :=
+    ExpressionContract.nonAssociative bitOrContract 3
+  have equalityContract :=
+    ExpressionContract.nonAssociative relationalContract 2
+  have logicalAndContract :=
+    ExpressionContract.leftAssociative equalityContract 1
+  have logicalOrContract :=
+    ExpressionContract.leftAssociative logicalAndContract 0
+  simpa only [expressionLayer] using
+    ExpressionContract.conditional nestedContract logicalOrContract
+
+theorem expressionLayer_validFor
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedContract : ExpressionContract statementValid nested)
+    (postfixContract : ExpressionContract statementValid
+      (expressionPostfix nested block)) :
+    (expressionLayer nested block).ValidFor
+      (Expr.ValidFor statementValid) :=
+  (expressionLayer_contract nested block statementValid nestedContract
+    postfixContract).validFor
+
+theorem expressionLayer_preservesTokenWindow
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedContract : ExpressionContract statementValid nested)
+    (postfixContract : ExpressionContract statementValid
+      (expressionPostfix nested block)) :
+    Parser.PreservesTokenWindow (expressionLayer nested block) :=
+  (expressionLayer_contract nested block statementValid nestedContract
+    postfixContract).preservesTokenWindow
+
+theorem expressionLayer_preservesTokensOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedContract : ExpressionContract statementValid nested)
+    (postfixContract : ExpressionContract statementValid
+      (expressionPostfix nested block)) :
+    Parser.PreservesTokensOnSuccess (expressionLayer nested block) :=
+  (expressionLayer_contract nested block statementValid nestedContract
+    postfixContract).preservesTokensOnSuccess
+
+theorem expressionLayer_cursor_lt_onSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedContract : ExpressionContract statementValid nested)
+    (postfixContract : ExpressionContract statementValid
+      (expressionPostfix nested block))
+    {input next : State} {value : Expr}
+    (parsed : expressionLayer nested block input = .ok value next) :
+    input.cursor < next.cursor :=
+  (expressionLayer_contract nested block statementValid nestedContract
+    postfixContract).cursorLtOnSuccess parsed
+
+theorem expressionLayer_cursorMonotoneOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedContract : ExpressionContract statementValid nested)
+    (postfixContract : ExpressionContract statementValid
+      (expressionPostfix nested block)) :
+    Parser.CursorMonotoneOnSuccess (expressionLayer nested block) :=
+  (expressionLayer_contract nested block statementValid nestedContract
+    postfixContract).cursorMonotoneOnSuccess
+
+theorem expressionLayer_startsAtCurrentTokenOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedContract : ExpressionContract statementValid nested)
+    (postfixContract : ExpressionContract statementValid
+      (expressionPostfix nested block)) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (expressionLayer nested block) (·.span) :=
+  (expressionLayer_contract nested block statementValid nestedContract
+    postfixContract).startsAtCurrentTokenOnSuccess
+
 end ExpressionInternals
 end Solcore.Syntax.Parser
