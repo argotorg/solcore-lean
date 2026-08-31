@@ -45,7 +45,10 @@ def operatorPart? : TokenKind → Option String
 def isOperatorPart (kind : TokenKind) : Bool :=
   (operatorPart? kind).isSome
 
-private def operatorParts (context : ParseContext) :
+namespace OperatorInternals
+
+/-- Fuel-bounded token collector used by parenthesized operator selectors. -/
+def operatorParts (context : ParseContext) :
     Nat → List String → State → Reply (List String)
   | 0, _, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, partsRev, state =>
@@ -65,6 +68,10 @@ private def operatorParts (context : ParseContext) :
             rejectAt state { head := .selectorName, tail := [] } context
           else
             .ok partsRev.reverse state
+
+end OperatorInternals
+
+open OperatorInternals
 
 private theorem operatorParts_validFor (context : ParseContext) :
     ∀ fuel partsRev state,
