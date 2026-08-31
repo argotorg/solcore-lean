@@ -54,7 +54,7 @@ def ValidFor (statementValid : SourceFile → YulStmt → Prop)
 
 end YulParsedBlock
 
-private def closeYulBlock (opening : Token)
+def closeYulBlock (opening : Token)
     (bodyRev : List YulStmt) : Parser YulParsedBlock := fun state =>
   match symbol .rightBrace .yulStatement state with
   | .ok closing next => .ok {
@@ -64,7 +64,7 @@ private def closeYulBlock (opening : Token)
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
-private def yulBlockItems (statement : Parser YulStmt)
+def yulBlockItems (statement : Parser YulStmt)
     (opening : Token) : Nat → List YulStmt → State → Reply YulParsedBlock
   | 0, _, state => .invariant (.fuelExhausted .yul state.currentSpan)
   | fuel + 1, bodyRev, state =>
