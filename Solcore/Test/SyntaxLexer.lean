@@ -220,6 +220,36 @@ private def testEmptyComments : IO Unit := do
     ] "empty and EOF comment spans"
   assertEqual output.diagnostics [] "empty-comment diagnostics"
 
+private def hyphenNameChars : Nat → List Char → List Char
+  | 0, reversed => reversed.reverse
+  | count + 1, reversed =>
+      hyphenNameChars count ('a' :: '-' :: reversed)
+
+private def testLongScans : IO Unit := do
+  let longName := String.ofList (List.replicate 100000 'a')
+  let nameOutput ← checkedLex "long identifier" longName
+  match nameOutput.tokens with
+  | [{ value := .identifier text, .. }] =>
+      assertEqual text.length 100000 "long identifier length"
+  | tokens =>
+      throw (IO.userError
+        s!"long identifier produced {tokens.length} tokens")
+
+  let commentOutput ← checkedLex "long line comment" ("//" ++ longName)
+  match commentOutput.comments with
+  | [{ kind := .line, text, .. }] =>
+      assertEqual text.length 100000 "long line-comment length"
+  | comments =>
+      throw (IO.userError
+        s!"long line comment produced {comments.length} comments")
+
+  let hyphenName := String.ofList (hyphenNameChars 10000 ['a'])
+  let hyphenOutput ← checkedLex "long hyphen identifier" hyphenName
+  assertEqual hyphenOutput.tokens.length 1
+    "long hyphen identifier token count"
+  assertEqual hyphenOutput.diagnostics []
+    "long hyphen identifier diagnostics"
+
 private def testInternalFuelBranch : IO Unit := do
   let file : SourceFile := { id := lexerSource, content := "x" }
   match Lexer.lexLoop file 0 (Lexer.State.initial file) with
@@ -245,6 +275,7 @@ def testSyntaxLexer : IO Unit := do
   testIdentifierBoundaries
   testWhitespaceAndStringNewlines
   testEmptyComments
+  testLongScans
   testInternalFuelBranch
 
 end Tests
