@@ -54,7 +54,8 @@ def startsYulLiteral (state : State) : Bool :=
   | some (.keyword .falseKw) => true
   | _ => false
 
-private def optionalYulCallArguments (nested : Parser YulExpr) :
+/-- Parse optional arguments using the supplied parser for recursive expressions. -/
+def optionalYulCallArguments (nested : Parser YulExpr) :
     Parser (Option (DelimitedList YulExpr)) := fun state =>
   if isSymbol state .leftParen then
     orElse
@@ -64,7 +65,8 @@ private def optionalYulCallArguments (nested : Parser YulExpr) :
   else
     .ok none state
 
-private def rejectedMeta : Parser YulExpr := fun state =>
+/-- Consume forbidden source-level meta syntax as a diagnosed error expression. -/
+def rejectedMeta : Parser YulExpr := fun state =>
   match state.peek? with
   | some token@{ value := .yulMetaBacktick _, .. }
   | some token@{ value := .yulMetaInterpolation _, .. } =>
@@ -75,7 +77,8 @@ private def rejectedMeta : Parser YulExpr := fun state =>
         })
   | _ => rejectAt state { head := .yulIdentifier, tail := [] } .yulExpression
 
-private def yulExpressionCore (nested : Parser YulExpr) : Parser YulExpr :=
+/-- Parse one non-recovering Yul expression layer with a recursive parser. -/
+def yulExpressionCore (nested : Parser YulExpr) : Parser YulExpr :=
     fun state =>
   if startsYulLiteral state then
     match yulLiteral state with
