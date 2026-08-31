@@ -8,6 +8,7 @@ namespace Tests
 
 open Solcore.Syntax.Parser
 
+example := @exportPath_validFor
 example := @exportPath_preservesTokenWindow
 example := @exportPath_preservesTokensOnSuccess
 example := @exportPath_cursorMonotoneOnSuccess
