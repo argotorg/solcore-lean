@@ -193,6 +193,35 @@ theorem parse_ok_provenance
           subst output
           exact parseLexed_ok_provenance file lexed parsedOutput parsing
 
+/-- The public parser can never expose the lexer's reserved invariant error. -/
+theorem parse_lexerInvariant_impossible
+    (file : SourceFile) (diagnostic : LexicalDiagnostic)
+    (result : parse file = .error (.lexerInvariant diagnostic)) : False := by
+  rcases Lexer.lex_exists_ok file with ⟨lexed, lexing⟩
+  unfold parse at result
+  rw [lexing] at result
+  cases parsing : parseLexed file lexed with
+  | error parserError => simp [parsing] at result
+  | ok output => simp [parsing] at result
+
+/-- Every remaining public parser error comes from `parseLexed`. -/
+theorem parse_error_parserInvariant
+    (file : SourceFile) (error : SyntaxInvariantError)
+    (result : parse file = .error error) :
+    ∃ lexed parserError,
+      Lexer.lex file = .ok lexed ∧
+      parseLexed file lexed = .error parserError ∧
+      error = .parserInvariant parserError := by
+  rcases Lexer.lex_exists_ok file with ⟨lexed, lexing⟩
+  unfold parse at result
+  rw [lexing] at result
+  cases parsing : parseLexed file lexed with
+  | error parserError =>
+      simp only [parsing] at result
+      cases result
+      exact ⟨lexed, parserError, lexing, parsing, rfl⟩
+  | ok output => simp [parsing] at result
+
 /--
 Every successful public parse exposes a successful lexer/parser composition and
 the exact retained lexical carriers that produced its output.

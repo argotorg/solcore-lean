@@ -17,6 +17,7 @@ import Solcore.Test.SyntaxParserDeclarationTrivia
 import Solcore.Test.SyntaxParserDiagnosticSuppression
 import Solcore.Test.SyntaxParserEnumTraitImpl
 import Solcore.Test.SyntaxParserExports
+import Solcore.Test.SyntaxParserInvariantProperties
 import Solcore.Test.SyntaxParserLegacyRejection
 import Solcore.Test.SyntaxParserModules
 import Solcore.Test.SyntaxParserNameProperties
