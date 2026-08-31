@@ -230,11 +230,13 @@ parenthesized groups and tuples, and comptime patterns. Their common dispatch
 and recovery layer also satisfy those contracts. Connecting that generic layer
 through the fuel-indexed public pattern parser remains active work. Core
 expression lifting covers literal, identifier, proxy, and leading-dot
-constructor atoms, the prefix-unary scanner, and tuple/group closing. The
-remaining parenthesized and recursive expression layers are still being
-composed. Assignment/expression, `let`, and return statements now have the full
-provenance, token-window, carrier, cursor, and starting-token boundary. Other
-statement forms remain in progress. Proof lifting also
+constructor atoms, complete parenthesized groups and tuples, the prefix-unary
+scanner, and the binary-operator helper layer. The remaining postfix and
+operator-precedence layers are still being composed. Assignment/expression,
+`let`, return, block, and `while` statements now have the full provenance,
+token-window, carrier, cursor, and starting-token boundary. Non-`let` items in
+`for` headers have the same contract; the complete `for` statement and other
+control forms remain in progress. Proof lifting also
 remains active for other declarations and the complete-file parser; defining a
 validity predicate alone is not treated as proof that a parser satisfies it.
 

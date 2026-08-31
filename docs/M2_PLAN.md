@@ -87,11 +87,12 @@ Pattern lifting covers wildcard, literal and Boolean leaves, both constructor
 forms, parenthesized groups and tuples, and comptime patterns. Their common
 dispatch and recovery layer also satisfy the compositional contracts; lifting
 that layer through the public fuel-indexed recursion remains. Core expression
-lifting covers literal, identifier, proxy, and leading-dot constructor atoms;
-prefix-unary scanning and tuple/group closing have also been lifted.
-Assignment/expression, `let`, and return statements have complete ordinary-result
-contracts. The remaining Core expression, statement, declaration, and
-complete-file parsers are active work.
+lifting covers literal, identifier, proxy, and leading-dot constructor atoms,
+complete parenthesized groups and tuples, prefix-unary scanning, and the binary
+operator helper layer. Assignment/expression, `let`, return, block, and `while`
+statements have complete ordinary-result contracts. Non-`let` `for`-header
+items have also reached that boundary. The remaining Core expression,
+statement, declaration, and complete-file parsers are active work.
 
 The remaining proof boundary also includes parser-generated diagnostic
 validity, provenance and unreachability of grammar invariant failures, parser
