@@ -74,11 +74,13 @@ and enums have source-validity, token-window, carrier, cursor, and
 start-position contracts.
 Function declarations reach the same boundary once their recursive block
 parser supplies its validity contract; constructors and fallback entries have
-the corresponding conditional guarantee for non-tail bodies. Individual trait
-predicates have reached the same boundary. Named parameters preserve provenance
-through recovery, and their delimited function-parameter list has the complete
-compositional boundary. Public lambda parameters also have complete source,
-token-window, carrier, cursor, and starting-token contracts.
+the corresponding conditional guarantee for non-tail bodies. Trait methods,
+bodies, and complete trait declarations have full source and state contracts.
+Individual trait predicates have reached the same boundary. Named parameters
+preserve provenance through recovery, and their delimited function-parameter
+list has the complete compositional boundary. Public lambda parameters also
+have complete source, token-window, carrier, cursor, and starting-token
+contracts.
 
 The recursive validity contracts for types, Yul syntax, Core expressions,
 patterns, and Core statements are independent of parser control flow. The
@@ -90,10 +92,10 @@ proof implementation currently has the following shape:
   to source-validity, token-window, carrier, cursor, and starting-token
   guarantees under the documented all-fuel `coreExpression` assumptions;
 - established expression atoms, groups, tuples, arrays, operator helpers, and
-  the left- and non-associative layers have complete contracts. Generic postfix
-  tail and wrapper contracts are complete structurally and for retained source,
-  and concrete `expressionAtom` parsing has token-window, carrier, cursor, and
-  starting-token contracts. Its source-validity contract remains open;
+  the left- and non-associative layers have complete contracts. Concrete atom
+  parsing, including lambda and recovery, has source, state, strict-progress,
+  and starting-token contracts that compose through postfix, unary, every
+  binary precedence, and conditional parsing;
 - conditional folding, the conditional tail, and the outer conditional parser
   have complete source-validity, token-window, carrier, cursor, and
   starting-token contracts;
@@ -103,17 +105,22 @@ proof implementation currently has the following shape:
   comptime, stop-token, rewind, and recovery paths;
 - the generic unary wrapper has complete source-validity, token-window,
   carrier, cursor, and starting-token contracts;
-- assignment/expression, `let`, return, block, `while`, `if`, and `for`
-  statements are complete, including both `for` item forms and item lists; and
+- assignment/expression, `let`, return, block, `while`, `if`, `for`, inline
+  assembly, `break`, and `continue` statements are complete, including both
+  `for` item forms and item lists;
 - match cases, the repeated case loop, and optional `default` parsing are
-  complete. The enclosing `match` parser has token-window, carrier, cursor, and
-  starting-token contracts, while its source-validity contract remains open.
+  complete, and the enclosing `match` parser has complete source, state,
+  strict-progress, and starting-token contracts; and
+- recognized-statement fallback preserves source validity and state across
+  primary success, fallback success, rejection, diagnostic reset, and
+  diagnostic re-emission. The complete eleven-branch statement dispatch is
+  assembled from those contracts. The public fuel-indexed Core expression
+  contract is complete under an explicit all-fuel Core statement assumption.
 
-The next proof work is therefore concrete: prove source validity for
-`expressionAtom`, carry it through the generic postfix and unary wrappers into
-the recursive expression path, assemble complete lambda-expression validity,
-and prove source validity for the enclosing `match` parser. Remaining
-declarations and the complete-file parser follow.
+The next proof work is therefore concrete: close expression, pattern, and
+statement fuel contracts in one simultaneous induction. Implementation and
+contract declarations, the top-level item loop, and the complete-file parser
+follow.
 Parser-generated diagnostic validity, grammar-invariant provenance and
 unreachability, resource bounds, and success soundness against a declarative
 grammar remain part of the final boundary.
