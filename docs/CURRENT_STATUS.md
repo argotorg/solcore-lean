@@ -207,22 +207,24 @@ spans, file ownership, the immutable token carrier, and the relevant source
 order. These compositional guarantees cover qualified names, module paths,
 selectors, literals, primitive token parsers, generic delimited lists, pragmas,
 derive attributes, isolated Core blocks, and the complete recursive type
-parser. Complete import, type-alias, and enum declarations retain valid source
-ranges and satisfy ordinary-result token-window, carrier, cursor, and starting
-token contracts. The same contracts cover export paths, constructor
-selections, export names, local export items, and export selections while the
-remaining export wrappers are still being lifted. Diagnostic filtering can
-only remove diagnostics and preserves span validity.
+parser. Complete import, export, type-alias, and enum declarations retain valid
+source ranges and satisfy ordinary-result token-window, carrier, cursor, and
+starting-token contracts. Individual trait predicates satisfy the same
+boundary, and named function parameters retain source provenance through both
+ordinary parsing and recovery. Diagnostic filtering can only remove
+diagnostics and preserves span validity.
 
 Reusable recursive contracts now state what it means for every retained range
 inside a type, Yul expression or statement, Core expression, pattern, or Core
 statement to belong to the original source. The public Yul expression,
 statement, and body parsers now satisfy the full provenance, token-window,
 carrier, cursor, and starting-token boundary. Type syntax has likewise been
-lifted through its public recursive parser. Proof lifting remains active for
-Core expressions, patterns, statements, several declaration families, and the
-complete-file parser; defining a validity predicate alone is not treated as
-proof that a parser satisfies it.
+lifted through its public recursive parser. Pattern lifting now covers
+wildcard, literal, and Boolean-builtin leaves while the recursive constructor,
+tuple, comptime, and recovery layers remain active. Proof lifting also remains
+active for Core expressions, statements, several declaration families, and
+the complete-file parser; defining a validity predicate alone is not treated
+as proof that a parser satisfies it.
 
 The remaining proof work includes those unclosed recursive and declaration
 parsers, validity of every parser-generated diagnostic, provenance and

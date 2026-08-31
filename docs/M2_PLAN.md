@@ -69,15 +69,19 @@ primitive consumers, carrier-preservation rules, and cursor/order laws now
 support compositional proofs for names, selectors, literals, delimiters,
 pragmas, derive attributes, Core blocks, the complete recursive type parser,
 and the public Yul expression, statement, and body parsers. Complete imports,
-type aliases, and enums have source-validity, token-window, carrier, cursor, and
-start-position contracts. Export paths, constructor selections, names, local
-items, and selections have reached the same boundary.
+exports, type aliases, and enums have source-validity, token-window, carrier,
+cursor, and start-position contracts. Individual trait predicates have reached
+the same boundary. Named parameters preserve provenance through recovery, and
+their delimited function-parameter list has the complete compositional
+boundary.
 
 The recursive validity contracts for types, Yul syntax, Core expressions,
 patterns, and Core statements are defined independently of parser control
-flow. Type and Yul lifting are complete at their public parser boundaries. The
-active proof work now connects the remaining Core expression, pattern,
-statement, declaration, and complete-file parsers to those contracts.
+flow. Type and Yul lifting are complete at their public parser boundaries.
+Pattern lifting covers wildcard, literal, and Boolean-builtin leaves; recursive
+constructors, tuples, comptime patterns, and recovery remain. The active proof
+work also connects the remaining Core expression, statement, declaration, and
+complete-file parsers to those contracts.
 
 The remaining proof boundary also includes parser-generated diagnostic
 validity, provenance and unreachability of grammar invariant failures, parser
