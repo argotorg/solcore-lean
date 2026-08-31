@@ -89,6 +89,109 @@ theorem selectedAlias_cursorMonotoneOnSuccess :
   · simp only [present]
     exact Parser.pure_cursorMonotoneOnSuccess none
 
+private theorem selectedAlias_some_components {input next : State}
+    {name : Identifier}
+    (parsed : ImportInternals.selectedAlias input = .ok (some name) next) :
+    ∃ marker afterMarker,
+      keyword .asKw .importDecl input = .ok marker afterMarker ∧
+        identifier .importDecl afterMarker = .ok name next := by
+  unfold ImportInternals.selectedAlias at parsed
+  rcases importBind_ok_components parsed with
+    ⟨observed, afterObserved, observedResult, rest⟩
+  unfold getState at observedResult
+  cases observedResult
+  split at rest
+  · rcases importBind_ok_components rest with
+      ⟨marker, afterMarker, markerResult, rest⟩
+    rcases importBind_ok_components rest with
+      ⟨parsedName, afterName, nameResult, finished⟩
+    cases finished
+    exact ⟨marker, afterMarker, markerResult, nameResult⟩
+  · cases rest
+
+/-- Selected imports retain their selector, alias, and covering range. -/
+theorem selectedImport_validFor :
+    selectedImport.ValidFor SelectedImport.ValidFor := by
+  have weak : selectedImport.ValidFor (fun _ _ => True) := by
+    unfold selectedImport
+    apply Parser.bind_validFor (selectorName_validFor .importDecl)
+    intro source
+    apply Parser.bind_validFor selectedAlias_validFor
+    intro alias
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : selectedImport input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok selection final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold selectedImport at stages
+      rcases importBind_ok_components stages with
+        ⟨source, afterSource, sourceResult, rest⟩
+      rcases importBind_ok_components rest with
+        ⟨alias, afterAlias, aliasResult, finished⟩
+      have sourceValid := selectorName_validFor .importDecl input inputValid
+      rw [sourceResult] at sourceValid
+      have aliasValid := selectedAlias_validFor afterSource sourceValid.2.1
+      rw [aliasResult] at aliasValid
+      cases alias with
+      | none =>
+          cases finished
+          exact ⟨⟨sourceValid.1.1, sourceValid.1, by simp⟩,
+            weakResult.2.1, weakResult.2.2⟩
+      | some name =>
+          rcases selectedAlias_some_components aliasResult with
+            ⟨marker, afterMarker, markerResult, nameResult⟩
+          rcases selectorName_startsAtCurrentTokenOnSuccess .importDecl
+              input source afterSource sourceResult with
+            ⟨firstToken, firstFound, sourceStart⟩
+          rcases identifier_ok_state_shape .importDecl nameResult with
+            ⟨nameToken, nameFound, nameSpan, _nameTokens, _nameCursor⟩
+          have firstAt :=
+            State.getElem?_eq_some_of_peek?_eq_some firstFound
+          have nameAt : input.tokens[afterMarker.cursor]? = some nameToken := by
+            have foundAt :=
+              State.getElem?_eq_some_of_peek?_eq_some nameFound
+            have sourceTokens := selectorName_preservesTokensOnSuccess
+              .importDecl input source afterSource sourceResult
+            have markerTokens := keyword_preservesTokensOnSuccess .asKw
+              .importDecl afterSource marker afterMarker markerResult
+            simpa [markerTokens, sourceTokens] using foundAt
+          have firstBeforeName :
+              firstToken.span.endByte ≤ nameToken.span.startByte := by
+            apply inputValid.token_end_le_token_start_of_getElem?_lt
+              firstAt nameAt
+            have sourceProgress :=
+              selectorName_cursor_lt_onSuccess .importDecl sourceResult
+            have markerShape := acceptToken_ok_state_shape
+              (.keyword .asKw) .importDecl (· == .keyword .asKw) markerResult
+            exact Nat.lt_trans sourceProgress (by simp [markerShape.2])
+          have sourceSpanValid : source.span.ValidFor input.file :=
+            sourceValid.1.1
+          have nameSpanValid : name.span.ValidFor input.file := by
+            have retained : Located.ValidFor afterSource.file name := by
+              simpa only [Option.ValidFor] using aliasValid.1
+            simpa [Located.ValidFor, sourceValid.2.2] using retained
+          have firstSpanValid := inputValid.peek?_span_validFor firstFound
+          have ordered : source.span.startByte ≤ name.span.endByte := by
+            calc
+              source.span.startByte = firstToken.span.startByte :=
+                sourceStart.symm
+              _ ≤ firstToken.span.endByte := firstSpanValid.2.1
+              _ ≤ nameToken.span.startByte := firstBeforeName
+              _ ≤ name.span.endByte := by
+                rw [nameSpan]
+                exact nameSpanValid.2.1
+          have coverValid := SourceSpan.cover_validFor sourceSpanValid
+            nameSpanValid ordered
+          cases finished
+          exact ⟨⟨coverValid, sourceValid.1, by simpa using nameSpanValid⟩,
+            weakResult.2.1, weakResult.2.2⟩
+
 /-- Selected imports preserve every ordinary token window. -/
 theorem selectedImport_preservesTokenWindow :
     Parser.PreservesTokenWindow selectedImport := by
