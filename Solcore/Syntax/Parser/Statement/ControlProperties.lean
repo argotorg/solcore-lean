@@ -266,6 +266,280 @@ theorem forItems_cursorMonotoneOnSuccess
 
 end ControlInternals
 
+/-- For statements preserve every nested parser token window. -/
+theorem forStatement_preservesTokenWindow
+    (statement : Parser Statement) (expression : Parser Expr)
+    (statementWindow : Parser.PreservesTokenWindow statement)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (forStatement statement expression) := by
+  unfold forStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .forKw .statement); intro marker
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .leftParen .statement); intro opening
+  apply Parser.bind_preservesTokenWindow
+    (ControlInternals.forItems_preservesTokenWindow expression .semicolon
+      (forItem_preservesTokenWindow expression expressionWindow)); intro initial
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .semicolon .statement); intro firstSeparator
+  apply Parser.bind_preservesTokenWindow expressionWindow; intro condition
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .semicolon .statement); intro secondSeparator
+  apply Parser.bind_preservesTokenWindow
+    (ControlInternals.forItems_preservesTokenWindow expression .rightParen
+      (forItem_preservesTokenWindow expression expressionWindow)); intro post
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .rightParen .statement); intro closing
+  apply Parser.bind_preservesTokenWindow
+    (coreBlock_preservesTokenWindow statement .require statementWindow); intro body
+  exact Parser.pure_preservesTokenWindow _
+
+theorem forStatement_preservesTokensOnSuccess
+    (statement : Parser Statement) (expression : Parser Expr)
+    (statementWindow : Parser.PreservesTokenWindow statement)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (forStatement statement expression) :=
+  (forStatement_preservesTokenWindow statement expression statementWindow
+    expressionWindow).preservesTokensOnSuccess
+
+/-- For-statement parsing never rewinds the token cursor. -/
+theorem forStatement_cursorMonotoneOnSuccess
+    (statement : Parser Statement) (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (forStatement statement expression) := by
+  unfold forStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .forKw .statement); intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .leftParen .statement); intro opening
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (ControlInternals.forItems_cursorMonotoneOnSuccess expression .semicolon
+      expressionCursor); intro initial
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .semicolon .statement); intro firstSeparator
+  apply Parser.bind_cursorMonotoneOnSuccess expressionCursor; intro condition
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .semicolon .statement); intro secondSeparator
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (ControlInternals.forItems_cursorMonotoneOnSuccess expression .rightParen
+      expressionCursor); intro post
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .rightParen .statement); intro closing
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (coreBlock_cursorMonotoneOnSuccess statement .require); intro body
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A complete for statement starts at its leading keyword. -/
+theorem forStatement_startsAtCurrentTokenOnSuccess
+    (statement : Parser Statement) (expression : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (forStatement statement expression) (·.span) := by
+  unfold forStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .forKw)
+      .statement (· == .keyword .forKw))
+  intro marker input parsedStatement final parsed
+  rcases controlBind_ok_components parsed with ⟨_, _, _, rest⟩
+  rcases controlBind_ok_components rest with ⟨_, _, _, rest⟩
+  rcases controlBind_ok_components rest with ⟨_, _, _, rest⟩
+  rcases controlBind_ok_components rest with ⟨_, _, _, rest⟩
+  rcases controlBind_ok_components rest with ⟨_, _, _, rest⟩
+  rcases controlBind_ok_components rest with ⟨_, _, _, rest⟩
+  rcases controlBind_ok_components rest with ⟨_, _, _, rest⟩
+  rcases controlBind_ok_components rest with ⟨_, _, _, finished⟩
+  cases finished
+  rfl
+
+/-- For statements retain both header and body provenance on every result. -/
+theorem forStatement_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop)
+    (statement : Parser Statement) (expression : Parser Expr)
+    (statementValid : statement.ValidFor
+      (Statement.ValidFor expressionValueValid patternValueValid yulValueValid))
+    (statementTokens : Parser.PreservesTokensOnSuccess statement)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    (expressionWindow : Parser.PreservesTokenWindow expression)
+    (expressionCursorLt : ∀ {input next : State} {value : Expr},
+      expression input = .ok value next → input.cursor < next.cursor)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span)) :
+    (forStatement statement expression).ValidFor
+      (Statement.ValidFor expressionValueValid patternValueValid yulValueValid) := by
+  let itemContract := forItem_validFor expression expressionValueValid
+    expressionValid expressionSpan expressionWindow expressionCursorLt
+      expressionStarts
+  let itemWindow := forItem_preservesTokenWindow expression expressionWindow
+  let expressionCursor : Parser.CursorMonotoneOnSuccess expression :=
+    fun _ _ _ result => Nat.le_of_lt (expressionCursorLt result)
+  let listValid (stop : Symbol) := ControlInternals.forItems_validFor
+    expression stop expressionValueValid itemContract
+  let bodyValid := coreBlock_validFor
+    (Statement.ValidFor expressionValueValid patternValueValid yulValueValid)
+    statement .require statementValid statementTokens
+      (fun _ _ valid => valid.span_valid)
+  have weak : (forStatement statement expression).ValidFor
+      (fun _ _ => True) := by
+    unfold forStatement
+    apply Parser.bind_validFor (keyword_validFor .forKw .statement); intro marker
+    apply Parser.bind_validFor (symbol_validFor .leftParen .statement); intro opening
+    apply Parser.bind_validFor (listValid .semicolon); intro initial
+    apply Parser.bind_validFor (symbol_validFor .semicolon .statement); intro sep1
+    apply Parser.bind_validFor expressionValid; intro condition
+    apply Parser.bind_validFor (symbol_validFor .semicolon .statement); intro sep2
+    apply Parser.bind_validFor (listValid .rightParen); intro post
+    apply Parser.bind_validFor (symbol_validFor .rightParen .statement); intro closing
+    apply Parser.bind_validFor bodyValid; intro body
+    exact Parser.pure_validFor _ _ (fun _ => trivial)
+  intro input inputValid
+  have weakReply := weak input inputValid
+  cases parsed : forStatement statement expression input with
+  | invariant error => trivial
+  | reject failure rejected => rw [parsed] at weakReply; exact weakReply
+  | ok parsedStatement final =>
+      rw [parsed] at weakReply
+      have stages := parsed
+      unfold forStatement at stages
+      rcases controlBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨opening, afterOpening, openingResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨initial, afterInitial, initialResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨sep1, afterSep1, sep1Result, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨condition, afterCondition, conditionResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨sep2, afterSep2, sep2Result, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨post, afterPost, postResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨closing, afterClosing, closingResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have markerReply := keyword_validFor .forKw .statement input inputValid
+      rw [markerResult] at markerReply
+      have openingReply := symbol_validFor .leftParen .statement afterMarker
+        markerReply.2.1
+      rw [openingResult] at openingReply
+      have initialReply := listValid .semicolon afterOpening openingReply.2.1
+      rw [initialResult] at initialReply
+      have sep1Reply := symbol_validFor .semicolon .statement afterInitial
+        initialReply.2.1
+      rw [sep1Result] at sep1Reply
+      have conditionReply := expressionValid afterSep1 sep1Reply.2.1
+      rw [conditionResult] at conditionReply
+      have sep2Reply := symbol_validFor .semicolon .statement afterCondition
+        conditionReply.2.1
+      rw [sep2Result] at sep2Reply
+      have postReply := listValid .rightParen afterSep2 sep2Reply.2.1
+      rw [postResult] at postReply
+      have closingReply := symbol_validFor .rightParen .statement afterPost
+        postReply.2.1
+      rw [closingResult] at closingReply
+      have bodyReply := bodyValid afterClosing closingReply.2.1
+      rw [bodyResult] at bodyReply
+      have markerSpan : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerReply.1
+      have openingSpan : opening.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, markerReply.2.2] using openingReply.1
+      have closingSpan : closing.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, postReply.2.2, sep2Reply.2.2, conditionReply.2.2,
+          sep1Reply.2.2, initialReply.2.2, openingReply.2.2,
+          markerReply.2.2] using closingReply.1
+      have initialValid : List.ValidFor
+          (ForItem.ValidFor expressionValueValid) input.file initial := by
+        simpa [openingReply.2.2, markerReply.2.2] using initialReply.1
+      have conditionValid : expressionValueValid input.file condition := by
+        simpa [sep1Reply.2.2, initialReply.2.2, openingReply.2.2,
+          markerReply.2.2] using conditionReply.1
+      have postValid : List.ValidFor (ForItem.ValidFor expressionValueValid)
+          input.file post := by
+        simpa [sep2Reply.2.2, conditionReply.2.2, sep1Reply.2.2,
+          initialReply.2.2, openingReply.2.2, markerReply.2.2] using postReply.1
+      have bodyInput : Block.ValidFor
+          (Statement.ValidFor expressionValueValid patternValueValid yulValueValid)
+          input.file body := by
+        simpa [bodyReply.2.2, closingReply.2.2, postReply.2.2,
+          sep2Reply.2.2, conditionReply.2.2, sep1Reply.2.2,
+          initialReply.2.2, openingReply.2.2, markerReply.2.2] using bodyReply.1
+      have markerTokens := keyword_preservesTokensOnSuccess .forKw .statement
+        input marker afterMarker markerResult
+      have openingTokens := symbol_preservesTokensOnSuccess .leftParen .statement
+        afterMarker opening afterOpening openingResult
+      have initialTokens := ControlInternals.forItems_preservesTokensOnSuccess
+        expression .semicolon itemWindow afterOpening initial afterInitial initialResult
+      have sep1Tokens := symbol_preservesTokensOnSuccess .semicolon .statement
+        afterInitial sep1 afterSep1 sep1Result
+      have conditionTokens := expressionWindow.preservesTokensOnSuccess
+        afterSep1 condition afterCondition conditionResult
+      have sep2Tokens := symbol_preservesTokensOnSuccess .semicolon .statement
+        afterCondition sep2 afterSep2 sep2Result
+      have postTokens := ControlInternals.forItems_preservesTokensOnSuccess
+        expression .rightParen itemWindow afterSep2 post afterPost postResult
+      have closingTokens := symbol_preservesTokensOnSuccess .rightParen .statement
+        afterPost closing afterClosing closingResult
+      have headerCursor : afterMarker.cursor < afterPost.cursor :=
+        Nat.lt_of_lt_of_le (acceptToken_cursor_lt_onSuccess
+          (.symbol .leftParen) .statement (· == .symbol .leftParen) openingResult)
+          (Nat.le_trans (ControlInternals.forItems_cursorMonotoneOnSuccess
+            expression .semicolon expressionCursor afterOpening initial
+              afterInitial initialResult) (Nat.le_trans
+            (symbol_cursorMonotoneOnSuccess .semicolon .statement _ _ _ sep1Result)
+            (Nat.le_trans (expressionCursor _ _ _ conditionResult) (Nat.le_trans
+              (symbol_cursorMonotoneOnSuccess .semicolon .statement _ _ _ sep2Result)
+              (ControlInternals.forItems_cursorMonotoneOnSuccess expression
+                .rightParen expressionCursor _ _ _ postResult)))))
+      have openingAt := State.getElem?_eq_some_of_peek?_eq_some
+        (symbol_ok_state_shape .leftParen .statement openingResult).1
+      have closingAtAfter := State.getElem?_eq_some_of_peek?_eq_some
+        (symbol_ok_state_shape .rightParen .statement closingResult).1
+      have closingAt : afterMarker.tokens[afterPost.cursor]? = some closing := by
+        simpa [postTokens, sep2Tokens, conditionTokens, sep1Tokens,
+          initialTokens, openingTokens] using closingAtAfter
+      have headerSeparated := markerReply.2.1.token_end_le_token_start_of_getElem?_lt
+        openingAt closingAt headerCursor
+      have headerValid := SourceSpan.cover_validFor openingSpan closingSpan
+        (Nat.le_trans openingSpan.2.1
+          (Nat.le_trans headerSeparated closingSpan.2.1))
+      rcases coreBlock_startsAtCurrentTokenOnSuccess statement .require
+          afterClosing body afterBody bodyResult with
+        ⟨bodyOpening, bodyFound, bodyStart⟩
+      have bodyAtAfter := State.getElem?_eq_some_of_peek?_eq_some bodyFound
+      have bodyAt : input.tokens[afterClosing.cursor]? = some bodyOpening := by
+        simpa [closingTokens, postTokens, sep2Tokens, conditionTokens,
+          sep1Tokens, initialTokens, openingTokens, markerTokens] using bodyAtAfter
+      have markerAt := State.getElem?_eq_some_of_peek?_eq_some
+        (acceptToken_ok_state_shape (.keyword .forKw) .statement
+          (· == .keyword .forKw) markerResult).1
+      have beforeBody : input.cursor < afterClosing.cursor :=
+        Nat.lt_of_lt_of_le (acceptToken_cursor_lt_onSuccess (.keyword .forKw)
+          .statement (· == .keyword .forKw) markerResult)
+          (Nat.le_trans (symbol_cursorMonotoneOnSuccess .leftParen .statement
+            _ _ _ openingResult) (Nat.le_trans
+            (ControlInternals.forItems_cursorMonotoneOnSuccess expression
+              .semicolon expressionCursor _ _ _ initialResult) (Nat.le_trans
+            (symbol_cursorMonotoneOnSuccess .semicolon .statement _ _ _ sep1Result)
+            (Nat.le_trans (expressionCursor _ _ _ conditionResult) (Nat.le_trans
+            (symbol_cursorMonotoneOnSuccess .semicolon .statement _ _ _ sep2Result)
+            (Nat.le_trans (ControlInternals.forItems_cursorMonotoneOnSuccess
+              expression .rightParen expressionCursor _ _ _ postResult)
+              (symbol_cursorMonotoneOnSuccess .rightParen .statement _ _ _
+                closingResult)))))))
+      have outerSeparated := inputValid.token_end_le_token_start_of_getElem?_lt
+        markerAt bodyAt beforeBody
+      have outerValid := SourceSpan.cover_validFor markerSpan bodyInput.1
+        (Nat.le_trans markerSpan.2.1 (Nat.le_trans outerSeparated
+          (by simpa [bodyStart] using bodyInput.1.2.1)))
+      cases finished
+      exact ⟨Statement.ValidFor.forLoop outerValid headerValid initialValid
+        conditionValid postValid bodyInput.1 bodyInput.2,
+        weakReply.2.1, weakReply.2.2⟩
+
 /-- A braced statement wrapper retains the block range and every body item. -/
 theorem blockStatement_validFor
     (statement : Parser Statement)
