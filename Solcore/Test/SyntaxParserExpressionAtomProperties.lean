@@ -30,5 +30,10 @@ example := @ExpressionAtomInternals.proxyExpression_preservesTokenWindow
 example := @ExpressionAtomInternals.proxyExpression_preservesTokensOnSuccess
 example := @ExpressionAtomInternals.proxyExpression_cursorMonotoneOnSuccess
 example := @ExpressionAtomInternals.proxyExpression_startsAtCurrentTokenOnSuccess
+example := @ExpressionAtomInternals.dotConstructor_validFor
+example := @ExpressionAtomInternals.dotConstructor_preservesTokenWindow
+example := @ExpressionAtomInternals.dotConstructor_preservesTokensOnSuccess
+example := @ExpressionAtomInternals.dotConstructor_cursorMonotoneOnSuccess
+example := @ExpressionAtomInternals.dotConstructor_startsAtCurrentTokenOnSuccess
 
 end Tests

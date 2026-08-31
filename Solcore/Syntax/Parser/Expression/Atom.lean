@@ -37,6 +37,27 @@ def proxyExpression : Parser Expr := do
     value := .proxy marker.span type
   }
 
+/-- Parse the optional argument list of a leading-dot constructor. -/
+def optionalDotConstructorArguments (nested : Parser Expr) :
+    Parser (Option (DelimitedList Expr)) := do
+  let state ← getState
+  if isSymbol state .leftParen then
+    pure (some (← delimitedNoTrailing .leftParen .rightParen true
+      nested .expression .expression))
+  else
+    pure none
+
+/-- Parse a leading-dot constructor expression. -/
+def dotConstructor (nested : Parser Expr) : Parser Expr := do
+  let dot ← symbol .dot .expression
+  let name ← expressionName
+  let arguments ← optionalDotConstructorArguments nested
+  let endSpan := arguments.map (fun values => values.span) |>.getD name.span
+  pure {
+    span := SourceSpan.cover dot.span endSpan
+    value := .dotConstructor dot.span name arguments
+  }
+
 end ExpressionAtomInternals
 
 private def closeTuple (opening : Token) (elementsRev : List Expr) :
@@ -100,22 +121,6 @@ private def parenthesized (nested : Parser Expr) : Parser Expr := fun state =>
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
-private def dotConstructor (nested : Parser Expr) : Parser Expr := do
-  let dot ← symbol .dot .expression
-  let name ← ExpressionAtomInternals.expressionName
-  let state ← getState
-  let arguments ←
-    if isSymbol state .leftParen then
-      pure (some (← delimitedNoTrailing .leftParen .rightParen true
-        nested .expression .expression))
-    else
-      pure none
-  let endSpan := arguments.map (fun values => values.span) |>.getD name.span
-  pure {
-    span := SourceSpan.cover dot.span endSpan
-    value := .dotConstructor dot.span name arguments
-  }
-
 private def lambdaExpression (block : Parser Block) : Parser Expr := do
   let marker ← keyword .lamKw .expression
   let parameters ← delimited .leftParen .rightParen true
@@ -139,7 +144,8 @@ private def expressionAtomCore (nested : Parser Expr)
     ExpressionAtomInternals.literalExpression state
   else if isBooleanValue state || isIdentifier state then
     ExpressionAtomInternals.identifierExpression state
-  else if isSymbol state .dot then dotConstructor nested state
+  else if isSymbol state .dot then
+    ExpressionAtomInternals.dotConstructor nested state
   else if isSymbol state .at then
     ExpressionAtomInternals.proxyExpression state
   else if isSymbol state .leftParen then parenthesized nested state

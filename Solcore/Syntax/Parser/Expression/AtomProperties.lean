@@ -276,5 +276,241 @@ theorem proxyExpression_startsAtCurrentTokenOnSuccess :
   cases finished
   rfl
 
+private theorem optionalDotConstructorArguments_validFor
+    (nested : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (optionalDotConstructorArguments nested).ValidFor
+      (Option.ValidFor
+        (DelimitedList.ValidFor (Expr.ValidFor statementValid))) := by
+  unfold optionalDotConstructorArguments
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  split
+  · apply Parser.bind_validFor_of_value
+      (delimitedNoTrailing_validFor (Expr.ValidFor statementValid)
+        .leftParen .rightParen true nested .expression .expression
+        nestedValid nestedPreserves)
+    intro values input inputValid valuesValid
+    exact ⟨by simpa only [Option.ValidFor] using valuesValid,
+      inputValid, rfl⟩
+  · exact Parser.pure_validFor none _ (fun _ => trivial)
+
+private theorem optionalDotConstructorArguments_preservesTokenWindow
+    (nested : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow
+      (optionalDotConstructorArguments nested) := by
+  unfold optionalDotConstructorArguments
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro observed
+  split
+  · apply Parser.bind_preservesTokenWindow
+      (delimitedWithPolicy_preservesTokenWindow .leftParen .rightParen
+        true false nested .expression .expression nestedPreserves)
+    intro values
+    exact Parser.pure_preservesTokenWindow _
+  · exact Parser.pure_preservesTokenWindow none
+
+private theorem optionalDotConstructorArguments_cursorMonotoneOnSuccess
+    (nested : Parser Expr) :
+    Parser.CursorMonotoneOnSuccess
+      (optionalDotConstructorArguments nested) := by
+  unfold optionalDotConstructorArguments
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  split
+  · apply Parser.bind_cursorMonotoneOnSuccess
+      (delimitedNoTrailing_cursorMonotoneOnSuccess .leftParen .rightParen
+        true nested .expression .expression)
+    intro values
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · exact Parser.pure_cursorMonotoneOnSuccess none
+
+private theorem optionalDotConstructorArguments_some_starts
+    (nested : Parser Expr) {input next : State}
+    {values : DelimitedList Expr}
+    (parsed : optionalDotConstructorArguments nested input =
+      .ok (some values) next) :
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte = values.span.startByte := by
+  unfold optionalDotConstructorArguments at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨observed, afterState, stateResult, rest⟩
+  unfold getState at stateResult
+  cases stateResult
+  split at rest
+  · rcases atomBind_ok_components rest with
+      ⟨arguments, afterArguments, argumentsResult, finished⟩
+    have starts := delimitedNoTrailing_startsAtCurrentTokenOnSuccess
+      .leftParen .rightParen true nested .expression .expression
+      input arguments afterArguments argumentsResult
+    cases finished
+    exact starts
+  · cases rest
+
+private theorem dotConstructor_weakValidFor (nested : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (dotConstructor nested).ValidFor (fun _ _ => True) := by
+  have argumentsWeak :=
+    (optionalDotConstructorArguments_validFor nested statementValid
+      nestedValid nestedPreserves).mono (fun _ _ _ => trivial)
+  unfold dotConstructor
+  apply Parser.bind_validFor (symbol_validFor .dot .expression)
+  intro dot
+  apply Parser.bind_validFor expressionName_validFor
+  intro name
+  apply Parser.bind_validFor argumentsWeak
+  intro arguments
+  exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+
+/-- Leading-dot expressions retain their name, arguments, and outer cover. -/
+theorem dotConstructor_validFor (nested : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (dotConstructor nested).ValidFor (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  have weak := dotConstructor_weakValidFor nested statementValid
+    nestedValid nestedPreserves input inputValid
+  cases parsed : dotConstructor nested input with
+  | invariant error => trivial
+  | reject failure rejected => rw [parsed] at weak; exact weak
+  | ok result final =>
+      rw [parsed] at weak
+      have stages := parsed
+      unfold dotConstructor at stages
+      rcases atomBind_ok_components stages with
+        ⟨dot, afterDot, dotResult, rest⟩
+      rcases atomBind_ok_components rest with
+        ⟨name, afterName, nameResult, rest⟩
+      rcases atomBind_ok_components rest with
+        ⟨arguments, afterArguments, argumentsResult, finished⟩
+      have dotReply := symbol_validFor .dot .expression input inputValid
+      rw [dotResult] at dotReply
+      have nameReply := expressionName_validFor afterDot dotReply.2.1
+      rw [nameResult] at nameReply
+      have argumentsReply := optionalDotConstructorArguments_validFor
+        nested statementValid nestedValid nestedPreserves
+        afterName nameReply.2.1
+      rw [argumentsResult] at argumentsReply
+      have dotSpanValid : dot.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using dotReply.1
+      have nameSpanValid : name.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, dotReply.2.2] using nameReply.1
+      have argumentsValid : Option.ValidFor
+          (DelimitedList.ValidFor (Expr.ValidFor statementValid))
+          input.file arguments := by
+        simpa [nameReply.2.2, dotReply.2.2] using argumentsReply.1
+      have dotShape := symbol_ok_state_shape .dot .expression dotResult
+      rcases expressionName_ok_state_shape nameResult with
+        ⟨nameToken, nameFound, nameTokenSpan, nameTokens, nameCursor⟩
+      have dotAdvanced : input.advance? = some (dot, afterDot) := by
+        unfold State.advance?
+        rw [dotShape.1, dotShape.2]
+        rfl
+      have dotBeforeName :=
+        inputValid.consumed_end_le_peek_start_after_advance
+          dotAdvanced nameFound
+      have orderedName : dot.span.startByte ≤ name.span.endByte :=
+        Nat.le_trans dotSpanValid.2.1 (Nat.le_trans
+          (by simpa [nameTokenSpan] using dotBeforeName)
+          nameSpanValid.2.1)
+      cases arguments with
+      | none =>
+          cases finished
+          exact ⟨Expr.ValidFor.dotConstructor
+            (SourceSpan.cover_validFor dotSpanValid nameSpanValid orderedName)
+            dotSpanValid nameSpanValid (by simp) (by simp),
+            weak.2.1, weak.2.2⟩
+      | some values =>
+          have valuesValid : DelimitedList.ValidFor
+              (Expr.ValidFor statementValid) input.file values := by
+            simpa only [Option.ValidFor] using argumentsValid
+          rcases optionalDotConstructorArguments_some_starts nested
+              argumentsResult with ⟨opening, openingFound, valuesStart⟩
+          have nameAtAfterName :
+              afterName.tokens[afterDot.cursor]? = some nameToken := by
+            rw [nameTokens]
+            exact State.getElem?_eq_some_of_peek?_eq_some nameFound
+          have openingAt :=
+            State.getElem?_eq_some_of_peek?_eq_some openingFound
+          have nameBeforeValues :=
+            nameReply.2.1.token_end_le_token_start_of_getElem?_lt
+              nameAtAfterName openingAt (by rw [nameCursor]; simp)
+          have orderedValues : dot.span.startByte ≤ values.span.endByte :=
+            Nat.le_trans orderedName (Nat.le_trans
+              (by simpa [nameTokenSpan, valuesStart] using nameBeforeValues)
+              valuesValid.1.2.1)
+          cases finished
+          refine ⟨Expr.ValidFor.dotConstructor
+            (SourceSpan.cover_validFor dotSpanValid valuesValid.1
+              orderedValues) dotSpanValid nameSpanValid ?_ ?_,
+            weak.2.1, weak.2.2⟩
+          · intro retained member
+            simp at member
+            subst retained
+            exact valuesValid.1
+          · intro retained retainedMember argument argumentMember
+            simp at retainedMember
+            subst retained
+            exact valuesValid.2 argument argumentMember
+
+/-- Leading-dot expression parsing preserves every ordinary token window. -/
+theorem dotConstructor_preservesTokenWindow (nested : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (dotConstructor nested) := by
+  unfold dotConstructor
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .dot .expression)
+  intro dot
+  apply Parser.bind_preservesTokenWindow expressionName_preservesTokenWindow
+  intro name
+  apply Parser.bind_preservesTokenWindow
+    (optionalDotConstructorArguments_preservesTokenWindow
+      nested nestedPreserves)
+  intro arguments
+  exact Parser.pure_preservesTokenWindow _
+
+theorem dotConstructor_preservesTokensOnSuccess (nested : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokensOnSuccess (dotConstructor nested) :=
+  (dotConstructor_preservesTokenWindow nested
+    nestedPreserves).preservesTokensOnSuccess
+
+/-- Leading-dot expression parsing never rewinds the cursor. -/
+theorem dotConstructor_cursorMonotoneOnSuccess (nested : Parser Expr) :
+    Parser.CursorMonotoneOnSuccess (dotConstructor nested) := by
+  unfold dotConstructor
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .dot .expression)
+  intro dot
+  apply Parser.bind_cursorMonotoneOnSuccess
+    expressionName_cursorMonotoneOnSuccess
+  intro name
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (optionalDotConstructorArguments_cursorMonotoneOnSuccess nested)
+  intro arguments
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A leading-dot expression starts at its dot token. -/
+theorem dotConstructor_startsAtCurrentTokenOnSuccess
+    (nested : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (dotConstructor nested) (·.span) := by
+  unfold dotConstructor
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (symbol_startsAtCurrentTokenOnSuccess .dot .expression)
+  intro dot input value final parsed
+  rcases atomBind_ok_components parsed with
+    ⟨name, afterName, nameResult, rest⟩
+  rcases atomBind_ok_components rest with
+    ⟨arguments, afterArguments, argumentsResult, finished⟩
+  cases finished
+  rfl
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser
