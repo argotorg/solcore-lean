@@ -108,6 +108,11 @@ private def parseFunctionType (nested : Parser TypeExpr) : Parser TypeExpr := do
 private def hasFollowingSymbol (state : State) (value : Symbol) : Bool :=
   state.peekOffsetKind? 1 == some (.symbol value)
 
+/-- Whether the current token can begin a canonical Core type. -/
+def startsTypeExpr (state : State) : Bool :=
+  isKeyword state .functionKw || isSymbol state .at ||
+    isSymbol state .leftParen || isIdentifier state
+
 /-- Recursive Core type parser, parameterized by remaining nesting depth. -/
 def typeExprWithFuel : Nat → Parser TypeExpr
   | 0 => fun state =>
