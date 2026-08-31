@@ -21,6 +21,7 @@ import Solcore.Test.SyntaxParserSignatures
 import Solcore.Test.SyntaxParserStatementFallback
 import Solcore.Test.SyntaxParserStatements
 import Solcore.Test.SyntaxParserTerms
+import Solcore.Test.SyntaxParserTotality
 import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTypes
 import Solcore.Test.SyntaxParserUpstreamFixtures
@@ -5080,6 +5081,7 @@ def run : IO Unit := do
   testSyntaxParserStatementFallback
   testSyntaxParserStatements
   testSyntaxParserTerms
+  testSyntaxParserTotality
   testSyntaxParserTrivia
   testSyntaxParserUpstreamFixtures
   testSyntaxPublicBoundary
