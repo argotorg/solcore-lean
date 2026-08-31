@@ -185,7 +185,10 @@ def exportSelection : Parser ExportSelection := fun state =>
 
 end ExportInternals
 
-private def finishExport (start : SourceSpan)
+namespace ExportInternals
+
+/-- Terminate an export declaration and attach its leading source span. -/
+def finishExport (start : SourceSpan)
     (value : ExportDeclValue) : Parser ExportDecl := do
   let semicolon ← symbol .semicolon .exportDecl
   pure {
@@ -193,11 +196,14 @@ private def finishExport (start : SourceSpan)
     value
   }
 
-private def localExport (start : SourceSpan) : Parser ExportDecl := do
+/-- Parse a braced list of local exports and its declaration terminator. -/
+def localExport (start : SourceSpan) : Parser ExportDecl := do
   let items ← delimited .leftBrace .rightBrace true
     ExportInternals.localExportItem
     .exportDecl .topLevel
   finishExport start (.local items)
+
+end ExportInternals
 
 private def pathExport (start : SourceSpan) : Parser ExportDecl := do
   let path ← ExportInternals.exportPath
@@ -205,20 +211,20 @@ private def pathExport (start : SourceSpan) : Parser ExportDecl := do
   if isSymbol state .dot then
     let _ ← symbol .dot .exportDecl
     let selection ← ExportInternals.exportSelection
-    finishExport start (.itemsFrom path selection)
+    ExportInternals.finishExport start (.itemsFrom path selection)
   else if isKeyword state .asKw then
     let _ ← keyword .asKw .exportDecl
     let alias ← identifier .exportDecl
-    finishExport start (.moduleAs path alias)
+    ExportInternals.finishExport start (.moduleAs path alias)
   else
-    finishExport start (.module path)
+    ExportInternals.finishExport start (.module path)
 
 /-- Parse one canonical export declaration. -/
 def exportDecl : Parser ExportDecl := do
   let exportKeyword ← keyword .exportKw .exportDecl
   let state ← getState
   if isSymbol state .leftBrace then
-    localExport exportKeyword.span
+    ExportInternals.localExport exportKeyword.span
   else
     pathExport exportKeyword.span
 

@@ -1194,4 +1194,172 @@ theorem exportSelection_startsAtCurrentTokenOnSuccess :
           true ExportInternals.exportName .exportDecl .topLevel
           input items next itemsResult
 
+/-- Export termination preserves the declaration cover and payload ranges. -/
+theorem finishExport_validFor (start : SourceSpan) (value : ExportDeclValue)
+    (input : State) (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    {startIndex : Nat} {startToken : Token}
+    (startFound : input.tokens[startIndex]? = some startToken)
+    (startSpan : startToken.span = start)
+    (startBefore : startIndex < input.cursor)
+    (valueValid : match value with
+      | .local items =>
+          items.span.ValidFor input.file ∧
+            ∀ item ∈ items.elements,
+              LocalExportItem.ValidFor input.file item
+      | .module path => QualifiedName.ValidFor input.file path
+      | .moduleAs path alias =>
+          QualifiedName.ValidFor input.file path ∧
+            alias.span.ValidFor input.file
+      | .itemsFrom path selection =>
+          QualifiedName.ValidFor input.file path ∧
+            ExportSelection.ValidFor input.file selection) :
+    (ExportInternals.finishExport start value input).ValidFor input
+      ExportDecl.ValidFor := by
+  have semicolonValid := symbol_validFor .semicolon .exportDecl
+    input inputValid
+  unfold ExportInternals.finishExport
+  cases semicolonResult : symbol .semicolon .exportDecl input with
+  | invariant error => simp only [bind, semicolonResult, Reply.ValidFor]
+  | reject failure rejected =>
+      rw [semicolonResult] at semicolonValid
+      simpa only [bind, semicolonResult, Reply.ValidFor] using semicolonValid
+  | ok semicolon next =>
+      rw [semicolonResult] at semicolonValid
+      have semicolonSpanValid : semicolon.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using semicolonValid.1
+      have semicolonShape := symbol_ok_state_shape .semicolon .exportDecl
+        semicolonResult
+      have semicolonAt :=
+        State.getElem?_eq_some_of_peek?_eq_some semicolonShape.1
+      have startBeforeSemicolon :=
+        inputValid.token_end_le_token_start_of_getElem?_lt
+          startFound semicolonAt startBefore
+      have ordered : start.startByte ≤ semicolon.span.endByte :=
+        Nat.le_trans startValid.2.1 (Nat.le_trans
+          (by simpa [startSpan] using startBeforeSemicolon)
+          semicolonSpanValid.2.1)
+      simp only [bind, semicolonResult, Reply.ValidFor,
+        ExportDecl.ValidFor]
+      exact ⟨⟨SourceSpan.cover_validFor startValid semicolonSpanValid
+          ordered, valueValid⟩, semicolonValid.2.1, semicolonValid.2.2⟩
+
+/-- Export termination preserves every ordinary token window. -/
+theorem finishExport_preservesTokenWindow (start : SourceSpan)
+    (value : ExportDeclValue) :
+    Parser.PreservesTokenWindow
+      (ExportInternals.finishExport start value) := by
+  unfold ExportInternals.finishExport
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .semicolon .exportDecl)
+  intro semicolon
+  exact Parser.pure_preservesTokenWindow _
+
+theorem finishExport_preservesTokensOnSuccess (start : SourceSpan)
+    (value : ExportDeclValue) :
+    Parser.PreservesTokensOnSuccess
+      (ExportInternals.finishExport start value) :=
+  (finishExport_preservesTokenWindow start value).preservesTokensOnSuccess
+
+/-- Export termination never rewinds the cursor. -/
+theorem finishExport_cursorMonotoneOnSuccess (start : SourceSpan)
+    (value : ExportDeclValue) :
+    Parser.CursorMonotoneOnSuccess
+      (ExportInternals.finishExport start value) := by
+  unfold ExportInternals.finishExport
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .semicolon .exportDecl)
+  intro semicolon
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+theorem finishExport_keepsStartByte (start : SourceSpan)
+    (value : ExportDeclValue) {input next : State} {result : ExportDecl}
+    (parsed : ExportInternals.finishExport start value input =
+      .ok result next) :
+    start.startByte = result.span.startByte := by
+  unfold ExportInternals.finishExport at parsed
+  rcases exportBind_ok_components parsed with
+    ⟨semicolon, afterSemicolon, _semicolonResult, finished⟩
+  cases finished
+  rfl
+
+/-- Braced local exports retain every selected item and declaration range. -/
+theorem localExport_validFor (start : SourceSpan) (input : State)
+    (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    {startIndex : Nat} {startToken : Token}
+    (startFound : input.tokens[startIndex]? = some startToken)
+    (startSpan : startToken.span = start)
+    (startBefore : startIndex < input.cursor) :
+    (ExportInternals.localExport start input).ValidFor input
+      ExportDecl.ValidFor := by
+  unfold ExportInternals.localExport
+  have itemsValid := delimited_validFor LocalExportItem.ValidFor
+    .leftBrace .rightBrace true ExportInternals.localExportItem
+    .exportDecl .topLevel localExportItem_validFor
+    localExportItem_preservesTokensOnSuccess input inputValid
+  cases itemsResult : delimited .leftBrace .rightBrace true
+      ExportInternals.localExportItem .exportDecl .topLevel input with
+  | invariant error => simp only [bind, itemsResult, Reply.ValidFor]
+  | reject failure rejected =>
+      rw [itemsResult] at itemsValid
+      simpa only [bind, itemsResult, Reply.ValidFor] using itemsValid
+  | ok items afterItems =>
+      rw [itemsResult] at itemsValid
+      have itemsValidAfter : DelimitedList.ValidFor
+          LocalExportItem.ValidFor afterItems.file items := by
+        simpa [itemsValid.2.2] using itemsValid.1
+      have startValidAfter : start.ValidFor afterItems.file := by
+        simpa [itemsValid.2.2] using startValid
+      have startFoundAfter :
+          afterItems.tokens[startIndex]? = some startToken := by
+        simpa [delimited_preservesTokensOnSuccess .leftBrace .rightBrace true
+          ExportInternals.localExportItem .exportDecl .topLevel
+          localExportItem_preservesTokensOnSuccess input items afterItems
+          itemsResult] using startFound
+      have startBeforeAfter : startIndex < afterItems.cursor :=
+        Nat.lt_of_lt_of_le startBefore
+          (delimited_cursorMonotoneOnSuccess .leftBrace .rightBrace true
+            ExportInternals.localExportItem .exportDecl .topLevel
+            input items afterItems itemsResult)
+      have finished := finishExport_validFor start (.local items) afterItems
+        itemsValid.2.1 startValidAfter startFoundAfter startSpan
+        startBeforeAfter ⟨itemsValidAfter.1, itemsValidAfter.2⟩
+      simpa only [bind, itemsResult] using
+        finished.of_file_eq itemsValid.2.2
+
+/-- Braced local exports preserve every ordinary token window. -/
+theorem localExport_preservesTokenWindow (start : SourceSpan) :
+    Parser.PreservesTokenWindow (ExportInternals.localExport start) := by
+  unfold ExportInternals.localExport
+  apply Parser.bind_preservesTokenWindow
+    (delimited_preservesTokenWindow .leftBrace .rightBrace true
+      ExportInternals.localExportItem .exportDecl .topLevel
+      localExportItem_preservesTokenWindow)
+  intro items
+  exact finishExport_preservesTokenWindow start (.local items)
+
+theorem localExport_preservesTokensOnSuccess (start : SourceSpan) :
+    Parser.PreservesTokensOnSuccess (ExportInternals.localExport start) :=
+  (localExport_preservesTokenWindow start).preservesTokensOnSuccess
+
+/-- Braced local exports never rewind the cursor. -/
+theorem localExport_cursorMonotoneOnSuccess (start : SourceSpan) :
+    Parser.CursorMonotoneOnSuccess (ExportInternals.localExport start) := by
+  unfold ExportInternals.localExport
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (delimited_cursorMonotoneOnSuccess .leftBrace .rightBrace true
+      ExportInternals.localExportItem .exportDecl .topLevel)
+  intro items
+  exact finishExport_cursorMonotoneOnSuccess start (.local items)
+
+theorem localExport_keepsStartByte (start : SourceSpan)
+    {input next : State} {result : ExportDecl}
+    (parsed : ExportInternals.localExport start input = .ok result next) :
+    start.startByte = result.span.startByte := by
+  unfold ExportInternals.localExport at parsed
+  rcases exportBind_ok_components parsed with
+    ⟨items, afterItems, _itemsResult, finished⟩
+  exact finishExport_keepsStartByte start (.local items) finished
+
 end Solcore.Syntax.Parser

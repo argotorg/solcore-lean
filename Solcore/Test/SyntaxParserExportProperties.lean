@@ -33,5 +33,15 @@ example := @exportSelection_preservesTokenWindow
 example := @exportSelection_preservesTokensOnSuccess
 example := @exportSelection_cursorMonotoneOnSuccess
 example := @exportSelection_startsAtCurrentTokenOnSuccess
+example := @finishExport_validFor
+example := @finishExport_preservesTokenWindow
+example := @finishExport_preservesTokensOnSuccess
+example := @finishExport_cursorMonotoneOnSuccess
+example := @finishExport_keepsStartByte
+example := @localExport_validFor
+example := @localExport_preservesTokenWindow
+example := @localExport_preservesTokensOnSuccess
+example := @localExport_cursorMonotoneOnSuccess
+example := @localExport_keepsStartByte
 
 end Tests
