@@ -12,13 +12,12 @@ The repository provides:
 - commit on return and rollback on balance-preflight rejection, revert, or trap;
 - observable state, return data, logs, balances, and contract creation;
 - reproducible generation and shrinking of a checked, pure Core v3 subset;
-- versioned command-line interfaces for older Core languages and the supported
-  single-file Surface parser; and
+- versioned compatibility interfaces for previously published formats; and
 - Lean proofs and executable tests for the modeled rules.
 
-Oracle v5 consumes Semantic Core, not arbitrary Solcore source text. The
-published Surface parser is a separate interface: parsing does not resolve
-names, type-check source, elaborate it into Core, or execute a contract.
+Oracle v5 consumes Semantic Core rather than source text. Source parsing, name
+resolution, source type checking, and elaboration are separate stages; an
+end-to-end source execution interface is not yet public.
 
 ## Requirements
 
