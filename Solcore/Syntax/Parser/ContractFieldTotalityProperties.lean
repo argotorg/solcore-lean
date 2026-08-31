@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.ContractProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.TypeFuelTotalityProperties
 
 /-! Valid-input totality laws local to contract fields. -/
 
@@ -51,14 +52,12 @@ theorem optionalFieldInitializer_ne_invariant
     expressionFree).ne_invariant input inputValid error
 
 /--
-A contract field introduces no invariant beyond expression and type parsing.
-The final semicolon parser is ordinary on every state, so expression validity
-is deliberately not required here.
+A contract field introduces no invariant beyond its expression parser. Public
+recursive type parsing and the final semicolon parser are already total.
 -/
 theorem contractField_invariantFreeOnValid
     (expressionParser : Parser Expr)
-    (expressionFree : Parser.InvariantFreeOnValid expressionParser)
-    (typeFree : Parser.InvariantFreeOnValid typeExpr) :
+    (expressionFree : Parser.InvariantFreeOnValid expressionParser) :
     Parser.InvariantFreeOnValid (contractField expressionParser) := by
   intro input inputValid
   rcases (identifier_ordinary .contractMember) input with
@@ -71,7 +70,7 @@ theorem contractField_invariantFreeOnValid
     · have colonValid := symbol_validFor .colon .contractMember afterName
         nameValid.2.1
       rw [colonResult] at colonValid
-      rcases typeFree afterColon colonValid.2.1 with
+      rcases typeExpr_invariantFreeOnValid afterColon colonValid.2.1 with
         ⟨type, afterType, typeResult⟩ |
         ⟨failure, rejected, typeResult⟩
       · have typeValid := typeExpr_validFor afterColon colonValid.2.1
@@ -106,11 +105,10 @@ theorem contractField_invariantFreeOnValid
 theorem contractField_ne_invariant
     (expressionParser : Parser Expr)
     (expressionFree : Parser.InvariantFreeOnValid expressionParser)
-    (typeFree : Parser.InvariantFreeOnValid typeExpr)
     (input : State) (inputValid : input.ValidFor)
     (error : ParserInvariantError) :
     contractField expressionParser input ≠ .invariant error :=
-  (contractField_invariantFreeOnValid expressionParser expressionFree
-    typeFree).ne_invariant input inputValid error
+  (contractField_invariantFreeOnValid expressionParser
+    expressionFree).ne_invariant input inputValid error
 
 end Solcore.Syntax.Parser.ContractInternals

@@ -16,11 +16,10 @@ example (expressionParser : Parser Expr)
 
 example (expressionParser : Parser Expr)
     (expressionFree : Parser.InvariantFreeOnValid expressionParser)
-    (typeFree : Parser.InvariantFreeOnValid typeExpr)
     (input : State) (inputValid : input.ValidFor)
     (error : ParserInvariantError) :
     contractField expressionParser input ≠ .invariant error :=
-  contractField_ne_invariant expressionParser expressionFree typeFree input
-    inputValid error
+  contractField_ne_invariant expressionParser expressionFree input inputValid
+    error
 
 end Solcore.Test.SyntaxParserContractFieldTotalityProperties
