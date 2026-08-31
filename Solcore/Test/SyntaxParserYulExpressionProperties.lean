@@ -85,4 +85,19 @@ example (nested : Parser YulExpr)
     (YulExpressionInternals.layer nested).ValidFor YulExpr.ValidFor :=
   YulExpressionInternals.layer_validFor nested valid preserves rejectShape
 
+example : yulExpression.ValidFor YulExpr.ValidFor :=
+  yulExpression_validFor
+
+example : Parser.PreservesTokenWindow yulExpression :=
+  yulExpression_preservesTokenWindow
+
+example : Parser.PreservesTokensOnSuccess yulExpression :=
+  yulExpression_preservesTokensOnSuccess
+
+example : Parser.CursorMonotoneOnSuccess yulExpression :=
+  yulExpression_cursorMonotoneOnSuccess
+
+example : Parser.StartsAtCurrentTokenOnSuccess yulExpression (·.span) :=
+  yulExpression_startsAtCurrentTokenOnSuccess
+
 end Tests

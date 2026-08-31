@@ -671,6 +671,29 @@ theorem recoverAux_cursorMonotoneOnSuccess (first last : SourceSpan)
   exact (recoverAux_ok_state_shape first fuel last input expression next
     result).2.1
 
+/-- Yul recovery preserves the complete immutable token window. -/
+theorem recoverAux_preservesTokenWindow (first last : SourceSpan)
+    (fuel : Nat) :
+    Parser.PreservesTokenWindow (recoverAux first last fuel) := by
+  intro input
+  induction fuel generalizing last input with
+  | zero => trivial
+  | succ fuel inductionHypothesis =>
+      unfold recoverAux
+      split
+      · unfold finishRecovered Reply.PreservesTokenWindow
+        exact ⟨rfl, rfl⟩
+      · cases advanced : input.advance? with
+        | none =>
+            unfold finishRecovered Reply.PreservesTokenWindow
+            exact ⟨rfl, rfl⟩
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            have recursive := inductionHypothesis token.span afterToken
+            have advanceShape := advance?_state_shape advanced
+            exact recursive.trans (by
+              simp [advanceShape.2])
+
 /-- One recovering Yul-expression layer preserves recursive provenance. -/
 theorem layer_validFor (nested : Parser YulExpr)
     (nestedValid : nested.ValidFor YulExpr.ValidFor)
@@ -783,6 +806,220 @@ theorem layer_preservesTokensOnSuccess (nested : Parser YulExpr)
               simpa [advanceShape.2, State.emit, rewound] using
                 coreRejectPreserves input failure failedState coreResult)
 
+/-- A recovering Yul layer preserves every ordinary token window. -/
+theorem layer_preservesTokenWindow (nested : Parser YulExpr)
+    (nestedShape : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (layer nested) := by
+  intro input
+  unfold layer
+  cases coreResult : yulExpressionCore nested input with
+  | invariant error => trivial
+  | ok expression next =>
+      have coreShape := yulExpressionCore_preservesTokenWindow nested
+        nestedShape input
+      rw [coreResult] at coreShape
+      exact coreShape
+  | reject failure failedState =>
+      have coreShape := yulExpressionCore_preservesTokenWindow nested
+        nestedShape input
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have failedShape : failedState.tokens = input.tokens ∧
+          failedState.window = input.window := by
+        simpa only [Reply.PreservesTokenWindow] using coreShape
+      have rewoundShape : rewound.tokens = input.tokens ∧
+          rewound.window = input.window := by
+        simpa [rewound] using failedShape
+      change (if isBoundary rewound then Reply.reject failure rewound else
+        match rewound.advance? with
+        | some (token, afterToken) =>
+            recoverAux token.span token.span (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound).PreservesTokenWindow input
+      split
+      · exact rewoundShape
+      · cases advanced : rewound.advance? with
+        | none => exact rewoundShape
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            have recovered := recoverAux_preservesTokenWindow token.span
+              token.span (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic)
+            have advanceShape := advance?_state_shape advanced
+            exact recovered.trans (by
+              simpa [State.emit, advanceShape.2] using rewoundShape)
+
+/-- A recovering Yul layer never rewinds its caller's cursor. -/
+theorem layer_cursorMonotoneOnSuccess (nested : Parser YulExpr) :
+    Parser.CursorMonotoneOnSuccess (layer nested) := by
+  intro input expression next result
+  unfold layer at result
+  cases coreResult : yulExpressionCore nested input with
+  | invariant error => simp [coreResult] at result
+  | ok value afterCore =>
+      simp only [coreResult] at result
+      have monotone := yulExpressionCore_cursorMonotoneOnSuccess nested
+        input value afterCore coreResult
+      cases result
+      exact monotone
+  | reject failure failedState =>
+      simp only [coreResult] at result
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if isBoundary rewound then Reply.reject failure rewound else
+        match rewound.advance? with
+        | some (token, afterToken) =>
+            recoverAux token.span token.span (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound) = .ok expression next at result
+      split at result
+      · contradiction
+      · cases advanced : rewound.advance? with
+        | none => simp [advanced] at result
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have recovered := recoverAux_cursorMonotoneOnSuccess token.span
+              token.span (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic) expression next result
+            have advanceShape := advance?_state_shape advanced
+            exact Nat.le_trans (by simp [advanceShape.2, State.emit, rewound])
+              recovered
+
+/-- A successful recovering layer starts at its caller's current token. -/
+theorem layer_startsAtCurrentTokenOnSuccess (nested : Parser YulExpr)
+    (nestedShape : Parser.PreservesTokenWindow nested) :
+    Parser.StartsAtCurrentTokenOnSuccess (layer nested) (·.span) := by
+  intro input expression next result
+  unfold layer at result
+  cases coreResult : yulExpressionCore nested input with
+  | invariant error => simp [coreResult] at result
+  | ok value afterCore =>
+      simp only [coreResult] at result
+      have starts := yulExpressionCore_startsAtCurrentTokenOnSuccess nested
+        input value afterCore coreResult
+      cases result
+      simpa using starts
+  | reject failure failedState =>
+      simp only [coreResult] at result
+      have coreShape := yulExpressionCore_reject_preservesTokenWindow nested
+        nestedShape coreResult
+      let rewound : State := { failedState with cursor := input.cursor }
+      change (if isBoundary rewound then Reply.reject failure rewound else
+        match rewound.advance? with
+        | some (token, afterToken) =>
+            recoverAux token.span token.span (afterToken.remainingCount + 1)
+              (afterToken.emit failure.toDiagnostic)
+        | none => Reply.reject failure rewound) = .ok expression next at result
+      split at result
+      · contradiction
+      · cases advanced : rewound.advance? with
+        | none => simp [advanced] at result
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at result
+            have advanceShape := advance?_state_shape advanced
+            have found : input.peek? = some token := by
+              have rewoundFound := advanceShape.1
+              unfold State.peek? at rewoundFound ⊢
+              simpa [rewound, coreShape.1, coreShape.2] using rewoundFound
+            have recovered := recoverAux_ok_state_shape token.span
+              (afterToken.remainingCount + 1) token.span
+              (afterToken.emit failure.toDiagnostic) expression next result
+            exact ⟨token, found, recovered.2.2.symm⟩
+
+/-- Every fuel-bounded recursive Yul parser preserves token windows. -/
+theorem withFuel_preservesTokenWindow : ∀ fuel,
+    Parser.PreservesTokenWindow (withFuel fuel) := by
+  intro fuel
+  induction fuel with
+  | zero => intro input; trivial
+  | succ fuel inductionHypothesis =>
+      exact layer_preservesTokenWindow (withFuel fuel) inductionHypothesis
+
+/-- Every fuel-bounded recursive Yul parser preserves source provenance. -/
+theorem withFuel_validFor : ∀ fuel,
+    (withFuel fuel).ValidFor YulExpr.ValidFor := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro input inputValid
+      change True
+      trivial
+  | succ fuel inductionHypothesis =>
+      have nestedShape := withFuel_preservesTokenWindow fuel
+      exact layer_validFor (withFuel fuel) inductionHypothesis
+        nestedShape.preservesTokensOnSuccess (by
+          intro input failure failedState result
+          exact yulExpressionCore_reject_preservesTokenWindow
+            (withFuel fuel) nestedShape result)
+
+/-- Every fuel-bounded recursive Yul parser preserves its token carrier. -/
+theorem withFuel_preservesTokensOnSuccess (fuel : Nat) :
+    Parser.PreservesTokensOnSuccess (withFuel fuel) :=
+  (withFuel_preservesTokenWindow fuel).preservesTokensOnSuccess
+
+/-- Every fuel-bounded recursive Yul parser keeps cursor order. -/
+theorem withFuel_cursorMonotoneOnSuccess : ∀ fuel,
+    Parser.CursorMonotoneOnSuccess (withFuel fuel) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro input expression next result
+      unfold withFuel at result
+      contradiction
+  | succ fuel inductionHypothesis =>
+      exact layer_cursorMonotoneOnSuccess (withFuel fuel)
+
+/-- Every successful fuel-bounded Yul parser starts at its input token. -/
+theorem withFuel_startsAtCurrentTokenOnSuccess : ∀ fuel,
+    Parser.StartsAtCurrentTokenOnSuccess (withFuel fuel) (·.span) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro input expression next result
+      unfold withFuel at result
+      contradiction
+  | succ fuel inductionHypothesis =>
+      exact layer_startsAtCurrentTokenOnSuccess (withFuel fuel)
+        (withFuel_preservesTokenWindow fuel)
+
 end YulExpressionInternals
+
+/-- The public recursive Yul parser preserves all retained source ranges. -/
+theorem yulExpression_validFor :
+    yulExpression.ValidFor YulExpr.ValidFor := by
+  intro input inputValid
+  unfold yulExpression
+  exact YulExpressionInternals.withFuel_validFor
+    (input.remainingCount + 1) input inputValid
+
+/-- The public recursive Yul parser preserves every ordinary token window. -/
+theorem yulExpression_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulExpression := by
+  intro input
+  unfold yulExpression
+  exact YulExpressionInternals.withFuel_preservesTokenWindow
+    (input.remainingCount + 1) input
+
+/-- The public recursive Yul parser preserves its immutable token carrier. -/
+theorem yulExpression_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess yulExpression :=
+  yulExpression_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- The public recursive Yul parser never rewinds its cursor. -/
+theorem yulExpression_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess yulExpression := by
+  intro input expression next result
+  unfold yulExpression at result
+  exact YulExpressionInternals.withFuel_cursorMonotoneOnSuccess
+    (input.remainingCount + 1) input expression next result
+
+/-- A successful public Yul expression starts at its current input token. -/
+theorem yulExpression_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess yulExpression (·.span) := by
+  intro input expression next result
+  unfold yulExpression at result
+  exact YulExpressionInternals.withFuel_startsAtCurrentTokenOnSuccess
+    (input.remainingCount + 1) input expression next result
 
 end Solcore.Syntax.Parser
