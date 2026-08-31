@@ -43,7 +43,8 @@ def yulExpressionStatement : Parser YulStmt := do
   let expression ← yulExpression
   pure { span := expression.span, value := .expression expression }
 
-private def yulReturnBuiltin : Parser YulStmt := do
+/-- Parse source-level `return(...)` as the corresponding Yul call statement. -/
+def yulReturnBuiltin : Parser YulStmt := do
   let marker ← keyword .returnKw .yulStatement
   let arguments ← delimited .leftParen .rightParen true yulExpression
     .yulExpression .yul
@@ -67,7 +68,7 @@ trying its final expression branch.  The expression parser may recover to a
 `YulExpr.error`; retain that AST and its cursor, but replace its speculative
 diagnostics with the more precise failure reached by the recognized branch.
 -/
-private def recognizedYulStatementOrFallback
+def recognizedYulStatementOrFallback
     (primary fallback : Parser YulStmt) : Parser YulStmt := fun state =>
   match primary state with
   | .ok value next => .ok value next

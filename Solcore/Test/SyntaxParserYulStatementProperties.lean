@@ -28,6 +28,12 @@ example := yulExpressionStatement_preservesTokensOnSuccess
 example := yulExpressionStatement_cursorMonotoneOnSuccess
 example := yulExpressionStatement_startsAtCurrentTokenOnSuccess
 
+example := yulReturnBuiltin_validFor
+example := yulReturnBuiltin_preservesTokenWindow
+example := yulReturnBuiltin_preservesTokensOnSuccess
+example := yulReturnBuiltin_cursorMonotoneOnSuccess
+example := yulReturnBuiltin_startsAtCurrentTokenOnSuccess
+
 example := yulLeaveControl_validFor
 example := yulBreakControl_validFor
 example := yulContinueControl_validFor
@@ -35,5 +41,10 @@ example := @yulControlToken_preservesTokenWindow
 example := @yulControlToken_preservesTokensOnSuccess
 example := @yulControlToken_cursorMonotoneOnSuccess
 example := @yulControlToken_startsAtCurrentTokenOnSuccess
+example := @recognizedYulStatementOrFallback_validFor
+example := @recognizedYulStatementOrFallback_preservesTokenWindow
+example := @recognizedYulStatementOrFallback_preservesTokensOnSuccess
+example := @recognizedYulStatementOrFallback_cursorMonotoneOnSuccess
+example := @recognizedYulStatementOrFallback_startsAtCurrentTokenOnSuccess
 
 end Tests

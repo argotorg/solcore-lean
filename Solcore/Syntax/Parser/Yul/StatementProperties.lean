@@ -415,6 +415,116 @@ theorem yulExpressionStatement_startsAtCurrentTokenOnSuccess :
   cases ‹_ = Reply.ok _ _›
   rfl
 
+/-- Yul `return(...)` preserves its synthesized call and argument ranges. -/
+theorem yulReturnBuiltin_validFor :
+    yulReturnBuiltin.ValidFor YulStmt.ValidFor := by
+  have argumentsContract := delimited_validFor YulExpr.ValidFor .leftParen
+    .rightParen true yulExpression .yulExpression .yul
+    yulExpression_validFor yulExpression_preservesTokensOnSuccess
+  have weak : yulReturnBuiltin.ValidFor (fun _ _ => True) := by
+    unfold yulReturnBuiltin
+    apply Parser.bind_validFor (keyword_validFor .returnKw .yulStatement)
+    intro marker
+    apply Parser.bind_validFor argumentsContract
+    intro arguments
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : yulReturnBuiltin input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok statement final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold yulReturnBuiltin at stages
+      rcases yulStatementBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases yulStatementBind_ok_components rest with
+        ⟨arguments, afterArguments, argumentsResult, finished⟩
+      have markerValid := keyword_validFor .returnKw .yulStatement input
+        inputValid
+      rw [markerResult] at markerValid
+      have argumentsValid := argumentsContract afterMarker markerValid.2.1
+      rw [argumentsResult] at argumentsValid
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerValid.1
+      have argumentsValidInput :
+          DelimitedList.ValidFor YulExpr.ValidFor input.file arguments := by
+        simpa [markerValid.2.2] using argumentsValid.1
+      have markerShape := acceptToken_ok_state_shape (.keyword .returnKw)
+        .yulStatement (· == .keyword .returnKw) markerResult
+      have markerAdvanced : input.advance? = some (marker, afterMarker) := by
+        unfold State.advance?
+        rw [markerShape.1, markerShape.2]
+        rfl
+      rcases delimited_startsAtCurrentTokenOnSuccess .leftParen .rightParen
+          true yulExpression .yulExpression .yul afterMarker arguments
+          afterArguments argumentsResult with
+        ⟨opening, openingFound, argumentsStart⟩
+      have markerBeforeArguments :=
+        inputValid.consumed_end_le_peek_start_after_advance markerAdvanced
+          openingFound
+      have ordered : marker.span.startByte ≤ arguments.span.endByte :=
+        Nat.le_trans markerSpanValid.2.1
+          (Nat.le_trans markerBeforeArguments (by
+            rw [argumentsStart]
+            exact argumentsValidInput.1.2.1))
+      have outerValid := SourceSpan.cover_validFor markerSpanValid
+        argumentsValidInput.1 ordered
+      have expressionValid : YulExpr.ValidFor input.file {
+          span := SourceSpan.cover marker.span arguments.span
+          value := .call { span := marker.span, value := "return" } arguments
+        } := YulExpr.ValidFor.call outerValid markerSpanValid
+          argumentsValidInput.1 argumentsValidInput.2
+      cases finished
+      exact ⟨YulStmt.ValidFor.expression outerValid expressionValid,
+        weakResult.2.1, weakResult.2.2⟩
+
+/-- Yul `return(...)` preserves every ordinary token window. -/
+theorem yulReturnBuiltin_preservesTokenWindow :
+    Parser.PreservesTokenWindow yulReturnBuiltin := by
+  unfold yulReturnBuiltin
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .returnKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (delimited_preservesTokenWindow .leftParen .rightParen true yulExpression
+      .yulExpression .yul yulExpression_preservesTokenWindow)
+  intro arguments
+  exact Parser.pure_preservesTokenWindow _
+
+theorem yulReturnBuiltin_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess yulReturnBuiltin :=
+  yulReturnBuiltin_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- Yul `return(...)` never rewinds the parser cursor. -/
+theorem yulReturnBuiltin_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess yulReturnBuiltin := by
+  unfold yulReturnBuiltin
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .returnKw .yulStatement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (delimited_cursorMonotoneOnSuccess .leftParen .rightParen true
+      yulExpression .yulExpression .yul)
+  intro arguments
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A successful Yul `return(...)` starts at its `return` token. -/
+theorem yulReturnBuiltin_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess yulReturnBuiltin (·.span) := by
+  unfold yulReturnBuiltin
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .returnKw)
+      .yulStatement (· == .keyword .returnKw))
+  intro marker input statement final parsed
+  rcases yulStatementBind_ok_components parsed with
+    ⟨arguments, afterArguments, _argumentsResult, finished⟩
+  cases finished
+  rfl
+
 /-- A keyword-only Yul control statement retains its keyword range. -/
 theorem yulControlToken_validFor (value : HardKeyword)
     (result : YulStmtValue)
@@ -478,5 +588,143 @@ theorem yulControlToken_startsAtCurrentTokenOnSuccess (value : HardKeyword)
   intros
   cases ‹_ = Reply.ok _ _›
   rfl
+
+/-- Recognized-statement fallback preserves either branch's provenance. -/
+theorem recognizedYulStatementOrFallback_validFor {valueValid :
+    SourceFile → YulStmt → Prop} (primary fallback : Parser YulStmt)
+    (primaryValid : primary.ValidFor valueValid)
+    (fallbackValid : fallback.ValidFor valueValid) :
+    (recognizedYulStatementOrFallback primary fallback).ValidFor valueValid := by
+  intro input inputValid
+  have primaryContract := primaryValid input inputValid
+  unfold recognizedYulStatementOrFallback
+  cases primaryResult : primary input with
+  | invariant error => trivial
+  | ok value next =>
+      rw [primaryResult] at primaryContract
+      simpa only [primaryResult] using primaryContract
+  | reject failure failedState =>
+      rw [primaryResult] at primaryContract
+      have fallbackContract := fallbackValid input inputValid
+      cases fallbackResult : fallback input with
+      | invariant error => trivial
+      | reject fallbackFailure fallbackState =>
+          simp only [Reply.ValidFor]
+          exact ⟨primaryContract.1, inputValid, trivial⟩
+      | ok value next =>
+          rw [fallbackResult] at fallbackContract
+          let reset : State := {
+            next with diagnosticsRev := input.diagnosticsRev
+          }
+          have resetValid : reset.ValidFor := {
+            tokens := fallbackContract.2.1.tokens
+            cursor_le_endIndex := fallbackContract.2.1.cursor_le_endIndex
+            endIndex_le_size := fallbackContract.2.1.endIndex_le_size
+            endByte_le_source := fallbackContract.2.1.endByte_le_source
+            endByte_boundary := fallbackContract.2.1.endByte_boundary
+            diagnosticsRev := by
+              intro diagnostic member
+              simpa [reset, fallbackContract.2.2] using
+                inputValid.diagnosticsRev diagnostic member
+          }
+          have emittedValid := resetValid.emit_validFor failure.toDiagnostic
+            (by simpa [reset, fallbackContract.2.2] using
+              failure.toDiagnostic_span_validFor primaryContract.1)
+          simp only [Reply.ValidFor]
+          exact ⟨fallbackContract.1, emittedValid,
+            by simpa [reset, State.emit] using fallbackContract.2.2⟩
+
+/-- Recognized-statement fallback preserves every ordinary token window. -/
+theorem recognizedYulStatementOrFallback_preservesTokenWindow
+    (primary fallback : Parser YulStmt)
+    (primaryShape : Parser.PreservesTokenWindow primary)
+    (fallbackShape : Parser.PreservesTokenWindow fallback) :
+    Parser.PreservesTokenWindow
+      (recognizedYulStatementOrFallback primary fallback) := by
+  intro input
+  have primaryContract := primaryShape input
+  unfold recognizedYulStatementOrFallback
+  cases primaryResult : primary input with
+  | invariant error => trivial
+  | ok value next =>
+      rw [primaryResult] at primaryContract
+      simpa only [primaryResult] using primaryContract
+  | reject failure failedState =>
+      have fallbackContract := fallbackShape input
+      cases fallbackResult : fallback input with
+      | invariant error => trivial
+      | reject fallbackFailure fallbackState =>
+          simp only [Reply.PreservesTokenWindow]
+          exact ⟨trivial, trivial⟩
+      | ok value next =>
+          rw [fallbackResult] at fallbackContract
+          simpa only [primaryResult, fallbackResult, State.emit,
+            Reply.PreservesTokenWindow] using fallbackContract
+
+theorem recognizedYulStatementOrFallback_preservesTokensOnSuccess
+    (primary fallback : Parser YulStmt)
+    (primaryShape : Parser.PreservesTokenWindow primary)
+    (fallbackShape : Parser.PreservesTokenWindow fallback) :
+    Parser.PreservesTokensOnSuccess
+      (recognizedYulStatementOrFallback primary fallback) :=
+  (recognizedYulStatementOrFallback_preservesTokenWindow primary fallback
+    primaryShape fallbackShape).preservesTokensOnSuccess
+
+/-- Recognized-statement fallback never rewinds either successful branch. -/
+theorem recognizedYulStatementOrFallback_cursorMonotoneOnSuccess
+    (primary fallback : Parser YulStmt)
+    (primaryMonotone : Parser.CursorMonotoneOnSuccess primary)
+    (fallbackMonotone : Parser.CursorMonotoneOnSuccess fallback) :
+    Parser.CursorMonotoneOnSuccess
+      (recognizedYulStatementOrFallback primary fallback) := by
+  intro input value next result
+  unfold recognizedYulStatementOrFallback at result
+  cases primaryResult : primary input with
+  | invariant error => simp [primaryResult] at result
+  | ok primaryValue afterPrimary =>
+      simp only [primaryResult] at result
+      have monotone := primaryMonotone input primaryValue afterPrimary
+        primaryResult
+      cases result
+      exact monotone
+  | reject failure failedState =>
+      simp only [primaryResult] at result
+      cases fallbackResult : fallback input with
+      | invariant error => simp [fallbackResult] at result
+      | reject fallbackFailure fallbackState => simp [fallbackResult] at result
+      | ok fallbackValue afterFallback =>
+          simp only [fallbackResult] at result
+          have monotone := fallbackMonotone input fallbackValue afterFallback
+            fallbackResult
+          cases result
+          exact monotone
+
+/-- Successful recognized fallback starts at the selected branch's token. -/
+theorem recognizedYulStatementOrFallback_startsAtCurrentTokenOnSuccess
+    (primary fallback : Parser YulStmt)
+    (primaryStarts : Parser.StartsAtCurrentTokenOnSuccess primary (·.span))
+    (fallbackStarts : Parser.StartsAtCurrentTokenOnSuccess fallback (·.span)) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (recognizedYulStatementOrFallback primary fallback) (·.span) := by
+  intro input value next result
+  unfold recognizedYulStatementOrFallback at result
+  cases primaryResult : primary input with
+  | invariant error => simp [primaryResult] at result
+  | ok primaryValue afterPrimary =>
+      simp only [primaryResult] at result
+      have starts := primaryStarts input primaryValue afterPrimary primaryResult
+      cases result
+      exact starts
+  | reject failure failedState =>
+      simp only [primaryResult] at result
+      cases fallbackResult : fallback input with
+      | invariant error => simp [fallbackResult] at result
+      | reject fallbackFailure fallbackState => simp [fallbackResult] at result
+      | ok fallbackValue afterFallback =>
+          simp only [fallbackResult] at result
+          have starts := fallbackStarts input fallbackValue afterFallback
+            fallbackResult
+          cases result
+          exact starts
 
 end Solcore.Syntax.Parser
