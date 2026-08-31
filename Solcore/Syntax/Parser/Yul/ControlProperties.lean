@@ -196,4 +196,215 @@ theorem yulIfStatement_startsAtCurrentTokenOnSuccess
   cases finished
   rfl
 
+/--
+Yul `for` parsing preserves every statement in its initializer, post block,
+and body together with the loop condition.  The recursive statement parser
+and fixed expression parser remain explicit dependencies.
+-/
+theorem yulForStatement_validFor (statement : Parser YulStmt)
+    (expressionValid : yulExpression.ValidFor YulExpr.ValidFor)
+    (expressionPreserves :
+      Parser.PreservesTokensOnSuccess yulExpression)
+    (expressionMonotone :
+      Parser.CursorMonotoneOnSuccess yulExpression)
+    (statementValid : statement.ValidFor YulStmt.ValidFor)
+    (statementPreserves :
+      Parser.PreservesTokensOnSuccess statement) :
+    (yulForStatement statement).ValidFor YulStmt.ValidFor := by
+  have weak : (yulForStatement statement).ValidFor (fun _ _ => True) := by
+    unfold yulForStatement
+    apply Parser.bind_validFor (keyword_validFor .forKw .yulStatement)
+    intro marker
+    apply Parser.bind_validFor
+      (yulBlock_validFor YulStmt.ValidFor statement statementValid
+        statementPreserves)
+    intro initializer
+    apply Parser.bind_validFor expressionValid
+    intro condition
+    apply Parser.bind_validFor
+      (yulBlock_validFor YulStmt.ValidFor statement statementValid
+        statementPreserves)
+    intro post
+    apply Parser.bind_validFor
+      (yulBlock_validFor YulStmt.ValidFor statement statementValid
+        statementPreserves)
+    intro body
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : yulForStatement statement input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok result final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold yulForStatement at stages
+      rcases yulBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨initializer, afterInitializer, initializerResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨condition, afterCondition, conditionResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨post, afterPost, postResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have markerValid := keyword_validFor .forKw .yulStatement input inputValid
+      rw [markerResult] at markerValid
+      have initializerValid := yulBlock_validFor YulStmt.ValidFor statement
+        statementValid statementPreserves afterMarker markerValid.2.1
+      rw [initializerResult] at initializerValid
+      have conditionValid := expressionValid afterInitializer
+        initializerValid.2.1
+      rw [conditionResult] at conditionValid
+      have postValid := yulBlock_validFor YulStmt.ValidFor statement
+        statementValid statementPreserves afterCondition conditionValid.2.1
+      rw [postResult] at postValid
+      have bodyValid := yulBlock_validFor YulStmt.ValidFor statement
+        statementValid statementPreserves afterPost postValid.2.1
+      rw [bodyResult] at bodyValid
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerValid.1
+      have initializerStatementsValid :
+          ∀ retained ∈ initializer.body,
+            YulStmt.ValidFor input.file retained := by
+        intro retained member
+        simpa [markerValid.2.2] using initializerValid.1.2 retained member
+      have conditionValidInput : YulExpr.ValidFor input.file condition := by
+        simpa [initializerValid.2.2, markerValid.2.2] using
+          conditionValid.1
+      have postStatementsValid :
+          ∀ retained ∈ post.body, YulStmt.ValidFor input.file retained := by
+        intro retained member
+        simpa [conditionValid.2.2, initializerValid.2.2,
+          markerValid.2.2] using postValid.1.2 retained member
+      have bodySpanValid : body.span.ValidFor input.file := by
+        simpa [postValid.2.2, conditionValid.2.2,
+          initializerValid.2.2, markerValid.2.2] using bodyValid.1.1
+      have bodyStatementsValid :
+          ∀ retained ∈ body.body, YulStmt.ValidFor input.file retained := by
+        intro retained member
+        simpa [postValid.2.2, conditionValid.2.2,
+          initializerValid.2.2, markerValid.2.2] using
+          bodyValid.1.2 retained member
+      have markerShape := acceptToken_ok_state_shape
+        (.keyword .forKw) .yulStatement (· == .keyword .forKw) markerResult
+      have markerAt :=
+        State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+      rcases yulBlock_startsAtCurrentTokenOnSuccess statement
+          statementPreserves afterPost body afterBody bodyResult with
+        ⟨openingToken, openingFound, openingStart⟩
+      have openingAtInput :
+          input.tokens[afterPost.cursor]? = some openingToken := by
+        have openingAt :=
+          State.getElem?_eq_some_of_peek?_eq_some openingFound
+        have postTokens := yulBlock_preservesTokensOnSuccess statement
+          statementPreserves afterCondition post afterPost postResult
+        have conditionTokens := expressionPreserves afterInitializer condition
+          afterCondition conditionResult
+        have initializerTokens := yulBlock_preservesTokensOnSuccess statement
+          statementPreserves afterMarker initializer afterInitializer
+          initializerResult
+        have markerTokens := keyword_preservesTokensOnSuccess .forKw
+          .yulStatement input marker afterMarker markerResult
+        simpa [postTokens, conditionTokens, initializerTokens, markerTokens]
+          using openingAt
+      have initializerProgress := yulBlock_cursor_lt_onSuccess statement
+        statementPreserves initializerResult
+      have conditionCursor := expressionMonotone afterInitializer condition
+        afterCondition conditionResult
+      have postProgress := yulBlock_cursor_lt_onSuccess statement
+        statementPreserves postResult
+      have initializerAfterMarker :
+          input.cursor + 1 < afterInitializer.cursor := by
+        simpa [markerShape.2] using initializerProgress
+      have markerBeforeOpening : input.cursor < afterPost.cursor := by
+        omega
+      have markerBeforeBody : marker.span.endByte ≤ body.span.startByte := by
+        rw [← openingStart]
+        exact inputValid.token_end_le_token_start_of_getElem?_lt markerAt
+          openingAtInput markerBeforeOpening
+      have outerValid :
+          (SourceSpan.cover marker.span body.span).ValidFor input.file := by
+        apply SourceSpan.cover_validFor markerSpanValid bodySpanValid
+        exact Nat.le_trans markerSpanValid.2.1
+          (Nat.le_trans markerBeforeBody bodySpanValid.2.1)
+      cases finished
+      exact ⟨YulStmt.ValidFor.forLoop outerValid initializerStatementsValid
+          conditionValidInput postStatementsValid bodyStatementsValid,
+        weakResult.2.1, weakResult.2.2⟩
+
+/-- Yul `for` parsing preserves the immutable lexer token carrier. -/
+theorem yulForStatement_preservesTokensOnSuccess
+    (statement : Parser YulStmt)
+    (expressionPreserves :
+      Parser.PreservesTokensOnSuccess yulExpression)
+    (statementPreserves :
+      Parser.PreservesTokensOnSuccess statement) :
+    Parser.PreservesTokensOnSuccess (yulForStatement statement) := by
+  unfold yulForStatement
+  apply Parser.bind_preservesTokensOnSuccess
+    (keyword_preservesTokensOnSuccess .forKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokensOnSuccess
+    (yulBlock_preservesTokensOnSuccess statement statementPreserves)
+  intro initializer
+  apply Parser.bind_preservesTokensOnSuccess expressionPreserves
+  intro condition
+  apply Parser.bind_preservesTokensOnSuccess
+    (yulBlock_preservesTokensOnSuccess statement statementPreserves)
+  intro post
+  apply Parser.bind_preservesTokensOnSuccess
+    (yulBlock_preservesTokensOnSuccess statement statementPreserves)
+  intro body
+  exact Parser.pure_preservesTokensOnSuccess _
+
+/-- Yul `for` parsing never moves the parser cursor backwards. -/
+theorem yulForStatement_cursorMonotoneOnSuccess
+    (statement : Parser YulStmt)
+    (expressionMonotone :
+      Parser.CursorMonotoneOnSuccess yulExpression)
+    (statementPreserves :
+      Parser.PreservesTokensOnSuccess statement) :
+    Parser.CursorMonotoneOnSuccess (yulForStatement statement) := by
+  unfold yulForStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .forKw .yulStatement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (yulBlock_cursorMonotoneOnSuccess statement statementPreserves)
+  intro initializer
+  apply Parser.bind_cursorMonotoneOnSuccess expressionMonotone
+  intro condition
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (yulBlock_cursorMonotoneOnSuccess statement statementPreserves)
+  intro post
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (yulBlock_cursorMonotoneOnSuccess statement statementPreserves)
+  intro body
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A successful Yul `for` statement starts at its current `for` token. -/
+theorem yulForStatement_startsAtCurrentTokenOnSuccess
+    (statement : Parser YulStmt) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (yulForStatement statement) (·.span) := by
+  unfold yulForStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess
+      (.keyword .forKw) .yulStatement (· == .keyword .forKw))
+  intro marker input value final parsed
+  rcases yulBind_ok_components parsed with
+    ⟨initializer, afterInitializer, _initializerResult, rest⟩
+  rcases yulBind_ok_components rest with
+    ⟨condition, afterCondition, _conditionResult, rest⟩
+  rcases yulBind_ok_components rest with
+    ⟨post, afterPost, _postResult, rest⟩
+  rcases yulBind_ok_components rest with
+    ⟨body, afterBody, _bodyResult, finished⟩
+  cases finished
+  rfl
+
 end Solcore.Syntax.Parser

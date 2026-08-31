@@ -13,6 +13,10 @@ example := @yulIfStatement_validFor
 example := @yulIfStatement_preservesTokensOnSuccess
 example := @yulIfStatement_cursorMonotoneOnSuccess
 example := @yulIfStatement_startsAtCurrentTokenOnSuccess
+example := @yulForStatement_validFor
+example := @yulForStatement_preservesTokensOnSuccess
+example := @yulForStatement_cursorMonotoneOnSuccess
+example := @yulForStatement_startsAtCurrentTokenOnSuccess
 
 example (nested : Parser YulStmt)
     (expressionValid : yulExpression.ValidFor YulExpr.ValidFor)
@@ -48,5 +52,38 @@ example (nested : Parser YulStmt) :
     Parser.StartsAtCurrentTokenOnSuccess
       (yulIfStatement nested) (·.span) :=
   yulIfStatement_startsAtCurrentTokenOnSuccess nested
+
+example (nested : Parser YulStmt)
+    (expressionValid : yulExpression.ValidFor YulExpr.ValidFor)
+    (expressionPreserves :
+      Parser.PreservesTokensOnSuccess yulExpression)
+    (expressionMonotone :
+      Parser.CursorMonotoneOnSuccess yulExpression)
+    (nestedValid : nested.ValidFor YulStmt.ValidFor)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (yulForStatement nested).ValidFor YulStmt.ValidFor :=
+  yulForStatement_validFor nested expressionValid expressionPreserves
+    expressionMonotone nestedValid nestedPreserves
+
+example (nested : Parser YulStmt)
+    (expressionPreserves :
+      Parser.PreservesTokensOnSuccess yulExpression)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (yulForStatement nested) :=
+  yulForStatement_preservesTokensOnSuccess nested expressionPreserves
+    nestedPreserves
+
+example (nested : Parser YulStmt)
+    (expressionMonotone :
+      Parser.CursorMonotoneOnSuccess yulExpression)
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (yulForStatement nested) :=
+  yulForStatement_cursorMonotoneOnSuccess nested expressionMonotone
+    nestedPreserves
+
+example (nested : Parser YulStmt) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (yulForStatement nested) (·.span) :=
+  yulForStatement_startsAtCurrentTokenOnSuccess nested
 
 end Tests
