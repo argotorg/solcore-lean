@@ -1366,6 +1366,145 @@ theorem lambdaExpression_retainsBodyEndOnSuccess (block : Parser Block)
   cases finished
   exact ⟨marker, parameters, returnType, body, rfl, rfl⟩
 
+private theorem lambdaExpression_weakValidFor (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (blockValid : block.ValidFor (Block.ValidFor statementValid)) :
+    (lambdaExpression block).ValidFor (fun _ _ => True) := by
+  unfold lambdaExpression
+  apply Parser.bind_validFor (keyword_validFor .lamKw .expression)
+  intro marker
+  apply Parser.bind_validFor
+    ((delimited_validFor LambdaParameter.ValidFor .leftParen .rightParen true
+      lambdaParameter .parameter .expression lambdaParameter_validFor
+      lambdaParameter_preservesTokensOnSuccess).mono (fun _ _ _ => trivial))
+  intro parameters
+  apply Parser.bind_validFor
+    (optionalLambdaReturnType_validFor.mono (fun _ _ _ => trivial))
+  intro returnType
+  apply Parser.bind_validFor (blockValid.mono (fun _ _ _ => trivial))
+  intro body
+  exact Parser.pure_validFor _ _ (fun _ => trivial)
+
+/-- Lambda parsing retains parameters, return type, body, and outer range. -/
+theorem lambdaExpression_validFor (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (blockValid : block.ValidFor (Block.ValidFor statementValid))
+    (blockStarts : Parser.StartsAtCurrentTokenOnSuccess block (·.span)) :
+    (lambdaExpression block).ValidFor (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  have weak := lambdaExpression_weakValidFor block statementValid blockValid
+    input inputValid
+  cases parsed : lambdaExpression block input with
+  | invariant error => trivial
+  | reject failure rejected => rw [parsed] at weak; exact weak
+  | ok expression final =>
+      rw [parsed] at weak
+      have stages := parsed
+      unfold lambdaExpression at stages
+      rcases atomBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases atomBind_ok_components rest with
+        ⟨parameters, afterParameters, parametersResult, rest⟩
+      rcases atomBind_ok_components rest with
+        ⟨returnType, afterReturnType, returnTypeResult, rest⟩
+      rcases atomBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have markerReply := keyword_validFor .lamKw .expression input inputValid
+      rw [markerResult] at markerReply
+      have parametersContract := delimited_validFor LambdaParameter.ValidFor
+        .leftParen .rightParen true lambdaParameter .parameter .expression
+        lambdaParameter_validFor lambdaParameter_preservesTokensOnSuccess
+      have parametersReply := parametersContract afterMarker markerReply.2.1
+      rw [parametersResult] at parametersReply
+      have returnTypeReply := optionalLambdaReturnType_validFor
+        afterParameters parametersReply.2.1
+      rw [returnTypeResult] at returnTypeReply
+      have bodyReply := blockValid afterReturnType returnTypeReply.2.1
+      rw [bodyResult] at bodyReply
+      have markerValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerReply.1
+      have parametersValid : DelimitedList.ValidFor LambdaParameter.ValidFor
+          input.file parameters := by
+        simpa [markerReply.2.2] using parametersReply.1
+      have returnTypeValid : Option.ValidFor TypeExpr.ValidFor input.file
+          returnType := by
+        simpa [parametersReply.2.2, markerReply.2.2] using returnTypeReply.1
+      have bodyValid : Block.ValidFor statementValid input.file body := by
+        simpa [returnTypeReply.2.2, parametersReply.2.2,
+          markerReply.2.2] using bodyReply.1
+      have markerShape := acceptToken_ok_state_shape (.keyword .lamKw)
+        .expression (· == .keyword .lamKw) markerResult
+      have parametersTokens := delimited_preservesTokensOnSuccess
+        .leftParen .rightParen true lambdaParameter .parameter .expression
+          lambdaParameter_preservesTokensOnSuccess afterMarker parameters
+            afterParameters parametersResult
+      have returnTypeTokens := optionalLambdaReturnType_preservesTokensOnSuccess
+        afterParameters returnType afterReturnType returnTypeResult
+      rcases blockStarts afterReturnType body afterBody bodyResult with
+        ⟨bodyToken, bodyFound, bodyStart⟩
+      have markerAt : afterReturnType.tokens[input.cursor]? = some marker := by
+        simpa [returnTypeTokens, parametersTokens, markerShape.2] using
+          State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+      have bodyAt := State.getElem?_eq_some_of_peek?_eq_some bodyFound
+      have markerBeforeBody :=
+        returnTypeReply.2.1.token_end_le_token_start_of_getElem?_lt
+          markerAt bodyAt (by
+            have parametersCursor := delimited_cursorMonotoneOnSuccess
+              .leftParen .rightParen true lambdaParameter .parameter .expression
+                afterMarker parameters afterParameters parametersResult
+            have returnTypeCursor := optionalLambdaReturnType_cursorMonotoneOnSuccess
+              afterParameters returnType afterReturnType returnTypeResult
+            simp [markerShape.2] at parametersCursor
+            omega)
+      have ordered : marker.span.startByte ≤ body.span.endByte :=
+        Nat.le_trans markerValid.2.1 (Nat.le_trans markerBeforeBody
+          (by rw [bodyStart]; exact bodyValid.1.2.1))
+      cases finished
+      refine ⟨Expr.ValidFor.lambda
+        (SourceSpan.cover_validFor markerValid bodyValid.1 ordered)
+        markerValid parametersValid.1 parametersValid.2 ?_ bodyValid,
+        weak.2.1, weak.2.2⟩
+      intro type member
+      cases returnType with
+      | none => simp at member
+      | some retained =>
+          simp at member
+          subst type
+          simpa [Option.ValidFor] using returnTypeValid
+
+/-- Atom dispatch preserves recursive source provenance in every branch. -/
+theorem expressionAtomCore_validFor
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested)
+    (blockValid : block.ValidFor (Block.ValidFor statementValid))
+    (blockStarts : Parser.StartsAtCurrentTokenOnSuccess block (·.span)) :
+    (expressionAtomCore nested block).ValidFor
+      (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  unfold expressionAtomCore
+  split
+  · exact literalExpression_validFor statementValid input inputValid
+  · split
+    · exact identifierExpression_validFor statementValid input inputValid
+    · split
+      · exact dotConstructor_validFor nested statementValid nestedValid
+          nestedTokens input inputValid
+      · split
+        · exact proxyExpression_validFor statementValid input inputValid
+        · split
+          · exact parenthesized_validFor nested statementValid nestedValid
+              nestedTokens input inputValid
+          · split
+            · exact arrayLiteral_validFor nested statementValid nestedValid
+                nestedTokens input inputValid
+            · split
+              · exact lambdaExpression_validFor block statementValid
+                  blockValid blockStarts input inputValid
+              · unfold rejectAt Reply.ValidFor
+                exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+
 /-- Atom dispatch preserves token windows when its recursive leaves do. -/
 theorem expressionAtomCore_preservesTokenWindow
     (nested : Parser Expr) (block : Parser Block)
@@ -1447,6 +1586,86 @@ theorem expressionAtomCore_startsAtCurrentTokenOnSuccess
               · exact lambdaExpression_startsAtCurrentTokenOnSuccess block
                   input value next result
               · simp [rejectAt] at result
+
+/-- Finishing atom recovery retains one source-valid error expression. -/
+theorem finishRecoveredAtom_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (first last : SourceSpan) (state : State)
+    (stateValid : state.ValidFor)
+    (firstValid : first.ValidFor state.file)
+    (lastValid : last.ValidFor state.file)
+    (ordered : first.startByte ≤ last.endByte) :
+    (finishRecoveredAtom first last state).ValidFor state
+      (Expr.ValidFor statementValid) := by
+  have spanValid := SourceSpan.cover_validFor firstValid lastValid ordered
+  unfold finishRecoveredAtom Reply.ValidFor
+  exact ⟨.error spanValid, stateValid.emit_validFor _ spanValid, rfl⟩
+
+/-- Fuel-bounded atom recovery preserves source provenance. -/
+theorem recoverAtomAux_validFor
+    (statementValid : SourceFile → Statement → Prop)
+    (first : SourceSpan) : ∀ fuel last state lastIndex lastToken,
+      state.ValidFor → first.ValidFor state.file →
+      last.ValidFor state.file → first.startByte ≤ last.endByte →
+      state.tokens[lastIndex]? = some lastToken → lastToken.span = last →
+      lastIndex < state.cursor →
+      (recoverAtomAux first last fuel state).ValidFor state
+        (Expr.ValidFor statementValid) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro last state lastIndex lastToken stateValid firstValid lastValid
+        ordered lastFound lastSpan lastBefore
+      unfold recoverAtomAux
+      split
+      · exact finishRecoveredAtom_validFor statementValid first last state
+          stateValid firstValid lastValid ordered
+      · cases advanced : state.advance? with
+        | none =>
+            exact finishRecoveredAtom_validFor statementValid first last state
+              stateValid firstValid lastValid ordered
+        | some pair =>
+            rcases pair with ⟨token, next⟩
+            have shape := advance?_state_shape advanced
+            have nextValid := stateValid.advance?_validFor advanced
+            have tokenValid := stateValid.peek?_span_validFor shape.1
+            have currentFound :=
+              State.getElem?_eq_some_of_peek?_eq_some shape.1
+            have lastBeforeCurrent :=
+              stateValid.token_end_le_token_start_of_getElem?_lt lastFound
+                currentFound lastBefore
+            exact (inductionHypothesis token.span next state.cursor token
+              nextValid (by simpa [shape.2] using firstValid)
+              (by simpa [shape.2] using tokenValid)
+              (Nat.le_trans ordered (Nat.le_trans
+                (by simpa [lastSpan] using lastBeforeCurrent)
+                tokenValid.2.1))
+              (by simpa [shape.2] using currentFound) rfl
+              (by simp [shape.2])).of_file_eq (by simp [shape.2])
+
+/-- Complete atom recovery preserves source provenance. -/
+theorem recoverAtom_validFor
+    (statementValid : SourceFile → Statement → Prop) :
+    Parser.ValidFor recoverAtom (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  unfold recoverAtom
+  cases advanced : input.advance? with
+  | none =>
+      unfold rejectAt Reply.ValidFor
+      exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+  | some pair =>
+      rcases pair with ⟨token, next⟩
+      have shape := advance?_state_shape advanced
+      have nextValid := inputValid.advance?_validFor advanced
+      have tokenValid := inputValid.peek?_span_validFor shape.1
+      have currentFound := State.getElem?_eq_some_of_peek?_eq_some shape.1
+      exact (recoverAtomAux_validFor statementValid token.span
+        (next.remainingCount + 1) token.span next input.cursor token nextValid
+        (by simpa [shape.2] using tokenValid)
+        (by simpa [shape.2] using tokenValid) tokenValid.2.1
+        (by simpa [shape.2] using currentFound) rfl
+        (by simp [shape.2])).of_file_eq (by simp [shape.2])
 
 /-- Fuel-bounded atom recovery preserves every ordinary token window. -/
 theorem recoverAtomAux_preservesTokenWindow (first last : SourceSpan)
@@ -1566,6 +1785,54 @@ theorem expressionAtom_preservesTokensOnSuccess
     Parser.PreservesTokensOnSuccess (expressionAtom nested block) :=
   (expressionAtom_preservesTokenWindow nested block nestedWindow
     blockWindow).preservesTokensOnSuccess
+
+/-- Public atom parsing preserves recursive source provenance through recovery. -/
+theorem expressionAtom_validFor
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (blockValid : block.ValidFor (Block.ValidFor statementValid))
+    (blockStarts : Parser.StartsAtCurrentTokenOnSuccess block (·.span))
+    (blockWindow : Parser.PreservesTokenWindow block) :
+    (expressionAtom nested block).ValidFor (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  unfold expressionAtom
+  have coreValid := expressionAtomCore_validFor nested block statementValid
+    nestedValid nestedWindow.preservesTokensOnSuccess blockValid blockStarts
+      input inputValid
+  cases coreResult : expressionAtomCore nested block input with
+  | ok value next => rw [coreResult] at coreValid; exact coreValid
+  | invariant error => trivial
+  | reject failure failedState =>
+      rw [coreResult] at coreValid
+      have coreShape := expressionAtomCore_preservesTokenWindow nested block
+        nestedWindow blockWindow input
+      rw [coreResult] at coreShape
+      let rewound : State := { failedState with cursor := input.cursor }
+      have rewoundValid : rewound.ValidFor := {
+        tokens := coreValid.2.1.tokens
+        cursor_le_endIndex := by
+          simpa [rewound, coreShape.2] using inputValid.cursor_le_endIndex
+        endIndex_le_size := coreValid.2.1.endIndex_le_size
+        endByte_le_source := coreValid.2.1.endByte_le_source
+        endByte_boundary := coreValid.2.1.endByte_boundary
+        diagnosticsRev := coreValid.2.1.diagnosticsRev
+      }
+      have rewoundFile : rewound.file = input.file := by
+        simpa [rewound] using coreValid.2.2
+      have failureValid : failure.span.ValidFor rewound.file := by
+        simpa [rewound, coreValid.2.2] using coreValid.1
+      change (if isAtomBoundary rewound then Reply.reject failure rewound
+        else recoverAtom (rewound.emit failure.toDiagnostic)).ValidFor input
+          (Expr.ValidFor statementValid)
+      split
+      · exact ⟨coreValid.1, rewoundValid, rewoundFile⟩
+      · have emittedValid := rewoundValid.emit_validFor failure.toDiagnostic
+          (failure.toDiagnostic_span_validFor failureValid)
+        exact (recoverAtom_validFor statementValid
+          (rewound.emit failure.toDiagnostic) emittedValid).of_file_eq
+            (by simpa [State.emit] using rewoundFile)
 
 /-- Public atom successes never rewind through either parsing path. -/
 theorem expressionAtom_cursorMonotoneOnSuccess
