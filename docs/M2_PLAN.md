@@ -131,8 +131,15 @@ declaration contract.
 Successful public output now has one unconditional contract covering the
 canonical parsed file plus every retained token, lexical-diagnostic, and
 parse-diagnostic span. Nesting diagnostics also have direct source provenance.
-The next proof work is grammar-invariant unreachability, parser-wide resource
-bounds, and success soundness against a declarative grammar.
+
+Totality is being closed from the outside inward. The production bounds for
+top-level and contract-member recovery, malformed type-alias recovery, pragma
+accumulation, and generic comma-delimited lists are proved adequate. The
+complete contract body is total once its member parser is invariant-free on
+valid input. The file loop and public parser are total once the derive-aware
+top-item parser is invariant-free on valid input. The next proof work is to
+discharge those two local premises through their nested parsers, followed by
+success soundness against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the

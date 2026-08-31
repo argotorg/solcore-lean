@@ -282,11 +282,25 @@ parsed file is canonically valid, and every retained token, lexical diagnostic,
 and parse diagnostic has a valid span owned by the same source file. Delimiter
 and conditional-nesting diagnostics have an explicit provenance proof as well.
 
-The remaining formal parser work is deeper than AST source validity. It
-includes proving grammar invariant failures unreachable, closing parser-wide
-resource bounds, and relating successful execution to a declarative grammar.
-Defining any of those properties is not treated as proof that the parser
-satisfies it.
+The parser-totality proof is now separated into local, checkable obligations.
+Production fuel is proved sufficient for top-level recovery, contract-member
+recovery, malformed type-alias recovery, pragma item accumulation, and generic
+comma-delimited lists. Their fuel-exhaustion paths are unreachable; the loops
+that require element progress also rule out their no-progress paths.
+
+The complete contract body is ordinary under one remaining premise: each
+valid contract-member invocation must itself avoid an internal invariant. The
+complete file loop, `sourceFile`, `parseLexed`, and public `parse` similarly
+become total under one remaining premise at the derive-aware top-item parser.
+These are reductions, not claims that the two premises have already been
+discharged. Pragma declarations are already invariant-free without either
+premise.
+
+The remaining formal parser work is to discharge those local premises through
+the nested declaration, expression, pattern, statement, type, and Yul parsers,
+then relate successful execution to a declarative grammar. Parser-wide
+resource bounds are no longer an undivided open item: the outer accumulation,
+recovery, and generic delimiter bounds above are complete.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
