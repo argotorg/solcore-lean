@@ -187,6 +187,24 @@ def qualifiedPattern (nested : Parser Pattern) : Parser Pattern := do
 
 end PatternInternals
 
+namespace PatternInternals
+
+/-- Parse a comptime pattern using the supplied expression parser. -/
+def comptimePattern (expression : Parser Expr) : Parser Pattern := fun state =>
+  match contextual .comptime .pattern state with
+  | .ok marker afterMarker =>
+      match expression afterMarker with
+      | .ok value next => .ok {
+          span := SourceSpan.cover marker.span value.span
+          value := .comptime marker.span value
+        } next
+      | .reject failure next => .reject failure next
+      | .invariant error => .invariant error
+  | .reject failure next => .reject failure next
+  | .invariant error => .invariant error
+
+end PatternInternals
+
 private def patternCore (nested : Parser Pattern)
     (expression : Parser Expr) : Parser Pattern := fun state =>
   if isSymbol state .underscore then
@@ -200,17 +218,7 @@ private def patternCore (nested : Parser Pattern)
   else if isSymbol state .dot then
     PatternInternals.dotConstructorPattern nested state
   else if isContextual state .comptime then
-    match contextual .comptime .pattern state with
-    | .ok marker afterMarker =>
-        match expression afterMarker with
-        | .ok value next => .ok {
-            span := SourceSpan.cover marker.span value.span
-            value := .comptime marker.span value
-          } next
-        | .reject failure next => .reject failure next
-        | .invariant error => .invariant error
-    | .reject failure next => .reject failure next
-    | .invariant error => .invariant error
+    PatternInternals.comptimePattern expression state
   else if isIdentifier state then PatternInternals.qualifiedPattern nested state
   else rejectAt state { head := .pattern, tail := [] } .pattern
 

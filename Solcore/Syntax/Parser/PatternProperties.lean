@@ -1339,5 +1339,163 @@ theorem qualifiedPattern_startsAtCurrentTokenOnSuccess
         rfl
       · cases arguments <;> cases finished <;> rfl
 
+/-- Comptime patterns retain their marker, expression, and covering range. -/
+theorem comptimePattern_validFor (expression : Parser Expr)
+    (expressionValid : SourceFile → Expr → Prop)
+    (parserValid : expression.ValidFor expressionValid)
+    (spanValid : ∀ {file : SourceFile} {value : Expr},
+      expressionValid file value → value.span.ValidFor file)
+    (starts : Parser.StartsAtCurrentTokenOnSuccess expression (·.span)) :
+    (comptimePattern expression).ValidFor
+      (Pattern.ValidFor expressionValid) := by
+  intro input inputValid
+  unfold comptimePattern
+  cases markerResult : contextual .comptime .pattern input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have valid := contextual_validFor .comptime .pattern input inputValid
+      rw [markerResult] at valid
+      exact valid
+  | ok marker afterMarker =>
+      have markerValid := contextual_validFor .comptime .pattern input
+        inputValid
+      rw [markerResult] at markerValid
+      simp only
+      cases expressionResult : expression afterMarker with
+      | invariant error =>
+          simp only [Reply.ValidFor]
+      | reject failure rejected =>
+          have valid := parserValid afterMarker markerValid.2.1
+          rw [expressionResult] at valid
+          simpa only [expressionResult, Reply.ValidFor] using
+            valid.of_file_eq markerValid.2.2
+      | ok value next =>
+          have valid := parserValid afterMarker markerValid.2.1
+          rw [expressionResult] at valid
+          rcases starts afterMarker value next expressionResult with
+            ⟨first, firstFound, valueStart⟩
+          have markerShape := acceptToken_ok_state_shape
+            (.contextual .comptime) .pattern
+            (·.isContextual .comptime) markerResult
+          have advanced : input.advance? = some (marker, afterMarker) := by
+            unfold State.advance?
+            rw [markerShape.1, markerShape.2]
+            rfl
+          have separated :=
+            inputValid.consumed_end_le_peek_start_after_advance
+              advanced firstFound
+          have markerSpanValid : marker.span.ValidFor input.file := by
+            simpa only [Located.ValidFor] using markerValid.1
+          have valueValidInput : expressionValid input.file value := by
+            simpa [markerValid.2.2] using valid.1
+          have valueSpanValid := spanValid valueValidInput
+          have ordered : marker.span.startByte ≤ value.span.endByte :=
+            Nat.le_trans markerSpanValid.2.1 (Nat.le_trans
+              (by simpa [valueStart] using separated)
+              valueSpanValid.2.1)
+          simp only [Reply.ValidFor]
+          exact ⟨Pattern.ValidFor.comptime
+              (SourceSpan.cover_validFor markerSpanValid valueSpanValid ordered)
+              markerSpanValid valueValidInput,
+            valid.2.1, valid.2.2.trans markerValid.2.2⟩
+
+/-- Comptime-pattern parsing preserves every ordinary token window. -/
+theorem comptimePattern_preservesTokenWindow (expression : Parser Expr)
+    (preserves : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (comptimePattern expression) := by
+  intro input
+  unfold comptimePattern
+  have markerShape :=
+    contextual_preservesTokenWindow .comptime .pattern input
+  cases markerResult : contextual .comptime .pattern input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [markerResult] at markerShape
+      exact markerShape
+  | ok marker afterMarker =>
+      rw [markerResult] at markerShape
+      simp only
+      have valueShape := preserves afterMarker
+      cases expressionResult : expression afterMarker with
+      | invariant error =>
+          simp only [Reply.PreservesTokenWindow]
+      | reject failure rejected =>
+          rw [expressionResult] at valueShape
+          simpa only [expressionResult, Reply.PreservesTokenWindow] using
+            valueShape.trans markerShape
+      | ok value next =>
+          rw [expressionResult] at valueShape
+          simpa only [expressionResult, Reply.PreservesTokenWindow] using
+            valueShape.trans markerShape
+
+/-- Comptime-pattern success preserves the immutable token carrier. -/
+theorem comptimePattern_preservesTokensOnSuccess (expression : Parser Expr)
+    (preserves : Parser.PreservesTokensOnSuccess expression) :
+    Parser.PreservesTokensOnSuccess (comptimePattern expression) := by
+  intro input value next result
+  unfold comptimePattern at result
+  cases markerResult : contextual .comptime .pattern input with
+  | invariant error => simp [markerResult] at result
+  | reject failure rejected => simp [markerResult] at result
+  | ok marker afterMarker =>
+      simp only [markerResult] at result
+      cases expressionResult : expression afterMarker with
+      | invariant error => simp [expressionResult] at result
+      | reject failure rejected => simp [expressionResult] at result
+      | ok inner final =>
+          simp only [expressionResult] at result
+          have innerTokens :=
+            preserves afterMarker inner final expressionResult
+          have markerTokens := contextual_preservesTokensOnSuccess
+            .comptime .pattern input marker afterMarker markerResult
+          cases result
+          exact innerTokens.trans markerTokens
+
+/-- Comptime-pattern parsing is cursor-monotone with its expression parser. -/
+theorem comptimePattern_cursorMonotoneOnSuccess (expression : Parser Expr)
+    (monotone : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (comptimePattern expression) := by
+  intro input value next result
+  unfold comptimePattern at result
+  cases markerResult : contextual .comptime .pattern input with
+  | invariant error => simp [markerResult] at result
+  | reject failure rejected => simp [markerResult] at result
+  | ok marker afterMarker =>
+      simp only [markerResult] at result
+      cases expressionResult : expression afterMarker with
+      | invariant error => simp [expressionResult] at result
+      | reject failure rejected => simp [expressionResult] at result
+      | ok inner final =>
+          simp only [expressionResult] at result
+          have markerMonotone := contextual_cursorMonotoneOnSuccess
+            .comptime .pattern input marker afterMarker markerResult
+          have innerMonotone :=
+            monotone afterMarker inner final expressionResult
+          cases result
+          exact Nat.le_trans markerMonotone innerMonotone
+
+/-- A comptime pattern starts at the current `comptime` token. -/
+theorem comptimePattern_startsAtCurrentTokenOnSuccess
+    (expression : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (comptimePattern expression) (·.span) := by
+  intro input value next result
+  unfold comptimePattern at result
+  cases markerResult : contextual .comptime .pattern input with
+  | invariant error => simp [markerResult] at result
+  | reject failure rejected => simp [markerResult] at result
+  | ok marker afterMarker =>
+      simp only [markerResult] at result
+      cases expressionResult : expression afterMarker with
+      | invariant error => simp [expressionResult] at result
+      | reject failure rejected => simp [expressionResult] at result
+      | ok inner final =>
+          simp only [expressionResult] at result
+          cases result
+          rcases contextual_startsAtCurrentTokenOnSuccess
+              .comptime .pattern input marker afterMarker markerResult with
+            ⟨token, found, start⟩
+          exact ⟨token, found, start⟩
+
 end PatternInternals
 end Solcore.Syntax.Parser
