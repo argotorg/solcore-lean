@@ -327,6 +327,92 @@ theorem importTerminator_validFor (lastSpan : SourceSpan)
     · unfold rejectAt Reply.ValidFor
       exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
 
+private theorem importTerminator_end_order (start last : SourceSpan)
+    (input : State) (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    (ordered : start.startByte ≤ last.endByte)
+    {startIndex : Nat} {startToken : Token}
+    (startFound : input.tokens[startIndex]? = some startToken)
+    (startSpan : startToken.span = start)
+    (startBefore : startIndex < input.cursor)
+    {endSpan : SourceSpan} {next : State}
+    (parsed : ImportInternals.terminator last input = .ok endSpan next) :
+    start.startByte ≤ endSpan.endByte := by
+  unfold ImportInternals.terminator at parsed
+  by_cases present : isSymbol input .semicolon
+  · simp only [present, if_true] at parsed
+    cases semicolonResult : symbol .semicolon .importDecl input with
+    | invariant error => simp [semicolonResult] at parsed
+    | reject failure rejected => simp [semicolonResult] at parsed
+    | ok semicolon afterSemicolon =>
+        simp only [semicolonResult] at parsed
+        cases parsed
+        have semicolonShape :=
+          symbol_ok_state_shape .semicolon .importDecl semicolonResult
+        have semicolonAt :=
+          State.getElem?_eq_some_of_peek?_eq_some semicolonShape.1
+        have startBeforeSemicolon :=
+          inputValid.token_end_le_token_start_of_getElem?_lt
+            startFound semicolonAt startBefore
+        have semicolonValid :=
+          inputValid.peek?_span_validFor semicolonShape.1
+        exact Nat.le_trans startValid.2.1
+          (Nat.le_trans (by simpa [startSpan] using startBeforeSemicolon)
+            semicolonValid.2.1)
+  · simp only [present] at parsed
+    by_cases topStart : atTopItemStart input = true
+    · simp only [topStart, if_true] at parsed
+      cases parsed
+      exact ordered
+    · simp only [topStart] at parsed
+      unfold rejectAt at parsed
+      contradiction
+
+/-- Finishing an import preserves both its cover and payload provenance. -/
+theorem finishImport_validFor (start last : SourceSpan)
+    (value : ImportDeclValue) (input : State)
+    (inputValid : input.ValidFor)
+    (startValid : start.ValidFor input.file)
+    (lastValid : last.ValidFor input.file)
+    (ordered : start.startByte ≤ last.endByte)
+    {startIndex : Nat} {startToken : Token}
+    (startFound : input.tokens[startIndex]? = some startToken)
+    (startSpan : startToken.span = start)
+    (startBefore : startIndex < input.cursor)
+    (valueValid : match value with
+      | .plain modulePath => ModulePath.ValidFor input.file modulePath
+      | .namespace modulePath alias =>
+          ModulePath.ValidFor input.file modulePath ∧
+            alias.span.ValidFor input.file
+      | .wildcard modulePath hidingClause =>
+          ModulePath.ValidFor input.file modulePath ∧
+            ∀ clause ∈ hidingClause, HidingClause.ValidFor input.file clause
+      | .selected selection modulePath hidingClause =>
+          selection.span.ValidFor input.file ∧
+            (∀ item ∈ selection.elements.toList,
+              SelectedImport.ValidFor input.file item) ∧
+            ModulePath.ValidFor input.file modulePath ∧
+            ∀ clause ∈ hidingClause,
+              HidingClause.ValidFor input.file clause) :
+    (ImportInternals.finish start last value input).ValidFor input
+      ImportDecl.ValidFor := by
+  have terminatorValid := importTerminator_validFor last input inputValid lastValid
+  unfold ImportInternals.finish
+  cases terminatorResult : ImportInternals.terminator last input with
+  | invariant error =>
+      simp only [bind, terminatorResult, Reply.ValidFor]
+  | reject failure rejected =>
+      rw [terminatorResult] at terminatorValid
+      simpa only [bind, terminatorResult, Reply.ValidFor] using
+        terminatorValid
+  | ok endSpan next =>
+      rw [terminatorResult] at terminatorValid
+      simp only [bind, terminatorResult, Reply.ValidFor, ImportDecl.ValidFor]
+      refine ⟨⟨SourceSpan.cover_validFor startValid terminatorValid.1 ?_,
+        valueValid⟩, terminatorValid.2.1, terminatorValid.2.2⟩
+      exact importTerminator_end_order start last input inputValid startValid
+        ordered startFound startSpan startBefore terminatorResult
+
 /-- Import terminators preserve every ordinary token window. -/
 theorem importTerminator_preservesTokenWindow (lastSpan : SourceSpan) :
     Parser.PreservesTokenWindow

@@ -23,6 +23,7 @@ example := optionalHiding_preservesTokenWindow
 example := optionalHiding_preservesTokensOnSuccess
 example := optionalHiding_cursorMonotoneOnSuccess
 example := @importTerminator_validFor
+example := @finishImport_validFor
 example := @importTerminator_preservesTokenWindow
 example := @importTerminator_preservesTokensOnSuccess
 example := @importTerminator_cursorMonotoneOnSuccess
