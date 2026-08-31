@@ -60,28 +60,36 @@ inductive ConstructorSelectionValue where
 
 abbrev ConstructorSelection := Located ConstructorSelectionValue
 
-/-- One entry in a local or remote export list. -/
-inductive ExportItemValue where
+/-- Export name accepted both locally and after a remote module path. -/
+inductive ExportNameValue where
   | wildcard (marker : SourceSpan)
-  | named
-      (name : SelectorName)
+  | identifier
+      (name : Identifier)
       (constructors : Option ConstructorSelection)
+  | operator (spelling : SpannedText)
+  deriving Repr, BEq, DecidableEq
+
+abbrev ExportName := Located ExportNameValue
+
+/-- Entry accepted only in a current-module `export { ... }` list. -/
+inductive LocalExportItemValue where
+  | name (name : ExportName)
   | moduleWildcard (modulePath : QualifiedName) (marker : SourceSpan)
   deriving Repr, BEq, DecidableEq
 
-abbrev ExportItem := Located ExportItemValue
+abbrev LocalExportItem := Located LocalExportItemValue
 
 /-- Selection suffix of `export Module.*` or `export Module.{...}`. -/
 inductive ExportSelectionValue where
   | wildcard (marker : SourceSpan)
-  | selected (items : DelimitedList ExportItem)
+  | selected (items : DelimitedList ExportName)
   deriving Repr, BEq, DecidableEq
 
 abbrev ExportSelection := Located ExportSelectionValue
 
 /-- Complete canonical export declaration payload. -/
 inductive ExportDeclValue where
-  | local (items : DelimitedList ExportItem)
+  | local (items : DelimitedList LocalExportItem)
   | module (modulePath : QualifiedName)
   | moduleAs
       (modulePath : QualifiedName)
