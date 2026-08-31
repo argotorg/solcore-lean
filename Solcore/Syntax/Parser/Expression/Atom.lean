@@ -76,7 +76,10 @@ def closeTuple (opening : Token) (elementsRev : List Expr) :
 
 end ExpressionAtomInternals
 
-private def tupleTail (nested : Parser Expr) (opening : Token) :
+namespace ExpressionAtomInternals
+
+/-- Continue a parenthesized expression after its first comma. -/
+def tupleTail (nested : Parser Expr) (opening : Token) :
     Nat → List Expr → State → Reply Expr
   | 0, _, state => .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1, elementsRev, state =>
@@ -90,7 +93,8 @@ private def tupleTail (nested : Parser Expr) (opening : Token) :
             | .ok value next =>
                 if next.cursor > before then
                   if isSymbol next .comma then
-                    tupleTail nested opening fuel (value :: elementsRev) next
+                    ExpressionAtomInternals.tupleTail nested opening fuel
+                      (value :: elementsRev) next
                   else
                     ExpressionAtomInternals.closeTuple opening
                       (value :: elementsRev) next
@@ -100,6 +104,8 @@ private def tupleTail (nested : Parser Expr) (opening : Token) :
             | .invariant error => .invariant error
       | .reject failure next => .reject failure next
       | .invariant error => .invariant error
+
+end ExpressionAtomInternals
 
 private def parenthesized (nested : Parser Expr) : Parser Expr := fun state =>
   match symbol .leftParen .expression state with
@@ -113,7 +119,8 @@ private def parenthesized (nested : Parser Expr) : Parser Expr := fun state =>
             if next.cursor ≤ before then
               .invariant (.noProgress .expression next.currentSpan)
             else if isSymbol next .comma then
-              tupleTail nested opening (next.remainingCount + 1) [first] next
+              ExpressionAtomInternals.tupleTail nested opening
+                (next.remainingCount + 1) [first] next
             else
               match symbol .rightParen .expression next with
               | .ok closing afterClosing => .ok {

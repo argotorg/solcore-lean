@@ -638,5 +638,275 @@ theorem closeTuple_endsAtCurrentTokenOnSuccess
           cases finished
           exact ⟨closing, found, rfl⟩
 
+/-- The closing parenthesis is the final consumed token. -/
+theorem closeTuple_endsAtLastConsumedTokenOnSuccess
+    (opening : Token) (elementsRev : List Expr)
+    {input final : State} {expression : Expr}
+    (parsed : closeTuple opening elementsRev input =
+      .ok expression final) :
+    ∃ closing, final.tokens[final.cursor - 1]? = some closing ∧
+      closing.span.endByte = expression.span.endByte := by
+  unfold closeTuple at parsed
+  rcases atomBind_ok_components parsed with
+    ⟨closing, afterClosing, closingResult, finished⟩
+  have shape := symbol_ok_state_shape .rightParen .expression closingResult
+  have indexed := State.getElem?_eq_some_of_peek?_eq_some shape.1
+  cases elementsRev with
+  | nil => cases finished; exact ⟨closing, by simpa [shape.2] using indexed, rfl⟩
+  | cons only tail =>
+      cases tail with
+      | nil => cases finished; exact ⟨closing, by simpa [shape.2] using indexed, rfl⟩
+      | cons second rest =>
+          cases finished
+          exact ⟨closing, by simpa [shape.2] using indexed, rfl⟩
+
+/-- The tuple-tail loop retains its opening and accumulated expressions. -/
+theorem tupleTail_validFor (nested : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested)
+    (opening : Token) : ∀ fuel elementsRev input openingIndex,
+    input.ValidFor →
+    input.tokens[openingIndex]? = some opening →
+    openingIndex < input.cursor →
+    List.ValidFor (Expr.ValidFor statementValid) input.file elementsRev →
+    (tupleTail nested opening fuel elementsRev input).ValidFor input
+      (Expr.ValidFor statementValid) := by
+  intro fuel
+  induction fuel with
+  | zero => intros; trivial
+  | succ fuel inductionHypothesis =>
+      intro elementsRev input openingIndex inputValid openingFound
+        openingBefore elementsValid
+      unfold tupleTail
+      cases commaResult : symbol .comma .expression input with
+      | invariant error => trivial
+      | reject failure rejected =>
+          have valid := symbol_validFor .comma .expression input inputValid
+          rw [commaResult] at valid
+          exact valid
+      | ok comma afterComma =>
+          have commaValid := symbol_validFor .comma .expression input
+            inputValid
+          rw [commaResult] at commaValid
+          have commaShape := symbol_ok_state_shape .comma .expression
+            commaResult
+          have openingFoundAfter :
+              afterComma.tokens[openingIndex]? = some opening := by
+            simpa [commaShape.2] using openingFound
+          have openingBeforeAfter : openingIndex < afterComma.cursor := by
+            simpa [commaShape.2] using Nat.lt_succ_of_lt openingBefore
+          have elementsValidAfter : List.ValidFor
+              (Expr.ValidFor statementValid) afterComma.file
+              elementsRev := by
+            simpa [commaValid.2.2] using elementsValid
+          simp only
+          split
+          · exact (closeTuple_validFor statementValid opening elementsRev
+                commaValid.2.1 openingFoundAfter openingBeforeAfter
+                elementsValidAfter).of_file_eq commaValid.2.2
+          · cases nestedResult : nested afterComma with
+            | invariant error => trivial
+            | reject failure rejected =>
+                have valid := nestedValid afterComma commaValid.2.1
+                rw [nestedResult] at valid
+                exact valid.of_file_eq commaValid.2.2
+            | ok value next =>
+                have valueValid := nestedValid afterComma commaValid.2.1
+                rw [nestedResult] at valueValid
+                simp only
+                split
+                · have tokensEq := nestedPreserves afterComma value next
+                      nestedResult
+                  have openingFoundNext :
+                      next.tokens[openingIndex]? = some opening := by
+                    simpa [tokensEq] using openingFoundAfter
+                  have openingBeforeNext : openingIndex < next.cursor :=
+                    Nat.lt_trans openingBeforeAfter (by omega)
+                  have accumulatedValid : List.ValidFor
+                      (Expr.ValidFor statementValid) next.file
+                      (value :: elementsRev) := by
+                    intro retained member
+                    rcases List.mem_cons.mp member with rfl | member
+                    · simpa [valueValid.2.2] using valueValid.1
+                    · simpa [valueValid.2.2] using
+                        elementsValidAfter retained member
+                  split
+                  · exact (inductionHypothesis (value :: elementsRev) next
+                        openingIndex valueValid.2.1 openingFoundNext
+                        openingBeforeNext accumulatedValid).of_file_eq
+                          (valueValid.2.2.trans commaValid.2.2)
+                  · exact (closeTuple_validFor statementValid opening
+                        (value :: elementsRev) valueValid.2.1
+                        openingFoundNext openingBeforeNext
+                        accumulatedValid).of_file_eq
+                          (valueValid.2.2.trans commaValid.2.2)
+                · trivial
+
+/-- The tuple-tail loop preserves the nested parser's token window. -/
+theorem tupleTail_preservesTokenWindow (nested : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested)
+    (opening : Token) : ∀ fuel elementsRev,
+    Parser.PreservesTokenWindow
+      (tupleTail nested opening fuel elementsRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro elementsRev input
+      trivial
+  | succ fuel inductionHypothesis =>
+      intro elementsRev input
+      unfold tupleTail
+      have commaShape := symbol_preservesTokenWindow .comma .expression input
+      cases commaResult : symbol .comma .expression input with
+      | invariant error => trivial
+      | reject failure rejected =>
+          rw [commaResult] at commaShape
+          exact commaShape
+      | ok comma afterComma =>
+          rw [commaResult] at commaShape
+          simp only
+          split
+          · exact (closeTuple_preservesTokenWindow opening elementsRev
+                afterComma).trans commaShape
+          · have nestedShape := nestedPreserves afterComma
+            cases nestedResult : nested afterComma with
+            | invariant error => trivial
+            | reject failure rejected =>
+                rw [nestedResult] at nestedShape
+                exact nestedShape.trans commaShape
+            | ok value next =>
+                rw [nestedResult] at nestedShape
+                simp only
+                split
+                · split
+                  · exact (inductionHypothesis (value :: elementsRev)
+                        next).trans (nestedShape.trans commaShape)
+                  · exact (closeTuple_preservesTokenWindow opening
+                        (value :: elementsRev) next).trans
+                          (nestedShape.trans commaShape)
+                · trivial
+
+theorem tupleTail_preservesTokensOnSuccess (nested : Parser Expr)
+    (nestedPreserves : Parser.PreservesTokenWindow nested)
+    (opening : Token) (fuel : Nat) (elementsRev : List Expr) :
+    Parser.PreservesTokensOnSuccess
+      (tupleTail nested opening fuel elementsRev) :=
+  (tupleTail_preservesTokenWindow nested nestedPreserves opening
+    fuel elementsRev).preservesTokensOnSuccess
+
+/-- The tuple-tail loop never rewinds the parser cursor. -/
+theorem tupleTail_cursorMonotoneOnSuccess (nested : Parser Expr)
+    (nestedMonotone : Parser.CursorMonotoneOnSuccess nested)
+    (opening : Token) : ∀ fuel elementsRev,
+    Parser.CursorMonotoneOnSuccess
+      (tupleTail nested opening fuel elementsRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro elementsRev input expression final parsed
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro elementsRev input expression final parsed
+      unfold tupleTail at parsed
+      cases commaResult : symbol .comma .expression input with
+      | invariant error => simp [commaResult] at parsed
+      | reject failure rejected => simp [commaResult] at parsed
+      | ok comma afterComma =>
+          simp only [commaResult] at parsed
+          have commaMonotone := symbol_cursorMonotoneOnSuccess .comma
+            .expression input comma afterComma commaResult
+          split at parsed
+          · exact Nat.le_trans commaMonotone
+              (closeTuple_cursorMonotoneOnSuccess opening elementsRev
+                afterComma expression final parsed)
+          · cases nestedResult : nested afterComma with
+            | invariant error => simp [nestedResult] at parsed
+            | reject failure rejected => simp [nestedResult] at parsed
+            | ok value next =>
+                simp only [nestedResult] at parsed
+                have valueMonotone := nestedMonotone afterComma value next
+                  nestedResult
+                split at parsed
+                · split at parsed
+                  · exact Nat.le_trans commaMonotone
+                      (Nat.le_trans valueMonotone
+                        (inductionHypothesis (value :: elementsRev)
+                          next expression final parsed))
+                  · exact Nat.le_trans commaMonotone
+                      (Nat.le_trans valueMonotone
+                        (closeTuple_cursorMonotoneOnSuccess opening
+                          (value :: elementsRev) next expression final parsed))
+                · contradiction
+
+/-- Every successful tuple-tail result keeps its opening-parenthesis start. -/
+theorem tupleTail_preservesOpeningStartOnSuccess
+    (nested : Parser Expr) (opening : Token) :
+    ∀ fuel elementsRev input expression final,
+      tupleTail nested opening fuel elementsRev input =
+        .ok expression final →
+      expression.span.startByte = opening.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro elementsRev input expression final parsed
+      unfold tupleTail at parsed
+      cases commaResult : symbol .comma .expression input with
+      | invariant error => simp [commaResult] at parsed
+      | reject failure rejected => simp [commaResult] at parsed
+      | ok comma afterComma =>
+          simp only [commaResult] at parsed
+          split at parsed
+          · exact closeTuple_preservesOpeningStartOnSuccess opening
+              elementsRev parsed
+          · cases nestedResult : nested afterComma with
+            | invariant error => simp [nestedResult] at parsed
+            | reject failure rejected => simp [nestedResult] at parsed
+            | ok value next =>
+                simp only [nestedResult] at parsed
+                split at parsed
+                · split at parsed
+                  · exact inductionHypothesis (value :: elementsRev)
+                      next expression final parsed
+                  · exact closeTuple_preservesOpeningStartOnSuccess
+                      opening (value :: elementsRev) parsed
+                · contradiction
+
+/-- A successful tuple tail ends at its final consumed parenthesis. -/
+theorem tupleTail_endsAtLastConsumedTokenOnSuccess
+    (nested : Parser Expr) (opening : Token) :
+    ∀ fuel elementsRev input expression final,
+      tupleTail nested opening fuel elementsRev input =
+        .ok expression final →
+      ∃ closing, final.tokens[final.cursor - 1]? = some closing ∧
+        closing.span.endByte = expression.span.endByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro elementsRev input expression final parsed
+      unfold tupleTail at parsed
+      cases commaResult : symbol .comma .expression input with
+      | invariant error => simp [commaResult] at parsed
+      | reject failure rejected => simp [commaResult] at parsed
+      | ok comma afterComma =>
+          simp only [commaResult] at parsed
+          split at parsed
+          · exact closeTuple_endsAtLastConsumedTokenOnSuccess opening
+              elementsRev parsed
+          · cases nestedResult : nested afterComma with
+            | invariant error => simp [nestedResult] at parsed
+            | reject failure rejected => simp [nestedResult] at parsed
+            | ok value next =>
+                simp only [nestedResult] at parsed
+                split at parsed
+                · split at parsed
+                  · exact inductionHypothesis (value :: elementsRev)
+                      next expression final parsed
+                  · exact closeTuple_endsAtLastConsumedTokenOnSuccess
+                      opening (value :: elementsRev) parsed
+                · contradiction
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser
