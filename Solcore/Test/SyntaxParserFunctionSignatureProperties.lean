@@ -14,5 +14,9 @@ example := returnClause_preservesTokenWindow
 example := returnClause_preservesTokensOnSuccess
 example := returnClause_cursorMonotoneOnSuccess
 example := @returnClause_some_startsAtCurrentTokenOnSuccess
+example := functionModifiers_validFor
+example := functionModifiers_preservesTokenWindow
+example := functionModifiers_preservesTokensOnSuccess
+example := functionModifiers_cursorMonotoneOnSuccess
 
 end Tests

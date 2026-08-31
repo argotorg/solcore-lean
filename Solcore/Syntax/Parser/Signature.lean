@@ -240,6 +240,15 @@ private def functionParameters : Parser (DelimitedList FunctionParameter) :=
   delimited .leftParen .rightParen true namedParameter
     .parameter .topLevel
 
+/-- Parse one optional function-modifier marker. -/
+def optionalFunctionModifier
+    (keywordValue : HardKeyword) : Parser (Option SourceSpan) := do
+  let state ← getState
+  if isKeyword state keywordValue then
+    pure (some (← keyword keywordValue .parameter).span)
+  else
+    pure none
+
 private def emitModifierOutsideContract (location : FunctionLocation)
     (keywordValue : HardKeyword) (marker : Option SourceSpan) : Parser Unit :=
   match location, marker with
@@ -249,23 +258,19 @@ private def emitModifierOutsideContract (location : FunctionLocation)
     }
   | _, _ => pure ()
 
-private def functionModifiers
-    (location : FunctionLocation) : Parser FunctionModifiers := do
-  let state ← getState
-  let publicMarker ←
-    if isKeyword state .publicKw then
-      pure (some (← keyword .publicKw .parameter).span)
-    else
-      pure none
-  let state ← getState
-  let payableMarker ←
-    if isKeyword state .payableKw then
-      pure (some (← keyword .payableKw .parameter).span)
-    else
-      pure none
+private def finishFunctionModifiers (location : FunctionLocation)
+    (publicMarker payableMarker : Option SourceSpan) :
+    Parser FunctionModifiers := do
   let _ ← emitModifierOutsideContract location .publicKw publicMarker
   let _ ← emitModifierOutsideContract location .payableKw payableMarker
   pure { publicMarker, payableMarker }
+
+/-- Parse optional public/payable markers and enforce their location policy. -/
+def functionModifiers
+    (location : FunctionLocation) : Parser FunctionModifiers := do
+  let publicMarker ← optionalFunctionModifier .publicKw
+  let payableMarker ← optionalFunctionModifier .payableKw
+  finishFunctionModifiers location publicMarker payableMarker
 
 /-- Parse an optional canonical function return-type clause. -/
 def returnClause : Parser (Option ReturnClause) := do
@@ -415,6 +420,13 @@ theorem returnClause_validFor :
 private theorem getState_preservesTokenWindowForSignature :
     Parser.PreservesTokenWindow getState := fun _ => ⟨rfl, rfl⟩
 
+private theorem emitDiagnostic_preservesTokenWindowForSignature
+    (diagnostic : ParseDiagnostic) :
+    Parser.PreservesTokenWindow (emitDiagnostic diagnostic) := by
+  intro input
+  unfold emitDiagnostic modifyState Reply.PreservesTokenWindow
+  exact ⟨rfl, rfl⟩
+
 /-- Optional return clauses preserve every ordinary token window. -/
 theorem returnClause_preservesTokenWindow :
     Parser.PreservesTokenWindow returnClause := by
@@ -479,5 +491,253 @@ theorem returnClause_some_startsAtCurrentTokenOnSuccess
   · simp only [present, Bool.false_eq_true, if_false] at parsed
     change Reply.ok none input = .ok (some clause) next at parsed
     simp at parsed
+
+/-- An optional modifier retains a valid marker whenever it is present. -/
+theorem optionalFunctionModifier_validFor (keywordValue : HardKeyword) :
+    (optionalFunctionModifier keywordValue).ValidFor
+      (Option.ValidFor (fun file span => span.ValidFor file)) := by
+  unfold optionalFunctionModifier
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isKeyword observed keywordValue
+  · simp only [present, if_true]
+    apply Parser.bind_validFor_of_value
+      (keyword_validFor keywordValue .parameter)
+    intro marker input inputValid markerValid
+    exact ⟨by simpa only [Option.ValidFor, Located.ValidFor] using markerValid,
+      inputValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+
+/-- Optional function modifiers preserve every ordinary token window. -/
+theorem optionalFunctionModifier_preservesTokenWindow
+    (keywordValue : HardKeyword) :
+    Parser.PreservesTokenWindow (optionalFunctionModifier keywordValue) := by
+  unfold optionalFunctionModifier
+  apply Parser.bind_preservesTokenWindow
+    getState_preservesTokenWindowForSignature
+  intro observed
+  by_cases present : isKeyword observed keywordValue
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokenWindow
+      (keyword_preservesTokenWindow keywordValue .parameter)
+    intro marker
+    exact Parser.pure_preservesTokenWindow _
+  · simp only [present]
+    exact Parser.pure_preservesTokenWindow none
+
+theorem optionalFunctionModifier_preservesTokensOnSuccess
+    (keywordValue : HardKeyword) :
+    Parser.PreservesTokensOnSuccess (optionalFunctionModifier keywordValue) :=
+  (optionalFunctionModifier_preservesTokenWindow keywordValue
+    ).preservesTokensOnSuccess
+
+/-- Optional function modifiers never rewind the parser cursor. -/
+theorem optionalFunctionModifier_cursorMonotoneOnSuccess
+    (keywordValue : HardKeyword) :
+    Parser.CursorMonotoneOnSuccess (optionalFunctionModifier keywordValue) := by
+  unfold optionalFunctionModifier
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isKeyword observed keywordValue
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      (keyword_cursorMonotoneOnSuccess keywordValue .parameter)
+    intro marker
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+
+private theorem functionModifiers_value_validFor
+    {file : SourceFile} (publicMarker payableMarker : Option SourceSpan)
+    (publicValid : Option.ValidFor (fun file span => span.ValidFor file)
+      file publicMarker)
+    (payableValid : Option.ValidFor (fun file span => span.ValidFor file)
+      file payableMarker) :
+    FunctionModifiers.ValidFor file { publicMarker, payableMarker } := by
+  cases publicMarker <;> cases payableMarker <;>
+    simp_all [FunctionModifiers.ValidFor, Option.ValidFor]
+
+private theorem finishFunctionModifiers_validForAt
+    (location : FunctionLocation)
+    (publicMarker payableMarker : Option SourceSpan) (input : State)
+    (inputValid : input.ValidFor)
+    (publicValid : Option.ValidFor (fun file span => span.ValidFor file)
+      input.file publicMarker)
+    (payableValid : Option.ValidFor (fun file span => span.ValidFor file)
+      input.file payableMarker) :
+    (finishFunctionModifiers location publicMarker payableMarker input
+      ).ValidFor input FunctionModifiers.ValidFor := by
+  have modifiersValid := functionModifiers_value_validFor publicMarker
+    payableMarker publicValid payableValid
+  cases location with
+  | contract =>
+      unfold finishFunctionModifiers emitModifierOutsideContract
+      simp only [bind, Reply.ValidFor]
+      exact ⟨modifiersValid, inputValid, rfl⟩
+  | module =>
+      cases publicMarker with
+      | none =>
+          cases payableMarker with
+          | none =>
+              unfold finishFunctionModifiers emitModifierOutsideContract
+              simp only [bind, Reply.ValidFor]
+              exact ⟨modifiersValid, inputValid, rfl⟩
+          | some payableSpan =>
+              simp only [Option.ValidFor] at payableValid
+              let diagnostic : ParseDiagnostic := {
+                span := payableSpan
+                kind := .constraintViolation
+                  (.modifierOutsideContract .payableKw)
+              }
+              have emittedValid := inputValid.emit_validFor diagnostic
+                payableValid
+              unfold finishFunctionModifiers emitModifierOutsideContract
+                emitDiagnostic modifyState
+              simp only [bind, Reply.ValidFor]
+              exact ⟨modifiersValid, emittedValid, rfl⟩
+      | some publicSpan =>
+          simp only [Option.ValidFor] at publicValid
+          cases payableMarker with
+          | none =>
+              let diagnostic : ParseDiagnostic := {
+                span := publicSpan
+                kind := .constraintViolation
+                  (.modifierOutsideContract .publicKw)
+              }
+              have emittedValid := inputValid.emit_validFor diagnostic
+                publicValid
+              unfold finishFunctionModifiers emitModifierOutsideContract
+                emitDiagnostic modifyState
+              simp only [bind, Reply.ValidFor]
+              exact ⟨modifiersValid, emittedValid, rfl⟩
+          | some payableSpan =>
+              simp only [Option.ValidFor] at payableValid
+              let publicDiagnostic : ParseDiagnostic := {
+                span := publicSpan
+                kind := .constraintViolation
+                  (.modifierOutsideContract .publicKw)
+              }
+              let payableDiagnostic : ParseDiagnostic := {
+                span := payableSpan
+                kind := .constraintViolation
+                  (.modifierOutsideContract .payableKw)
+              }
+              have afterPublic := inputValid.emit_validFor publicDiagnostic
+                publicValid
+              have afterPayable := afterPublic.emit_validFor payableDiagnostic
+                payableValid
+              unfold finishFunctionModifiers emitModifierOutsideContract
+                emitDiagnostic modifyState
+              simp only [bind, Reply.ValidFor]
+              exact ⟨modifiersValid, afterPayable, rfl⟩
+
+/-- Function modifiers retain every written marker and valid diagnostic. -/
+theorem functionModifiers_validFor (location : FunctionLocation) :
+    (functionModifiers location).ValidFor FunctionModifiers.ValidFor := by
+  intro input inputValid
+  unfold functionModifiers
+  cases publicResult : optionalFunctionModifier .publicKw input with
+  | invariant error => simp only [bind, publicResult, Reply.ValidFor]
+  | reject failure rejected =>
+      have valid := optionalFunctionModifier_validFor .publicKw input inputValid
+      rw [publicResult] at valid
+      simpa only [bind, publicResult, Reply.ValidFor] using valid
+  | ok publicMarker afterPublic =>
+      have publicContract := optionalFunctionModifier_validFor .publicKw input
+        inputValid
+      rw [publicResult] at publicContract
+      simp only [bind, publicResult]
+      cases payableResult : optionalFunctionModifier .payableKw afterPublic with
+      | invariant error => trivial
+      | reject failure rejected =>
+          have valid := optionalFunctionModifier_validFor .payableKw
+            afterPublic publicContract.2.1
+          rw [payableResult] at valid
+          have transported := valid.of_file_eq publicContract.2.2
+          change failure.span.ValidFor input.file ∧
+            rejected.ValidFor ∧ rejected.file = input.file
+          exact transported
+      | ok payableMarker afterPayable =>
+          have payableContract := optionalFunctionModifier_validFor .payableKw
+            afterPublic publicContract.2.1
+          rw [payableResult] at payableContract
+          have publicValid : Option.ValidFor
+              (fun file span => span.ValidFor file) afterPayable.file
+              publicMarker := by
+            simpa [payableContract.2.2, publicContract.2.2] using
+              publicContract.1
+          have payableValid : Option.ValidFor
+              (fun file span => span.ValidFor file) afterPayable.file
+              payableMarker := by
+            simpa [payableContract.2.2] using payableContract.1
+          exact (finishFunctionModifiers_validForAt location publicMarker
+            payableMarker afterPayable payableContract.2.1 publicValid
+            payableValid).of_file_eq
+              (payableContract.2.2.trans publicContract.2.2)
+
+private theorem emitModifierOutsideContract_preservesTokenWindow
+    (location : FunctionLocation) (keywordValue : HardKeyword)
+    (marker : Option SourceSpan) : Parser.PreservesTokenWindow
+      (emitModifierOutsideContract location keywordValue marker) := by
+  unfold emitModifierOutsideContract
+  cases location <;> cases marker <;>
+    first | exact Parser.pure_preservesTokenWindow ()
+          | exact emitDiagnostic_preservesTokenWindowForSignature _
+
+private theorem finishFunctionModifiers_preservesTokenWindow
+    (location : FunctionLocation) (publicMarker payableMarker : Option SourceSpan) :
+    Parser.PreservesTokenWindow
+      (finishFunctionModifiers location publicMarker payableMarker) := by
+  unfold finishFunctionModifiers
+  apply Parser.bind_preservesTokenWindow
+    (emitModifierOutsideContract_preservesTokenWindow location .publicKw publicMarker)
+  intro _
+  apply Parser.bind_preservesTokenWindow
+    (emitModifierOutsideContract_preservesTokenWindow location .payableKw payableMarker)
+  intro _
+  exact Parser.pure_preservesTokenWindow _
+
+/-- Function modifiers preserve every ordinary token window. -/
+theorem functionModifiers_preservesTokenWindow (location : FunctionLocation) :
+    Parser.PreservesTokenWindow (functionModifiers location) := by
+  unfold functionModifiers
+  apply Parser.bind_preservesTokenWindow
+    (optionalFunctionModifier_preservesTokenWindow .publicKw)
+  intro publicMarker
+  apply Parser.bind_preservesTokenWindow
+    (optionalFunctionModifier_preservesTokenWindow .payableKw)
+  exact finishFunctionModifiers_preservesTokenWindow location publicMarker
+
+theorem functionModifiers_preservesTokensOnSuccess (location : FunctionLocation) :
+    Parser.PreservesTokensOnSuccess (functionModifiers location) :=
+  (functionModifiers_preservesTokenWindow location).preservesTokensOnSuccess
+
+private theorem emitModifierOutsideContract_cursorMonotoneOnSuccess
+    (location : FunctionLocation) (keywordValue : HardKeyword)
+    (marker : Option SourceSpan) : Parser.CursorMonotoneOnSuccess
+      (emitModifierOutsideContract location keywordValue marker) := by
+  unfold emitModifierOutsideContract
+  cases location <;> cases marker <;>
+    first | exact Parser.pure_cursorMonotoneOnSuccess ()
+          | exact emitDiagnostic_cursorMonotoneOnSuccess _
+
+/-- Function modifiers never rewind the parser cursor. -/
+theorem functionModifiers_cursorMonotoneOnSuccess (location : FunctionLocation) :
+    Parser.CursorMonotoneOnSuccess (functionModifiers location) := by
+  unfold functionModifiers finishFunctionModifiers
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (optionalFunctionModifier_cursorMonotoneOnSuccess .publicKw)
+  intro publicMarker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (optionalFunctionModifier_cursorMonotoneOnSuccess .payableKw)
+  intro payableMarker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (emitModifierOutsideContract_cursorMonotoneOnSuccess location .publicKw publicMarker)
+  intro _
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (emitModifierOutsideContract_cursorMonotoneOnSuccess location .payableKw payableMarker)
+  intro _
+  exact Parser.pure_cursorMonotoneOnSuccess _
 
 end Solcore.Syntax.Parser
