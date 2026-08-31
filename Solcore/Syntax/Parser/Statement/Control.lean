@@ -113,7 +113,7 @@ def blockStatement (statement : Parser Statement) : Parser Statement := do
   let body ← coreBlock statement .require
   pure { span := body.span, value := .block body.value }
 
-private def terminatedControl (keywordValue : HardKeyword)
+def ControlInternals.terminatedControl (keywordValue : HardKeyword)
     (value : StatementValue) : Parser Statement := do
   let marker ← keyword keywordValue .statement
   let semicolon ← symbol .semicolon .statement
@@ -123,9 +123,9 @@ private def terminatedControl (keywordValue : HardKeyword)
   }
 
 def breakStatement : Parser Statement :=
-  terminatedControl .breakKw .breakStmt
+  ControlInternals.terminatedControl .breakKw .breakStmt
 
 def continueStatement : Parser Statement :=
-  terminatedControl .continueKw .continueStmt
+  ControlInternals.terminatedControl .continueKw .continueStmt
 
 end Solcore.Syntax.Parser

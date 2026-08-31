@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Statement.Control
 import Solcore.Syntax.Parser.Statement.SimpleProperties
+import Solcore.Syntax.Parser.Yul.StatementProperties
 import Solcore.Syntax.StatementValidity
 
 /-! Contracts for canonical Core control-statement parsers. -/
@@ -1258,5 +1259,280 @@ theorem ifStatement_startsAtCurrentTokenOnSuccess
       afterMarker markerResult with ⟨token, found, starts⟩
   cases finished
   exact ⟨token, found, starts⟩
+
+/-- Inline assembly retains its keyword, Yul body, and outer range. -/
+theorem assemblyStatement_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop)
+    (yulValid : ∀ file statement,
+      YulStmt.ValidFor file statement → yulValueValid file statement) :
+    assemblyStatement.ValidFor
+      (Statement.ValidFor expressionValueValid patternValueValid
+        yulValueValid) := by
+  intro input inputValid
+  have weak : assemblyStatement.ValidFor (fun _ _ => True) := by
+    unfold assemblyStatement
+    apply Parser.bind_validFor (keyword_validFor .assemblyKw .statement)
+    intro marker
+    apply Parser.bind_validFor (yulBody_validFor.mono (fun _ _ _ => trivial))
+    intro body
+    exact Parser.pure_validFor _ _ (fun _ => trivial)
+  have weakResult := weak input inputValid
+  cases parsed : assemblyStatement input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok statement final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold assemblyStatement at stages
+      rcases controlBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have markerReply := keyword_validFor .assemblyKw .statement input inputValid
+      rw [markerResult] at markerReply
+      have bodyReply := yulBody_validFor afterMarker markerReply.2.1
+      rw [bodyResult] at bodyReply
+      have markerValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerReply.1
+      have bodyValid : YulParsedBlock.ValidFor YulStmt.ValidFor input.file body := by
+        simpa [markerReply.2.2] using bodyReply.1
+      have markerShape := acceptToken_ok_state_shape (.keyword .assemblyKw)
+        .statement (· == .keyword .assemblyKw) markerResult
+      rcases yulBody_startsAtCurrentTokenOnSuccess afterMarker body afterBody
+          bodyResult with
+        ⟨opening, openingFound, bodyStart⟩
+      have markerAt := State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+      have openingAtAfter :=
+        State.getElem?_eq_some_of_peek?_eq_some openingFound
+      have markerTokens := keyword_preservesTokensOnSuccess .assemblyKw
+        .statement input marker afterMarker markerResult
+      have openingAt : input.tokens[afterMarker.cursor]? = some opening := by
+        simpa [markerTokens] using openingAtAfter
+      have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+        markerAt openingAt
+          (acceptToken_cursor_lt_onSuccess (.keyword .assemblyKw) .statement
+            (· == .keyword .assemblyKw) markerResult)
+      have ordered : marker.span.startByte ≤ body.span.endByte :=
+        Nat.le_trans markerValid.2.1 (Nat.le_trans separated
+          (by rw [bodyStart]; exact bodyValid.1.2.1))
+      have outerValid := SourceSpan.cover_validFor markerValid bodyValid.1 ordered
+      cases finished
+      exact ⟨Statement.ValidFor.assembly outerValid (fun retained member =>
+        yulValid input.file retained (bodyValid.2 retained member)),
+          weakResult.2.1, weakResult.2.2⟩
+
+theorem assemblyStatement_preservesTokenWindow :
+    Parser.PreservesTokenWindow assemblyStatement := by
+  unfold assemblyStatement
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .assemblyKw .statement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow yulBody_preservesTokenWindow
+  intro body
+  exact Parser.pure_preservesTokenWindow _
+
+theorem assemblyStatement_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess assemblyStatement :=
+  assemblyStatement_preservesTokenWindow.preservesTokensOnSuccess
+
+theorem assemblyStatement_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess assemblyStatement := by
+  unfold assemblyStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .assemblyKw .statement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess yulBody_cursorMonotoneOnSuccess
+  intro body
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+theorem assemblyStatement_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess assemblyStatement (·.span) := by
+  unfold assemblyStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .assemblyKw)
+      .statement (· == .keyword .assemblyKw))
+  intro marker input statement final parsed
+  rcases controlBind_ok_components parsed with
+    ⟨body, afterBody, bodyResult, finished⟩
+  cases finished
+  rfl
+
+theorem assemblyStatement_cursor_lt_onSuccess
+    {input final : State} {statement : Statement}
+    (parsed : assemblyStatement input = .ok statement final) :
+    input.cursor < final.cursor := by
+  have stages := parsed
+  unfold assemblyStatement at stages
+  rcases controlBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases controlBind_ok_components rest with
+    ⟨body, afterBody, bodyResult, finished⟩
+  cases finished
+  exact Nat.lt_of_lt_of_le
+    (acceptToken_cursor_lt_onSuccess (.keyword .assemblyKw) .statement
+      (· == .keyword .assemblyKw) markerResult)
+    (yulBody_cursorMonotoneOnSuccess afterMarker body final bodyResult)
+
+namespace ControlInternals
+
+/-- A terminated control parser retains its marker, semicolon, and value. -/
+theorem terminatedControl_validFor (keywordValue : HardKeyword)
+    (value : StatementValue) :
+    (terminatedControl keywordValue value).ValidFor
+      (fun file statement =>
+        statement.span.ValidFor file ∧ statement.value = value) := by
+  intro input inputValid
+  have weak : (terminatedControl keywordValue value).ValidFor
+      (fun _ _ => True) := by
+    unfold terminatedControl
+    apply Parser.bind_validFor (keyword_validFor keywordValue .statement)
+    intro marker
+    apply Parser.bind_validFor (symbol_validFor .semicolon .statement)
+    intro semicolon
+    exact Parser.pure_validFor _ _ (fun _ => trivial)
+  have weakResult := weak input inputValid
+  cases parsed : terminatedControl keywordValue value input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok statement final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold terminatedControl at stages
+      rcases controlBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases controlBind_ok_components rest with
+        ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+      have markerReply := keyword_validFor keywordValue .statement input inputValid
+      rw [markerResult] at markerReply
+      have semicolonReply := symbol_validFor .semicolon .statement afterMarker
+        markerReply.2.1
+      rw [semicolonResult] at semicolonReply
+      have markerValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerReply.1
+      have semicolonValid : semicolon.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, markerReply.2.2] using semicolonReply.1
+      have markerShape := acceptToken_ok_state_shape (.keyword keywordValue)
+        .statement (· == .keyword keywordValue) markerResult
+      have semicolonShape := symbol_ok_state_shape .semicolon .statement
+        semicolonResult
+      have markerAt := State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+      have semicolonAtAfter :=
+        State.getElem?_eq_some_of_peek?_eq_some semicolonShape.1
+      have markerTokens := keyword_preservesTokensOnSuccess keywordValue
+        .statement input marker afterMarker markerResult
+      have semicolonAt : input.tokens[afterMarker.cursor]? = some semicolon := by
+        simpa [markerTokens] using semicolonAtAfter
+      have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+        markerAt semicolonAt
+          (acceptToken_cursor_lt_onSuccess (.keyword keywordValue) .statement
+            (· == .keyword keywordValue) markerResult)
+      have outerValid := SourceSpan.cover_validFor markerValid semicolonValid
+        (Nat.le_trans markerValid.2.1
+          (Nat.le_trans separated semicolonValid.2.1))
+      cases finished
+      exact ⟨⟨outerValid, rfl⟩, weakResult.2.1, weakResult.2.2⟩
+
+theorem terminatedControl_preservesTokenWindow (keywordValue : HardKeyword)
+    (value : StatementValue) :
+    Parser.PreservesTokenWindow (terminatedControl keywordValue value) := by
+  unfold terminatedControl
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow keywordValue .statement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .semicolon .statement)
+  intro semicolon
+  exact Parser.pure_preservesTokenWindow _
+
+theorem terminatedControl_cursorMonotoneOnSuccess (keywordValue : HardKeyword)
+    (value : StatementValue) :
+    Parser.CursorMonotoneOnSuccess (terminatedControl keywordValue value) := by
+  unfold terminatedControl
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess keywordValue .statement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .semicolon .statement)
+  intro semicolon
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+theorem terminatedControl_startsAtCurrentTokenOnSuccess
+    (keywordValue : HardKeyword) (value : StatementValue) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (terminatedControl keywordValue value) (·.span) := by
+  unfold terminatedControl
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword keywordValue)
+      .statement (· == .keyword keywordValue))
+  intro marker input statement final parsed
+  rcases controlBind_ok_components parsed with
+    ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+  cases finished
+  rfl
+
+end ControlInternals
+
+theorem breakStatement_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop) :
+    breakStatement.ValidFor (Statement.ValidFor expressionValueValid
+      patternValueValid yulValueValid) := by
+  simpa only [breakStatement] using
+    (ControlInternals.terminatedControl_validFor .breakKw .breakStmt).mono
+      (fun _ statement retained => by
+        rcases statement with ⟨span, value⟩
+        simp only at retained
+        cases retained.2
+        exact Statement.ValidFor.breakStmt retained.1)
+
+theorem continueStatement_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (patternValueValid : SourceFile → Pattern → Prop)
+    (yulValueValid : SourceFile → YulStmt → Prop) :
+    continueStatement.ValidFor (Statement.ValidFor expressionValueValid
+      patternValueValid yulValueValid) := by
+  simpa only [continueStatement] using
+    (ControlInternals.terminatedControl_validFor .continueKw .continueStmt).mono
+      (fun _ statement retained => by
+        rcases statement with ⟨span, value⟩
+        simp only at retained
+        cases retained.2
+        exact Statement.ValidFor.continueStmt retained.1)
+
+theorem breakStatement_preservesTokenWindow :
+    Parser.PreservesTokenWindow breakStatement :=
+  ControlInternals.terminatedControl_preservesTokenWindow .breakKw .breakStmt
+
+theorem continueStatement_preservesTokenWindow :
+    Parser.PreservesTokenWindow continueStatement :=
+  ControlInternals.terminatedControl_preservesTokenWindow
+    .continueKw .continueStmt
+
+theorem breakStatement_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess breakStatement :=
+  ControlInternals.terminatedControl_cursorMonotoneOnSuccess
+    .breakKw .breakStmt
+
+theorem continueStatement_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess continueStatement :=
+  ControlInternals.terminatedControl_cursorMonotoneOnSuccess
+    .continueKw .continueStmt
+
+theorem breakStatement_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess breakStatement (·.span) :=
+  ControlInternals.terminatedControl_startsAtCurrentTokenOnSuccess
+    .breakKw .breakStmt
+
+theorem continueStatement_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess continueStatement (·.span) :=
+  ControlInternals.terminatedControl_startsAtCurrentTokenOnSuccess
+    .continueKw .continueStmt
 
 end Solcore.Syntax.Parser

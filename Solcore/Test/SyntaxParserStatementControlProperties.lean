@@ -42,5 +42,23 @@ example := @ifStatement_preservesTokenWindow
 example := @ifStatement_preservesTokensOnSuccess
 example := @ifStatement_cursorMonotoneOnSuccess
 example := @ifStatement_startsAtCurrentTokenOnSuccess
+example := @assemblyStatement_validFor
+example := @assemblyStatement_preservesTokenWindow
+example := @assemblyStatement_preservesTokensOnSuccess
+example := @assemblyStatement_cursorMonotoneOnSuccess
+example := @assemblyStatement_startsAtCurrentTokenOnSuccess
+example := @assemblyStatement_cursor_lt_onSuccess
+example := @ControlInternals.terminatedControl_validFor
+example := @ControlInternals.terminatedControl_preservesTokenWindow
+example := @ControlInternals.terminatedControl_cursorMonotoneOnSuccess
+example := @ControlInternals.terminatedControl_startsAtCurrentTokenOnSuccess
+example := @breakStatement_validFor
+example := @continueStatement_validFor
+example := @breakStatement_preservesTokenWindow
+example := @continueStatement_preservesTokenWindow
+example := @breakStatement_cursorMonotoneOnSuccess
+example := @continueStatement_cursorMonotoneOnSuccess
+example := @breakStatement_startsAtCurrentTokenOnSuccess
+example := @continueStatement_startsAtCurrentTokenOnSuccess
 
 end Tests
