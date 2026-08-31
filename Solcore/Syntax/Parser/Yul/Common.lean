@@ -8,14 +8,14 @@ structure YulNameSequence where
   span : SourceSpan
   names : NonemptyList YulIdentifier
 
-private def finishYulNames (first last : YulIdentifier)
+def finishYulNames (first last : YulIdentifier)
     (tailRev : List YulIdentifier) (state : State) : Reply YulNameSequence :=
   .ok {
     span := SourceSpan.cover first.span last.span
     names := { head := first, tail := tailRev.reverse }
   } state
 
-private def yulNamesTail (first : YulIdentifier) :
+def yulNamesTail (first : YulIdentifier) :
     Nat → YulIdentifier → List YulIdentifier → State → Reply YulNameSequence
   | 0, _, _, state => .invariant (.fuelExhausted .yul state.currentSpan)
   | fuel + 1, last, tailRev, state =>
