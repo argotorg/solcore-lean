@@ -749,6 +749,76 @@ theorem unaryOperators_cursorMonotoneOnSuccess (fuel : Nat)
                   ({ span := token.span, value := operator } :: operatorsRev)
                   { input with cursor := input.cursor + 1 } parsed)
 
+/-- Every scanned unary operator ends before the scanner's next token. -/
+theorem unaryOperators_endBeforeCurrentOnSuccess :
+    ∀ fuel operatorsRev input operators next,
+      input.ValidFor →
+      (∀ retained ∈ operatorsRev, ∀ token,
+        input.peek? = some token →
+        retained.span.endByte ≤ token.span.startByte) →
+      unaryOperators fuel operatorsRev input = .ok operators next →
+      ∀ retained ∈ operators, ∀ token,
+        next.peek? = some token →
+        retained.span.endByte ≤ token.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro operatorsRev input operators next inputValid accumulatedBefore parsed
+      unfold unaryOperators at parsed
+      cases found : input.peek? with
+      | none =>
+          simp only [found] at parsed
+          cases parsed
+          intro retained member token futureFound
+          have retainedMember : retained ∈ operatorsRev := by
+            simpa using member
+          exact accumulatedBefore retained retainedMember token futureFound
+      | some current =>
+          simp only [found] at parsed
+          cases decoded : unaryOp? current.value with
+          | none =>
+              simp only [decoded] at parsed
+              cases parsed
+              intro retained member token futureFound
+              have retainedMember : retained ∈ operatorsRev := by
+                simpa using member
+              exact accumulatedBefore retained retainedMember token futureFound
+          | some operator =>
+              simp only [decoded] at parsed
+              have advanced : input.advance? = some (current,
+                  { input with cursor := input.cursor + 1 }) := by
+                unfold State.advance?
+                rw [found]
+                rfl
+              have nextValid := inputValid.advance?_validFor advanced
+              have nextAccumulated : ∀ retained ∈
+                  ({ span := current.span, value := operator } :: operatorsRev),
+                  ∀ token,
+                    ({ input with cursor := input.cursor + 1 } : State).peek? =
+                      some token →
+                    retained.span.endByte ≤ token.span.startByte := by
+                intro retained member token futureFound
+                have currentAt :=
+                  State.getElem?_eq_some_of_peek?_eq_some found
+                have futureAtNext :=
+                  State.getElem?_eq_some_of_peek?_eq_some futureFound
+                have futureAt : input.tokens[input.cursor + 1]? = some token := by
+                  simpa using futureAtNext
+                have separated :=
+                  inputValid.token_end_le_token_start_of_getElem?_lt currentAt
+                    futureAt (by omega)
+                rcases List.mem_cons.mp member with rfl | member
+                · exact separated
+                · exact Nat.le_trans
+                    (accumulatedBefore retained member current found)
+                    (Nat.le_trans
+                      (inputValid.peek?_span_validFor found).2.1 separated)
+              exact inductionHypothesis
+                ({ span := current.span, value := operator } :: operatorsRev)
+                { input with cursor := input.cursor + 1 } operators next
+                  nextValid nextAccumulated parsed
+
 /-- Unary wrapping preserves the final operand's source end. -/
 theorem applyUnaryOperators_preservesBaseEnd
     (operators : List (Located UnaryOp)) (base : Expr) :
@@ -790,6 +860,61 @@ theorem applyUnaryOperators_validFor
           exact ordered operator (by simp))
       simpa only [applyUnaryOperators, List.foldr] using
         (Expr.ValidFor.unary outerValid operatorValid operandValid)
+
+/-- Unary parsing retains every scanned operator and postfix source range. -/
+theorem expressionUnary_validFor
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (postfixValid : (expressionPostfix nested block).ValidFor
+      (Expr.ValidFor statementValid))
+    (postfixStarts : Parser.StartsAtCurrentTokenOnSuccess
+      (expressionPostfix nested block) (·.span)) :
+    (expressionUnary nested block).ValidFor
+      (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  unfold expressionUnary
+  cases operatorsResult : unaryOperators (input.remainingCount + 1) [] input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have reply := unaryOperators_validFor (input.remainingCount + 1) [] input
+        inputValid (by simp [List.ValidFor])
+      rw [operatorsResult] at reply
+      exact reply
+  | ok operators afterOperators =>
+      have operatorsReply := unaryOperators_validFor
+        (input.remainingCount + 1) [] input inputValid
+          (by simp [List.ValidFor])
+      rw [operatorsResult] at operatorsReply
+      simp only
+      cases postfixResult : expressionPostfix nested block afterOperators with
+      | invariant error => trivial
+      | reject failure rejected =>
+          have reply := postfixValid afterOperators operatorsReply.2.1
+          rw [postfixResult] at reply
+          exact reply.of_file_eq operatorsReply.2.2
+      | ok base next =>
+          have postfixReply := postfixValid afterOperators operatorsReply.2.1
+          rw [postfixResult] at postfixReply
+          rcases postfixStarts afterOperators base next postfixResult with
+            ⟨first, firstFound, baseStart⟩
+          have baseValid : Expr.ValidFor statementValid input.file base := by
+            simpa [operatorsReply.2.2] using postfixReply.1
+          have ordered : ∀ retained ∈ operators,
+              retained.span.startByte ≤ base.span.endByte := by
+            intro retained member
+            have retainedValid := operatorsReply.1 retained member
+            have beforeFirst := unaryOperators_endBeforeCurrentOnSuccess
+              (input.remainingCount + 1) [] input operators afterOperators
+                inputValid (by simp) operatorsResult retained member first
+                  firstFound
+            exact Nat.le_trans retainedValid.2.1
+              (Nat.le_trans beforeFirst (by
+                rw [baseStart]
+                exact baseValid.span_valid.2.1))
+          have wrappedValid := applyUnaryOperators_validFor statementValid
+            input.file operators base operatorsReply.1 baseValid ordered
+          exact ⟨wrappedValid, postfixReply.2.1,
+            postfixReply.2.2.trans operatorsReply.2.2⟩
 
 /-- Unary parsing preserves token windows when postfix parsing does. -/
 theorem expressionUnary_preservesTokenWindow
