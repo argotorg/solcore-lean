@@ -142,7 +142,10 @@ def leftAssociative (operand : Parser Expr)
 
 end ExpressionInternals
 
-private def nonAssociative (operand : Parser Expr)
+namespace ExpressionInternals
+
+/-- Parse one optional binary operator at a non-associative precedence. -/
+def nonAssociative (operand : Parser Expr)
     (precedence : Nat) : Parser Expr := fun state =>
   match operand state with
   | .ok left next =>
@@ -160,6 +163,8 @@ private def nonAssociative (operand : Parser Expr)
           | .invariant error => .invariant error
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+end ExpressionInternals
 
 private structure ConditionalHead where
   condition : Expr
@@ -225,8 +230,8 @@ def expressionLayer (nested : Parser Expr)
   let bitAnd := ExpressionInternals.leftAssociative add 6
   let bitXor := ExpressionInternals.leftAssociative bitAnd 5
   let bitOr := ExpressionInternals.leftAssociative bitXor 4
-  let relational := nonAssociative bitOr 3
-  let equality := nonAssociative relational 2
+  let relational := ExpressionInternals.nonAssociative bitOr 3
+  let equality := ExpressionInternals.nonAssociative relational 2
   let logicalAnd := ExpressionInternals.leftAssociative equality 1
   let logicalOr := ExpressionInternals.leftAssociative logicalAnd 0
   conditional nested logicalOr

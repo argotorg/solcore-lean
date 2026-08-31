@@ -619,5 +619,259 @@ theorem leftAssociative_validFor
           leftReply.2.1 leftValidNext leftBefore
       exact recursive.of_file_eq leftReply.2.2
 
+/-- A non-associative precedence layer preserves every ordinary token window. -/
+theorem nonAssociative_preservesTokenWindow (operand : Parser Expr)
+    (operandWindow : Parser.PreservesTokenWindow operand)
+    (precedence : Nat) :
+    Parser.PreservesTokenWindow (nonAssociative operand precedence) := by
+  intro input
+  unfold nonAssociative
+  have leftShape := operandWindow input
+  cases leftResult : operand input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [leftResult] at leftShape
+      exact leftShape
+  | ok left next =>
+      rw [leftResult] at leftShape
+      simp only
+      cases operatorResult : binaryAtPrecedence? next precedence with
+      | none =>
+          simp only
+          exact leftShape
+      | some operator =>
+          simp only
+          have consumedShape := consumeBinary_preservesTokenWindow
+            operator next
+          cases consumedResult : consumeBinary operator next with
+          | invariant error =>
+              simp only
+              trivial
+          | reject failure rejected =>
+              rw [consumedResult] at consumedShape
+              simp only
+              exact consumedShape.trans leftShape
+          | ok value afterOperator =>
+              rw [consumedResult] at consumedShape
+              simp only
+              have rightShape := operandWindow afterOperator
+              cases rightResult : operand afterOperator with
+              | invariant error =>
+                  simp only
+                  trivial
+              | reject failure rejected =>
+                  rw [rightResult] at rightShape
+                  simp only
+                  exact rightShape.trans (consumedShape.trans leftShape)
+              | ok right final =>
+                  rw [rightResult] at rightShape
+                  simp only
+                  exact rightShape.trans (consumedShape.trans leftShape)
+
+theorem nonAssociative_preservesTokensOnSuccess (operand : Parser Expr)
+    (operandWindow : Parser.PreservesTokenWindow operand)
+    (precedence : Nat) :
+    Parser.PreservesTokensOnSuccess (nonAssociative operand precedence) :=
+  (nonAssociative_preservesTokenWindow operand operandWindow
+    precedence).preservesTokensOnSuccess
+
+/-- A non-associative precedence layer never rewinds the parser cursor. -/
+theorem nonAssociative_cursorMonotoneOnSuccess (operand : Parser Expr)
+    (operandCursor : Parser.CursorMonotoneOnSuccess operand)
+    (precedence : Nat) :
+    Parser.CursorMonotoneOnSuccess (nonAssociative operand precedence) := by
+  intro input expression final parsed
+  unfold nonAssociative at parsed
+  cases leftResult : operand input with
+  | invariant error => simp [leftResult] at parsed
+  | reject failure rejected => simp [leftResult] at parsed
+  | ok left next =>
+      simp only [leftResult] at parsed
+      have leftMonotone := operandCursor input left next leftResult
+      cases operatorResult : binaryAtPrecedence? next precedence with
+      | none =>
+          simp only [operatorResult] at parsed
+          cases parsed
+          exact leftMonotone
+      | some operator =>
+          simp only [operatorResult] at parsed
+          cases consumedResult : consumeBinary operator next with
+          | invariant error => simp [consumedResult] at parsed
+          | reject failure rejected => simp [consumedResult] at parsed
+          | ok value afterOperator =>
+              simp only [consumedResult] at parsed
+              have consumedMonotone :=
+                consumeBinary_cursorMonotoneOnSuccess operator next value
+                  afterOperator consumedResult
+              cases rightResult : operand afterOperator with
+              | invariant error => simp [rightResult] at parsed
+              | reject failure rejected => simp [rightResult] at parsed
+              | ok right afterRight =>
+                  simp only [rightResult] at parsed
+                  have rightMonotone :=
+                    operandCursor afterOperator right afterRight rightResult
+                  cases parsed
+                  exact Nat.le_trans leftMonotone
+                    (Nat.le_trans consumedMonotone rightMonotone)
+
+/-- A non-associative layer retains its first operand's start token. -/
+theorem nonAssociative_startsAtCurrentTokenOnSuccess
+    (operand : Parser Expr)
+    (operandStarts :
+      Parser.StartsAtCurrentTokenOnSuccess operand (·.span))
+    (precedence : Nat) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (nonAssociative operand precedence) (·.span) := by
+  intro input expression final parsed
+  unfold nonAssociative at parsed
+  cases leftResult : operand input with
+  | invariant error => simp [leftResult] at parsed
+  | reject failure rejected => simp [leftResult] at parsed
+  | ok left next =>
+      simp only [leftResult] at parsed
+      rcases operandStarts input left next leftResult with
+        ⟨first, found, starts⟩
+      cases operatorResult : binaryAtPrecedence? next precedence with
+      | none =>
+          simp only [operatorResult] at parsed
+          cases parsed
+          exact ⟨first, found, starts⟩
+      | some operator =>
+          simp only [operatorResult] at parsed
+          cases consumedResult : consumeBinary operator next with
+          | invariant error => simp [consumedResult] at parsed
+          | reject failure rejected => simp [consumedResult] at parsed
+          | ok value afterOperator =>
+              simp only [consumedResult] at parsed
+              cases rightResult : operand afterOperator with
+              | invariant error => simp [rightResult] at parsed
+              | reject failure rejected => simp [rightResult] at parsed
+              | ok right afterRight =>
+                  simp only [rightResult] at parsed
+                  cases parsed
+                  exact ⟨first, found, by simpa using starts⟩
+
+/-- A non-associative precedence layer retains all recursive source ranges. -/
+theorem nonAssociative_validFor
+    (operand : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (operandValid : operand.ValidFor (Expr.ValidFor statementValid))
+    (operandTokens : Parser.PreservesTokensOnSuccess operand)
+    (operandCursorLt : ∀ {input next : State} {value : Expr},
+      operand input = .ok value next → input.cursor < next.cursor)
+    (operandStarts :
+      Parser.StartsAtCurrentTokenOnSuccess operand (·.span))
+    (precedence : Nat) :
+    (nonAssociative operand precedence).ValidFor
+      (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  unfold nonAssociative
+  cases leftResult : operand input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have rejectedValid := operandValid input inputValid
+      rw [leftResult] at rejectedValid
+      exact rejectedValid
+  | ok left next =>
+      have leftReply := operandValid input inputValid
+      rw [leftResult] at leftReply
+      simp only
+      cases operatorResult : binaryAtPrecedence? next precedence with
+      | none =>
+          simp only
+          exact leftReply
+      | some operator =>
+          simp only
+          rcases binaryAtPrecedence?_some_state_shape operatorResult with
+            ⟨operatorToken, operatorFound, _decoded, _operatorSpan⟩
+          have operatorValidNext := binaryAtPrecedence?_validFor
+            leftReply.2.1 operatorResult
+          have leftTokens := operandTokens input left next leftResult
+          rcases operandStarts input left next leftResult with
+            ⟨leftToken, leftFound, leftStart⟩
+          have leftAt := State.getElem?_eq_some_of_peek?_eq_some leftFound
+          have operatorAtNext :=
+            State.getElem?_eq_some_of_peek?_eq_some operatorFound
+          have operatorAt : input.tokens[next.cursor]? = some operatorToken := by
+            simpa [leftTokens] using operatorAtNext
+          have beforeOperator :=
+            inputValid.token_end_le_token_start_of_getElem?_lt leftAt
+              operatorAt (operandCursorLt leftResult)
+          have leftTokenValid := inputValid.peek?_span_validFor leftFound
+          have leftBeforeOperator : left.span.startByte ≤
+              operatorToken.span.startByte := by
+            exact Nat.le_trans
+              (by simpa [leftStart] using leftTokenValid.2.1) beforeOperator
+          have consumedReply := consumeBinary_reply_validFor operator
+            leftReply.2.1 operatorFound
+          cases consumedResult : consumeBinary operator next with
+          | invariant error =>
+              simp only
+              trivial
+          | reject failure rejected =>
+              rw [consumedResult] at consumedReply
+              simp only
+              exact consumedReply.of_file_eq leftReply.2.2
+          | ok value afterOperator =>
+              rw [consumedResult] at consumedReply
+              have exactConsumed := consumeBinary_ok_state_shape operator next
+              rw [consumedResult] at exactConsumed
+              cases exactConsumed
+              simp only
+              cases rightResult : operand
+                  { next with cursor := next.cursor + 1 } with
+              | invariant error =>
+                  simp only
+                  trivial
+              | reject failure rejected =>
+                  have rejectedValid := operandValid
+                    { next with cursor := next.cursor + 1 }
+                    consumedReply.2.1
+                  rw [rightResult] at rejectedValid
+                  simp only
+                  exact rejectedValid.of_file_eq
+                    (consumedReply.2.2.trans leftReply.2.2)
+              | ok right afterRight =>
+                  have rightReply := operandValid
+                    { next with cursor := next.cursor + 1 }
+                    consumedReply.2.1
+                  rw [rightResult] at rightReply
+                  have rightValidInput :
+                      Expr.ValidFor statementValid input.file right := by
+                    simpa [rightReply.2.2, consumedReply.2.2,
+                      leftReply.2.2] using rightReply.1
+                  rcases operandStarts
+                      { next with cursor := next.cursor + 1 } right afterRight
+                      rightResult with
+                    ⟨rightToken, rightFound, rightStart⟩
+                  have rightAtAfter :=
+                    State.getElem?_eq_some_of_peek?_eq_some rightFound
+                  have rightAt : input.tokens[next.cursor + 1]? =
+                      some rightToken := by
+                    simpa [leftTokens] using rightAtAfter
+                  have operatorBeforeRight :=
+                    inputValid.token_end_le_token_start_of_getElem?_lt
+                      operatorAt rightAt (by omega)
+                  have operatorTokenValid :=
+                    inputValid.token_span_validFor_of_getElem?_eq_some
+                      operatorAt
+                  have ordered : left.span.startByte ≤ right.span.endByte := by
+                    calc
+                      left.span.startByte ≤ operatorToken.span.startByte :=
+                        leftBeforeOperator
+                      _ ≤ operatorToken.span.endByte := operatorTokenValid.2.1
+                      _ ≤ rightToken.span.startByte := operatorBeforeRight
+                      _ = right.span.startByte := rightStart
+                      _ ≤ right.span.endByte := rightValidInput.span_valid.2.1
+                  have operatorValidInput : Located.ValidFor input.file
+                      operator := by
+                    simpa [leftReply.2.2] using operatorValidNext
+                  have binaryValid := binaryNode_validFor statementValid
+                    input.file left operator right leftReply.1
+                      operatorValidInput rightValidInput ordered
+                  exact ⟨binaryValid, rightReply.2.1,
+                    rightReply.2.2.trans
+                      (consumedReply.2.2.trans leftReply.2.2)⟩
+
 end ExpressionInternals
 end Solcore.Syntax.Parser
