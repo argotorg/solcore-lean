@@ -463,6 +463,133 @@ theorem delimitedNoTrailing_preservesTokensOnSuccess {α : Type}
   delimitedWithPolicy_preservesTokensOnSuccess opening closing allowEmpty false
     element context phase elementShape
 
+private theorem closeDelimited_startsAtOpening {α : Type}
+    (opening : Token) (closing : Symbol) (context : ParseContext)
+    (elementsRev : List α) {input next : State}
+    {values : DelimitedList α}
+    (result : closeDelimited opening closing context elementsRev input =
+      .ok values next) :
+    values.span.startByte = opening.span.startByte := by
+  unfold closeDelimited at result
+  cases closingResult : symbol closing context input with
+  | ok token afterClosing =>
+      simp only [closingResult] at result
+      cases result
+      rfl
+  | reject failure rejected =>
+      simp only [closingResult] at result
+      contradiction
+  | invariant error =>
+      simp only [closingResult] at result
+      contradiction
+
+private theorem afterDelimitedElement_startsAtOpening {α : Type}
+    (element : Parser α) (closing : Symbol) (allowTrailing : Bool)
+    (context : ParseContext) (phase : ParserPhase) (opening : Token) :
+    ∀ fuel elementsRev input values next,
+      afterDelimitedElement element closing allowTrailing context phase opening
+          fuel elementsRev input = .ok values next →
+        values.span.startByte = opening.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro elementsRev input values next result
+      simp only [afterDelimitedElement] at result
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro elementsRev input values next result
+      unfold afterDelimitedElement at result
+      split at result
+      · cases commaResult : symbol .comma context input with
+        | ok comma afterComma =>
+            simp only [commaResult] at result
+            split at result
+            · exact closeDelimited_startsAtOpening opening closing context
+                elementsRev result
+            · cases elementResult : element afterComma with
+              | ok value afterElement =>
+                  simp only [elementResult] at result
+                  split at result
+                  · exact inductionHypothesis (value :: elementsRev)
+                      afterElement values next result
+                  · contradiction
+              | reject failure rejected =>
+                  simp only [elementResult] at result
+                  contradiction
+              | invariant error =>
+                  simp only [elementResult] at result
+                  contradiction
+        | reject failure rejected =>
+            simp only [commaResult] at result
+            contradiction
+        | invariant error =>
+            simp only [commaResult] at result
+            contradiction
+      · split at result
+        · exact closeDelimited_startsAtOpening opening closing context
+            elementsRev result
+        · unfold rejectAt at result
+          contradiction
+
+/-- A delimited result starts at the opening token of the input state. -/
+theorem delimitedWithPolicy_startsAtCurrentTokenOnSuccess {α : Type}
+    (opening closing : Symbol) (allowEmpty allowTrailing : Bool)
+    (element : Parser α) (context : ParseContext) (phase : ParserPhase) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (delimitedWithPolicy opening closing allowEmpty allowTrailing element
+        context phase) (·.span) := by
+  intro input values next result
+  unfold delimitedWithPolicy at result
+  cases openingResult : symbol opening context input with
+  | ok openingToken afterOpening =>
+      simp only [openingResult] at result
+      have openingFound :=
+        (symbol_ok_state_shape opening context openingResult).1
+      split at result
+      · exact ⟨openingToken, openingFound,
+          (closeDelimited_startsAtOpening openingToken closing context []
+            result).symm⟩
+      · cases elementResult : element afterOpening with
+        | ok value afterElement =>
+            simp only [elementResult] at result
+            split at result
+            · exact ⟨openingToken, openingFound,
+                (afterDelimitedElement_startsAtOpening element closing
+                  allowTrailing context phase openingToken
+                  (afterOpening.remainingCount + 1) [value] afterElement
+                  values next result).symm⟩
+            · contradiction
+        | reject failure rejected =>
+            simp only [elementResult] at result
+            contradiction
+        | invariant error =>
+            simp only [elementResult] at result
+            contradiction
+  | reject failure rejected =>
+      simp only [openingResult] at result
+      contradiction
+  | invariant error =>
+      simp only [openingResult] at result
+      contradiction
+
+theorem delimited_startsAtCurrentTokenOnSuccess {α : Type}
+    (opening closing : Symbol) (allowEmpty : Bool) (element : Parser α)
+    (context : ParseContext) (phase : ParserPhase) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (delimited opening closing allowEmpty element context phase)
+        (·.span) :=
+  delimitedWithPolicy_startsAtCurrentTokenOnSuccess opening closing allowEmpty
+    true element context phase
+
+theorem delimitedNoTrailing_startsAtCurrentTokenOnSuccess {α : Type}
+    (opening closing : Symbol) (allowEmpty : Bool) (element : Parser α)
+    (context : ParseContext) (phase : ParserPhase) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (delimitedNoTrailing opening closing allowEmpty element context phase)
+        (·.span) :=
+  delimitedWithPolicy_startsAtCurrentTokenOnSuccess opening closing allowEmpty
+    false element context phase
+
 private theorem closeDelimited_cursor_lt_onSuccess {α : Type}
     (opening : Token) (closing : Symbol) (context : ParseContext)
     (elementsRev : List α) {input next : State} {values : DelimitedList α}

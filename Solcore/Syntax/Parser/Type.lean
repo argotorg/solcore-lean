@@ -252,6 +252,19 @@ theorem parseTupleType_cursorMonotoneOnSuccess (nested : Parser TypeExpr) :
   · intro tuple
     exact Parser.pure_cursorMonotoneOnSuccess _
 
+/-- A tuple type starts at its current opening parenthesis token. -/
+theorem parseTupleType_startsAtCurrentTokenOnSuccess
+    (nested : Parser TypeExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (parseTupleType nested) (·.span) := by
+  unfold parseTupleType
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+  · exact delimited_startsAtCurrentTokenOnSuccess .leftParen .rightParen
+      true nested .typeExpr .typeExpr
+  · intro tuple input value final parsed
+    cases parsed
+    rfl
+
 private def parseFunctionType (nested : Parser TypeExpr) : Parser TypeExpr := do
   let functionKeyword ← keyword .functionKw .typeExpr
   let parameters ← delimited .leftParen .rightParen true nested

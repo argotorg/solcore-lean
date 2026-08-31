@@ -21,6 +21,9 @@ example := @delimitedWithPolicy_cursor_lt_onSuccess
 example := @delimitedWithPolicy_cursorMonotoneOnSuccess
 example := @delimited_cursorMonotoneOnSuccess
 example := @delimitedNoTrailing_cursorMonotoneOnSuccess
+example := @delimitedWithPolicy_startsAtCurrentTokenOnSuccess
+example := @delimited_startsAtCurrentTokenOnSuccess
+example := @delimitedNoTrailing_startsAtCurrentTokenOnSuccess
 
 example {α : Type} (file : SourceFile) (values : DelimitedList α)
     (elementValid : SourceFile → α → Prop)

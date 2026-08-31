@@ -26,6 +26,11 @@ example (nested : Parser TypeExpr) :
     Parser.CursorMonotoneOnSuccess (parseTupleType nested) :=
   parseTupleType_cursorMonotoneOnSuccess nested
 
+example (nested : Parser TypeExpr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (parseTupleType nested) (·.span) :=
+  parseTupleType_startsAtCurrentTokenOnSuccess nested
+
 example {file : SourceFile} {span : SourceSpan} {elements : List TypeExpr}
     (spanValid : span.ValidFor file)
     (elementsValid : ∀ element ∈ elements,
