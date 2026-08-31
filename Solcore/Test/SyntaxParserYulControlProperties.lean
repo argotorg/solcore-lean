@@ -17,6 +17,10 @@ example := @yulForStatement_validFor
 example := @yulForStatement_preservesTokensOnSuccess
 example := @yulForStatement_cursorMonotoneOnSuccess
 example := @yulForStatement_startsAtCurrentTokenOnSuccess
+example := @yulFunctionStatement_validFor
+example := @yulFunctionStatement_preservesTokensOnSuccess
+example := @yulFunctionStatement_cursorMonotoneOnSuccess
+example := @yulFunctionStatement_startsAtCurrentTokenOnSuccess
 
 example (nested : Parser YulStmt)
     (expressionValid : yulExpression.ValidFor YulExpr.ValidFor)

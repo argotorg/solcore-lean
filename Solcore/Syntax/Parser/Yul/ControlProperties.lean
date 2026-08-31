@@ -407,4 +407,274 @@ theorem yulForStatement_startsAtCurrentTokenOnSuccess
   cases finished
   rfl
 
+private theorem yulReturnClause_validFor :
+    YulControl.returnClause.ValidFor YulReturnClause.ValidFor := by
+  have weak : YulControl.returnClause.ValidFor (fun _ _ => True) := by
+    unfold YulControl.returnClause
+    apply Parser.bind_validFor (symbol_validFor .arrow .yulStatement)
+    intro arrow
+    apply Parser.bind_validFor yulNames_validFor
+    intro names
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : YulControl.returnClause input with
+  | invariant error => trivial
+  | reject failure rejected => rw [parsed] at weakResult; exact weakResult
+  | ok result final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold YulControl.returnClause at stages
+      rcases yulBind_ok_components stages with
+        ⟨arrow, afterArrow, arrowResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨names, afterNames, namesResult, finished⟩
+      have arrowValid := symbol_validFor .arrow .yulStatement input inputValid
+      rw [arrowResult] at arrowValid
+      have namesValid := yulNames_validFor afterArrow arrowValid.2.1
+      rw [namesResult] at namesValid
+      have arrowSpanValid : arrow.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using arrowValid.1
+      have namesSpanValid : names.span.ValidFor input.file := by
+        simpa [arrowValid.2.2] using namesValid.1.1
+      have arrowShape := symbol_ok_state_shape .arrow .yulStatement arrowResult
+      have arrowAdvanced : input.advance? = some (arrow, afterArrow) := by
+        unfold State.advance?
+        rw [arrowShape.1, arrowShape.2]
+        rfl
+      rcases yulNames_startsAtCurrentTokenOnSuccess afterArrow names
+          afterNames namesResult with ⟨first, firstFound, firstStart⟩
+      have arrowBeforeNames : arrow.span.startByte ≤ names.span.endByte :=
+        Nat.le_trans arrowSpanValid.2.1 (Nat.le_trans
+          (by
+            rw [← firstStart]
+            exact inputValid.consumed_end_le_peek_start_after_advance
+              arrowAdvanced firstFound)
+          namesSpanValid.2.1)
+      cases finished
+      refine ⟨⟨SourceSpan.cover_validFor arrowSpanValid namesSpanValid
+          arrowBeforeNames, arrowSpanValid, ?_⟩,
+        weakResult.2.1, weakResult.2.2⟩
+      intro name member
+      simpa [arrowValid.2.2] using namesValid.1.2 name member
+theorem yulReturns_validFor : YulControl.returns.ValidFor
+      (Option.ValidFor YulReturnClause.ValidFor) := by
+  unfold YulControl.returns
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases present : isSymbol observed .arrow
+  · simp only [present, if_true]
+    apply Parser.bind_validFor_of_value yulReturnClause_validFor
+    intro clause input inputValid clauseValid
+    exact ⟨by simpa only [Option.ValidFor] using clauseValid,
+      inputValid, rfl⟩
+  · simp only [present]
+    exact Parser.pure_validFor none
+      (Option.ValidFor YulReturnClause.ValidFor) (fun _ => trivial)
+private theorem yulReturnClause_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess YulControl.returnClause := by
+  unfold YulControl.returnClause
+  apply Parser.bind_preservesTokensOnSuccess
+    (symbol_preservesTokensOnSuccess .arrow .yulStatement)
+  intro arrow
+  apply Parser.bind_preservesTokensOnSuccess
+    yulNames_preservesTokensOnSuccess
+  intro names
+  exact Parser.pure_preservesTokensOnSuccess _
+theorem yulReturns_preservesTokensOnSuccess : Parser.PreservesTokensOnSuccess YulControl.returns := by
+  unfold YulControl.returns
+  apply Parser.bind_preservesTokensOnSuccess getState_preservesTokensOnSuccess
+  intro observed
+  by_cases present : isSymbol observed .arrow
+  · simp only [present, if_true]
+    apply Parser.bind_preservesTokensOnSuccess
+      yulReturnClause_preservesTokensOnSuccess
+    intro clause
+    exact Parser.pure_preservesTokensOnSuccess _
+  · simp only [present]
+    exact Parser.pure_preservesTokensOnSuccess none
+private theorem yulReturnClause_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess YulControl.returnClause := by
+  unfold YulControl.returnClause
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .arrow .yulStatement)
+  intro arrow
+  apply Parser.bind_cursorMonotoneOnSuccess
+    yulNames_cursorMonotoneOnSuccess
+  intro names
+  exact Parser.pure_cursorMonotoneOnSuccess _
+theorem yulReturns_cursorMonotoneOnSuccess : Parser.CursorMonotoneOnSuccess YulControl.returns := by
+  unfold YulControl.returns
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases present : isSymbol observed .arrow
+  · simp only [present, if_true]
+    apply Parser.bind_cursorMonotoneOnSuccess
+      yulReturnClause_cursorMonotoneOnSuccess
+    intro clause
+    exact Parser.pure_cursorMonotoneOnSuccess _
+  · simp only [present]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+/-- Yul function definitions retain every name, delimiter, and body range. -/
+theorem yulFunctionStatement_validFor (statement : Parser YulStmt)
+    (statementValid : statement.ValidFor YulStmt.ValidFor)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    (yulFunctionStatement statement).ValidFor YulStmt.ValidFor := by
+  have weak : (yulFunctionStatement statement).ValidFor
+      (fun _ _ => True) := by
+    unfold yulFunctionStatement
+    apply Parser.bind_validFor (keyword_validFor .functionKw .yulStatement)
+    intro marker
+    apply Parser.bind_validFor yulName_validFor
+    intro name
+    apply Parser.bind_validFor yulParameters_validFor
+    intro parameters
+    apply Parser.bind_validFor yulReturns_validFor
+    intro returns
+    apply Parser.bind_validFor
+      (yulBlock_validFor YulStmt.ValidFor statement statementValid
+        statementPreserves)
+    intro body
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : yulFunctionStatement statement input with
+  | invariant error => trivial
+  | reject failure rejected => rw [parsed] at weakResult; exact weakResult
+  | ok result final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold yulFunctionStatement at stages
+      rcases yulBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨name, afterName, nameResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨parameters, afterParameters, parametersResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨returns, afterReturns, returnsResult, rest⟩
+      rcases yulBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have markerValid := keyword_validFor .functionKw .yulStatement
+        input inputValid
+      rw [markerResult] at markerValid
+      have nameValid := yulName_validFor afterMarker markerValid.2.1
+      rw [nameResult] at nameValid
+      have parametersValid := yulParameters_validFor afterName nameValid.2.1
+      rw [parametersResult] at parametersValid
+      have returnsValid := yulReturns_validFor afterParameters
+        parametersValid.2.1
+      rw [returnsResult] at returnsValid
+      have bodyValid := yulBlock_validFor YulStmt.ValidFor statement
+        statementValid statementPreserves afterReturns returnsValid.2.1
+      rw [bodyResult] at bodyValid
+      have markerSpanValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerValid.1
+      have bodySpanValid : body.span.ValidFor input.file := by
+        simpa [returnsValid.2.2, parametersValid.2.2, nameValid.2.2,
+          markerValid.2.2] using bodyValid.1.1
+      have markerShape := acceptToken_ok_state_shape
+        (.keyword .functionKw) .yulStatement
+        (· == .keyword .functionKw) markerResult
+      have markerAt :=
+        State.getElem?_eq_some_of_peek?_eq_some markerShape.1
+      rcases yulBlock_startsAtCurrentTokenOnSuccess statement
+          statementPreserves afterReturns body afterBody bodyResult with
+        ⟨opening, openingFound, openingStart⟩
+      have openingAtInput : input.tokens[afterReturns.cursor]? = some opening := by
+        have openingAt := State.getElem?_eq_some_of_peek?_eq_some openingFound
+        simpa [yulReturns_preservesTokensOnSuccess afterParameters returns
+          afterReturns returnsResult,
+          yulParameters_preservesTokensOnSuccess afterName parameters
+            afterParameters parametersResult,
+          yulName_preservesTokensOnSuccess afterMarker name afterName nameResult,
+          keyword_preservesTokensOnSuccess .functionKw .yulStatement input
+            marker afterMarker markerResult] using openingAt
+      have nameCursor := yulName_cursorMonotoneOnSuccess afterMarker name
+        afterName nameResult
+      have parametersCursor := yulParameters_cursorMonotoneOnSuccess afterName
+        parameters afterParameters parametersResult
+      have returnsCursor := yulReturns_cursorMonotoneOnSuccess afterParameters
+        returns afterReturns returnsResult
+      have markerBeforeOpening : input.cursor < afterReturns.cursor := by
+        have afterMarkerBefore : input.cursor + 1 ≤ afterReturns.cursor := by
+          simpa [markerShape.2] using
+            Nat.le_trans nameCursor (Nat.le_trans parametersCursor returnsCursor)
+        omega
+      have markerBeforeBody : marker.span.endByte ≤ body.span.startByte := by
+        rw [← openingStart]
+        exact inputValid.token_end_le_token_start_of_getElem?_lt markerAt
+          openingAtInput markerBeforeOpening
+      have outerValid := SourceSpan.cover_validFor markerSpanValid bodySpanValid
+        (Nat.le_trans markerSpanValid.2.1
+          (Nat.le_trans markerBeforeBody bodySpanValid.2.1))
+      cases finished
+      exact ⟨YulStmt.ValidFor.functionDef outerValid
+          (by simpa only [Located.ValidFor, markerValid.2.2] using nameValid.1)
+          (by simpa only [DelimitedList.ValidFor, Located.ValidFor,
+            nameValid.2.2, markerValid.2.2] using parametersValid.1)
+          (by simpa [parametersValid.2.2, nameValid.2.2,
+            markerValid.2.2] using returnsValid.1)
+          (by
+            intro retained member
+            simpa [returnsValid.2.2, parametersValid.2.2, nameValid.2.2,
+            markerValid.2.2] using bodyValid.1.2 retained member),
+        weakResult.2.1, weakResult.2.2⟩
+/-- Yul function parsing preserves the immutable lexer token carrier. -/
+theorem yulFunctionStatement_preservesTokensOnSuccess
+    (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    Parser.PreservesTokensOnSuccess (yulFunctionStatement statement) := by
+  unfold yulFunctionStatement
+  apply Parser.bind_preservesTokensOnSuccess
+    (keyword_preservesTokensOnSuccess .functionKw .yulStatement)
+  intro marker
+  apply Parser.bind_preservesTokensOnSuccess yulName_preservesTokensOnSuccess
+  intro name
+  apply Parser.bind_preservesTokensOnSuccess
+    yulParameters_preservesTokensOnSuccess
+  intro parameters
+  apply Parser.bind_preservesTokensOnSuccess yulReturns_preservesTokensOnSuccess
+  intro returns
+  apply Parser.bind_preservesTokensOnSuccess
+    (yulBlock_preservesTokensOnSuccess statement statementPreserves)
+  intro body
+  exact Parser.pure_preservesTokensOnSuccess _
+/-- Yul function parsing never rewinds the parser cursor. -/
+theorem yulFunctionStatement_cursorMonotoneOnSuccess
+    (statement : Parser YulStmt)
+    (statementPreserves : Parser.PreservesTokensOnSuccess statement) :
+    Parser.CursorMonotoneOnSuccess (yulFunctionStatement statement) := by
+  unfold yulFunctionStatement
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .functionKw .yulStatement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess yulName_cursorMonotoneOnSuccess
+  intro name
+  apply Parser.bind_cursorMonotoneOnSuccess
+    yulParameters_cursorMonotoneOnSuccess
+  intro parameters
+  apply Parser.bind_cursorMonotoneOnSuccess yulReturns_cursorMonotoneOnSuccess
+  intro returns
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (yulBlock_cursorMonotoneOnSuccess statement statementPreserves)
+  intro body
+  exact Parser.pure_cursorMonotoneOnSuccess _
+/-- A successful Yul function definition starts at its `function` token. -/
+theorem yulFunctionStatement_startsAtCurrentTokenOnSuccess
+    (statement : Parser YulStmt) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (yulFunctionStatement statement) (·.span) := by
+  unfold yulFunctionStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess
+      (.keyword .functionKw) .yulStatement (· == .keyword .functionKw))
+  intro marker input value final parsed
+  rcases yulBind_ok_components parsed with ⟨name, afterName, _, rest⟩
+  rcases yulBind_ok_components rest with ⟨parameters, afterParameters, _, rest⟩
+  rcases yulBind_ok_components rest with ⟨returns, afterReturns, _, rest⟩
+  rcases yulBind_ok_components rest with ⟨body, afterBody, _, finished⟩
+  cases finished
+  rfl
+
 end Solcore.Syntax.Parser

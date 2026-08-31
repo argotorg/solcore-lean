@@ -84,23 +84,32 @@ def yulSwitchStatement (statement : Parser YulStmt) : Parser YulStmt := do
       }
       pure { span, value := .error }
 
-private def yulReturns : Parser (Option YulReturnClause) := do
+namespace YulControl
+
+/-- Parse the arrow and nonempty return-name sequence of a Yul function. -/
+def returnClause : Parser YulReturnClause := do
+  let arrow ← symbol .arrow .yulStatement
+  let names ← yulNames
+  pure {
+    span := SourceSpan.cover arrow.span names.span
+    value := { arrow := arrow.span, names := names.names }
+  }
+
+/-- Parse the optional return-name clause of a Yul function definition. -/
+def returns : Parser (Option YulReturnClause) := do
   let state ← getState
   if isSymbol state .arrow then
-    let arrow ← symbol .arrow .yulStatement
-    let names ← yulNames
-    pure (some {
-      span := SourceSpan.cover arrow.span names.span
-      value := { arrow := arrow.span, names := names.names }
-    })
+    pure (some (← returnClause))
   else
     pure none
+
+end YulControl
 
 def yulFunctionStatement (statement : Parser YulStmt) : Parser YulStmt := do
   let marker ← keyword .functionKw .yulStatement
   let name ← yulName
   let parameters ← yulParameters
-  let returns ← yulReturns
+  let returns ← YulControl.returns
   let body ← yulBlock statement
   pure {
     span := SourceSpan.cover marker.span body.span
