@@ -66,6 +66,15 @@ def optionalSemicolon : Parser (Option SourceSpan) := do
   else
     pure none
 
+/-- Parse the optional expression before a required return semicolon. -/
+def optionalReturnValue
+    (expression : Parser Expr) : Parser (Option Expr) := do
+  let state ← getState
+  if isSymbol state .semicolon then
+    pure none
+  else
+    pure (some (← expression))
+
 def assignmentEnd : AssignmentTail → SourceSpan
   | .value _ right => right.span
   | .bitNot operator => operator
@@ -135,10 +144,7 @@ def letStatement (expression : Parser Expr) : Parser Statement := do
 /-- Parse a semicolon-terminated Core `return` statement. -/
 def returnStatement (expression : Parser Expr) : Parser Statement := do
   let marker ← keyword .returnKw .statement
-  let state ← getState
-  let value ←
-    if isSymbol state .semicolon then pure none
-    else pure (some (← expression))
+  let value ← StatementSimpleInternals.optionalReturnValue expression
   let semicolon ← symbol .semicolon .statement
   pure {
     span := SourceSpan.cover marker.span semicolon.span

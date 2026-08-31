@@ -580,6 +580,62 @@ theorem optionalSemicolon_some_startsAtCurrentTokenOnSuccess
     change Reply.ok none input = .ok (some span) final at parsed
     cases parsed
 
+/-- Optional return values retain nested expression provenance when present. -/
+theorem optionalReturnValue_validFor (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid) :
+    (optionalReturnValue expression).ValidFor
+      (Option.ValidFor expressionValueValid) := by
+  unfold optionalReturnValue
+  apply Parser.bind_validFor getState_validFor
+  intro observed
+  by_cases empty : isSymbol observed .semicolon
+  · simp only [empty, if_true]
+    exact Parser.pure_validFor none _ (fun _ => trivial)
+  · simp only [empty]
+    apply Parser.bind_validFor_of_value expressionValid
+    intro value input inputValid valueValid
+    exact ⟨by simpa only [Option.ValidFor] using valueValid,
+      inputValid, rfl⟩
+
+/-- Optional return values preserve every ordinary token window. -/
+theorem optionalReturnValue_preservesTokenWindow (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (optionalReturnValue expression) := by
+  unfold optionalReturnValue
+  apply Parser.bind_preservesTokenWindow getState_preservesTokenWindow
+  intro observed
+  by_cases empty : isSymbol observed .semicolon
+  · simp only [empty, if_true]
+    exact Parser.pure_preservesTokenWindow none
+  · simp only [empty]
+    apply Parser.bind_preservesTokenWindow expressionWindow
+    intro value
+    exact Parser.pure_preservesTokenWindow _
+
+theorem optionalReturnValue_preservesTokensOnSuccess
+    (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (optionalReturnValue expression) :=
+  (optionalReturnValue_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- Optional return-value parsing never rewinds the token cursor. -/
+theorem optionalReturnValue_cursorMonotoneOnSuccess
+    (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (optionalReturnValue expression) := by
+  unfold optionalReturnValue
+  apply Parser.bind_cursorMonotoneOnSuccess getState_cursorMonotoneOnSuccess
+  intro observed
+  by_cases empty : isSymbol observed .semicolon
+  · simp only [empty, if_true]
+    exact Parser.pure_cursorMonotoneOnSuccess none
+  · simp only [empty]
+    apply Parser.bind_cursorMonotoneOnSuccess expressionCursor
+    intro value
+    exact Parser.pure_cursorMonotoneOnSuccess _
+
 end StatementSimpleInternals
 
 /-- Assignment/expression statements preserve nested expression windows. -/

@@ -47,6 +47,12 @@ example := @StatementSimpleInternals.optionalSemicolon_preservesTokensOnSuccess
 example := @StatementSimpleInternals.optionalSemicolon_cursorMonotoneOnSuccess
 example :=
   @StatementSimpleInternals.optionalSemicolon_some_startsAtCurrentTokenOnSuccess
+example := @StatementSimpleInternals.optionalReturnValue_validFor
+example := @StatementSimpleInternals.optionalReturnValue_preservesTokenWindow
+example :=
+  @StatementSimpleInternals.optionalReturnValue_preservesTokensOnSuccess
+example :=
+  @StatementSimpleInternals.optionalReturnValue_cursorMonotoneOnSuccess
 example := @assignmentOrExpressionStatement_preservesTokenWindow
 example := @assignmentOrExpressionStatement_preservesTokensOnSuccess
 example := @assignmentOrExpressionStatement_cursorMonotoneOnSuccess
