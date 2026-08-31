@@ -4,14 +4,16 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def finishRecoveredType (span : SourceSpan)
+namespace TypeAliasInternals
+
+def finishRecoveredType (span : SourceSpan)
     (state : State) : Reply TypeExpr :=
   .ok { span, value := .error } (state.emit {
     span
     kind := .recovered .typeAliasValue
   })
 
-private def recoverTypeAliasValueAux (first last : SourceSpan) :
+def recoverTypeAliasValueAux (first last : SourceSpan) :
     Nat → State → Reply TypeExpr
   | 0, state => .invariant (.fuelExhausted .typeAlias state.currentSpan)
   | fuel + 1, state =>
@@ -24,7 +26,7 @@ private def recoverTypeAliasValueAux (first last : SourceSpan) :
         | none => finishRecoveredType (SourceSpan.cover first last) state
 
 /-- Consume the nonempty malformed RHS prefix before the first semicolon. -/
-private def recoverTypeAliasValue (state : State) : Reply TypeExpr :=
+def recoverTypeAliasValue (state : State) : Reply TypeExpr :=
   if state.atEnd || isSymbol state .semicolon then
     rejectAt state { head := .typeExpr, tail := [] } .typeAlias
   else
@@ -34,7 +36,7 @@ private def recoverTypeAliasValue (state : State) : Reply TypeExpr :=
           (next.remainingCount + 1) next
     | none => rejectAt state { head := .typeExpr, tail := [] } .typeAlias
 
-private def parseAliasValue : Parser TypeExpr := fun state =>
+def parseAliasValue : Parser TypeExpr := fun state =>
   match typeExpr state with
   | .ok value next => .ok value next
   | .reject failure failedState =>
@@ -48,6 +50,8 @@ private def parseAliasValue : Parser TypeExpr := fun state =>
         recoverTypeAliasValue
           (rewound.emit failure.toDiagnostic)
   | .invariant error => .invariant error
+
+end TypeAliasInternals
 
 /-- Parse one canonical transparent type-alias declaration. -/
 def typeAlias : Parser TypeAliasDecl := do
@@ -63,7 +67,7 @@ def typeAlias : Parser TypeAliasDecl := do
     else
       pure none
   let _ ← symbol .equal .typeAlias
-  let value ← parseAliasValue
+  let value ← TypeAliasInternals.parseAliasValue
   let semicolon ← symbol .semicolon .typeAlias
   pure {
     span := SourceSpan.cover typeKeyword.span semicolon.span

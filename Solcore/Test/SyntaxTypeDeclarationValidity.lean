@@ -1,4 +1,4 @@
-import Solcore.Syntax.TypeDeclarationValidity
+import Solcore.Syntax.Parser.TypeAliasProperties
 
 /-! External consumers for type and enum declaration validity. -/
 
@@ -7,8 +7,15 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Syntax
+open Solcore.Syntax.Parser
 
 example := @TypeAliasDecl.ValidFor
+example := @TypeAliasInternals.finishRecoveredType_validFor
+example := @TypeAliasInternals.recoverTypeAliasValueAux_validFor
+example := @TypeAliasInternals.parseAliasValue_validFor
+example := @TypeAliasInternals.parseAliasValue_preservesTokenWindow
+example := @TypeAliasInternals.parseAliasValue_preservesTokensOnSuccess
+example := @TypeAliasInternals.parseAliasValue_cursorMonotoneOnSuccess
 example := @EnumConstructor.ValidFor
 example := @EnumDecl.ValidFor
 
