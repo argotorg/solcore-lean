@@ -67,14 +67,17 @@ and every public lexer result passes preflight. Any public parser error
 therefore occurs only after successful lexing and preflight. Parser state,
 primitive consumers, carrier-preservation rules, and cursor/order laws now
 support compositional proofs for names, selectors, literals, delimiters,
-pragmas, derive attributes, Core blocks, four recursive type forms, and Yul
-expression and block recovery paths.
+pragmas, derive attributes, Core blocks, the complete recursive type parser,
+and the public Yul expression, statement, and body parsers. Complete imports,
+type aliases, and enums have source-validity, token-window, carrier, cursor, and
+start-position contracts. Export paths, constructor selections, names, local
+items, and selections have reached the same boundary.
 
 The recursive validity contracts for types, Yul syntax, Core expressions,
 patterns, and Core statements are defined independently of parser control
-flow. The active proof work connects the remaining type branches and complete
-fuel-bounded type, Yul, expression, pattern, and statement parsers to those
-contracts.
+flow. Type and Yul lifting are complete at their public parser boundaries. The
+active proof work now connects the remaining Core expression, pattern,
+statement, declaration, and complete-file parsers to those contracts.
 
 The remaining proof boundary also includes parser-generated diagnostic
 validity, provenance and unreachability of grammar invariant failures, parser

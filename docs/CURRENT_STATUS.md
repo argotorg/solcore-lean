@@ -204,25 +204,30 @@ the same carrier guarantees directly.
 
 Parser state, primitive consumers, and cursor/lookahead laws preserve valid
 spans, file ownership, the immutable token carrier, and the relevant source
-order. These compositional guarantees now cover qualified names, module paths,
-selector and operator names, literals and primitive token parsers, generic
-delimited lists, pragmas, derive attributes, isolated Core blocks, and the
-proxy, tuple, `comptime`, and mapping type forms. Inline Yul has the same laws
-for names, literals, call-expression layers, expression recovery, parameter
-lists, and braced statement blocks. Diagnostic filtering can only remove
-diagnostics and preserves span validity.
+order. These compositional guarantees cover qualified names, module paths,
+selectors, literals, primitive token parsers, generic delimited lists, pragmas,
+derive attributes, isolated Core blocks, and the complete recursive type
+parser. Complete import, type-alias, and enum declarations retain valid source
+ranges and satisfy ordinary-result token-window, carrier, cursor, and starting
+token contracts. The same contracts cover export paths, constructor
+selections, export names, local export items, and export selections while the
+remaining export wrappers are still being lifted. Diagnostic filtering can
+only remove diagnostics and preserves span validity.
 
 Reusable recursive contracts now state what it means for every retained range
 inside a type, Yul expression or statement, Core expression, pattern, or Core
-statement to belong to the original source. Proofs are being lifted from the
-leaf and block parsers through the complete recursive parsers; defining these
-contracts alone is not treated as proof that every complete parser result
-satisfies them.
+statement to belong to the original source. The public Yul expression,
+statement, and body parsers now satisfy the full provenance, token-window,
+carrier, cursor, and starting-token boundary. Type syntax has likewise been
+lifted through its public recursive parser. Proof lifting remains active for
+Core expressions, patterns, statements, several declaration families, and the
+complete-file parser; defining a validity predicate alone is not treated as
+proof that a parser satisfies it.
 
-The remaining proof work includes that recursive lifting, validity of every
-parser-generated diagnostic, provenance and unreachability of grammar
-invariant failures, parser resource bounds, and soundness against a
-declarative grammar.
+The remaining proof work includes those unclosed recursive and declaration
+parsers, validity of every parser-generated diagnostic, provenance and
+unreachability of grammar invariant failures, parser resource bounds, and
+soundness against a declarative grammar.
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
