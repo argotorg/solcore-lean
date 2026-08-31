@@ -7,17 +7,24 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private def selectedImport : Parser SelectedImport := do
-  let source ← selectorName .importDecl
+namespace ImportInternals
+
+/-- Parse the optional alias of one selected import. -/
+def selectedAlias : Parser (Option Identifier) := do
   let state ← getState
-  let alias ←
-    if isKeyword state .asKw then
-      do
-        let _ ← keyword .asKw .importDecl
-        let name ← identifier .importDecl
-        pure (some name)
-    else
-      pure none
+  if isKeyword state .asKw then
+    let _ ← keyword .asKw .importDecl
+    let name ← identifier .importDecl
+    pure (some name)
+  else
+    pure none
+
+end ImportInternals
+
+/-- Parse one selector and its optional local alias. -/
+def selectedImport : Parser SelectedImport := do
+  let source ← selectorName .importDecl
+  let alias ← ImportInternals.selectedAlias
   let span := match alias with
     | some name => SourceSpan.cover source.span name.span
     | none => source.span

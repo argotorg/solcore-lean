@@ -1,0 +1,17 @@
+import Solcore.Syntax.Parser.ImportProperties
+
+/-! External consumers for canonical import parser contracts. -/
+
+set_option autoImplicit false
+
+namespace Tests
+
+open Solcore.Syntax
+open Solcore.Syntax.Parser
+
+example := selectedAlias_validFor
+example := selectedAlias_preservesTokenWindow
+example := selectedAlias_preservesTokensOnSuccess
+example := selectedAlias_cursorMonotoneOnSuccess
+
+end Tests
