@@ -44,7 +44,7 @@ published through Oracle v4.
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
 | Canonical parser | Complete executable source-to-AST boundary; public errors occur only after successful lexing and preflight | Declarative grammar soundness and deeper output invariants | High |
-| Canonical frontend proofs | Active | Lexer totality and preflight equivalence are complete. Compositional span/carrier/cursor laws cover qualified names, module paths, selectors, literals and primitives, delimiters, pragmas, Yul leaves, and derive targets. Deeper recursive ASTs, parser diagnostics, grammar invariants, resource bounds, and declarative soundness remain | High |
+| Canonical frontend proofs | Active | Lexer totality and preflight equivalence are complete. Compositional span/carrier/cursor laws cover names, selectors, literals, primitives, delimiters, pragmas, derive attributes, Core blocks, proxy/tuple/comptime/mapping types, and Yul expression and block recovery paths. Recursive validity contracts exist for types, Yul syntax, Core expressions, patterns, and statements; complete recursive-parser lifting, parser diagnostics, grammar invariants, resource bounds, and declarative soundness remain | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 

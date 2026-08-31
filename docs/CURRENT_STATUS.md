@@ -206,11 +206,20 @@ Parser state, primitive consumers, and cursor/lookahead laws preserve valid
 spans, file ownership, the immutable token carrier, and the relevant source
 order. These compositional guarantees now cover qualified names, module paths,
 selector and operator names, literals and primitive token parsers, generic
-delimited lists, pragma declarations, Yul name and literal leaves, and derive
-targets. Diagnostic filtering can only remove diagnostics and preserves span
-validity.
+delimited lists, pragmas, derive attributes, isolated Core blocks, and the
+proxy, tuple, `comptime`, and mapping type forms. Inline Yul has the same laws
+for names, literals, call-expression layers, expression recovery, parameter
+lists, and braced statement blocks. Diagnostic filtering can only remove
+diagnostics and preserves span validity.
 
-The remaining proof work covers the deeper recursive AST, validity of every
+Reusable recursive contracts now state what it means for every retained range
+inside a type, Yul expression or statement, Core expression, pattern, or Core
+statement to belong to the original source. Proofs are being lifted from the
+leaf and block parsers through the complete recursive parsers; defining these
+contracts alone is not treated as proof that every complete parser result
+satisfies them.
+
+The remaining proof work includes that recursive lifting, validity of every
 parser-generated diagnostic, provenance and unreachability of grammar
 invariant failures, parser resource bounds, and soundness against a
 declarative grammar.

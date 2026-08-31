@@ -65,15 +65,20 @@ exceptional fuel result.
 Parser preflight accepts exactly the lexer results satisfying that contract,
 and every public lexer result passes preflight. Any public parser error
 therefore occurs only after successful lexing and preflight. Parser state,
-primitive consumers, carrier-preservation rules, and cursor/order laws support
-compositional proofs for qualified names, module paths, selector and operator
-names, literals and primitive parsers, generic delimited lists, pragma
-declarations, Yul name and literal leaves, and derive targets.
+primitive consumers, carrier-preservation rules, and cursor/order laws now
+support compositional proofs for names, selectors, literals, delimiters,
+pragmas, derive attributes, Core blocks, four recursive type forms, and Yul
+expression and block recovery paths.
 
-The remaining proof boundary covers deeper recursive AST forms,
-parser-generated diagnostic validity, provenance and unreachability of grammar
-invariant failures, parser resource bounds, and parser success soundness
-against a declarative grammar.
+The recursive validity contracts for types, Yul syntax, Core expressions,
+patterns, and Core statements are defined independently of parser control
+flow. The active proof work connects the remaining type branches and complete
+fuel-bounded type, Yul, expression, pattern, and statement parsers to those
+contracts.
+
+The remaining proof boundary also includes parser-generated diagnostic
+validity, provenance and unreachability of grammar invariant failures, parser
+resource bounds, and parser success soundness against a declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the
