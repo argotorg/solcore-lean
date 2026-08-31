@@ -1,8 +1,7 @@
 # Canonical syntax implementation plan
 
-This plan covers the active source frontend. ADR-0153 replaces the old parser
-target with the syntax implemented by `solcore-rs` PR #20 at commit
-`18fd9f75d290df0070e21ee56e0a5691f232596f`.
+This plan covers the active source frontend. The old parser target is replaced
+by the stabilized canonical syntax introduced by `solcore-rs` PR #20.
 
 ## Target and compatibility
 
@@ -78,7 +77,8 @@ parser supplies its validity contract; constructors and fallback entries have
 the corresponding conditional guarantee for non-tail bodies. Individual trait
 predicates have reached the same boundary. Named parameters preserve provenance
 through recovery, and their delimited function-parameter list has the complete
-compositional boundary.
+compositional boundary. Public lambda parameters also have complete source,
+token-window, carrier, cursor, and starting-token contracts.
 
 The recursive validity contracts for types, Yul syntax, Core expressions,
 patterns, and Core statements are independent of parser control flow. The
@@ -86,23 +86,34 @@ proof implementation currently has the following shape:
 
 - public type and Yul parsers are complete at the compositional boundary;
 - pattern leaves, constructors, groups, tuples, comptime forms, dispatch, and
-  recovery are complete below the public fuel-indexed recursive wrapper;
+  recovery are complete. The public fuel-indexed parser lifts these contracts
+  to source-validity, token-window, carrier, cursor, and starting-token
+  guarantees under the documented all-fuel `coreExpression` assumptions;
 - established expression atoms, groups, tuples, arrays, operator helpers, and
-  the left- and non-associative layers have complete contracts;
-- conditional folding and the conditional tail preserve recursive validity,
-  token windows, carriers, and cursor order;
+  the left- and non-associative layers have complete contracts. Generic postfix
+  tail and wrapper contracts are complete structurally and for retained source,
+  and concrete `expressionAtom` parsing has token-window, carrier, cursor, and
+  starting-token contracts. Its source-validity contract remains open;
+- conditional folding, the conditional tail, and the outer conditional parser
+  have complete source-validity, token-window, carrier, cursor, and
+  starting-token contracts;
 - lambda return types and lambda-expression state/start/end behavior are
-  proved, while ordinary, comptime, and recovery lambda-parameter branches
-  retain source-valid values;
+  proved, and public lambda-parameter parsing has complete source-validity,
+  token-window, carrier, cursor, and starting-token contracts across ordinary,
+  comptime, stop-token, rewind, and recovery paths;
+- the generic unary wrapper has complete source-validity, token-window,
+  carrier, cursor, and starting-token contracts;
 - assignment/expression, `let`, return, block, `while`, `if`, and `for`
   statements are complete, including both `for` item forms and item lists; and
-- match cases and the repeated case loop are complete below default-body and
-  outer-match assembly.
+- match cases, the repeated case loop, and optional `default` parsing are
+  complete. The enclosing `match` parser has token-window, carrier, cursor, and
+  starting-token contracts, while its source-validity contract remains open.
 
-The next proof work is therefore concrete: close the postfix and unary
-expression wrappers, complete the outer conditional and lambda parsers, lift
-the shared pattern layer through public recursion, and finish default and outer
-match parsing. Remaining declarations and the complete-file parser follow.
+The next proof work is therefore concrete: prove source validity for
+`expressionAtom`, carry it through the generic postfix and unary wrappers into
+the recursive expression path, assemble complete lambda-expression validity,
+and prove source validity for the enclosing `match` parser. Remaining
+declarations and the complete-file parser follow.
 Parser-generated diagnostic validity, grammar-invariant provenance and
 unreachability, resource bounds, and success soundness against a declarative
 grammar remain part of the final boundary.
@@ -125,5 +136,5 @@ The canonical syntax slice is complete when:
 - the complete build, tests, metadata validation, and kernel audit pass.
 
 Resolution, source typing, elaboration, and end-to-end source execution are the
-next frontend milestones. They consume the syntax result without changing the
+next frontend stages. They consume the syntax result without changing the
 meaning of checked Semantic Core or Oracle v5.

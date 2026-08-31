@@ -25,12 +25,12 @@ Oracle v5. Their closed wire catalogs and strict Lean codecs are the current
 normative format definitions. Producing additional schema files is a packaging
 task, not missing executable behavior.
 
-Canonical Solcore syntax is implemented as a fresh `Solcore.Syntax` layer
-under ADR-0153. Its executable lexer and parser target `solcore-rs` PR #20 at
-commit `18fd9f75d290df0070e21ee56e0a5691f232596f` and do not reuse the Surface v1
-or Multi AST and parser definitions. Oracle v4 remains available only as a
-frozen historical compatibility interface. Formal parser proofs continue
-after the executable grammar; this does not block use of the Lean parser API.
+Canonical Solcore syntax is implemented as a fresh `Solcore.Syntax` layer. Its
+executable lexer and parser follow the stabilized syntax introduced by
+`solcore-rs` PR #20 and do not reuse the Surface v1 or Multi AST and parser
+definitions. Oracle v4 remains available only as a frozen historical
+compatibility interface. Formal parser proofs continue after the executable
+grammar; this does not block use of the Lean parser API.
 
 ## What works now
 
@@ -225,29 +225,42 @@ behavior. At the current proof boundary:
 - the public type and Yul parsers have complete source-validity, token-window,
   carrier, cursor, and starting-token contracts;
 - pattern proofs cover leaves, constructor forms, parenthesized groups and
-  tuples, comptime patterns, and the shared dispatch and recovery layer;
+  tuples, comptime patterns, dispatch, recovery, and the public fuel-indexed
+  parser. The public lift has source-validity, token-window, carrier, cursor, and
+  starting-token contracts under the documented all-fuel `coreExpression`
+  assumptions;
 - expression proofs cover the established atoms, parenthesized expressions and
   tuples, array literals, the prefix-operator scanner, binary-operator helpers,
-  and the complete left- and non-associative layers;
-- conditional-expression folding and its fuel-indexed tail preserve recursive
-  source validity as well as token-window, carrier, and cursor contracts;
+  and the complete left- and non-associative layers. The generic postfix tail
+  and wrapper have structural and source contracts. Concrete `expressionAtom`
+  parsing has token-window, carrier, cursor, and starting-token contracts, but
+  its source-validity contract remains open. The generic unary wrapper has
+  complete source-validity, token-window, carrier, cursor, and starting-token
+  contracts;
+- conditional-expression folding, its fuel-indexed tail, and the outer
+  conditional parser have complete source-validity, token-window, carrier,
+  cursor, and starting-token contracts;
 - lambda return-type parsing and the lambda expression's state, start, and body
-  endpoint contracts are complete, and the ordinary, comptime, and recovery
-  lambda-parameter branches preserve source validity;
+  endpoint contracts are complete. The public `lambdaParameter` parser has
+  complete source-validity, token-window, carrier, cursor, and starting-token
+  contracts across ordinary, comptime, stop-token, rewind, and recovery paths;
 - assignment/expression, `let`, return, block, `while`, `if`, and `for`
   statements have complete source-validity and state contracts, including both
   kinds of `for` header item and their comma-separated lists; and
 - individual `match` cases and the repeated case list preserve their retained
   patterns, bodies, source ranges, token windows, carriers, and cursor order.
+  Optional `default` parsing has its complete compositional contract; the
+  enclosing `match` parser has token-window, carrier, cursor, and starting-token
+  contracts, while its source-validity contract remains open.
 
-The remaining recursive boundary is explicit. The postfix layer, the unary
-expression wrapper, and the outer conditional-expression parser are not yet
-closed. Lambda precursors have not yet been assembled into complete lambda
-expression validity. The common pattern layer still needs lifting through the
-public fuel-indexed recursive pattern parser. Match default-body handling and
-the enclosing `match` statement remain open. Other declaration parsers and the
-complete-file parser also remain active work; defining a validity predicate is
-not treated as proof that a parser satisfies it.
+The remaining recursive boundary is explicit. Concrete `expressionAtom`
+source validity is still needed before source validity can be carried through
+the already-proved generic postfix and unary wrappers into the final recursive
+expression path. Lambda precursors have not yet been assembled into complete
+lambda-expression validity. The enclosing `match` statement still needs its
+source-validity proof. Other declaration parsers and the complete-file parser
+also remain active work; defining a validity predicate is not treated as proof
+that a parser satisfies it.
 
 Beyond those parser-specific gaps, remaining work includes validity of every
 parser-generated diagnostic, provenance and unreachability of grammar
