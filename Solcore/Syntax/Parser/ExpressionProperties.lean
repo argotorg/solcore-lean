@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Expression
+import Solcore.Syntax.Parser.Expression.AtomProperties
 import Solcore.Syntax.CollectionValidity
 import Solcore.Syntax.ExpressionValidity
 
@@ -1967,6 +1968,62 @@ theorem cursorMonotoneOnSuccess
   intro input value next parsed
   exact Nat.le_of_lt (contract.cursorLtOnSuccess parsed)
 
+/-- Assemble the concrete recoverable atom contract. -/
+theorem atom
+    (statementValid : SourceFile → Statement → Prop)
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedContract : ExpressionContract statementValid nested)
+    (blockValid : block.ValidFor (Block.ValidFor statementValid))
+    (blockWindow : Parser.PreservesTokenWindow block)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block)
+    (blockStarts : Parser.StartsAtCurrentTokenOnSuccess block (·.span)) :
+    ExpressionContract statementValid (expressionAtom nested block) := {
+  validFor := ExpressionAtomInternals.expressionAtom_validFor nested block
+    statementValid nestedContract.validFor nestedContract.preservesTokenWindow
+      blockValid blockStarts blockWindow
+  preservesTokenWindow :=
+    ExpressionAtomInternals.expressionAtom_preservesTokenWindow nested block
+      nestedContract.preservesTokenWindow blockWindow
+  cursorLtOnSuccess := fun parsed =>
+    ExpressionAtomInternals.expressionAtom_cursor_lt_onSuccess nested block
+      nestedContract.cursorMonotoneOnSuccess blockCursor parsed
+  startsAtCurrentTokenOnSuccess :=
+    ExpressionAtomInternals.expressionAtom_startsAtCurrentTokenOnSuccess
+      nested block nestedContract.preservesTokenWindow blockWindow
+}
+
+/-- Assemble concrete atom and postfix parsing into one expression contract. -/
+theorem concretePostfix
+    (statementValid : SourceFile → Statement → Prop)
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedContract : ExpressionContract statementValid nested)
+    (blockValid : block.ValidFor (Block.ValidFor statementValid))
+    (blockWindow : Parser.PreservesTokenWindow block)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block)
+    (blockStarts : Parser.StartsAtCurrentTokenOnSuccess block (·.span)) :
+    ExpressionContract statementValid
+      (expressionPostfix nested block) := by
+  let atomContract := atom statementValid nested block nestedContract
+    blockValid blockWindow blockCursor blockStarts
+  exact {
+    validFor := ExpressionAtomInternals.expressionPostfix_validFor nested block
+      statementValid atomContract.validFor
+        atomContract.preservesTokensOnSuccess atomContract.cursorLtOnSuccess
+          atomContract.startsAtCurrentTokenOnSuccess nestedContract.validFor
+            nestedContract.preservesTokensOnSuccess
+              nestedContract.cursorMonotoneOnSuccess
+    preservesTokenWindow :=
+      ExpressionAtomInternals.expressionPostfix_preservesTokenWindow
+        nested block atomContract.preservesTokenWindow
+          nestedContract.preservesTokenWindow
+    cursorLtOnSuccess := fun parsed =>
+      ExpressionAtomInternals.expressionPostfix_cursor_lt_onSuccess
+        nested block nestedContract.cursorMonotoneOnSuccess blockCursor parsed
+    startsAtCurrentTokenOnSuccess :=
+      ExpressionAtomInternals.expressionPostfix_startsAtCurrentTokenOnSuccess
+        nested block atomContract.startsAtCurrentTokenOnSuccess
+  }
+
 /-- Lift a postfix contract through prefix unary parsing. -/
 theorem unary
     (statementValid : SourceFile → Statement → Prop)
@@ -2085,6 +2142,21 @@ theorem expressionLayer_contract
     ExpressionContract.leftAssociative logicalAndContract 0
   simpa only [expressionLayer] using
     ExpressionContract.conditional nestedContract logicalOrContract
+
+/-- Build the complete concrete expression layer from recursive and block
+contracts, including recoverable atoms and postfix syntax. -/
+theorem expressionLayer_concrete_contract
+    (nested : Parser Expr) (block : Parser Block)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedContract : ExpressionContract statementValid nested)
+    (blockValid : block.ValidFor (Block.ValidFor statementValid))
+    (blockWindow : Parser.PreservesTokenWindow block)
+    (blockCursor : Parser.CursorMonotoneOnSuccess block)
+    (blockStarts : Parser.StartsAtCurrentTokenOnSuccess block (·.span)) :
+    ExpressionContract statementValid (expressionLayer nested block) :=
+  expressionLayer_contract nested block statementValid nestedContract
+    (ExpressionContract.concretePostfix statementValid nested block nestedContract
+      blockValid blockWindow blockCursor blockStarts)
 
 theorem expressionLayer_validFor
     (nested : Parser Expr) (block : Parser Block)
