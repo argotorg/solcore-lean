@@ -11,6 +11,7 @@ import Solcore.Test.SyntaxParserExports
 import Solcore.Test.SyntaxParserModules
 import Solcore.Test.SyntaxParserRecovery
 import Solcore.Test.SyntaxParserSignatures
+import Solcore.Test.SyntaxParserStatements
 import Solcore.Test.SyntaxParserTerms
 import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTypes
@@ -5055,6 +5056,7 @@ def run : IO Unit := do
   testSyntaxParserTypes
   testSyntaxParserRecovery
   testSyntaxParserSignatures
+  testSyntaxParserStatements
   testSyntaxParserTerms
   testSyntaxParserTrivia
   testProfile
