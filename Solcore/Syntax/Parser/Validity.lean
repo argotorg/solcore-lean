@@ -68,6 +68,11 @@ def ValidFor {α : Type} (parser : Parser α)
     (valueValid : SourceFile → α → Prop) : Prop :=
   ∀ input, input.ValidFor → (parser input).ValidFor input valueValid
 
+/-- Successful parsing preserves the immutable token carrier. -/
+def PreservesTokensOnSuccess {α : Type} (parser : Parser α) : Prop :=
+  ∀ input value next, parser input = .ok value next →
+    next.tokens = input.tokens
+
 /-- Build a parser contract from its ordinary success and rejection branches. -/
 theorem validFor_of_ok_reject {α : Type} (parser : Parser α)
     (valueValid : SourceFile → α → Prop)

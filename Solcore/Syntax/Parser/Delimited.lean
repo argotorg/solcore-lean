@@ -15,19 +15,6 @@ def ValidFor {α : Type} (elementValid : SourceFile → α → Prop)
 
 end DelimitedList
 
-namespace Parser
-
-namespace Parser
-
-/-- Successful parsing preserves the immutable token carrier. -/
-def PreservesTokensOnSuccess {α : Type} (parser : Parser α) : Prop :=
-  ∀ input value next, parser input = .ok value next →
-    next.tokens = input.tokens
-
-end Parser
-
-end Parser
-
 end Solcore.Syntax
 
 namespace Solcore.Syntax.Parser
