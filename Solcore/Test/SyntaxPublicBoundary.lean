@@ -17,6 +17,14 @@ private def publicSyntaxSource : SourceFile := {
   content := "type PublicWord = word;"
 }
 
+private def malformedPublicSyntaxSource : SourceFile := {
+  id := {
+    origin := .main
+    path := "public-syntax-malformed.sol"
+  }
+  content := "function bad(x: ) {}"
+}
+
 private def assertTrue (condition : Bool) (label : String) : IO Unit := do
   unless condition do
     throw (IO.userError s!"{label}: expected true")
@@ -29,6 +37,7 @@ def testSyntaxPublicBoundary : IO Unit := do
   | .error error => throw (IO.userError
       s!"public parser invariant failed: {reprStr error}")
   | .ok output =>
+      assertTrue output.isDiagnosticFree "public diagnostic-free result"
       unless output.lexicalDiagnostics.isEmpty do
         throw (IO.userError
           s!"unexpected lexical diagnostics: {reprStr output.lexicalDiagnostics}")
@@ -42,5 +51,15 @@ def testSyntaxPublicBoundary : IO Unit := do
             "public canonical AST"
       | items => throw (IO.userError
           s!"unexpected public AST: {reprStr items}")
+  match Syntax.Parser.parse malformedPublicSyntaxSource with
+  | .error error => throw (IO.userError
+      s!"malformed public parser invariant failed: {reprStr error}")
+  | .ok output =>
+      assertTrue (!output.isDiagnosticFree)
+        "malformed public diagnostic result"
+
+example (output : ParseOutput) :
+    output.isDiagnosticFree = true ↔ output.DiagnosticFree :=
+  output.isDiagnosticFree_eq_true_iff
 
 end Tests
