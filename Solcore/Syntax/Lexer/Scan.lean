@@ -65,6 +65,9 @@ inductive StringScan where
       (escape : Option Char)
       (tokenEndByte : Nat)
       (remaining : List Char)
+  | invalidPrefix
+      (endByte : Nat)
+      (remaining : List Char)
   | unterminated
   deriving Repr, BEq
 
@@ -84,6 +87,8 @@ def scanString :
             (String.ofList decodedRev.reverse)
             rest
   | _, '\\' :: [], _, _, _ => .unterminated
+  | cursor, '\\' :: characters@('\n' :: _), _, _, _ =>
+      .invalidPrefix (cursor + 1) characters
   | cursor, '\\' :: escaped :: rest, spellingRev, decodedRev, invalid =>
       let decoded? :=
         match escaped with
