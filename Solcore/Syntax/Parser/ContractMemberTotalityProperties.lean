@@ -1,6 +1,7 @@
 import Solcore.Syntax.Parser.ContractBodyTotalityProperties
 import Solcore.Syntax.Parser.DeriveAttributeTotalityProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.TypeAliasTotalityProperties
 
 /-! Conditional totality for canonical contract-member dispatch. -/
 
@@ -25,16 +26,15 @@ theorem mapMember_invariantFreeOnValid {alpha : Type}
       unfold mapMember
       simp only [bind, result]⟩
 
-/-- The six declaration parsers selected by contract-member dispatch. -/
+/-- The five declaration parsers selected by contract-member dispatch. -/
 structure ContractMemberTotalityContract : Prop where
   field : Parser.InvariantFreeOnValid (contractField expression)
   function : Parser.InvariantFreeOnValid (functionDecl .contract)
   constructor : Parser.InvariantFreeOnValid constructorDecl
   fallback : Parser.InvariantFreeOnValid fallbackDecl
-  typeAlias : Parser.InvariantFreeOnValid typeAlias
   enum : Parser.InvariantFreeOnValid (enumDecl none)
 
-/-- The state-selected plain member parser inherits exactly those six inputs. -/
+/-- The state-selected plain member parser inherits exactly those five inputs. -/
 theorem contractMemberParser_invariantFreeOnValid
     (contract : ContractMemberTotalityContract) (state : State) :
     Parser.InvariantFreeOnValid (contractMemberParser state) := by
@@ -51,7 +51,7 @@ theorem contractMemberParser_invariantFreeOnValid
   · exact mapMember_invariantFreeOnValid _ wrapFallback contract.fallback
   split
   · exact mapMember_invariantFreeOnValid _ wrapContractTypeAlias
-      contract.typeAlias
+      typeAlias_invariantFreeOnValid
   split
   · exact mapMember_invariantFreeOnValid _ wrapContractEnum contract.enum
   · exact Parser.rejectAt_invariantFreeOnValid
@@ -75,7 +75,7 @@ theorem attachContractDerive_invariantFreeOnValid
   cases value <;> left <;>
     simp [attachContractDerive, emitDiagnostic, modifyState, bind, pure]
 
-/-- Derive-aware member dispatch inherits only the same six branch inputs. -/
+/-- Derive-aware member dispatch inherits only the same five branch inputs. -/
 theorem contractMemberWithAttribute_invariantFreeOnValid
     (contract : ContractMemberTotalityContract) :
     Parser.InvariantFreeOnValid contractMemberWithAttribute := by
@@ -113,7 +113,7 @@ theorem contractMemberWithAttribute_invariantFreeOnValid
   · simpa [attributed] using
       contractMemberCore_invariantFreeOnValid contract input inputValid
 
-/-- No invariant can escape derive-aware member parsing under six inputs. -/
+/-- No invariant can escape derive-aware member parsing under five inputs. -/
 theorem contractMemberWithAttribute_ne_invariant
     (contract : ContractMemberTotalityContract)
     (input : State) (inputValid : input.ValidFor)
@@ -122,14 +122,14 @@ theorem contractMemberWithAttribute_ne_invariant
   (contractMemberWithAttribute_invariantFreeOnValid contract).ne_invariant
     input inputValid error
 
-/-- Convert the six-field contract to the contract-body loop premise. -/
+/-- Convert the five-field contract to the contract-body loop premise. -/
 theorem contractMemberInvariantFree_of_totalityContract
     (contract : ContractMemberTotalityContract) :
     ContractMemberInvariantFreeOnValid := by
   intro input inputValid error
   exact contractMemberWithAttribute_ne_invariant contract input inputValid error
 
-/-- Contract-body parsing is ordinary under exactly the six member inputs. -/
+/-- Contract-body parsing is ordinary under exactly the five member inputs. -/
 theorem contractBody_ordinary_of_memberTotalityContract
     (contract : ContractMemberTotalityContract)
     (input : State) (inputValid : input.ValidFor) :
@@ -138,7 +138,7 @@ theorem contractBody_ordinary_of_memberTotalityContract
   contractBody_ordinary
     (contractMemberInvariantFree_of_totalityContract contract) input inputValid
 
-/-- Contract-body invariants are unreachable under the same six inputs. -/
+/-- Contract-body invariants are unreachable under the same five inputs. -/
 theorem contractBody_ne_invariant_of_memberTotalityContract
     (contract : ContractMemberTotalityContract)
     (input : State) (inputValid : input.ValidFor)

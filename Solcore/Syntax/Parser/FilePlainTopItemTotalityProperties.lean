@@ -2,6 +2,7 @@ import Solcore.Syntax.Parser.FilePlainTopItemProperties
 import Solcore.Syntax.Parser.ImportTotalityProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
 import Solcore.Syntax.Parser.PragmaTotalityProperties
+import Solcore.Syntax.Parser.TypeAliasTotalityProperties
 
 /-! Conditional invariant freedom for top-level declaration dispatch. -/
 
@@ -24,10 +25,9 @@ theorem mapTopItem_invariantFreeOnValid {alpha : Type}
       unfold mapTopItem
       simp only [result]⟩
 
-/-- The seven declaration parsers whose totality remains an explicit input. -/
+/-- The six declaration parsers whose totality remains an explicit input. -/
 structure PlainTopItemTotalityContract : Prop where
   exportDecl : Parser.InvariantFreeOnValid exportDecl
-  typeAlias : Parser.InvariantFreeOnValid typeAlias
   moduleFunction : Parser.InvariantFreeOnValid (functionDecl .module)
   enumDecl : Parser.InvariantFreeOnValid (enumDecl none)
   traitDecl : Parser.InvariantFreeOnValid traitDecl
@@ -55,7 +55,7 @@ theorem plainTopItem_invariantFreeOnValid
           input inputValid
       · split
         · exact (mapTopItem_invariantFreeOnValid wrapTypeAlias
-            contract.typeAlias) input inputValid
+            typeAlias_invariantFreeOnValid) input inputValid
         · split
           · exact (mapTopItem_invariantFreeOnValid wrapFunction
               contract.moduleFunction) input inputValid

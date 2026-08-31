@@ -2,6 +2,7 @@ import Solcore.Syntax.Parser.InvariantFreeProperties
 import Solcore.Syntax.Parser.PrimitiveTotalityProperties
 import Solcore.Syntax.Parser.TypeAliasProperties
 import Solcore.Syntax.Parser.TypeAliasRecoveryTotalityProperties
+import Solcore.Syntax.Parser.TypeFuelTotalityProperties
 
 /-! Conditional totality for complete canonical type aliases. -/
 
@@ -70,7 +71,7 @@ theorem parseAliasValue_ne_invariant
 end TypeAliasInternals
 
 /-- A complete type alias is total once recursive type parsing is total. -/
-theorem typeAlias_invariantFreeOnValid
+theorem typeAlias_invariantFreeOnValid_of_type
     (typeFree : Parser.InvariantFreeOnValid typeExpr) :
     Parser.InvariantFreeOnValid typeAlias := by
   unfold typeAlias
@@ -104,12 +105,23 @@ theorem typeAlias_invariantFreeOnValid
   } : TypeAliasDecl)
 
 /-- Complete type aliases cannot expose an invariant under the type premise. -/
-theorem typeAlias_ne_invariant
+theorem typeAlias_ne_invariant_of_type
     (typeFree : Parser.InvariantFreeOnValid typeExpr)
     (input : State) (inputValid : input.ValidFor)
     (error : ParserInvariantError) :
     typeAlias input ≠ .invariant error :=
-  (typeAlias_invariantFreeOnValid typeFree).ne_invariant
+  (typeAlias_invariantFreeOnValid_of_type typeFree).ne_invariant
     input inputValid error
+
+/-- Complete canonical type aliases are invariant-free on valid input. -/
+theorem typeAlias_invariantFreeOnValid :
+    Parser.InvariantFreeOnValid typeAlias :=
+  typeAlias_invariantFreeOnValid_of_type typeExpr_invariantFreeOnValid
+
+theorem typeAlias_ne_invariant
+    (input : State) (inputValid : input.ValidFor)
+    (error : ParserInvariantError) :
+    typeAlias input ≠ .invariant error :=
+  typeAlias_invariantFreeOnValid.ne_invariant input inputValid error
 
 end Solcore.Syntax.Parser
