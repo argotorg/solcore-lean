@@ -1,0 +1,11 @@
+import Solcore.Syntax.Parser.LambdaParameterCoreTotalityProperties
+set_option autoImplicit false
+namespace Solcore.Test.SyntaxParserLambdaParameterCoreTotalityProperties
+open Solcore.Syntax.Parser
+example := @LambdaParameterInternals.lambdaParameterCore_invariantFreeOnValid
+example := @LambdaParameterInternals.lambdaParameterCore_cursor_lt_onSuccess
+example := @lambdaParameter_invariantFreeOnValid
+example := @lambdaParameter_ne_invariant
+example := @lambdaParameter_cursor_lt_onSuccess
+example := @lambdaParameter_elementTotalityContract
+end Solcore.Test.SyntaxParserLambdaParameterCoreTotalityProperties
