@@ -89,6 +89,19 @@ priority explicit. Publication can freeze display text separately if needed.
 The new implementation is built as a fresh source layer rather than by adding
 constructors to the frozen Surface v1 algebra.
 
+The AST is a parsed-syntax layer. It represents recovery nodes that the pinned
+parser deliberately returns after emitting a diagnostic; grammar validity,
+match arity, and other contextual facts belong to a subsequent well-formedness
+layer. Valid productions may still use nonempty collections where parse
+failure prevents construction altogether.
+
+Lean retains written distinctions that the Rust implementation sometimes
+lowers immediately, including grouping, `while`, compound assignment, and
+explicit Yul return clauses. Core and inline-Yul literals are separate because
+only Yul has boolean literal nodes; Core `true` and `false` remain
+identifier-shaped syntax. Literal strings retain their raw quoted spelling and
+are decoded only by a later semantic phase.
+
 1. Define source locations and a closed token catalog.
 2. Define the complete source-preserving AST independently of Semantic Core.
 3. Implement a total lexer with explicit lexical diagnostics.
