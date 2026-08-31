@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.File
 import Solcore.Syntax.Parser.DiagnosticFilter
+import Solcore.Syntax.Parser.DeriveCarrierProperties
 import Solcore.Syntax.Parser.Preflight
 import Solcore.Syntax.Parser.Validity
 import Solcore.Syntax.Parser.LiteralProperties
