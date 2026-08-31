@@ -228,6 +228,51 @@ theorem traitBody_validFor : traitBody.ValidFor TraitBody.ValidFor := by
         input.cursor openingReply.2.1 openingAtNext (by simp [openingShape.2])
           (by simp [List.ValidFor])).of_file_eq openingReply.2.2
 
+/-- The method loop retains the opening brace as the body left edge. -/
+private theorem traitMethods_preservesOpeningStartOnSuccess
+    (opening : Token) : ∀ fuel methodsRev input body final,
+    traitMethods opening fuel methodsRev input = .ok body final →
+      body.span.startByte = opening.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro methodsRev input body final parsed
+      unfold traitMethods at parsed
+      split at parsed
+      · unfold closeTraitBody at parsed
+        rcases traitBind_ok_components parsed with
+          ⟨closing, afterClosing, closingResult, finished⟩
+        cases finished
+        rfl
+      · split at parsed
+        · cases methodResult : traitMethod input with
+          | invariant error => simp [methodResult] at parsed
+          | reject failure rejected => simp [methodResult] at parsed
+          | ok method next =>
+              simp only [methodResult] at parsed
+              split at parsed
+              · exact inductionHypothesis (method :: methodsRev) next body
+                  final parsed
+              · contradiction
+        · simp [rejectAt] at parsed
+
+/-- A complete trait body starts at its opening brace token. -/
+theorem traitBody_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess traitBody (·.span) := by
+  intro input body final parsed
+  unfold traitBody at parsed
+  cases openingResult : symbol .leftBrace .topItem input with
+  | invariant error => simp [openingResult] at parsed
+  | reject failure rejected => simp [openingResult] at parsed
+  | ok opening next =>
+      simp only [openingResult] at parsed
+      have openingShape := symbol_ok_state_shape .leftBrace .topItem
+        openingResult
+      have retained := traitMethods_preservesOpeningStartOnSuccess opening
+        (next.remainingCount + 1) [] next body final parsed
+      exact ⟨opening, openingShape.1, retained.symm⟩
+
 private theorem closeTraitBody_preservesTokenWindow (opening : Token)
     (methodsRev : List TraitMethod) :
     Parser.PreservesTokenWindow (closeTraitBody opening methodsRev) := by
@@ -345,6 +390,122 @@ theorem traitBody_cursorMonotoneOnSuccess :
   | invariant error => simp [openingResult] at result
 
 end TraitInternals
+
+/-- A complete trait declaration retains only ranges from its source. -/
+theorem traitDecl_validFor : traitDecl.ValidFor TraitDecl.ValidFor := by
+  intro input inputValid
+  have weak : traitDecl.ValidFor (fun _ _ => True) := by
+    unfold traitDecl
+    apply Parser.bind_validFor (contextual_validFor .trait .topItem)
+    intro marker
+    apply Parser.bind_validFor (identifier_validFor .topItem)
+    intro name
+    apply Parser.bind_validFor genericParameters_validFor
+    intro genericParameters
+    apply Parser.bind_validFor whereClause_validFor
+    intro parsedWhereClause
+    apply Parser.bind_validFor TraitInternals.traitBody_validFor
+    intro body
+    exact Parser.pure_validFor _ _ (fun _ => trivial)
+  have weakResult := weak input inputValid
+  cases parsed : traitDecl input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok declaration final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold traitDecl at stages
+      rcases traitBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases traitBind_ok_components rest with
+        ⟨name, afterName, nameResult, rest⟩
+      rcases traitBind_ok_components rest with
+        ⟨genericParameters, afterParameters, parametersResult, rest⟩
+      rcases traitBind_ok_components rest with
+        ⟨parsedWhereClause, afterWhere, whereResult, rest⟩
+      rcases traitBind_ok_components rest with
+        ⟨body, afterBody, bodyResult, finished⟩
+      have markerReply := contextual_validFor .trait .topItem input inputValid
+      rw [markerResult] at markerReply
+      have nameReply := identifier_validFor .topItem afterMarker markerReply.2.1
+      rw [nameResult] at nameReply
+      have parametersReply := genericParameters_validFor afterName nameReply.2.1
+      rw [parametersResult] at parametersReply
+      have whereReply := whereClause_validFor afterParameters
+        parametersReply.2.1
+      rw [whereResult] at whereReply
+      have bodyReply := TraitInternals.traitBody_validFor afterWhere
+        whereReply.2.1
+      rw [bodyResult] at bodyReply
+      have markerValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerReply.1
+      have nameValid : name.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, markerReply.2.2] using nameReply.1
+      have parametersValid : NonemptyDelimitedList.ValidFor Located.ValidFor
+          input.file genericParameters := by
+        simpa [nameReply.2.2, markerReply.2.2] using parametersReply.1
+      have whereValid : Option.ValidFor WhereClause.ValidFor input.file
+          parsedWhereClause := by
+        simpa [parametersReply.2.2, nameReply.2.2, markerReply.2.2] using
+          whereReply.1
+      have bodyValid : TraitInternals.TraitBody.ValidFor input.file body := by
+        simpa [whereReply.2.2, parametersReply.2.2, nameReply.2.2,
+          markerReply.2.2] using bodyReply.1
+      rcases contextual_startsAtCurrentTokenOnSuccess .trait .topItem input
+          marker afterMarker markerResult with
+        ⟨markerToken, markerFound, markerStart⟩
+      rcases TraitInternals.traitBody_startsAtCurrentTokenOnSuccess afterWhere
+          body afterBody bodyResult with
+        ⟨opening, openingFound, bodyStart⟩
+      have markerAt := State.getElem?_eq_some_of_peek?_eq_some markerFound
+      have openingAtAfter :=
+        State.getElem?_eq_some_of_peek?_eq_some openingFound
+      have markerTokens := contextual_preservesTokensOnSuccess .trait .topItem
+        input marker afterMarker markerResult
+      have nameTokens := identifier_preservesTokensOnSuccess .topItem
+        afterMarker name afterName nameResult
+      have parametersTokens := genericParameters_preservesTokensOnSuccess
+        afterName genericParameters afterParameters parametersResult
+      have whereTokens := whereClause_preservesTokensOnSuccess afterParameters
+        parsedWhereClause afterWhere whereResult
+      have openingAt : input.tokens[afterWhere.cursor]? = some opening := by
+        simpa [whereTokens, parametersTokens, nameTokens, markerTokens] using
+          openingAtAfter
+      have markerProgress : input.cursor < afterMarker.cursor := by
+        exact acceptToken_cursor_lt_onSuccess (.contextual .trait) .topItem
+          (·.isContextual .trait) markerResult
+      have progress : input.cursor < afterWhere.cursor :=
+        Nat.lt_of_lt_of_le markerProgress
+          (Nat.le_trans (identifier_cursorMonotoneOnSuccess .topItem
+            afterMarker name afterName nameResult)
+            (Nat.le_trans (genericParameters_cursorMonotoneOnSuccess afterName
+              genericParameters afterParameters parametersResult)
+              (whereClause_cursorMonotoneOnSuccess afterParameters
+                parsedWhereClause afterWhere whereResult)))
+      have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+        markerAt openingAt progress
+      have markerTokenValid := inputValid.peek?_span_validFor markerFound
+      have ordered : marker.span.startByte ≤ body.span.endByte := by
+        calc
+          marker.span.startByte = markerToken.span.startByte := markerStart.symm
+          _ ≤ markerToken.span.endByte := markerTokenValid.2.1
+          _ ≤ opening.span.startByte := separated
+          _ = body.span.startByte := bodyStart
+          _ ≤ body.span.endByte := bodyValid.1.2.1
+      have outerValid := SourceSpan.cover_validFor markerValid bodyValid.1 ordered
+      cases finished
+      refine ⟨⟨outerValid, nameValid, parametersValid.1,
+        parametersValid.2, ?_, bodyValid.1, bodyValid.2⟩,
+          weakResult.2.1, weakResult.2.2⟩
+      intro clause member
+      cases parsedWhereClause with
+      | none => simp at member
+      | some retained =>
+          simp at member
+          subst clause
+          simpa [Option.ValidFor] using whereValid
 
 /-- Complete trait declarations preserve ordinary token windows. -/
 theorem traitDecl_preservesTokenWindow
