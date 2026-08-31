@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Export
+import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.Function
 import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.Pragma
@@ -40,6 +41,12 @@ private def wrapFunction (declaration : FunctionDecl) : TopItem := {
   value := .function declaration
 }
 
+private def wrapEnum (declaration : EnumDecl) : TopItem := {
+  span := declaration.span
+  leadingComments := []
+  value := .enum declaration
+}
+
 /-- Parse the top-level forms implemented by the current vertical slice. -/
 private def topItem : Parser TopItem := fun state =>
   if isKeyword state .importKw then
@@ -65,6 +72,11 @@ private def topItem : Parser TopItem := fun state =>
   else if isKeyword state .functionKw then
     match functionDecl .module state with
     | .ok declaration next => .ok (wrapFunction declaration) next
+    | .reject failure next => .reject failure next
+    | .invariant error => .invariant error
+  else if isContextual state .enum then
+    match enumDecl none state with
+    | .ok declaration next => .ok (wrapEnum declaration) next
     | .reject failure next => .reject failure next
     | .invariant error => .invariant error
   else
