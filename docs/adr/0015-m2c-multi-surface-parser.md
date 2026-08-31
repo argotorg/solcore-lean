@@ -3,6 +3,8 @@
 - Status: Accepted
 - Decision date: 2026-08-18
 - Scope: M2c internal multi-module Surface lexer and parser
+- Current applicability: Frozen old-grammar reference; ADR-0153 defines the
+  active syntax implementation.
 
 ## Reader summary / Current implementation
 
@@ -17,10 +19,10 @@
 - **Not yet implemented:** The complete fast parser, nonterminal prediction and
   completion, contextual guards, root selection, exact equality with the chart
   reference, canonical six-file certificates, and publication are absent.
-- **Development status:** ADR-0018 freezes this grammar as an internal
-  reference and pauses the remaining fast parser, canonical-file gate,
-  identity, and resolver work while Semantic Core vNext is developed.
-- **Reader guidance:** Use the frontend freeze plan for current status. The
+- **Development status:** This grammar remains an internal historical
+  reference. Its remaining fast parser, canonical-file gate, identity, and
+  resolver work are not targets of the ADR-0153 replacement.
+- **Reader guidance:** Use the canonical syntax plan for current status. The
   remainder of this ADR is the detailed technical reference for the frozen
   grammar and proof boundary.
 

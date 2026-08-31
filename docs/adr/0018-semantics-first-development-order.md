@@ -1,6 +1,6 @@
 # ADR-0018: Semantics-first development order
 
-- Status: Accepted
+- Status: Superseded by ADR-0153
 - Decision date: 2026-08-27
 - Scope: repository development order and internal version boundaries
 

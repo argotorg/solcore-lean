@@ -3,6 +3,8 @@
 - Status: Accepted
 - Decision date: 2026-08-18
 - Scope: M2c workspace identity kernel
+- Current applicability: Historical workspace kernel. Its identity ideas do
+  not automatically constrain the fresh ADR-0153 syntax boundary.
 
 ## Reader summary / Current implementation
 

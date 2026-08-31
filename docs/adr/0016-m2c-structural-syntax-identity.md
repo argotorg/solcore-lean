@@ -1,6 +1,6 @@
 # ADR-0016: M2c structural syntax identity
 
-- Status: Accepted
+- Status: Superseded by ADR-0153
 - Decision date: 2026-08-18
 - Scope: M2c parsed-syntax identity and address certification
 
@@ -10,22 +10,21 @@
   module-rooted structural address; derive certified module-reference sites,
   virtual scope identities, canonical indices, selection, and finite measures
   without using spans or compiler allocation identity.
-- **Current implementation:** The ADR is Accepted, so implementation is
-  authorized against the frozen ADR-0015 boundary. No Structural identity
-  modules are currently present in Solcore; implementation has not started
-  and is paused by ADR-0018.
+- **Current implementation:** No Structural identity modules were implemented.
+  This design addresses the frozen ADR-0015 AST and is not carried into the
+  canonical frontend automatically.
 - **Not yet implemented:** `prepareGraphModule`, structural selection and
   inventories, `CertifiedModuleIndex`, identity lifting, scope/owner tables,
   primary-span proofs, and the required traversal and injectivity audits.
-  ADR-0015 now produces CertifiedParsedModule; the remaining blocker is the
-  deliberate semantics-first development freeze.
+  ADR-0015 produces CertifiedParsedModule, but these additions are no longer
+  planned for that historical AST.
 - **Suggested reading:** Read “Dependency and frozen boundaries”, “One absolute
   address scheme”, and “Exact direct-child inventory” first; then read
   “Virtual lexical scopes”, “Construction boundary and diagnostics”, and
   “Required proof boundary”. The long role tables are reference material.
 
-The remainder of this ADR is a technical reference. For the current
-development priority and pause condition, read the frontend freeze plan.
+The remainder of this ADR is a technical reference for the old Multi AST. For
+the current implementation order, read the canonical syntax plan.
 
 ## Context
 

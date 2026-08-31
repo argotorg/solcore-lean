@@ -3,6 +3,8 @@
 - Status: Accepted
 - Decision date: 2026-07-23
 - Scope: M2 frontend
+- Current applicability: Frozen Surface v1 history; ADR-0153 defines the
+  canonical replacement syntax.
 
 ## Reader summary / Current implementation
 

@@ -3,6 +3,8 @@
 - Status: Accepted
 - Decision date: 2026-08-18
 - Scope: M2b Surface parser publication
+- Current applicability: Frozen Oracle v4 compatibility; this is not the
+  canonical syntax selected by ADR-0153.
 
 ## Reader summary / Current implementation
 

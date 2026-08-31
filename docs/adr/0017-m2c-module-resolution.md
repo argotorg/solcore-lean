@@ -1,19 +1,18 @@
 # ADR-0017: M2c module and lexical name resolution
 
-- Status: Proposed
+- Status: Superseded by ADR-0153
 - Decision date: 2026-08-18
 - Scope: M2c module graph, public interfaces, and lexical name resolution
 
 ## Reader summary / Current implementation
 
-- **Decision under review:** Specify a pure reachable-module graph, exact
+- **Historical proposal:** Specify a pure reachable-module graph, exact
   standard-bundle verification, least public-interface and candidate closure,
   lexical lookup, typed diagnostics, certificate replay, and an outer resolver
   API over ADR-0014 through ADR-0016 values.
-- **Current implementation:** None. This ADR remains Proposed; there are no
-  Foundation/Sha256, Structural identity, or Resolution modules. ADR-0015's
-  certified one-file structural boundary exists, while ADR-0016 has no code.
-  Review and implementation are paused by ADR-0018.
+- **Current implementation:** None. There are no Foundation/Sha256, Structural
+  identity, or Resolution modules for this design. ADR-0015's certified
+  one-file structural boundary remains historical, while ADR-0016 has no code.
 - **Open gates:** The production SHA-256 path and six-source resolver run must
   succeed in ordinary CI; exact `E`, `A`, `R`, strict-round, and final-atom
   counts must replace the planning estimates; independent adversarial and
@@ -23,8 +22,8 @@
   “Exact executable resource metric” and both feasibility gates. Lookup tables
   and divergence ledgers are reference sections.
 
-The remainder of this Proposed ADR is a technical design reference. It is not
-the active implementation roadmap while ADR-0018 is in force.
+The remainder is a technical design reference for the old Multi AST. It is not
+the active implementation roadmap.
 
 ## Context
 
