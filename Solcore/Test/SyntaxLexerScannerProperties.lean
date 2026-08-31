@@ -93,4 +93,22 @@ example (file : SourceFile) (startByte endByte : Nat)
     (scanQuotedString_closed_advances startByte input endByte spelling
       decoded remaining result)
 
+example (file : SourceFile) (cursor : Nat) (first : Char)
+    (remaining : List Char)
+    (suffix : CursorSuffix file cursor (first :: remaining)) :
+    let scan := scanLetterIdentifier first remaining
+    (sourceSpan file cursor
+      (cursor + scan.kind.spelling.utf8ByteSize)).ValidFor file := by
+  exact suffix.sourceSpan_validFor
+    (scanLetterIdentifier_advances cursor first remaining)
+
+example (file : SourceFile) (cursor : Nat) (first : Char)
+    (remaining : List Char)
+    (suffix : CursorSuffix file cursor (first :: remaining)) :
+    let scan := scanMarkedYulIdentifier first remaining
+    (sourceSpan file cursor
+      (cursor + scan.kind.spelling.utf8ByteSize)).ValidFor file := by
+  exact suffix.sourceSpan_validFor
+    (scanMarkedYulIdentifier_advances cursor first remaining)
+
 end Tests

@@ -113,6 +113,32 @@ private def scanHyphenGroups : Nat → List Char → List Char → TextScan
       remaining
     }
 
+private theorem reverse_foldl_prepend (characters consumedRev : List Char) :
+    (characters.foldl (fun prior character => character :: prior)
+      consumedRev).reverse = consumedRev.reverse ++ characters := by
+  induction characters generalizing consumedRev with
+  | nil => simp
+  | cons character rest inductionHypothesis =>
+      simp only [List.foldl_cons]
+      rw [inductionHypothesis]
+      simp [List.reverse_cons, List.append_assoc]
+
+private theorem scanHyphenGroups_partition
+    (fuel : Nat) (consumedRev remaining : List Char) :
+    let scan := scanHyphenGroups fuel consumedRev remaining
+    consumedRev.reverse ++ remaining = scan.consumed ++ scan.remaining := by
+  fun_induction scanHyphenGroups fuel consumedRev remaining with
+  | case1 => simp
+  | case2 fuel consumedRev next rest plain nextRev _isStart
+      inductionHypothesis =>
+      dsimp only at inductionHypothesis ⊢
+      rw [← inductionHypothesis]
+      rw [reverse_foldl_prepend]
+      rw [takeWhile_partition isCoreIdentifierContinue rest]
+      simp [nextRev, List.append_assoc]
+  | case3 => simp
+  | case4 => simp
+
 /-- Scan a name whose first Unicode Letter has already been consumed. -/
 def scanLetterIdentifier (first : Char) (remaining : List Char) : IdentifierScan :=
   let plain := takeWhile isCoreIdentifierContinue remaining
@@ -146,6 +172,93 @@ def scanMarkedYulIdentifier
     kind := .yulIdentifier (String.ofList (first :: tail.consumed))
     remaining := tail.remaining
   }
+
+private theorem scanLetterIdentifier_exact (first : Char)
+    (remaining : List Char) :
+    let scan := scanLetterIdentifier first remaining
+    ∃ consumed,
+      first :: remaining = consumed ++ scan.remaining ∧
+        scan.kind.spelling = String.ofList consumed := by
+  fun_cases scanLetterIdentifier first remaining with
+  | case1 plain rest plainRemaining tail text =>
+      dsimp only
+      refine ⟨first :: plain.consumed ++ '$' :: tail.consumed, ?_, rfl⟩
+      have plainPartition :
+          remaining = plain.consumed ++ plain.remaining := by
+        simpa only [plain] using
+          takeWhile_partition isCoreIdentifierContinue remaining
+      have tailPartition : rest = tail.consumed ++ tail.remaining := by
+        simpa only [tail] using
+          takeWhile_partition isYulIdentifierContinue rest
+      rw [plainPartition]
+      rw [plainRemaining]
+      rw [tailPartition]
+      simp [List.append_assoc]
+  | case2 plain _notYul full text kind =>
+      dsimp only
+      refine ⟨full.consumed, ?_, ?_⟩
+      · calc
+          first :: remaining =
+              (first :: plain.consumed) ++ plain.remaining := by
+            have plainPartition :
+                remaining = plain.consumed ++ plain.remaining := by
+              simpa only [plain] using
+                takeWhile_partition isCoreIdentifierContinue remaining
+            rw [plainPartition]
+            simp
+          _ = full.consumed ++ full.remaining := by
+            simpa [full] using
+              scanHyphenGroups_partition (plain.remaining.length + 1)
+                (first :: plain.consumed).reverse plain.remaining
+      · dsimp only [kind]
+        split
+        · rename_i keyword recognized
+          change keyword.spelling = String.ofList full.consumed
+          exact HardKeyword.spelling_eq_of_ofString?_eq_some
+            text keyword recognized
+        · change text = String.ofList full.consumed
+          rfl
+
+private theorem scanMarkedYulIdentifier_exact (first : Char)
+    (remaining : List Char) :
+    let scan := scanMarkedYulIdentifier first remaining
+    ∃ consumed,
+      first :: remaining = consumed ++ scan.remaining ∧
+        scan.kind.spelling = String.ofList consumed := by
+  unfold scanMarkedYulIdentifier
+  dsimp only
+  refine ⟨first :: (takeWhile isYulIdentifierContinue remaining).consumed,
+    ?_, rfl⟩
+  exact congrArg (List.cons first)
+    (takeWhile_partition isYulIdentifierContinue remaining)
+
+/--
+A letter-led identifier scan consumes exactly the bytes represented by its
+returned token spelling, including Yul and hard-keyword branches.
+-/
+theorem scanLetterIdentifier_advances (cursor : Nat) (first : Char)
+    (remaining : List Char) :
+    let scan := scanLetterIdentifier first remaining
+    Advances cursor (first :: remaining)
+      (cursor + scan.kind.spelling.utf8ByteSize) scan.remaining := by
+  rcases scanLetterIdentifier_exact first remaining with
+    ⟨consumed, partition, spelling⟩
+  refine ⟨consumed, partition, ?_⟩
+  simp [byteSize, spelling]
+
+/--
+A marked Yul identifier scan consumes exactly the bytes represented by its
+returned token spelling.
+-/
+theorem scanMarkedYulIdentifier_advances (cursor : Nat) (first : Char)
+    (remaining : List Char) :
+    let scan := scanMarkedYulIdentifier first remaining
+    Advances cursor (first :: remaining)
+      (cursor + scan.kind.spelling.utf8ByteSize) scan.remaining := by
+  rcases scanMarkedYulIdentifier_exact first remaining with
+    ⟨consumed, partition, spelling⟩
+  refine ⟨consumed, partition, ?_⟩
+  simp [byteSize, spelling]
 
 /-- Recognize every two-character symbol before its one-character prefix. -/
 def multiSymbol? (first second : Char) : Option Symbol :=
