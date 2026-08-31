@@ -6,8 +6,8 @@ the syntax evolve without forcing the executable semantics to be rewritten.
 ## Layers
 
     source text
-      -> versioned Surface parser
-      -> Surface-to-Resolved adapter
+      -> canonical Syntax lexer and parser
+      -> Syntax-to-Resolved adapter
       -> resolved and typed semantic input
       -> Semantic Core
       -> contract runtime
@@ -17,13 +17,14 @@ Only some of these arrows exist today. The architecture treats each arrow as a
 separate executable transformation with its own declarative relation and proof
 boundary.
 
-### Surface
+### Source syntax
 
-Surface owns concrete spelling, tokens, comments, grouping, and source spans.
-The published Surface v1 parser is stable. The larger Multi parser is an
-internal reference for a frozen grammar.
+`Solcore.Syntax` owns the canonical concrete spelling, tokens, comments,
+grouping, recovery nodes, and source spans selected by ADR-0153. It is a fresh
+frontend rather than an extension of the old Surface AST. Surface v1 and the
+larger Multi parser remain historical compatibility references.
 
-Surface data is not semantic identity. A source span cannot stand in for a
+Source syntax is not semantic identity. A source span cannot stand in for a
 declaration, scope, variable, function, or module identity.
 
 ### Resolved input
@@ -33,8 +34,9 @@ will make scope ownership and module selection explicit. Its contract should
 depend on abstract declarations and occurrences, not on a particular parser
 implementation.
 
-No executable Resolved language exists yet. During the semantics-first phase,
-Core and runtime work must not depend on the unfinished Multi AST.
+No executable Resolved language exists yet. Its implementation follows the
+canonical parser and must not make Core or runtime semantics depend on source
+spelling.
 
 ### Semantic Core
 
@@ -883,7 +885,8 @@ Numeric indexes remain independent declarations tied to registry positions by
 finite exact laws. The thirty compatibility declarations and length-9 boundary
 describe that nine-capability milestone. ADR-0139 subsequently extends the
 same derived tables to ten entries without changing indexes 0 through 8 or any
-public boundary. Parser and syntax proofs remain paused.
+public boundary. Parser and syntax proofs were paused at that milestone;
+ADR-0153 later resumed frontend work against the replacement syntax.
 
 ADR-0138 is complete above parent-indexed selected execution.
 Its internal six-way carrier preserves storage absence, code absence, exact
@@ -1157,8 +1160,9 @@ An executable function is not used as its own specification.
 | --- | --- | --- |
 | Semantic Core v1 / Oracle v2 | Frozen historical Core | No reinterpretation |
 | Semantic Core v2 / Oracle v3 | Frozen Core predecessor | No reinterpretation |
-| Surface v1 / Oracle v4 | Current published parser | No reinterpretation |
-| Internal Multi frontend | Frozen grammar reference | No active grammar proof expansion |
+| Surface v1 / Oracle v4 | Frozen historical parser | No reinterpretation |
+| Internal Multi frontend | Frozen historical grammar reference | Maintenance only |
+| Canonical Syntax | Current internal source frontend | Additive publication only |
 | Semantic Core v3 / Oracle v5 | Current checked Core and contract execution | No reinterpretation |
 | Later Core/runtime extensions | Outside the current public boundary | Additive publication only |
 
@@ -1168,17 +1172,16 @@ profile.
 
 ## Dependency policy
 
-Work is ordered by exposure to syntax churn:
+Each layer has an explicit boundary:
 
-1. Core values, typing, evaluation, and machine proofs.
-2. Explicit contract state and observations.
-3. Resolved static semantics over abstract identities.
-4. Surface adapters and source diagnostics.
-5. Concrete parser updates and grammar-specific proofs.
+1. Canonical Syntax retains source text structure and diagnostics.
+2. Resolved input owns names, scopes, modules, and source typing.
+3. Elaboration produces checked Semantic Core.
+4. Semantic Core owns typed evaluation independently of source spelling.
+5. Contract runtime and observation own external state and total results.
 
-The first two groups can proceed while the concrete language syntax is under
-revision. The final two resume only after a syntax version is deliberately
-stabilized.
+Changes should cross these boundaries through explicit transformations rather
+than by importing a parser AST into the semantic kernel.
 
 ## Repository map
 
@@ -1186,8 +1189,9 @@ stabilized.
 | --- | --- |
 | Solcore/Core | Semantic Core, its local value store, and current Core proofs |
 | Solcore/Semantics | Cross-feature and internal runtime semantics |
-| Solcore/Surface | Published Surface v1 |
-| Solcore/Surface/Multi | Frozen internal Multi frontend |
+| Solcore/Syntax | Canonical source tokens, AST, lexer, and parser |
+| Solcore/Surface | Frozen historical Surface v1 |
+| Solcore/Surface/Multi | Frozen historical Multi frontend |
 | Solcore/Workspace | Pure workspace identity and validation |
 | Solcore/Oracle | Versioned external protocols |
 | schema, profiles, Tests/golden | Published compatibility artifacts |
