@@ -1,0 +1,13 @@
+import Solcore.Syntax.Parser.PublicPatternTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserPublicPatternTotalityProperties
+
+open Solcore.Syntax.Parser
+
+example := @pattern_invariantFreeOnValid_of_coreExpressionTotality
+example := @pattern_ne_invariant_of_coreExpressionTotality
+example := @pattern_elementTotalityContract_of_coreExpression
+
+end Solcore.Test.SyntaxParserPublicPatternTotalityProperties
