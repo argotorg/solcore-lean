@@ -9,7 +9,7 @@ abbrev YulIdentifier := SpannedText
 
 /-- Source-preserving inline-Yul expression payload. -/
 inductive YulExprValue where
-  | literal (literal : Literal)
+  | literal (literal : YulLiteral)
   | identifier (name : YulIdentifier)
   | call
       (callee : YulIdentifier)
@@ -57,7 +57,7 @@ inductive YulStmtValue where
 /-- One non-default Yul switch arm. -/
 inductive YulCaseValue where
   | arm
-      (literal : Literal)
+      (literal : YulLiteral)
       (body : List (Located YulStmtValue))
   deriving Repr, BEq
 

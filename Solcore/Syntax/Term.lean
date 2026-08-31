@@ -10,7 +10,7 @@ mutual
 
 /-- Source-preserving canonical Core expression payload. -/
 inductive ExprValue where
-  | literal (literal : Literal)
+  | literal (literal : CoreLiteral)
   | identifier (name : Identifier)
   | dotConstructor
       (dot : SourceSpan)
@@ -57,7 +57,7 @@ inductive ExprValue where
 /-- Source-preserving canonical pattern payload. -/
 inductive PatternValue where
   | wildcard (marker : SourceSpan)
-  | literal (literal : Literal)
+  | literal (literal : CoreLiteral)
   | binder (name : Identifier)
   | constructor
       (leadingDot : Option SourceSpan)
