@@ -34,7 +34,7 @@ private def scanBacktick (file : SourceFile) (state : State)
   | none =>
       let endByte := file.content.utf8ByteSize
       state.recover file state.cursor endByte endByte []
-        (.invalidCharacter '`')
+        .invalidToken
 
 private def scanInterpolation (file : SourceFile) (state : State)
     (remaining : List Char) : Option State :=
@@ -49,16 +49,16 @@ private def scanQuoted (file : SourceFile) (state : State)
   match scanQuotedString state.cursor remaining with
   | .closed endByte spelling _decoded rest =>
       state.emitToken file endByte rest (.stringLiteral spelling)
-  | .invalidEscape _ _ escape tokenEndByte rest =>
+  | .invalidEscape _ _ _escape tokenEndByte rest =>
       state.recover file state.cursor tokenEndByte tokenEndByte rest
-        (.invalidStringEscape escape)
+        .invalidStringEscape
   | .invalidPrefix endByte rest =>
       state.recover file state.cursor endByte endByte rest
-        (.invalidCharacter '"')
+        .invalidToken
   | .unterminated =>
       let endByte := file.content.utf8ByteSize
       state.recover file state.cursor endByte endByte []
-        (.invalidCharacter '"')
+        .invalidToken
 
 private def scanDecimal (file : SourceFile) (state : State)
     (characters : List Char) : State :=
@@ -141,7 +141,7 @@ def step (file : SourceFile) (state : State) : State :=
                           state.recover file state.cursor
                             (state.cursor + left.utf8Size)
                             (state.cursor + left.utf8Size) (right :: after)
-                            (.invalidCharacter left)
+                            .invalidToken
               | character, [] =>
                   match singleSymbol? character with
                   | some symbol => emitSymbol file state symbol []
@@ -149,6 +149,6 @@ def step (file : SourceFile) (state : State) : State :=
                       state.recover file state.cursor
                         (state.cursor + character.utf8Size)
                         (state.cursor + character.utf8Size) []
-                        (.invalidCharacter character)
+                        .invalidToken
 
 end Solcore.Syntax.Lexer

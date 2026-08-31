@@ -83,7 +83,7 @@ private def testUnicode : IO Unit := do
     [(0, 3), (4, 10), (11, 16), (20, 21)]
     "Unicode identifier Rust spans"
   assertEqual (diagnosticViews output)
-    [(.invalidCharacter '§', (17, 19))]
+    [(.invalidToken, (17, 19))]
     "Unicode invalid-scalar span"
 
 private def testYulAndMeta : IO Unit := do
@@ -111,7 +111,7 @@ private def testYulAndMeta : IO Unit := do
   let backtick ← checkedLex "unterminated backtick" "`unterminated"
   assertEqual backtick.tokens [] "unterminated backtick tokens"
   assertEqual (diagnosticViews backtick)
-    [(.invalidCharacter '`', (0, 13))]
+    [(.invalidToken, (0, 13))]
     "unterminated backtick Rust span"
 
 private def testStringsAndRecovery : IO Unit := do
@@ -122,13 +122,13 @@ private def testStringsAndRecovery : IO Unit := do
   assertEqual (tokenRanges strings) [(0, 6), (15, 20)]
     "string recovery token spans"
   assertEqual (diagnosticViews strings)
-    [(.invalidStringEscape (some 'q'), (7, 14))]
+    [(.invalidStringEscape, (7, 14))]
     "invalid string escape Rust span"
 
   let unterminated ← checkedLex "unterminated string" "\"unterminated after"
   assertEqual unterminated.tokens [] "unterminated string tokens"
   assertEqual (diagnosticViews unterminated)
-    [(.invalidCharacter '"', (0, 19))]
+    [(.invalidToken, (0, 19))]
     "unterminated string Rust span"
 
   let accumulated ← checkedLex "diagnostic accumulation" "§ \"bad\\q\" ¤ ok"
@@ -137,9 +137,9 @@ private def testStringsAndRecovery : IO Unit := do
   assertEqual (tokenRanges accumulated) [(14, 16)]
     "diagnostic accumulation token span"
   assertEqual (diagnosticViews accumulated) [
-      (.invalidCharacter '§', (0, 2)),
-      (.invalidStringEscape (some 'q'), (3, 10)),
-      (.invalidCharacter '¤', (11, 13))
+      (.invalidToken, (0, 2)),
+      (.invalidStringEscape, (3, 10)),
+      (.invalidToken, (11, 13))
     ] "diagnostic accumulation order and Rust spans"
 
 private def testComments : IO Unit := do
@@ -207,7 +207,7 @@ private def testWhitespaceAndStringNewlines : IO Unit := do
   assertEqual (tokenRanges escapedLf) [(6, 11)]
     "escaped-LF recovery token span"
   assertEqual (diagnosticViews escapedLf)
-    [(.invalidCharacter '"', (0, 5))]
+    [(.invalidToken, (0, 5))]
     "escaped-LF invalid-prefix span"
 
 private def testEmptyComments : IO Unit := do

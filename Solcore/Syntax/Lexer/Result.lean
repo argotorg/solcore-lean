@@ -6,9 +6,9 @@ namespace Solcore.Syntax
 
 /-- Closed lexical failure catalog of the canonical source lexer. -/
 inductive LexicalErrorKind where
-  | invalidCharacter (character : Char)
+  | invalidToken
   | unterminatedBlockComment
-  | invalidStringEscape (escape : Option Char)
+  | invalidStringEscape
   | internalFuelExhausted
   deriving Repr, BEq, DecidableEq
 
