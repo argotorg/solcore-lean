@@ -73,6 +73,114 @@ def PreservesTokensOnSuccess {α : Type} (parser : Parser α) : Prop :=
   ∀ input value next, parser input = .ok value next →
     next.tokens = input.tokens
 
+/-- Successful parsing never moves the cursor backwards. -/
+def CursorMonotoneOnSuccess {α : Type} (parser : Parser α) : Prop :=
+  ∀ input value next, parser input = .ok value next →
+    input.cursor ≤ next.cursor
+
+/-- A pure parser leaves the token carrier unchanged. -/
+theorem pure_preservesTokensOnSuccess {α : Type} (value : α) :
+    PreservesTokensOnSuccess (pure value : Parser α) := by
+  intro input result next parsed
+  cases parsed
+  rfl
+
+/-- A pure parser leaves the cursor in place. -/
+theorem pure_cursorMonotoneOnSuccess {α : Type} (value : α) :
+    CursorMonotoneOnSuccess (pure value : Parser α) := by
+  intro input result next parsed
+  cases parsed
+  exact Nat.le_refl _
+
+/-- Sequential composition preserves the carrier when both stages do. -/
+theorem bind_preservesTokensOnSuccess {α β : Type} {first : Parser α}
+    {next : α → Parser β}
+    (firstPreserves : PreservesTokensOnSuccess first)
+    (nextPreserves : ∀ value, PreservesTokensOnSuccess (next value)) :
+    PreservesTokensOnSuccess (first >>= next) := by
+  intro input value final parsed
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      simp only [firstResult] at parsed
+      exact (nextPreserves firstValue afterFirst value final parsed).trans
+        (firstPreserves input firstValue afterFirst firstResult)
+  | reject failure rejected =>
+      simp only [firstResult] at parsed
+      cases parsed
+  | invariant error =>
+      simp only [firstResult] at parsed
+      cases parsed
+
+/-- Sequential composition is monotone when both stages are monotone. -/
+theorem bind_cursorMonotoneOnSuccess {α β : Type} {first : Parser α}
+    {next : α → Parser β}
+    (firstMonotone : CursorMonotoneOnSuccess first)
+    (nextMonotone : ∀ value, CursorMonotoneOnSuccess (next value)) :
+    CursorMonotoneOnSuccess (first >>= next) := by
+  intro input value final parsed
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      simp only [firstResult] at parsed
+      exact Nat.le_trans (firstMonotone input firstValue afterFirst firstResult)
+        (nextMonotone firstValue afterFirst value final parsed)
+  | reject failure rejected =>
+      simp only [firstResult] at parsed
+      cases parsed
+  | invariant error =>
+      simp only [firstResult] at parsed
+      cases parsed
+
+/-- Transactional ordered choice preserves a shared carrier contract. -/
+theorem orElse_preservesTokensOnSuccess {α : Type}
+    {first second : Parser α}
+    (firstPreserves : PreservesTokensOnSuccess first)
+    (secondPreserves : PreservesTokensOnSuccess second) :
+    PreservesTokensOnSuccess (orElse first second) := by
+  intro input value next parsed
+  unfold orElse at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      simp only [firstResult] at parsed
+      have preserved :=
+        firstPreserves input firstValue afterFirst firstResult
+      cases parsed
+      exact preserved
+  | reject failure rejected =>
+      simp only [firstResult] at parsed
+      exact secondPreserves input value next parsed
+  | invariant error =>
+      simp only [firstResult] at parsed
+      cases parsed
+
+/-- Transactional ordered choice preserves cursor monotonicity. -/
+theorem orElse_cursorMonotoneOnSuccess {α : Type}
+    {first second : Parser α}
+    (firstMonotone : CursorMonotoneOnSuccess first)
+    (secondMonotone : CursorMonotoneOnSuccess second) :
+    CursorMonotoneOnSuccess (orElse first second) := by
+  intro input value next parsed
+  unfold orElse at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      simp only [firstResult] at parsed
+      have monotone := firstMonotone input firstValue afterFirst firstResult
+      cases parsed
+      exact monotone
+  | reject failure rejected =>
+      simp only [firstResult] at parsed
+      exact secondMonotone input value next parsed
+  | invariant error =>
+      simp only [firstResult] at parsed
+      cases parsed
+
 /-- Build a parser contract from its ordinary success and rejection branches. -/
 theorem validFor_of_ok_reject {α : Type} (parser : Parser α)
     (valueValid : SourceFile → α → Prop)
@@ -190,6 +298,22 @@ theorem getState_validFor :
   intro input inputValid
   exact ⟨⟨inputValid, rfl⟩, inputValid, rfl⟩
 
+/-- Reading the current state leaves the token carrier unchanged. -/
+theorem getState_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess getState := by
+  intro input value next parsed
+  unfold getState at parsed
+  cases parsed
+  rfl
+
+/-- Reading the current state leaves the cursor in place. -/
+theorem getState_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess getState := by
+  intro input value next parsed
+  unfold getState at parsed
+  cases parsed
+  exact Nat.le_refl _
+
 /-- A validity- and file-preserving update defines a valid state parser. -/
 theorem modifyState_validFor (update : State → State)
     (preserves : ∀ input, input.ValidFor →
@@ -199,6 +323,24 @@ theorem modifyState_validFor (update : State → State)
   unfold modifyState Reply.ValidFor
   exact ⟨trivial, (preserves input inputValid).1,
     (preserves input inputValid).2⟩
+
+/-- A state update preserves the carrier when its update function does. -/
+theorem modifyState_preservesTokensOnSuccess (update : State → State)
+    (preserves : ∀ input, (update input).tokens = input.tokens) :
+    Parser.PreservesTokensOnSuccess (modifyState update) := by
+  intro input value next parsed
+  unfold modifyState at parsed
+  cases parsed
+  exact preserves input
+
+/-- A state update is monotone when its update function is monotone. -/
+theorem modifyState_cursorMonotoneOnSuccess (update : State → State)
+    (monotone : ∀ input, input.cursor ≤ (update input).cursor) :
+    Parser.CursorMonotoneOnSuccess (modifyState update) := by
+  intro input value next parsed
+  unfold modifyState at parsed
+  cases parsed
+  exact monotone input
 
 /-- Emit one diagnostic known valid for this concrete input state. -/
 theorem emitDiagnostic_reply_validFor {input : State}
@@ -216,6 +358,22 @@ theorem emitDiagnostic_validFor (diagnostic : ParseDiagnostic)
   intro input inputValid
   exact emitDiagnostic_reply_validFor inputValid diagnostic
     (diagnosticValid input inputValid)
+
+/-- Adding a diagnostic does not alter the immutable token carrier. -/
+theorem emitDiagnostic_preservesTokensOnSuccess
+    (diagnostic : ParseDiagnostic) :
+    Parser.PreservesTokensOnSuccess (emitDiagnostic diagnostic) := by
+  apply modifyState_preservesTokensOnSuccess
+  intro input
+  rfl
+
+/-- Adding a diagnostic leaves the cursor in place. -/
+theorem emitDiagnostic_cursorMonotoneOnSuccess
+    (diagnostic : ParseDiagnostic) :
+    Parser.CursorMonotoneOnSuccess (emitDiagnostic diagnostic) := by
+  apply modifyState_cursorMonotoneOnSuccess
+  intro input
+  exact Nat.le_refl _
 
 /-- Committing a valid failure diagnostic preserves state validity and file. -/
 theorem emitFailure_validFor {state : State} (stateValid : state.ValidFor)
