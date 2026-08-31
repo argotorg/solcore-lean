@@ -9,6 +9,24 @@ set_option autoImplicit false
 namespace Solcore.Syntax.Parser
 namespace PatternInternals
 
+private theorem patternBind_ok_components {alpha beta : Type}
+    {first : Parser alpha} {next : alpha → Parser beta}
+    {input final : State} {value : beta}
+    (parsed : (first >>= next) input = .ok value final) :
+    ∃ firstValue afterFirst,
+      first input = .ok firstValue afterFirst ∧
+        next firstValue afterFirst = .ok value final := by
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      rw [firstResult] at parsed
+      exact ⟨firstValue, afterFirst, rfl, parsed⟩
+  | reject failure rejected => rw [firstResult] at parsed; contradiction
+  | invariant error => rw [firstResult] at parsed; contradiction
+
 /-- Wildcard parsing retains both the outer and marker source ranges. -/
 theorem wildcardPattern_validFor
     (expressionValid : SourceFile → Expr → Prop) :
@@ -156,6 +174,26 @@ theorem patternName_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess patternName :=
   patternName_preservesTokenWindow.preservesTokensOnSuccess
 
+theorem patternName_ok_state_shape {input next : State}
+    {name : Identifier} (parsed : patternName input = .ok name next) :
+    ∃ token, input.peek? = some token ∧ token.span = name.span ∧
+      next.tokens = input.tokens ∧ next.cursor = input.cursor + 1 := by
+  unfold patternName at parsed
+  split at parsed
+  · unfold booleanIdentifier at parsed
+    cases found : input.peek? with
+    | none => simp [found, rejectAt] at parsed
+    | some token =>
+        rcases token with ⟨span, kind⟩
+        cases kind <;> simp only [found] at parsed
+        all_goals try { unfold rejectAt at parsed; contradiction }
+        case keyword keyword =>
+          cases keyword <;> simp only at parsed
+          all_goals try { unfold rejectAt at parsed; contradiction }
+          all_goals cases parsed
+          all_goals exact ⟨_, rfl, rfl, rfl, rfl⟩
+  · exact identifier_ok_state_shape .pattern parsed
+
 /-- Successful pattern-name parsing never rewinds the cursor. -/
 theorem patternName_cursorMonotoneOnSuccess :
     Parser.CursorMonotoneOnSuccess patternName := by
@@ -166,6 +204,12 @@ theorem patternName_cursorMonotoneOnSuccess :
       input name next parsed
   · exact identifier_cursorMonotoneOnSuccess .pattern
       input name next parsed
+
+theorem patternName_cursor_lt_onSuccess {input next : State}
+    {name : Identifier} (parsed : patternName input = .ok name next) :
+    input.cursor < next.cursor := by
+  rw [(patternName_ok_state_shape parsed).choose_spec.2.2.2]
+  simp
 
 /-- A pattern name starts at the ordinary or Boolean name token. -/
 theorem patternName_startsAtCurrentTokenOnSuccess :
@@ -330,6 +374,35 @@ theorem optionalConstructorArguments_preservesTokensOnSuccess
   (optionalConstructorArguments_preservesTokenWindow
     nested nestedPreserves).preservesTokensOnSuccess
 
+theorem optionalConstructorArguments_some_startsAtCurrentTokenOnSuccess
+    (nested : Parser Pattern) {input next : State}
+    {values : NonemptyDelimitedList Pattern}
+    (parsed : optionalConstructorArguments nested input =
+      .ok (some values) next) :
+    ∃ token, input.peek? = some token ∧
+      token.span.startByte = values.span.startByte := by
+  unfold optionalConstructorArguments at parsed
+  split at parsed
+  · unfold orElse at parsed
+    cases firstResult : (do
+        pure (some (← constructorArguments nested))) input with
+    | ok result afterFirst =>
+        simp only [firstResult] at parsed
+        cases parsed
+        rcases patternBind_ok_components firstResult with
+          ⟨arguments, afterArguments, argumentsResult, finished⟩
+        have starts := constructorArguments_startsAtCurrentTokenOnSuccess
+          nested input arguments afterArguments argumentsResult
+        cases finished
+        exact starts
+    | reject failure rejected =>
+        rw [firstResult] at parsed
+        simp [pure] at parsed
+    | invariant error =>
+        rw [firstResult] at parsed
+        simp at parsed
+  · simp at parsed
+
 /-- Optional constructor arguments never rewind the cursor. -/
 theorem optionalConstructorArguments_cursorMonotoneOnSuccess
     (nested : Parser Pattern) :
@@ -346,6 +419,184 @@ theorem optionalConstructorArguments_cursorMonotoneOnSuccess
       input values next parsed
   · cases parsed
     exact Nat.le_refl _
+
+private theorem dotConstructorPattern_weakValidFor
+    (nested : Parser Pattern)
+    (expressionValid : SourceFile → Expr → Prop)
+    (nestedValid : nested.ValidFor (Pattern.ValidFor expressionValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (dotConstructorPattern nested).ValidFor (fun _ _ => True) := by
+  have argumentsWeak : (optionalConstructorArguments nested).ValidFor
+      (fun _ _ => True) :=
+    (optionalConstructorArguments_validFor nested expressionValid
+      nestedValid nestedPreserves).mono (fun _ _ _ => trivial)
+  unfold dotConstructorPattern
+  apply Parser.bind_validFor (symbol_validFor .dot .pattern)
+  intro dot
+  apply Parser.bind_validFor patternName_validFor
+  intro name
+  apply Parser.bind_validFor argumentsWeak
+  intro arguments
+  exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+
+/-- Leading-dot constructors retain their marker, name, and nested ranges. -/
+theorem dotConstructorPattern_validFor (nested : Parser Pattern)
+    (expressionValid : SourceFile → Expr → Prop)
+    (nestedValid : nested.ValidFor (Pattern.ValidFor expressionValid))
+    (nestedPreserves : Parser.PreservesTokensOnSuccess nested) :
+    (dotConstructorPattern nested).ValidFor
+      (Pattern.ValidFor expressionValid) := by
+  intro input inputValid
+  have weak := dotConstructorPattern_weakValidFor nested expressionValid
+    nestedValid nestedPreserves input inputValid
+  cases parsed : dotConstructorPattern nested input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weak
+      exact weak
+  | ok result final =>
+      rw [parsed] at weak
+      have stages := parsed
+      unfold dotConstructorPattern at stages
+      rcases patternBind_ok_components stages with
+        ⟨dot, afterDot, dotResult, rest⟩
+      rcases patternBind_ok_components rest with
+        ⟨name, afterName, nameResult, rest⟩
+      rcases patternBind_ok_components rest with
+        ⟨arguments, afterArguments, argumentsResult, finished⟩
+      have dotReply := symbol_validFor .dot .pattern input inputValid
+      rw [dotResult] at dotReply
+      have nameReply := patternName_validFor afterDot dotReply.2.1
+      rw [nameResult] at nameReply
+      have argumentsReply := optionalConstructorArguments_validFor nested
+        expressionValid nestedValid nestedPreserves afterName nameReply.2.1
+      rw [argumentsResult] at argumentsReply
+      have dotSpanValid : dot.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using dotReply.1
+      have nameSpanValid : name.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, dotReply.2.2] using nameReply.1
+      have argumentsValid : Option.ValidFor
+          (NonemptyDelimitedList.ValidFor
+            (Pattern.ValidFor expressionValid)) input.file arguments := by
+        simpa [nameReply.2.2, dotReply.2.2] using argumentsReply.1
+      have dotShape := symbol_ok_state_shape .dot .pattern dotResult
+      rcases patternName_ok_state_shape nameResult with
+        ⟨nameToken, nameFound, nameTokenSpan, nameTokens, nameCursor⟩
+      have dotAdvanced : input.advance? = some (dot, afterDot) := by
+        unfold State.advance?
+        rw [dotShape.1, dotShape.2]
+        rfl
+      have dotBeforeName :=
+        inputValid.consumed_end_le_peek_start_after_advance
+          dotAdvanced nameFound
+      have orderedName : dot.span.startByte ≤ name.span.endByte :=
+        Nat.le_trans dotSpanValid.2.1 (Nat.le_trans
+          (by simpa [nameTokenSpan] using dotBeforeName)
+          nameSpanValid.2.1)
+      cases arguments with
+      | none =>
+          cases finished
+          refine ⟨Pattern.ValidFor.constructor
+            (SourceSpan.cover_validFor dotSpanValid nameSpanValid orderedName)
+            ?_ ?_ nameSpanValid ?_ ?_, weak.2.1, weak.2.2⟩
+          · intro marker member
+            simp at member
+            subst marker
+            exact dotSpanValid
+          · simp
+          · simp
+          · simp
+      | some values =>
+          have valuesValid : NonemptyDelimitedList.ValidFor
+              (Pattern.ValidFor expressionValid) input.file values := by
+            simpa only [Option.ValidFor] using argumentsValid
+          rcases optionalConstructorArguments_some_startsAtCurrentTokenOnSuccess
+              nested argumentsResult with ⟨opening, openingFound, valuesStart⟩
+          have nameAtAfterName :
+              afterName.tokens[afterDot.cursor]? = some nameToken := by
+            rw [nameTokens]
+            exact State.getElem?_eq_some_of_peek?_eq_some nameFound
+          have openingAt :=
+            State.getElem?_eq_some_of_peek?_eq_some openingFound
+          have nameBeforeValues :=
+            nameReply.2.1.token_end_le_token_start_of_getElem?_lt
+              nameAtAfterName openingAt (by rw [nameCursor]; simp)
+          have orderedValues : dot.span.startByte ≤ values.span.endByte :=
+            Nat.le_trans orderedName (Nat.le_trans
+              (by simpa [nameTokenSpan, valuesStart] using nameBeforeValues)
+              valuesValid.1.2.1)
+          cases finished
+          refine ⟨Pattern.ValidFor.constructor
+            (SourceSpan.cover_validFor dotSpanValid valuesValid.1
+              orderedValues) ?_ ?_ nameSpanValid ?_ ?_,
+            weak.2.1, weak.2.2⟩
+          · intro marker member
+            simp at member
+            subst marker
+            exact dotSpanValid
+          · simp
+          · intro retained member
+            simp at member
+            subst retained
+            exact valuesValid.1
+          · intro retained retainedMember pattern patternMember
+            simp at retainedMember
+            subst retained
+            exact valuesValid.2 pattern patternMember
+
+/-- Leading-dot constructors preserve every ordinary token window. -/
+theorem dotConstructorPattern_preservesTokenWindow (nested : Parser Pattern)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (dotConstructorPattern nested) := by
+  unfold dotConstructorPattern
+  apply Parser.bind_preservesTokenWindow
+    (symbol_preservesTokenWindow .dot .pattern)
+  intro dot
+  apply Parser.bind_preservesTokenWindow patternName_preservesTokenWindow
+  intro name
+  apply Parser.bind_preservesTokenWindow
+    (optionalConstructorArguments_preservesTokenWindow nested nestedPreserves)
+  intro arguments
+  exact Parser.pure_preservesTokenWindow _
+
+theorem dotConstructorPattern_preservesTokensOnSuccess
+    (nested : Parser Pattern)
+    (nestedPreserves : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokensOnSuccess (dotConstructorPattern nested) :=
+  (dotConstructorPattern_preservesTokenWindow
+    nested nestedPreserves).preservesTokensOnSuccess
+
+/-- Leading-dot constructors never rewind the cursor. -/
+theorem dotConstructorPattern_cursorMonotoneOnSuccess
+    (nested : Parser Pattern) :
+    Parser.CursorMonotoneOnSuccess (dotConstructorPattern nested) := by
+  unfold dotConstructorPattern
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (symbol_cursorMonotoneOnSuccess .dot .pattern)
+  intro dot
+  apply Parser.bind_cursorMonotoneOnSuccess
+    patternName_cursorMonotoneOnSuccess
+  intro name
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (optionalConstructorArguments_cursorMonotoneOnSuccess nested)
+  intro arguments
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A leading-dot constructor starts at its dot token. -/
+theorem dotConstructorPattern_startsAtCurrentTokenOnSuccess
+    (nested : Parser Pattern) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (dotConstructorPattern nested) (·.span) := by
+  unfold dotConstructorPattern
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (symbol_startsAtCurrentTokenOnSuccess .dot .pattern)
+  intro dot input value final parsed
+  rcases patternBind_ok_components parsed with
+    ⟨name, afterName, _nameResult, rest⟩
+  rcases patternBind_ok_components rest with
+    ⟨arguments, afterArguments, _argumentsResult, finished⟩
+  cases finished
+  rfl
 
 end PatternInternals
 end Solcore.Syntax.Parser

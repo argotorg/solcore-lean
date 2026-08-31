@@ -133,7 +133,10 @@ private def parenthesizedPattern (nested : Parser Pattern) : Parser Pattern :=
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 
-private def dotConstructorPattern
+namespace PatternInternals
+
+/-- Parse a leading-dot constructor pattern. -/
+def dotConstructorPattern
     (nested : Parser Pattern) : Parser Pattern := do
   let dot ← symbol .dot .pattern
   let name ← PatternInternals.patternName
@@ -143,6 +146,8 @@ private def dotConstructorPattern
     span := SourceSpan.cover dot.span endSpan
     value := .constructor (some dot.span) [] name arguments
   }
+
+end PatternInternals
 
 private def startsWithLowercase (name : Identifier) : Bool :=
   match name.value.toList with
@@ -175,7 +180,8 @@ private def patternCore (nested : Parser Pattern)
   else if isBooleanValue state then
     PatternInternals.booleanBinderPattern state
   else if isSymbol state .leftParen then parenthesizedPattern nested state
-  else if isSymbol state .dot then dotConstructorPattern nested state
+  else if isSymbol state .dot then
+    PatternInternals.dotConstructorPattern nested state
   else if isContextual state .comptime then
     match contextual .comptime .pattern state with
     | .ok marker afterMarker =>
