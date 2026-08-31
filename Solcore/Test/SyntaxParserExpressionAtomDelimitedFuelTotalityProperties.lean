@@ -1,0 +1,18 @@
+import Solcore.Syntax.Parser.Expression.AtomDelimitedFuelTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserExpressionAtomDelimitedFuelTotalityProperties
+
+open Solcore.Syntax
+open Solcore.Syntax.Parser
+open Solcore.Syntax.Parser.ExpressionAtomInternals
+
+example := @optionalDotConstructorArguments_ordinary_of_elementFuel
+example := @optionalDotConstructorArguments_ne_invariant_of_elementFuel
+example := @dotConstructor_ordinary_of_elementFuel
+example := @dotConstructor_ne_invariant_of_elementFuel
+example := @arrayLiteral_ordinary_of_elementFuel
+example := @arrayLiteral_ne_invariant_of_elementFuel
+
+end Solcore.Test.SyntaxParserExpressionAtomDelimitedFuelTotalityProperties
