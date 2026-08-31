@@ -401,6 +401,17 @@ theorem finishImport_cursorMonotoneOnSuccess (start last : SourceSpan)
   intro endSpan
   exact Parser.pure_cursorMonotoneOnSuccess _
 
+theorem finishImport_keepsStartByte (start last : SourceSpan)
+    (value : ImportDeclValue) {input next : State} {result : ImportDecl}
+    (parsed : ImportInternals.finish start last value input =
+      .ok result next) :
+    start.startByte = result.span.startByte := by
+  unfold ImportInternals.finish at parsed
+  rcases importBind_ok_components parsed with
+    ⟨endSpan, afterEnd, _endResult, finished⟩
+  cases finished
+  rfl
+
 theorem plainImport_preservesTokenWindow (start : SourceSpan) :
     Parser.PreservesTokenWindow
       (ImportInternals.plainImport start) := by
@@ -501,6 +512,54 @@ theorem wildcardImport_cursorMonotoneOnSuccess (start : SourceSpan) :
   exact finishImport_cursorMonotoneOnSuccess start
     (match hidden with | some clause => clause.span | none => path.span)
     (.wildcard path hidden)
+
+theorem plainImport_keepsStartByte (start : SourceSpan)
+    {input next : State} {result : ImportDecl}
+    (parsed : ImportInternals.plainImport start input = .ok result next) :
+    start.startByte = result.span.startByte := by
+  unfold ImportInternals.plainImport at parsed
+  rcases importBind_ok_components parsed with
+    ⟨path, afterPath, _pathResult, finished⟩
+  exact finishImport_keepsStartByte start path.span (.plain path) finished
+
+theorem namespaceImport_keepsStartByte (start : SourceSpan)
+    {input next : State} {result : ImportDecl}
+    (parsed : ImportInternals.namespaceImport start input = .ok result next) :
+    start.startByte = result.span.startByte := by
+  unfold ImportInternals.namespaceImport at parsed
+  rcases importBind_ok_components parsed with
+    ⟨star, afterStar, _starResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨asMarker, afterAs, _asResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨alias, afterAlias, _aliasResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨fromMarker, afterFrom, _fromResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨path, afterPath, _pathResult, finished⟩
+  exact finishImport_keepsStartByte start path.span
+    (.namespace path alias) finished
+
+theorem wildcardImport_keepsStartByte (start : SourceSpan)
+    {input next : State} {result : ImportDecl}
+    (parsed : ImportInternals.wildcardImport start input = .ok result next) :
+    start.startByte = result.span.startByte := by
+  unfold ImportInternals.wildcardImport at parsed
+  rcases importBind_ok_components parsed with
+    ⟨star, afterStar, _starResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨fromMarker, afterFrom, _fromResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨path, afterPath, _pathResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨hidden, afterHidden, _hiddenResult, finished⟩
+  cases hidden with
+  | none =>
+      exact finishImport_keepsStartByte start path.span
+        (.wildcard path none) (by simpa using finished)
+  | some clause =>
+      exact finishImport_keepsStartByte start clause.span
+        (.wildcard path (some clause)) (by simpa using finished)
 
 private theorem selectedAlias_some_components {input next : State}
     {name : Identifier}
@@ -805,6 +864,27 @@ theorem selectiveImport_cursorMonotoneOnSuccess (start : SourceSpan) :
     (match hidden with | some clause => clause.span | none => path.span)
     (.selected selection path hidden)
 
+theorem selectiveImport_keepsStartByte (start : SourceSpan)
+    {input next : State} {result : ImportDecl}
+    (parsed : ImportInternals.selectiveImport start input = .ok result next) :
+    start.startByte = result.span.startByte := by
+  unfold ImportInternals.selectiveImport at parsed
+  rcases importBind_ok_components parsed with
+    ⟨selection, afterSelection, _selectionResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨fromMarker, afterFrom, _fromResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨path, afterPath, _pathResult, rest⟩
+  rcases importBind_ok_components rest with
+    ⟨hidden, afterHidden, _hiddenResult, finished⟩
+  cases hidden with
+  | none =>
+      exact finishImport_keepsStartByte start path.span
+        (.selected selection path none) (by simpa using finished)
+  | some clause =>
+      exact finishImport_keepsStartByte start clause.span
+        (.selected selection path (some clause)) (by simpa using finished)
+
 /-- Complete import parsing preserves every ordinary token window. -/
 theorem importDecl_preservesTokenWindow :
     Parser.PreservesTokenWindow importDecl := by
@@ -856,5 +936,25 @@ theorem importDecl_cursorMonotoneOnSuccess :
       exact selectiveImport_cursorMonotoneOnSuccess importKeyword.span
     · simp only [selected]
       exact plainImport_cursorMonotoneOnSuccess importKeyword.span
+
+/-- Complete import parsing starts at the leading `import` token. -/
+theorem importDecl_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess importDecl (·.span) := by
+  unfold importDecl
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess
+      (.keyword .importKw) .importDecl (· == .keyword .importKw))
+  intro importKeyword input result final parsed
+  rcases importBind_ok_components parsed with
+    ⟨observed, afterObserved, observedResult, branchResult⟩
+  unfold getState at observedResult
+  cases observedResult
+  split at branchResult
+  · split at branchResult
+    · exact namespaceImport_keepsStartByte importKeyword.span branchResult
+    · exact wildcardImport_keepsStartByte importKeyword.span branchResult
+  · split at branchResult
+    · exact selectiveImport_keepsStartByte importKeyword.span branchResult
+    · exact plainImport_keepsStartByte importKeyword.span branchResult
 
 end Solcore.Syntax.Parser
