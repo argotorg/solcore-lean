@@ -8,6 +8,7 @@ namespace Tests
 
 open Solcore.Syntax.Parser
 
+example := @functionDecl_validFor_of_span
 example := @functionDecl_preservesTokenWindow_of_block
 example := @functionDecl_preservesTokensOnSuccess_of_block
 example := @functionDecl_cursorMonotoneOnSuccess_of_block
