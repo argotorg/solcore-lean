@@ -156,6 +156,34 @@ theorem modulePath_preservesTokensOnSuccess (context : ParseContext) :
         exact qualifiedName_preservesTokensOnSuccess context .topLevel
           input name next nameResult
 
+/-- A module path starts at its package marker or first name component. -/
+theorem modulePath_startsAtCurrentTokenOnSuccess (context : ParseContext) :
+    Parser.StartsAtCurrentTokenOnSuccess (modulePath context) (·.span) := by
+  intro input path next result
+  unfold modulePath at result
+  split at result
+  · cases markerResult : symbol .at context input with
+    | invariant error => simp [markerResult] at result
+    | reject failure rejected => simp [markerResult] at result
+    | ok marker afterMarker =>
+        simp only [markerResult] at result
+        cases nameResult : qualifiedName context .topLevel afterMarker with
+        | invariant error => simp [nameResult] at result
+        | reject failure rejected => simp [nameResult] at result
+        | ok name final =>
+            simp only [nameResult] at result
+            cases result
+            exact ⟨marker,
+              (symbol_ok_state_shape .at context markerResult).1, rfl⟩
+  · cases nameResult : qualifiedName context .topLevel input with
+    | invariant error => simp [nameResult] at result
+    | reject failure rejected => simp [nameResult] at result
+    | ok name final =>
+        simp only [nameResult] at result
+        cases result
+        exact qualifiedName_startsAtCurrentTokenOnSuccess context .topLevel
+          input name next nameResult
+
 /-- Every successful module path consumes at least its first path token. -/
 theorem modulePath_cursor_lt_onSuccess (context : ParseContext)
     {input next : State} {path : ModulePath}

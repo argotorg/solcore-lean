@@ -273,6 +273,16 @@ theorem qualifiedName_preservesTokensOnSuccess (context : ParseContext)
   intro input name next result
   exact (qualifiedName_ok_state_shape context phase result).choose_spec.2.2
 
+/-- A qualified name starts at the first identifier token it retains. -/
+theorem qualifiedName_startsAtCurrentTokenOnSuccess
+    (context : ParseContext) (phase : ParserPhase) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (qualifiedName context phase) (·.span) := by
+  intro input name next result
+  rcases qualifiedName_ok_state_shape context phase result with
+    ⟨firstToken, found, start, _tokens⟩
+  exact ⟨firstToken, found, start⟩
+
 private theorem qualifiedNameTail_cursorMonotoneOnSuccess
     (context : ParseContext) (phase : ParserPhase) (first : Identifier) :
     ∀ fuel last tailRev input name next,

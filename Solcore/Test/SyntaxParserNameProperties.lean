@@ -31,7 +31,37 @@ example (context : ParseContext) (phase : ParserPhase) :
 
 example := @qualifiedName_ok_state_shape
 example := @qualifiedName_preservesTokensOnSuccess
+example := @qualifiedName_startsAtCurrentTokenOnSuccess
 example := @qualifiedName_cursor_lt_onSuccess
 example := @qualifiedName_cursorMonotoneOnSuccess
+
+example (context : ParseContext) (phase : ParserPhase) :
+    (qualifiedName context phase).ValidFor QualifiedName.ValidFor ∧
+      Parser.PreservesTokensOnSuccess (qualifiedName context phase) ∧
+      Parser.CursorMonotoneOnSuccess (qualifiedName context phase) ∧
+      Parser.StartsAtCurrentTokenOnSuccess
+        (qualifiedName context phase) (·.span) :=
+  ⟨qualifiedName_validFor context phase,
+    qualifiedName_preservesTokensOnSuccess context phase,
+    qualifiedName_cursorMonotoneOnSuccess context phase,
+    qualifiedName_startsAtCurrentTokenOnSuccess context phase⟩
+
+example (context : ParseContext) (phase : ParserPhase)
+    {input next : State} {name : QualifiedName}
+    (inputValid : input.ValidFor)
+    (result : qualifiedName context phase input = .ok name next) :
+    QualifiedName.ValidFor input.file name ∧ next.ValidFor ∧
+      next.file = input.file ∧ input.cursor < next.cursor ∧
+      next.tokens = input.tokens ∧
+      ∃ token, input.peek? = some token ∧
+        token.span.startByte = name.span.startByte := by
+  have valid := qualifiedName_validFor context phase input inputValid
+  rw [result] at valid
+  exact ⟨valid.1, valid.2.1, valid.2.2,
+    qualifiedName_cursor_lt_onSuccess context phase result,
+    qualifiedName_preservesTokensOnSuccess context phase
+      input name next result,
+    qualifiedName_startsAtCurrentTokenOnSuccess context phase
+      input name next result⟩
 
 end Tests
