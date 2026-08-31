@@ -56,6 +56,34 @@ private def takeWhileRev
 def takeWhile (predicate : Char → Bool) (characters : List Char) : TextScan :=
   takeWhileRev predicate characters []
 
+private theorem takeWhileRev_partition (predicate : Char → Bool)
+    (characters consumedRev : List Char) :
+    let scan := takeWhileRev predicate characters consumedRev
+    consumedRev.reverse ++ characters = scan.consumed ++ scan.remaining := by
+  induction characters generalizing consumedRev with
+  | nil => simp [takeWhileRev]
+  | cons character rest inductionHypothesis =>
+      simp only [takeWhileRev]
+      split
+      · rw [← inductionHypothesis (character :: consumedRev)]
+        simp [List.reverse_cons, List.append_assoc]
+      · simp
+
+theorem takeWhile_partition (predicate : Char → Bool)
+    (characters : List Char) :
+    characters =
+      (takeWhile predicate characters).consumed ++
+        (takeWhile predicate characters).remaining := by
+  simpa [takeWhile] using takeWhileRev_partition predicate characters []
+
+theorem takeWhile_advances (predicate : Char → Bool)
+    (startByte : Nat) (characters : List Char) :
+    let scan := takeWhile predicate characters
+    Advances startByte characters
+      (startByte + byteSize scan.consumed) scan.remaining := by
+  refine ⟨(takeWhile predicate characters).consumed, ?_, rfl⟩
+  exact takeWhile_partition predicate characters
+
 /-- Result of either the Core or Yul identifier regular expression. -/
 structure IdentifierScan where
   kind : TokenKind

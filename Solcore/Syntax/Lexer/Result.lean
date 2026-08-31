@@ -45,6 +45,30 @@ def sourceSpan (file : SourceFile) (startByte endByte : Nat) : SourceSpan := {
 def byteSize (characters : List Char) : Nat :=
   (String.ofList characters).utf8ByteSize
 
+@[simp] theorem byteSize_nil : byteSize [] = 0 := by
+  simp [byteSize]
+
+theorem byteSize_cons (character : Char) (characters : List Char) :
+    byteSize (character :: characters) =
+      character.utf8Size + byteSize characters := by
+  simp [byteSize, String.ofList_cons]
+
+theorem byteSize_append (leading trailing : List Char) :
+    byteSize (leading ++ trailing) =
+      byteSize leading + byteSize trailing := by
+  simp [byteSize, String.ofList_append]
+
+@[simp] theorem byteSize_toList (text : String) :
+    byteSize text.toList = text.utf8ByteSize := by
+  simp [byteSize]
+
+/-- A scanner consumes an exact character prefix and advances by its bytes. -/
+def Advances (startByte : Nat) (input : List Char)
+    (endByte : Nat) (remaining : List Char) : Prop :=
+  ∃ consumed,
+    input = consumed ++ remaining ∧
+      endByte = startByte + byteSize consumed
+
 /-- The executable lexer performs at most one main transition per character. -/
 def fuelBound (file : SourceFile) : Nat :=
   file.content.length + 1

@@ -114,6 +114,12 @@ def ofString? : String → Option HardKeyword
     ofString? keyword.spelling = some keyword := by
   cases keyword <;> rfl
 
+theorem spelling_eq_of_ofString?_eq_some (text : String)
+    (keyword : HardKeyword) (recognized : ofString? text = some keyword) :
+    keyword.spelling = text := by
+  fun_cases ofString? text <;> simp [ofString?] at recognized
+  all_goals subst keyword <;> rfl
+
 end HardKeyword
 
 /--
