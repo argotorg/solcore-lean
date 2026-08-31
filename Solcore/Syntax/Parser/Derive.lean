@@ -119,6 +119,23 @@ private theorem deriveComponent_preservesTokensOnSuccess :
   intro input name next result
   exact (deriveComponent_ok_state_shape result).choose_spec.2.2.1
 
+private theorem deriveComponent_preservesTokenWindow :
+    Parser.PreservesTokenWindow deriveComponent := by
+  intro input
+  unfold deriveComponent
+  cases found : input.peek? with
+  | none =>
+      exact rejectAt_preservesTokenWindow input
+        { head := .identifier, tail := [] } .topItem
+  | some token =>
+      simp only
+      cases reserved : reservedDeriveKeyword? token.value with
+      | none =>
+          simp only
+          exact identifier_preservesTokenWindow .topItem input
+      | some keywordValue =>
+          simp [Reply.PreservesTokenWindow, State.emit]
+
 private theorem deriveComponent_cursorMonotoneOnSuccess :
     Parser.CursorMonotoneOnSuccess deriveComponent := by
   intro input name next result
@@ -312,6 +329,64 @@ theorem deriveTarget_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess deriveTarget := by
   intro input name next result
   exact (deriveTarget_ok_state_shape result).choose_spec.2.2.1
+
+private theorem deriveTargetTail_preservesTokenWindow
+    (first : Identifier) :
+    ∀ fuel last tailRev,
+      Parser.PreservesTokenWindow
+        (deriveTargetTail first fuel last tailRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro last tailRev input
+      trivial
+  | succ fuel inductionHypothesis =>
+      intro last tailRev input
+      unfold deriveTargetTail
+      split
+      · have dotShape := symbol_preservesTokenWindow .dot .topItem input
+        cases dotResult : symbol .dot .topItem input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [dotResult] at dotShape
+            exact dotShape
+        | ok dot afterDot =>
+            rw [dotResult] at dotShape
+            have componentShape :=
+              deriveComponent_preservesTokenWindow afterDot
+            cases componentResult : deriveComponent afterDot with
+            | invariant error =>
+                simp only [componentResult, Reply.PreservesTokenWindow]
+            | reject failure rejected =>
+                rw [componentResult] at componentShape
+                simpa only [componentResult,
+                  Reply.PreservesTokenWindow] using
+                    componentShape.trans dotShape
+            | ok component next =>
+                rw [componentResult] at componentShape
+                simpa only [componentResult,
+                  Reply.PreservesTokenWindow] using
+                    (inductionHypothesis component
+                      (component :: tailRev) next).trans
+                        (componentShape.trans dotShape)
+      · unfold finishDeriveTarget
+        exact ⟨rfl, rfl⟩
+
+/-- Derive targets preserve every ordinary token window. -/
+theorem deriveTarget_preservesTokenWindow :
+    Parser.PreservesTokenWindow deriveTarget := by
+  intro input
+  unfold deriveTarget
+  have firstShape := deriveComponent_preservesTokenWindow input
+  cases firstResult : deriveComponent input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [firstResult] at firstShape
+      exact firstShape
+  | ok first next =>
+      rw [firstResult] at firstShape
+      exact (deriveTargetTail_preservesTokenWindow first
+        (next.remainingCount + 1) first [] next).trans firstShape
 
 /-- Derive-target success never moves the cursor backwards. -/
 theorem deriveTarget_cursorMonotoneOnSuccess :

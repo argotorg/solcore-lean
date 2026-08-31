@@ -12,6 +12,9 @@ open Solcore.Syntax.Parser
 example : deriveTarget.ValidFor QualifiedName.ValidFor :=
   deriveTarget_validFor
 
+example : Parser.PreservesTokenWindow deriveTarget :=
+  deriveTarget_preservesTokenWindow
+
 example : Parser.PreservesTokensOnSuccess deriveTarget :=
   deriveTarget_preservesTokensOnSuccess
 
