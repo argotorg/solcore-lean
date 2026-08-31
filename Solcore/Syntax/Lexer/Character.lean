@@ -37,20 +37,24 @@ structure TextScan where
   remaining : List Char
   deriving Repr, BEq
 
-def takeWhile (predicate : Char → Bool) : List Char → TextScan
-  | [] => {
-      consumed := []
+private def takeWhileRev
+    (predicate : Char → Bool) : List Char → List Char → TextScan
+  | [], consumedRev => {
+      consumed := consumedRev.reverse
       remaining := []
     }
-  | characters@(character :: rest) =>
+  | characters@(character :: rest), consumedRev =>
       if predicate character then
-        let tail := takeWhile predicate rest
-        { tail with consumed := character :: tail.consumed }
+        takeWhileRev predicate rest (character :: consumedRev)
       else
         {
-          consumed := []
+          consumed := consumedRev.reverse
           remaining := characters
         }
+
+/-- Tail-recursive longest-prefix selection. -/
+def takeWhile (predicate : Char → Bool) (characters : List Char) : TextScan :=
+  takeWhileRev predicate characters []
 
 /-- Result of either the Core or Yul identifier regular expression. -/
 structure IdentifierScan where
@@ -59,23 +63,25 @@ structure IdentifierScan where
   deriving Repr, BEq
 
 private def scanHyphenGroups : Nat → List Char → List Char → TextScan
-  | 0, consumed, remaining => {
-      consumed
+  | 0, consumedRev, remaining => {
+      consumed := consumedRev.reverse
       remaining
     }
-  | fuel + 1, consumed, '-' :: next :: rest =>
+  | fuel + 1, consumedRev, '-' :: next :: rest =>
       if isCoreIdentifierStart next then
         let plain := takeWhile isCoreIdentifierContinue rest
+        let nextRev :=
+          ('-' :: next :: plain.consumed).foldl
+            (fun prior character => character :: prior) consumedRev
         scanHyphenGroups fuel
-          (consumed ++ ['-', next] ++ plain.consumed)
-          plain.remaining
+          nextRev plain.remaining
       else
         {
-          consumed
+          consumed := consumedRev.reverse
           remaining := '-' :: next :: rest
         }
-  | _ + 1, consumed, remaining => {
-      consumed
+  | _ + 1, consumedRev, remaining => {
+      consumed := consumedRev.reverse
       remaining
     }
 
@@ -92,7 +98,8 @@ def scanLetterIdentifier (first : Char) (remaining : List Char) : IdentifierScan
       }
   | rest =>
       let full :=
-        scanHyphenGroups (rest.length + 1) (first :: plain.consumed) rest
+        scanHyphenGroups (rest.length + 1)
+          (first :: plain.consumed).reverse rest
       let text := String.ofList full.consumed
       let kind :=
         match HardKeyword.ofString? text with

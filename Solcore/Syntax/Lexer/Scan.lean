@@ -11,21 +11,25 @@ structure LineCommentScan where
   remaining : List Char
   deriving Repr, BEq
 
-/-- Scan source characters after the opening `//`. -/
-def scanLineComment : Nat → List Char → LineCommentScan
-  | cursor, [] => {
+/-- Tail-recursive scan source characters after the opening `//`. -/
+private def scanLineCommentRev :
+    Nat → List Char → List Char → LineCommentScan
+  | cursor, [], bodyRev => {
       endByte := cursor
-      body := []
+      body := bodyRev.reverse
       remaining := []
     }
-  | cursor, characters@('\n' :: _) => {
+  | cursor, characters@('\n' :: _), bodyRev => {
       endByte := cursor
-      body := []
+      body := bodyRev.reverse
       remaining := characters
     }
-  | cursor, character :: rest =>
-      let tail := scanLineComment (cursor + character.utf8Size) rest
-      { tail with body := character :: tail.body }
+  | cursor, character :: rest, bodyRev =>
+      scanLineCommentRev
+        (cursor + character.utf8Size) rest (character :: bodyRev)
+
+def scanLineComment (cursor : Nat) (characters : List Char) : LineCommentScan :=
+  scanLineCommentRev cursor characters []
 
 /-- Complete outcome of a nested `/* ... */` scan. -/
 inductive BlockCommentScan where
