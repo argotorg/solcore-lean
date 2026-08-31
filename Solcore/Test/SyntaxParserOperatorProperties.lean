@@ -13,6 +13,8 @@ open Solcore.Syntax.Parser
 example := @SelectorName.ValidFor
 example := @operatorSelector_validFor
 example := @selectorName_validFor
+example := @operatorSelector_preservesTokenWindow
+example := @selectorName_preservesTokenWindow
 example := @operatorSelector_preservesTokensOnSuccess
 example := @selectorName_preservesTokensOnSuccess
 example := @operatorSelector_startsAtCurrentTokenOnSuccess
@@ -24,21 +26,25 @@ example := @selectorName_cursorMonotoneOnSuccess
 
 example (context : ParseContext) :
     (operatorSelector context).ValidFor SelectorName.ValidFor ∧
+      Parser.PreservesTokenWindow (operatorSelector context) ∧
       Parser.PreservesTokensOnSuccess (operatorSelector context) ∧
       Parser.CursorMonotoneOnSuccess (operatorSelector context) ∧
       Parser.StartsAtCurrentTokenOnSuccess
         (operatorSelector context) (·.span) :=
   ⟨operatorSelector_validFor context,
+    operatorSelector_preservesTokenWindow context,
     operatorSelector_preservesTokensOnSuccess context,
     operatorSelector_cursorMonotoneOnSuccess context,
     operatorSelector_startsAtCurrentTokenOnSuccess context⟩
 
 example (context : ParseContext) :
     (selectorName context).ValidFor SelectorName.ValidFor ∧
+      Parser.PreservesTokenWindow (selectorName context) ∧
       Parser.PreservesTokensOnSuccess (selectorName context) ∧
       Parser.CursorMonotoneOnSuccess (selectorName context) ∧
       Parser.StartsAtCurrentTokenOnSuccess (selectorName context) (·.span) :=
   ⟨selectorName_validFor context,
+    selectorName_preservesTokenWindow context,
     selectorName_preservesTokensOnSuccess context,
     selectorName_cursorMonotoneOnSuccess context,
     selectorName_startsAtCurrentTokenOnSuccess context⟩

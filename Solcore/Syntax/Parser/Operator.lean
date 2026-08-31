@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Validity
+import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.StateCursorProperties
 import Solcore.Syntax.ModuleValidity
 
@@ -119,6 +119,7 @@ private theorem operatorParts_validFor (context : ParseContext) :
                 intro parts next result
                 cases result
                 exact ⟨rfl, Nat.le_refl _⟩
+
       | none =>
           simp only
           split
@@ -134,6 +135,37 @@ private theorem operatorParts_validFor (context : ParseContext) :
             intro parts next result
             cases result
             exact ⟨rfl, Nat.le_refl _⟩
+
+private theorem operatorParts_preservesTokenWindow
+    (context : ParseContext) :
+    ∀ fuel partsRev,
+      Parser.PreservesTokenWindow (operatorParts context fuel partsRev) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro partsRev input
+      trivial
+  | succ fuel inductionHypothesis =>
+      intro partsRev input
+      unfold operatorParts
+      cases found : input.peek? with
+      | some token =>
+          simp only
+          cases part : operatorPart? token.value with
+          | some spelling =>
+              simp only
+              exact (inductionHypothesis (spelling :: partsRev)
+                { input with cursor := input.cursor + 1 }).trans ⟨rfl, rfl⟩
+          | none =>
+              simp only
+              split
+              · exact rejectAt_preservesTokenWindow input _ _
+              · exact ⟨rfl, rfl⟩
+      | none =>
+          simp only
+          split
+          · exact rejectAt_preservesTokenWindow input _ _
+          · exact ⟨rfl, rfl⟩
 
 /-- Parse a nonempty parenthesized operator selector. -/
 def operatorSelector (context : ParseContext) : Parser SelectorName := fun state =>
@@ -242,6 +274,48 @@ theorem operatorSelector_validFor (context : ParseContext) :
                 closingValid.2.2.trans
                   (partsValid.2.2.trans openingValid.2.2)⟩
 
+/-- Operator selectors preserve the token window on every ordinary reply. -/
+theorem operatorSelector_preservesTokenWindow (context : ParseContext) :
+    Parser.PreservesTokenWindow (operatorSelector context) := by
+  intro input
+  unfold operatorSelector
+  have openingShape := symbol_preservesTokenWindow .leftParen context input
+  cases openingResult : symbol .leftParen context input with
+  | invariant error =>
+      simp only [Reply.PreservesTokenWindow]
+  | reject failure rejected =>
+      rw [openingResult] at openingShape
+      simpa only [openingResult, Reply.PreservesTokenWindow] using openingShape
+  | ok opening afterOpening =>
+      rw [openingResult] at openingShape
+      simp only
+      have partsShape := operatorParts_preservesTokenWindow context
+        (afterOpening.remainingCount + 1) [] afterOpening
+      cases partsResult : operatorParts context
+          (afterOpening.remainingCount + 1) [] afterOpening with
+      | invariant error =>
+          simp only [Reply.PreservesTokenWindow]
+      | reject failure rejected =>
+          rw [partsResult] at partsShape
+          simpa only [Reply.PreservesTokenWindow] using
+            partsShape.trans openingShape
+      | ok parts afterParts =>
+          rw [partsResult] at partsShape
+          simp only
+          have closingShape := symbol_preservesTokenWindow .rightParen
+            context afterParts
+          cases closingResult : symbol .rightParen context afterParts with
+          | invariant error =>
+              simp only [Reply.PreservesTokenWindow]
+          | reject failure rejected =>
+              rw [closingResult] at closingShape
+              simpa only [Reply.PreservesTokenWindow] using
+                closingShape.trans (partsShape.trans openingShape)
+          | ok closing next =>
+              rw [closingResult] at closingShape
+              simpa only [Reply.PreservesTokenWindow] using
+                closingShape.trans (partsShape.trans openingShape)
+
 /-- Operator-selector success preserves the immutable token carrier. -/
 theorem operatorSelector_preservesTokensOnSuccess (context : ParseContext) :
     Parser.PreservesTokensOnSuccess (operatorSelector context) := by
@@ -338,6 +412,24 @@ theorem selectorName_validFor (context : ParseContext) :
         simp only
         unfold Reply.ValidFor SelectorName.ValidFor
         exact ⟨⟨spanValid, spanValid⟩, nameValid.2.1, nameValid.2.2⟩
+
+/-- Selector names preserve the token window on every ordinary reply. -/
+theorem selectorName_preservesTokenWindow (context : ParseContext) :
+    Parser.PreservesTokenWindow (selectorName context) := by
+  intro input
+  unfold selectorName
+  split
+  · exact operatorSelector_preservesTokenWindow context input
+  · have nameShape := identifier_preservesTokenWindow context input
+    cases nameResult : identifier context input with
+    | invariant error =>
+        simp only [Reply.PreservesTokenWindow]
+    | reject failure rejected =>
+        rw [nameResult] at nameShape
+        simpa only [nameResult, Reply.PreservesTokenWindow] using nameShape
+    | ok name next =>
+        rw [nameResult] at nameShape
+        simpa only [nameResult, Reply.PreservesTokenWindow] using nameShape
 
 /-- Selector-name success preserves the token carrier in both branches. -/
 theorem selectorName_preservesTokensOnSuccess (context : ParseContext) :
