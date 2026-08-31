@@ -7,6 +7,7 @@ import Solcore.Oracle.V4
 import Solcore.Oracle.Stream
 import Solcore.Standard.CanonicalData
 import Solcore.Test.SyntaxLexer
+import Solcore.Test.SyntaxParserBodyIsolation
 import Solcore.Test.SyntaxParserContracts
 import Solcore.Test.SyntaxParserDeclarationTrivia
 import Solcore.Test.SyntaxParserEnumTraitImpl
@@ -5055,6 +5056,7 @@ def testCanonicalRawLexing : IO Unit := do
 
 def run : IO Unit := do
   testSyntaxLexer
+  testSyntaxParserBodyIsolation
   testSyntaxParserContracts
   testSyntaxParserDeclarationTrivia
   testSyntaxParserEnumTraitImpl
