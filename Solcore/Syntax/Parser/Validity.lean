@@ -465,6 +465,12 @@ theorem getState_validFor :
   intro input inputValid
   exact ⟨⟨inputValid, rfl⟩, inputValid, rfl⟩
 
+/-- Reading the current state preserves its complete token window. -/
+theorem getState_preservesTokenWindow :
+    Parser.PreservesTokenWindow getState := by
+  intro input
+  exact ⟨rfl, rfl⟩
+
 /-- Reading the current state leaves the token carrier unchanged. -/
 theorem getState_preservesTokensOnSuccess :
     Parser.PreservesTokensOnSuccess getState := by
@@ -490,6 +496,16 @@ theorem modifyState_validFor (update : State → State)
   unfold modifyState Reply.ValidFor
   exact ⟨trivial, (preserves input inputValid).1,
     (preserves input inputValid).2⟩
+
+/-- A state update preserves the token window when its update function does. -/
+theorem modifyState_preservesTokenWindow (update : State → State)
+    (preserves : ∀ input,
+      (update input).tokens = input.tokens ∧
+        (update input).window = input.window) :
+    Parser.PreservesTokenWindow (modifyState update) := by
+  intro input
+  unfold modifyState Reply.PreservesTokenWindow
+  exact preserves input
 
 /-- A state update preserves the carrier when its update function does. -/
 theorem modifyState_preservesTokensOnSuccess (update : State → State)
@@ -525,6 +541,14 @@ theorem emitDiagnostic_validFor (diagnostic : ParseDiagnostic)
   intro input inputValid
   exact emitDiagnostic_reply_validFor inputValid diagnostic
     (diagnosticValid input inputValid)
+
+/-- Adding a diagnostic preserves the complete token window. -/
+theorem emitDiagnostic_preservesTokenWindow
+    (diagnostic : ParseDiagnostic) :
+    Parser.PreservesTokenWindow (emitDiagnostic diagnostic) := by
+  apply modifyState_preservesTokenWindow
+  intro input
+  exact ⟨rfl, rfl⟩
 
 /-- Adding a diagnostic does not alter the immutable token carrier. -/
 theorem emitDiagnostic_preservesTokensOnSuccess

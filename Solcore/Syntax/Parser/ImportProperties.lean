@@ -24,11 +24,6 @@ private theorem importBind_ok_components {α β : Type}
   | reject failure rejected => rw [firstResult] at parsed; contradiction
   | invariant error => rw [firstResult] at parsed; contradiction
 
-private theorem getState_preservesTokenWindow :
-    Parser.PreservesTokenWindow getState := by
-  intro input
-  exact ⟨rfl, rfl⟩
-
 /-- Optional selected-import aliases retain their identifier range. -/
 theorem selectedAlias_validFor :
     ImportInternals.selectedAlias.ValidFor

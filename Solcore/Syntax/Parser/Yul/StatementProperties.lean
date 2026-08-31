@@ -85,11 +85,6 @@ theorem yulBlockStatement_startsAtCurrentTokenOnSuccess
   cases ‹_ = Reply.ok _ _›
   rfl
 
-private theorem getState_preservesTokenWindow :
-    Parser.PreservesTokenWindow getState := by
-  intro input
-  exact ⟨rfl, rfl⟩
-
 /-- A Yul `let` initializer preserves a present expression's provenance. -/
 theorem yulLetInitializer_validFor :
     yulLetInitializer.ValidFor (Option.ValidFor YulExpr.ValidFor) := by

@@ -44,11 +44,6 @@ private theorem requireNonempty_cursorMonotoneOnSuccess {α : Type}
       cases result
       exact Nat.le_refl _
 
-private theorem getState_preservesTokenWindow :
-    Parser.PreservesTokenWindow getState := by
-  intro input
-  exact ⟨rfl, rfl⟩
-
 private theorem requireNonempty_preservesTokenWindow {α : Type}
     (parsed : DelimitedList α) (phase : ParserPhase) :
     Parser.PreservesTokenWindow (requireNonempty parsed phase) := by
