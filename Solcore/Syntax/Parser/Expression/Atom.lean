@@ -234,7 +234,10 @@ def expressionAtom (nested : Parser Expr)
         recoverAtom (rewound.emit failure.toDiagnostic)
   | .invariant error => .invariant error
 
-private def postfixTail (nested : Parser Expr) (block : Parser Block) :
+namespace ExpressionAtomInternals
+
+/-- Extend one atom through every following index, call, and field suffix. -/
+def postfixTail (nested : Parser Expr) (block : Parser Block) :
     Nat → Expr → State → Reply Expr
   | 0, _, state => .invariant (.fuelExhausted .expression state.currentSpan)
   | fuel + 1, base, state =>
@@ -246,7 +249,7 @@ private def postfixTail (nested : Parser Expr) (block : Parser Block) :
                 match symbol .rightBracket .expression next with
                 | .ok closing afterClosing =>
                     let brackets := SourceSpan.cover opening.span closing.span
-                    postfixTail nested block fuel {
+                    ExpressionAtomInternals.postfixTail nested block fuel {
                       span := SourceSpan.cover base.span closing.span
                       value := .index base brackets index
                     } afterClosing
@@ -260,7 +263,7 @@ private def postfixTail (nested : Parser Expr) (block : Parser Block) :
         match delimitedNoTrailing .leftParen .rightParen true nested
             .expression .expression state with
         | .ok arguments next =>
-            postfixTail nested block fuel {
+            ExpressionAtomInternals.postfixTail nested block fuel {
               span := SourceSpan.cover base.span arguments.span
               value := .call base arguments
             } next
@@ -271,7 +274,7 @@ private def postfixTail (nested : Parser Expr) (block : Parser Block) :
         | .ok dot afterDot =>
             match identifier .expression afterDot with
             | .ok name next =>
-                postfixTail nested block fuel {
+                ExpressionAtomInternals.postfixTail nested block fuel {
                   span := SourceSpan.cover base.span name.span
                   value := .field base dot.span name
                 } next
@@ -282,12 +285,15 @@ private def postfixTail (nested : Parser Expr) (block : Parser Block) :
       else
         .ok base state
 
+end ExpressionAtomInternals
+
 /-- Parse an atom followed by all canonical postfix operations. -/
 def expressionPostfix (nested : Parser Expr)
     (block : Parser Block) : Parser Expr := fun state =>
   match expressionAtom nested block state with
   | .ok base next =>
-      postfixTail nested block (next.remainingCount + 1) base next
+      ExpressionAtomInternals.postfixTail nested block
+        (next.remainingCount + 1) base next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
 

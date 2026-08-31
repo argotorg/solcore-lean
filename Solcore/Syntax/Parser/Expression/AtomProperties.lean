@@ -1354,5 +1354,192 @@ theorem lambdaExpression_retainsBodyEndOnSuccess (block : Parser Block)
   cases finished
   exact ⟨marker, parameters, returnType, body, rfl, rfl⟩
 
+/-- The postfix loop preserves every ordinary token window. -/
+theorem postfixTail_preservesTokenWindow
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedWindow : Parser.PreservesTokenWindow nested) :
+    ∀ fuel base,
+      Parser.PreservesTokenWindow (postfixTail nested block fuel base) := by
+  intro fuel
+  induction fuel with
+  | zero => intro base input; trivial
+  | succ fuel inductionHypothesis =>
+      intro base input
+      unfold postfixTail
+      by_cases indexed : isSymbol input .leftBracket
+      · simp only [indexed, if_true]
+        have openingShape :=
+          symbol_preservesTokenWindow .leftBracket .expression input
+        cases openingResult : symbol .leftBracket .expression input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [openingResult] at openingShape
+            exact openingShape
+        | ok opening afterOpening =>
+            rw [openingResult] at openingShape
+            simp only
+            have indexShape := nestedWindow afterOpening
+            cases indexResult : nested afterOpening with
+            | invariant error => trivial
+            | reject failure rejected =>
+                rw [indexResult] at indexShape
+                exact indexShape.trans openingShape
+            | ok index next =>
+                rw [indexResult] at indexShape
+                simp only
+                have closingShape :=
+                  symbol_preservesTokenWindow .rightBracket .expression next
+                cases closingResult : symbol .rightBracket .expression next with
+                | invariant error => trivial
+                | reject failure rejected =>
+                    rw [closingResult] at closingShape
+                    exact (closingShape.trans indexShape).trans openingShape
+                | ok closing afterClosing =>
+                    rw [closingResult] at closingShape
+                    exact (((inductionHypothesis {
+                        span := SourceSpan.cover base.span closing.span
+                        value := .index base
+                          (SourceSpan.cover opening.span closing.span) index
+                      } afterClosing).trans closingShape).trans
+                        indexShape).trans openingShape
+      · simp only [indexed, Bool.false_eq_true, if_false]
+        by_cases called : isSymbol input .leftParen
+        · simp only [called, if_true]
+          have argumentsShape :
+              ((delimitedNoTrailing .leftParen .rightParen true nested
+                .expression .expression) input).PreservesTokenWindow input := by
+            simpa only [delimitedNoTrailing] using
+              (delimitedWithPolicy_preservesTokenWindow .leftParen .rightParen
+                true false nested .expression .expression nestedWindow input)
+          cases argumentsResult :
+              delimitedNoTrailing .leftParen .rightParen true nested
+                .expression .expression input with
+          | invariant error => trivial
+          | reject failure rejected =>
+              rw [argumentsResult] at argumentsShape
+              exact argumentsShape
+          | ok arguments next =>
+              rw [argumentsResult] at argumentsShape
+              exact (inductionHypothesis {
+                span := SourceSpan.cover base.span arguments.span
+                value := .call base arguments
+              } next).trans argumentsShape
+        · simp only [called, Bool.false_eq_true, if_false]
+          by_cases field : isSymbol input .dot
+          · simp only [field, if_true]
+            have dotShape := symbol_preservesTokenWindow .dot .expression input
+            cases dotResult : symbol .dot .expression input with
+            | invariant error => trivial
+            | reject failure rejected =>
+                rw [dotResult] at dotShape
+                exact dotShape
+            | ok dot afterDot =>
+                rw [dotResult] at dotShape
+                simp only
+                have nameShape := identifier_preservesTokenWindow
+                  .expression afterDot
+                cases nameResult : identifier .expression afterDot with
+                | invariant error => trivial
+                | reject failure rejected =>
+                    rw [nameResult] at nameShape
+                    exact nameShape.trans dotShape
+                | ok name next =>
+                    rw [nameResult] at nameShape
+                    exact ((inductionHypothesis {
+                      span := SourceSpan.cover base.span name.span
+                      value := .field base dot.span name
+                    } next).trans nameShape).trans dotShape
+          · simp only [field]
+            exact ⟨rfl, rfl⟩
+
+theorem postfixTail_preservesTokensOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (fuel : Nat) (base : Expr) :
+    Parser.PreservesTokensOnSuccess (postfixTail nested block fuel base) :=
+  (postfixTail_preservesTokenWindow nested block nestedWindow fuel
+    base).preservesTokensOnSuccess
+
+/-- Successful postfix parsing never rewinds its caller. -/
+theorem postfixTail_cursorMonotoneOnSuccess
+    (nested : Parser Expr) (block : Parser Block)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) :
+    ∀ fuel base,
+      Parser.CursorMonotoneOnSuccess (postfixTail nested block fuel base) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro base input expression final parsed
+      unfold postfixTail at parsed
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro base input expression final parsed
+      unfold postfixTail at parsed
+      by_cases indexed : isSymbol input .leftBracket
+      · simp only [indexed, if_true] at parsed
+        cases openingResult : symbol .leftBracket .expression input with
+        | invariant error => simp [openingResult] at parsed
+        | reject failure rejected => simp [openingResult] at parsed
+        | ok opening afterOpening =>
+            simp only [openingResult] at parsed
+            cases indexResult : nested afterOpening with
+            | invariant error => simp [indexResult] at parsed
+            | reject failure rejected => simp [indexResult] at parsed
+            | ok index next =>
+                simp only [indexResult] at parsed
+                cases closingResult : symbol .rightBracket .expression next with
+                | invariant error => simp [closingResult] at parsed
+                | reject failure rejected => simp [closingResult] at parsed
+                | ok closing afterClosing =>
+                    simp only [closingResult] at parsed
+                    exact Nat.le_trans
+                      (symbol_cursorMonotoneOnSuccess .leftBracket .expression
+                        input opening afterOpening openingResult)
+                      (Nat.le_trans
+                        (nestedCursor afterOpening index next indexResult)
+                        (Nat.le_trans
+                          (symbol_cursorMonotoneOnSuccess .rightBracket
+                            .expression next closing afterClosing closingResult)
+                          (inductionHypothesis _ afterClosing expression final
+                            parsed)))
+      · simp only [indexed, Bool.false_eq_true, if_false] at parsed
+        by_cases called : isSymbol input .leftParen
+        · simp only [called, if_true] at parsed
+          cases argumentsResult :
+              delimitedNoTrailing .leftParen .rightParen true nested
+                .expression .expression input with
+          | invariant error => simp [argumentsResult] at parsed
+          | reject failure rejected => simp [argumentsResult] at parsed
+          | ok arguments next =>
+              simp only [argumentsResult] at parsed
+              exact Nat.le_trans
+                (delimitedNoTrailing_cursorMonotoneOnSuccess .leftParen
+                  .rightParen true nested .expression .expression input
+                    arguments next argumentsResult)
+                (inductionHypothesis _ next expression final parsed)
+        · simp only [called, Bool.false_eq_true, if_false] at parsed
+          by_cases field : isSymbol input .dot
+          · simp only [field, if_true] at parsed
+            cases dotResult : symbol .dot .expression input with
+            | invariant error => simp [dotResult] at parsed
+            | reject failure rejected => simp [dotResult] at parsed
+            | ok dot afterDot =>
+                simp only [dotResult] at parsed
+                cases nameResult : identifier .expression afterDot with
+                | invariant error => simp [nameResult] at parsed
+                | reject failure rejected => simp [nameResult] at parsed
+                | ok name next =>
+                    simp only [nameResult] at parsed
+                    exact Nat.le_trans
+                      (symbol_cursorMonotoneOnSuccess .dot .expression input dot
+                        afterDot dotResult)
+                      (Nat.le_trans
+                        (identifier_cursorMonotoneOnSuccess .expression afterDot
+                          name next nameResult)
+                        (inductionHypothesis _ next expression final parsed))
+          · simp only [field] at parsed
+            cases parsed
+            exact Nat.le_refl _
+
 end ExpressionAtomInternals
 end Solcore.Syntax.Parser
