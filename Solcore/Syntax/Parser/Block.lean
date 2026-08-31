@@ -345,6 +345,66 @@ private def captureBlock? (state : State) : Option CapturedBlock :=
         none
   | none => none
 
+private theorem captureBlockTail_cursor_lt_endIndex
+    (state : State) (opening : Token) :
+    ∀ fuel depth offset captured,
+      captureBlockTail state opening fuel depth offset = some captured →
+        state.cursor < captured.window.endIndex := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intros
+      contradiction
+  | succ fuel inductionHypothesis =>
+      intro depth offset captured result
+      unfold captureBlockTail at result
+      cases found : state.peekOffset? offset with
+      | none => simp [found] at result
+      | some token =>
+          simp only [found] at result
+          rcases token with ⟨span, kind⟩
+          cases kind with
+          | symbol symbol =>
+              cases symbol <;>
+                try { exact inductionHypothesis _ _ _ result }
+              case rightBrace =>
+                by_cases atRoot : depth = 1
+                · subst depth
+                  have capturedEq := Option.some.inj (by
+                    simpa using result)
+                  subst captured
+                  change state.cursor < state.cursor + offset + 1
+                  omega
+                · apply inductionHypothesis (depth - 1) (offset + 1)
+                  simpa [atRoot] using result
+          | keyword keyword => exact inductionHypothesis _ _ _ result
+          | identifier text => exact inductionHypothesis _ _ _ result
+          | yulIdentifier text => exact inductionHypothesis _ _ _ result
+          | decimalLiteral text => exact inductionHypothesis _ _ _ result
+          | hexadecimalLiteral text => exact inductionHypothesis _ _ _ result
+          | stringLiteral text => exact inductionHypothesis _ _ _ result
+          | yulMetaBacktick text => exact inductionHypothesis _ _ _ result
+          | yulMetaInterpolation text =>
+              exact inductionHypothesis _ _ _ result
+
+private theorem captureBlock?_cursor_lt_endIndex {state : State}
+    {captured : CapturedBlock}
+    (result : captureBlock? state = some captured) :
+    state.cursor < captured.window.endIndex := by
+  unfold captureBlock? at result
+  cases found : state.peek? with
+  | none => simp [found] at result
+  | some opening =>
+      simp only [found] at result
+      split at result
+      · exact captureBlockTail_cursor_lt_endIndex state opening
+          state.remainingCount 1 1 captured result
+      · contradiction
+
+/-- Whether the current cursor begins a lexically balanced braced block. -/
+def hasBalancedBlockCapture (state : State) : Bool :=
+  (captureBlock? state).isSome
+
 /--
 Run a block parser in its balanced brace window. An ordinary body rejection is
 local to that window: retain its complete span and diagnostics, produce an empty
@@ -366,5 +426,76 @@ def isolateBlock (parser : Parser Block) : Parser Block := fun state =>
           .ok { span := captured.span, value := [] }
             (merged.emit failure.toDiagnostic)
       | .invariant error => .invariant error
+
+/-- Block isolation preserves the parent token carrier on every success path. -/
+theorem isolateBlock_preservesTokensOnSuccess (parser : Parser Block)
+    (parserShape : Parser.PreservesTokensOnSuccess parser) :
+    Parser.PreservesTokensOnSuccess (isolateBlock parser) := by
+  intro input body next result
+  unfold isolateBlock at result
+  cases captureResult : captureBlock? input with
+  | none =>
+      simp only [captureResult] at result
+      exact parserShape input body next result
+  | some captured =>
+      simp only [captureResult] at result
+      cases childResult : parser
+          (input.enterWindow input.cursor captured.window) with
+      | ok childBody childAfter =>
+          simp only [childResult] at result
+          cases result
+          rfl
+      | reject failure childAfter =>
+          simp only [childResult] at result
+          cases result
+          rfl
+      | invariant error =>
+          simp [childResult] at result
+
+private theorem isolateBlock_cursor_lt_onSuccess_of_capture
+    (parser : Parser Block) {input next : State} {body : Block}
+    {captured : CapturedBlock}
+    (captureResult : captureBlock? input = some captured)
+    (result : isolateBlock parser input = .ok body next) :
+    input.cursor < next.cursor := by
+  have capturedProgress := captureBlock?_cursor_lt_endIndex captureResult
+  unfold isolateBlock at result
+  simp only [captureResult] at result
+  cases childResult : parser
+      (input.enterWindow input.cursor captured.window) with
+  | ok childBody childAfter =>
+      simp only [childResult] at result
+      cases result
+      simpa [State.mergeDiagnostics] using capturedProgress
+  | reject failure childAfter =>
+      simp only [childResult] at result
+      cases result
+      simpa [State.mergeDiagnostics, State.emit] using capturedProgress
+  | invariant error =>
+      simp [childResult] at result
+
+/-- A balanced captured block always advances beyond its closing brace. -/
+theorem isolateBlock_cursor_lt_onSuccess_of_balancedCapture
+    (parser : Parser Block) {input next : State} {body : Block}
+    (captured : hasBalancedBlockCapture input = true)
+    (result : isolateBlock parser input = .ok body next) :
+    input.cursor < next.cursor := by
+  rcases Option.isSome_iff_exists.mp captured with
+    ⟨capturedBlock, captureResult⟩
+  exact isolateBlock_cursor_lt_onSuccess_of_capture parser captureResult result
+
+/-- Block isolation either keeps the parser's progress or skips its capture. -/
+theorem isolateBlock_cursorMonotoneOnSuccess (parser : Parser Block)
+    (parserMonotone : Parser.CursorMonotoneOnSuccess parser) :
+    Parser.CursorMonotoneOnSuccess (isolateBlock parser) := by
+  intro input body next result
+  cases captureResult : captureBlock? input with
+  | none =>
+      unfold isolateBlock at result
+      simp only [captureResult] at result
+      exact parserMonotone input body next result
+  | some captured =>
+      exact Nat.le_of_lt
+        (isolateBlock_cursor_lt_onSuccess_of_capture parser captureResult result)
 
 end Solcore.Syntax.Parser
