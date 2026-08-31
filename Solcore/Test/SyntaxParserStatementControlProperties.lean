@@ -60,5 +60,10 @@ example := @breakStatement_cursorMonotoneOnSuccess
 example := @continueStatement_cursorMonotoneOnSuccess
 example := @breakStatement_startsAtCurrentTokenOnSuccess
 example := @continueStatement_startsAtCurrentTokenOnSuccess
+example := @ControlInternals.terminatedControl_cursor_lt_onSuccess
+example := @breakStatement_preservesTokensOnSuccess
+example := @continueStatement_preservesTokensOnSuccess
+example := @breakStatement_cursor_lt_onSuccess
+example := @continueStatement_cursor_lt_onSuccess
 
 end Tests

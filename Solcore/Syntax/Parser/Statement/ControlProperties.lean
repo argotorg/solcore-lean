@@ -1535,4 +1535,45 @@ theorem continueStatement_startsAtCurrentTokenOnSuccess :
   ControlInternals.terminatedControl_startsAtCurrentTokenOnSuccess
     .continueKw .continueStmt
 
+/-- Every successful terminated control consumes its leading keyword. -/
+theorem ControlInternals.terminatedControl_cursor_lt_onSuccess
+    (keywordValue : HardKeyword) (value : StatementValue)
+    {input final : State} {statement : Statement}
+    (parsed : terminatedControl keywordValue value input = .ok statement final) :
+    input.cursor < final.cursor := by
+  have stages := parsed
+  unfold terminatedControl at stages
+  rcases controlBind_ok_components stages with
+    ⟨marker, afterMarker, markerResult, rest⟩
+  rcases controlBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, semicolonResult, finished⟩
+  cases finished
+  exact Nat.lt_of_lt_of_le
+    (acceptToken_cursor_lt_onSuccess (.keyword keywordValue) .statement
+      (· == .keyword keywordValue) markerResult)
+    (symbol_cursorMonotoneOnSuccess .semicolon .statement afterMarker
+      semicolon final semicolonResult)
+
+theorem breakStatement_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess breakStatement :=
+  breakStatement_preservesTokenWindow.preservesTokensOnSuccess
+
+theorem continueStatement_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess continueStatement :=
+  continueStatement_preservesTokenWindow.preservesTokensOnSuccess
+
+theorem breakStatement_cursor_lt_onSuccess
+    {input final : State} {statement : Statement}
+    (parsed : breakStatement input = .ok statement final) :
+    input.cursor < final.cursor :=
+  ControlInternals.terminatedControl_cursor_lt_onSuccess
+    .breakKw .breakStmt parsed
+
+theorem continueStatement_cursor_lt_onSuccess
+    {input final : State} {statement : Statement}
+    (parsed : continueStatement input = .ok statement final) :
+    input.cursor < final.cursor :=
+  ControlInternals.terminatedControl_cursor_lt_onSuccess
+    .continueKw .continueStmt parsed
+
 end Solcore.Syntax.Parser
