@@ -169,10 +169,18 @@ private def testControlStatements : IO Unit := do
       { value := .block nestedBody, .. }
     ] =>
       assertEqual (expressionName? condition) (some "ready") "while condition"
-      assertEqual whileBody.value.length 1 "while body"
-      assertEqual thenBody.value.length 1 "if body"
-      assertEqual elseBody.value.length 1 "else body"
-      assertEqual nestedBody.length 1 "nested block"
+      match whileBody.value, thenBody.value, elseBody.value, nestedBody with
+      | [{ value := .breakStmt, .. }],
+          [{ value := .returnStmt none, .. }],
+          [{ value := .continueStmt, .. }],
+          [{ value := .letDecl name none none, .. }] =>
+          assertEqual name.value "x" "nested block let"
+      | whileStatements, thenStatements, elseStatements, blockStatements =>
+          let message :=
+            s!"control bodies changed: {reprStr whileStatements}; " ++
+              s!"{reprStr thenStatements}; {reprStr elseStatements}; " ++
+              s!"{reprStr blockStatements}"
+          throw (IO.userError message)
   | statements => throw (IO.userError
       s!"control statement shapes changed: {reprStr statements}")
 
