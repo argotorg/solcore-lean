@@ -362,6 +362,38 @@ theorem pragmaDecl_preservesTokensOnSuccess :
                   exact semicolonTokens.trans
                     (itemsTokens.trans (nameTokens.trans keywordTokens))
 
+/-- A pragma declaration starts at its retained `pragma` keyword token. -/
+theorem pragmaDecl_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess pragmaDecl (·.span) := by
+  intro input declaration next result
+  unfold pragmaDecl at result
+  cases keywordResult : keyword .pragmaKw .pragmaDecl input with
+  | invariant error => simp [bind, keywordResult] at result
+  | reject failure rejected => simp [bind, keywordResult] at result
+  | ok pragmaKeyword afterKeyword =>
+      simp only [bind, keywordResult] at result
+      cases nameResult : rawIdentifier .pragmaDecl afterKeyword with
+      | invariant error => simp [nameResult] at result
+      | reject failure rejected => simp [nameResult] at result
+      | ok name afterName =>
+          simp only [nameResult] at result
+          cases itemsResult : pragmaItems afterName with
+          | invariant error => simp [itemsResult] at result
+          | reject failure rejected => simp [itemsResult] at result
+          | ok items afterItems =>
+              simp only [itemsResult] at result
+              cases semicolonResult :
+                  symbol .semicolon .pragmaDecl afterItems with
+              | invariant error => simp [semicolonResult] at result
+              | reject failure rejected => simp [semicolonResult] at result
+              | ok semicolon final =>
+                  simp only [semicolonResult] at result
+                  cases result
+                  exact ⟨pragmaKeyword,
+                    (acceptToken_ok_state_shape (.keyword .pragmaKw)
+                      .pragmaDecl (· == .keyword .pragmaKw)
+                      keywordResult).1, rfl⟩
+
 /-- Every successful pragma consumes its keyword, name, and terminator. -/
 theorem pragmaDecl_cursor_lt_onSuccess {input next : State}
     {declaration : PragmaDecl}

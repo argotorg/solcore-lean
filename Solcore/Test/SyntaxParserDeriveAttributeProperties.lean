@@ -23,6 +23,9 @@ example : deriveAttribute.ValidFor DeriveAttribute.ValidFor :=
 example : Parser.PreservesTokensOnSuccess deriveAttribute :=
   deriveAttribute_preservesTokensOnSuccess
 
+example : Parser.StartsAtCurrentTokenOnSuccess deriveAttribute (·.span) :=
+  deriveAttribute_startsAtCurrentTokenOnSuccess
+
 example {input next : State} {value : DeriveAttribute}
     (parsed : deriveAttribute input = .ok value next) :
     input.cursor < next.cursor :=
@@ -30,5 +33,14 @@ example {input next : State} {value : DeriveAttribute}
 
 example : Parser.CursorMonotoneOnSuccess deriveAttribute :=
   deriveAttribute_cursorMonotoneOnSuccess
+
+example :
+    deriveAttribute.ValidFor DeriveAttribute.ValidFor ∧
+      Parser.PreservesTokensOnSuccess deriveAttribute ∧
+      Parser.CursorMonotoneOnSuccess deriveAttribute ∧
+      Parser.StartsAtCurrentTokenOnSuccess deriveAttribute (·.span) :=
+  ⟨deriveAttribute_validFor, deriveAttribute_preservesTokensOnSuccess,
+    deriveAttribute_cursorMonotoneOnSuccess,
+    deriveAttribute_startsAtCurrentTokenOnSuccess⟩
 
 end Tests

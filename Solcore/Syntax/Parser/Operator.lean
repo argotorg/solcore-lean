@@ -290,6 +290,34 @@ theorem operatorSelector_preservesTokensOnSuccess (context : ParseContext) :
                 _ = afterOpening.tokens := partsShape.1
                 _ = input.tokens := by rw [openingShape.2]
 
+/-- An operator selector starts at its retained opening parenthesis. -/
+theorem operatorSelector_startsAtCurrentTokenOnSuccess
+    (context : ParseContext) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (operatorSelector context) (·.span) := by
+  intro input selector next result
+  unfold operatorSelector at result
+  cases openingResult : symbol .leftParen context input with
+  | invariant error => simp [openingResult] at result
+  | reject failure rejected => simp [openingResult] at result
+  | ok opening afterOpening =>
+      simp only [openingResult] at result
+      cases partsResult : operatorParts context
+          (afterOpening.remainingCount + 1) [] afterOpening with
+      | invariant error => simp [partsResult] at result
+      | reject failure rejected => simp [partsResult] at result
+      | ok parts afterParts =>
+          simp only [partsResult] at result
+          cases closingResult : symbol .rightParen context afterParts with
+          | invariant error => simp [closingResult] at result
+          | reject failure rejected => simp [closingResult] at result
+          | ok closing final =>
+              simp only [closingResult] at result
+              cases result
+              exact ⟨opening,
+                (symbol_ok_state_shape .leftParen context openingResult).1,
+                rfl⟩
+
 /-- Parse either an ordinary identifier or a parenthesized operator. -/
 def selectorName (context : ParseContext) : Parser SelectorName := fun state =>
   if isSymbol state .leftParen then
@@ -342,6 +370,24 @@ theorem selectorName_preservesTokensOnSuccess (context : ParseContext) :
         rcases identifier_ok_state_shape context identifierResult with
           ⟨_token, _found, _span, tokensEq, _cursor⟩
         exact tokensEq
+
+/-- A selector name starts at its identifier or opening parenthesis. -/
+theorem selectorName_startsAtCurrentTokenOnSuccess (context : ParseContext) :
+    Parser.StartsAtCurrentTokenOnSuccess (selectorName context) (·.span) := by
+  intro input selector next result
+  unfold selectorName at result
+  split at result
+  · exact operatorSelector_startsAtCurrentTokenOnSuccess context
+      input selector next result
+  · cases identifierResult : identifier context input with
+    | invariant error => simp [identifierResult] at result
+    | reject failure rejected => simp [identifierResult] at result
+    | ok name afterName =>
+        simp only [identifierResult] at result
+        cases result
+        rcases identifier_ok_state_shape context identifierResult with
+          ⟨token, found, span, _tokens, _cursor⟩
+        exact ⟨token, found, congrArg SourceSpan.startByte span⟩
 
 /-- Parenthesized operator selectors consume both delimiters. -/
 theorem operatorSelector_cursor_lt_onSuccess (context : ParseContext)
