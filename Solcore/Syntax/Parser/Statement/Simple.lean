@@ -159,20 +159,24 @@ def returnStatement (expression : Parser Expr) : Parser Statement := do
     value := .returnStmt value
   }
 
-private def forLetItem (expression : Parser Expr) : Parser ForItem := do
+namespace StatementSimpleInternals
+
+def forLetEnd (name : Identifier) (type : Option TypeExpr)
+    (initializer : Option Expr) : SourceSpan :=
+  initializer.map (fun value => value.span) |>.getD
+    (type.map (fun value => value.span) |>.getD name.span)
+
+def forLetItem (expression : Parser Expr) : Parser ForItem := do
   let marker ← keyword .letKw .statement
   let name ← identifier .statement
   let type ← StatementSimpleInternals.optionalLetType
   let initializer ←
     StatementSimpleInternals.optionalLetInitializer expression
-  let endSpan := initializer.map (fun value => value.span) |>.getD
-    (type.map (fun value => value.span) |>.getD name.span)
+  let endSpan := forLetEnd name type initializer
   pure {
     span := SourceSpan.cover marker.span endSpan
     value := .letDecl name type initializer
   }
-
-namespace StatementSimpleInternals
 
 def forAssignmentOrExpression
     (expression : Parser Expr) : Parser ForItem := do
@@ -193,7 +197,8 @@ end StatementSimpleInternals
 
 /-- Restricted item accepted in one canonical `for` header list. -/
 def forItem (expression : Parser Expr) : Parser ForItem := fun state =>
-  if isKeyword state .letKw then forLetItem expression state
+  if isKeyword state .letKw then
+    StatementSimpleInternals.forLetItem expression state
   else StatementSimpleInternals.forAssignmentOrExpression expression state
 
 end Solcore.Syntax.Parser

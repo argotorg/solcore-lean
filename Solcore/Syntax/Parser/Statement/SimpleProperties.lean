@@ -756,6 +756,283 @@ theorem optionalLetInitializer_cursorMonotoneOnSuccess
   · simp only [present]
     exact Parser.pure_cursorMonotoneOnSuccess none
 
+/-- A present optional type exposes the first token after its colon. -/
+theorem optionalLetType_some_startsAfterColon {input final : State}
+    {type : TypeExpr}
+    (parsed : optionalLetType input = .ok (some type) final) :
+    ∃ colon afterColon first,
+      symbol .colon .statement input = .ok colon afterColon ∧
+      afterColon.peek? = some first ∧
+      first.span.startByte = type.span.startByte := by
+  unfold optionalLetType getState at parsed
+  simp only [bind] at parsed
+  by_cases present : isSymbol input .colon
+  · simp only [present, if_true] at parsed
+    rcases simpleBind_ok_components parsed with
+      ⟨colon, afterColon, colonResult, rest⟩
+    rcases simpleBind_ok_components rest with
+      ⟨parsedType, afterType, typeResult, finished⟩
+    have typeEq : parsedType = type := by cases finished; rfl
+    subst parsedType
+    rcases typeExpr_startsAtCurrentTokenOnSuccess
+        afterColon type afterType typeResult with
+      ⟨first, firstFound, firstStart⟩
+    exact ⟨colon, afterColon, first, colonResult, firstFound, firstStart⟩
+  · simp only [present] at parsed
+    change Reply.ok none input = .ok (some type) final at parsed
+    cases parsed
+
+/-- A present initializer exposes the expression token after its equals sign. -/
+theorem optionalLetInitializer_some_startsAfterEqual
+    (expression : Parser Expr)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span))
+    {input final : State} {value : Expr}
+    (parsed : optionalLetInitializer expression input =
+      .ok (some value) final) :
+    ∃ equal afterEqual first,
+      symbol .equal .statement input = .ok equal afterEqual ∧
+      afterEqual.peek? = some first ∧
+      first.span.startByte = value.span.startByte := by
+  unfold optionalLetInitializer getState at parsed
+  simp only [bind] at parsed
+  by_cases present : isSymbol input .equal
+  · simp only [present, if_true] at parsed
+    rcases simpleBind_ok_components parsed with
+      ⟨equal, afterEqual, equalResult, rest⟩
+    rcases simpleBind_ok_components rest with
+      ⟨parsedValue, afterValue, valueResult, finished⟩
+    have valueEq : parsedValue = value := by cases finished; rfl
+    subst parsedValue
+    rcases expressionStarts afterEqual value afterValue valueResult with
+      ⟨first, firstFound, firstStart⟩
+    exact ⟨equal, afterEqual, first, equalResult, firstFound, firstStart⟩
+  · simp only [present] at parsed
+    change Reply.ok none input = .ok (some value) final at parsed
+    cases parsed
+
+/-- For-header let items preserve nested expression token windows. -/
+theorem forLetItem_preservesTokenWindow (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow (forLetItem expression) := by
+  unfold forLetItem
+  apply Parser.bind_preservesTokenWindow
+    (keyword_preservesTokenWindow .letKw .statement)
+  intro marker
+  apply Parser.bind_preservesTokenWindow
+    (identifier_preservesTokenWindow .statement)
+  intro name
+  apply Parser.bind_preservesTokenWindow optionalLetType_preservesTokenWindow
+  intro type
+  apply Parser.bind_preservesTokenWindow
+    (optionalLetInitializer_preservesTokenWindow expression expressionWindow)
+  intro initializer
+  exact Parser.pure_preservesTokenWindow _
+
+theorem forLetItem_preservesTokensOnSuccess (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess (forLetItem expression) :=
+  (forLetItem_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- For-header let items never rewind the token cursor. -/
+theorem forLetItem_cursorMonotoneOnSuccess (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess (forLetItem expression) := by
+  unfold forLetItem
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (keyword_cursorMonotoneOnSuccess .letKw .statement)
+  intro marker
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (identifier_cursorMonotoneOnSuccess .statement)
+  intro name
+  apply Parser.bind_cursorMonotoneOnSuccess
+    optionalLetType_cursorMonotoneOnSuccess
+  intro type
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (optionalLetInitializer_cursorMonotoneOnSuccess expression
+      expressionCursor)
+  intro initializer
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- A for-header let item starts at its leading `let` keyword. -/
+theorem forLetItem_startsAtCurrentTokenOnSuccess (expression : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (forLetItem expression) (·.span) := by
+  unfold forLetItem
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (acceptToken_startsAtCurrentTokenOnSuccess (.keyword .letKw)
+      .statement (· == .keyword .letKw))
+  intro marker input item final parsed
+  rcases simpleBind_ok_components parsed with
+    ⟨name, afterName, _nameResult, rest⟩
+  rcases simpleBind_ok_components rest with
+    ⟨type, afterType, _typeResult, rest⟩
+  rcases simpleBind_ok_components rest with
+    ⟨initializer, afterInitializer, _initializerResult, finished⟩
+  cases finished
+  rfl
+
+/-- The selected for-let endpoint retains valid source provenance. -/
+theorem forLetEnd_validFor
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    {file : SourceFile} {name : Identifier} {type : Option TypeExpr}
+    {initializer : Option Expr} (nameValid : name.span.ValidFor file)
+    (typeValid : Option.ValidFor TypeExpr.ValidFor file type)
+    (initializerValid : Option.ValidFor expressionValueValid file initializer) :
+    (forLetEnd name type initializer).ValidFor file := by
+  cases initializer with
+  | some value =>
+      exact expressionSpan file value
+        (by simpa only [Option.ValidFor] using initializerValid)
+  | none =>
+      cases type with
+      | some value =>
+          exact TypeExpr.ValidFor.span_valid
+            (by simpa only [Option.ValidFor] using typeValid)
+      | none => exact nameValid
+
+/-- For-header let items retain name, type, initializer, and outer ranges. -/
+theorem forLetItem_validFor
+    (expression : Parser Expr)
+    (expressionValueValid : SourceFile → Expr → Prop)
+    (expressionValid : expression.ValidFor expressionValueValid)
+    (expressionSpan : ∀ file value,
+      expressionValueValid file value → value.span.ValidFor file)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span)) :
+    (forLetItem expression).ValidFor
+      (ForItem.ValidFor expressionValueValid) := by
+  have weak : (forLetItem expression).ValidFor (fun _ _ => True) := by
+    unfold forLetItem
+    apply Parser.bind_validFor (keyword_validFor .letKw .statement)
+    intro marker
+    apply Parser.bind_validFor (identifier_validFor .statement)
+    intro name
+    apply Parser.bind_validFor optionalLetType_validFor
+    intro type
+    apply Parser.bind_validFor
+      (optionalLetInitializer_validFor expression expressionValueValid
+        expressionValid)
+    intro initializer
+    exact Parser.pure_validFor _ _ (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : forLetItem expression input with
+  | invariant error => trivial
+  | reject failure rejected => rw [parsed] at weakResult; exact weakResult
+  | ok item final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold forLetItem at stages
+      rcases simpleBind_ok_components stages with
+        ⟨marker, afterMarker, markerResult, rest⟩
+      rcases simpleBind_ok_components rest with
+        ⟨name, afterName, nameResult, rest⟩
+      rcases simpleBind_ok_components rest with
+        ⟨type, afterType, typeResult, rest⟩
+      rcases simpleBind_ok_components rest with
+        ⟨initializer, afterInitializer, initializerResult, finished⟩
+      have markerReply := keyword_validFor .letKw .statement input inputValid
+      rw [markerResult] at markerReply
+      have nameReply := identifier_validFor .statement afterMarker
+        markerReply.2.1
+      rw [nameResult] at nameReply
+      have typeReply := optionalLetType_validFor afterName nameReply.2.1
+      rw [typeResult] at typeReply
+      have initializerReply := optionalLetInitializer_validFor expression
+        expressionValueValid expressionValid afterType typeReply.2.1
+      rw [initializerResult] at initializerReply
+      have markerValid : marker.span.ValidFor input.file := by
+        simpa only [Located.ValidFor] using markerReply.1
+      have nameValid : name.span.ValidFor input.file := by
+        simpa only [Located.ValidFor, markerReply.2.2] using nameReply.1
+      have typeValid : Option.ValidFor TypeExpr.ValidFor input.file type := by
+        simpa [nameReply.2.2, markerReply.2.2] using typeReply.1
+      have initializerValid : Option.ValidFor expressionValueValid input.file
+          initializer := by
+        simpa [typeReply.2.2, nameReply.2.2, markerReply.2.2] using
+          initializerReply.1
+      have endpointValid := forLetEnd_validFor expressionValueValid
+        expressionSpan nameValid typeValid initializerValid
+      have markerAt := State.getElem?_eq_some_of_peek?_eq_some
+        (acceptToken_ok_state_shape (.keyword .letKw) .statement
+          (· == .keyword .letKw) markerResult).1
+      have markerBefore {later : State} {first : Token}
+          {endpoint : SourceSpan} (tokens : later.tokens = input.tokens)
+          (cursor : input.cursor < later.cursor)
+          (found : later.peek? = some first)
+          (starts : first.span.startByte = endpoint.startByte)
+          (valid : endpoint.ValidFor input.file) :
+          marker.span.startByte ≤ endpoint.endByte := by
+        have firstAt : input.tokens[later.cursor]? = some first := by
+          simpa [tokens] using State.getElem?_eq_some_of_peek?_eq_some found
+        exact Nat.le_trans markerValid.2.1 (Nat.le_trans
+          (inputValid.token_end_le_token_start_of_getElem?_lt markerAt firstAt
+            cursor) (by simpa [starts] using valid.2.1))
+      have markerTokens := keyword_preservesTokensOnSuccess .letKw .statement
+        input marker afterMarker markerResult
+      have markerCursor := acceptToken_cursor_lt_onSuccess
+        (.keyword .letKw) .statement (· == .keyword .letKw) markerResult
+      have nameTokens := identifier_preservesTokensOnSuccess .statement
+        afterMarker name afterName nameResult
+      have nameCursor := identifier_cursorMonotoneOnSuccess .statement
+        afterMarker name afterName nameResult
+      have typeTokens := optionalLetType_preservesTokensOnSuccess
+        afterName type afterType typeResult
+      have typeCursor := optionalLetType_cursorMonotoneOnSuccess
+        afterName type afterType typeResult
+      have endpointOrder : marker.span.startByte ≤
+          (forLetEnd name type initializer).endByte := by
+        cases initializer with
+        | some value =>
+            rcases optionalLetInitializer_some_startsAfterEqual expression
+                expressionStarts initializerResult with
+              ⟨equal, afterEqual, first, equalResult, firstFound, firstStart⟩
+            exact markerBefore
+              ((symbol_preservesTokensOnSuccess .equal .statement _ _ _
+                equalResult).trans (typeTokens.trans (nameTokens.trans markerTokens)))
+              (Nat.lt_of_lt_of_le markerCursor (Nat.le_trans nameCursor
+                (Nat.le_trans typeCursor (Nat.le_of_lt
+                  (acceptToken_cursor_lt_onSuccess (.symbol .equal) .statement
+                    (· == .symbol .equal) equalResult))))) firstFound firstStart
+              (expressionSpan input.file value
+                (by simpa only [Option.ValidFor] using initializerValid))
+        | none =>
+            cases type with
+            | some value =>
+                rcases optionalLetType_some_startsAfterColon typeResult with
+                  ⟨colon, afterColon, first, colonResult, firstFound, firstStart⟩
+                exact markerBefore
+                  ((symbol_preservesTokensOnSuccess .colon .statement _ _ _
+                    colonResult).trans (nameTokens.trans markerTokens))
+                  (Nat.lt_of_lt_of_le markerCursor (Nat.le_trans nameCursor
+                    (Nat.le_of_lt (acceptToken_cursor_lt_onSuccess
+                      (.symbol .colon) .statement (· == .symbol .colon)
+                        colonResult)))) firstFound firstStart
+                  (TypeExpr.ValidFor.span_valid
+                    (by simpa only [Option.ValidFor] using typeValid))
+            | none =>
+                rcases identifier_ok_state_shape .statement nameResult with
+                  ⟨first, firstFound, firstSpan, _tokens, _cursor⟩
+                exact markerBefore markerTokens markerCursor firstFound
+                  (congrArg SourceSpan.startByte firstSpan) nameValid
+      have outerValid := SourceSpan.cover_validFor markerValid endpointValid
+        endpointOrder
+      have retainedType : ∀ value ∈ type,
+          TypeExpr.ValidFor input.file value := by
+        intro value member
+        cases type <;> simp_all [Option.ValidFor]
+      have retainedInitializer : ∀ value ∈ initializer,
+          expressionValueValid input.file value := by
+        intro value member
+        cases initializer <;> simp_all [Option.ValidFor]
+      cases finished
+      exact ⟨ForItem.ValidFor.letDecl outerValid nameValid retainedType
+        retainedInitializer, weakResult.2.1, weakResult.2.2⟩
+
 /-- For-header assignment/expression items preserve nested token windows. -/
 theorem forAssignmentOrExpression_preservesTokenWindow
     (expression : Parser Expr)
