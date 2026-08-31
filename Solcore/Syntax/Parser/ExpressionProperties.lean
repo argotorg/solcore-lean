@@ -28,6 +28,23 @@ theorem foldConditionalHead_preservesElseEnd
       elseBranch.span.endByte := by
   rfl
 
+@[simp] theorem foldConditionalHead_startByte
+    (elseBranch : Expr) (head : ConditionalHead) :
+    (foldConditionalHead elseBranch head).span.startByte =
+      head.condition.span.startByte := rfl
+
+/-- Folding the same pending prefixes depends only on the base's left edge. -/
+theorem foldConditionalHeads_start_congr
+    (heads : List ConditionalHead) (first second : Expr)
+    (sameStart : first.span.startByte = second.span.startByte) :
+    (heads.foldl foldConditionalHead first).span.startByte =
+      (heads.foldl foldConditionalHead second).span.startByte := by
+  induction heads generalizing first second with
+  | nil => exact sameStart
+  | cons head rest inductionHypothesis =>
+      simp only [List.foldl]
+      exact inductionHypothesis _ _ rfl
+
 /-- Attaching a valid conditional prefix retains every recursive source range. -/
 theorem foldConditionalHead_validFor
     (statementValid : SourceFile → Statement → Prop)
@@ -221,6 +238,67 @@ theorem conditionalTail_cursorMonotoneOnSuccess
       · simp only [present] at parsed
         cases parsed
         exact Nat.le_refl _
+
+/-- A conditional tail preserves the left edge represented by its accumulator. -/
+theorem conditionalTail_preservesFoldStartOnSuccess
+    (nested alternative : Parser Expr) :
+    ∀ fuel heads condition input expression final,
+      conditionalTail nested alternative fuel heads condition input =
+        .ok expression final →
+      expression.span.startByte =
+        (heads.foldl foldConditionalHead condition).span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero => intros; contradiction
+  | succ fuel inductionHypothesis =>
+      intro heads condition input expression final parsed
+      unfold conditionalTail at parsed
+      by_cases present : isSymbol input .question
+      · simp only [present, if_true] at parsed
+        cases questionResult : symbol .question .expression input with
+        | invariant error => simp [questionResult] at parsed
+        | reject failure rejected => simp [questionResult] at parsed
+        | ok question afterQuestion =>
+            simp only [questionResult] at parsed
+            cases thenResult : nested afterQuestion with
+            | invariant error => simp [thenResult] at parsed
+            | reject failure rejected => simp [thenResult] at parsed
+            | ok thenBranch afterThen =>
+                simp only [thenResult] at parsed
+                cases colonResult : symbol .colon .expression afterThen with
+                | invariant error => simp [colonResult] at parsed
+                | reject failure rejected => simp [colonResult] at parsed
+                | ok colon afterColon =>
+                    simp only [colonResult] at parsed
+                    cases alternativeResult : alternative afterColon with
+                    | invariant error => simp [alternativeResult] at parsed
+                    | reject failure rejected =>
+                        simp [alternativeResult] at parsed
+                    | ok nextCondition next =>
+                        simp only [alternativeResult] at parsed
+                        calc
+                          expression.span.startByte =
+                              (({
+                                condition
+                                question := question.span
+                                thenBranch
+                                colon := colon.span
+                              } :: heads).foldl foldConditionalHead
+                                nextCondition).span.startByte :=
+                            inductionHypothesis _ _ next expression final parsed
+                          _ = (heads.foldl foldConditionalHead
+                              (foldConditionalHead nextCondition {
+                                condition
+                                question := question.span
+                                thenBranch
+                                colon := colon.span
+                              })).span.startByte := rfl
+                          _ = (heads.foldl foldConditionalHead
+                              condition).span.startByte :=
+                            foldConditionalHeads_start_congr heads _ _ rfl
+      · simp only [present] at parsed
+        cases parsed
+        rfl
 
 /-- The conditional-prefix loop retains every pending and parsed source range. -/
 theorem conditionalTail_validFor
@@ -442,6 +520,129 @@ theorem conditionalTail_validFor
             exact Nat.le_trans (headsBefore head member)
               conditionValid.span_valid.2.1)
         exact ⟨folded, inputValid, rfl⟩
+
+/-- A complete conditional layer preserves every ordinary token window. -/
+theorem conditional_preservesTokenWindow
+    (nested alternative : Parser Expr)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (alternativeWindow : Parser.PreservesTokenWindow alternative) :
+    Parser.PreservesTokenWindow (conditional nested alternative) := by
+  intro input
+  unfold conditional
+  have alternativeShape := alternativeWindow input
+  cases alternativeResult : alternative input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [alternativeResult] at alternativeShape
+      exact alternativeShape
+  | ok condition next =>
+      rw [alternativeResult] at alternativeShape
+      exact (conditionalTail_preservesTokenWindow nested alternative
+        nestedWindow alternativeWindow (next.remainingCount + 1) [] condition
+          next).trans alternativeShape
+
+theorem conditional_preservesTokensOnSuccess
+    (nested alternative : Parser Expr)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (alternativeWindow : Parser.PreservesTokenWindow alternative) :
+    Parser.PreservesTokensOnSuccess (conditional nested alternative) :=
+  (conditional_preservesTokenWindow nested alternative nestedWindow
+    alternativeWindow).preservesTokensOnSuccess
+
+/-- A complete conditional layer never rewinds the token cursor. -/
+theorem conditional_cursorMonotoneOnSuccess
+    (nested alternative : Parser Expr)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    (alternativeCursor : Parser.CursorMonotoneOnSuccess alternative) :
+    Parser.CursorMonotoneOnSuccess (conditional nested alternative) := by
+  intro input expression final parsed
+  unfold conditional at parsed
+  cases alternativeResult : alternative input with
+  | invariant error => simp [alternativeResult] at parsed
+  | reject failure rejected => simp [alternativeResult] at parsed
+  | ok condition next =>
+      simp only [alternativeResult] at parsed
+      exact Nat.le_trans
+        (alternativeCursor input condition next alternativeResult)
+        (conditionalTail_cursorMonotoneOnSuccess nested alternative
+          nestedCursor alternativeCursor (next.remainingCount + 1) []
+            condition next expression final parsed)
+
+/-- A complete conditional layer retains its first alternative's left edge. -/
+theorem conditional_startsAtCurrentTokenOnSuccess
+    (nested alternative : Parser Expr)
+    (alternativeStarts :
+      Parser.StartsAtCurrentTokenOnSuccess alternative (·.span)) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (conditional nested alternative) (·.span) := by
+  intro input expression final parsed
+  unfold conditional at parsed
+  cases alternativeResult : alternative input with
+  | invariant error => simp [alternativeResult] at parsed
+  | reject failure rejected => simp [alternativeResult] at parsed
+  | ok condition next =>
+      simp only [alternativeResult] at parsed
+      rcases alternativeStarts input condition next alternativeResult with
+        ⟨token, found, starts⟩
+      have retained := conditionalTail_preservesFoldStartOnSuccess nested
+        alternative (next.remainingCount + 1) [] condition next expression
+          final parsed
+      exact ⟨token, found, starts.trans (by simpa using retained.symm)⟩
+
+/-- A complete conditional layer retains every recursive source range. -/
+theorem conditional_validFor
+    (nested alternative : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    (alternativeValid : alternative.ValidFor
+      (Expr.ValidFor statementValid))
+    (alternativeTokens : Parser.PreservesTokensOnSuccess alternative)
+    (alternativeCursorLt : ∀ {input next : State} {value : Expr},
+      alternative input = .ok value next → input.cursor < next.cursor)
+    (alternativeStarts :
+      Parser.StartsAtCurrentTokenOnSuccess alternative (·.span)) :
+    (conditional nested alternative).ValidFor
+      (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  unfold conditional
+  cases alternativeResult : alternative input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      have reply := alternativeValid input inputValid
+      rw [alternativeResult] at reply
+      exact reply
+  | ok condition next =>
+      have alternativeReply := alternativeValid input inputValid
+      rw [alternativeResult] at alternativeReply
+      rcases alternativeStarts input condition next alternativeResult with
+        ⟨firstToken, firstFound, firstStart⟩
+      have firstAt := State.getElem?_eq_some_of_peek?_eq_some firstFound
+      have carrier := alternativeTokens input condition next alternativeResult
+      have conditionBefore : ∀ future, next.peek? = some future →
+          condition.span.startByte ≤ future.span.startByte := by
+        intro future futureFound
+        have futureAtNext :=
+          State.getElem?_eq_some_of_peek?_eq_some futureFound
+        have futureAt : input.tokens[next.cursor]? = some future := by
+          simpa [carrier] using futureAtNext
+        have separated := inputValid.token_end_le_token_start_of_getElem?_lt
+          firstAt futureAt (alternativeCursorLt alternativeResult)
+        have firstValid := inputValid.peek?_span_validFor firstFound
+        calc
+          condition.span.startByte = firstToken.span.startByte := firstStart.symm
+          _ ≤ firstToken.span.endByte := firstValid.2.1
+          _ ≤ future.span.startByte := separated
+      have recursive := conditionalTail_validFor nested alternative
+        statementValid nestedValid nestedTokens nestedCursor alternativeValid
+          alternativeTokens alternativeCursorLt alternativeStarts
+            (next.remainingCount + 1) [] condition next alternativeReply.2.1
+              (by simp [List.ValidFor])
+              (by simpa [alternativeReply.2.2] using alternativeReply.1)
+                (by simp)
+                conditionBefore
+      exact recursive.of_file_eq alternativeReply.2.2
 
 /-- Prefix unary scanning preserves operator spans and parser-state validity. -/
 theorem unaryOperators_validFor :
