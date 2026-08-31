@@ -8,6 +8,23 @@ set_option autoImplicit false
 namespace Solcore.Syntax.Parser
 namespace StatementSimpleInternals
 
+private theorem simpleBind_ok_components {alpha beta : Type}
+    {first : Parser alpha} {next : alpha → Parser beta}
+    {input final : State} {value : beta}
+    (parsed : (first >>= next) input = .ok value final) :
+    ∃ firstValue afterFirst, first input = .ok firstValue afterFirst ∧
+      next firstValue afterFirst = .ok value final := by
+  change (match first input with
+    | .ok firstValue afterFirst => next firstValue afterFirst
+    | .reject failure rejected => .reject failure rejected
+    | .invariant error => .invariant error) = .ok value final at parsed
+  cases firstResult : first input with
+  | ok firstValue afterFirst =>
+      rw [firstResult] at parsed
+      exact ⟨firstValue, afterFirst, rfl, parsed⟩
+  | reject failure rejected => rw [firstResult] at parsed; contradiction
+  | invariant error => rw [firstResult] at parsed; contradiction
+
 private theorem advanceAfterValueAssignPeek_validFor {input : State}
     {token : Token} (valid : input.ValidFor)
     (found : input.peek? = some token) :
@@ -310,4 +327,135 @@ theorem optionalSemicolon_some_startsAtCurrentTokenOnSuccess
     cases parsed
 
 end StatementSimpleInternals
+
+/-- Assignment/expression statements preserve nested expression windows. -/
+theorem assignmentOrExpressionStatement_preservesTokenWindow
+    (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokenWindow
+      (assignmentOrExpressionStatement expression) := by
+  unfold assignmentOrExpressionStatement
+  apply Parser.bind_preservesTokenWindow expressionWindow
+  intro left
+  apply Parser.bind_preservesTokenWindow
+    (StatementSimpleInternals.optionalAssignmentTail_preservesTokenWindow
+      expression expressionWindow)
+  intro tail
+  apply Parser.bind_preservesTokenWindow
+    StatementSimpleInternals.optionalSemicolon_preservesTokenWindow
+  intro semicolon
+  dsimp only
+  cases tail with
+  | none => exact Parser.pure_preservesTokenWindow _
+  | some tail =>
+      cases tail with
+      | value operator right =>
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true]
+            apply Parser.bind_preservesTokenWindow
+              (emitDiagnostic_preservesTokenWindow _)
+            intro _
+            exact Parser.pure_preservesTokenWindow _
+          · simp only [missing]
+            exact Parser.pure_preservesTokenWindow _
+      | bitNot operator =>
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true]
+            apply Parser.bind_preservesTokenWindow
+              (emitDiagnostic_preservesTokenWindow _)
+            intro _
+            exact Parser.pure_preservesTokenWindow _
+          · simp only [missing]
+            exact Parser.pure_preservesTokenWindow _
+
+theorem assignmentOrExpressionStatement_preservesTokensOnSuccess
+    (expression : Parser Expr)
+    (expressionWindow : Parser.PreservesTokenWindow expression) :
+    Parser.PreservesTokensOnSuccess
+      (assignmentOrExpressionStatement expression) :=
+  (assignmentOrExpressionStatement_preservesTokenWindow expression
+    expressionWindow).preservesTokensOnSuccess
+
+/-- Assignment/expression statements inherit expression cursor monotonicity. -/
+theorem assignmentOrExpressionStatement_cursorMonotoneOnSuccess
+    (expression : Parser Expr)
+    (expressionCursor : Parser.CursorMonotoneOnSuccess expression) :
+    Parser.CursorMonotoneOnSuccess
+      (assignmentOrExpressionStatement expression) := by
+  unfold assignmentOrExpressionStatement
+  apply Parser.bind_cursorMonotoneOnSuccess expressionCursor
+  intro left
+  apply Parser.bind_cursorMonotoneOnSuccess
+    (StatementSimpleInternals.optionalAssignmentTail_cursorMonotoneOnSuccess
+      expression expressionCursor)
+  intro tail
+  apply Parser.bind_cursorMonotoneOnSuccess
+    StatementSimpleInternals.optionalSemicolon_cursorMonotoneOnSuccess
+  intro semicolon
+  dsimp only
+  cases tail with
+  | none => exact Parser.pure_cursorMonotoneOnSuccess _
+  | some tail =>
+      cases tail with
+      | value operator right =>
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true]
+            apply Parser.bind_cursorMonotoneOnSuccess
+              (emitDiagnostic_cursorMonotoneOnSuccess _)
+            intro _
+            exact Parser.pure_cursorMonotoneOnSuccess _
+          · simp only [missing]
+            exact Parser.pure_cursorMonotoneOnSuccess _
+      | bitNot operator =>
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true]
+            apply Parser.bind_cursorMonotoneOnSuccess
+              (emitDiagnostic_cursorMonotoneOnSuccess _)
+            intro _
+            exact Parser.pure_cursorMonotoneOnSuccess _
+          · simp only [missing]
+            exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- Assignment/expression statements start where their left expression does. -/
+theorem assignmentOrExpressionStatement_startsAtCurrentTokenOnSuccess
+    (expression : Parser Expr)
+    (expressionStarts :
+      Parser.StartsAtCurrentTokenOnSuccess expression (·.span)) :
+    Parser.StartsAtCurrentTokenOnSuccess
+      (assignmentOrExpressionStatement expression) (·.span) := by
+  unfold assignmentOrExpressionStatement
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first expressionStarts
+  intro left input statement final parsed
+  rcases StatementSimpleInternals.simpleBind_ok_components parsed with
+    ⟨tail, afterTail, _tailResult, rest⟩
+  rcases StatementSimpleInternals.simpleBind_ok_components rest with
+    ⟨semicolon, afterSemicolon, _semicolonResult, finished⟩
+  dsimp only at finished
+  cases tail with
+  | none =>
+      cases finished
+      rfl
+  | some tail =>
+      cases tail with
+      | value operator right =>
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true] at finished
+            rcases StatementSimpleInternals.simpleBind_ok_components finished
+              with ⟨_, afterDiagnostic, _diagnosticResult, completed⟩
+            cases completed
+            rfl
+          · simp only [missing] at finished
+            cases finished
+            rfl
+      | bitNot operator =>
+          by_cases missing : semicolon.isNone
+          · simp only [missing, if_true] at finished
+            rcases StatementSimpleInternals.simpleBind_ok_components finished
+              with ⟨_, afterDiagnostic, _diagnosticResult, completed⟩
+            cases completed
+            rfl
+          · simp only [missing] at finished
+            cases finished
+            rfl
+
 end Solcore.Syntax.Parser
