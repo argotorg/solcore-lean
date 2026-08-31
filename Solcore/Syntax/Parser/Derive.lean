@@ -320,7 +320,10 @@ theorem deriveTarget_cursorMonotoneOnSuccess :
   exact Nat.le_of_lt
     (deriveTarget_ok_state_shape result).choose_spec.2.2.2
 
-private def validDeriveAttribute : Parser DeriveAttribute := do
+namespace DeriveAttributeInternals
+
+/-- Proof-visible normal path for the public derive-attribute parser. -/
+def valid : Parser DeriveAttribute := do
   let hash ← symbol .hash .topItem
   let _ ← symbol .leftBracket .topItem
   let _ ← contextual .derive .topItem
@@ -344,7 +347,8 @@ private def atDeriveDeclarationBoundary (state : State) : Bool :=
   atTopItemStart state || startsDeriveContractField state ||
     isSymbol state .rightBrace
 
-private def finishRecoveredDerive (hash last : SourceSpan)
+/-- Build the common recovered value; exposed only for proof modules. -/
+def finishRecovered (hash last : SourceSpan)
     (constraint : ParseConstraint) (state : State) : Reply DeriveAttribute :=
   let span := SourceSpan.cover hash last
   .ok {
@@ -352,36 +356,40 @@ private def finishRecoveredDerive (hash last : SourceSpan)
     value := { targets := { span, elements := [] } }
   } (state.emit { span, kind := .constraintViolation constraint })
 
-private def recoverDeriveTail (hash last : SourceSpan) :
+/-- Scan a malformed derive tail; exposed only for proof modules. -/
+def recoverTail (hash last : SourceSpan) :
     Nat → State → Reply DeriveAttribute
   | 0, state => .invariant (.fuelExhausted .topLevel state.currentSpan)
   | fuel + 1, state =>
       if isSymbol state .rightBracket then
         match symbol .rightBracket .topItem state with
         | .ok closing next =>
-            finishRecoveredDerive hash closing.span
+            finishRecovered hash closing.span
               .malformedDeriveAttribute next
         | .reject failure next => .reject failure next
         | .invariant error => .invariant error
       else if state.atEnd || atDeriveDeclarationBoundary state then
-        finishRecoveredDerive hash last .unclosedDeriveAttribute state
+        finishRecovered hash last .unclosedDeriveAttribute state
       else
         match state.advance? with
         | some (token, next) =>
-            recoverDeriveTail hash token.span fuel next
-        | none => finishRecoveredDerive hash last .unclosedDeriveAttribute state
+            recoverTail hash token.span fuel next
+        | none => finishRecovered hash last .unclosedDeriveAttribute state
 
-private def recoveredDeriveAttribute : Parser DeriveAttribute := fun state =>
+/-- Proof-visible recovery path for the public derive-attribute parser. -/
+def recovered : Parser DeriveAttribute := fun state =>
   match symbol .hash .topItem state with
   | .ok hash afterHash =>
       match symbol .leftBracket .topItem afterHash with
       | .ok opening next =>
-          recoverDeriveTail hash.span opening.span
+          recoverTail hash.span opening.span
             (next.remainingCount + 1) next
       | .reject failure next => .reject failure next
       | .invariant error => .invariant error
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+end DeriveAttributeInternals
 
 /--
 Parse one canonical derive attribute. Once `#[` has been consumed, malformed
@@ -389,6 +397,6 @@ and unclosed forms become empty recovered attributes without consuming the next
 declaration boundary.
 -/
 def deriveAttribute : Parser DeriveAttribute :=
-  orElse validDeriveAttribute recoveredDeriveAttribute
+  orElse DeriveAttributeInternals.valid DeriveAttributeInternals.recovered
 
 end Solcore.Syntax.Parser
