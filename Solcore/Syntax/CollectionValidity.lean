@@ -6,6 +6,15 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax
 
+namespace List
+
+/-- Every element of a list belongs to one source. -/
+def ValidFor {α : Type} (elementValid : SourceFile → α → Prop)
+    (file : SourceFile) (values : List α) : Prop :=
+  ∀ element ∈ values, elementValid file element
+
+end List
+
 namespace NonemptyList
 
 /-- Every element of a structurally nonempty list belongs to one source. -/
