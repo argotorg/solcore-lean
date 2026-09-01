@@ -1,3 +1,6 @@
+import Solcore.Syntax.DeclarativeCoreBlockGrammar
+import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
+import Solcore.Syntax.Parser.DiagnosticReflectionProperties
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
 import Solcore.Syntax.Parser.StateCursorProperties
 import Solcore.Syntax.CollectionValidity
@@ -12,6 +15,12 @@ inductive TailExpressionPolicy where
   | allow
   | require
   deriving Repr, BEq, DecidableEq
+
+/-- Parser policy viewed in the parser-independent Core block grammar. -/
+def TailExpressionPolicy.declarative :
+    TailExpressionPolicy → DeclarativeGrammar.CoreBlockTailPolicy
+  | .allow => .allow
+  | .require => .require
 
 private def validateExpressionSemicolon
     (statement : Statement) (state : State) : State :=
@@ -32,6 +41,47 @@ private def validateBlockTails (policy : TailExpressionPolicy) :
   | first :: rest, state =>
       validateBlockTails policy rest
         (validateExpressionSemicolon first state)
+
+private theorem validateExpressionSemicolon_diagnosticFree_iff
+    (statement : Statement) (state : State) :
+    (validateExpressionSemicolon statement state).diagnosticsRev = [] ↔
+      state.diagnosticsRev = [] ∧
+        DeclarativeGrammar.CoreBlockStatementTerminated statement := by
+  rcases statement with ⟨span, value⟩
+  cases value <;> try
+    simp [validateExpressionSemicolon,
+      DeclarativeGrammar.CoreBlockStatementTerminated, State.emit]
+  case expression expression trailingSemicolon =>
+    cases trailingSemicolon with
+    | false => simp
+    | true => simp
+
+private theorem validateBlockTails_diagnosticFree_iff :
+    ∀ policy statements state,
+      (validateBlockTails policy statements state).diagnosticsRev = [] ↔
+        state.diagnosticsRev = [] ∧
+          DeclarativeGrammar.CoreBlockTailsValid policy.declarative
+            statements := by
+  intro policy statements
+  induction statements with
+  | nil =>
+      intro state
+      simp [validateBlockTails,
+        DeclarativeGrammar.CoreBlockTailsValid]
+  | cons first rest inductionHypothesis =>
+      intro state
+      cases rest with
+      | nil =>
+          cases policy <;>
+            simp [validateBlockTails,
+              TailExpressionPolicy.declarative,
+              validateExpressionSemicolon_diagnosticFree_iff]
+      | cons second tail =>
+          simp [validateBlockTails,
+            DeclarativeGrammar.CoreBlockTailsValid,
+            TailExpressionPolicy.declarative,
+            inductionHypothesis,
+            validateExpressionSemicolon_diagnosticFree_iff, and_assoc]
 
 def closeCoreBlock (opening : Token)
     (policy : TailExpressionPolicy) (bodyRev : List Statement) :
@@ -136,6 +186,54 @@ private theorem validateBlockTails_window_shape :
           exact (inductionHypothesis
             (validateExpressionSemicolon first state)).trans
               (validateExpressionSemicolon_window_shape first state)
+
+/--
+A diagnostic-free close exposes its exact brace, body, tail policy, and input
+diagnostic state.  This is the public behavioral seam for the private block-tail
+validator.
+-/
+theorem closeCoreBlock_success_sound_and_reflects
+    (opening : Token) (policy : TailExpressionPolicy)
+    (bodyRev : List Statement) {input next : State} {body : Block}
+    (diagnosticFree : next.diagnosticsRev = [])
+    (result : closeCoreBlock opening policy bodyRev input = .ok body next) :
+    ∃ closingSpan,
+      body = {
+        span := SourceSpan.cover opening.span closingSpan
+        value := bodyRev.reverse
+      } ∧
+      DeclarativeGrammar.ExactTokenParses (.symbol .rightBrace)
+        input.declarativeRemainder closingSpan next.declarativeRemainder ∧
+      DeclarativeGrammar.CoreBlockTailsValid policy.declarative
+        bodyRev.reverse ∧
+      input.diagnosticsRev = [] := by
+  unfold closeCoreBlock at result
+  simp only [bind] at result
+  cases closingResult : symbol .rightBrace .statement input with
+  | invariant error => simp [closingResult] at result
+  | reject failure rejected => simp [closingResult] at result
+  | ok closing afterClosing =>
+      simp only [closingResult, modifyState, pure] at result
+      cases result
+      have validation :=
+        (validateBlockTails_diagnosticFree_iff policy bodyRev.reverse
+          afterClosing).mp diagnosticFree
+      have inputFree := symbol_reflectsDiagnosticFreeOnSuccess .rightBrace
+        .statement input closing afterClosing closingResult validation.1
+      have remainderEq :
+          State.declarativeRemainder
+              (validateBlockTails policy bodyRev.reverse afterClosing) =
+            afterClosing.declarativeRemainder := by
+        have stateShape := validateBlockTails_state_shape policy
+          bodyRev.reverse afterClosing
+        have windowShape := validateBlockTails_window_shape policy
+          bodyRev.reverse afterClosing
+        unfold State.declarativeRemainder
+        rw [stateShape.1, stateShape.2, windowShape]
+      refine ⟨closing.span, rfl, ?_, validation.2, inputFree⟩
+      rw [remainderEq]
+      exact symbol_success_exactTokenParses .rightBrace .statement
+        closingResult
 
 private theorem validateExpressionSemicolon_file_shape
     (statement : Statement) (state : State) :
