@@ -146,6 +146,7 @@ import Solcore.Test.SyntaxParserPredicateProperties
 import Solcore.Test.SyntaxParserPredicateSequenceTotalityProperties
 import Solcore.Test.SyntaxParserPredicateTotalityProperties
 import Solcore.Test.SyntaxParserPragmaProperties
+import Solcore.Test.SyntaxParserPragmaSoundnessProperties
 import Solcore.Test.SyntaxParserPragmaTotalityProperties
 import Solcore.Test.SyntaxParserPrimitiveProperties
 import Solcore.Test.SyntaxParserPrimitiveCarrierProperties
