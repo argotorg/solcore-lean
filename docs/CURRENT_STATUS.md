@@ -331,9 +331,20 @@ derive attribute only on enums; body soundness preserves exact braces,
 right-brace priority, strict member progress, forward member order, and rules
 out every recovery success using its required diagnostic. Complete contract
 soundness retains the marker, name, optional generics, body span, members, and
-final remainder, with source-validity composition and public consumers. A
-concrete complete-file language judgment still requires parser-independent
-Core expression and block relations to instantiate these abstract boundaries.
+final remainder, with source-validity composition and public consumers.
+
+The same abstract relations now extend through complete top-level dispatch and
+the complete-file parser. `PlainTopItemParses` records the exact negative
+lookaheads for every earlier declaration branch, while `TopItemParses` records
+leading-hash priority and permits derive attachment only to enums.
+`TopItemsParses` preserves declaration order, strict cursor progress, and
+end-of-window termination. `SourceFileParses` additionally specifies the exact
+pure attachment of the complete source-order comment stream. Diagnostic
+reflection through every declaration and top-item branch rules out all file
+recovery successes, so every diagnostic-free `sourceFile` result derives this
+parameterized complete-file grammar and composes with source validity. The
+remaining grammar work is to define parser-independent Core expression and
+block relations and instantiate these abstract boundaries concretely.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
@@ -344,13 +355,14 @@ algebraic enums. Parser-independent `ImportDeclParses` and `ExportDeclParses`
 judgments combine their respective forms without caller-supplied AST shape
 guards. `EnumDeclParses` directly characterizes complete enum success while
 retaining the supplied derive attribute. Export and enum soundness need no
-diagnostic-free premise. A generic `TopItemsParses` judgment and file-loop
-theorem already preserve forward item order, strict cursor progress,
-end-of-window termination, and the fact that recovery always diagnoses. They
-are parameterized by the still-unproved complete top-item correspondence. The
-next slice connects the declaration theorems to that scaffold before
-specializing diagnostic-free files. Recovered malformed output remains
-separate so that recovery is not confused with language acceptance.
+diagnostic-free premise. These declaration judgments now feed the exact
+`PlainTopItemParses` and derive-aware `TopItemParses` correspondences. The
+complete file-loop and `sourceFile` theorems preserve forward item order,
+strict cursor progress, end-of-window termination, exact comment attachment,
+and recovery exclusion by diagnostic commitment. They remain parameterized
+only by the expression and block relations used inside functions and
+contracts. Recovered malformed output remains separate so that recovery is
+not confused with language acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle

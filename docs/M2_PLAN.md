@@ -207,9 +207,14 @@ Contract declarations now extend these parametric boundaries through exact
 member dispatch, enum-only derive attachment, brace-delimited forward member
 order, strict progress, and recovery exclusion by diagnostic commitment.
 Their body and declaration soundness theorems compose with source validity and
-are publicly consumed. The remaining step toward a concrete top-item grammar
-is to instantiate the abstract expression and block judgments with the
-declarative Core language.
+are publicly consumed. Exact plain and derive-aware top-item judgments now
+compose every declaration branch in executable priority order. Their
+diagnostic reflection feeds a complete-file theorem that preserves forward
+item order, strict progress, end-of-window termination, exact source-order
+comment attachment, and recovery exclusion. The resulting `SourceFileParses`
+boundary composes with source validity and is publicly consumed. The remaining
+step is to define parser-independent Core expression and block judgments and
+instantiate this completed parametric file grammar with them.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
@@ -220,11 +225,11 @@ algebraic enums. Parser-independent `ImportDeclParses` and `ExportDeclParses`
 judgments combine their respective forms without caller-supplied AST shape
 guards. `EnumDeclParses` directly characterizes complete enum success while
 retaining the supplied derive attribute. Export and enum soundness need no
-diagnostic-free premise. The generic complete-file item loop also has a
-parameterized declarative soundness theorem preserving forward order, strict
-progress, end-of-window termination, and recovery diagnostics. The remaining
-top-item correspondence is next; once it is available, that loop theorem will
-specialize to complete diagnostic-free files. Recovered malformed output
+diagnostic-free premise. `PlainTopItemParses` records exact earlier-branch
+absence, and `TopItemParses` records leading-hash priority and enum-only derive
+attachment. The complete-file item loop and `SourceFileParses` theorem now
+preserve forward order, strict progress, end-of-window termination, exact
+comment attachment, and recovery diagnostics. Recovered malformed output
 remains separate so that recovery is not confused with language acceptance.
 
 This frontend work remains separate from the completed syntax-independent
@@ -241,7 +246,8 @@ The canonical syntax slice is complete when:
 - all retained token, comment, and AST spans use valid UTF-8 byte boundaries;
 - ordinary malformed input produces total diagnostic output;
 - every diagnostic-free complete-file result is proved derivable in the
-  independent declarative grammar;
+  parametric independent grammar, and concrete Core expression and block
+  relations instantiate that grammar;
 - the canonical frontend is the only current syntax described by public
   documentation; and
 - the complete build, tests, metadata validation, and kernel audit pass.

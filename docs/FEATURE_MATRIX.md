@@ -43,9 +43,9 @@ published through Oracle v4.
 | Token and parsed AST catalog | Complete executable representation | Contextual well-formedness layer | High |
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
-| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, and internal lexer/parser invariant errors are unreachable | Extend the independent grammar through the remaining forms and prove diagnostic-free complete-file soundness | High |
-| Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, and backward diagnostic reflection through recursive types and function-signature leaves | Extend the declarative correspondence through the remaining productions | High |
-| Declarative grammar and parser soundness | Active; complete for pragmas, paths, selector names, generic delimiter policies, all import/export forms, derive targets and attributes, shared generic parameters with exact optional priority, unconditional recursive type expressions, strict function parameters, predicates and optional `where`, ordered modifiers, module/contract function signatures, complete traits, transparent type aliases, algebraic enums, parametric function/implementation/contract declarations over abstract expression and block relations, and a parameterized complete-file item-loop theorem | Instantiate the remaining abstract expression/block boundaries and connect complete top-item soundness to the diagnostic-free file theorem; exact negative priority for grouped-predicate fallback still requires completeness | High |
+| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, internal lexer/parser invariant errors are unreachable, and diagnostic-free output has parametric complete-file grammar soundness | Instantiate the independent Core expression and block relations | High |
+| Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, and backward diagnostic reflection through declarations, top-item dispatch, and the complete file loop | Define the remaining concrete declarative Core relations | High |
+| Declarative grammar and parser soundness | Active; complete for pragmas, paths, selector names, generic delimiter policies, all import/export forms, derive targets and attributes, shared generic parameters with exact optional priority, unconditional recursive type expressions, strict function parameters, predicates and optional `where`, ordered modifiers, module/contract function signatures, complete traits, transparent type aliases, algebraic enums, parametric function/implementation/contract declarations, exact plain and derive-aware top-item dispatch, and complete files with exact comments, order, progress, end-of-window termination, and recovery exclusion | Instantiate the abstract expression/block boundaries with concrete Core relations; exact negative priority for grouped-predicate fallback still requires completeness | High |
 | Declaration, type, and Yul parser proofs | Complete source/state and totality boundary for every production declaration, contract member, recursive type, and public Yul parser; recursive type, shared generic-parameter, predicate/`where`, ordered-modifier, enum, and trait grammar soundness are established, while transparent-alias, strict-parameter-list, function-signature, trait, function-declaration, implementation, and contract soundness use diagnostic freedom at their actual recovery, policy, expression, or abstract-body boundaries | Define concrete expression, statement, block, and Yul grammars | High |
 | Core expression parser proofs | Complete source/state and unconditional totality contracts for atoms, lambda, postfix, unary, binary, conditional, and recursive block interaction | Declarative grammar soundness | High |
 | Pattern and statement parser proofs | Complete source/state and unconditional totality contracts, including recovery, blocks, loops, `match`, inline assembly, and simultaneous expression/pattern/statement recursion | Declarative grammar soundness | High |
@@ -96,11 +96,14 @@ method source order, semicolons, closing-brace priority, required generic
 parameters, optional `where`, outer spans, and the final remainder. The three
 levels also compose with source validity and are publicly registered.
 
-Function declarations and implementations now extend the strict boundary over
-an abstract block judgment. Exact signature policy, optional `default`,
-nonempty implementation heads, method order, brace priority, strict progress,
-outer spans, and remainders are preserved. The theorem families are publicly
-registered; concrete top-item specialization waits for the Core block grammar.
+Function declarations, implementations, and contracts now extend the strict
+boundary over abstract expression and block judgments. Exact signature policy,
+optional `default`, nonempty implementation heads, member and method order,
+brace priority, strict progress, outer spans, and remainders are preserved.
+Exact plain and derive-aware top-item soundness feeds a complete-file judgment
+with source-order comment attachment, full-window consumption, and recovery
+exclusion. These theorem families are publicly registered; concrete
+specialization now waits only for the Core expression and block grammars.
 
 ## Semantic Core v3 feature inventory
 
