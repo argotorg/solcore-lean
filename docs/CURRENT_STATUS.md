@@ -342,9 +342,17 @@ end-of-window termination. `SourceFileParses` additionally specifies the exact
 pure attachment of the complete source-order comment stream. Diagnostic
 reflection through every declaration and top-item branch rules out all file
 recovery successes, so every diagnostic-free `sourceFile` result derives this
-parameterized complete-file grammar and composes with source validity. The
-remaining grammar work is to define parser-independent Core expression and
-block relations and instantiate these abstract boundaries concretely.
+parameterized complete-file grammar and composes with source validity.
+Parser-independent judgments now cover raw, balanced, isolated, and canonical
+Core blocks; the complete Core expression layer; the ordered public Core
+pattern layer; Core `let`, `return`, assignment, block, `while`, `if`, `break`,
+and `continue` statements; and inline-Yul name sequences, the public
+expression layer, and its basic controls. Transactional constructor and call
+arguments carry explicit declarative rejection specifications whose
+disjointness laws preserve parser priority. The remaining work is to finish
+the larger Core and Yul statement forms, close the fuel-indexed mutual
+recursion, and instantiate the abstract file boundary with those concrete
+relations.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

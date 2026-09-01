@@ -212,9 +212,13 @@ compose every declaration branch in executable priority order. Their
 diagnostic reflection feeds a complete-file theorem that preserves forward
 item order, strict progress, end-of-window termination, exact source-order
 comment attachment, and recovery exclusion. The resulting `SourceFileParses`
-boundary composes with source validity and is publicly consumed. The remaining
-step is to define parser-independent Core expression and block judgments and
-instantiate this completed parametric file grammar with them.
+boundary composes with source validity and is publicly consumed. Independent
+Core block, expression-layer, and ordered pattern-layer judgments are now in
+place, together with simple and basic-control statement judgments, inline-Yul
+name sequences, and the inline-Yul expression layer. The remaining step is to
+finish larger Core and Yul statements, define their fuel-indexed mutual
+closure, and instantiate the completed parametric file grammar with those
+concrete relations.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
@@ -246,8 +250,8 @@ The canonical syntax slice is complete when:
 - all retained token, comment, and AST spans use valid UTF-8 byte boundaries;
 - ordinary malformed input produces total diagnostic output;
 - every diagnostic-free complete-file result is proved derivable in the
-  parametric independent grammar, and concrete Core expression and block
-  relations instantiate that grammar;
+  parametric independent grammar, and concrete mutually recursive Core term,
+  block, and inline-Yul relations instantiate that grammar;
 - the canonical frontend is the only current syntax described by public
   documentation; and
 - the complete build, tests, metadata validation, and kernel audit pass.
