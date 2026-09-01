@@ -218,10 +218,13 @@ dotted qualified names, both local and `@`-prefixed external module paths, and
 identifier or parenthesized-operator selector names. Shared declarative rules
 and parser-soundness theorems now also cover nonempty comma-separated lists
 with an optional trailing comma, selected import names and aliases, nonempty
-selected-import lists, hiding clauses, and optional hiding dispatch. Export
-coverage additionally includes nonempty lists without trailing commas,
-constructor selections, prioritized export names, possibly empty lists with
-optional trailing commas, local export items, and remote selections.
+selected-import lists, hiding clauses, optional hiding dispatch, and both
+allow-empty delimiter policies. Export coverage additionally includes
+nonempty lists without trailing commas, constructor selections, prioritized
+export names, local export items, and remote selections. Derive coverage now
+includes ordinary and diagnosed reserved target components, maximal dotted
+targets, and exact normal `#[derive(...)]` attributes; diagnostic-free public
+attribute soundness excludes its malformed recovery path.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms: plain, namespace, wildcard with or without a
@@ -230,10 +233,14 @@ covers all four canonical export forms: local, module, module alias, and
 items-from-module. Parser-independent `ImportDeclParses` and `ExportDeclParses`
 judgments combine their respective forms without caller-supplied AST shape
 guards; export soundness needs no diagnostic-free premise because its
-terminator has no recovery branch. The next slices extend the same boundary
-through the remaining top-level forms and complete files. Recovered malformed
-output remains separate so that recovery is not confused with language
-acceptance.
+terminator has no recovery branch. A generic `TopItemsParses` judgment and
+file-loop theorem already preserve forward item order, strict cursor progress,
+end-of-window termination, and the fact that recovery always diagnoses. They
+are parameterized by the still-incomplete concrete top-item grammar. The next
+slices cover recursive types and the remaining declarations before
+specializing that scaffold to complete diagnostic-free files. Recovered
+malformed output remains separate so that recovery is not confused with
+language acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle

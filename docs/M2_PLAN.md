@@ -106,10 +106,12 @@ dotted qualified names, local and `@`-prefixed external module paths, and
 identifier or parenthesized-operator selector names. Shared declarative rules
 and parser-soundness theorems also cover nonempty comma-separated lists with
 an optional trailing comma, selected import names and aliases, nonempty
-selected-import lists, hiding clauses, and optional hiding dispatch. Export
-coverage additionally includes nonempty lists without trailing commas,
-constructor selections, prioritized export names, possibly empty lists with
-optional trailing commas, local export items, and remote selections.
+selected-import lists, hiding clauses, optional hiding dispatch, and both
+allow-empty delimiter policies. Export coverage additionally includes
+nonempty lists without trailing commas, constructor selections, prioritized
+export names, local export items, and remote selections. Derive targets and
+normal `#[derive(...)]` attributes now have exact parser-independent grammars;
+the public attribute theorem uses diagnostic freedom only to exclude recovery.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms: plain, namespace, wildcard with or without a
@@ -118,9 +120,13 @@ covers all four canonical export forms: local, module, module alias, and
 items-from-module. Parser-independent `ImportDeclParses` and `ExportDeclParses`
 judgments combine their respective forms without caller-supplied AST shape
 guards; export soundness needs no diagnostic-free premise because its
-terminator has no recovery branch. The remaining top-level forms and complete
-diagnostic-free files are next. Recovered malformed output remains separate so
-that recovery is not confused with language acceptance.
+terminator has no recovery branch. The generic complete-file item loop also
+has a parameterized declarative soundness theorem preserving forward order,
+strict progress, end-of-window termination, and recovery diagnostics. Recursive
+types and the remaining concrete top-level forms are next; once their item
+grammar is available, that loop theorem will specialize to complete
+diagnostic-free files. Recovered malformed output remains separate so that
+recovery is not confused with language acceptance.
 
 This frontend work remains separate from the completed syntax-independent
 execution semantics. Resolution, source typing, and elaboration will consume
