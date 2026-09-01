@@ -229,6 +229,7 @@ import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTriviaSelectionProperties
 import Solcore.Test.SyntaxParserTriviaValidityProperties
 import Solcore.Test.SyntaxParserTypeExprProperties
+import Solcore.Test.SyntaxParserTypeExprSoundnessProperties
 import Solcore.Test.SyntaxParserTypeAliasRecoveryTotalityProperties
 import Solcore.Test.SyntaxParserTypeAliasTotalityProperties
 import Solcore.Test.SyntaxParserTypeFuelTotalityProperties
