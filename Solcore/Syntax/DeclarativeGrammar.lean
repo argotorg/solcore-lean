@@ -1205,6 +1205,104 @@ inductive ImplDeclParses
         }
       } output
 
+/-! Grammar of strict contract entries and fields over abstract body/expression grammars. -/
+
+/--
+Exact modifiers retained by constructors and fallback entries.  An explicit
+`public` marker is rejected by the strict diagnostic-free grammar because the
+executable parser diagnoses and discards it; `payable` remains optional.
+-/
+def ContractEntryModifiersParses
+    (input : Remainder) (payableMarker : Option SourceSpan)
+    (output : Remainder) : Prop :=
+  TokenKindAbsentAt input.tokens input.endIndex input.cursor
+      (.keyword .publicKw) ∧
+    OptionalFunctionModifierParses .payableKw input payableMarker output
+
+/-- Exact constructor entry with an abstract required-tail block grammar. -/
+inductive ConstructorDeclParses
+    (bodyParses : Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.ConstructorDecl → Remainder → Prop where
+  | parsed
+      {input afterMarker afterParameters afterModifiers output : Remainder}
+      {parameters : DelimitedList Syntax.FunctionParameter}
+      {payableMarker : Option SourceSpan} {body : Syntax.Block}
+      (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses (.keyword .constructorKw)
+        input markerSpan afterMarker)
+      (parametersParsed : FunctionParametersParses
+        afterMarker parameters afterParameters)
+      (modifiersParsed : ContractEntryModifiersParses
+        afterParameters payableMarker afterModifiers)
+      (bodyParsed : bodyParses afterModifiers body output) :
+      ConstructorDeclParses bodyParses input {
+        span := SourceSpan.cover markerSpan body.span
+        value := { parameters, payableMarker, body }
+      } output
+
+/--
+Exact fallback entry.  The empty-parameter premise excludes the executable
+diagnostic path that retains an invalid nonempty list in the AST.
+-/
+inductive FallbackDeclParses
+    (bodyParses : Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.FallbackDecl → Remainder → Prop where
+  | parsed
+      {input afterMarker afterParameters afterModifiers output : Remainder}
+      {parameters : DelimitedList Syntax.FunctionParameter}
+      {payableMarker : Option SourceSpan} {body : Syntax.Block}
+      (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses (.keyword .fallbackKw)
+        input markerSpan afterMarker)
+      (parametersParsed : FunctionParametersParses
+        afterMarker parameters afterParameters)
+      (parameterless : parameters.elements = [])
+      (modifiersParsed : ContractEntryModifiersParses
+        afterParameters payableMarker afterModifiers)
+      (bodyParsed : bodyParses afterModifiers body output) :
+      FallbackDeclParses bodyParses input {
+        span := SourceSpan.cover markerSpan body.span
+        value := { parameters, payableMarker, body }
+      } output
+
+/-- Prioritized optional initializer of a contract storage field. -/
+inductive OptionalContractFieldInitializerParses
+    (expressionParses : Remainder → Syntax.Expr → Remainder → Prop) :
+    Remainder → Option Syntax.Expr → Remainder → Prop where
+  | absent {input : Remainder}
+      (equalAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .equal)) :
+      OptionalContractFieldInitializerParses expressionParses input none input
+  | present {input afterEqual output : Remainder} {value : Syntax.Expr}
+      (equalSpan : SourceSpan)
+      (equalToken : ExactTokenParses (.symbol .equal)
+        input equalSpan afterEqual)
+      (valueParsed : expressionParses afterEqual value output) :
+      OptionalContractFieldInitializerParses expressionParses input
+        (some value) output
+
+/-- Exact storage-field grammar with an abstract initializer expression. -/
+inductive ContractFieldParses
+    (expressionParses : Remainder → Syntax.Expr → Remainder → Prop) :
+    Remainder → Syntax.ContractField → Remainder → Prop where
+  | parsed
+      {input afterName afterColon afterType afterInitializer output : Remainder}
+      {name : Identifier} {type : Syntax.TypeExpr}
+      {initializer : Option Syntax.Expr}
+      (colonSpan semicolonSpan : SourceSpan)
+      (nameParsed : IdentifierParses input name afterName)
+      (colonToken : ExactTokenParses (.symbol .colon)
+        afterName colonSpan afterColon)
+      (typeParsed : TypeExprParses afterColon type afterType)
+      (initializerParsed : OptionalContractFieldInitializerParses
+        expressionParses afterType initializer afterInitializer)
+      (semicolonToken : ExactTokenParses (.symbol .semicolon)
+        afterInitializer semicolonSpan output) :
+      ContractFieldParses expressionParses input {
+        span := SourceSpan.cover name.span semicolonSpan
+        value := { name, type, initializer }
+      } output
+
 /-! Grammar of canonical signature-only trait declarations. -/
 
 /-- Exact module-policy signature followed by a trait-method semicolon. -/
