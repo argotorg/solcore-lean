@@ -197,6 +197,15 @@ generics, optional `where`, and the final brace. Method, body, and declaration
 theorems have source-validity compositions, public registration, and
 compile-time consumers.
 
+Function declarations now compose exact location-indexed signatures with an
+abstract parser-independent block relation. Implementations lift the same
+boundary through optional `default`, nonempty head arguments, optional
+`where`, module-policy methods, right-brace priority, strict progress, and
+forward-order body accumulation. Their diagnostic-free reflection,
+source-validity compositions, consumers, and public imports are complete.
+The remaining step toward a concrete top-item grammar is to instantiate these
+parametric judgments with the declarative Core block language.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

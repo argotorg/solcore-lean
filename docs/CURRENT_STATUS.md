@@ -314,6 +314,17 @@ optional `where`, body span, method list, and final remainder. Method, body,
 and declaration soundness all compose with source validity and are exported
 through the public syntax umbrella.
 
+Ordinary function declarations and implementations now have parametric
+parser-independent judgments over an abstract block relation. Function
+soundness composes the exact location-specific signature, isolated body,
+outer cover span, and final remainder. Implementation soundness additionally
+retains optional-`default` priority, nonempty trailing-comma head arguments,
+module-policy methods, right-brace-first body dispatch, strict method progress,
+and forward method order. These APIs reflect diagnostic freedom through every
+nested body and have source-validity compositions, consumers, and public
+registration. A concrete complete-file language judgment still requires a
+parser-independent Core block relation to instantiate the abstract boundary.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
