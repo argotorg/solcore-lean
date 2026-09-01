@@ -203,8 +203,13 @@ boundary through optional `default`, nonempty head arguments, optional
 `where`, module-policy methods, right-brace priority, strict progress, and
 forward-order body accumulation. Their diagnostic-free reflection,
 source-validity compositions, consumers, and public imports are complete.
-The remaining step toward a concrete top-item grammar is to instantiate these
-parametric judgments with the declarative Core block language.
+Contract declarations now extend these parametric boundaries through exact
+member dispatch, enum-only derive attachment, brace-delimited forward member
+order, strict progress, and recovery exclusion by diagnostic commitment.
+Their body and declaration soundness theorems compose with source validity and
+are publicly consumed. The remaining step toward a concrete top-item grammar
+is to instantiate the abstract expression and block judgments with the
+declarative Core language.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
@@ -218,10 +223,9 @@ retaining the supplied derive attribute. Export and enum soundness need no
 diagnostic-free premise. The generic complete-file item loop also has a
 parameterized declarative soundness theorem preserving forward order, strict
 progress, end-of-window termination, and recovery diagnostics. The remaining
-concrete top-level forms are next; once their item grammar is available, that
-loop theorem will specialize to complete diagnostic-free files. Recovered
-malformed output remains separate so that recovery is not confused with
-language acceptance.
+top-item correspondence is next; once it is available, that loop theorem will
+specialize to complete diagnostic-free files. Recovered malformed output
+remains separate so that recovery is not confused with language acceptance.
 
 This frontend work remains separate from the completed syntax-independent
 execution semantics. Resolution, source typing, and elaboration will consume

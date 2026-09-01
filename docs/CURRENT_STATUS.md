@@ -322,8 +322,18 @@ retains optional-`default` priority, nonempty trailing-comma head arguments,
 module-policy methods, right-brace-first body dispatch, strict method progress,
 and forward method order. These APIs reflect diagnostic freedom through every
 nested body and have source-validity compositions, consumers, and public
-registration. A concrete complete-file language judgment still requires a
-parser-independent Core block relation to instantiate the abstract boundary.
+registration.
+
+Contract declarations now lift the same abstract expression and block
+relations through fields, functions, constructors, fallbacks, aliases, and
+enums in exact executable priority order. Attribute-aware members accept a
+derive attribute only on enums; body soundness preserves exact braces,
+right-brace priority, strict member progress, forward member order, and rules
+out every recovery success using its required diagnostic. Complete contract
+soundness retains the marker, name, optional generics, body span, members, and
+final remainder, with source-validity composition and public consumers. A
+concrete complete-file language judgment still requires parser-independent
+Core expression and block relations to instantiate these abstract boundaries.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
@@ -337,10 +347,10 @@ retaining the supplied derive attribute. Export and enum soundness need no
 diagnostic-free premise. A generic `TopItemsParses` judgment and file-loop
 theorem already preserve forward item order, strict cursor progress,
 end-of-window termination, and the fact that recovery always diagnoses. They
-are parameterized by the still-incomplete concrete top-item grammar. The next
-slices cover the remaining declarations before specializing that scaffold to
-complete diagnostic-free files. Recovered malformed output remains separate
-so that recovery is not confused with language acceptance.
+are parameterized by the still-unproved complete top-item correspondence. The
+next slice connects the declaration theorems to that scaffold before
+specializing diagnostic-free files. Recovered malformed output remains
+separate so that recovery is not confused with language acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
