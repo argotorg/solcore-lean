@@ -502,6 +502,72 @@ inductive ExportNameParses :
         value := .identifier name constructors
       } output
 
+/-- No identifier followed by a dot begins at one active-window cursor. -/
+def IdentifierDotAbsentAt
+    (tokens : Array Token) (endIndex cursor : Nat) : Prop :=
+  ¬ ∃ identifierSpan dotSpan text,
+    TokenAt tokens endIndex cursor {
+      span := identifierSpan
+      value := .identifier text
+    } ∧
+    TokenAt tokens endIndex (cursor + 1) {
+      span := dotSpan
+      value := .symbol .dot
+    }
+
+/-- Independent grammar of one local export name or qualified wildcard. -/
+inductive LocalExportItemParses :
+    Remainder → Syntax.LocalExportItem → Remainder → Prop where
+  | moduleWildcard {input afterPath : Remainder}
+      {path : Syntax.QualifiedName}
+      (dotSpan markerSpan : SourceSpan)
+      (pathParsed : ExportPathParses input path afterPath)
+      (dotToken : TokenAt afterPath.tokens afterPath.endIndex
+        afterPath.cursor {
+          span := dotSpan
+          value := .symbol .dot
+        })
+      (markerToken : TokenAt afterPath.tokens afterPath.endIndex
+        (afterPath.cursor + 1) {
+          span := markerSpan
+          value := .symbol .star
+        }) :
+      LocalExportItemParses input {
+        span := SourceSpan.cover path.span markerSpan
+        value := .moduleWildcard path markerSpan
+      } { afterPath with cursor := afterPath.cursor + 2 }
+  | name {input output : Remainder} {name : Syntax.ExportName}
+      (qualifiedAbsent : IdentifierDotAbsentAt input.tokens input.endIndex
+        input.cursor)
+      (nameParsed : ExportNameParses input name output) :
+      LocalExportItemParses input {
+        span := name.span
+        value := .name name
+      } output
+
+/-- Independent grammar of a wildcard or braced remote export selection. -/
+inductive ExportSelectionParses :
+    Remainder → Syntax.ExportSelection → Remainder → Prop where
+  | wildcard {input : Remainder} (markerSpan : SourceSpan)
+      (markerToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := markerSpan
+        value := .symbol .star
+      }) :
+      ExportSelectionParses input {
+        span := markerSpan
+        value := .wildcard markerSpan
+      } { input with cursor := input.cursor + 1 }
+  | selected {input output : Remainder}
+      {items : DelimitedList Syntax.ExportName}
+      (starAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .star))
+      (itemsParsed : TrailingDelimitedListParses .leftBrace .rightBrace
+        ExportNameParses input items output) :
+      ExportSelectionParses input {
+        span := items.span
+        value := .selected items
+      } output
+
 /-- Exact optional alias following one selected import name. -/
 inductive SelectedAliasParses :
     Remainder → Option Identifier → Remainder → Prop where
