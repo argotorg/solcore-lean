@@ -113,20 +113,39 @@ export names, local export items, and remote selections. Derive targets and
 normal `#[derive(...)]` attributes now have exact parser-independent grammars;
 the public attribute theorem uses diagnostic freedom only to exclude recovery.
 
+Recursive type expressions now have exact mutual declarative judgments for
+named, mapping, comptime, proxy, tuple, and function forms. The concrete
+recursive delimiter rules retain empty and nonempty lists, optional trailing
+commas, optional nonempty named arguments and function returns, exact token
+windows, and source element order. Named-type derivations explicitly retain
+the failed `comptime<` and `mapping(` pair lookaheads that select the dispatcher
+branch. Both the fuel-bounded parser and the public recursive type parser have
+unconditional success soundness, with source validity available by
+composition.
+
+Transparent aliases now have an exact grammar for their keyword, name,
+prioritized optional parameter list that may be empty and may have a trailing
+comma, equals sign, recursive value type, and semicolon. Diagnostic freedom is
+used only to rule out the executable alias-value recovery branch; ordinary
+recursive type success is already unconditional. The recursive type and alias
+theorem families are exposed by the public syntax umbrella and exercised by
+compile-time consumers. The full build and `lake test` pass with those
+registrations.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
-all four canonical import forms: plain, namespace, wildcard with or without a
-hiding clause, and selective imports. Unconditional strict soundness also
-covers all four canonical export forms: local, module, module alias, and
-items-from-module. Parser-independent `ImportDeclParses` and `ExportDeclParses`
-judgments combine their respective forms without caller-supplied AST shape
-guards; export soundness needs no diagnostic-free premise because its
-terminator has no recovery branch. The generic complete-file item loop also
-has a parameterized declarative soundness theorem preserving forward order,
-strict progress, end-of-window termination, and recovery diagnostics. Recursive
-types and the remaining concrete top-level forms are next; once their item
-grammar is available, that loop theorem will specialize to complete
-diagnostic-free files. Recovered malformed output remains separate so that
-recovery is not confused with language acceptance.
+all four canonical import forms—plain, namespace, wildcard with or without a
+hiding clause, and selective imports—and transparent type aliases.
+Unconditional strict soundness also covers all four canonical export forms:
+local, module, module alias, and items-from-module. Parser-independent
+`ImportDeclParses` and `ExportDeclParses` judgments combine their respective
+forms without caller-supplied AST shape guards; export soundness needs no
+diagnostic-free premise because its terminator has no recovery branch. The
+generic complete-file item loop also has a parameterized declarative soundness
+theorem preserving forward order, strict progress, end-of-window termination,
+and recovery diagnostics. The remaining concrete top-level forms are next;
+once their item grammar is available, that loop theorem will specialize to
+complete diagnostic-free files. Recovered malformed output remains separate
+so that recovery is not confused with language acceptance.
 
 This frontend work remains separate from the completed syntax-independent
 execution semantics. Resolution, source typing, and elaboration will consume

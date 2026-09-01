@@ -45,12 +45,17 @@ published through Oracle v4.
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
 | Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, and internal lexer/parser invariant errors are unreachable | Extend the independent grammar through the remaining forms and prove diagnostic-free complete-file soundness | High |
 | Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, and public totality | Extend the declarative correspondence through the remaining productions | High |
-| Declarative grammar and parser soundness | Active; complete for pragmas, paths, selector names, generic trailing/no-trailing delimited lists including allow-empty policies, all import/export forms, derive targets and attributes, plus a parameterized complete-file item-loop theorem | Add recursive types and the remaining concrete top-level forms, then specialize diagnostic-free complete-file soundness | High |
-| Declaration, type, and Yul parser proofs | Complete source/state and totality boundary for every production declaration, contract member, recursive type, and public Yul parser | Declarative grammar soundness | High |
+| Declarative grammar and parser soundness | Active; complete for pragmas, paths, selector names, generic delimiter policies, all import/export forms, derive targets and attributes, unconditional recursive type expressions with exact branch priority, transparent type aliases, and a parameterized complete-file item-loop theorem | Add the remaining concrete top-level forms, then specialize diagnostic-free complete-file soundness | High |
+| Declaration, type, and Yul parser proofs | Complete source/state and totality boundary for every production declaration, contract member, recursive type, and public Yul parser; recursive type declarative soundness is unconditional, while alias diagnostic freedom only excludes value recovery | Extend declarative soundness through the remaining declarations and Yul forms | High |
 | Core expression parser proofs | Complete source/state and unconditional totality contracts for atoms, lambda, postfix, unary, binary, conditional, and recursive block interaction | Declarative grammar soundness | High |
 | Pattern and statement parser proofs | Complete source/state and unconditional totality contracts, including recovery, blocks, loops, `match`, inline assembly, and simultaneous expression/pattern/statement recursion | Declarative grammar soundness | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
+
+Recursive type and type-alias soundness are exported by the public syntax
+umbrella and checked by compile-time consumers. Their exact recursive
+delimiter and dispatcher-priority judgments are included in the successful
+full build and `lake test`.
 
 ## Semantic Core v3 feature inventory
 

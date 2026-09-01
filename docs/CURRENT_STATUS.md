@@ -226,21 +226,40 @@ includes ordinary and diagnosed reserved target components, maximal dotted
 targets, and exact normal `#[derive(...)]` attributes; diagnostic-free public
 attribute soundness excludes its malformed recovery path.
 
+Recursive type expressions now have exact parser-independent coverage for
+named, mapping, comptime, proxy, tuple, and function forms. Their mutually
+recursive delimiter judgments retain empty and nonempty lists, optional
+trailing commas, optional nonempty named arguments and function returns, exact
+token windows, and written element order. The named branch also records the
+failed `comptime<` and `mapping(` composite lookaheads that give the executable
+dispatcher its priority. Soundness is unconditional for both the fuel-bounded
+and public recursive type parsers and composes with the established source
+validity contract.
+
+Transparent type aliases now reuse that recursive type grammar after an exact
+`type` keyword, name, prioritized optional parameter list that may be empty and
+may have a trailing comma, equals sign, and semicolon. Their public theorem
+requires diagnostic freedom only to exclude the alias-RHS recovery branch; the
+normal alias path and recursive type theorem do not otherwise need that
+premise. Both theorem families have compile-time consumers and public
+`Solcore.Syntax` registration. The full build and `lake test` pass with those
+registrations.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
-all four canonical import forms: plain, namespace, wildcard with or without a
-hiding clause, and selective imports. Unconditional strict soundness also
-covers all four canonical export forms: local, module, module alias, and
-items-from-module. Parser-independent `ImportDeclParses` and `ExportDeclParses`
-judgments combine their respective forms without caller-supplied AST shape
-guards; export soundness needs no diagnostic-free premise because its
-terminator has no recovery branch. A generic `TopItemsParses` judgment and
-file-loop theorem already preserve forward item order, strict cursor progress,
-end-of-window termination, and the fact that recovery always diagnoses. They
-are parameterized by the still-incomplete concrete top-item grammar. The next
-slices cover recursive types and the remaining declarations before
-specializing that scaffold to complete diagnostic-free files. Recovered
-malformed output remains separate so that recovery is not confused with
-language acceptance.
+all four canonical import forms—plain, namespace, wildcard with or without a
+hiding clause, and selective imports—and transparent type aliases.
+Unconditional strict soundness also covers all four canonical export forms:
+local, module, module alias, and items-from-module. Parser-independent
+`ImportDeclParses` and `ExportDeclParses` judgments combine their respective
+forms without caller-supplied AST shape guards; export soundness needs no
+diagnostic-free premise because its terminator has no recovery branch. A
+generic `TopItemsParses` judgment and file-loop theorem already preserve
+forward item order, strict cursor progress, end-of-window termination, and the
+fact that recovery always diagnoses. They are parameterized by the
+still-incomplete concrete top-item grammar. The next slices cover the
+remaining declarations before specializing that scaffold to complete
+diagnostic-free files. Recovered malformed output remains separate so that
+recovery is not confused with language acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
