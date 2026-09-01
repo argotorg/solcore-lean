@@ -8,6 +8,7 @@ import Solcore.Syntax.Parser.CertifiedParseProperties
 import Solcore.Syntax.Parser.ConstructorSelectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedSoundnessProperties
+import Solcore.Syntax.Parser.ExportNameSoundnessProperties
 import Solcore.Syntax.Parser.ExportPathSoundnessProperties
 import Solcore.Syntax.Parser.HidingClauseSoundnessProperties
 import Solcore.Syntax.Parser.ImportDeclSoundnessProperties
