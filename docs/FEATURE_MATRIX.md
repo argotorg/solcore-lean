@@ -43,9 +43,9 @@ published through Oracle v4.
 | Token and parsed AST catalog | Complete executable representation | Contextual well-formedness layer | High |
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
-| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, internal lexer/parser invariant errors are unreachable, and diagnostic-free output derives the concrete Core complete-file grammar | Exact negative priority for grouped-predicate fallback remains a component-level strengthening | High |
+| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, internal lexer/parser invariant errors are unreachable, and diagnostic-free successful `parseLexed` and `parse` outputs derive `CoreSourceFileOrdinaryParsesFromStart` with canonical parsed-file validity | Resolution, typing, and elaboration remain later stages | High |
 | Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, backward diagnostic reflection through declarations and the complete file loop, and concrete fuel-indexed public Core and Yul outcomes | None at the current foundation boundary | High |
-| Declarative grammar and parser soundness | Active; complete for declarations and complete files, mutually recursive public Core expressions/patterns/statements/blocks, exact Yul blocks and statement forms, transactional rejection witnesses, and concrete complete-file Core specialization | Exact negative priority for grouped-predicate fallback still requires grouped-grammar completeness | High |
+| Declarative grammar and parser soundness | Active; complete for declarations and complete files, mutually recursive public Core expressions/patterns/statements/blocks, exact grouped-first predicate fallback, exact Yul blocks and statement forms, transactional rejection witnesses, and concrete complete-file Core specialization | Recovery-free clean Core acceptance and contextual well-formedness remain separate later boundaries | High |
 | Declaration, type, and Yul parser proofs | Complete source/state, totality, and concrete clean/ordinary/reject soundness boundaries for recursive types and every public Yul expression, statement, and braced body parser, including the assignment fallback | None at this boundary | High |
 | Core expression parser proofs | Complete source/state, totality, fuel-indexed ordinary/reject outcome soundness, diagnostic reflection, and public parser-independent registration across atoms, lambda, postfix, unary, binary, conditional, and block interaction | None at the current outcome boundary | High |
 | Pattern and statement parser proofs | Complete executable contracts plus fuel-indexed ordinary/reject outcomes and public registration for the mutually recursive pattern and statement parsers, covering `let`, `return`, assignment, `for`, `match`, assembly, block, `while`, `if`, `break`, and `continue` in exact dispatcher order | None at the current outcome boundary | High |
@@ -72,12 +72,12 @@ a diagnostic, so `FunctionParameterParses` and `FunctionParametersParses`
 characterize diagnostic-free typed parameters without admitting recovery
 nodes.
 
-Bare and grouped predicate sequences have unconditional soundness into a
-successful-branch union, and optional `where` retains exact marker priority.
-That union does not yet express the stronger negative claim that the grouped
-grammar has no derivation whenever transactional parsing falls back to the
-bare branch after a leading `(`; such a claim needs grouped-grammar
-completeness.
+Bare and grouped predicate sequences have unconditional soundness with exact
+grouped-first priority, and optional `where` retains exact marker priority. A
+bare `PredicateSequenceParses` derivation carries
+`GroupedPredicateSequenceUnavailable`, obtained either from absence of its
+opening token or from exact grouped rejection and `no_parse` before the
+transactional fallback restarts at the original input.
 
 Function modifiers have unconditional fixed-order `public`-then-`payable`
 grammar soundness. Diagnostic-free module success excludes both markers,
@@ -106,6 +106,11 @@ exclusion. These theorem families are publicly registered. The fuel-indexed
 mutual Core closure and public Yul outcomes now instantiate that judgment as
 `CoreSourceFileOrdinaryParses`, with concrete public expression and isolated
 body relations for both block-tail policies.
+`CoreSourceFileOrdinaryParsesFromStart` exposes the root-window judgment while
+hiding its final remainder. Diagnostic-free successful `parseLexed` and
+`parse` results derive it over their exact public carriers and pair it with
+canonical parsed-file validity; its component relations remain recovery-aware
+ordinary judgments.
 
 ## Semantic Core v3 feature inventory
 

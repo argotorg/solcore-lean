@@ -283,12 +283,12 @@ contracts.
 Predicates and optional `where` clauses also have exact component grammars and
 unconditional success soundness. Bare sequences retain forward predicate
 order and distinguish a final predicate from a trailing comma; grouped
-sequences reuse the nonempty trailing-delimiter grammar. The transactional
-grouped-or-bare parser is currently specified by the union of its successful
-branches. The grammar does not yet add a negative grouped-derivation premise
-to a bare fallback that starts with `(`: deriving that stronger priority fact
-requires a converse completeness theorem for grouped parsing, which is not yet
-proved.
+sequences reuse the nonempty trailing-delimiter grammar. `PredicateSequenceParses`
+now records the transactional parser's exact grouped-first priority. Its bare
+constructor carries `GroupedPredicateSequenceUnavailable`: this follows either
+from absence of the opening `(`, or from an exact grouped rejection whose
+`no_parse` theorem excludes every grouped derivation before transactional
+fallback runs the bare parser from the original input.
 
 Function modifiers are parsed in the fixed optional `public`-then-`payable`
 order, with unconditional grammar soundness. A diagnostic-free module parse
@@ -371,9 +371,12 @@ boundaries.
 and the isolated `.allow` and `.require` block relations to the abstract
 top-item grammar. `CoreSourceFileOrdinaryParses` lifts that specialization
 through exact item order, complete-window consumption, and comment attachment.
-Every diagnostic-free successful `sourceFile` parse derives this concrete
-grammar; with valid inputs it also composes with complete parsed-file source
-validity. The component relations deliberately remain recovery-aware ordinary
+`CoreSourceFileOrdinaryParsesFromStart` packages the root token window and hides
+only the final remainder. Every diagnostic-free successful `parseLexed` result
+derives that judgment over the supplied lexer tokens and comments; the public
+`parse` theorem states it over the tokens and comments retained in its output.
+Paired theorems add canonical parsed-file source validity at both boundaries.
+The component relations deliberately remain recovery-aware ordinary
 over-approximations, while the outer diagnostic-free premise excludes actual
 recovery successes at the complete-file boundary.
 

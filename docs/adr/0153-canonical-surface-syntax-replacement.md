@@ -3,7 +3,7 @@
 - Status: Accepted
 - Decision date: 2026-08-31
 - Scope: source syntax, lexical tokens, parsed syntax, and frontend migration
-- Implementation: Executable parser complete; invariant proofs active
+- Implementation: Executable parser complete; public ordinary grammar soundness established
 
 ## Context
 
@@ -177,13 +177,16 @@ preflight accepts exactly these valid lexer results, every public lexer result
 passes it, and any public parse error therefore occurs after preflight.
 
 The compositional parser laws preserve source ownership, valid spans, the
-token carrier, and the cursor/order facts needed by surrounding parsers. They
-currently cover qualified names, module paths, selector and operator names,
-literals and primitive parsers, generic delimited lists, pragma declarations,
-Yul name and literal leaves, and derive targets. Diagnostic filtering also
-preserves span validity. Deeper recursive AST spans, validity of all
-parser-produced diagnostics, grammar-invariant provenance and unreachability,
-resource bounds, and declarative grammar soundness remain follow-up proof work.
+token carrier, and the cursor/order facts needed by surrounding parsers. Public
+totality and resource bounds, complete output provenance, recursive Core and
+Yul outcomes, declaration and file soundness, and exact transactional branch
+priority, including grouped-first predicate fallback, are established. A
+diagnostic-free successful `parseLexed` or `parse` result derives
+`CoreSourceFileOrdinaryParsesFromStart` from its root token carrier and composes
+with canonical parsed-file validity. The ordinary component relations remain
+recovery-aware; the diagnostic-free premise excludes actual recovery results
+at this public boundary. Resolution, source typing, and elaboration remain
+subsequent frontend milestones.
 
 ## Consequences
 

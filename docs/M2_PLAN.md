@@ -169,10 +169,11 @@ Individual predicates, nonempty bare and grouped predicate sequences, and
 prioritized optional `where` clauses now have parser-independent grammars and
 unconditional success soundness. Bare tails preserve forward order and their
 optional trailing comma; grouped sequences use the generic nonempty trailing
-delimiter grammar. Transactional grouped-or-bare dispatch is currently
-captured as a union of successful branches. An exact negative condition on a
-bare fallback beginning with `(` remains outside the present theorem: it
-requires a converse completeness theorem for grouped parsing.
+delimiter grammar. Transactional grouped-or-bare dispatch now records exact
+grouped-first priority. A bare result carries
+`GroupedPredicateSequenceUnavailable`, derived either from opening-parenthesis
+absence or from exact grouped rejection and its `no_parse` consequence before
+transactional fallback restarts at the original input.
 
 Optional function modifiers now preserve exact keyword absence or presence in
 the fixed `public`-then-`payable` order. Modifier grammar soundness is
@@ -230,9 +231,13 @@ now likewise have fuel-indexed ordinary/reject closures, public production-fuel
 specializations, deterministic outcomes, and backward diagnostic reflection.
 The concrete `CoreSourceFileOrdinaryParses` grammar instantiates the completed
 parametric file theorem with public Core expressions and isolated `.allow` and
-`.require` bodies. Thus every diagnostic-free complete-file success has a
-concrete parser-independent ordinary derivation, while the ordinary component
-relations remain reusable for recovered parser outcomes.
+`.require` bodies. `CoreSourceFileOrdinaryParsesFromStart` supplies its exact
+root-window, existential-final-remainder public form. Diagnostic-free successful
+`parseLexed` and `parse` results derive that form over their exact input or
+retained-output carriers, and paired theorems add canonical parsed-file source
+validity. The ordinary component relations remain reusable for recovered parser
+outcomes; the diagnostic-free premise excludes such recoveries from these
+public conclusions.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
@@ -263,9 +268,9 @@ The canonical syntax slice is complete when:
 - lexical and parse diagnostics are deterministic and source-located;
 - all retained token, comment, and AST spans use valid UTF-8 byte boundaries;
 - ordinary malformed input produces total diagnostic output;
-- every diagnostic-free complete-file result is proved derivable in both the
-  parametric independent grammar and its concrete mutually recursive Core
-  term, block, and inline-Yul ordinary specialization;
+- every diagnostic-free public `parseLexed` or `parse` result is proved
+  derivable in both the parametric independent grammar and its concrete
+  mutually recursive Core term, block, and inline-Yul ordinary specialization;
 - the canonical frontend is the only current syntax described by public
   documentation; and
 - the complete build, tests, metadata validation, and kernel audit pass.
