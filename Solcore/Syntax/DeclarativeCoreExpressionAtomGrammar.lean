@@ -42,4 +42,44 @@ inductive ProxyExpressionParses :
         value := .proxy markerSpan type
       } output
 
+/--
+Prioritized optional argument list of a leading-dot constructor.  A present
+opening parenthesis commits to the no-trailing delimited branch; absence is
+recorded only when that opening token is not current.
+-/
+inductive OptionalDotConstructorArgumentsParses
+    (nestedParses : Remainder → Syntax.Expr → Remainder → Prop) :
+    Remainder → Option (DelimitedList Syntax.Expr) → Remainder → Prop where
+  | absent {input : Remainder}
+      (openingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .leftParen)) :
+      OptionalDotConstructorArgumentsParses nestedParses input none input
+  | present {input output : Remainder}
+      {arguments : DelimitedList Syntax.Expr}
+      (parsed : NoTrailingDelimitedListParses .leftParen .rightParen
+        nestedParses input arguments output) :
+      OptionalDotConstructorArgumentsParses nestedParses input
+        (some arguments) output
+
+/--
+Exact leading-dot constructor grammar, including Boolean-first name parsing,
+optional-argument priority, retained marker, and outer range.
+-/
+inductive DotConstructorParses
+    (nestedParses : Remainder → Syntax.Expr → Remainder → Prop) :
+    Remainder → Syntax.Expr → Remainder → Prop where
+  | parsed {input afterDot afterName output : Remainder}
+      {name : Syntax.Identifier}
+      {arguments : Option (DelimitedList Syntax.Expr)}
+      (dotSpan : SourceSpan)
+      (dotParsed : ExactTokenParses (.symbol .dot) input dotSpan afterDot)
+      (nameParsed : ExpressionNameParses afterDot name afterName)
+      (argumentsParsed : OptionalDotConstructorArgumentsParses nestedParses
+        afterName arguments output) :
+      DotConstructorParses nestedParses input {
+        span := SourceSpan.cover dotSpan
+          (arguments.map (fun values => values.span) |>.getD name.span)
+        value := .dotConstructor dotSpan name arguments
+      } output
+
 end Solcore.Syntax.DeclarativeGrammar
