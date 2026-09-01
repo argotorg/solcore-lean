@@ -296,6 +296,17 @@ def SelectedImportParses
       | some alias =>
           SourceSpan.cover selection.value.source.span alias.span
 
+/-- Independent grammar of one nonempty braced selected-import list. -/
+def SelectedImportsParses
+    (input : Remainder)
+    (selection : NonemptyDelimitedList Syntax.SelectedImport)
+    (output : Remainder) : Prop :=
+  NonemptyTrailingDelimitedListParses .leftBrace .rightBrace
+    SelectedImportParses input {
+      span := selection.span
+      elements := selection.elements.toList
+    } output
+
 /-! Plain imports remain a separate judgment as other import forms are added. -/
 
 /-- Grammar of the module path and semicolon following `import`. -/
