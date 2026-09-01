@@ -24,6 +24,55 @@ def TokenAt (tokens : Array Token) (endIndex : Nat)
     (index : Nat) (token : Token) : Prop :=
   index < endIndex ∧ tokens[index]? = some token
 
+/-- No token of `kind` occurs at one position in the active window. -/
+def TokenKindAbsentAt (tokens : Array Token) (endIndex index : Nat)
+    (kind : TokenKind) : Prop :=
+  ¬ ∃ span, TokenAt tokens endIndex index { span, value := kind }
+
+/-- Last identifier of one nonempty forward-order component sequence. -/
+def finalIdentifier : Identifier → List Identifier → Identifier
+  | first, [] => first
+  | _, next :: rest => finalIdentifier next rest
+
+/-- Grammar of the dotted components following a first identifier. -/
+inductive DottedIdentifierTailParses
+    (tokens : Array Token) (endIndex : Nat) :
+    Nat → List Identifier → Nat → Prop where
+  | done (cursor : Nat)
+      (stopped : TokenKindAbsentAt tokens endIndex cursor (.symbol .dot)) :
+      DottedIdentifierTailParses tokens endIndex cursor [] cursor
+  | next {cursor finish : Nat} {component : Identifier}
+      {components : List Identifier}
+      (dotSpan : SourceSpan)
+      (dotToken : TokenAt tokens endIndex cursor {
+        span := dotSpan
+        value := .symbol .dot
+      })
+      (componentToken : TokenAt tokens endIndex (cursor + 1) {
+        span := component.span
+        value := .identifier component.value
+      })
+      (tail : DottedIdentifierTailParses tokens endIndex (cursor + 2)
+        components finish) :
+      DottedIdentifierTailParses tokens endIndex cursor
+        (component :: components) finish
+
+/-- Independent recognition judgment for one nonempty qualified name. -/
+def QualifiedNameParses
+    (input : Remainder) (name : Syntax.QualifiedName)
+    (output : Remainder) : Prop :=
+  output.tokens = input.tokens ∧
+    output.endIndex = input.endIndex ∧
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := name.value.components.head.span
+      value := .identifier name.value.components.head.value
+    } ∧
+    DottedIdentifierTailParses input.tokens input.endIndex
+      (input.cursor + 1) name.value.components.tail output.cursor ∧
+    name.span = SourceSpan.cover name.value.components.head.span
+      (finalIdentifier name.value.components.head
+        name.value.components.tail).span
+
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
     (tokens : Array Token) (endIndex : Nat) :
