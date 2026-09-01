@@ -224,4 +224,15 @@ theorem identifier_ok_tokenAt (context : ParseContext)
       · rw [rawSound.2]
         exact ⟨rawSound.1, rfl, rfl, rfl⟩
 
+/-- Checked identifier success follows the parser-independent identifier grammar. -/
+theorem identifier_success_sound (context : ParseContext)
+    {input next : State} {name : Identifier}
+    (result : identifier context input = .ok name next) :
+    DeclarativeGrammar.IdentifierParses input.declarativeRemainder name
+      next.declarativeRemainder := by
+  rcases identifier_ok_tokenAt context result with
+    ⟨nameToken, tokensEq, windowEq, cursorEq⟩
+  exact ⟨nameToken, tokensEq,
+    congrArg TokenWindow.endIndex windowEq, cursorEq⟩
+
 end Solcore.Syntax.Parser
