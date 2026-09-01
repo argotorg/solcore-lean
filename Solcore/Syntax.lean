@@ -18,6 +18,7 @@ import Solcore.Syntax.Parser.ExportNameSoundnessProperties
 import Solcore.Syntax.Parser.ExportPathSoundnessProperties
 import Solcore.Syntax.Parser.ExportSelectionSoundnessProperties
 import Solcore.Syntax.Parser.FileItemsSoundnessProperties
+import Solcore.Syntax.Parser.FunctionDeclSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
 import Solcore.Syntax.Parser.FunctionSignatureSoundnessProperties
 import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
