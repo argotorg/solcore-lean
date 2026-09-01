@@ -778,6 +778,107 @@ inductive PredicateParses :
         arguments
       } output
 
+/-! Grammar of bare, grouped, and optional `where` predicate sequences. -/
+
+/-- Token kinds accepted by the canonical type-expression start lookahead. -/
+inductive TypeExprStartToken : TokenKind → Prop where
+  | function : TypeExprStartToken (.keyword .functionKw)
+  | proxy : TypeExprStartToken (.symbol .at)
+  | tuple : TypeExprStartToken (.symbol .leftParen)
+  | identifier (name : String) : TypeExprStartToken (.identifier name)
+
+/-- A canonical type expression can start at this remainder. -/
+def TypeExprStartsAt (input : Remainder) : Prop :=
+  ∃ span kind,
+    TokenAt input.tokens input.endIndex input.cursor { span, value := kind } ∧
+      TypeExprStartToken kind
+
+/-- No token accepted by the type-expression start lookahead occurs here. -/
+def TypeExprAbsentAt (input : Remainder) : Prop :=
+  ¬ TypeExprStartsAt input
+
+/--
+Forward-order grammar of the commas and predicates following the first bare
+predicate. The final span is the last predicate, or a retained trailing comma.
+-/
+inductive BarePredicateTailParses :
+    SourceSpan → Remainder → List Syntax.Predicate → SourceSpan →
+      Remainder → Prop where
+  | done {input : Remainder} {lastSpan : SourceSpan}
+      (commaAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .comma)) :
+      BarePredicateTailParses lastSpan input [] lastSpan input
+  | trailing {input afterComma : Remainder}
+      {lastSpan commaSpan : SourceSpan}
+      (commaToken : ExactTokenParses (.symbol .comma)
+        input commaSpan afterComma)
+      (nextAbsent : TypeExprAbsentAt afterComma) :
+      BarePredicateTailParses lastSpan input [] commaSpan afterComma
+  | next {input afterComma afterPredicate output : Remainder}
+      {lastSpan commaSpan finalSpan : SourceSpan}
+      {predicate : Syntax.Predicate} {predicates : List Syntax.Predicate}
+      (commaToken : ExactTokenParses (.symbol .comma)
+        input commaSpan afterComma)
+      (nextStarts : TypeExprStartsAt afterComma)
+      (predicateParsed : PredicateParses afterComma predicate afterPredicate)
+      (tail : BarePredicateTailParses predicate.span afterPredicate
+        predicates finalSpan output) :
+      BarePredicateTailParses lastSpan input (predicate :: predicates)
+        finalSpan output
+
+/-- Exact grammar of a nonempty unparenthesized predicate sequence. -/
+inductive BarePredicateSequenceParses :
+    Remainder → NonemptyDelimitedList Syntax.Predicate → Remainder → Prop where
+  | parsed {input afterFirst output : Remainder}
+      {first : Syntax.Predicate} {rest : List Syntax.Predicate}
+      {finalSpan : SourceSpan}
+      (firstParsed : PredicateParses input first afterFirst)
+      (tailParsed : BarePredicateTailParses first.span afterFirst rest
+        finalSpan output) :
+      BarePredicateSequenceParses input {
+        span := SourceSpan.cover first.span finalSpan
+        elements := { head := first, tail := rest }
+      } output
+
+/-- Exact generic-delimiter grammar of a parenthesized predicate sequence. -/
+def GroupedPredicateSequenceParses
+    (input : Remainder) (values : NonemptyDelimitedList Syntax.Predicate)
+    (output : Remainder) : Prop :=
+  NonemptyTrailingDelimitedListParses .leftParen .rightParen PredicateParses
+    input { span := values.span, elements := values.elements.toList } output
+
+/-- Either successful branch of the parser's transactional sequence choice. -/
+inductive PredicateSequenceParses :
+    Remainder → NonemptyDelimitedList Syntax.Predicate → Remainder → Prop where
+  | bare {input output : Remainder}
+      {values : NonemptyDelimitedList Syntax.Predicate}
+      (parsed : BarePredicateSequenceParses input values output) :
+      PredicateSequenceParses input values output
+  | grouped {input output : Remainder}
+      {values : NonemptyDelimitedList Syntax.Predicate}
+      (parsed : GroupedPredicateSequenceParses input values output) :
+      PredicateSequenceParses input values output
+
+/-- Prioritized optional `where` marker and its nonempty predicate sequence. -/
+inductive OptionalWhereClauseParses :
+    Remainder → Option Syntax.WhereClause → Remainder → Prop where
+  | absent {input : Remainder}
+      (markerAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.identifier ContextualKeyword.where.spelling)) :
+      OptionalWhereClauseParses input none input
+  | present {input afterMarker output : Remainder}
+      {predicates : NonemptyDelimitedList Syntax.Predicate}
+      (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses
+        (.identifier ContextualKeyword.where.spelling)
+        input markerSpan afterMarker)
+      (predicatesParsed : PredicateSequenceParses
+        afterMarker predicates output) :
+      OptionalWhereClauseParses input (some {
+        span := SourceSpan.cover markerSpan predicates.span
+        predicates := predicates.elements
+      }) output
+
 /-! Grammar shared by named function and trait-method signatures. -/
 
 /-- Prioritized optional `returns (...)` clause with exact recursive types. -/
