@@ -11,5 +11,6 @@ import Solcore.Syntax.Parser.PlainImportSoundnessProperties
 import Solcore.Syntax.Parser.PragmaSoundnessProperties
 import Solcore.Syntax.Parser.Properties
 import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
+import Solcore.Syntax.Parser.WildcardImportNoHidingSoundnessProperties
 
 /-! Public Lean boundary for the canonical Solcore source syntax. -/
