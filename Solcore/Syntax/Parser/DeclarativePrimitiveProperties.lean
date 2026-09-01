@@ -235,4 +235,43 @@ theorem identifier_success_sound (context : ParseContext)
   exact ⟨nameToken, tokensEq,
     congrArg TokenWindow.endIndex windowEq, cursorEq⟩
 
+/-- Keyword success is one exact parser-independent token transition. -/
+theorem keyword_success_exactTokenParses
+    (value : HardKeyword) (context : ParseContext)
+    {input next : State} {token : Token}
+    (result : keyword value context input = .ok token next) :
+    DeclarativeGrammar.ExactTokenParses (.keyword value)
+      input.declarativeRemainder token.span next.declarativeRemainder := by
+  rcases keyword_ok_tokenAt value context result with ⟨tokenAt, shape⟩
+  unfold DeclarativeGrammar.ExactTokenParses
+  refine ⟨tokenAt, ?_⟩
+  rw [shape]
+  rfl
+
+/-- Symbol success is one exact parser-independent token transition. -/
+theorem symbol_success_exactTokenParses
+    (value : Symbol) (context : ParseContext)
+    {input next : State} {token : Token}
+    (result : symbol value context input = .ok token next) :
+    DeclarativeGrammar.ExactTokenParses (.symbol value)
+      input.declarativeRemainder token.span next.declarativeRemainder := by
+  rcases symbol_ok_tokenAt value context result with ⟨tokenAt, shape⟩
+  unfold DeclarativeGrammar.ExactTokenParses
+  refine ⟨tokenAt, ?_⟩
+  rw [shape]
+  rfl
+
+/-- Contextual-keyword success is one exact token transition. -/
+theorem contextual_success_exactTokenParses
+    (value : ContextualKeyword) (context : ParseContext)
+    {input next : State} {token : Token}
+    (result : contextual value context input = .ok token next) :
+    DeclarativeGrammar.ExactTokenParses (.identifier value.spelling)
+      input.declarativeRemainder token.span next.declarativeRemainder := by
+  rcases contextual_ok_tokenAt value context result with ⟨tokenAt, shape⟩
+  unfold DeclarativeGrammar.ExactTokenParses
+  refine ⟨tokenAt, ?_⟩
+  rw [shape]
+  rfl
+
 end Solcore.Syntax.Parser
