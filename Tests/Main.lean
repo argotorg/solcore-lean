@@ -108,6 +108,7 @@ import Solcore.Test.SyntaxParserFunctionProperties
 import Solcore.Test.SyntaxParserGenericParametersTotalityProperties
 import Solcore.Test.SyntaxParserGenericParameterProperties
 import Solcore.Test.SyntaxParserHidingClauseSoundnessProperties
+import Solcore.Test.SyntaxParserImportDeclSoundnessProperties
 import Solcore.Test.SyntaxParserImportProperties
 import Solcore.Test.SyntaxParserImportBaseTotalityProperties
 import Solcore.Test.SyntaxParserImportSelectionTotalityProperties
