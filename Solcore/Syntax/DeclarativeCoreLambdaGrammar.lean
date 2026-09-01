@@ -106,4 +106,25 @@ inductive OptionalLambdaReturnTypeParses :
       (typeParsed : TypeExprParses afterArrow type output) :
       OptionalLambdaReturnTypeParses input (some type) output
 
+/-- Exact lambda expression grammar over a supplied Core block judgment. -/
+inductive LambdaExpressionParses
+    (blockParses : Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.Expr → Remainder → Prop where
+  | parsed {input afterMarker afterParameters afterReturn output : Remainder}
+      {parameters : DelimitedList Syntax.LambdaParameter}
+      {returnType : Option Syntax.TypeExpr} {body : Syntax.Block}
+      (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses (.keyword .lamKw) input markerSpan
+        afterMarker)
+      (parametersParsed : TrailingDelimitedListParses
+        .leftParen .rightParen LambdaParameterParses afterMarker parameters
+          afterParameters)
+      (returnTypeParsed : OptionalLambdaReturnTypeParses afterParameters
+        returnType afterReturn)
+      (bodyParsed : blockParses afterReturn body output) :
+      LambdaExpressionParses blockParses input {
+        span := SourceSpan.cover markerSpan body.span
+        value := .lambda markerSpan parameters returnType body
+      } output
+
 end Solcore.Syntax.DeclarativeGrammar
