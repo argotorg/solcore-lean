@@ -187,6 +187,36 @@ private theorem validateBlockTails_window_shape :
             (validateExpressionSemicolon first state)).trans
               (validateExpressionSemicolon_window_shape first state)
 
+/-- Closing a raw Core block has the exact brace, source-order body, and
+remainder even when tail validation emits ordinary diagnostics. -/
+theorem closeCoreBlock_success_ordinary_sound
+    (opening : Token) (policy : TailExpressionPolicy)
+    (bodyRev : List Statement) {input next : State} {body : Block}
+    (result : closeCoreBlock opening policy bodyRev input = .ok body next) :
+    ∃ closingSpan,
+      body = {
+        span := SourceSpan.cover opening.span closingSpan
+        value := bodyRev.reverse
+      } ∧
+      DeclarativeGrammar.ExactTokenParses (.symbol .rightBrace)
+        input.declarativeRemainder closingSpan next.declarativeRemainder := by
+  unfold closeCoreBlock at result
+  simp only [bind] at result
+  cases closingResult : symbol .rightBrace .statement input with
+  | invariant error => simp [closingResult] at result
+  | reject failure rejected => simp [closingResult] at result
+  | ok closing afterClosing =>
+      simp only [closingResult, modifyState, pure] at result
+      cases result
+      have stateShape := validateBlockTails_state_shape policy
+        bodyRev.reverse afterClosing
+      have windowShape := validateBlockTails_window_shape policy
+        bodyRev.reverse afterClosing
+      refine ⟨closing.span, rfl, ?_⟩
+      simpa [State.declarativeRemainder, stateShape.1, stateShape.2,
+        windowShape] using
+          symbol_success_exactTokenParses .rightBrace .statement closingResult
+
 /--
 A diagnostic-free close exposes its exact brace, body, tail policy, and input
 diagnostic state.  This is the public behavioral seam for the private block-tail
