@@ -1,0 +1,13 @@
+import Solcore.Syntax.Parser.ContractEntryHelperTotalityProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserContractEntryHelperTotalityProperties
+
+open Solcore.Syntax.Parser
+
+example := @ContractEntryInternals.entryParameters_invariantFreeOnValid
+example := @ContractEntryInternals.optionalModifier_invariantFreeOnValid
+example := @ContractEntryInternals.implicitPublicModifiers_invariantFreeOnValid
+
+end Solcore.Test.SyntaxParserContractEntryHelperTotalityProperties
