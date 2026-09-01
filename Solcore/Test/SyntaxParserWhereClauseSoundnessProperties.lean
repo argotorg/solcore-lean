@@ -16,6 +16,10 @@ example := @TypeExprAbsentAt
 example := @BarePredicateTailParses
 example := @BarePredicateSequenceParses
 example := @GroupedPredicateSequenceParses
+example := @GroupedPredicateSequenceUnavailable
+example := @GroupedPredicateSequenceRejects
+example := @groupedPredicateSequenceDeterministicOutcomeSpec
+example := @GroupedPredicateSequenceRejects.no_parse
 example := @PredicateSequenceParses
 example := @OptionalWhereClauseParses
 
@@ -23,6 +27,8 @@ example := @PredicateInternals.barePredicates_success_sound
 example := @PredicateInternals.barePredicates_success_sound_and_validFor
 example := @PredicateInternals.groupedPredicates_success_sound
 example := @PredicateInternals.groupedPredicates_success_sound_and_validFor
+example := @PredicateInternals.groupedPredicates_reject_sound
+example := @PredicateInternals.groupedPredicates_ordinaryOutcome_sound
 example := @PredicateInternals.predicateSequence_success_sound
 example := @PredicateInternals.predicateSequence_success_sound_and_validFor
 example := @whereClause_success_sound
@@ -47,6 +53,23 @@ example {input next : State}
         predicates :=
   PredicateInternals.predicateSequence_success_sound_and_validFor inputValid
     result
+
+example {input rejected : State} {failure : Failure}
+    (result : PredicateInternals.groupedPredicates input =
+      .reject failure rejected) :
+    GroupedPredicateSequenceRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  PredicateInternals.groupedPredicates_reject_sound result
+
+example {input rejected : Remainder}
+    (rejection : GroupedPredicateSequenceRejects input rejected) :
+    GroupedPredicateSequenceUnavailable input :=
+  rejection.no_parse
+
+example :
+    DeterministicOutcomeSpec GroupedPredicateSequenceParses
+      GroupedPredicateSequenceRejects :=
+  groupedPredicateSequenceDeterministicOutcomeSpec
 
 example {input next : State} {clause : Option WhereClause}
     (result : whereClause input = .ok clause next) :
