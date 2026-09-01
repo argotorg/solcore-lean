@@ -312,21 +312,23 @@ On the statement side, assignment/expression fallback, `let`, `return`, Core
 blocks, braced statements, `while`, `if`, and `for` now have recursive-fuel
 contracts. Both `for` item forms and the comma-separated item loops have
 separate fixed element-fuel and decreasing loop-fuel proofs. `break` and
-`continue` remain unconditionally ordinary leaves.
+`continue` remain unconditionally ordinary leaves. Core `match` now has total
+helpers for individual arms, arm lists, optional `default`, and arity
+validation, plus an ordinary-result theorem for the complete parser under its
+fuel bounds and a reusable contract for statement-layer dispatch. Inline
+`assembly` is fully total on valid input and inherits the completed public Yul
+body contract.
 
-Inline Yul now has an unconditional public expression contract. Name lists,
-function signatures, statement leaves, and optional termination are total;
-statement leaves also have strict-progress element contracts. Recursive Yul
-blocks and the block, `if`, `for`, and function statement forms have explicit
-fuel contracts. Transactional fallback and state-selected choice preserve
-those contracts. Switch helpers, statement recovery, and the final recursive
-statement family are the remaining Yul closure work.
+Inline Yul is now closed end to end for valid-input totality. The public
+expression, statement, and braced-body parsers are ordinary and
+invariant-free. This includes switch arms and defaults, recovery, the recursive
+statement family, block iteration, ordered statement choice, and strict
+progress for loop elements.
 
-The remaining mutual Core closure is concentrated in `match`, inline
-`assembly`, the ordered statement dispatcher, and the simultaneous public
-expression/statement fuel induction. This is therefore not yet a claim that
-public Core expression and statement parsing are unconditionally
-invariant-free.
+The remaining mutual Core work is the ordered `statementLayer` dispatch and
+the simultaneous expression, pattern, and statement fuel closure. Until that
+is complete, public Core expression and statement parsing are not yet claimed
+to be unconditionally invariant-free.
 
 After that closure, the five declaration and five contract-member obligations
 must be discharged before successful parsing is related to a declarative

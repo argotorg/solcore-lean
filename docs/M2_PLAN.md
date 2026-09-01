@@ -152,15 +152,21 @@ parser under the matching expression-family premises.
 Statement totality covers assignment/expression fallback, `let`, `return`,
 `break`, `continue`, fuel-aware Core block iteration/isolation, and the
 braced, `while`, `if`, and `for` control forms. Both `for` item variants and
-their list loop have explicit contracts.
+their list loop have explicit contracts. Core `match` has complete helper,
+arm-list, optional-default, and validation proofs together with an
+ordinary-result theorem and a reusable branch contract for the whole parser.
+Core inline `assembly` is total on valid input and also exposes its branch
+contract.
 
-Inline-Yul expression, names, signatures, statement leaves, blocks, and the
-block, `if`, `for`, and function statement forms now have totality and strict
-progress contracts. Fallback, state choice, transactional choice, and optional
-termination have fuel-preserving composition laws. The next proof step is to
-close Yul switch and recovery, then Core `match`, `assembly`, ordered statement
-dispatch, and the simultaneous expression/statement families. The remaining
-declaration branches and declarative grammar soundness follow that closure.
+Inline-Yul valid-input totality is complete for the public expression,
+statement, and braced-body parsers. The proof includes switch, recovery, the
+recursive statement family, ordered choice, block iteration, and strict
+progress.
+
+The next proof step is the ordered Core `statementLayer` dispatch followed by
+the simultaneous expression, pattern, and statement fuel closure. After that,
+the five remaining declaration parsers and five contract-member parsers are
+discharged, then successful parsing is related to the declarative grammar.
 
 Executable coverage preceded deep grammar-specific proof regeneration. The
 proof work now targets the completed executable grammar while preserving the
