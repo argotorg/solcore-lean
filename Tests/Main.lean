@@ -166,6 +166,7 @@ import Solcore.Test.SyntaxParserQualifiedNameSoundnessProperties
 import Solcore.Test.SyntaxParserQualifiedNameTotalityProperties
 import Solcore.Test.SyntaxParserRecovery
 import Solcore.Test.SyntaxParserReservedWords
+import Solcore.Test.SyntaxParserSelectorNameSoundnessProperties
 import Solcore.Test.SyntaxParserSignatures
 import Solcore.Test.SyntaxParserStateCursorProperties
 import Solcore.Test.SyntaxParserStateProperties
