@@ -57,6 +57,7 @@ import Solcore.Test.SyntaxParserDeriveAttributeTotalityProperties
 import Solcore.Test.SyntaxParserDeriveRecoveryTotalityProperties
 import Solcore.Test.SyntaxParserDeriveTargetInternals
 import Solcore.Test.SyntaxParserDeriveTargetProperties
+import Solcore.Test.SyntaxParserDeriveTargetSoundnessProperties
 import Solcore.Test.SyntaxParserDeriveTargetTotalityProperties
 import Solcore.Test.SyntaxParserDiagnosticSuppression
 import Solcore.Test.SyntaxParserEnumBodyTotalityProperties
