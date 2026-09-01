@@ -8,7 +8,8 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
-private theorem bind_ok_components {alpha beta : Type}
+/-- A successful monadic import stage exposes both successful component replies. -/
+theorem importBind_success_components {alpha beta : Type}
     {first : Parser alpha} {nextParser : alpha → Parser beta}
     {input final : State} {value : beta}
     (result : (first >>= nextParser) input = .ok value final) :
@@ -72,11 +73,11 @@ theorem plainImport_success_sound_of_diagnosticFree
     DeclarativeGrammar.PlainImportTailParses start
       input.declarativeRemainder declaration next.declarativeRemainder := by
   unfold ImportInternals.plainImport at result
-  rcases bind_ok_components result with
+  rcases importBind_success_components result with
     ⟨path, afterPath, pathResult, finishResult⟩
   have pathSound := modulePath_success_sound .importDecl pathResult
   unfold ImportInternals.finish at finishResult
-  rcases bind_ok_components finishResult with
+  rcases importBind_success_components finishResult with
     ⟨endSpan, afterEnd, endResult, finished⟩
   cases finished
   rcases importTerminator_success_sound_of_diagnosticFree path.span
@@ -89,49 +90,70 @@ theorem plainImport_success_sound_of_diagnosticFree
     rfl
   · rw [endSpanEq]
 
-private theorem finish_success_value (start last : SourceSpan)
+/-- Successful import finishing retains its supplied payload constructor. -/
+theorem finishImport_success_value (start last : SourceSpan)
     (value : ImportDeclValue) {input next : State}
     {declaration : ImportDecl}
     (result : ImportInternals.finish start last value input =
       .ok declaration next) :
     declaration.value = value := by
   unfold ImportInternals.finish at result
-  rcases bind_ok_components result with
+  rcases importBind_success_components result with
     ⟨endSpan, afterEnd, _endResult, finished⟩
   cases finished
   rfl
 
-private theorem namespaceImport_success_value (start : SourceSpan)
+/-- Plain-helper success produces exactly the plain payload constructor. -/
+theorem plainImport_success_value (start : SourceSpan)
+    {input next : State} {declaration : ImportDecl}
+    (result : ImportInternals.plainImport start input =
+      .ok declaration next) :
+    ∃ path, declaration.value = .plain path := by
+  unfold ImportInternals.plainImport at result
+  rcases importBind_success_components result with
+    ⟨path, afterPath, _pathResult, finished⟩
+  exact ⟨path,
+    finishImport_success_value start path.span (.plain path) finished⟩
+
+/-- Namespace-helper success produces exactly the namespace payload constructor. -/
+theorem namespaceImport_success_value (start : SourceSpan)
     {input next : State} {declaration : ImportDecl}
     (result : ImportInternals.namespaceImport start input =
       .ok declaration next) :
     ∃ path alias, declaration.value = .namespace path alias := by
   unfold ImportInternals.namespaceImport at result
-  rcases bind_ok_components result with ⟨_star, afterStar, _, rest⟩
-  rcases bind_ok_components rest with ⟨_as, afterAs, _, rest⟩
-  rcases bind_ok_components rest with ⟨alias, afterAlias, _, rest⟩
-  rcases bind_ok_components rest with ⟨_from, afterFrom, _, rest⟩
-  rcases bind_ok_components rest with ⟨path, afterPath, _, finished⟩
+  rcases importBind_success_components result with
+    ⟨_star, afterStar, _, rest⟩
+  rcases importBind_success_components rest with ⟨_as, afterAs, _, rest⟩
+  rcases importBind_success_components rest with
+    ⟨alias, afterAlias, _, rest⟩
+  rcases importBind_success_components rest with
+    ⟨_from, afterFrom, _, rest⟩
+  rcases importBind_success_components rest with
+    ⟨path, afterPath, _, finished⟩
   exact ⟨path, alias,
-    finish_success_value start path.span (.namespace path alias) finished⟩
+    finishImport_success_value start path.span (.namespace path alias) finished⟩
 
-private theorem wildcardImport_success_value (start : SourceSpan)
+/-- Wildcard-helper success produces exactly the wildcard payload constructor. -/
+theorem wildcardImport_success_value (start : SourceSpan)
     {input next : State} {declaration : ImportDecl}
     (result : ImportInternals.wildcardImport start input =
       .ok declaration next) :
     ∃ path hidden, declaration.value = .wildcard path hidden := by
   unfold ImportInternals.wildcardImport at result
-  rcases bind_ok_components result with ⟨_star, afterStar, _, rest⟩
-  rcases bind_ok_components rest with ⟨_from, afterFrom, _, rest⟩
-  rcases bind_ok_components rest with ⟨path, afterPath, _, rest⟩
-  rcases bind_ok_components rest with ⟨hidden, afterHidden, _, finished⟩
+  rcases importBind_success_components result with
+    ⟨_star, afterStar, _, rest⟩
+  rcases importBind_success_components rest with ⟨_from, afterFrom, _, rest⟩
+  rcases importBind_success_components rest with ⟨path, afterPath, _, rest⟩
+  rcases importBind_success_components rest with
+    ⟨hidden, afterHidden, _, finished⟩
   cases hidden with
   | none =>
       have finishedNone : ImportInternals.finish start path.span
           (.wildcard path none) afterHidden = .ok declaration next := by
         simpa using finished
       exact ⟨path, none,
-        finish_success_value start path.span (.wildcard path none)
+        finishImport_success_value start path.span (.wildcard path none)
           finishedNone⟩
   | some clause =>
       have finishedSome : ImportInternals.finish start clause.span
@@ -139,21 +161,23 @@ private theorem wildcardImport_success_value (start : SourceSpan)
             .ok declaration next := by
         simpa using finished
       exact ⟨path, some clause,
-        finish_success_value start clause.span
+        finishImport_success_value start clause.span
           (.wildcard path (some clause)) finishedSome⟩
 
-private theorem selectiveImport_success_value (start : SourceSpan)
+/-- Selective-helper success produces exactly the selected payload constructor. -/
+theorem selectiveImport_success_value (start : SourceSpan)
     {input next : State} {declaration : ImportDecl}
     (result : ImportInternals.selectiveImport start input =
       .ok declaration next) :
     ∃ selection path hidden,
       declaration.value = .selected selection path hidden := by
   unfold ImportInternals.selectiveImport at result
-  rcases bind_ok_components result with
+  rcases importBind_success_components result with
     ⟨selection, afterSelection, _, rest⟩
-  rcases bind_ok_components rest with ⟨_from, afterFrom, _, rest⟩
-  rcases bind_ok_components rest with ⟨path, afterPath, _, rest⟩
-  rcases bind_ok_components rest with ⟨hidden, afterHidden, _, finished⟩
+  rcases importBind_success_components rest with ⟨_from, afterFrom, _, rest⟩
+  rcases importBind_success_components rest with ⟨path, afterPath, _, rest⟩
+  rcases importBind_success_components rest with
+    ⟨hidden, afterHidden, _, finished⟩
   cases hidden with
   | none =>
       have finishedNone : ImportInternals.finish start path.span
@@ -161,7 +185,7 @@ private theorem selectiveImport_success_value (start : SourceSpan)
             .ok declaration next := by
         simpa using finished
       exact ⟨selection, path, none,
-        finish_success_value start path.span
+        finishImport_success_value start path.span
           (.selected selection path none) finishedNone⟩
   | some clause =>
       have finishedSome : ImportInternals.finish start clause.span
@@ -169,7 +193,7 @@ private theorem selectiveImport_success_value (start : SourceSpan)
             .ok declaration next := by
         simpa using finished
       exact ⟨selection, path, some clause,
-        finish_success_value start clause.span
+        finishImport_success_value start clause.span
           (.selected selection path (some clause)) finishedSome⟩
 
 /--
@@ -187,10 +211,10 @@ theorem importDecl_plain_success_sound {input next : State}
     DeclarativeGrammar.PlainImportDeclParses input.declarativeRemainder
       declaration next.declarativeRemainder := by
   unfold importDecl at result
-  rcases bind_ok_components result with
+  rcases importBind_success_components result with
     ⟨importKeyword, afterKeyword, keywordResult, rest⟩
   have keywordSound := keyword_ok_tokenAt .importKw .importDecl keywordResult
-  rcases bind_ok_components rest with
+  rcases importBind_success_components rest with
     ⟨observed, afterObserved, observedResult, branchResult⟩
   unfold getState at observedResult
   cases observedResult
