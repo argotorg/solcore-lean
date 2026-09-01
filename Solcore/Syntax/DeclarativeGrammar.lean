@@ -1209,4 +1209,35 @@ def PragmaDeclParses
     output.cursor = semicolonIndex + 1 ∧
     declaration.span = SourceSpan.cover keywordSpan semicolonSpan
 
+/-! Complete-file accumulation over an abstract top-item grammar. -/
+
+/--
+Forward-order grammar of the top-level items remaining after an existing
+reverse accumulator.  The terminal condition mirrors the executable file
+loop's `atEnd` check; strict progress mirrors its successful-item guard.
+-/
+inductive TopItemsParses
+    (itemParses : Remainder → Syntax.TopItem → Remainder → Prop) :
+    Remainder → List Syntax.TopItem → Remainder → Prop where
+  | done {input : Remainder}
+      (atEnd : input.endIndex ≤ input.cursor) :
+      TopItemsParses itemParses input [] input
+  | next {input afterItem output : Remainder}
+      {item : Syntax.TopItem} {items : List Syntax.TopItem}
+      (itemParsed : itemParses input item afterItem)
+      (progress : input.cursor < afterItem.cursor)
+      (rest : TopItemsParses itemParses afterItem items output) :
+      TopItemsParses itemParses input (item :: items) output
+
+/-- Every complete top-item derivation finishes at its active-window end. -/
+theorem TopItemsParses.output_atEnd
+    {itemParses : Remainder → Syntax.TopItem → Remainder → Prop}
+    {input output : Remainder} {items : List Syntax.TopItem}
+    (parsed : TopItemsParses itemParses input items output) :
+    output.endIndex ≤ output.cursor := by
+  induction parsed with
+  | done atEnd => exact atEnd
+  | next itemParsed progress rest inductionHypothesis =>
+      exact inductionHypothesis
+
 end Solcore.Syntax.DeclarativeGrammar
