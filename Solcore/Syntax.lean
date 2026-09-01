@@ -23,6 +23,7 @@ import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
 import Solcore.Syntax.Parser.FunctionSignatureSoundnessProperties
 import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
 import Solcore.Syntax.Parser.HidingClauseSoundnessProperties
+import Solcore.Syntax.Parser.ImplDeclSoundnessProperties
 import Solcore.Syntax.Parser.ImportDeclSoundnessProperties
 import Solcore.Syntax.Parser.LocalExportItemSoundnessProperties
 import Solcore.Syntax.Parser.ModulePathSoundnessProperties

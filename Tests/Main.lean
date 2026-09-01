@@ -133,6 +133,7 @@ import Solcore.Test.SyntaxParserImplBodyTotalityProperties
 import Solcore.Test.SyntaxParserImplDeclarationTotalityProperties
 import Solcore.Test.SyntaxParserImplHeadTotalityProperties
 import Solcore.Test.SyntaxParserImplProperties
+import Solcore.Test.SyntaxParserImplSoundnessProperties
 import Solcore.Test.SyntaxParserInvariantFreeProperties
 import Solcore.Test.SyntaxParserInvariantProperties
 import Solcore.Test.SyntaxParserLegacyRejection
