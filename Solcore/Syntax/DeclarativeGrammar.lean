@@ -2149,6 +2149,217 @@ def DeriveAttributeParses
       value := { targets }
     }
 
+/-! Grammar of strict contract members, bodies, and complete declarations. -/
+
+/-- Composite lookahead selecting a storage field before every other member. -/
+def ContractFieldStartsAt (input : Remainder) : Prop :=
+  ∃ spelling nameSpan colonSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := nameSpan
+      value := .identifier spelling
+    } ∧
+    TokenAt input.tokens input.endIndex (input.cursor + 1) {
+      span := colonSpan
+      value := .symbol .colon
+    }
+
+/--
+Exact attribute-free member dispatch in executable priority order.  Negative
+premises retain every earlier selector, including the field composite
+lookahead that takes priority over a contextual `enum` spelling followed by
+`:`.
+-/
+inductive ContractMemberCoreParses
+    (expressionParses : Remainder → Syntax.Expr → Remainder → Prop)
+    (allowBodyParses requiredBodyParses :
+      Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.ContractMember → Remainder → Prop where
+  | field {input output : Remainder} {declaration : Syntax.ContractField}
+      (startsField : ContractFieldStartsAt input)
+      (parsed : ContractFieldParses expressionParses input declaration output) :
+      ContractMemberCoreParses expressionParses allowBodyParses
+        requiredBodyParses input {
+          span := declaration.span
+          leadingComments := []
+          value := .field declaration
+        } output
+  | function {input output : Remainder} {declaration : Syntax.FunctionDecl}
+      (fieldAbsent : ¬ ContractFieldStartsAt input)
+      (parsed : FunctionDeclParses allowBodyParses
+        ContractFunctionModifiersAllowed input declaration output) :
+      ContractMemberCoreParses expressionParses allowBodyParses
+        requiredBodyParses input {
+          span := declaration.span
+          leadingComments := []
+          value := .function declaration
+        } output
+  | constructor {input output : Remainder}
+      {declaration : Syntax.ConstructorDecl}
+      (fieldAbsent : ¬ ContractFieldStartsAt input)
+      (functionAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .functionKw))
+      (parsed : ConstructorDeclParses requiredBodyParses
+        input declaration output) :
+      ContractMemberCoreParses expressionParses allowBodyParses
+        requiredBodyParses input {
+          span := declaration.span
+          leadingComments := []
+          value := .constructor declaration
+        } output
+  | fallback {input output : Remainder}
+      {declaration : Syntax.FallbackDecl}
+      (fieldAbsent : ¬ ContractFieldStartsAt input)
+      (functionAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .functionKw))
+      (constructorAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .constructorKw))
+      (parsed : FallbackDeclParses requiredBodyParses
+        input declaration output) :
+      ContractMemberCoreParses expressionParses allowBodyParses
+        requiredBodyParses input {
+          span := declaration.span
+          leadingComments := []
+          value := .fallback declaration
+        } output
+  | typeAlias {input output : Remainder}
+      {declaration : Syntax.TypeAliasDecl}
+      (fieldAbsent : ¬ ContractFieldStartsAt input)
+      (functionAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .functionKw))
+      (constructorAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .constructorKw))
+      (fallbackAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .fallbackKw))
+      (parsed : TypeAliasDeclParses input declaration output) :
+      ContractMemberCoreParses expressionParses allowBodyParses
+        requiredBodyParses input {
+          span := declaration.span
+          leadingComments := []
+          value := .typeAlias declaration
+        } output
+  | enum {input output : Remainder} {declaration : Syntax.EnumDecl}
+      (fieldAbsent : ¬ ContractFieldStartsAt input)
+      (functionAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .functionKw))
+      (constructorAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .constructorKw))
+      (fallbackAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .fallbackKw))
+      (typeAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .typeKw))
+      (parsed : EnumDeclParses none input declaration output) :
+      ContractMemberCoreParses expressionParses allowBodyParses
+        requiredBodyParses input {
+          span := declaration.span
+          leadingComments := []
+          value := .enum declaration
+        } output
+
+/--
+Strict attribute-aware member dispatch.  A leading hash commits to derive
+parsing; diagnostic freedom permits attachment only to the enum branch.
+-/
+inductive ContractMemberParses
+    (expressionParses : Remainder → Syntax.Expr → Remainder → Prop)
+    (allowBodyParses requiredBodyParses :
+      Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.ContractMember → Remainder → Prop where
+  | plain {input output : Remainder} {member : Syntax.ContractMember}
+      (hashAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .hash))
+      (parsed : ContractMemberCoreParses expressionParses allowBodyParses
+        requiredBodyParses input member output) :
+      ContractMemberParses expressionParses allowBodyParses
+        requiredBodyParses input member output
+  | derivedEnum
+      {input afterDerive output : Remainder}
+      {derive : Syntax.DeriveAttribute} {declaration : Syntax.EnumDecl}
+      (deriveParsed : DeriveAttributeParses input derive afterDerive)
+      (fieldAbsent : ¬ ContractFieldStartsAt afterDerive)
+      (functionAbsent : TokenKindAbsentAt afterDerive.tokens
+        afterDerive.endIndex afterDerive.cursor (.keyword .functionKw))
+      (constructorAbsent : TokenKindAbsentAt afterDerive.tokens
+        afterDerive.endIndex afterDerive.cursor (.keyword .constructorKw))
+      (fallbackAbsent : TokenKindAbsentAt afterDerive.tokens
+        afterDerive.endIndex afterDerive.cursor (.keyword .fallbackKw))
+      (typeAbsent : TokenKindAbsentAt afterDerive.tokens afterDerive.endIndex
+        afterDerive.cursor (.keyword .typeKw))
+      (enumParsed : EnumDeclParses (some derive)
+        afterDerive declaration output) :
+      ContractMemberParses expressionParses allowBodyParses
+        requiredBodyParses input {
+          span := declaration.span
+          leadingComments := []
+          value := .enum declaration
+        } output
+
+/-- Forward-order contract members ending at the exact closing brace. -/
+inductive ContractMemberTailParses
+    (expressionParses : Remainder → Syntax.Expr → Remainder → Prop)
+    (allowBodyParses requiredBodyParses :
+      Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → List Syntax.ContractMember → SourceSpan →
+      Remainder → Prop where
+  | close {input output : Remainder} (closingSpan : SourceSpan)
+      (closingToken : ExactTokenParses (.symbol .rightBrace)
+        input closingSpan output) :
+      ContractMemberTailParses expressionParses allowBodyParses
+        requiredBodyParses input [] closingSpan output
+  | next {input afterMember output : Remainder}
+      {member : Syntax.ContractMember} {members : List Syntax.ContractMember}
+      {closingSpan : SourceSpan}
+      (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .rightBrace))
+      (memberParsed : ContractMemberParses expressionParses allowBodyParses
+        requiredBodyParses input member afterMember)
+      (progress : input.cursor < afterMember.cursor)
+      (tail : ContractMemberTailParses expressionParses allowBodyParses
+        requiredBodyParses afterMember members closingSpan output) :
+      ContractMemberTailParses expressionParses allowBodyParses
+        requiredBodyParses input (member :: members) closingSpan output
+
+/-- Exact braces, body span, and source-order strict contract members. -/
+inductive ContractBodyParses
+    (expressionParses : Remainder → Syntax.Expr → Remainder → Prop)
+    (allowBodyParses requiredBodyParses :
+      Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → SourceSpan → List Syntax.ContractMember →
+      Remainder → Prop where
+  | parsed {input afterOpening output : Remainder}
+      {members : List Syntax.ContractMember} (openingSpan closingSpan : SourceSpan)
+      (openingToken : ExactTokenParses (.symbol .leftBrace)
+        input openingSpan afterOpening)
+      (membersParsed : ContractMemberTailParses expressionParses
+        allowBodyParses requiredBodyParses afterOpening members closingSpan
+        output) :
+      ContractBodyParses expressionParses allowBodyParses requiredBodyParses
+        input (SourceSpan.cover openingSpan closingSpan) members output
+
+/-- Exact canonical contract declaration over abstract member leaves. -/
+inductive ContractDeclParses
+    (expressionParses : Remainder → Syntax.Expr → Remainder → Prop)
+    (allowBodyParses requiredBodyParses :
+      Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.ContractDecl → Remainder → Prop where
+  | parsed
+      {input afterMarker afterName afterGenerics output : Remainder}
+      {name : Identifier}
+      {genericParameters : Option Syntax.GenericParameters}
+      {bodySpan : SourceSpan} {members : List Syntax.ContractMember}
+      (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses (.keyword .contractKw)
+        input markerSpan afterMarker)
+      (nameParsed : IdentifierParses afterMarker name afterName)
+      (genericsParsed : OptionalGenericParametersParses
+        afterName genericParameters afterGenerics)
+      (bodyParsed : ContractBodyParses expressionParses allowBodyParses
+        requiredBodyParses afterGenerics bodySpan members output) :
+      ContractDeclParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := SourceSpan.cover markerSpan bodySpan
+          value := { name, genericParameters, bodySpan, members }
+        } output
+
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
     (tokens : Array Token) (endIndex : Nat) :
