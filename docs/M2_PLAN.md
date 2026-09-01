@@ -216,12 +216,14 @@ boundary composes with source validity and is publicly consumed. Independent
 Core block, expression-layer, and ordered pattern-layer judgments are now in
 place, together with Core simple, control, `for`, `match`, and assembly
 statement judgments. Inline-Yul coverage now includes name sequences, the
-public expression layer, exact braced blocks, keyword controls, optional
-semicolons, `let`, assignment, expression statements, and source-level
-`return(...)`. The remaining step is to finish the aggregate Core dispatcher
-and larger Yul controls, define their fuel-indexed mutual closure, and
-instantiate the completed parametric file grammar with those concrete
-relations.
+public expression layer, exact braced blocks, `let`, assignment, expression
+and source-level `return(...)` statements, `if`, `for`, `switch`, function
+definitions, keyword controls, optional semicolons, and the complete ordered
+dispatcher through its diagnostic-free recovery boundary. The aggregate Core
+dispatcher is also complete. The remaining step is to build concrete
+parser-independent rejection witnesses for transactional fallbacks, define
+the fuel-indexed recursive closure, and instantiate the completed parametric
+file grammar with those concrete relations.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

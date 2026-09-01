@@ -346,15 +346,17 @@ parameterized complete-file grammar and composes with source validity.
 Parser-independent judgments now cover raw, balanced, isolated, and canonical
 Core blocks; the complete Core expression layer; the ordered public Core
 pattern layer; Core `let`, `return`, assignment, `for`, `match`, assembly,
-block, `while`, `if`, `break`, and `continue` statements; and inline-Yul name
-sequences, the public expression layer, exact braced blocks, keyword-only
-controls, optional semicolons, `let`, assignment, expression statements, and
-source-level `return(...)`. Transactional constructor and call arguments
-carry explicit declarative rejection specifications whose disjointness laws
-preserve parser priority. The remaining work is to finish the aggregate Core
-dispatcher and larger Yul control forms, close the fuel-indexed mutual
-recursion, and instantiate the abstract file boundary with those concrete
-relations.
+block, `while`, `if`, `break`, and `continue` statements, and their complete
+ordered dispatcher. Inline-Yul coverage now includes name sequences, the
+public expression layer, exact braced blocks, `let`, assignment, expression
+and source-level `return(...)` statements, `if`, `for`, `switch`, function
+definitions, keyword controls, optional semicolons, the complete ordered
+dispatcher, and the diagnostic-free recovery boundary. Transactional
+constructor, call-argument, and Yul-assignment fallbacks carry explicit
+declarative rejection specifications whose disjointness laws preserve parser
+priority. The remaining work is to construct their concrete executable
+rejection witnesses, close the fuel-indexed recursive relations, and
+instantiate the abstract file boundary with those relations.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
