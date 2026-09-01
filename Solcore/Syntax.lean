@@ -6,6 +6,7 @@ import Solcore.Syntax.Identifier
 import Solcore.Syntax.Parser
 import Solcore.Syntax.Parser.CertifiedParseProperties
 import Solcore.Syntax.Parser.ConstructorSelectionSoundnessProperties
+import Solcore.Syntax.Parser.ContractDeclSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingSoundnessProperties
