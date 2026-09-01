@@ -33,6 +33,3 @@ def run : IO Unit := do
     assertMalformedOrdinary content
 
 end Solcore.Test.SyntaxParserPublicStatementFuelTotalityProperties
-
-def main : IO Unit :=
-  Solcore.Test.SyntaxParserPublicStatementFuelTotalityProperties.run
