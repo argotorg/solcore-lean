@@ -67,5 +67,14 @@ example := @Syntax.Parser.parseLexed_ok_coreOrdinary_sound
 example := @Syntax.Parser.parseLexed_ok_coreOrdinary_sound_and_validFor
 example := @Syntax.Parser.parse_ok_coreOrdinary_sound
 example := @Syntax.Parser.parse_ok_coreOrdinary_sound_and_validFor
+example := @Syntax.DeclarativeGrammar.PredicateRejects
+example := @Syntax.DeclarativeGrammar.predicateDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.GroupedPredicateSequenceRejects
+example := @Syntax.DeclarativeGrammar.GroupedPredicateSequenceUnavailable
+example := @Syntax.DeclarativeGrammar.GroupedPredicateSequenceRejects.no_parse
+example := @Syntax.Parser.predicate_reject_sound
+example := @Syntax.Parser.predicate_ordinaryOutcome_sound
+example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
+example := @Syntax.Parser.PredicateInternals.groupedPredicates_ordinaryOutcome_sound
 
 end Tests

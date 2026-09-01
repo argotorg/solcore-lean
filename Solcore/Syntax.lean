@@ -25,6 +25,7 @@ import Solcore.Syntax.Parser.FunctionDeclSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
 import Solcore.Syntax.Parser.FunctionSignatureSoundnessProperties
 import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
+import Solcore.Syntax.Parser.GroupedPredicateSequenceOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.HidingClauseSoundnessProperties
 import Solcore.Syntax.Parser.ImplDeclSoundnessProperties
 import Solcore.Syntax.Parser.ImportDeclSoundnessProperties
@@ -34,6 +35,7 @@ import Solcore.Syntax.Parser.NamespaceImportSoundnessProperties
 import Solcore.Syntax.Parser.PlainImportSoundnessProperties
 import Solcore.Syntax.Parser.PlainTopItemDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.PlainTopItemSoundnessProperties
+import Solcore.Syntax.Parser.PredicateOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.PredicateSoundnessProperties
 import Solcore.Syntax.Parser.PragmaSoundnessProperties
 import Solcore.Syntax.Parser.Properties
