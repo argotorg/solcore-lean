@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.BarePredicateSequenceSoundnessProperties
-import Solcore.Syntax.Parser.GroupedPredicateSequenceSoundnessProperties
+import Solcore.Syntax.Parser.GroupedPredicateSequenceOrdinaryRejectionSoundnessProperties
 
 /-! Success soundness for predicate-sequence branch selection. -/
 
@@ -7,7 +7,19 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser.PredicateInternals
 
-/-- Every successful sequence belongs to its grouped-or-bare grammar union. -/
+private theorem groupedUnavailable_of_opening_absent {input : State}
+    (openingAbsent : isSymbol input .leftParen = false) :
+    DeclarativeGrammar.GroupedPredicateSequenceUnavailable
+      input.declarativeRemainder := by
+  rintro ⟨values, output, grouped⟩
+  unfold DeclarativeGrammar.GroupedPredicateSequenceParses at grouped
+  rcases grouped with ⟨openingSpan, first, afterFirst, rest, closingSpan,
+    tokensEq, endIndexEq, openingToken, firstParsed, progress, tail,
+    elementsEq, spanEq⟩
+  exact symbolAbsentAt_of_isSymbol_eq_false .leftParen openingAbsent
+    ⟨openingSpan, openingToken⟩
+
+/-- Every successful sequence records exact grouped-first branch priority. -/
 theorem predicateSequence_success_sound {input next : State}
     {values : PredicateSequence}
     (result : predicateSequence input = .ok values next) :
@@ -23,10 +35,16 @@ theorem predicateSequence_success_sound {input next : State}
         exact .grouped (groupedPredicates_success_sound groupedResult)
     | reject failure rejected =>
         simp only [groupedResult] at result
-        exact .bare (barePredicates_success_sound result)
+        exact .bare
+          (groupedPredicates_reject_sound groupedResult).no_parse
+          (barePredicates_success_sound result)
     | invariant error =>
         simp [groupedResult] at result
-  · exact .bare (barePredicates_success_sound result)
+  · rename_i openingAbsent
+    exact .bare
+      (groupedUnavailable_of_opening_absent
+        (Bool.eq_false_iff.mpr openingAbsent))
+      (barePredicates_success_sound result)
 
 /-- Sequence-union soundness composes with source validity. -/
 theorem predicateSequence_success_sound_and_validFor {input next : State}

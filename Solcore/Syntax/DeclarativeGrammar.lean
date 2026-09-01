@@ -847,11 +847,16 @@ def GroupedPredicateSequenceParses
   NonemptyTrailingDelimitedListParses .leftParen .rightParen PredicateParses
     input { span := values.span, elements := values.elements.toList } output
 
-/-- Either successful branch of the parser's transactional sequence choice. -/
+/-- The preferred grouped predicate grammar has no derivation from here. -/
+def GroupedPredicateSequenceUnavailable (input : Remainder) : Prop :=
+  ¬ ∃ values output, GroupedPredicateSequenceParses input values output
+
+/-- Prioritized successful branch of the transactional predicate choice. -/
 inductive PredicateSequenceParses :
     Remainder → NonemptyDelimitedList Syntax.Predicate → Remainder → Prop where
   | bare {input output : Remainder}
       {values : NonemptyDelimitedList Syntax.Predicate}
+      (groupedUnavailable : GroupedPredicateSequenceUnavailable input)
       (parsed : BarePredicateSequenceParses input values output) :
       PredicateSequenceParses input values output
   | grouped {input output : Remainder}
