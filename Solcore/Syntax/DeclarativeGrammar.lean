@@ -728,6 +728,27 @@ inductive PredicateParses :
         arguments
       } output
 
+/-! Grammar shared by named function and trait-method signatures. -/
+
+/-- Prioritized optional `returns (...)` clause with exact recursive types. -/
+inductive OptionalReturnClauseParses :
+    Remainder → Option Syntax.ReturnClause → Remainder → Prop where
+  | absent {input : Remainder}
+      (returnsAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.identifier ContextualKeyword.returns.spelling)) :
+      OptionalReturnClauseParses input none input
+  | present {input afterMarker output : Remainder}
+      {types : DelimitedList Syntax.TypeExpr} (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses
+        (.identifier ContextualKeyword.returns.spelling)
+        input markerSpan afterMarker)
+      (typesParsed : TrailingDelimitedListParses
+        .leftParen .rightParen TypeExprParses afterMarker types output) :
+      OptionalReturnClauseParses input (some {
+        span := SourceSpan.cover markerSpan types.span
+        types
+      }) output
+
 /-! Grammar of canonical transparent type-alias declarations. -/
 
 /-- Prioritized optional, possibly empty type-alias parameters. -/
