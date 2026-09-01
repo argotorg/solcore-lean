@@ -25,6 +25,7 @@ import Solcore.Syntax.Parser.LocalExportItemSoundnessProperties
 import Solcore.Syntax.Parser.ModulePathSoundnessProperties
 import Solcore.Syntax.Parser.NamespaceImportSoundnessProperties
 import Solcore.Syntax.Parser.PlainImportSoundnessProperties
+import Solcore.Syntax.Parser.PredicateSoundnessProperties
 import Solcore.Syntax.Parser.PragmaSoundnessProperties
 import Solcore.Syntax.Parser.Properties
 import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
