@@ -228,4 +228,47 @@ theorem recoverTopItem_startsAtCurrentTokenOnSuccess :
     Parser.StartsAtCurrentTokenOnSuccess recoverTopItem (·.span) :=
   fun _ _ _ parsed => (recoverTopItem_ok_state_shape parsed).2
 
+/-- Every successful auxiliary recovery commits a recovery diagnostic. -/
+theorem recoverTopItemAux_diagnostics_ne_nil_onSuccess
+    (first last : SourceSpan) :
+    ∀ fuel, ∀ {input next : State} {item : TopItem},
+      recoverTopItemAux first last fuel input = .ok item next →
+      next.diagnosticsRev ≠ [] := by
+  intro fuel
+  induction fuel generalizing last with
+  | zero =>
+      simp [recoverTopItemAux]
+  | succ fuel inductionHypothesis =>
+      intro input next item parsed
+      unfold recoverTopItemAux at parsed
+      split at parsed
+      · unfold finishRecoveredTopItem at parsed
+        cases parsed
+        simp [State.emit]
+      · cases advanced : input.advance? with
+        | none =>
+            simp only [advanced] at parsed
+            unfold finishRecoveredTopItem at parsed
+            cases parsed
+            simp [State.emit]
+        | some pair =>
+            rcases pair with ⟨token, afterToken⟩
+            simp only [advanced] at parsed
+            exact inductionHypothesis token.span parsed
+
+/-- Every successful complete recovery commits a recovery diagnostic. -/
+theorem recoverTopItem_diagnostics_ne_nil_onSuccess
+    {input next : State} {item : TopItem}
+    (parsed : recoverTopItem input = .ok item next) :
+    next.diagnosticsRev ≠ [] := by
+  unfold recoverTopItem at parsed
+  cases advanced : input.advance? with
+  | none =>
+      simp [advanced, rejectAt] at parsed
+  | some pair =>
+      rcases pair with ⟨token, afterToken⟩
+      simp only [advanced] at parsed
+      exact recoverTopItemAux_diagnostics_ne_nil_onSuccess token.span
+        token.span (afterToken.remainingCount + 1) parsed
+
 end Solcore.Syntax.Parser.FileInternals
