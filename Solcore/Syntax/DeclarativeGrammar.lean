@@ -491,6 +491,44 @@ def WildcardImportDeclParses
     WildcardImportTailParses keywordSpan
       { input with cursor := input.cursor + 1 } declaration output
 
+/-- Grammar after `import` for a selected import with optional hiding. -/
+def SelectiveImportTailParses (startSpan : SourceSpan)
+    (input : Remainder) (declaration : Syntax.ImportDecl)
+    (output : Remainder) : Prop :=
+  ∃ selection afterSelection fromSpan path afterPath hidden afterHidden
+      semicolonSpan,
+    SelectedImportsParses input selection afterSelection ∧
+    TokenAt afterSelection.tokens afterSelection.endIndex
+      afterSelection.cursor {
+        span := fromSpan
+        value := .identifier ContextualKeyword.from.spelling
+      } ∧
+    ModulePathParses
+      { afterSelection with cursor := afterSelection.cursor + 1 }
+      path afterPath ∧
+    OptionalHidingParses afterPath hidden afterHidden ∧
+    TokenAt afterHidden.tokens afterHidden.endIndex afterHidden.cursor {
+      span := semicolonSpan
+      value := .symbol .semicolon
+    } ∧
+    output = { afterHidden with cursor := afterHidden.cursor + 1 } ∧
+    declaration = {
+      span := SourceSpan.cover startSpan semicolonSpan
+      value := .selected selection path hidden
+    }
+
+/-- Independent recognition judgment for one complete selected import. -/
+def SelectiveImportDeclParses
+    (input : Remainder) (declaration : Syntax.ImportDecl)
+    (output : Remainder) : Prop :=
+  ∃ keywordSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := keywordSpan
+      value := .keyword .importKw
+    } ∧
+    SelectiveImportTailParses keywordSpan
+      { input with cursor := input.cursor + 1 } declaration output
+
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
     (tokens : Array Token) (endIndex : Nat) :
