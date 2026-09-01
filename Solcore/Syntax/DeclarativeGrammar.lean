@@ -73,6 +73,58 @@ def QualifiedNameParses
       (finalIdentifier name.value.components.head
         name.value.components.tail).span
 
+/-- No dot followed by an identifier begins at one active-window cursor. -/
+def DotIdentifierAbsentAt
+    (tokens : Array Token) (endIndex cursor : Nat) : Prop :=
+  ¬ ∃ dotSpan componentSpan text,
+    TokenAt tokens endIndex cursor {
+      span := dotSpan
+      value := .symbol .dot
+    } ∧
+    TokenAt tokens endIndex (cursor + 1) {
+      span := componentSpan
+      value := .identifier text
+    }
+
+/-- Forward dotted tail of an export path, stopping before selection suffixes. -/
+inductive ExportPathTailParses
+    (tokens : Array Token) (endIndex : Nat) :
+    Nat → List Identifier → Nat → Prop where
+  | done (cursor : Nat)
+      (stopped : DotIdentifierAbsentAt tokens endIndex cursor) :
+      ExportPathTailParses tokens endIndex cursor [] cursor
+  | next {cursor finish : Nat} {component : Identifier}
+      {components : List Identifier}
+      (dotSpan : SourceSpan)
+      (dotToken : TokenAt tokens endIndex cursor {
+        span := dotSpan
+        value := .symbol .dot
+      })
+      (componentToken : TokenAt tokens endIndex (cursor + 1) {
+        span := component.span
+        value := .identifier component.value
+      })
+      (tail : ExportPathTailParses tokens endIndex (cursor + 2)
+        components finish) :
+      ExportPathTailParses tokens endIndex cursor
+        (component :: components) finish
+
+/-- Independent maximal grammar of one export module path. -/
+def ExportPathParses
+    (input : Remainder) (path : Syntax.QualifiedName)
+    (output : Remainder) : Prop :=
+  output.tokens = input.tokens ∧
+    output.endIndex = input.endIndex ∧
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := path.value.components.head.span
+      value := .identifier path.value.components.head.value
+    } ∧
+    ExportPathTailParses input.tokens input.endIndex (input.cursor + 1)
+      path.value.components.tail output.cursor ∧
+    path.span = SourceSpan.cover path.value.components.head.span
+      (finalIdentifier path.value.components.head
+        path.value.components.tail).span
+
 /--
 Independent recognition judgment for one module path.
 
