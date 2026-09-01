@@ -97,7 +97,7 @@ def pattern : Parser Pattern := fun state =>
 
 /-- Parse one complete canonical Core statement. -/
 def statement : Parser Statement := fun state =>
-  TermInternals.coreStatementWithFuel (state.remainingCount + 1) state
+  TermInternals.coreStatementWithFuel (state.remainingCount + 2) state
 
 /-- Parse one canonical Core block with an explicit root-tail policy. -/
 def block (policy : TailExpressionPolicy) : Parser Block := fun state =>

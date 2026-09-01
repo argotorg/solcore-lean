@@ -98,23 +98,23 @@ theorem statement_canonical_contract :
     intro input inputValid
     unfold statement
     exact (TermInternals.coreStatementWithFuel_canonical_contract
-      (input.remainingCount + 1)).validFor input inputValid
+      (input.remainingCount + 2)).validFor input inputValid
   preservesTokenWindow := by
     intro input
     unfold statement
     exact (TermInternals.coreStatementWithFuel_canonical_contract
-      (input.remainingCount + 1)).preservesTokenWindow input
+      (input.remainingCount + 2)).preservesTokenWindow input
   cursorMonotoneOnSuccess := by
     intro input value next parsed
     unfold statement at parsed
     exact (TermInternals.coreStatementWithFuel_canonical_contract
-      (input.remainingCount + 1)).cursorMonotoneOnSuccess
+      (input.remainingCount + 2)).cursorMonotoneOnSuccess
         input value next parsed
   startsAtCurrentTokenOnSuccess := by
     intro input value next parsed
     unfold statement at parsed
     exact (TermInternals.coreStatementWithFuel_canonical_contract
-      (input.remainingCount + 1)).startsAtCurrentTokenOnSuccess
+      (input.remainingCount + 2)).startsAtCurrentTokenOnSuccess
         input value next parsed
 }
 
