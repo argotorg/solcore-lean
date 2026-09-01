@@ -215,16 +215,18 @@ cover recovered output as well as diagnostic-free output.
 
 An independent declarative grammar now covers pragma declarations, maximal
 dotted qualified names, both local and `@`-prefixed external module paths, and
-identifier or parenthesized-operator selector names. It also covers
-diagnostic-free strict imports in their plain and namespace forms, plus
-wildcard imports that have no hiding clause. Successful parsing of these forms
-is connected to that grammar while retaining the existing source-provenance
-contract. This is not yet a whole-file grammar theorem.
+identifier or parenthesized-operator selector names. Shared declarative rules
+and parser-soundness theorems now also cover nonempty comma-separated lists
+with an optional trailing comma, selected import names and aliases, nonempty
+selected-import lists, hiding clauses, and optional hiding dispatch.
 
-The next slices add the shared nonempty braced-list grammar, hiding clauses,
-and the remaining import forms before extending the result to complete files.
-Recovered malformed output remains separate so that recovery is not confused
-with language acceptance.
+At the complete diagnostic-free declaration level, strict soundness currently
+covers plain imports, namespace imports, and wildcard imports without a hiding
+clause. The next slices connect wildcard imports with hiding and selective
+imports to exact semicolon-terminated declarations, then extend the same
+boundary through the remaining top-level forms and complete files. Recovered
+malformed output remains separate so that recovery is not confused with
+language acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
