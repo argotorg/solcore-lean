@@ -24,6 +24,7 @@ import Solcore.Test.SyntaxParserBlockFuelTotalityProperties
 import Solcore.Test.SyntaxParserBlockTotalityProperties
 import Solcore.Test.SyntaxParserBodyIsolation
 import Solcore.Test.SyntaxParserCanonicalParserTotalityProperties
+import Solcore.Test.SyntaxParserCertifiedParseProperties
 import Solcore.Test.SyntaxParserCompleteOutputProperties
 import Solcore.Test.SyntaxParserContracts
 import Solcore.Test.SyntaxParserContractBodyProperties
