@@ -7,5 +7,6 @@ import Solcore.Syntax.Parser
 import Solcore.Syntax.Parser.CertifiedParseProperties
 import Solcore.Syntax.Parser.PragmaSoundnessProperties
 import Solcore.Syntax.Parser.Properties
+import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
 
 /-! Public Lean boundary for the canonical Solcore source syntax. -/
