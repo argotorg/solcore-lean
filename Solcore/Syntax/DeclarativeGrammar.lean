@@ -1056,6 +1056,84 @@ inductive FunctionSignatureParses
         whereClause
       } output
 
+/-! Grammar of canonical signature-only trait declarations. -/
+
+/-- Exact module-policy signature followed by a trait-method semicolon. -/
+inductive TraitMethodParses :
+    Remainder → Syntax.TraitMethod → Remainder → Prop where
+  | parsed {input afterSignature output : Remainder}
+      {signature : Syntax.FunctionSignature} (semicolonSpan : SourceSpan)
+      (signatureParsed : FunctionSignatureParses
+        ModuleFunctionModifiersAllowed input signature afterSignature)
+      (semicolonToken : ExactTokenParses (.symbol .semicolon)
+        afterSignature semicolonSpan output) :
+      TraitMethodParses input {
+        span := SourceSpan.cover signature.span semicolonSpan
+        value := {
+          leadingComments := []
+          signature
+          semicolon := semicolonSpan
+        }
+      } output
+
+/-- Forward-order methods ending at the exact closing trait brace. -/
+inductive TraitMethodTailParses :
+    Remainder → List Syntax.TraitMethod → SourceSpan →
+      Remainder → Prop where
+  | close {input output : Remainder} (closingSpan : SourceSpan)
+      (closingToken : ExactTokenParses (.symbol .rightBrace)
+        input closingSpan output) :
+      TraitMethodTailParses input [] closingSpan output
+  | next {input afterMethod output : Remainder}
+      {method : Syntax.TraitMethod} {methods : List Syntax.TraitMethod}
+      {closingSpan : SourceSpan}
+      (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .rightBrace))
+      (methodParsed : TraitMethodParses input method afterMethod)
+      (tail : TraitMethodTailParses afterMethod methods closingSpan output) :
+      TraitMethodTailParses input (method :: methods) closingSpan output
+
+/-- Exact braces, retained body span, and source-order trait methods. -/
+inductive TraitBodyParses :
+    Remainder → SourceSpan → List Syntax.TraitMethod →
+      Remainder → Prop where
+  | parsed {input afterOpening output : Remainder}
+      {methods : List Syntax.TraitMethod} (openingSpan closingSpan : SourceSpan)
+      (openingToken : ExactTokenParses (.symbol .leftBrace)
+        input openingSpan afterOpening)
+      (methodsParsed : TraitMethodTailParses
+        afterOpening methods closingSpan output) :
+      TraitBodyParses input (SourceSpan.cover openingSpan closingSpan)
+        methods output
+
+/-- Exact canonical trait declaration with required generic parameters. -/
+inductive TraitDeclParses :
+    Remainder → Syntax.TraitDecl → Remainder → Prop where
+  | parsed
+      {input afterMarker afterName afterGenerics afterWhere output : Remainder}
+      {name : Identifier} {genericParameters : Syntax.GenericParameters}
+      {whereClause : Option Syntax.WhereClause} {bodySpan : SourceSpan}
+      {methods : List Syntax.TraitMethod} (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses
+        (.identifier ContextualKeyword.trait.spelling)
+        input markerSpan afterMarker)
+      (nameParsed : IdentifierParses afterMarker name afterName)
+      (genericsParsed : GenericParametersParses
+        afterName genericParameters afterGenerics)
+      (whereParsed : OptionalWhereClauseParses
+        afterGenerics whereClause afterWhere)
+      (bodyParsed : TraitBodyParses afterWhere bodySpan methods output) :
+      TraitDeclParses input {
+        span := SourceSpan.cover markerSpan bodySpan
+        value := {
+          name
+          genericParameters
+          whereClause
+          bodySpan
+          methods
+        }
+      } output
+
 /-! Grammar of canonical algebraic enum declarations. -/
 
 /-- Prioritized optional constructor payload with no trailing comma. -/
