@@ -15,7 +15,7 @@ inductive FunctionLocation where
   | contract
   deriving Repr, BEq, DecidableEq
 
-private def requireGenericParameters
+def requireGenericParameters
     (values : DelimitedList Identifier) : Parser GenericParameters :=
   match values.elements with
   | head :: tail => pure {
