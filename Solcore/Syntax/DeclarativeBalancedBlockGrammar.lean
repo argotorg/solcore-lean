@@ -127,4 +127,30 @@ theorem BalancedBlockTailScans.endIndex_le {input : Remainder}
   | other tokenAt notOpening notClosing tail inductionHypothesis =>
       exact inductionHypothesis
 
+/-- No lexically balanced braced capture begins at this cursor. -/
+def BalancedBlockCaptureAbsentAt (input : Remainder) : Prop :=
+  ¬ ∃ captured, BalancedBlockCaptures input captured
+
+/--
+Exact behavior of the isolation wrapper over an abstract block grammar.
+
+Without a capture the underlying grammar runs in the parent window.  With a
+capture it runs in the smaller child window while the parent always resumes
+immediately after the captured closing brace.
+-/
+inductive IsolatedCoreBlockParses
+    (blockParses : Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.Block → Remainder → Prop where
+  | direct {input output : Remainder} {body : Syntax.Block}
+      (captureAbsent : BalancedBlockCaptureAbsentAt input)
+      (bodyParsed : blockParses input body output) :
+      IsolatedCoreBlockParses blockParses input body output
+  | captured {input childOutput : Remainder} {body : Syntax.Block}
+      {capture : BalancedBlockCapture}
+      (captureParsed : BalancedBlockCaptures input capture)
+      (bodyParsed : blockParses (capture.childRemainder input) body
+        childOutput) :
+      IsolatedCoreBlockParses blockParses input body
+        (capture.parentRemainder input)
+
 end Solcore.Syntax.DeclarativeGrammar
