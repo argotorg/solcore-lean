@@ -44,9 +44,9 @@ published through Oracle v4.
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
 | Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, and internal lexer/parser invariant errors are unreachable | Extend the independent grammar through the remaining forms and prove diagnostic-free complete-file soundness | High |
-| Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, and public totality | Extend the declarative correspondence through the remaining productions | High |
-| Declarative grammar and parser soundness | Active; complete for pragmas, paths, selector names, generic delimiter policies, all import/export forms, derive targets and attributes, shared generic parameters with exact optional priority, unconditional recursive type expressions, transparent type aliases, algebraic enums, and a parameterized complete-file item-loop theorem | Add the remaining concrete top-level forms, then specialize diagnostic-free complete-file soundness | High |
-| Declaration, type, and Yul parser proofs | Complete source/state and totality boundary for every production declaration, contract member, recursive type, and public Yul parser; recursive type, shared generic-parameter, and enum-declaration grammar soundness are unconditional, while alias diagnostic freedom only excludes value recovery | Extend declarative soundness through the remaining declarations and Yul forms | High |
+| Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, and backward diagnostic reflection through recursive types and function-signature leaves | Extend the declarative correspondence through the remaining productions | High |
+| Declarative grammar and parser soundness | Active; complete for pragmas, paths, selector names, generic delimiter policies, all import/export forms, derive targets and attributes, shared generic parameters with exact optional priority, unconditional recursive type expressions, strict function parameters, predicates and optional `where`, ordered modifiers, module/contract function signatures, transparent type aliases, algebraic enums, and a parameterized complete-file item-loop theorem | Add the remaining concrete top-level forms, then specialize diagnostic-free complete-file soundness; exact negative priority for grouped-predicate fallback still requires completeness | High |
+| Declaration, type, and Yul parser proofs | Complete source/state and totality boundary for every production declaration, contract member, recursive type, and public Yul parser; recursive type, shared generic-parameter, predicate/`where`, ordered-modifier, and enum grammar soundness are unconditional, while transparent-alias, strict-parameter-list, and function-signature soundness use diagnostic freedom at value-recovery, parameter-error/recovery, or module-location-policy boundaries | Extend declarative soundness through the remaining declarations and Yul forms | High |
 | Core expression parser proofs | Complete source/state and unconditional totality contracts for atoms, lambda, postfix, unary, binary, conditional, and recursive block interaction | Declarative grammar soundness | High |
 | Pattern and statement parser proofs | Complete source/state and unconditional totality contracts, including recovery, blocks, loops, `match`, inline assembly, and simultaneous expression/pattern/statement recursion | Declarative grammar soundness | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
@@ -62,6 +62,33 @@ successful enum declaration is unconditionally grammar-sound, retains any
 supplied derive attribute in its AST, and uses that attribute's span as the
 outer span start. These registered theorem families are included in the
 successful full build and `lake test`.
+
+Backward diagnostic reflection composes through parser sequencing,
+transactional choice, token consumers, and delimiters. Its concrete instances
+cover recursive types, named and delimited function parameters, predicates,
+bare/grouped predicate sequences, optional `where`, and the remaining
+function-signature leaves. Parameter error and recovery success always commit
+a diagnostic, so `FunctionParameterParses` and `FunctionParametersParses`
+characterize diagnostic-free typed parameters without admitting recovery
+nodes.
+
+Bare and grouped predicate sequences have unconditional soundness into a
+successful-branch union, and optional `where` retains exact marker priority.
+That union does not yet express the stronger negative claim that the grouped
+grammar has no derivation whenever transactional parsing falls back to the
+bare branch after a leading `(`; such a claim needs grouped-grammar
+completeness.
+
+Function modifiers have unconditional fixed-order `public`-then-`payable`
+grammar soundness. Diagnostic-free module success excludes both markers,
+whereas contract policy permits every syntactically ordered pair. A complete
+diagnostic-free function signature therefore derives the corresponding
+module- or contract-indexed `FunctionSignatureParses` judgment, with exact
+component order, remainders, AST fields, endpoint span, and source-validity
+composition. The signature judgment ends before a function body or
+trait-method semicolon. These parameter, predicate/`where`, modifier, and
+function-signature theorem families are exported through `Solcore.Syntax` and
+checked by compile-time consumers.
 
 ## Semantic Core v3 feature inventory
 

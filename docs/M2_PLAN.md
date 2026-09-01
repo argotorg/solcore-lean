@@ -148,6 +148,46 @@ generic-parameter, type-alias, and enum-declaration theorem families have
 compile-time consumers and public `Solcore.Syntax` registration. The full
 build and `lake test` pass with those registrations.
 
+Backward diagnostic reflection now provides the reusable bridge needed by
+strict diagnostic-free grammars: diagnostic-free successful output implies a
+diagnostic-free parser input. The laws cover pure parsing, sequencing,
+transactional choice, primitive token consumers, and delimiter policies, and
+are instantiated through recursive types, parameters, predicates and their
+sequences, optional `where`, generic parameters, modifiers, and return
+clauses. Named-parameter recovery and missing-type errors separately prove
+that every successful error path commits a diagnostic.
+
+Typed named parameters now have an exact `FunctionParameterParses` grammar for
+ordinary and contextual `comptime` forms. The ordinary constructor records
+the absence of the composite `comptime`-identifier prefix, and
+`FunctionParametersParses` lifts the element grammar to a possibly empty,
+optionally trailing-comma parenthesized list. Diagnostic freedom excludes
+parameter error and recovery nodes, yielding strict element and list
+soundness with source-validity compositions.
+
+Individual predicates, nonempty bare and grouped predicate sequences, and
+prioritized optional `where` clauses now have parser-independent grammars and
+unconditional success soundness. Bare tails preserve forward order and their
+optional trailing comma; grouped sequences use the generic nonempty trailing
+delimiter grammar. Transactional grouped-or-bare dispatch is currently
+captured as a union of successful branches. An exact negative condition on a
+bare fallback beginning with `(` remains outside the present theorem: it
+requires a converse completeness theorem for grouped parsing.
+
+Optional function modifiers now preserve exact keyword absence or presence in
+the fixed `public`-then-`payable` order. Modifier grammar soundness is
+unconditional; diagnostic-free module success proves that both contract-only
+markers are absent, while contract success satisfies its permissive policy.
+The complete diagnostic-free `functionSignature` parser, which ends before a
+function body or trait-method semicolon, now derives `FunctionSignatureParses`
+for either location. Its proof reflects diagnostic freedom from `where`
+through returns and modifiers to the parameter boundary, retains every
+intermediate remainder and AST field, and identifies the parser and
+declarative endpoint calculations exactly. Source validity composes with the
+generic location-indexed theorem. These parameter, predicate/`where`,
+modifier, and function-signature theorem families are exported through
+`Solcore.Syntax` and checked by compile-time consumers.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—and transparent type aliases.
