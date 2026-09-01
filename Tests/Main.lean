@@ -41,6 +41,7 @@ import Solcore.Test.SyntaxParserContractProperties
 import Solcore.Test.SyntaxParserContractFieldTotalityProperties
 import Solcore.Test.SyntaxParserContractRecoveryProperties
 import Solcore.Test.SyntaxParserContractRecoveryTotalityProperties
+import Solcore.Test.SyntaxParserConstructorSelectionSoundnessProperties
 import Solcore.Test.SyntaxParserDeclarationTrivia
 import Solcore.Test.SyntaxParserDeclarationCanonicalProperties
 import Solcore.Test.SyntaxParserDelimitedProperties
