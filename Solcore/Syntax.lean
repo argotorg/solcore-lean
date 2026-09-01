@@ -1,5 +1,6 @@
 import Solcore.Syntax.Declaration
 import Solcore.Syntax.CoreTermValidity
+import Solcore.Syntax.DeclarativeFileGrammar
 import Solcore.Syntax.DeclarativeGrammar
 import Solcore.Syntax.Lexer
 import Solcore.Syntax.Identifier
@@ -30,6 +31,8 @@ import Solcore.Syntax.Parser.LocalExportItemSoundnessProperties
 import Solcore.Syntax.Parser.ModulePathSoundnessProperties
 import Solcore.Syntax.Parser.NamespaceImportSoundnessProperties
 import Solcore.Syntax.Parser.PlainImportSoundnessProperties
+import Solcore.Syntax.Parser.PlainTopItemDiagnosticReflectionProperties
+import Solcore.Syntax.Parser.PlainTopItemSoundnessProperties
 import Solcore.Syntax.Parser.PredicateSoundnessProperties
 import Solcore.Syntax.Parser.PragmaSoundnessProperties
 import Solcore.Syntax.Parser.Properties
@@ -39,6 +42,8 @@ import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportsSoundnessProperties
 import Solcore.Syntax.Parser.SelectiveImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectorNameSoundnessProperties
+import Solcore.Syntax.Parser.SourceFileSoundnessProperties
+import Solcore.Syntax.Parser.TopItemSoundnessProperties
 import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
 import Solcore.Syntax.Parser.TypeAliasSoundnessProperties
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
