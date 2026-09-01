@@ -17,5 +17,6 @@ import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportsSoundnessProperties
 import Solcore.Syntax.Parser.SelectorNameSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportNoHidingSoundnessProperties
+import Solcore.Syntax.Parser.WildcardImportSoundnessProperties
 
 /-! Public Lean boundary for the canonical Solcore source syntax. -/

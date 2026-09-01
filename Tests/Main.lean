@@ -233,6 +233,7 @@ import Solcore.Test.SyntaxParserUpstreamFixtures
 import Solcore.Test.SyntaxParserValidityProperties
 import Solcore.Test.SyntaxParserWhereClauseTotalityProperties
 import Solcore.Test.SyntaxParserWildcardImportNoHidingSoundnessProperties
+import Solcore.Test.SyntaxParserWildcardImportSoundnessProperties
 import Solcore.Test.SyntaxParserYul
 import Solcore.Test.SyntaxParserYulBodyTotalityProperties
 import Solcore.Test.SyntaxParserYulBlockFuelTotalityProperties
