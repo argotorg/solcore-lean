@@ -62,4 +62,10 @@ example (output : ParseOutput) :
     output.isDiagnosticFree = true ↔ output.DiagnosticFree :=
   output.isDiagnosticFree_eq_true_iff
 
+example := @Syntax.DeclarativeGrammar.CoreSourceFileOrdinaryParsesFromStart
+example := @Syntax.Parser.parseLexed_ok_coreOrdinary_sound
+example := @Syntax.Parser.parseLexed_ok_coreOrdinary_sound_and_validFor
+example := @Syntax.Parser.parse_ok_coreOrdinary_sound
+example := @Syntax.Parser.parse_ok_coreOrdinary_sound_and_validFor
+
 end Tests
