@@ -703,6 +703,31 @@ mutual
         OptionalFunctionTypeReturnsParses input (some values) output
 end
 
+/-! Grammar of one trait predicate over recursive type expressions. -/
+
+/-- Exact predicate `subject: Trait<arguments...>` in retained source order. -/
+inductive PredicateParses :
+    Remainder → Syntax.Predicate → Remainder → Prop where
+  | parsed {input afterSubject afterColon afterName output : Remainder}
+      {subject : Syntax.TypeExpr} {traitName : Identifier}
+      {arguments : Option (NonemptyDelimitedList Syntax.TypeExpr)}
+      (colonSpan : SourceSpan)
+      (subjectParsed : TypeExprParses input subject afterSubject)
+      (colonToken : ExactTokenParses (.symbol .colon)
+        afterSubject colonSpan afterColon)
+      (nameParsed : IdentifierParses afterColon traitName afterName)
+      (argumentsParsed : OptionalNamedTypeArgumentsParses
+        afterName arguments output) :
+      PredicateParses input {
+        span := SourceSpan.cover subject.span
+          (match arguments with
+          | some values => values.span
+          | none => traitName.span)
+        subject
+        traitName
+        arguments
+      } output
+
 /-! Grammar of canonical transparent type-alias declarations. -/
 
 /-- Prioritized optional, possibly empty type-alias parameters. -/
