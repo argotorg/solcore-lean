@@ -352,11 +352,14 @@ public expression layer, exact braced blocks, `let`, assignment, expression
 and source-level `return(...)` statements, `if`, `for`, `switch`, function
 definitions, keyword controls, optional semicolons, the complete ordered
 dispatcher, and the diagnostic-free recovery boundary. Transactional
-constructor, call-argument, and Yul-assignment fallbacks carry explicit
-declarative rejection specifications whose disjointness laws preserve parser
-priority. The remaining work is to construct their concrete executable
-rejection witnesses, close the fuel-indexed recursive relations, and
-instantiate the abstract file boundary with those relations.
+constructor, call-argument, and Yul-assignment fallbacks now carry concrete
+parser-independent rejection witnesses whose disjointness laws preserve parser
+priority. The public recursive Yul expression parser is closed by a
+fuel-indexed clean/ordinary/reject outcome family, including recovery,
+diagnosed names and meta tokens, call-argument rewind, and the concrete public
+assignment fallback. The remaining work is to close the Yul statement and
+mutually recursive Core relations, then instantiate the abstract file boundary
+with those concrete relations.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

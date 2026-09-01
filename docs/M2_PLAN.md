@@ -220,10 +220,12 @@ public expression layer, exact braced blocks, `let`, assignment, expression
 and source-level `return(...)` statements, `if`, `for`, `switch`, function
 definitions, keyword controls, optional semicolons, and the complete ordered
 dispatcher through its diagnostic-free recovery boundary. The aggregate Core
-dispatcher is also complete. The remaining step is to build concrete
-parser-independent rejection witnesses for transactional fallbacks, define
-the fuel-indexed recursive closure, and instantiate the completed parametric
-file grammar with those concrete relations.
+dispatcher is also complete. Concrete rejection witnesses now cover delimited
+constructor/call fallbacks and public Yul assignment, and the public Yul
+expression parser has a complete fuel-indexed clean/ordinary/reject closure.
+The remaining step is to close Yul statements and the mutually recursive Core
+relations, then instantiate the completed parametric file grammar with those
+concrete relations.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

@@ -44,9 +44,9 @@ published through Oracle v4.
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
 | Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, internal lexer/parser invariant errors are unreachable, and diagnostic-free output has parametric complete-file grammar soundness | Close the mutual Core/Yul grammar recursion and instantiate the file boundary | High |
-| Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, and backward diagnostic reflection through declarations, top-item dispatch, complete Core/Yul statement dispatch, and the complete file loop | Close the concrete fuel-indexed Core/Yul relations | High |
-| Declarative grammar and parser soundness | Active; complete for declarations and complete files as before, plus raw/balanced/isolated Core blocks, the full Core expression layer, the ordered public Core pattern and statement dispatchers, Yul expressions, exact Yul blocks, every Yul control/function form, and the ordered Yul statement/semicolon/recovery layers. Transactional fallbacks require independent rejection evidence disjoint from success | Construct concrete rejection witnesses and the fuel-indexed recursive specialization; exact negative priority for grouped-predicate fallback still requires completeness | High |
-| Declaration, type, and Yul parser proofs | Complete source/state and totality boundary for every production declaration, contract member, recursive type, and public Yul parser; declarative Yul expression, block, `let`, assignment, expression, `return`, `if`, `for`, `switch`, function, keyword-control, dispatcher, semicolon, and diagnostic-free recovery soundness are established | Complete transactional rejection witnesses and recursive specialization | High |
+| Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, backward diagnostic reflection through declarations and the complete file loop, and concrete fuel-indexed public Yul-expression outcomes | Close Yul statements and the mutually recursive Core relations | High |
+| Declarative grammar and parser soundness | Active; complete for declarations and complete files as before, plus raw/balanced/isolated Core blocks, the full Core expression layer, the ordered public Core pattern and statement dispatchers, exact Yul blocks and statement forms, concrete transactional rejection witnesses, and the fuel-indexed public Yul-expression specialization | Close Yul statements and the mutually recursive Core specialization; exact negative priority for grouped-predicate fallback still requires completeness | High |
+| Declaration, type, and Yul parser proofs | Complete source/state and totality boundaries for every production declaration, contract member, recursive type, and public Yul parser; public Yul expressions additionally have concrete clean/ordinary/reject fuel soundness and a concrete assignment fallback | Complete Yul-statement outcomes and recursive Core specialization | High |
 | Core expression parser proofs | Complete source/state and totality contracts plus exact parser-independent soundness for atoms, lambda, postfix, unary, binary, conditional, block interaction, and the diagnostic-free public layer | Fuel-indexed mutual specialization and public registration | High |
 | Pattern and statement parser proofs | Complete executable contracts; exact ordered public pattern soundness and the exact aggregate Core statement dispatcher are established across `let`, `return`, assignment, `for`, `match`, assembly, block, `while`, `if`, `break`, and `continue` | Close the concrete mutual recursion | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
@@ -103,8 +103,8 @@ brace priority, strict progress, outer spans, and remainders are preserved.
 Exact plain and derive-aware top-item soundness feeds a complete-file judgment
 with source-order comment attachment, full-window consumption, and recovery
 exclusion. These theorem families are publicly registered; concrete
-specialization now waits on the remaining Core/Yul statement relations and
-their fuel-indexed mutual closure.
+specialization now waits on the remaining Yul statement relations and their
+composition with the fuel-indexed mutual Core closure.
 
 ## Semantic Core v3 feature inventory
 
