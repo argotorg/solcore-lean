@@ -1,4 +1,4 @@
-import Solcore.Syntax.Module
+import Solcore.Syntax.Declaration
 
 /-!
 Declarative token grammar for the canonical syntax.
@@ -1036,6 +1036,67 @@ inductive ImportDeclParses :
   | ofSelected {input output : Remainder} {declaration : Syntax.ImportDecl}
       (parsed : SelectiveImportDeclParses input declaration output) :
       ImportDeclParses input declaration output
+
+/-! Derive targets retain reserved-keyword recovery without parser details. -/
+
+/-- Hard keywords retained as diagnosed components of a derive target. -/
+def ReservedDeriveTargetKeyword : HardKeyword → Prop
+  | .importKw | .exportKw | .pragmaKw | .typeKw | .dataKw
+  | .classKw | .instanceKw | .contractKw | .publicKw | .payableKw
+  | .functionKw | .constructorKw | .fallbackKw | .forallKw
+  | .defaultKw => True
+  | _ => False
+
+/-- Exact grammar of one ordinary or diagnosed reserved derive component. -/
+inductive DeriveComponentParses :
+    Remainder → Identifier → Remainder → Prop where
+  | identifier {input output : Remainder} {name : Identifier}
+      (parsed : IdentifierParses input name output) :
+      DeriveComponentParses input name output
+  | reserved {input : Remainder} (keyword : HardKeyword)
+      (allowed : ReservedDeriveTargetKeyword keyword)
+      (span : SourceSpan)
+      (token : TokenAt input.tokens input.endIndex input.cursor {
+        span
+        value := .keyword keyword
+      }) :
+      DeriveComponentParses input {
+        span
+        value := keyword.spelling
+      } { input with cursor := input.cursor + 1 }
+
+/-- Maximal forward dotted tail of one derive target. -/
+inductive DeriveTargetTailParses :
+    Remainder → List Identifier → Remainder → Prop where
+  | done {input : Remainder}
+      (stopped : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .dot)) :
+      DeriveTargetTailParses input [] input
+  | next {input afterComponent output : Remainder}
+      {component : Identifier} {components : List Identifier}
+      (dotSpan : SourceSpan)
+      (dotToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := dotSpan
+        value := .symbol .dot
+      })
+      (componentParsed : DeriveComponentParses
+        { input with cursor := input.cursor + 1 }
+        component afterComponent)
+      (tail : DeriveTargetTailParses afterComponent components output) :
+      DeriveTargetTailParses input (component :: components) output
+
+/-- Independent maximal grammar of one dotted derive target. -/
+def DeriveTargetParses
+    (input : Remainder) (target : Syntax.DeriveTarget)
+    (output : Remainder) : Prop :=
+  ∃ first afterFirst components,
+    DeriveComponentParses input first afterFirst ∧
+    DeriveTargetTailParses afterFirst components output ∧
+    target = {
+      span := SourceSpan.cover first.span
+        (finalIdentifier first components).span
+      value := { components := { head := first, tail := components } }
+    }
 
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
