@@ -18,6 +18,7 @@ import Solcore.Syntax.Parser.ExportNameSoundnessProperties
 import Solcore.Syntax.Parser.ExportPathSoundnessProperties
 import Solcore.Syntax.Parser.ExportSelectionSoundnessProperties
 import Solcore.Syntax.Parser.FileItemsSoundnessProperties
+import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
 import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
 import Solcore.Syntax.Parser.HidingClauseSoundnessProperties
 import Solcore.Syntax.Parser.ImportDeclSoundnessProperties
@@ -36,6 +37,7 @@ import Solcore.Syntax.Parser.SelectiveImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectorNameSoundnessProperties
 import Solcore.Syntax.Parser.TypeAliasSoundnessProperties
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
+import Solcore.Syntax.Parser.WhereClauseSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportNoHidingSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportSoundnessProperties
 
