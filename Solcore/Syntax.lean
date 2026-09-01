@@ -5,6 +5,7 @@ import Solcore.Syntax.Lexer
 import Solcore.Syntax.Identifier
 import Solcore.Syntax.Parser
 import Solcore.Syntax.Parser.CertifiedParseProperties
+import Solcore.Syntax.Parser.DelimitedSoundnessProperties
 import Solcore.Syntax.Parser.ModulePathSoundnessProperties
 import Solcore.Syntax.Parser.NamespaceImportSoundnessProperties
 import Solcore.Syntax.Parser.PlainImportSoundnessProperties
