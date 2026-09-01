@@ -103,6 +103,7 @@ import Solcore.Test.SyntaxParserFileItemProperties
 import Solcore.Test.SyntaxParserFileItemStrictProperties
 import Solcore.Test.SyntaxParserFileItemTotalityProperties
 import Solcore.Test.SyntaxParserFileItemsProperties
+import Solcore.Test.SyntaxParserFileItemsSoundnessProperties
 import Solcore.Test.SyntaxParserFileItemsStateProperties
 import Solcore.Test.SyntaxParserFileItemsTotalityProperties
 import Solcore.Test.SyntaxParserFilePlainTopItemProperties
