@@ -703,6 +703,56 @@ mutual
         OptionalFunctionTypeReturnsParses input (some values) output
 end
 
+/-! Grammar of named function parameters over recursive type expressions. -/
+
+/-- No contextual `comptime` followed by an identifier starts here. -/
+def ComptimeParameterPrefixAbsentAt (input : Remainder) : Prop :=
+  ¬ ∃ markerSpan nameSpan name,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := markerSpan
+      value := .identifier ContextualKeyword.comptime.spelling
+    } ∧
+    TokenAt input.tokens input.endIndex (input.cursor + 1) {
+      span := nameSpan
+      value := .identifier name
+    }
+
+/-- Exact non-recovery grammar of one typed named parameter. -/
+inductive FunctionParameterParses :
+    Remainder → Syntax.FunctionParameter → Remainder → Prop where
+  | ordinary {input afterName afterColon output : Remainder}
+      {name : Identifier} {type : Syntax.TypeExpr} (colonSpan : SourceSpan)
+      (comptimePrefixAbsent : ComptimeParameterPrefixAbsentAt input)
+      (nameParsed : IdentifierParses input name afterName)
+      (colonToken : ExactTokenParses (.symbol .colon)
+        afterName colonSpan afterColon)
+      (typeParsed : TypeExprParses afterColon type output) :
+      FunctionParameterParses input {
+        span := SourceSpan.cover name.span type.span
+        value := .typed none name type
+      } output
+  | comptime {input afterMarker afterName afterColon output : Remainder}
+      {name : Identifier} {type : Syntax.TypeExpr}
+      (markerSpan colonSpan : SourceSpan)
+      (markerToken : ExactTokenParses
+        (.identifier ContextualKeyword.comptime.spelling)
+        input markerSpan afterMarker)
+      (nameParsed : IdentifierParses afterMarker name afterName)
+      (colonToken : ExactTokenParses (.symbol .colon)
+        afterName colonSpan afterColon)
+      (typeParsed : TypeExprParses afterColon type output) :
+      FunctionParameterParses input {
+        span := SourceSpan.cover markerSpan type.span
+        value := .typed (some markerSpan) name type
+      } output
+
+/-- Possibly empty typed named parameters with an optional trailing comma. -/
+def FunctionParametersParses
+    (input : Remainder) (parameters : DelimitedList Syntax.FunctionParameter)
+    (output : Remainder) : Prop :=
+  TrailingDelimitedListParses .leftParen .rightParen
+    FunctionParameterParses input parameters output
+
 /-! Grammar of one trait predicate over recursive type expressions. -/
 
 /-- Exact predicate `subject: Trait<arguments...>` in retained source order. -/
