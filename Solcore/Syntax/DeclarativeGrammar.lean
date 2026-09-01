@@ -1098,6 +1098,40 @@ def DeriveTargetParses
       value := { components := { head := first, tail := components } }
     }
 
+/--
+Independent grammar of the normal `#[derive(...)]` path.  Empty target lists
+and reserved target components remain represented here because the executable
+normal path retains them with diagnostics; the public parser soundness theorem
+uses diagnostic freedom to exclude recovery as a whole.
+-/
+def DeriveAttributeParses
+    (input : Remainder) (value : Syntax.DeriveAttribute)
+    (output : Remainder) : Prop :=
+  ∃ hashSpan bracketSpan deriveSpan targets afterTargets closingSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := hashSpan
+      value := .symbol .hash
+    } ∧
+    TokenAt input.tokens input.endIndex (input.cursor + 1) {
+      span := bracketSpan
+      value := .symbol .leftBracket
+    } ∧
+    TokenAt input.tokens input.endIndex (input.cursor + 2) {
+      span := deriveSpan
+      value := .identifier ContextualKeyword.derive.spelling
+    } ∧
+    NoTrailingDelimitedListParses .leftParen .rightParen DeriveTargetParses
+      { input with cursor := input.cursor + 3 } targets afterTargets ∧
+    TokenAt afterTargets.tokens afterTargets.endIndex afterTargets.cursor {
+      span := closingSpan
+      value := .symbol .rightBracket
+    } ∧
+    output = { afterTargets with cursor := afterTargets.cursor + 1 } ∧
+    value = {
+      span := SourceSpan.cover hashSpan closingSpan
+      value := { targets }
+    }
+
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
     (tokens : Array Token) (endIndex : Nat) :
