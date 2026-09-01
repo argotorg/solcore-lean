@@ -101,12 +101,16 @@ the parsed file, tokens, nested comments, lexical diagnostics, and parse
 diagnostics. All carriers refer to the same input file, and the parsed file
 retains its exact full-file span.
 
-The next proof slice is intentionally different from the completed totality
-work. It will define an independent declarative grammar for the canonical
-syntax and prove that a diagnostic-free parser result is derivable in that
-grammar. Recovered malformed output will receive a separate, explicit
-soundness statement so that recovery is not confused with language
-acceptance.
+The independent declarative grammar now covers pragma declarations, maximal
+dotted qualified names, and local and `@`-prefixed external module paths.
+Successful parsing of each form implies both derivability in that
+parser-independent token grammar and the existing source-validity contract.
+
+Diagnostic-free strict plain imports are the next grammar slice. Later slices
+will extend the same result through the remaining declarations, types,
+expressions, patterns, statements, and complete diagnostic-free files.
+Recovered malformed output remains separate so that recovery is not confused
+with language acceptance.
 
 This frontend work remains separate from the completed syntax-independent
 execution semantics. Resolution, source typing, and elaboration will consume
@@ -121,6 +125,8 @@ The canonical syntax slice is complete when:
 - lexical and parse diagnostics are deterministic and source-located;
 - all retained token, comment, and AST spans use valid UTF-8 byte boundaries;
 - ordinary malformed input produces total diagnostic output;
+- every diagnostic-free complete-file result is proved derivable in the
+  independent declarative grammar;
 - the canonical frontend is the only current syntax described by public
   documentation; and
 - the complete build, tests, metadata validation, and kernel audit pass.

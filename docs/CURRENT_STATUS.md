@@ -213,11 +213,16 @@ the input identity and full-file span, retained lexer carriers are unchanged,
 and all token and diagnostic spans belong to that same file. These properties
 cover recovered output as well as diagnostic-free output.
 
-The next formal parser task is success soundness against a declarative grammar.
-The existing validity predicates establish source ownership, span discipline,
-and structurally valid recovered ASTs; they do not yet define an independent
-grammar relation saying exactly which token sequence derives a diagnostic-free
-AST. That relation and its connection to successful parsing remain open.
+An independent declarative grammar now covers pragma declarations, maximal
+dotted qualified names, and both local and `@`-prefixed external module paths.
+Every successful production parse for those forms is proved to follow that
+grammar while also satisfying the existing source-provenance contract. This is
+the first soundness slice, not yet a whole-file grammar theorem.
+
+The next slice starts with diagnostic-free strict plain imports, then extends
+the same boundary through the remaining productions and complete files.
+Recovered malformed output remains separate so that recovery is not confused
+with language acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle

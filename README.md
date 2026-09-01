@@ -120,7 +120,7 @@ def exampleSyntax : ParseResult :=
 ```
 
 Successful results retain tokens, comments, lexical diagnostics, parse
-diagnostics, and a source-preserving AST for the complete canonical grammar.
+diagnostics, and a source-preserving AST for the supported canonical syntax.
 The public parser is proved to return an ordinary result for every source file.
 Malformed input is reported through diagnostics and recovery nodes; the
 internal exceptional branch is unreachable.
