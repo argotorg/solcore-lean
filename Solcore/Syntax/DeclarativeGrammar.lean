@@ -29,6 +29,17 @@ def TokenKindAbsentAt (tokens : Array Token) (endIndex index : Nat)
     (kind : TokenKind) : Prop :=
   ¬ ∃ span, TokenAt tokens endIndex index { span, value := kind }
 
+/-- Exact grammar of one checked identifier occurrence. -/
+def IdentifierParses
+    (input : Remainder) (name : Identifier) (output : Remainder) : Prop :=
+  TokenAt input.tokens input.endIndex input.cursor {
+      span := name.span
+      value := .identifier name.value
+    } ∧
+    output.tokens = input.tokens ∧
+    output.endIndex = input.endIndex ∧
+    output.cursor = input.cursor + 1
+
 /-- Last identifier of one nonempty forward-order component sequence. -/
 def finalIdentifier : Identifier → List Identifier → Identifier
   | first, [] => first
@@ -368,6 +379,45 @@ def NonemptyNoTrailingDelimitedListParses {α : Type}
       closingSpan output ∧
     values.elements = first :: rest ∧
     values.span = SourceSpan.cover openingSpan closingSpan
+
+/-- Exact nonempty constructor-name list between parentheses. -/
+def ConstructorNamesParses
+    (input : Remainder) (constructors : NonemptyList Identifier)
+    (span : SourceSpan) (output : Remainder) : Prop :=
+  NonemptyNoTrailingDelimitedListParses .leftParen .rightParen
+    IdentifierParses input {
+      span
+      elements := constructors.toList
+    } output
+
+/-- Independent grammar of an all-or-named constructor selection. -/
+inductive ConstructorSelectionParses :
+    Remainder → Syntax.ConstructorSelection → Remainder → Prop where
+  | all {input : Remainder}
+      (openingSpan markerSpan closingSpan : SourceSpan)
+      (openingToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := openingSpan
+        value := .symbol .leftParen
+      })
+      (markerToken : TokenAt input.tokens input.endIndex (input.cursor + 1) {
+        span := markerSpan
+        value := .symbol .star
+      })
+      (closingToken : TokenAt input.tokens input.endIndex (input.cursor + 2) {
+        span := closingSpan
+        value := .symbol .rightParen
+      }) :
+      ConstructorSelectionParses input {
+        span := SourceSpan.cover openingSpan closingSpan
+        value := .all markerSpan
+      } { input with cursor := input.cursor + 3 }
+  | named {input output : Remainder} {constructors : NonemptyList Identifier}
+      {span : SourceSpan}
+      (namesParsed : ConstructorNamesParses input constructors span output) :
+      ConstructorSelectionParses input {
+        span
+        value := .named constructors
+      } output
 
 /-- Exact optional alias following one selected import name. -/
 inductive SelectedAliasParses :
