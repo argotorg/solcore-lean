@@ -314,6 +314,61 @@ def NonemptyTrailingDelimitedListParses {α : Type}
     values.elements = first :: rest ∧
     values.span = SourceSpan.cover openingSpan closingSpan
 
+/-- Forward-order tail grammar for a list that rejects a final comma. -/
+inductive NoTrailingDelimitedTailParses {α : Type}
+    (closing : Symbol)
+    (elementParses : Remainder → α → Remainder → Prop) :
+    Remainder → List α → SourceSpan → Remainder → Prop where
+  | close {input : Remainder} {closingSpan : SourceSpan}
+      (commaAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .comma))
+      (closingToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := closingSpan
+        value := .symbol closing
+      }) :
+      NoTrailingDelimitedTailParses closing elementParses input [] closingSpan
+        { input with cursor := input.cursor + 1 }
+  | next {input afterElement output : Remainder}
+      {commaSpan closingSpan : SourceSpan} {element : α}
+      {elements : List α}
+      (commaToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := commaSpan
+        value := .symbol .comma
+      })
+      (elementParsed : elementParses
+        { input with cursor := input.cursor + 1 } element afterElement)
+      (progress : input.cursor + 1 < afterElement.cursor)
+      (tail : NoTrailingDelimitedTailParses closing elementParses afterElement
+        elements closingSpan output) :
+      NoTrailingDelimitedTailParses closing elementParses input
+        (element :: elements) closingSpan output
+
+/--
+Independent grammar of a nonempty comma-separated list that rejects a final
+comma.  The parser does not inspect the closing token after a comma; it calls
+the element parser directly, so the recursive case carries no closing-absence
+premise.
+-/
+def NonemptyNoTrailingDelimitedListParses {α : Type}
+    (opening closing : Symbol)
+    (elementParses : Remainder → α → Remainder → Prop)
+    (input : Remainder) (values : DelimitedList α)
+    (output : Remainder) : Prop :=
+  ∃ openingSpan first afterFirst rest closingSpan,
+    output.tokens = input.tokens ∧
+    output.endIndex = input.endIndex ∧
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := openingSpan
+      value := .symbol opening
+    } ∧
+    elementParses { input with cursor := input.cursor + 1 }
+      first afterFirst ∧
+    input.cursor + 1 < afterFirst.cursor ∧
+    NoTrailingDelimitedTailParses closing elementParses afterFirst rest
+      closingSpan output ∧
+    values.elements = first :: rest ∧
+    values.span = SourceSpan.cover openingSpan closingSpan
+
 /-- Exact optional alias following one selected import name. -/
 inductive SelectedAliasParses :
     Remainder → Option Identifier → Remainder → Prop where
