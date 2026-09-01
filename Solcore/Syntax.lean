@@ -36,6 +36,7 @@ import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportsSoundnessProperties
 import Solcore.Syntax.Parser.SelectiveImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectorNameSoundnessProperties
+import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
 import Solcore.Syntax.Parser.TypeAliasSoundnessProperties
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
 import Solcore.Syntax.Parser.WhereClauseSoundnessProperties

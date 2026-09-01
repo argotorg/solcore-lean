@@ -230,6 +230,7 @@ import Solcore.Test.SyntaxParserTerms
 import Solcore.Test.SyntaxParserTraitBodyTotalityProperties
 import Solcore.Test.SyntaxParserTraitDeclarationTotalityProperties
 import Solcore.Test.SyntaxParserTraitProperties
+import Solcore.Test.SyntaxParserTraitSoundnessProperties
 import Solcore.Test.SyntaxParserTotality
 import Solcore.Test.SyntaxParserTrivia
 import Solcore.Test.SyntaxParserTriviaSelectionProperties
