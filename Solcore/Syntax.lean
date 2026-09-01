@@ -10,6 +10,7 @@ import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedSoundnessProperties
+import Solcore.Syntax.Parser.DeriveAttributeSoundnessProperties
 import Solcore.Syntax.Parser.DeriveTargetSoundnessProperties
 import Solcore.Syntax.Parser.ExportDeclSoundnessProperties
 import Solcore.Syntax.Parser.ExportNameSoundnessProperties
