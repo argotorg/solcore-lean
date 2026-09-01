@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionPostfixOutcomeGrammar
+import Solcore.Syntax.DeclarativeCoreIdentifierOutcomeGrammar
 import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
 
 /-!

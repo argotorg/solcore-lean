@@ -1,4 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreExpressionPostfixGrammar
+import Solcore.Syntax.DeclarativeCoreIdentifierOutcomeGrammar
 import Solcore.Syntax.DeclarativeDelimitedNoTrailingOutcomeProperties
 
 /-!
@@ -9,19 +10,6 @@ postfix expressions.
 set_option autoImplicit false
 
 namespace Solcore.Syntax.DeclarativeGrammar
-
-/-- No ordinary identifier token occurs at the current grammar cursor. -/
-def IdentifierAbsentAt (input : Remainder) : Prop :=
-  ¬ ∃ span text, TokenAt input.tokens input.endIndex input.cursor {
-    span
-    value := .identifier text
-  }
-
-/-- Exact rejection of the checked Core identifier primitive. -/
-inductive IdentifierRejects : Remainder → Remainder → Prop where
-  | absent {input : Remainder}
-      (identifierAbsent : IdentifierAbsentAt input) :
-      IdentifierRejects input input
 
 /-- The existing postfix grammar admits ordinary nested outcomes as-is. -/
 abbrev PostfixTailOrdinaryParses := PostfixTailParses
