@@ -703,6 +703,50 @@ mutual
         OptionalFunctionTypeReturnsParses input (some values) output
 end
 
+/-! Grammar of canonical transparent type-alias declarations. -/
+
+/-- Prioritized optional, possibly empty type-alias parameters. -/
+inductive OptionalTypeAliasParametersParses :
+    Remainder → Option (DelimitedList Identifier) → Remainder → Prop where
+  | absent {input : Remainder}
+      (openingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .leftParen)) :
+      OptionalTypeAliasParametersParses input none input
+  | present {input output : Remainder}
+      {parameters : DelimitedList Identifier}
+      (parsed : TrailingDelimitedListParses .leftParen .rightParen
+        IdentifierParses input parameters output) :
+      OptionalTypeAliasParametersParses input (some parameters) output
+
+/-- Exact non-recovery grammar of one complete transparent type alias. -/
+inductive TypeAliasDeclParses :
+    Remainder → Syntax.TypeAliasDecl → Remainder → Prop where
+  | parsed
+      {input afterKeyword afterName afterParameters afterEqual afterValue
+        output : Remainder}
+      {name : Identifier}
+      {parameters : Option (DelimitedList Identifier)}
+      {value : Syntax.TypeExpr}
+      (keywordSpan equalSpan semicolonSpan : SourceSpan)
+      (keywordToken : ExactTokenParses (.keyword .typeKw)
+        input keywordSpan afterKeyword)
+      (nameParsed : IdentifierParses afterKeyword name afterName)
+      (parametersParsed : OptionalTypeAliasParametersParses
+        afterName parameters afterParameters)
+      (equalToken : ExactTokenParses (.symbol .equal)
+        afterParameters equalSpan afterEqual)
+      (valueParsed : TypeExprParses afterEqual value afterValue)
+      (semicolonToken : ExactTokenParses (.symbol .semicolon)
+        afterValue semicolonSpan output) :
+      TypeAliasDeclParses input {
+        span := SourceSpan.cover keywordSpan semicolonSpan
+        value := {
+          name
+          parameters
+          value
+        }
+      } output
+
 /-- Exact nonempty constructor-name list between parentheses. -/
 def ConstructorNamesParses
     (input : Remainder) (constructors : NonemptyList Identifier)
