@@ -1081,6 +1081,130 @@ inductive FunctionDeclParses
         value := { signature, body }
       } output
 
+/-! Grammar of canonical implementation declarations over an abstract block grammar. -/
+
+/-- Prioritized optional leading `default` marker of an implementation. -/
+inductive OptionalImplDefaultMarkerParses :
+    Remainder → Option SourceSpan → Remainder → Prop where
+  | absent {input : Remainder}
+      (markerAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.keyword .defaultKw)) :
+      OptionalImplDefaultMarkerParses input none input
+  | present {input output : Remainder} (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses (.keyword .defaultKw)
+        input markerSpan output) :
+      OptionalImplDefaultMarkerParses input (some markerSpan) output
+
+/-- Exact nonempty implementation head arguments between angle brackets. -/
+def ImplHeadArgumentsParses
+    (input : Remainder) (arguments : NonemptyDelimitedList Syntax.TypeExpr)
+    (output : Remainder) : Prop :=
+  NonemptyTrailingDelimitedListParses .less .greater TypeExprParses input {
+    span := arguments.span
+    elements := arguments.elements.toList
+  } output
+
+/-- One implementation method is a module-policy function with empty trivia. -/
+inductive ImplMethodParses
+    (bodyParses : Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.ImplMethod → Remainder → Prop where
+  | parsed {input output : Remainder}
+      {declaration : Syntax.FunctionDecl}
+      (declarationParsed : FunctionDeclParses bodyParses
+        ModuleFunctionModifiersAllowed input declaration output) :
+      ImplMethodParses bodyParses input {
+        span := declaration.span
+        value := {
+          leadingComments := []
+          declaration
+        }
+      } output
+
+/--
+Forward-order implementation methods ending at the exact closing brace.
+
+The closing branch has priority.  Every method branch records the executable
+loop's strict cursor-progress guard independently of its fuel bound.
+-/
+inductive ImplMethodTailParses
+    (bodyParses : Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → List Syntax.ImplMethod → SourceSpan →
+      Remainder → Prop where
+  | close {input output : Remainder} (closingSpan : SourceSpan)
+      (closingToken : ExactTokenParses (.symbol .rightBrace)
+        input closingSpan output) :
+      ImplMethodTailParses bodyParses input [] closingSpan output
+  | next {input afterMethod output : Remainder}
+      {method : Syntax.ImplMethod} {methods : List Syntax.ImplMethod}
+      {closingSpan : SourceSpan}
+      (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .rightBrace))
+      (methodParsed : ImplMethodParses bodyParses input method afterMethod)
+      (progress : input.cursor < afterMethod.cursor)
+      (tail : ImplMethodTailParses bodyParses afterMethod methods
+        closingSpan output) :
+      ImplMethodTailParses bodyParses input (method :: methods)
+        closingSpan output
+
+/-- Exact braces, retained span, and source-order implementation methods. -/
+inductive ImplBodyParses
+    (bodyParses : Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → SourceSpan → List Syntax.ImplMethod →
+      Remainder → Prop where
+  | parsed {input afterOpening output : Remainder}
+      {methods : List Syntax.ImplMethod} (openingSpan closingSpan : SourceSpan)
+      (openingToken : ExactTokenParses (.symbol .leftBrace)
+        input openingSpan afterOpening)
+      (methodsParsed : ImplMethodTailParses bodyParses afterOpening methods
+        closingSpan output) :
+      ImplBodyParses bodyParses input
+        (SourceSpan.cover openingSpan closingSpan) methods output
+
+/--
+Exact canonical implementation declaration.  Function bodies remain abstract,
+while the optional marker, head arguments, where clause, body, and outer range
+are fixed independently of the executable parser.
+-/
+inductive ImplDeclParses
+    (bodyParses : Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.ImplDecl → Remainder → Prop where
+  | parsed
+      {input afterDefault afterMarker afterGenerics afterName afterArguments
+        afterWhere output : Remainder}
+      {defaultMarker : Option SourceSpan}
+      {genericParameters : Option Syntax.GenericParameters}
+      {traitName : Identifier}
+      {headArguments : NonemptyDelimitedList Syntax.TypeExpr}
+      {whereClause : Option Syntax.WhereClause}
+      {bodySpan : SourceSpan} {methods : List Syntax.ImplMethod}
+      (markerSpan : SourceSpan)
+      (defaultParsed : OptionalImplDefaultMarkerParses input defaultMarker
+        afterDefault)
+      (markerToken : ExactTokenParses
+        (.identifier ContextualKeyword.impl.spelling)
+        afterDefault markerSpan afterMarker)
+      (genericsParsed : OptionalGenericParametersParses
+        afterMarker genericParameters afterGenerics)
+      (nameParsed : IdentifierParses afterGenerics traitName afterName)
+      (argumentsParsed : ImplHeadArgumentsParses
+        afterName headArguments afterArguments)
+      (whereParsed : OptionalWhereClauseParses
+        afterArguments whereClause afterWhere)
+      (bodyParsed : ImplBodyParses bodyParses afterWhere bodySpan methods
+        output) :
+      ImplDeclParses bodyParses input {
+        span := SourceSpan.cover (defaultMarker.getD markerSpan) bodySpan
+        value := {
+          defaultMarker
+          genericParameters
+          traitName
+          headArguments
+          whereClause
+          bodySpan
+          methods
+        }
+      } output
+
 /-! Grammar of canonical signature-only trait declarations. -/
 
 /-- Exact module-policy signature followed by a trait-method semicolon. -/
