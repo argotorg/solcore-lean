@@ -262,6 +262,40 @@ def NonemptyTrailingDelimitedListParses {α : Type}
     values.elements = first :: rest ∧
     values.span = SourceSpan.cover openingSpan closingSpan
 
+/-- Exact optional alias following one selected import name. -/
+inductive SelectedAliasParses :
+    Remainder → Option Identifier → Remainder → Prop where
+  | absent {input : Remainder}
+      (stopped : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.keyword .asKw)) :
+      SelectedAliasParses input none input
+  | present {input output : Remainder} {name : Identifier}
+      (asSpan : SourceSpan)
+      (asToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := asSpan
+        value := .keyword .asKw
+      })
+      (nameToken : TokenAt input.tokens input.endIndex (input.cursor + 1) {
+        span := name.span
+        value := .identifier name.value
+      })
+      (tokensEq : output.tokens = input.tokens)
+      (endIndexEq : output.endIndex = input.endIndex)
+      (cursorEq : output.cursor = input.cursor + 2) :
+      SelectedAliasParses input (some name) output
+
+/-- Independent grammar of one import selector and its optional alias. -/
+def SelectedImportParses
+    (input : Remainder) (selection : Syntax.SelectedImport)
+    (output : Remainder) : Prop :=
+  ∃ afterSource,
+    SelectorNameParses input selection.value.source afterSource ∧
+    SelectedAliasParses afterSource selection.value.alias output ∧
+    selection.span = match selection.value.alias with
+      | none => selection.value.source.span
+      | some alias =>
+          SourceSpan.cover selection.value.source.span alias.span
+
 /-! Plain imports remain a separate judgment as other import forms are added. -/
 
 /-- Grammar of the module path and semicolon following `import`. -/

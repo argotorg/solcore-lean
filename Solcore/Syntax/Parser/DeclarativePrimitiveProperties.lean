@@ -41,6 +41,20 @@ theorem symbolAbsentAt_of_isSymbol_eq_false (value : Symbol)
   unfold instBEqSymbol.beq at absent
   cases value <;> contradiction
 
+/-- A failed keyword lookahead excludes that keyword at the grammar cursor. -/
+theorem keywordAbsentAt_of_isKeyword_eq_false (value : HardKeyword)
+    {input : State} (absent : isKeyword input value = false) :
+    DeclarativeGrammar.TokenKindAbsentAt input.tokens
+      input.window.endIndex input.cursor (.keyword value) := by
+  rintro ⟨span, inside, found⟩
+  unfold isKeyword State.peekKind? State.peek? at absent
+  simp only [inside, ↓reduceIte, found, Option.map_some] at absent
+  change instBEqTokenKind.beq (.keyword value) (.keyword value) = false at absent
+  simp only [instBEqTokenKind.beq] at absent
+  change instBEqHardKeyword.beq value value = false at absent
+  unfold instBEqHardKeyword.beq at absent
+  cases value <;> contradiction
+
 private theorem acceptToken_ok_tokenAt_of_kind (kind : TokenKind)
     (expected : ParseExpectation) (context : ParseContext)
     (accepts : TokenKind → Bool)
