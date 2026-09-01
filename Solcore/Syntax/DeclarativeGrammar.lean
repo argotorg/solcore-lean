@@ -453,6 +453,44 @@ def WildcardImportNoHidingDeclParses
     WildcardImportNoHidingTailParses keywordSpan
       { input with cursor := input.cursor + 1 } declaration output
 
+/-- Grammar after `import` for a wildcard import with optional hiding. -/
+def WildcardImportTailParses (startSpan : SourceSpan)
+    (input : Remainder) (declaration : Syntax.ImportDecl)
+    (output : Remainder) : Prop :=
+  ∃ starSpan fromSpan path afterPath hidden afterHidden semicolonSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := starSpan
+      value := .symbol .star
+    } ∧
+    TokenAt input.tokens input.endIndex (input.cursor + 1) {
+      span := fromSpan
+      value := .identifier ContextualKeyword.from.spelling
+    } ∧
+    ModulePathParses { input with cursor := input.cursor + 2 }
+      path afterPath ∧
+    OptionalHidingParses afterPath hidden afterHidden ∧
+    TokenAt afterHidden.tokens afterHidden.endIndex afterHidden.cursor {
+      span := semicolonSpan
+      value := .symbol .semicolon
+    } ∧
+    output = { afterHidden with cursor := afterHidden.cursor + 1 } ∧
+    declaration = {
+      span := SourceSpan.cover startSpan semicolonSpan
+      value := .wildcard path hidden
+    }
+
+/-- Independent recognition judgment for a complete wildcard import. -/
+def WildcardImportDeclParses
+    (input : Remainder) (declaration : Syntax.ImportDecl)
+    (output : Remainder) : Prop :=
+  ∃ keywordSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := keywordSpan
+      value := .keyword .importKw
+    } ∧
+    WildcardImportTailParses keywordSpan
+      { input with cursor := input.cursor + 1 } declaration output
+
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
     (tokens : Array Token) (endIndex : Nat) :
