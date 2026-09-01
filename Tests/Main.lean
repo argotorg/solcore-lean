@@ -125,6 +125,7 @@ import Solcore.Test.SyntaxParserModulePathProperties
 import Solcore.Test.SyntaxParserModulePathSoundnessProperties
 import Solcore.Test.SyntaxParserModulePathTotalityProperties
 import Solcore.Test.SyntaxParserModules
+import Solcore.Test.SyntaxParserNamespaceImportSoundnessProperties
 import Solcore.Test.SyntaxParserNamedParameterTotalityProperties
 import Solcore.Test.SyntaxParserNameProperties
 import Solcore.Test.SyntaxParserOperatorProperties
