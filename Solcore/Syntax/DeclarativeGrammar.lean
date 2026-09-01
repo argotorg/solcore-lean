@@ -108,6 +108,84 @@ inductive ModulePathParses : Remainder → Syntax.ModulePath → Remainder → P
         }
       } output
 
+/-! Import and export selectors share an exact identifier/operator grammar. -/
+
+/-- Symbols admitted as parts of a parenthesized import/export operator. -/
+def SelectorOperatorSymbol : Symbol → Prop
+  | .colonEqual | .arrow | .fatArrow | .equalEqual | .notEqual
+  | .greaterEqual | .lessEqual | .logicalAnd | .logicalOr
+  | .plusEqual | .minusEqual | .starEqual | .slashEqual | .caretEqual
+  | .ampEqual | .pipeEqual | .percentEqual | .tildeEqual
+  | .plus | .minus | .star | .slash | .percent | .bang | .tilde
+  | .less | .greater | .equal | .pipe | .amp | .caret | .colon => True
+  | _ => False
+
+/--
+Forward-order grammar of the symbols inside an operator selector.
+
+The empty case is useful for the recursive tail.  `OperatorSelectorParses`
+separately requires the complete sequence to be nonempty.
+-/
+inductive SelectorOperatorPartsParses
+    (tokens : Array Token) (endIndex : Nat) :
+    Nat → List String → Nat → Prop where
+  | done (cursor : Nat) :
+      SelectorOperatorPartsParses tokens endIndex cursor [] cursor
+  | next {cursor finish : Nat} {symbol : Symbol} {parts : List String}
+      (allowed : SelectorOperatorSymbol symbol)
+      (span : SourceSpan)
+      (token : TokenAt tokens endIndex cursor {
+        span
+        value := .symbol symbol
+      })
+      (tail : SelectorOperatorPartsParses tokens endIndex
+        (cursor + 1) parts finish) :
+      SelectorOperatorPartsParses tokens endIndex cursor
+        (symbol.spelling :: parts) finish
+
+/-- Exact grammar of one parenthesized, nonempty operator selector. -/
+def OperatorSelectorParses
+    (input : Remainder) (selector : Syntax.SelectorName)
+    (output : Remainder) : Prop :=
+  ∃ openingSpan closingSpan parts closingIndex,
+    output.tokens = input.tokens ∧
+    output.endIndex = input.endIndex ∧
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := openingSpan
+      value := .symbol .leftParen
+    } ∧
+    SelectorOperatorPartsParses input.tokens input.endIndex
+      (input.cursor + 1) parts closingIndex ∧
+    parts ≠ [] ∧
+    TokenAt input.tokens input.endIndex closingIndex {
+      span := closingSpan
+      value := .symbol .rightParen
+    } ∧
+    output.cursor = closingIndex + 1 ∧
+    selector = {
+      span := SourceSpan.cover openingSpan closingSpan
+      value := .operator (String.join parts)
+    }
+
+/-- Independent grammar of an identifier or parenthesized operator selector. -/
+inductive SelectorNameParses :
+    Remainder → Syntax.SelectorName → Remainder → Prop where
+  | identifier {input output : Remainder} {name : Identifier}
+      (nameToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := name.span
+        value := .identifier name.value
+      })
+      (tokensEq : output.tokens = input.tokens)
+      (endIndexEq : output.endIndex = input.endIndex)
+      (cursorEq : output.cursor = input.cursor + 1) :
+      SelectorNameParses input {
+        span := name.span
+        value := .identifier name
+      } output
+  | operator {input output : Remainder} {selector : Syntax.SelectorName}
+      (parsed : OperatorSelectorParses input selector output) :
+      SelectorNameParses input selector output
+
 /-! Plain imports remain a separate judgment as other import forms are added. -/
 
 /-- Grammar of the module path and semicolon following `import`. -/
