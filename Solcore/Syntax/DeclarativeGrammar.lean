@@ -529,6 +529,22 @@ def SelectiveImportDeclParses
     SelectiveImportTailParses keywordSpan
       { input with cursor := input.cursor + 1 } declaration output
 
+/-- Parser-independent union of the four complete canonical import forms. -/
+inductive ImportDeclParses :
+    Remainder → Syntax.ImportDecl → Remainder → Prop where
+  | ofPlain {input output : Remainder} {declaration : Syntax.ImportDecl}
+      (parsed : PlainImportDeclParses input declaration output) :
+      ImportDeclParses input declaration output
+  | ofNamespace {input output : Remainder} {declaration : Syntax.ImportDecl}
+      (parsed : NamespaceImportDeclParses input declaration output) :
+      ImportDeclParses input declaration output
+  | ofWildcard {input output : Remainder} {declaration : Syntax.ImportDecl}
+      (parsed : WildcardImportDeclParses input declaration output) :
+      ImportDeclParses input declaration output
+  | ofSelected {input output : Remainder} {declaration : Syntax.ImportDecl}
+      (parsed : SelectiveImportDeclParses input declaration output) :
+      ImportDeclParses input declaration output
+
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
     (tokens : Array Token) (endIndex : Nat) :
