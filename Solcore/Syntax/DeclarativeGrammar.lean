@@ -108,6 +108,36 @@ inductive ModulePathParses : Remainder → Syntax.ModulePath → Remainder → P
         }
       } output
 
+/-! Plain imports remain a separate judgment as other import forms are added. -/
+
+/-- Grammar of the module path and semicolon following `import`. -/
+def PlainImportTailParses (startSpan : SourceSpan)
+    (input : Remainder) (declaration : Syntax.ImportDecl)
+    (output : Remainder) : Prop :=
+  ∃ path afterPath semicolonSpan,
+    ModulePathParses input path afterPath ∧
+    TokenAt afterPath.tokens afterPath.endIndex afterPath.cursor {
+      span := semicolonSpan
+      value := .symbol .semicolon
+    } ∧
+    output = { afterPath with cursor := afterPath.cursor + 1 } ∧
+    declaration = {
+      span := SourceSpan.cover startSpan semicolonSpan
+      value := .plain path
+    }
+
+/-- Independent recognition judgment for `import ModulePath ;`. -/
+def PlainImportDeclParses
+    (input : Remainder) (declaration : Syntax.ImportDecl)
+    (output : Remainder) : Prop :=
+  ∃ keywordSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := keywordSpan
+      value := .keyword .importKw
+    } ∧
+    PlainImportTailParses keywordSpan
+      { input with cursor := input.cursor + 1 } declaration output
+
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
     (tokens : Array Token) (endIndex : Nat) :
