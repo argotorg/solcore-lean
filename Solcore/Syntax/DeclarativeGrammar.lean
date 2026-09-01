@@ -2437,6 +2437,159 @@ def PragmaDeclParses
     output.cursor = semicolonIndex + 1 ∧
     declaration.span = SourceSpan.cover keywordSpan semicolonSpan
 
+/-! Parametric strict grammar of complete top-level declarations. -/
+
+/-- Every listed selector token is absent at the current top-item cursor. -/
+def TopItemKindsAbsentAt (input : Remainder)
+    (kinds : List TokenKind) : Prop :=
+  ∀ kind ∈ kinds,
+    TokenKindAbsentAt input.tokens input.endIndex input.cursor kind
+
+/--
+Exact attribute-free top-level dispatch in executable priority order.  Core
+function, implementation, and contract bodies remain abstract relations.
+-/
+inductive PlainTopItemParses
+    (expressionParses : Remainder → Syntax.Expr → Remainder → Prop)
+    (allowBodyParses requiredBodyParses :
+      Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.TopItem → Remainder → Prop where
+  | importDecl {input output : Remainder} {declaration : Syntax.ImportDecl}
+      (parsed : ImportDeclParses input declaration output) :
+      PlainTopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .importDecl declaration
+        } output
+  | exportDecl {input output : Remainder} {declaration : Syntax.ExportDecl}
+      (earlierAbsent : TopItemKindsAbsentAt input [
+        .keyword .importKw])
+      (parsed : ExportDeclParses input declaration output) :
+      PlainTopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .exportDecl declaration
+        } output
+  | pragmaDecl {input output : Remainder} {declaration : Syntax.PragmaDecl}
+      (earlierAbsent : TopItemKindsAbsentAt input [
+        .keyword .importKw, .keyword .exportKw])
+      (parsed : PragmaDeclParses input declaration output) :
+      PlainTopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .pragmaDecl declaration
+        } output
+  | typeAlias {input output : Remainder}
+      {declaration : Syntax.TypeAliasDecl}
+      (earlierAbsent : TopItemKindsAbsentAt input [
+        .keyword .importKw, .keyword .exportKw, .keyword .pragmaKw])
+      (parsed : TypeAliasDeclParses input declaration output) :
+      PlainTopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .typeAlias declaration
+        } output
+  | function {input output : Remainder} {declaration : Syntax.FunctionDecl}
+      (earlierAbsent : TopItemKindsAbsentAt input [
+        .keyword .importKw, .keyword .exportKw, .keyword .pragmaKw,
+        .keyword .typeKw])
+      (parsed : FunctionDeclParses allowBodyParses
+        ModuleFunctionModifiersAllowed input declaration output) :
+      PlainTopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .function declaration
+        } output
+  | enum {input output : Remainder} {declaration : Syntax.EnumDecl}
+      (earlierAbsent : TopItemKindsAbsentAt input [
+        .keyword .importKw, .keyword .exportKw, .keyword .pragmaKw,
+        .keyword .typeKw, .keyword .functionKw])
+      (parsed : EnumDeclParses none input declaration output) :
+      PlainTopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .enum declaration
+        } output
+  | trait {input output : Remainder} {declaration : Syntax.TraitDecl}
+      (earlierAbsent : TopItemKindsAbsentAt input [
+        .keyword .importKw, .keyword .exportKw, .keyword .pragmaKw,
+        .keyword .typeKw, .keyword .functionKw,
+        .identifier ContextualKeyword.enum.spelling])
+      (parsed : TraitDeclParses input declaration output) :
+      PlainTopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .trait declaration
+        } output
+  | impl {input output : Remainder} {declaration : Syntax.ImplDecl}
+      (earlierAbsent : TopItemKindsAbsentAt input [
+        .keyword .importKw, .keyword .exportKw, .keyword .pragmaKw,
+        .keyword .typeKw, .keyword .functionKw,
+        .identifier ContextualKeyword.enum.spelling,
+        .identifier ContextualKeyword.trait.spelling])
+      (parsed : ImplDeclParses allowBodyParses input declaration output) :
+      PlainTopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .impl declaration
+        } output
+  | contract {input output : Remainder} {declaration : Syntax.ContractDecl}
+      (earlierAbsent : TopItemKindsAbsentAt input [
+        .keyword .importKw, .keyword .exportKw, .keyword .pragmaKw,
+        .keyword .typeKw, .keyword .functionKw,
+        .identifier ContextualKeyword.enum.spelling,
+        .identifier ContextualKeyword.trait.spelling,
+        .identifier ContextualKeyword.impl.spelling,
+        .keyword .defaultKw])
+      (parsed : ContractDeclParses expressionParses allowBodyParses
+        requiredBodyParses input declaration output) :
+      PlainTopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .contract declaration
+        } output
+
+/--
+Strict derive-aware top-item grammar.  A leading hash commits to a derive
+attribute; diagnostic freedom permits its attachment only to an enum.
+-/
+inductive TopItemParses
+    (expressionParses : Remainder → Syntax.Expr → Remainder → Prop)
+    (allowBodyParses requiredBodyParses :
+      Remainder → Syntax.Block → Remainder → Prop) :
+    Remainder → Syntax.TopItem → Remainder → Prop where
+  | plain {input output : Remainder} {item : Syntax.TopItem}
+      (hashAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .hash))
+      (parsed : PlainTopItemParses expressionParses allowBodyParses
+        requiredBodyParses input item output) :
+      TopItemParses expressionParses allowBodyParses requiredBodyParses
+        input item output
+  | derivedEnum
+      {input afterDerive output : Remainder}
+      {derive : Syntax.DeriveAttribute} {declaration : Syntax.EnumDecl}
+      (deriveParsed : DeriveAttributeParses input derive afterDerive)
+      (earlierAbsent : TopItemKindsAbsentAt afterDerive [
+        .keyword .importKw, .keyword .exportKw, .keyword .pragmaKw,
+        .keyword .typeKw, .keyword .functionKw])
+      (enumParsed : EnumDeclParses (some derive)
+        afterDerive declaration output) :
+      TopItemParses expressionParses allowBodyParses requiredBodyParses
+        input {
+          span := declaration.span
+          leadingComments := []
+          value := .enum declaration
+        } output
+
 /-! Complete-file accumulation over an abstract top-item grammar. -/
 
 /--
