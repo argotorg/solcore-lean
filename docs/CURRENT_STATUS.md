@@ -345,12 +345,14 @@ recovery successes, so every diagnostic-free `sourceFile` result derives this
 parameterized complete-file grammar and composes with source validity.
 Parser-independent judgments now cover raw, balanced, isolated, and canonical
 Core blocks; the complete Core expression layer; the ordered public Core
-pattern layer; Core `let`, `return`, assignment, block, `while`, `if`, `break`,
-and `continue` statements; and inline-Yul name sequences, the public
-expression layer, and its basic controls. Transactional constructor and call
-arguments carry explicit declarative rejection specifications whose
-disjointness laws preserve parser priority. The remaining work is to finish
-the larger Core and Yul statement forms, close the fuel-indexed mutual
+pattern layer; Core `let`, `return`, assignment, `for`, `match`, assembly,
+block, `while`, `if`, `break`, and `continue` statements; and inline-Yul name
+sequences, the public expression layer, exact braced blocks, keyword-only
+controls, optional semicolons, `let`, assignment, expression statements, and
+source-level `return(...)`. Transactional constructor and call arguments
+carry explicit declarative rejection specifications whose disjointness laws
+preserve parser priority. The remaining work is to finish the aggregate Core
+dispatcher and larger Yul control forms, close the fuel-indexed mutual
 recursion, and instantiate the abstract file boundary with those concrete
 relations.
 
