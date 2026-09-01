@@ -900,6 +900,52 @@ inductive OptionalReturnClauseParses :
         types
       }) output
 
+/-- Prioritized optional occurrence of one fixed function modifier. -/
+inductive OptionalFunctionModifierParses (keyword : HardKeyword) :
+    Remainder → Option SourceSpan → Remainder → Prop where
+  | absent {input : Remainder}
+      (markerAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.keyword keyword)) :
+      OptionalFunctionModifierParses keyword input none input
+  | present {input output : Remainder} (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses (.keyword keyword)
+        input markerSpan output) :
+      OptionalFunctionModifierParses keyword input (some markerSpan) output
+
+/-- Exact fixed-order parsing of optional `public` then `payable` markers. -/
+def FunctionModifiersParses
+    (input : Remainder) (modifiers : Syntax.FunctionModifiers)
+    (output : Remainder) : Prop :=
+  ∃ afterPublic,
+    OptionalFunctionModifierParses .publicKw input modifiers.publicMarker
+      afterPublic ∧
+    OptionalFunctionModifierParses .payableKw afterPublic
+      modifiers.payableMarker output
+
+/-- Module-level functions allow no contract-only modifiers. -/
+def ModuleFunctionModifiersAllowed
+    (modifiers : Syntax.FunctionModifiers) : Prop :=
+  modifiers.publicMarker = none ∧ modifiers.payableMarker = none
+
+/-- Contract functions allow every syntactically ordered modifier pair. -/
+def ContractFunctionModifiersAllowed
+    (_ : Syntax.FunctionModifiers) : Prop := True
+
+/-- Parser-independent endpoint retained by one complete function signature. -/
+def functionSignatureEnd (parameters : DelimitedList Syntax.FunctionParameter)
+    (modifiers : Syntax.FunctionModifiers)
+    (returnsClause : Option Syntax.ReturnClause)
+    (whereClause : Option Syntax.WhereClause) : SourceSpan :=
+  match whereClause with
+  | some clause => clause.span
+  | none => match returnsClause with
+    | some clause => clause.span
+    | none => match modifiers.payableMarker with
+      | some span => span
+      | none => match modifiers.publicMarker with
+        | some span => span
+        | none => parameters.span
+
 /-! Grammar of canonical transparent type-alias declarations. -/
 
 /-- Prioritized optional, possibly empty type-alias parameters. -/
@@ -966,6 +1012,49 @@ inductive OptionalGenericParametersParses :
       {parameters : Syntax.GenericParameters}
       (parsed : GenericParametersParses input parameters output) :
       OptionalGenericParametersParses input (some parameters) output
+
+/--
+Exact complete named-function signature under a parser-independent modifier
+policy. The grammar retains every component in source order and excludes the
+function body or trait-method semicolon.
+-/
+inductive FunctionSignatureParses
+    (modifiersAllowed : Syntax.FunctionModifiers → Prop) :
+    Remainder → Syntax.FunctionSignature → Remainder → Prop where
+  | parsed
+      {input afterKeyword afterName afterGenerics afterParameters
+        afterModifiers afterReturns output : Remainder}
+      {name : Identifier}
+      {genericParameters : Option Syntax.GenericParameters}
+      {parameters : DelimitedList Syntax.FunctionParameter}
+      {modifiers : Syntax.FunctionModifiers}
+      {returnsClause : Option Syntax.ReturnClause}
+      {whereClause : Option Syntax.WhereClause}
+      (keywordSpan : SourceSpan)
+      (keywordToken : ExactTokenParses (.keyword .functionKw)
+        input keywordSpan afterKeyword)
+      (nameParsed : IdentifierParses afterKeyword name afterName)
+      (genericsParsed : OptionalGenericParametersParses
+        afterName genericParameters afterGenerics)
+      (parametersParsed : FunctionParametersParses
+        afterGenerics parameters afterParameters)
+      (modifiersParsed : FunctionModifiersParses
+        afterParameters modifiers afterModifiers)
+      (returnsParsed : OptionalReturnClauseParses
+        afterModifiers returnsClause afterReturns)
+      (whereParsed : OptionalWhereClauseParses
+        afterReturns whereClause output)
+      (policy : modifiersAllowed modifiers) :
+      FunctionSignatureParses modifiersAllowed input {
+        span := SourceSpan.cover keywordSpan
+          (functionSignatureEnd parameters modifiers returnsClause whereClause)
+        name
+        genericParameters
+        parameters
+        modifiers
+        returnsClause
+        whereClause
+      } output
 
 /-! Grammar of canonical algebraic enum declarations. -/
 
