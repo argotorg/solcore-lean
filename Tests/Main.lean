@@ -108,6 +108,8 @@ import Solcore.Test.SyntaxParserImportProperties
 import Solcore.Test.SyntaxParserImportBaseTotalityProperties
 import Solcore.Test.SyntaxParserImportSelectionTotalityProperties
 import Solcore.Test.SyntaxParserImportTotalityProperties
+import Solcore.Test.SyntaxParserImplBodyTotalityProperties
+import Solcore.Test.SyntaxParserImplDeclarationTotalityProperties
 import Solcore.Test.SyntaxParserImplHeadTotalityProperties
 import Solcore.Test.SyntaxParserImplProperties
 import Solcore.Test.SyntaxParserInvariantFreeProperties
@@ -193,6 +195,8 @@ import Solcore.Test.SyntaxParserTermStatementFallbackTotalityProperties
 import Solcore.Test.SyntaxParserTermStatementProperties
 import Solcore.Test.SyntaxParserTermStatementTotalityProperties
 import Solcore.Test.SyntaxParserTerms
+import Solcore.Test.SyntaxParserTraitBodyTotalityProperties
+import Solcore.Test.SyntaxParserTraitDeclarationTotalityProperties
 import Solcore.Test.SyntaxParserTraitProperties
 import Solcore.Test.SyntaxParserTotality
 import Solcore.Test.SyntaxParserTrivia
