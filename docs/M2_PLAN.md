@@ -113,6 +113,22 @@ export names, local export items, and remote selections. Derive targets and
 normal `#[derive(...)]` attributes now have exact parser-independent grammars;
 the public attribute theorem uses diagnostic freedom only to exclude recovery.
 
+Shared generic parameters now have an exact nonempty `<...>` grammar with an
+optional trailing comma. The optional judgment preserves executable priority
+by requiring the leading `<` to be absent in its absent branch. Both the list
+and optional-wrapper parsers have unconditional success soundness and compose
+with their established source-validity contracts.
+
+Algebraic enum declarations now have exact grammar and unconditional success
+soundness from the contextual `enum` marker through the closing brace.
+Constructor payloads are selected by a leading `(`; when present, they may
+contain zero fields but cannot have a trailing comma. Bodies may be empty,
+admit an optional trailing comma, and preserve constructors in forward source
+order. Every successful enum declaration is unconditionally grammar-sound. It
+retains an already supplied derive attribute in its AST and uses that
+attribute's span as the outer span start; source validity composes with the
+supplied derive contract.
+
 Recursive type expressions now have exact mutual declarative judgments for
 named, mapping, comptime, proxy, tuple, and function forms. The concrete
 recursive delimiter rules retain empty and nonempty lists, optional trailing
@@ -127,25 +143,27 @@ Transparent aliases now have an exact grammar for their keyword, name,
 prioritized optional parameter list that may be empty and may have a trailing
 comma, equals sign, recursive value type, and semicolon. Diagnostic freedom is
 used only to rule out the executable alias-value recovery branch; ordinary
-recursive type success is already unconditional. The recursive type and alias
-theorem families are exposed by the public syntax umbrella and exercised by
-compile-time consumers. The full build and `lake test` pass with those
-registrations.
+recursive type success is already unconditional. Recursive type, shared
+generic-parameter, type-alias, and enum-declaration theorem families have
+compile-time consumers and public `Solcore.Syntax` registration. The full
+build and `lake test` pass with those registrations.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—and transparent type aliases.
 Unconditional strict soundness also covers all four canonical export forms:
-local, module, module alias, and items-from-module. Parser-independent
-`ImportDeclParses` and `ExportDeclParses` judgments combine their respective
-forms without caller-supplied AST shape guards; export soundness needs no
-diagnostic-free premise because its terminator has no recovery branch. The
-generic complete-file item loop also has a parameterized declarative soundness
-theorem preserving forward order, strict progress, end-of-window termination,
-and recovery diagnostics. The remaining concrete top-level forms are next;
-once their item grammar is available, that loop theorem will specialize to
-complete diagnostic-free files. Recovered malformed output remains separate
-so that recovery is not confused with language acceptance.
+local, module, module alias, and items-from-module, together with complete
+algebraic enums. Parser-independent `ImportDeclParses` and `ExportDeclParses`
+judgments combine their respective forms without caller-supplied AST shape
+guards. `EnumDeclParses` directly characterizes complete enum success while
+retaining the supplied derive attribute. Export and enum soundness need no
+diagnostic-free premise. The generic complete-file item loop also has a
+parameterized declarative soundness theorem preserving forward order, strict
+progress, end-of-window termination, and recovery diagnostics. The remaining
+concrete top-level forms are next; once their item grammar is available, that
+loop theorem will specialize to complete diagnostic-free files. Recovered
+malformed output remains separate so that recovery is not confused with
+language acceptance.
 
 This frontend work remains separate from the completed syntax-independent
 execution semantics. Resolution, source typing, and elaboration will consume

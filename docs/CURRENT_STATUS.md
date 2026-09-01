@@ -226,6 +226,22 @@ includes ordinary and diagnosed reserved target components, maximal dotted
 targets, and exact normal `#[derive(...)]` attributes; diagnostic-free public
 attribute soundness excludes its malformed recovery path.
 
+Shared generic parameters now have an exact nonempty `<...>` grammar with an
+optional trailing comma. Their prioritized optional wrapper records the
+absence of a leading `<` in its absent branch, so the declarative judgment
+matches the executable branch choice exactly. Both the list and
+optional-wrapper parsers have unconditional success soundness and
+source-validity compositions.
+
+Algebraic enums now have exact parser-independent coverage from the contextual
+`enum` marker through the closing brace. Constructor payloads are selected by
+a leading `(`; when present, they may contain zero fields but cannot have a
+trailing comma. Enum bodies may be empty, admit an optional trailing comma,
+and retain constructors in forward source order. Every successful enum
+declaration is unconditionally grammar-sound. It retains an already supplied
+derive attribute in its AST field and uses that attribute's span as the outer
+span start; source validity composes with the supplied derive contract.
+
 Recursive type expressions now have exact parser-independent coverage for
 named, mapping, comptime, proxy, tuple, and function forms. Their mutually
 recursive delimiter judgments retain empty and nonempty lists, optional
@@ -241,7 +257,8 @@ Transparent type aliases now reuse that recursive type grammar after an exact
 may have a trailing comma, equals sign, and semicolon. Their public theorem
 requires diagnostic freedom only to exclude the alias-RHS recovery branch; the
 normal alias path and recursive type theorem do not otherwise need that
-premise. Both theorem families have compile-time consumers and public
+premise. Recursive type, shared generic-parameter, type-alias, and
+enum-declaration theorem families have compile-time consumers and public
 `Solcore.Syntax` registration. The full build and `lake test` pass with those
 registrations.
 
@@ -249,17 +266,18 @@ At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—and transparent type aliases.
 Unconditional strict soundness also covers all four canonical export forms:
-local, module, module alias, and items-from-module. Parser-independent
-`ImportDeclParses` and `ExportDeclParses` judgments combine their respective
-forms without caller-supplied AST shape guards; export soundness needs no
-diagnostic-free premise because its terminator has no recovery branch. A
-generic `TopItemsParses` judgment and file-loop theorem already preserve
-forward item order, strict cursor progress, end-of-window termination, and the
-fact that recovery always diagnoses. They are parameterized by the
-still-incomplete concrete top-item grammar. The next slices cover the
-remaining declarations before specializing that scaffold to complete
-diagnostic-free files. Recovered malformed output remains separate so that
-recovery is not confused with language acceptance.
+local, module, module alias, and items-from-module, together with complete
+algebraic enums. Parser-independent `ImportDeclParses` and `ExportDeclParses`
+judgments combine their respective forms without caller-supplied AST shape
+guards. `EnumDeclParses` directly characterizes complete enum success while
+retaining the supplied derive attribute. Export and enum soundness need no
+diagnostic-free premise. A generic `TopItemsParses` judgment and file-loop
+theorem already preserve forward item order, strict cursor progress,
+end-of-window termination, and the fact that recovery always diagnoses. They
+are parameterized by the still-incomplete concrete top-item grammar. The next
+slices cover the remaining declarations before specializing that scaffold to
+complete diagnostic-free files. Recovered malformed output remains separate
+so that recovery is not confused with language acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
