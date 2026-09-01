@@ -159,6 +159,7 @@ import Solcore.Test.SyntaxParserPublicStatementFuelTotalityProperties
 import Solcore.Test.SyntaxParserPublicTotalityProperties
 import Solcore.Test.SyntaxParserPublicValidityProperties
 import Solcore.Test.SyntaxParserQualifiedNameInternals
+import Solcore.Test.SyntaxParserQualifiedNameSoundnessProperties
 import Solcore.Test.SyntaxParserQualifiedNameTotalityProperties
 import Solcore.Test.SyntaxParserRecovery
 import Solcore.Test.SyntaxParserReservedWords
