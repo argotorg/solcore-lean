@@ -188,9 +188,18 @@ generic location-indexed theorem. These parameter, predicate/`where`,
 modifier, and function-signature theorem families are exported through
 `Solcore.Syntax` and checked by compile-time consumers.
 
+Trait methods now add the exact terminating semicolon to a module-policy
+signature. Trait bodies preserve forward method order, exact braces, the
+right-brace-first loop priority, and the retained body cover span. Backward
+diagnostic reflection through that loop yields complete diagnostic-free
+`TraitDeclParses` soundness from the contextual marker through required
+generics, optional `where`, and the final brace. Method, body, and declaration
+theorems have source-validity compositions, public registration, and
+compile-time consumers.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
-hiding clause, and selective imports—and transparent type aliases.
+hiding clause, and selective imports—transparent type aliases, and traits.
 Unconditional strict soundness also covers all four canonical export forms:
 local, module, module alias, and items-from-module, together with complete
 algebraic enums. Parser-independent `ImportDeclParses` and `ExportDeclParses`

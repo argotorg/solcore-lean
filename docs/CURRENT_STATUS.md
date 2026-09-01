@@ -304,9 +304,19 @@ validity composes with the same result. These parameter, predicate/`where`,
 modifier, and function-signature theorem families are exported through
 `Solcore.Syntax` and checked by compile-time consumers.
 
+Trait declarations now extend that signature boundary through exact method
+semicolons and brace-delimited bodies. `TraitMethodTailParses` preserves source
+order while recording closing-brace priority, and the fuel-bounded executable
+loop reflects diagnostic freedom backward through every retained method.
+Complete diagnostic-free trait success therefore derives
+`TraitDeclParses`, including its contextual marker, required generics,
+optional `where`, body span, method list, and final remainder. Method, body,
+and declaration soundness all compose with source validity and are exported
+through the public syntax umbrella.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
-hiding clause, and selective imports—and transparent type aliases.
+hiding clause, and selective imports—transparent type aliases, and traits.
 Unconditional strict soundness also covers all four canonical export forms:
 local, module, module alias, and items-from-module, together with complete
 algebraic enums. Parser-independent `ImportDeclParses` and `ExportDeclParses`

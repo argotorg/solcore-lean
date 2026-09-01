@@ -45,8 +45,8 @@ published through Oracle v4.
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
 | Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, and internal lexer/parser invariant errors are unreachable | Extend the independent grammar through the remaining forms and prove diagnostic-free complete-file soundness | High |
 | Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, and backward diagnostic reflection through recursive types and function-signature leaves | Extend the declarative correspondence through the remaining productions | High |
-| Declarative grammar and parser soundness | Active; complete for pragmas, paths, selector names, generic delimiter policies, all import/export forms, derive targets and attributes, shared generic parameters with exact optional priority, unconditional recursive type expressions, strict function parameters, predicates and optional `where`, ordered modifiers, module/contract function signatures, transparent type aliases, algebraic enums, and a parameterized complete-file item-loop theorem | Add the remaining concrete top-level forms, then specialize diagnostic-free complete-file soundness; exact negative priority for grouped-predicate fallback still requires completeness | High |
-| Declaration, type, and Yul parser proofs | Complete source/state and totality boundary for every production declaration, contract member, recursive type, and public Yul parser; recursive type, shared generic-parameter, predicate/`where`, ordered-modifier, and enum grammar soundness are unconditional, while transparent-alias, strict-parameter-list, and function-signature soundness use diagnostic freedom at value-recovery, parameter-error/recovery, or module-location-policy boundaries | Extend declarative soundness through the remaining declarations and Yul forms | High |
+| Declarative grammar and parser soundness | Active; complete for pragmas, paths, selector names, generic delimiter policies, all import/export forms, derive targets and attributes, shared generic parameters with exact optional priority, unconditional recursive type expressions, strict function parameters, predicates and optional `where`, ordered modifiers, module/contract function signatures, complete traits, transparent type aliases, algebraic enums, and a parameterized complete-file item-loop theorem | Add the remaining concrete top-level forms, then specialize diagnostic-free complete-file soundness; exact negative priority for grouped-predicate fallback still requires completeness | High |
+| Declaration, type, and Yul parser proofs | Complete source/state and totality boundary for every production declaration, contract member, recursive type, and public Yul parser; recursive type, shared generic-parameter, predicate/`where`, ordered-modifier, enum, and trait grammar soundness are established, while transparent-alias, strict-parameter-list, function-signature, and trait soundness use diagnostic freedom at their actual recovery or policy boundaries | Extend declarative soundness through functions, implementations, contracts, and Yul forms | High |
 | Core expression parser proofs | Complete source/state and unconditional totality contracts for atoms, lambda, postfix, unary, binary, conditional, and recursive block interaction | Declarative grammar soundness | High |
 | Pattern and statement parser proofs | Complete source/state and unconditional totality contracts, including recovery, blocks, loops, `match`, inline assembly, and simultaneous expression/pattern/statement recursion | Declarative grammar soundness | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
@@ -89,6 +89,12 @@ composition. The signature judgment ends before a function body or
 trait-method semicolon. These parameter, predicate/`where`, modifier, and
 function-signature theorem families are exported through `Solcore.Syntax` and
 checked by compile-time consumers.
+
+Trait methods, brace-delimited method bodies, and complete trait declarations
+now have exact parser-independent judgments. Diagnostic-free success preserves
+method source order, semicolons, closing-brace priority, required generic
+parameters, optional `where`, outer spans, and the final remainder. The three
+levels also compose with source validity and are publicly registered.
 
 ## Semantic Core v3 feature inventory
 
