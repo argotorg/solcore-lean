@@ -120,6 +120,19 @@ theorem importDecl_wildcard_success_sound {input next : State}
       rw [valueEq] at wildcardEq
       contradiction
 
+/-- A wildcard import with a present hiding clause uses the general grammar. -/
+theorem importDecl_wildcardWithHiding_success_sound {input next : State}
+    {declaration : ImportDecl}
+    (diagnosticFree : next.diagnosticsRev = [])
+    (withHidingShape : ∃ path clause,
+      declaration.value = .wildcard path (some clause))
+    (result : importDecl input = .ok declaration next) :
+    DeclarativeGrammar.WildcardImportDeclParses input.declarativeRemainder
+      declaration next.declarativeRemainder := by
+  apply importDecl_wildcard_success_sound diagnosticFree _ result
+  rcases withHidingShape with ⟨path, clause, shape⟩
+  exact ⟨path, some clause, shape⟩
+
 /-- Wildcard grammar soundness composes with source-provenance validity. -/
 theorem importDecl_wildcard_success_sound_and_validFor
     {input next : State} {declaration : ImportDecl}
@@ -136,5 +149,21 @@ theorem importDecl_wildcard_success_sound_and_validFor
   have valid := importDecl_validFor input inputValid
   rw [result] at valid
   exact valid.1
+
+/-- Present-hiding wildcard soundness also retains source provenance. -/
+theorem importDecl_wildcardWithHiding_success_sound_and_validFor
+    {input next : State} {declaration : ImportDecl}
+    (inputValid : input.ValidFor)
+    (diagnosticFree : next.diagnosticsRev = [])
+    (withHidingShape : ∃ path clause,
+      declaration.value = .wildcard path (some clause))
+    (result : importDecl input = .ok declaration next) :
+    DeclarativeGrammar.WildcardImportDeclParses input.declarativeRemainder
+        declaration next.declarativeRemainder ∧
+      declaration.ValidFor input.file := by
+  apply importDecl_wildcard_success_sound_and_validFor inputValid
+    diagnosticFree _ result
+  rcases withHidingShape with ⟨path, clause, shape⟩
+  exact ⟨path, some clause, shape⟩
 
 end Solcore.Syntax.Parser
