@@ -88,6 +88,7 @@ import Solcore.Test.SyntaxParserExportNameTotalityProperties
 import Solcore.Test.SyntaxParserExportProperties
 import Solcore.Test.SyntaxParserExportPathSoundnessProperties
 import Solcore.Test.SyntaxParserExportPathTotalityProperties
+import Solcore.Test.SyntaxParserExportSelectionSoundnessProperties
 import Solcore.Test.SyntaxParserExportSelectionItemTotalityProperties
 import Solcore.Test.SyntaxParserExportTotalityProperties
 import Solcore.Test.SyntaxParserExports
@@ -129,6 +130,7 @@ import Solcore.Test.SyntaxParserLiteralProperties
 import Solcore.Test.SyntaxParserLiteralTotalityProperties
 import Solcore.Test.SyntaxParserLambdaParameterCoreTotalityProperties
 import Solcore.Test.SyntaxParserLambdaParameterTotalityProperties
+import Solcore.Test.SyntaxParserLocalExportItemSoundnessProperties
 import Solcore.Test.SyntaxParserModulePathProperties
 import Solcore.Test.SyntaxParserModulePathSoundnessProperties
 import Solcore.Test.SyntaxParserModulePathTotalityProperties
