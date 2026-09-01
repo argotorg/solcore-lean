@@ -108,12 +108,13 @@ and parser-soundness theorems also cover nonempty comma-separated lists with
 an optional trailing comma, selected import names and aliases, nonempty
 selected-import lists, hiding clauses, and optional hiding dispatch.
 
-At the complete diagnostic-free declaration level, strict soundness currently
-covers plain imports, namespace imports, and wildcard imports without a hiding
-clause. Wildcard imports with hiding and selective imports are next, followed
-by the remaining top-level forms and complete diagnostic-free files. Recovered
-malformed output remains separate so that recovery is not confused with
-language acceptance.
+At the complete diagnostic-free declaration level, strict soundness now covers
+all four canonical import forms: plain, namespace, wildcard with or without a
+hiding clause, and selective imports. A single parser-independent
+`ImportDeclParses` judgment combines them without requiring callers to provide
+an AST shape guard. Exports are next, followed by the remaining top-level forms
+and complete diagnostic-free files. Recovered malformed output remains
+separate so that recovery is not confused with language acceptance.
 
 This frontend work remains separate from the completed syntax-independent
 execution semantics. Resolution, source typing, and elaboration will consume
