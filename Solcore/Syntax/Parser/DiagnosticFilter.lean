@@ -61,6 +61,13 @@ def filterParseDiagnostics (file : SourceFile)
     (parsed : List ParseDiagnostic) : List ParseDiagnostic :=
   suppressLexicalCascades file.content lexical parsed
 
+/-- With no lexical errors, diagnostic normalization retains every parser
+diagnostic exactly. -/
+@[simp] theorem filterParseDiagnostics_nil_lexical
+    (file : SourceFile) (parsed : List ParseDiagnostic) :
+    filterParseDiagnostics file [] parsed = parsed := by
+  simp [filterParseDiagnostics, suppressLexicalCascades]
+
 /-- Diagnostic normalization can only remove parser diagnostics. -/
 theorem mem_of_mem_filterParseDiagnostics
     (file : SourceFile) (lexical : List LexicalDiagnostic)
