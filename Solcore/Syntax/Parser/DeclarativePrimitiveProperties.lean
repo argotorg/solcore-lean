@@ -126,6 +126,29 @@ theorem symbol_ok_tokenAt (value : Symbol) (context : ParseContext)
     (fun actual accepted =>
       symbol_accepts_kind value (actual := actual) accepted) result
 
+private theorem contextual_accepts_kind (value : ContextualKeyword)
+    {actual : TokenKind} (accepted : actual.isContextual value = true) :
+    actual = .identifier value.spelling := by
+  cases actual <;> simp only [TokenKind.isContextual] at accepted
+  all_goals try { contradiction }
+  case identifier text =>
+    have equal : text = value.spelling := beq_iff_eq.mp accepted
+    subst text
+    rfl
+
+/-- Contextual-keyword success exposes its exact identifier token. -/
+theorem contextual_ok_tokenAt (value : ContextualKeyword)
+    (context : ParseContext) {input next : State} {token : Token}
+    (result : contextual value context input = .ok token next) :
+    DeclarativeGrammar.TokenAt input.tokens input.window.endIndex input.cursor {
+      span := token.span
+      value := .identifier value.spelling
+    } ∧ next = { input with cursor := input.cursor + 1 } :=
+  acceptToken_ok_tokenAt_of_kind (.identifier value.spelling)
+    (.contextual value) context (fun kind => kind.isContextual value)
+    (fun actual accepted =>
+      contextual_accepts_kind value (actual := actual) accepted) result
+
 /-- Raw identifier success exposes the exact identifier token consumed. -/
 theorem rawIdentifier_ok_tokenAt (context : ParseContext)
     {input next : State} {name : Identifier}
