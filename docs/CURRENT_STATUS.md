@@ -188,153 +188,36 @@ in the fixed-revision parser audit. Four malformed inputs differ only because
 Lean retains an additional explicit recovery diagnostic; exact diagnostic
 kinds, byte ranges, order, and recovery ASTs are now regression-tested.
 
-Formal provenance laws prove source identity, the exact full-file span, and
-exact retention of the lexer carriers. The public lexer is proved total: its
-character-count fuel bound always suffices, so the reserved
-`internalFuelExhausted` result cannot occur. Every returned `LexedFile`
-satisfies the complete lexical contract. Its tokens and comments have
-nonempty, UTF-8-valid spans in source order without overlap, and every retained
-lexical diagnostic has a valid source span.
+The public lexer is proved total. Its character-count bound always suffices,
+and every returned token, nested comment, and lexical diagnostic belongs to
+the input file and uses a valid UTF-8 byte span. Tokens and comments remain in
+source order without overlap.
 
-Parser preflight is proved equivalent to that lexical contract, and every
-result from the public lexer passes it. Consequently, a public parser error
-cannot originate in lexing or preflight; it occurs only after both have
-succeeded and the grammar parser has started. Successful public parses expose
-the same carrier guarantees directly.
+The parser is also proved total at its public boundary. Every `SourceFile`
+produces an ordinary `ParseOutput`; the internal lexer- and parser-invariant
+error branches are unreachable. Malformed source is therefore represented by
+ordinary diagnostics and recovery syntax rather than by an internal failure.
+The same guarantee holds when `parseLexed` is called with a lexer result that
+satisfies the public lexical contract.
 
-Parser state, primitive consumers, and cursor/lookahead laws preserve valid
-spans, file ownership, the immutable token carrier, and the relevant source
-order. These compositional guarantees cover qualified names, module paths,
-selectors, literals, primitive token parsers, generic delimited lists, pragmas,
-derive attributes, isolated and recursively parsed Core blocks, complete
-function signatures, and the complete recursive type parser. Complete import,
-export, type-alias, and enum declarations retain valid source ranges and satisfy ordinary-result
-token-window, carrier, cursor, and starting-token contracts. A complete
-function declaration, constructor, fallback entry, and implementation now use
-the canonical recursive Core block contract directly. Their retained bodies
-and implementation methods therefore have unconditional canonical source
-provenance as well as the established parser-state guarantees. Trait methods,
-bodies, and complete trait declarations have source, token-window, carrier,
-cursor, strict-progress, and starting-token guarantees. Contract fields,
-including optional initializers, have complete source and state contracts. The
-plain contract-member core now composes fields, functions, constructors,
-fallback entries, type aliases, enums, and rejection into one canonical
-contract.
-Individual trait predicates satisfy the same boundary, and named function
-parameters retain source provenance through both ordinary parsing and
-recovery. Diagnostic filtering can only remove diagnostics and preserves span
-validity.
+The proof is compositional across types, expressions, patterns, statements,
+Core blocks, inline Yul, imports, exports, aliases, enums, traits,
+implementations, functions, contracts, derive attributes, recovery, and the
+complete file loop. Recursive expression, pattern, statement, type, and Yul
+parsers have sufficient production fuel, while list and recovery loops either
+advance or terminate. All top-level declarations and contract-member forms are
+included in the unconditional result.
 
-Reusable contracts now describe both retained source ranges and parser-state
-behavior. At the current proof boundary:
+Every public output also has a source-provenance contract: its parsed file has
+the input identity and full-file span, retained lexer carriers are unchanged,
+and all token and diagnostic spans belong to that same file. These properties
+cover recovered output as well as diagnostic-free output.
 
-- the public type and Yul parsers have complete source-validity, token-window,
-  carrier, cursor, and starting-token contracts;
-- pattern proofs cover leaves, constructor forms, parenthesized groups and
-  tuples, comptime patterns, dispatch, recovery, and the public parser. The
-  public entry point now has an unconditional canonical source-validity,
-  token-window, carrier, cursor, and starting-token contract;
-- expression proofs cover the established atoms, parenthesized expressions and
-  tuples, array literals, the prefix-operator scanner, binary-operator helpers,
-  and the complete left- and non-associative layers. Concrete atom parsing,
-  including lambda expressions and recovery, has complete source and state
-  contracts with strict progress. Those contracts compose through postfix,
-  unary, every binary precedence, and the outer conditional layer;
-- conditional-expression folding, its fuel-indexed tail, and the outer
-  conditional parser have complete source-validity, token-window, carrier,
-  cursor, and starting-token contracts;
-- lambda return-type parsing and the lambda expression's state, start, and body
-  endpoint contracts are complete. The public `lambdaParameter` parser has
-  complete source-validity, token-window, carrier, cursor, and starting-token
-  contracts across ordinary, comptime, stop-token, rewind, and recovery paths;
-- assignment/expression, `let`, return, block, `while`, `if`, `for`, inline
-  assembly, `break`, and `continue` statements have complete source-validity
-  and state contracts, including both kinds of `for` header item and their
-  comma-separated lists;
-- individual `match` cases and the repeated case list preserve their retained
-  patterns, bodies, source ranges, token windows, carriers, and cursor order.
-  Optional `default` parsing and the enclosing `match` parser have complete
-  source, state, starting-token, and strict-progress contracts; and
-- expression, pattern, and statement contracts are closed together by one
-  simultaneous fuel induction. A step-indexed canonical validity predicate
-  resolves the lambda-body recursion without an unsafe or assumed fixed point;
-  the public `expression`, `pattern`, `statement`, and both public block modes
-  are instantiated unconditionally; and
-- recognized-statement recovery, including diagnostic reset and re-emission,
-  and the complete eleven-branch statement dispatch are proved independently.
-  Comment selection is also proved to retain only comments from the lexer
-  stream. Comment attachment preserves nested enum, trait, implementation, and
-  contract validity, is proved uniformly for every top-level branch, and lifts
-  to valid item lists and complete `ParsedFile` values. Top-level declaration
-  wrappers and derive attachment preserve canonical provenance and span
-  alignment. Top-level error recovery has canonical source, token-window,
-  carrier, cursor, strict-progress, and starting-token contracts.
-
-Contract-member derive attachment, member recovery, the complete contract body,
-and the outer contract declaration now satisfy the same canonical source and
-parser-state boundary. This closes the last declaration-specific assumption:
-all nine plain top-level branches, the derive-aware item parser, the
-fuel-bounded item loop, `sourceFile`, `parseLexed`, and public `parse` now have
-unconditional canonical contracts.
-
-A successful public parse also satisfies one complete output contract. Its
-parsed file is canonically valid, and every retained token, lexical diagnostic,
-and parse diagnostic has a valid span owned by the same source file. Delimiter
-and conditional-nesting diagnostics have an explicit provenance proof as well.
-
-The parser-totality proof is now separated into local, checkable obligations.
-Production fuel is proved sufficient for top-level recovery, contract-member
-recovery, malformed type-alias recovery, pragma item accumulation, and generic
-comma-delimited lists. Their fuel-exhaustion paths are unreachable; the loops
-that require element progress also rule out their no-progress paths.
-
-The complete contract body is now reduced to five explicit member parsers:
-field, contract function, constructor, fallback, and enum. The complete file
-loop, `sourceFile`, `parseLexed`, and public `parse` are reduced to five explicit
-declaration parsers: module function, enum, trait, implementation, and contract.
-Imports, exports, type aliases, pragma declarations,
-derive targets, derive attributes, derive recovery, attachment, dispatch, and
-outer accumulation are discharged internally. The complete recursive type
-parser is invariant-free on valid input: its production fuel is proved
-adequate across named, mapping, comptime, proxy, tuple, and function forms.
-Export paths, constructor selections, export names, selected-item lists, and
-complete export declarations are also invariant-free on valid input.
-
-Term-parser totality now reaches complete expression and pattern layers. Lambda
-parameters are unconditionally total. Lambda atoms, postfix calls and indexing,
-prefix operators, every binary precedence level, conditional expressions,
-pattern dispatch, and pattern recovery have explicit fuel-aware contracts. The
-recursive pattern family lifts those contracts through every fuel level, and
-the public pattern parser has an `ElementTotalityContract` whenever the
-corresponding recursive expression family contracts are supplied.
-
-On the statement side, assignment/expression fallback, `let`, `return`, Core
-blocks, braced statements, `while`, `if`, and `for` now have recursive-fuel
-contracts. Both `for` item forms and the comma-separated item loops have
-separate fixed element-fuel and decreasing loop-fuel proofs. `break` and
-`continue` remain unconditionally ordinary leaves. Core `match` now has total
-helpers for individual arms, arm lists, optional `default`, and arity
-validation, plus an ordinary-result theorem for the complete parser under its
-fuel bounds and a reusable contract for statement-layer dispatch. Inline
-`assembly` is fully total on valid input and inherits the completed public Yul
-body contract.
-
-Inline Yul is now closed end to end for valid-input totality. The public
-expression, statement, and braced-body parsers are ordinary and
-invariant-free. This includes switch arms and defaults, recovery, the recursive
-statement family, block iteration, ordered statement choice, and strict
-progress for loop elements.
-
-The remaining mutual Core work is the ordered `statementLayer` dispatch and
-the simultaneous expression, pattern, and statement fuel closure. Until that
-is complete, public Core expression and statement parsing are not yet claimed
-to be unconditionally invariant-free.
-
-After that closure, the five declaration and five contract-member obligations
-must be discharged before successful parsing is related to a declarative
-grammar.
-Parser-wide resource bounds are no longer an undivided open item: the outer
-accumulation, recovery, and generic delimiter bounds above are complete.
+The next formal parser task is success soundness against a declarative grammar.
+The existing validity predicates establish source ownership, span discipline,
+and structurally valid recovered ASTs; they do not yet define an independent
+grammar relation saying exactly which token sequence derives a diagnostic-free
+AST. That relation and its connection to successful parsing remain open.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle

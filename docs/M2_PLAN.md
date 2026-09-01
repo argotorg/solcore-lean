@@ -83,94 +83,34 @@ list has the complete compositional boundary. Public lambda parameters also
 have complete source, token-window, carrier, cursor, and starting-token
 contracts.
 
-The recursive validity contracts for types, Yul syntax, Core expressions,
-patterns, and Core statements are independent of parser control flow. The
-proof implementation currently has the following shape:
+The public lexer and parser are now total. For every `SourceFile`, public
+parsing returns an ordinary output; neither fuel exhaustion nor an internal
+parser invariant is reachable. Ordinary malformed input stays inside the same
+output type and is represented by source-located diagnostics and recovery
+nodes.
 
-- public type and Yul parsers are complete at the compositional boundary;
-- pattern leaves, constructors, groups, tuples, comptime forms, dispatch, and
-  recovery are complete. The public parser has unconditional canonical
-  source-validity, token-window, carrier, cursor, and starting-token guarantees;
-- established expression atoms, groups, tuples, arrays, operator helpers, and
-  the left- and non-associative layers have complete contracts. Concrete atom
-  parsing, including lambda and recovery, has source, state, strict-progress,
-  and starting-token contracts that compose through postfix, unary, every
-  binary precedence, and conditional parsing;
-- conditional folding, the conditional tail, and the outer conditional parser
-  have complete source-validity, token-window, carrier, cursor, and
-  starting-token contracts;
-- lambda return types and lambda-expression state/start/end behavior are
-  proved, and public lambda-parameter parsing has complete source-validity,
-  token-window, carrier, cursor, and starting-token contracts across ordinary,
-  comptime, stop-token, rewind, and recovery paths;
-- the generic unary wrapper has complete source-validity, token-window,
-  carrier, cursor, and starting-token contracts;
-- assignment/expression, `let`, return, block, `while`, `if`, `for`, inline
-  assembly, `break`, and `continue` statements are complete, including both
-  `for` item forms and item lists;
-- match cases, the repeated case loop, and optional `default` parsing are
-  complete, and the enclosing `match` parser has complete source, state,
-  strict-progress, and starting-token contracts; and
-- recognized-statement fallback preserves source validity and state across
-  primary success, fallback success, rejection, diagnostic reset, and
-  diagnostic re-emission. The complete eleven-branch statement dispatch is
-  assembled from those contracts; and
-- expression, pattern, and statement are closed in one simultaneous fuel
-  induction. Step-indexed canonical validity discharges its explicit closure
-  premise, yielding unconditional public contracts for expressions, patterns,
-  statements, and Core blocks.
+This result is assembled from the production parsers rather than assumed at
+the outer API. It covers recursive types, expressions, patterns, statements,
+Core blocks, inline Yul, all declaration forms, contract members, derive
+handling, recovery, and complete-file accumulation. The corresponding proofs
+also preserve the immutable token carrier, source ownership, cursor order, and
+valid UTF-8 spans.
 
-Contract-member dispatch, derive attachment, recovery, the complete contract
-body, the outer declaration, and top-level recovery now have canonical
-source/state contracts. Comment attachment preserves validity for every
-top-level branch, item list, and complete parsed file. All nine plain top-level
-declarations, the derive-aware item parser, the item loop, `sourceFile`,
-`parseLexed`, and public `parse` are therefore composed without an assumed
-declaration contract.
+Every successful public result has one complete provenance contract covering
+the parsed file, tokens, nested comments, lexical diagnostics, and parse
+diagnostics. All carriers refer to the same input file, and the parsed file
+retains its exact full-file span.
 
-Successful public output now has one unconditional contract covering the
-canonical parsed file plus every retained token, lexical-diagnostic, and
-parse-diagnostic span. Nesting diagnostics also have direct source provenance.
+The next proof slice is intentionally different from the completed totality
+work. It will define an independent declarative grammar for the canonical
+syntax and prove that a diagnostic-free parser result is derivable in that
+grammar. Recovered malformed output will receive a separate, explicit
+soundness statement so that recovery is not confused with language
+acceptance.
 
-Totality is being closed from the outside inward. The production bounds for
-top-level and contract-member recovery, malformed type-alias recovery, pragma
-accumulation, and generic comma-delimited lists are proved adequate. The
-complete contract body now exposes five member obligations: field, contract
-function, constructor, fallback, and enum. The file loop and public parser
-expose five declaration obligations: module function, enum, trait,
-implementation, and contract. Import, export, type alias, pragma, and the
-complete derive path are already discharged. The shared recursive type parser
-is invariant-free with proved production-fuel adequacy across every type form.
-
-Term totality now covers the complete expression precedence layer and the
-complete recovering pattern layer. Lambda parameters are unconditionally
-total; lambda atoms, postfix operations, unary operators, binary operators, and
-conditionals compose from explicit recursive expression and block contracts.
-Pattern totality lifts through the recursive fuel family and reaches the public
-parser under the matching expression-family premises.
-
-Statement totality covers assignment/expression fallback, `let`, `return`,
-`break`, `continue`, fuel-aware Core block iteration/isolation, and the
-braced, `while`, `if`, and `for` control forms. Both `for` item variants and
-their list loop have explicit contracts. Core `match` has complete helper,
-arm-list, optional-default, and validation proofs together with an
-ordinary-result theorem and a reusable branch contract for the whole parser.
-Core inline `assembly` is total on valid input and also exposes its branch
-contract.
-
-Inline-Yul valid-input totality is complete for the public expression,
-statement, and braced-body parsers. The proof includes switch, recovery, the
-recursive statement family, ordered choice, block iteration, and strict
-progress.
-
-The next proof step is the ordered Core `statementLayer` dispatch followed by
-the simultaneous expression, pattern, and statement fuel closure. After that,
-the five remaining declaration parsers and five contract-member parsers are
-discharged, then successful parsing is related to the declarative grammar.
-
-Executable coverage preceded deep grammar-specific proof regeneration. The
-proof work now targets the completed executable grammar while preserving the
-already completed, syntax-independent execution semantics.
+This frontend work remains separate from the completed syntax-independent
+execution semantics. Resolution, source typing, and elaboration will consume
+the canonical syntax result after the grammar boundary is coherent.
 
 ## Completion conditions
 
