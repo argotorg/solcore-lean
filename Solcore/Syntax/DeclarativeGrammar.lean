@@ -138,6 +138,51 @@ def PlainImportDeclParses
     PlainImportTailParses keywordSpan
       { input with cursor := input.cursor + 1 } declaration output
 
+/-- Grammar after `import` for `* as alias from ModulePath ;`. -/
+def NamespaceImportTailParses (startSpan : SourceSpan)
+    (input : Remainder) (declaration : Syntax.ImportDecl)
+    (output : Remainder) : Prop :=
+  ∃ starSpan asSpan alias fromSpan path afterPath semicolonSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := starSpan
+      value := .symbol .star
+    } ∧
+    TokenAt input.tokens input.endIndex (input.cursor + 1) {
+      span := asSpan
+      value := .keyword .asKw
+    } ∧
+    TokenAt input.tokens input.endIndex (input.cursor + 2) {
+      span := alias.span
+      value := .identifier alias.value
+    } ∧
+    TokenAt input.tokens input.endIndex (input.cursor + 3) {
+      span := fromSpan
+      value := .identifier ContextualKeyword.from.spelling
+    } ∧
+    ModulePathParses { input with cursor := input.cursor + 4 }
+      path afterPath ∧
+    TokenAt afterPath.tokens afterPath.endIndex afterPath.cursor {
+      span := semicolonSpan
+      value := .symbol .semicolon
+    } ∧
+    output = { afterPath with cursor := afterPath.cursor + 1 } ∧
+    declaration = {
+      span := SourceSpan.cover startSpan semicolonSpan
+      value := .namespace path alias
+    }
+
+/-- Independent recognition judgment for one complete namespace import. -/
+def NamespaceImportDeclParses
+    (input : Remainder) (declaration : Syntax.ImportDecl)
+    (output : Remainder) : Prop :=
+  ∃ keywordSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := keywordSpan
+      value := .keyword .importKw
+    } ∧
+    NamespaceImportTailParses keywordSpan
+      { input with cursor := input.cursor + 1 } declaration output
+
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
     (tokens : Array Token) (endIndex : Nat) :
