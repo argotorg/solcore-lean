@@ -29,6 +29,25 @@ def TokenKindAbsentAt (tokens : Array Token) (endIndex index : Nat)
     (kind : TokenKind) : Prop :=
   ¬ ∃ span, TokenAt tokens endIndex index { span, value := kind }
 
+/-- Consume one exact token while retaining the immutable active window. -/
+def ExactTokenParses (kind : TokenKind) (input : Remainder)
+    (span : SourceSpan) (output : Remainder) : Prop :=
+  TokenAt input.tokens input.endIndex input.cursor { span, value := kind } ∧
+    output = { input with cursor := input.cursor + 1 }
+
+/-- No requested contextual-word and following-symbol pair starts here. -/
+def ContextualSymbolPairAbsentAt (input : Remainder)
+    (keyword : ContextualKeyword) (symbol : Symbol) : Prop :=
+  ¬ ∃ keywordSpan symbolSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := keywordSpan
+      value := .identifier keyword.spelling
+    } ∧
+    TokenAt input.tokens input.endIndex (input.cursor + 1) {
+      span := symbolSpan
+      value := .symbol symbol
+    }
+
 /-- Exact grammar of one checked identifier occurrence. -/
 def IdentifierParses
     (input : Remainder) (name : Identifier) (output : Remainder) : Prop :=
@@ -439,6 +458,250 @@ inductive NoTrailingDelimitedListParses {α : Type}
         elementParses input values output) :
       NoTrailingDelimitedListParses opening closing elementParses input values
         output
+
+/-! Recursive grammar of canonical type-expression token shapes. -/
+
+/-
+Independent recursive grammar of every non-recovery type expression, together
+with its concrete recursive delimiter and optional-suffix support judgments.
+
+The concrete list judgments mirror `TrailingDelimitedListParses`.  They are
+mutual because Lean's positivity checker cannot nest this recursive grammar
+through the generic relation's parser parameter.
+-/
+mutual
+  inductive TypeExprParses :
+      Remainder → Syntax.TypeExpr → Remainder → Prop where
+    | function {input afterKeyword afterParameters output : Remainder}
+        {result : Syntax.TypeExpr}
+        {parameters : DelimitedList Syntax.TypeExpr}
+        {returns : Option (DelimitedList Syntax.TypeExpr)}
+        (keywordSpan : SourceSpan)
+        (keywordToken : ExactTokenParses (.keyword .functionKw)
+          input keywordSpan afterKeyword)
+        (resultEq : result = {
+          span := SourceSpan.cover keywordSpan (match returns with
+            | some values => values.span
+            | none => parameters.span)
+          value := .function keywordSpan parameters returns
+        })
+        (parametersParsed : TypeExprTrailingDelimitedListParses
+          .leftParen .rightParen afterKeyword parameters afterParameters)
+        (returnsParsed : OptionalFunctionTypeReturnsParses
+          afterParameters returns output) :
+        TypeExprParses input result output
+    | comptime {input afterMarker afterOpening afterInner output : Remainder}
+        {result : Syntax.TypeExpr}
+        {inner : Syntax.TypeExpr}
+        (markerSpan openingSpan closingSpan : SourceSpan)
+        (markerToken : ExactTokenParses
+          (.identifier ContextualKeyword.comptime.spelling)
+          input markerSpan afterMarker)
+        (openingToken : ExactTokenParses (.symbol .less)
+          afterMarker openingSpan afterOpening)
+        (closingToken : ExactTokenParses (.symbol .greater)
+          afterInner closingSpan output)
+        (resultEq : result = {
+          span := SourceSpan.cover markerSpan closingSpan
+          value := .comptime markerSpan
+            (SourceSpan.cover openingSpan closingSpan) inner
+        })
+        (innerParsed : TypeExprParses afterOpening inner afterInner) :
+        TypeExprParses input result output
+    | mapping
+        {input afterMarker afterOpening afterKey afterArrow afterValue output :
+          Remainder}
+        {result : Syntax.TypeExpr}
+        {key value : Syntax.TypeExpr}
+        (markerSpan openingSpan arrowSpan closingSpan : SourceSpan)
+        (markerToken : ExactTokenParses
+          (.identifier ContextualKeyword.mapping.spelling)
+          input markerSpan afterMarker)
+        (openingToken : ExactTokenParses (.symbol .leftParen)
+          afterMarker openingSpan afterOpening)
+        (arrowToken : ExactTokenParses (.symbol .fatArrow)
+          afterKey arrowSpan afterArrow)
+        (closingToken : ExactTokenParses (.symbol .rightParen)
+          afterValue closingSpan output)
+        (resultEq : result = {
+          span := SourceSpan.cover markerSpan closingSpan
+          value := .mapping markerSpan
+            (SourceSpan.cover openingSpan closingSpan) key value
+        })
+        (keyParsed : TypeExprParses afterOpening key afterKey)
+        (valueParsed : TypeExprParses afterArrow value afterValue) :
+        TypeExprParses input result output
+    | proxy {input afterMarker output : Remainder} {result inner : Syntax.TypeExpr}
+        (markerSpan : SourceSpan)
+        (markerToken : ExactTokenParses (.symbol .at)
+          input markerSpan afterMarker)
+        (resultEq : result = {
+          span := SourceSpan.cover markerSpan inner.span
+          value := .proxy markerSpan inner
+        })
+        (innerParsed : TypeExprParses afterMarker inner output) :
+        TypeExprParses input result output
+    | tuple {input output : Remainder}
+        {result : Syntax.TypeExpr}
+        {values : DelimitedList Syntax.TypeExpr}
+        (resultEq : result = {
+          span := values.span
+          value := .tuple values.elements
+        })
+        (valuesParsed : TypeExprTrailingDelimitedListParses
+          .leftParen .rightParen input values output) :
+        TypeExprParses input result output
+    | named {input afterName output : Remainder}
+        {result : Syntax.TypeExpr}
+        {name : Syntax.QualifiedName}
+        {arguments : Option (NonemptyDelimitedList Syntax.TypeExpr)}
+        (comptimeAbsent : ContextualSymbolPairAbsentAt
+          input .comptime .less)
+        (mappingAbsent : ContextualSymbolPairAbsentAt
+          input .mapping .leftParen)
+        (nameParsed : QualifiedNameParses input name afterName)
+        (resultEq : result = {
+          span := match arguments with
+            | some values => SourceSpan.cover name.span values.span
+            | none => name.span
+          value := .named name arguments
+        })
+        (argumentsParsed : OptionalNamedTypeArgumentsParses
+          afterName arguments output) :
+        TypeExprParses input result output
+
+  /-- Forward-order tail of a recursive type-expression delimiter list. -/
+  inductive TypeExprTrailingDelimitedTailParses :
+      Symbol → Remainder → List Syntax.TypeExpr → SourceSpan → Remainder →
+        Prop where
+    | close {closing : Symbol} {input : Remainder}
+        {closingSpan : SourceSpan}
+        (commaAbsent : TokenKindAbsentAt input.tokens input.endIndex
+          input.cursor (.symbol .comma))
+        (closingToken : TokenAt input.tokens input.endIndex input.cursor {
+          span := closingSpan
+          value := .symbol closing
+        }) :
+        TypeExprTrailingDelimitedTailParses closing input [] closingSpan
+          { input with cursor := input.cursor + 1 }
+    | trailing {closing : Symbol} {input : Remainder}
+        {commaSpan closingSpan : SourceSpan}
+        (commaToken : TokenAt input.tokens input.endIndex input.cursor {
+          span := commaSpan
+          value := .symbol .comma
+        })
+        (closingToken : TokenAt input.tokens input.endIndex
+          (input.cursor + 1) {
+            span := closingSpan
+            value := .symbol closing
+          }) :
+        TypeExprTrailingDelimitedTailParses closing input [] closingSpan
+          { input with cursor := input.cursor + 2 }
+    | next {closing : Symbol} {input afterElement output : Remainder}
+        {commaSpan closingSpan : SourceSpan} {element : Syntax.TypeExpr}
+        {elements values : List Syntax.TypeExpr}
+        (commaToken : TokenAt input.tokens input.endIndex input.cursor {
+          span := commaSpan
+          value := .symbol .comma
+        })
+        (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+          (input.cursor + 1) (.symbol closing))
+        (progress : input.cursor + 1 < afterElement.cursor)
+        (elementsEq : values = element :: elements)
+        (elementParsed : TypeExprParses
+          { input with cursor := input.cursor + 1 } element afterElement)
+        (tail : TypeExprTrailingDelimitedTailParses closing afterElement
+          elements closingSpan output) :
+        TypeExprTrailingDelimitedTailParses closing input
+          values closingSpan output
+
+  /-- Possibly empty recursive list with an optional trailing comma. -/
+  inductive TypeExprTrailingDelimitedListParses :
+      Symbol → Symbol → Remainder → DelimitedList Syntax.TypeExpr →
+        Remainder → Prop where
+    | empty {opening closing : Symbol} {input : Remainder}
+        {values : DelimitedList Syntax.TypeExpr}
+        (openingSpan closingSpan : SourceSpan)
+        (elementsEq : values.elements = [])
+        (spanEq : values.span = SourceSpan.cover openingSpan closingSpan)
+        (openingToken : TokenAt input.tokens input.endIndex input.cursor {
+          span := openingSpan
+          value := .symbol opening
+        })
+        (closingToken : TokenAt input.tokens input.endIndex
+          (input.cursor + 1) {
+            span := closingSpan
+            value := .symbol closing
+          }) :
+        TypeExprTrailingDelimitedListParses opening closing input values
+          { input with cursor := input.cursor + 2 }
+    | nonempty {opening closing : Symbol}
+        {input afterFirst output : Remainder}
+        {values : DelimitedList Syntax.TypeExpr}
+        {first : Syntax.TypeExpr} {rest : List Syntax.TypeExpr}
+        (openingSpan closingSpan : SourceSpan)
+        (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+          (input.cursor + 1) (.symbol closing))
+        (openingToken : TokenAt input.tokens input.endIndex input.cursor {
+          span := openingSpan
+          value := .symbol opening
+        })
+        (progress : input.cursor + 1 < afterFirst.cursor)
+        (tokensEq : output.tokens = input.tokens)
+        (endIndexEq : output.endIndex = input.endIndex)
+        (elementsEq : values.elements = first :: rest)
+        (spanEq : values.span = SourceSpan.cover openingSpan closingSpan)
+        (firstParsed : TypeExprParses
+          { input with cursor := input.cursor + 1 } first afterFirst)
+        (tail : TypeExprTrailingDelimitedTailParses closing afterFirst rest
+          closingSpan output) :
+        TypeExprTrailingDelimitedListParses opening closing input values output
+
+  /-- Optional, structurally nonempty generic arguments of a named type. -/
+  inductive OptionalNamedTypeArgumentsParses :
+      Remainder → Option (NonemptyDelimitedList Syntax.TypeExpr) →
+        Remainder → Prop where
+    | absent {input : Remainder}
+        (openingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+          input.cursor (.symbol .less)) :
+        OptionalNamedTypeArgumentsParses input none input
+    | present {input afterFirst output : Remainder}
+        {arguments : NonemptyDelimitedList Syntax.TypeExpr}
+        {first : Syntax.TypeExpr} {rest : List Syntax.TypeExpr}
+        (openingSpan closingSpan : SourceSpan)
+        (openingToken : TokenAt input.tokens input.endIndex input.cursor {
+          span := openingSpan
+          value := .symbol .less
+        })
+        (progress : input.cursor + 1 < afterFirst.cursor)
+        (tokensEq : output.tokens = input.tokens)
+        (endIndexEq : output.endIndex = input.endIndex)
+        (elementsEq : arguments.elements.toList = first :: rest)
+        (spanEq : arguments.span =
+          SourceSpan.cover openingSpan closingSpan)
+        (firstParsed : TypeExprParses
+          { input with cursor := input.cursor + 1 } first afterFirst)
+        (tail : TypeExprTrailingDelimitedTailParses .greater afterFirst rest
+          closingSpan output) :
+        OptionalNamedTypeArgumentsParses input (some arguments) output
+
+  /-- Optional `returns (...)` suffix of a function type. -/
+  inductive OptionalFunctionTypeReturnsParses :
+      Remainder → Option (DelimitedList Syntax.TypeExpr) → Remainder →
+        Prop where
+    | absent {input : Remainder}
+        (returnsAbsent : TokenKindAbsentAt input.tokens input.endIndex
+          input.cursor (.identifier ContextualKeyword.returns.spelling)) :
+        OptionalFunctionTypeReturnsParses input none input
+    | present {input afterMarker output : Remainder}
+        {values : DelimitedList Syntax.TypeExpr} (markerSpan : SourceSpan)
+        (markerToken : ExactTokenParses
+          (.identifier ContextualKeyword.returns.spelling)
+          input markerSpan afterMarker)
+        (valuesParsed : TypeExprTrailingDelimitedListParses
+          .leftParen .rightParen afterMarker values output) :
+        OptionalFunctionTypeReturnsParses input (some values) output
+end
 
 /-- Exact nonempty constructor-name list between parentheses. -/
 def ConstructorNamesParses
