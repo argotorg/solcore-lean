@@ -568,6 +568,162 @@ inductive ExportSelectionParses :
         value := .selected items
       } output
 
+/-- Exact semicolon and covering span that finish one export payload. -/
+def FinishExportParses (start : SourceSpan) (value : Syntax.ExportDeclValue)
+    (input : Remainder) (declaration : Syntax.ExportDecl)
+    (output : Remainder) : Prop :=
+  ∃ semicolonSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := semicolonSpan
+      value := .symbol .semicolon
+    } ∧
+    output = { input with cursor := input.cursor + 1 } ∧
+    declaration = {
+      span := SourceSpan.cover start semicolonSpan
+      value
+    }
+
+/-- Grammar after `export` for one braced list of local items. -/
+def LocalExportTailParses (start : SourceSpan)
+    (input : Remainder) (declaration : Syntax.ExportDecl)
+    (output : Remainder) : Prop :=
+  ∃ items afterItems,
+    TrailingDelimitedListParses .leftBrace .rightBrace LocalExportItemParses
+      input items afterItems ∧
+    FinishExportParses start (.local items) afterItems declaration output
+
+/-- Grammar after `export` for a path followed by a remote selection. -/
+def ItemsFromExportTailParses (start : SourceSpan)
+    (input : Remainder) (declaration : Syntax.ExportDecl)
+    (output : Remainder) : Prop :=
+  ∃ path afterPath dotSpan selection afterSelection,
+    ExportPathParses input path afterPath ∧
+    TokenAt afterPath.tokens afterPath.endIndex afterPath.cursor {
+      span := dotSpan
+      value := .symbol .dot
+    } ∧
+    ExportSelectionParses
+      { afterPath with cursor := afterPath.cursor + 1 }
+      selection afterSelection ∧
+    FinishExportParses start (.itemsFrom path selection) afterSelection
+      declaration output
+
+/-- Grammar after `export` for a path and `as` alias. -/
+def ModuleAsExportTailParses (start : SourceSpan)
+    (input : Remainder) (declaration : Syntax.ExportDecl)
+    (output : Remainder) : Prop :=
+  ∃ path afterPath asSpan alias afterAlias,
+    ExportPathParses input path afterPath ∧
+    TokenKindAbsentAt afterPath.tokens afterPath.endIndex afterPath.cursor
+      (.symbol .dot) ∧
+    TokenAt afterPath.tokens afterPath.endIndex afterPath.cursor {
+      span := asSpan
+      value := .keyword .asKw
+    } ∧
+    IdentifierParses { afterPath with cursor := afterPath.cursor + 1 }
+      alias afterAlias ∧
+    FinishExportParses start (.moduleAs path alias) afterAlias declaration
+      output
+
+/-- Grammar after `export` for a path with no selection or alias suffix. -/
+def ModuleExportTailParses (start : SourceSpan)
+    (input : Remainder) (declaration : Syntax.ExportDecl)
+    (output : Remainder) : Prop :=
+  ∃ path afterPath,
+    ExportPathParses input path afterPath ∧
+    TokenKindAbsentAt afterPath.tokens afterPath.endIndex afterPath.cursor
+      (.symbol .dot) ∧
+    TokenKindAbsentAt afterPath.tokens afterPath.endIndex afterPath.cursor
+      (.keyword .asKw) ∧
+    FinishExportParses start (.module path) afterPath declaration output
+
+/-- Parser-independent union of the three path-export suffix forms. -/
+inductive PathExportTailParses (start : SourceSpan) :
+    Remainder → Syntax.ExportDecl → Remainder → Prop where
+  | itemsFrom {input output : Remainder}
+      {declaration : Syntax.ExportDecl}
+      (parsed : ItemsFromExportTailParses start input declaration output) :
+      PathExportTailParses start input declaration output
+  | moduleAs {input output : Remainder}
+      {declaration : Syntax.ExportDecl}
+      (parsed : ModuleAsExportTailParses start input declaration output) :
+      PathExportTailParses start input declaration output
+  | module {input output : Remainder}
+      {declaration : Syntax.ExportDecl}
+      (parsed : ModuleExportTailParses start input declaration output) :
+      PathExportTailParses start input declaration output
+
+/-- Independent recognition judgment for one complete local export. -/
+def LocalExportDeclParses
+    (input : Remainder) (declaration : Syntax.ExportDecl)
+    (output : Remainder) : Prop :=
+  ∃ keywordSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := keywordSpan
+      value := .keyword .exportKw
+    } ∧
+    LocalExportTailParses keywordSpan
+      { input with cursor := input.cursor + 1 } declaration output
+
+/-- Independent recognition judgment for an items-from-module export. -/
+def ItemsFromExportDeclParses
+    (input : Remainder) (declaration : Syntax.ExportDecl)
+    (output : Remainder) : Prop :=
+  ∃ keywordSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := keywordSpan
+      value := .keyword .exportKw
+    } ∧
+    TokenKindAbsentAt input.tokens input.endIndex (input.cursor + 1)
+      (.symbol .leftBrace) ∧
+    ItemsFromExportTailParses keywordSpan
+      { input with cursor := input.cursor + 1 } declaration output
+
+/-- Independent recognition judgment for a module-alias export. -/
+def ModuleAsExportDeclParses
+    (input : Remainder) (declaration : Syntax.ExportDecl)
+    (output : Remainder) : Prop :=
+  ∃ keywordSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := keywordSpan
+      value := .keyword .exportKw
+    } ∧
+    TokenKindAbsentAt input.tokens input.endIndex (input.cursor + 1)
+      (.symbol .leftBrace) ∧
+    ModuleAsExportTailParses keywordSpan
+      { input with cursor := input.cursor + 1 } declaration output
+
+/-- Independent recognition judgment for a plain module export. -/
+def ModuleExportDeclParses
+    (input : Remainder) (declaration : Syntax.ExportDecl)
+    (output : Remainder) : Prop :=
+  ∃ keywordSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := keywordSpan
+      value := .keyword .exportKw
+    } ∧
+    TokenKindAbsentAt input.tokens input.endIndex (input.cursor + 1)
+      (.symbol .leftBrace) ∧
+    ModuleExportTailParses keywordSpan
+      { input with cursor := input.cursor + 1 } declaration output
+
+/-- Parser-independent union of the four complete canonical export forms. -/
+inductive ExportDeclParses :
+    Remainder → Syntax.ExportDecl → Remainder → Prop where
+  | ofLocal {input output : Remainder} {declaration : Syntax.ExportDecl}
+      (parsed : LocalExportDeclParses input declaration output) :
+      ExportDeclParses input declaration output
+  | ofModule {input output : Remainder} {declaration : Syntax.ExportDecl}
+      (parsed : ModuleExportDeclParses input declaration output) :
+      ExportDeclParses input declaration output
+  | ofModuleAs {input output : Remainder} {declaration : Syntax.ExportDecl}
+      (parsed : ModuleAsExportDeclParses input declaration output) :
+      ExportDeclParses input declaration output
+  | ofItemsFrom {input output : Remainder}
+      {declaration : Syntax.ExportDecl}
+      (parsed : ItemsFromExportDeclParses input declaration output) :
+      ExportDeclParses input declaration output
+
 /-- Exact optional alias following one selected import name. -/
 inductive SelectedAliasParses :
     Remainder → Option Identifier → Remainder → Prop where
