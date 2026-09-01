@@ -218,16 +218,22 @@ dotted qualified names, both local and `@`-prefixed external module paths, and
 identifier or parenthesized-operator selector names. Shared declarative rules
 and parser-soundness theorems now also cover nonempty comma-separated lists
 with an optional trailing comma, selected import names and aliases, nonempty
-selected-import lists, hiding clauses, and optional hiding dispatch.
+selected-import lists, hiding clauses, and optional hiding dispatch. Export
+coverage additionally includes nonempty lists without trailing commas,
+constructor selections, prioritized export names, possibly empty lists with
+optional trailing commas, local export items, and remote selections.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms: plain, namespace, wildcard with or without a
-hiding clause, and selective imports. A single parser-independent
-`ImportDeclParses` judgment combines them, and successful diagnostic-free
-`importDecl` parsing implies that judgment without a caller-supplied AST shape
-guard. The next slices extend the same boundary through exports, the remaining
-top-level forms, and complete files. Recovered malformed output remains
-separate so that recovery is not confused with language acceptance.
+hiding clause, and selective imports. Unconditional strict soundness also
+covers all four canonical export forms: local, module, module alias, and
+items-from-module. Parser-independent `ImportDeclParses` and `ExportDeclParses`
+judgments combine their respective forms without caller-supplied AST shape
+guards; export soundness needs no diagnostic-free premise because its
+terminator has no recovery branch. The next slices extend the same boundary
+through the remaining top-level forms and complete files. Recovered malformed
+output remains separate so that recovery is not confused with language
+acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
