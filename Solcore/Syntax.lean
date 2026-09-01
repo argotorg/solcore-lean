@@ -50,5 +50,6 @@ import Solcore.Syntax.Parser.TypeExprSoundnessProperties
 import Solcore.Syntax.Parser.WhereClauseSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportNoHidingSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportSoundnessProperties
+import Solcore.Syntax.Parser.YulBodyPublicSoundnessProperties
 
 /-! Public Lean boundary for the canonical Solcore source syntax. -/
