@@ -27,6 +27,20 @@ theorem tokenAt_of_peek?_eq_some {input : State} {token : Token}
   ⟨State.cursor_lt_endIndex_of_peek?_eq_some found,
     State.getElem?_eq_some_of_peek?_eq_some found⟩
 
+/-- A failed symbol lookahead excludes that symbol at the grammar cursor. -/
+theorem symbolAbsentAt_of_isSymbol_eq_false (value : Symbol)
+    {input : State} (absent : isSymbol input value = false) :
+    DeclarativeGrammar.TokenKindAbsentAt input.tokens
+      input.window.endIndex input.cursor (.symbol value) := by
+  rintro ⟨span, inside, found⟩
+  unfold isSymbol State.peekKind? State.peek? at absent
+  simp only [inside, ↓reduceIte, found, Option.map_some] at absent
+  change instBEqTokenKind.beq (.symbol value) (.symbol value) = false at absent
+  simp only [instBEqTokenKind.beq] at absent
+  change instBEqSymbol.beq value value = false at absent
+  unfold instBEqSymbol.beq at absent
+  cases value <;> contradiction
+
 private theorem acceptToken_ok_tokenAt_of_kind (kind : TokenKind)
     (expected : ParseExpectation) (context : ParseContext)
     (accepts : TokenKind → Bool)
