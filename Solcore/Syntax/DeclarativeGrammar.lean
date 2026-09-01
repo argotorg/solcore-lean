@@ -325,6 +325,36 @@ def NonemptyTrailingDelimitedListParses {α : Type}
     values.elements = first :: rest ∧
     values.span = SourceSpan.cover openingSpan closingSpan
 
+/--
+Independent grammar of a possibly empty comma-separated list with an optional
+final comma.  The nonempty branch records that the parser's preferred empty
+branch did not match immediately after the opening delimiter.
+-/
+inductive TrailingDelimitedListParses {α : Type}
+    (opening closing : Symbol)
+    (elementParses : Remainder → α → Remainder → Prop) :
+    Remainder → DelimitedList α → Remainder → Prop where
+  | empty {input : Remainder} (openingSpan closingSpan : SourceSpan)
+      (openingToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := openingSpan
+        value := .symbol opening
+      })
+      (closingToken : TokenAt input.tokens input.endIndex (input.cursor + 1) {
+        span := closingSpan
+        value := .symbol closing
+      }) :
+      TrailingDelimitedListParses opening closing elementParses input {
+        span := SourceSpan.cover openingSpan closingSpan
+        elements := []
+      } { input with cursor := input.cursor + 2 }
+  | nonempty {input output : Remainder} {values : DelimitedList α}
+      (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        (input.cursor + 1) (.symbol closing))
+      (parsed : NonemptyTrailingDelimitedListParses opening closing
+        elementParses input values output) :
+      TrailingDelimitedListParses opening closing elementParses input values
+        output
+
 /-- Forward-order tail grammar for a list that rejects a final comma. -/
 inductive NoTrailingDelimitedTailParses {α : Type}
     (closing : Symbol)
