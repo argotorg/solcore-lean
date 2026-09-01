@@ -419,6 +419,59 @@ inductive ConstructorSelectionParses :
         value := .named constructors
       } output
 
+/-- Maximal optional constructor selection following one exported name. -/
+inductive OptionalConstructorSelectionParses :
+    Remainder → Option Syntax.ConstructorSelection → Remainder → Prop where
+  | absent {input : Remainder}
+      (stopped : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .leftParen)) :
+      OptionalConstructorSelectionParses input none input
+  | present {input output : Remainder}
+      {selection : Syntax.ConstructorSelection}
+      (parsed : ConstructorSelectionParses input selection output) :
+      OptionalConstructorSelectionParses input (some selection) output
+
+/-- Independent grammar of one wildcard, operator, or identifier export name. -/
+inductive ExportNameParses :
+    Remainder → Syntax.ExportName → Remainder → Prop where
+  | wildcard {input : Remainder} (markerSpan : SourceSpan)
+      (markerToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := markerSpan
+        value := .symbol .star
+      }) :
+      ExportNameParses input {
+        span := markerSpan
+        value := .wildcard markerSpan
+      } { input with cursor := input.cursor + 1 }
+  | operator {input output : Remainder} {span : SourceSpan}
+      {spelling : String}
+      (starAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .star))
+      (parsed : OperatorSelectorParses input {
+        span
+        value := .operator spelling
+      } output) :
+      ExportNameParses input {
+        span
+        value := .operator { span, value := spelling }
+      } output
+  | identifier {input afterName output : Remainder}
+      {name : Identifier}
+      {constructors : Option Syntax.ConstructorSelection}
+      (starAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .star))
+      (leftParenAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .leftParen))
+      (nameParsed : IdentifierParses input name afterName)
+      (constructorsParsed : OptionalConstructorSelectionParses afterName
+        constructors output) :
+      ExportNameParses input {
+        span := match constructors with
+          | none => name.span
+          | some selection => SourceSpan.cover name.span selection.span
+        value := .identifier name constructors
+      } output
+
 /-- Exact optional alias following one selected import name. -/
 inductive SelectedAliasParses :
     Remainder → Option Identifier → Remainder → Prop where
