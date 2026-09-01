@@ -48,7 +48,8 @@ theorem attachEnumConstructors_validFor (file : SourceFile)
   induction constructors with
   | nil =>
       intro previous _constructorValid attached member
-      simp [attachEnumConstructors] at member
+      simp [attachEnumConstructors,
+        Solcore.Syntax.Trivia.Internals.attachEnumConstructors] at member
   | cons constructor rest inductionHypothesis =>
       intro previous constructorsValid attached member
       have constructorValid := constructorsValid constructor (by simp)
@@ -58,14 +59,17 @@ theorem attachEnumConstructors_validFor (file : SourceFile)
           retainedMember)
       cases previous with
       | none =>
-          simp only [attachEnumConstructors, List.mem_cons] at member
+          simp only [attachEnumConstructors,
+            Solcore.Syntax.Trivia.Internals.attachEnumConstructors,
+            List.mem_cons] at member
           rcases member with rfl | retainedMember
           · exact attachEnumConstructorComments_validFor file comments
               commentsValid _ constructor constructorValid
           · exact inductionHypothesis (some constructor.span) restValid
               attached retainedMember
       | some prior =>
-          simp only [attachEnumConstructors] at member
+          simp only [attachEnumConstructors,
+            Solcore.Syntax.Trivia.Internals.attachEnumConstructors] at member
           split at member
           · simp only [List.mem_cons] at member
             rcases member with rfl | retainedMember
