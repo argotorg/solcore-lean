@@ -307,6 +307,40 @@ def SelectedImportsParses
       elements := selection.elements.toList
     } output
 
+/-- Independent grammar of one nonempty braced selector-name list. -/
+def NonemptySelectorListParses
+    (input : Remainder) (names : NonemptyList Syntax.SelectorName)
+    (listSpan : SourceSpan) (output : Remainder) : Prop :=
+  NonemptyTrailingDelimitedListParses .leftBrace .rightBrace
+    SelectorNameParses input {
+      span := listSpan
+      elements := names.toList
+    } output
+
+/-- Exact grammar of one nonempty `hiding { ... }` clause. -/
+def HidingClauseParses
+    (input : Remainder) (clause : Syntax.HidingClause)
+    (output : Remainder) : Prop :=
+  ∃ markerSpan listSpan,
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := markerSpan
+      value := .identifier ContextualKeyword.hiding.spelling
+    } ∧
+    NonemptySelectorListParses { input with cursor := input.cursor + 1 }
+      clause.value.names listSpan output ∧
+    clause.span = SourceSpan.cover markerSpan listSpan
+
+/-- Maximal optional grammar for a trailing hiding clause. -/
+inductive OptionalHidingParses :
+    Remainder → Option Syntax.HidingClause → Remainder → Prop where
+  | absent {input : Remainder}
+      (stopped : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.identifier ContextualKeyword.hiding.spelling)) :
+      OptionalHidingParses input none input
+  | present {input output : Remainder} {clause : Syntax.HidingClause}
+      (parsed : HidingClauseParses input clause output) :
+      OptionalHidingParses input (some clause) output
+
 /-! Plain imports remain a separate judgment as other import forms are added. -/
 
 /-- Grammar of the module path and semicolon following `import`. -/

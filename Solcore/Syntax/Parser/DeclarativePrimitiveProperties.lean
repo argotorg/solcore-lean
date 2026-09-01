@@ -55,6 +55,21 @@ theorem keywordAbsentAt_of_isKeyword_eq_false (value : HardKeyword)
   unfold instBEqHardKeyword.beq at absent
   cases value <;> contradiction
 
+/-- Failed contextual lookahead excludes its identifier spelling. -/
+theorem contextualAbsentAt_of_isContextual_eq_false
+    (value : ContextualKeyword) {input : State}
+    (absent : isContextual input value = false) :
+    DeclarativeGrammar.TokenKindAbsentAt input.tokens
+      input.window.endIndex input.cursor (.identifier value.spelling) := by
+  rintro ⟨span, inside, found⟩
+  unfold isContextual State.peekKind? State.peek? at absent
+  simp only [inside, ↓reduceIte, found, Option.map_some,
+    TokenKind.isContextual] at absent
+  have same : (value.spelling == value.spelling) = true :=
+    beq_iff_eq.mpr rfl
+  rw [same] at absent
+  contradiction
+
 private theorem acceptToken_ok_tokenAt_of_kind (kind : TokenKind)
     (expected : ParseExpectation) (context : ParseContext)
     (accepts : TokenKind → Bool)
