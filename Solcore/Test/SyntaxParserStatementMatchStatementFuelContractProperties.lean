@@ -1,0 +1,12 @@
+import Solcore.Syntax.Parser.Statement.MatchStatementFuelContractProperties
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SyntaxParserStatementMatchStatementFuelContractProperties
+
+open Solcore.Syntax.Parser
+
+example := @matchStatement_ne_invariant_of_fuels
+example := @matchStatement_fuelTotalityContract
+
+end Solcore.Test.SyntaxParserStatementMatchStatementFuelContractProperties
