@@ -102,16 +102,17 @@ diagnostics. All carriers refer to the same input file, and the parsed file
 retains its exact full-file span.
 
 The independent declarative grammar now covers pragma declarations, maximal
-dotted qualified names, and local and `@`-prefixed external module paths.
-It also covers diagnostic-free strict imports in their plain and namespace
-forms, plus wildcard imports that have no hiding clause. Successful parsing of
-these forms implies both derivability in that parser-independent token grammar
-and the existing source-validity contract.
+dotted qualified names, local and `@`-prefixed external module paths, and
+identifier or parenthesized-operator selector names. It also covers
+diagnostic-free strict imports in their plain and namespace forms, plus
+wildcard imports that have no hiding clause. Successful parsing of these forms
+implies both derivability in that parser-independent token grammar and the
+existing source-validity contract.
 
-Selector grammar is next, followed by hiding clauses and the remaining import
-forms. The same result will then be extended toward complete diagnostic-free
-files. Recovered malformed output remains separate so that recovery is not
-confused with language acceptance.
+The shared nonempty braced-list grammar is next, followed by hiding clauses and
+the remaining import forms. The same result will then be extended toward
+complete diagnostic-free files. Recovered malformed output remains separate
+so that recovery is not confused with language acceptance.
 
 This frontend work remains separate from the completed syntax-independent
 execution semantics. Resolution, source typing, and elaboration will consume
