@@ -215,14 +215,15 @@ cover recovered output as well as diagnostic-free output.
 
 An independent declarative grammar now covers pragma declarations, maximal
 dotted qualified names, and both local and `@`-prefixed external module paths.
-Every successful production parse for those forms is proved to follow that
-grammar while also satisfying the existing source-provenance contract. This is
-the first soundness slice, not yet a whole-file grammar theorem.
+It also covers diagnostic-free strict imports in their plain and namespace
+forms, plus wildcard imports that have no hiding clause. Successful parsing of
+these forms is connected to that grammar while retaining the existing
+source-provenance contract. This is not yet a whole-file grammar theorem.
 
-The next slice starts with diagnostic-free strict plain imports, then extends
-the same boundary through the remaining productions and complete files.
-Recovered malformed output remains separate so that recovery is not confused
-with language acceptance.
+The next slices add selector grammar, hiding clauses, and the remaining import
+forms before extending the result to complete files. Recovered malformed
+output remains separate so that recovery is not confused with language
+acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
