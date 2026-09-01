@@ -15,6 +15,7 @@ import Solcore.Syntax.Parser.Properties
 import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportsSoundnessProperties
+import Solcore.Syntax.Parser.SelectiveImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectorNameSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportNoHidingSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportSoundnessProperties
