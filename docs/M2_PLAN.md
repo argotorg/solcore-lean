@@ -225,9 +225,14 @@ constructor/call fallbacks and public Yul assignment. The public Yul
 expression, statement, and braced-body parsers have complete fuel-indexed
 clean/ordinary/reject closures, including recovery, transactional rewind,
 exact dispatcher priority, optional termination, and block-boundary rejection.
-The remaining step is to close the mutually recursive Core expression,
-pattern, statement, and block relations, then instantiate the completed
-parametric file grammar with those concrete relations.
+The mutually recursive Core expression, pattern, statement, and block parsers
+now likewise have fuel-indexed ordinary/reject closures, public production-fuel
+specializations, deterministic outcomes, and backward diagnostic reflection.
+The concrete `CoreSourceFileOrdinaryParses` grammar instantiates the completed
+parametric file theorem with public Core expressions and isolated `.allow` and
+`.require` bodies. Thus every diagnostic-free complete-file success has a
+concrete parser-independent ordinary derivation, while the ordinary component
+relations remain reusable for recovered parser outcomes.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
@@ -258,9 +263,9 @@ The canonical syntax slice is complete when:
 - lexical and parse diagnostics are deterministic and source-located;
 - all retained token, comment, and AST spans use valid UTF-8 byte boundaries;
 - ordinary malformed input produces total diagnostic output;
-- every diagnostic-free complete-file result is proved derivable in the
-  parametric independent grammar, and concrete mutually recursive Core term,
-  block, and inline-Yul relations instantiate that grammar;
+- every diagnostic-free complete-file result is proved derivable in both the
+  parametric independent grammar and its concrete mutually recursive Core
+  term, block, and inline-Yul ordinary specialization;
 - the canonical frontend is the only current syntax described by public
   documentation; and
 - the complete build, tests, metadata validation, and kernel audit pass.

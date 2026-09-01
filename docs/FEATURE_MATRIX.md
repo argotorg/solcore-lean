@@ -43,12 +43,12 @@ published through Oracle v4.
 | Token and parsed AST catalog | Complete executable representation | Contextual well-formedness layer | High |
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
-| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, internal lexer/parser invariant errors are unreachable, and diagnostic-free output has parametric complete-file grammar soundness | Close the mutual Core grammar recursion and instantiate the file boundary | High |
-| Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, backward diagnostic reflection through declarations and the complete file loop, and concrete fuel-indexed public Yul expression/statement/body outcomes | Close the mutually recursive Core relations | High |
-| Declarative grammar and parser soundness | Active; complete for declarations and complete files as before, plus raw/balanced/isolated Core blocks, the full clean Core expression layer, the ordered public Core pattern and statement dispatchers, exact Yul blocks and statement forms, concrete transactional rejection witnesses, and the fuel-indexed public Yul expression/statement/body specialization | Close the mutually recursive Core specialization; exact negative priority for grouped-predicate fallback still requires completeness | High |
-| Declaration, type, and Yul parser proofs | Complete source/state, totality, and concrete clean/ordinary/reject soundness boundaries for every public Yul expression, statement, and braced body parser, including the assignment fallback | Complete the recursive Core specialization | High |
-| Core expression parser proofs | Complete source/state and totality contracts plus exact parser-independent soundness for atoms, lambda, postfix, unary, binary, conditional, block interaction, and the diagnostic-free public layer | Fuel-indexed mutual specialization and public registration | High |
-| Pattern and statement parser proofs | Complete executable contracts; exact ordered clean pattern soundness and the exact clean aggregate Core statement dispatcher are established across `let`, `return`, assignment, `for`, `match`, assembly, block, `while`, `if`, `break`, and `continue`; ordinary Core assignment outcomes are concrete | Close the concrete mutual recursion | High |
+| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, internal lexer/parser invariant errors are unreachable, and diagnostic-free output derives the concrete Core complete-file grammar | Exact negative priority for grouped-predicate fallback remains a component-level strengthening | High |
+| Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, backward diagnostic reflection through declarations and the complete file loop, and concrete fuel-indexed public Core and Yul outcomes | None at the current foundation boundary | High |
+| Declarative grammar and parser soundness | Active; complete for declarations and complete files, mutually recursive public Core expressions/patterns/statements/blocks, exact Yul blocks and statement forms, transactional rejection witnesses, and concrete complete-file Core specialization | Exact negative priority for grouped-predicate fallback still requires grouped-grammar completeness | High |
+| Declaration, type, and Yul parser proofs | Complete source/state, totality, and concrete clean/ordinary/reject soundness boundaries for recursive types and every public Yul expression, statement, and braced body parser, including the assignment fallback | None at this boundary | High |
+| Core expression parser proofs | Complete source/state, totality, fuel-indexed ordinary/reject outcome soundness, diagnostic reflection, and public parser-independent registration across atoms, lambda, postfix, unary, binary, conditional, and block interaction | None at the current outcome boundary | High |
+| Pattern and statement parser proofs | Complete executable contracts plus fuel-indexed ordinary/reject outcomes and public registration for the mutually recursive pattern and statement parsers, covering `let`, `return`, assignment, `for`, `match`, assembly, block, `while`, `if`, `break`, and `continue` in exact dispatcher order | None at the current outcome boundary | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
@@ -102,9 +102,10 @@ optional `default`, nonempty implementation heads, member and method order,
 brace priority, strict progress, outer spans, and remainders are preserved.
 Exact plain and derive-aware top-item soundness feeds a complete-file judgment
 with source-order comment attachment, full-window consumption, and recovery
-exclusion. These theorem families are publicly registered; concrete
-specialization now waits on the remaining Yul statement relations and their
-composition with the fuel-indexed mutual Core closure.
+exclusion. These theorem families are publicly registered. The fuel-indexed
+mutual Core closure and public Yul outcomes now instantiate that judgment as
+`CoreSourceFileOrdinaryParses`, with concrete public expression and isolated
+body relations for both block-tail policies.
 
 ## Semantic Core v3 feature inventory
 

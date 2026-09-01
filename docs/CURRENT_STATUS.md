@@ -347,21 +347,35 @@ Parser-independent judgments now cover raw, balanced, isolated, and canonical
 Core blocks; the complete Core expression layer; the ordered public Core
 pattern layer; Core `let`, `return`, assignment, `for`, `match`, assembly,
 block, `while`, `if`, `break`, and `continue` statements, and their complete
-ordered dispatcher. Inline-Yul coverage now includes name sequences, the
-public expression layer, exact braced blocks, `let`, assignment, expression
-and source-level `return(...)` statements, `if`, `for`, `switch`, function
-definitions, keyword controls, optional semicolons, the complete ordered
-dispatcher, and the diagnostic-free recovery boundary. Transactional
-constructor, call-argument, and Yul-assignment fallbacks now carry concrete
-parser-independent rejection witnesses whose disjointness laws preserve parser
-priority. The public recursive Yul expression, statement, and braced-body
-parsers are closed by fuel-indexed clean/ordinary/reject outcome families.
-They include expression and statement recovery, diagnosed names and meta
-tokens, call-argument and recognized-statement rewind, exact statement
-priority, optional semicolons, block boundaries, and the concrete public
-assignment fallback. The remaining work is to close the mutually recursive
-Core expression, pattern, statement, and block relations, then instantiate the
-abstract file boundary with those concrete relations.
+ordered dispatcher. Their mutually recursive executable expression, pattern,
+statement, and block parsers are now closed by fuel-indexed ordinary/reject
+outcome families. The public fuel bounds are explicit: expressions and
+patterns use the active-window remainder plus one, statements use it plus two,
+and blocks use the fixed statement fuel of the remainder plus one. Public
+success and rejection soundness, deterministic outcome specifications, and
+diagnostic reflection are registered for all four entry points.
+
+Inline-Yul coverage includes name sequences, the public expression layer,
+exact braced blocks, `let`, assignment, expression and source-level
+`return(...)` statements, `if`, `for`, `switch`, function definitions,
+keyword controls, optional semicolons, the complete ordered dispatcher, and
+the diagnostic-free recovery boundary. Transactional constructor,
+call-argument, and Yul-assignment fallbacks carry concrete parser-independent
+rejection witnesses whose disjointness laws preserve parser priority. The
+public recursive Yul expression, statement, and braced-body parsers are closed
+by fuel-indexed clean/ordinary/reject outcome families, including recovery,
+transactional rewind, exact statement priority, optional semicolons, and block
+boundaries.
+
+`CoreTopItemOrdinaryParses` now supplies the public Core expression relation
+and the isolated `.allow` and `.require` block relations to the abstract
+top-item grammar. `CoreSourceFileOrdinaryParses` lifts that specialization
+through exact item order, complete-window consumption, and comment attachment.
+Every diagnostic-free successful `sourceFile` parse derives this concrete
+grammar; with valid inputs it also composes with complete parsed-file source
+validity. The component relations deliberately remain recovery-aware ordinary
+over-approximations, while the outer diagnostic-free premise excludes actual
+recovery successes at the complete-file boundary.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
@@ -376,10 +390,11 @@ diagnostic-free premise. These declaration judgments now feed the exact
 `PlainTopItemParses` and derive-aware `TopItemParses` correspondences. The
 complete file-loop and `sourceFile` theorems preserve forward item order,
 strict cursor progress, end-of-window termination, exact comment attachment,
-and recovery exclusion by diagnostic commitment. They remain parameterized
-only by the expression and block relations used inside functions and
-contracts. Recovered malformed output remains separate so that recovery is
-not confused with language acceptance.
+and recovery exclusion by diagnostic commitment. The generic theorem remains
+reusable with abstract expression and block relations, and its concrete Core
+ordinary specialization is now public and compile-time consumed. Recovered
+malformed output remains separate so that recovery is not confused with
+language acceptance.
 
 Resolution, source type checking, and elaboration into checked Semantic Core
 are separate later stages. No new frontend result is published through Oracle
