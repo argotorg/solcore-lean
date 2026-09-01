@@ -747,6 +747,105 @@ inductive TypeAliasDeclParses :
         }
       } output
 
+/-! Grammar shared by canonical declarations with generic parameters. -/
+
+/-- Exact nonempty, trailing-comma generic parameter list. -/
+def GenericParametersParses
+    (input : Remainder) (parameters : Syntax.GenericParameters)
+    (output : Remainder) : Prop :=
+  NonemptyTrailingDelimitedListParses .less .greater IdentifierParses input {
+    span := parameters.span
+    elements := parameters.elements.toList
+  } output
+
+/-- Prioritized optional generic parameters selected by a leading `<`. -/
+inductive OptionalGenericParametersParses :
+    Remainder → Option Syntax.GenericParameters → Remainder → Prop where
+  | absent {input : Remainder}
+      (openingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .less)) :
+      OptionalGenericParametersParses input none input
+  | present {input output : Remainder}
+      {parameters : Syntax.GenericParameters}
+      (parsed : GenericParametersParses input parameters output) :
+      OptionalGenericParametersParses input (some parameters) output
+
+/-! Grammar of canonical algebraic enum declarations. -/
+
+/-- Prioritized optional constructor payload with no trailing comma. -/
+inductive OptionalEnumConstructorFieldsParses :
+    Remainder → Option (DelimitedList Syntax.TypeExpr) → Remainder →
+      Prop where
+  | absent {input : Remainder}
+      (openingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .leftParen)) :
+      OptionalEnumConstructorFieldsParses input none input
+  | present {input output : Remainder}
+      {fields : DelimitedList Syntax.TypeExpr}
+      (parsed : NoTrailingDelimitedListParses .leftParen .rightParen
+        TypeExprParses input fields output) :
+      OptionalEnumConstructorFieldsParses input (some fields) output
+
+/-- Exact enum constructor name, optional payload, span, and empty trivia. -/
+inductive EnumConstructorParses :
+    Remainder → Syntax.EnumConstructor → Remainder → Prop where
+  | parsed {input afterName output : Remainder}
+      {name : Identifier}
+      {fields : Option (DelimitedList Syntax.TypeExpr)}
+      (nameParsed : IdentifierParses input name afterName)
+      (fieldsParsed : OptionalEnumConstructorFieldsParses
+        afterName fields output) :
+      EnumConstructorParses input {
+        span := SourceSpan.cover name.span
+          (fields.map (fun values => values.span) |>.getD name.span)
+        value := {
+          leadingComments := []
+          name
+          fields
+        }
+      } output
+
+/-- Possibly empty, trailing-comma enum body between braces. -/
+def EnumBodyParses
+    (input : Remainder) (bodySpan : SourceSpan)
+    (constructors : List Syntax.EnumConstructor) (output : Remainder) : Prop :=
+  TrailingDelimitedListParses .leftBrace .rightBrace EnumConstructorParses
+    input { span := bodySpan, elements := constructors } output
+
+/--
+Exact enum declaration after an already supplied optional derive attribute.
+The active remainder begins at the contextual `enum` marker; a supplied derive
+attribute contributes only the retained outer start and AST field.
+-/
+inductive EnumDeclParses (deriveAttribute : Option Syntax.DeriveAttribute) :
+    Remainder → Syntax.EnumDecl → Remainder → Prop where
+  | parsed {input afterMarker afterName afterParameters output : Remainder}
+      {name : Identifier}
+      {parameters : Option Syntax.GenericParameters}
+      {bodySpan : SourceSpan}
+      {constructors : List Syntax.EnumConstructor}
+      (markerSpan : SourceSpan)
+      (markerToken : ExactTokenParses
+        (.identifier ContextualKeyword.enum.spelling)
+        input markerSpan afterMarker)
+      (nameParsed : IdentifierParses afterMarker name afterName)
+      (parametersParsed : OptionalGenericParametersParses
+        afterName parameters afterParameters)
+      (bodyParsed : EnumBodyParses afterParameters bodySpan constructors
+        output) :
+      EnumDeclParses deriveAttribute input {
+        span := SourceSpan.cover
+          (deriveAttribute.map (fun derive => derive.span) |>.getD markerSpan)
+          bodySpan
+        value := {
+          deriveAttribute
+          name
+          parameters
+          bodySpan
+          constructors
+        }
+      } output
+
 /-- Exact nonempty constructor-name list between parentheses. -/
 def ConstructorNamesParses
     (input : Remainder) (constructors : NonemptyList Identifier)
