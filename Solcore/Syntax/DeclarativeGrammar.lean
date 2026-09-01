@@ -186,6 +186,82 @@ inductive SelectorNameParses :
       (parsed : OperatorSelectorParses input selector output) :
       SelectorNameParses input selector output
 
+/-! Generic nonempty delimiter grammar used by hiding and selection lists. -/
+
+/--
+Forward-order grammar after one delimited element has been recognized.
+
+The absence premises retain the executable parser's branch priority: a comma
+is handled before a closing symbol, and a closing symbol immediately following
+a comma is handled as the optional trailing comma rather than as an element.
+-/
+inductive TrailingDelimitedTailParses {α : Type}
+    (closing : Symbol)
+    (elementParses : Remainder → α → Remainder → Prop) :
+    Remainder → List α → SourceSpan → Remainder → Prop where
+  | close {input : Remainder} {closingSpan : SourceSpan}
+      (commaAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        input.cursor (.symbol .comma))
+      (closingToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := closingSpan
+        value := .symbol closing
+      }) :
+      TrailingDelimitedTailParses closing elementParses input [] closingSpan
+        { input with cursor := input.cursor + 1 }
+  | trailing {input : Remainder} {commaSpan closingSpan : SourceSpan}
+      (commaToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := commaSpan
+        value := .symbol .comma
+      })
+      (closingToken : TokenAt input.tokens input.endIndex
+        (input.cursor + 1) {
+          span := closingSpan
+          value := .symbol closing
+        }) :
+      TrailingDelimitedTailParses closing elementParses input [] closingSpan
+        { input with cursor := input.cursor + 2 }
+  | next {input afterElement output : Remainder}
+      {commaSpan closingSpan : SourceSpan} {element : α}
+      {elements : List α}
+      (commaToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := commaSpan
+        value := .symbol .comma
+      })
+      (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex
+        (input.cursor + 1) (.symbol closing))
+      (elementParsed : elementParses
+        { input with cursor := input.cursor + 1 } element afterElement)
+      (progress : input.cursor + 1 < afterElement.cursor)
+      (tail : TrailingDelimitedTailParses closing elementParses afterElement
+        elements closingSpan output) :
+      TrailingDelimitedTailParses closing elementParses input
+        (element :: elements) closingSpan output
+
+/--
+Independent grammar of a nonempty comma-separated list with an optional final
+comma.  Delimiter and element ranges remain in source order, while the output
+retains the input token carrier and active-window end.
+-/
+def NonemptyTrailingDelimitedListParses {α : Type}
+    (opening closing : Symbol)
+    (elementParses : Remainder → α → Remainder → Prop)
+    (input : Remainder) (values : DelimitedList α)
+    (output : Remainder) : Prop :=
+  ∃ openingSpan first afterFirst rest closingSpan,
+    output.tokens = input.tokens ∧
+    output.endIndex = input.endIndex ∧
+    TokenAt input.tokens input.endIndex input.cursor {
+      span := openingSpan
+      value := .symbol opening
+    } ∧
+    elementParses { input with cursor := input.cursor + 1 }
+      first afterFirst ∧
+    input.cursor + 1 < afterFirst.cursor ∧
+    TrailingDelimitedTailParses closing elementParses afterFirst rest
+      closingSpan output ∧
+    values.elements = first :: rest ∧
+    values.span = SourceSpan.cover openingSpan closingSpan
+
 /-! Plain imports remain a separate judgment as other import forms are added. -/
 
 /-- Grammar of the module path and semicolon following `import`. -/
