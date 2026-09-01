@@ -73,6 +73,41 @@ def QualifiedNameParses
       (finalIdentifier name.value.components.head
         name.value.components.tail).span
 
+/--
+Independent recognition judgment for one module path.
+
+A local path is exactly a qualified name.  An external-package path starts
+with `@` and then parses the same qualified-name grammar from the following
+token.  The retained marker, components, and covering span are fixed by the
+recognized tokens.
+-/
+inductive ModulePathParses : Remainder → Syntax.ModulePath → Remainder → Prop
+    where
+  | local {input output : Remainder} {name : Syntax.QualifiedName}
+      (nameParses : QualifiedNameParses input name output) :
+      ModulePathParses input {
+        span := name.span
+        value := {
+          externalMarker := none
+          components := name.value.components
+        }
+      } output
+  | externalPackage {input output : Remainder} {name : Syntax.QualifiedName}
+      (markerSpan : SourceSpan)
+      (markerToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := markerSpan
+        value := .symbol .at
+      })
+      (nameParses : QualifiedNameParses
+        { input with cursor := input.cursor + 1 } name output) :
+      ModulePathParses input {
+        span := SourceSpan.cover markerSpan name.span
+        value := {
+          externalMarker := some markerSpan
+          components := name.value.components
+        }
+      } output
+
 /-- Token grammar after the first pragma argument has been consumed. -/
 inductive PragmaItemsTailParses
     (tokens : Array Token) (endIndex : Nat) :
