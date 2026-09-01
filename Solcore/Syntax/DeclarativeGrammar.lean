@@ -1056,6 +1056,31 @@ inductive FunctionSignatureParses
         whereClause
       } output
 
+/-! Grammar of ordinary function declarations over an abstract block grammar. -/
+
+/--
+Exact signature-to-body grammar of an ordinary function declaration.
+
+The body relation is deliberately abstract so this declaration grammar can be
+composed with a parser-independent block grammar without referring to the
+executable statement parser or its fuel.  The modifier policy is shared with
+`FunctionSignatureParses` and therefore remains exact for the declaration's
+syntactic location.
+-/
+inductive FunctionDeclParses
+    (bodyParses : Remainder → Syntax.Block → Remainder → Prop)
+    (modifiersAllowed : Syntax.FunctionModifiers → Prop) :
+    Remainder → Syntax.FunctionDecl → Remainder → Prop where
+  | parsed {input afterSignature output : Remainder}
+      {signature : Syntax.FunctionSignature} {body : Syntax.Block}
+      (signatureParsed : FunctionSignatureParses modifiersAllowed
+        input signature afterSignature)
+      (bodyParsed : bodyParses afterSignature body output) :
+      FunctionDeclParses bodyParses modifiersAllowed input {
+        span := SourceSpan.cover signature.span body.span
+        value := { signature, body }
+      } output
+
 /-! Grammar of canonical signature-only trait declarations. -/
 
 /-- Exact module-policy signature followed by a trait-method semicolon. -/
