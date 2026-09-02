@@ -524,7 +524,8 @@ prioritize dot plus selection, absent-dot `as` plus checked alias, and finally
 the bare module form; every branch ends at the same exact semicolon boundary.
 The aggregate consumes exact `export`, dispatches on a nonconsuming `{` guard,
 and retains exact AST, covering span, carrier, window, cursor, and first
-rejection. All endpoints are deterministic and success/rejection exclusive.
+rejection. Successful endpoints are deterministic and success/rejection
+exclusive.
 The declarative and parser outcome packages are exported publicly and checked
 by dedicated and public-boundary consumers; broader top-item rejection remains
 a separate boundary.
