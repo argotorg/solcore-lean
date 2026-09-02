@@ -542,6 +542,17 @@ declaration successful remainders are deterministic, and success is disjoint
 from rejection. The public packages are compile-time consumed; no broader
 top-item or file rejection package is claimed.
 
+Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
+its prioritized six-way dispatcher. Identifier-plus-colon field lookahead runs
+first, followed by `function`, `constructor`, `fallback`, `type`, and contextual
+`enum`; a selected branch never falls through after rejection. Success retains
+the wrapped member AST, declaration span, empty leading comments, carrier,
+window, cursor, and final remainder. Rejection records the selected leaf or an
+exact nonconsuming unrecognized-member case. Successful remainders are
+deterministic and success is disjoint from rejection. Existing strict member
+soundness remains available; no derive-aware member, contract-body, top-item,
+or file broad rejection is claimed.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

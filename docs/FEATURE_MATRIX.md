@@ -255,6 +255,17 @@ item-list, and declaration successful remainders are deterministic, and
 success is disjoint from rejection. Public packages are compile-time consumed;
 no broad top-item or file rejection is claimed.
 
+Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
+field, function, constructor, fallback, type-alias, and contextual-enum
+dispatch in executable priority order. Identifier-plus-colon field lookahead
+wins, including for `enum:`, and a selected rejecting branch never falls
+through. Success retains its wrapped AST, declaration span, empty leading
+comments, carrier, window, cursor, and final remainder. Rejection records the
+selected leaf or an exact nonconsuming unrecognized-member case. Successful
+remainders are deterministic and success is disjoint from rejection. Existing
+strict member soundness remains available; derive-aware members, contract
+bodies, top items, and files are not claimed here.
+
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
 optional `default`, nonempty implementation heads, member and method order,
