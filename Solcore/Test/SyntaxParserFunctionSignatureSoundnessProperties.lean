@@ -1,6 +1,7 @@
+import Solcore.Syntax.Parser.FunctionSignatureOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionSignatureSoundnessProperties
 
-/-! External consumers for complete function-signature soundness. -/
+/-! External consumers for strict and broad function-signature outcomes. -/
 
 set_option autoImplicit false
 
@@ -16,6 +17,9 @@ example := @ModuleFunctionModifiersAllowed
 example := @ContractFunctionModifiersAllowed
 example := @functionSignatureEnd
 example := @FunctionSignatureParses
+example := @FunctionSignatureOrdinaryParses
+example := @FunctionSignatureRejects
+example := @functionSignatureDeterministicOutcomeSpec
 
 example := @optionalFunctionModifier_success_sound
 example := @optionalFunctionModifier_success_sound_and_validFor
@@ -40,6 +44,10 @@ example := @functionSignature_success_sound
 example := @functionSignature_success_sound_and_validFor
 example := @functionSignature_module_success_sound
 example := @functionSignature_contract_success_sound
+example := @functionSignature_success_ordinaryOutcome_sound
+example := @functionSignature_reject_ordinaryOutcome_sound
+example := @functionSignature_ordinaryOutcome_sound
+example := @functionSignature_ordinaryOutcomeSpec
 
 example {input next : State} {signature : FunctionSignature}
     (inputValid : input.ValidFor) (diagnosticFree : next.diagnosticsRev = [])
@@ -58,5 +66,17 @@ example {input next : State} {signature : FunctionSignature}
       FunctionSignature.ValidFor input.file signature :=
   functionSignature_success_sound_and_validFor .contract inputValid
     diagnosticFree result
+
+example {input next : State} {signature : FunctionSignature}
+    (result : functionSignature .module input = .ok signature next) :
+    FunctionSignatureOrdinaryParses input.declarativeRemainder signature
+      next.declarativeRemainder :=
+  functionSignature_success_ordinaryOutcome_sound .module result
+
+example {input rejected : State} {failure : Failure}
+    (result : functionSignature .contract input = .reject failure rejected) :
+    FunctionSignatureRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  functionSignature_reject_ordinaryOutcome_sound .contract result
 
 end Solcore.Test.SyntaxParserFunctionSignatureSoundnessProperties
