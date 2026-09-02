@@ -106,8 +106,9 @@ exclusion. These theorem families are publicly registered. The fuel-indexed
 mutual Core closure and public Yul outcomes now instantiate that judgment as
 `CoreSourceFileOrdinaryParses`, with concrete public expression and isolated
 body relations for both block-tail policies.
-`CoreSourceFileOrdinaryParsesFromStart` exposes the root-window judgment while
-hiding its final remainder. Diagnostic-free successful `parseLexed` and
+`CoreSourceFileOrdinaryParsesFromStart` fixes both the root window and the
+canonical terminal remainder, with the same carrier and `endIndex` and a final
+cursor equal to the token count. Diagnostic-free successful `parseLexed` and
 `parse` results derive it over their exact public carriers and pair it with
 canonical parsed-file validity; its component relations remain recovery-aware
 ordinary judgments.

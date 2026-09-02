@@ -182,8 +182,9 @@ totality and resource bounds, complete output provenance, recursive Core and
 Yul outcomes, declaration and file soundness, and exact transactional branch
 priority, including grouped-first predicate fallback, are established. A
 diagnostic-free successful `parseLexed` or `parse` result derives
-`CoreSourceFileOrdinaryParsesFromStart` from its root token carrier and composes
-with canonical parsed-file validity. The ordinary component relations remain
+`CoreSourceFileOrdinaryParsesFromStart` from its root token carrier to the
+canonical terminal remainder with an exact end cursor, and composes with
+canonical parsed-file validity. The ordinary component relations remain
 recovery-aware; the diagnostic-free premise excludes actual recovery results
 at this public boundary. Resolution, source typing, and elaboration remain
 subsequent frontend milestones.

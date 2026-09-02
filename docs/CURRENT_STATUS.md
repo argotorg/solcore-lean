@@ -371,11 +371,13 @@ boundaries.
 and the isolated `.allow` and `.require` block relations to the abstract
 top-item grammar. `CoreSourceFileOrdinaryParses` lifts that specialization
 through exact item order, complete-window consumption, and comment attachment.
-`CoreSourceFileOrdinaryParsesFromStart` packages the root token window and hides
-only the final remainder. Every diagnostic-free successful `parseLexed` result
-derives that judgment over the supplied lexer tokens and comments; the public
-`parse` theorem states it over the tokens and comments retained in its output.
-Paired theorems add canonical parsed-file source validity at both boundaries.
+`CoreSourceFileOrdinaryParsesFromStart` fixes both the root token window and its
+canonical terminal remainder: the carrier and `endIndex` are preserved and the
+final cursor is exactly the token count. Every diagnostic-free successful
+`parseLexed` result derives that judgment over the supplied lexer tokens and
+comments; the public `parse` theorem states it over the tokens and comments
+retained in its output. Paired theorems add canonical parsed-file source
+validity at both boundaries.
 The component relations deliberately remain recovery-aware ordinary
 over-approximations, while the outer diagnostic-free premise excludes actual
 recovery successes at the complete-file boundary.

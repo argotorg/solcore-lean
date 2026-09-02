@@ -231,13 +231,14 @@ now likewise have fuel-indexed ordinary/reject closures, public production-fuel
 specializations, deterministic outcomes, and backward diagnostic reflection.
 The concrete `CoreSourceFileOrdinaryParses` grammar instantiates the completed
 parametric file theorem with public Core expressions and isolated `.allow` and
-`.require` bodies. `CoreSourceFileOrdinaryParsesFromStart` supplies its exact
-root-window, existential-final-remainder public form. Diagnostic-free successful
+`.require` bodies. `CoreSourceFileOrdinaryParsesFromStart` fixes its exact root
+window and canonical terminal remainder, preserving the carrier and `endIndex`
+while setting the final cursor to the token count. Diagnostic-free successful
 `parseLexed` and `parse` results derive that form over their exact input or
 retained-output carriers, and paired theorems add canonical parsed-file source
-validity. The ordinary component relations remain reusable for recovered parser
-outcomes; the diagnostic-free premise excludes such recoveries from these
-public conclusions.
+validity. The ordinary component relations remain reusable for recovered
+parser outcomes; the diagnostic-free premise excludes such recoveries from
+these public conclusions.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
