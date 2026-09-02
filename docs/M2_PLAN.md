@@ -401,9 +401,11 @@ success includes checked identifiers and diagnosed reserved hard keywords;
 component rejection requires both alternatives to be unavailable. Tail
 rejection retains the consumed dot and the exact first or later component
 failure. Each layer has a unique successful remainder and disjoint
-success/rejection. Executable success and rejection reflection are publicly
-registered and compile-time consumed at dedicated and umbrella boundaries.
-Rejection-endpoint and AST uniqueness remain outside this target milestone.
+success/rejection. A reusable stronger outcome contract now fixes the
+successful AST together with its remainder and fixes the rejection endpoint;
+exact-token and checked-identifier primitives and all three derive-target
+layers instantiate it. Executable reflection re-exports these laws and is
+compile-time consumed at dedicated and umbrella boundaries.
 
 Complete derive attributes now also have exact broad ordinary outcomes. The
 valid path distinguishes five rejection stages: hash, opening bracket,

@@ -547,10 +547,11 @@ recursive dotted-tail, and complete-target layers. Components retain both
 checked identifiers and diagnosed reserved hard keywords; rejection records
 that neither branch is available. Tail rejection preserves the consumed dot
 and the exact first or later component failure. Successful remainders are
-unique and success is disjoint from rejection at every layer. Executable
-success and rejection reflection are publicly exported and checked by
-dedicated and umbrella consumers. This does not claim rejection-endpoint or
-AST uniqueness.
+unique and success is disjoint from rejection at every layer. The stronger
+exact outcome contract now also fixes each successful identifier/component
+list/complete target AST and every rejecting remainder. Executable success and
+rejection reflection expose these exactness laws publicly and are checked by
+dedicated and umbrella consumers.
 
 Complete derive attributes now also have exact broad ordinary outcomes. The
 valid path records five rejection stages: hash, opening bracket, contextual

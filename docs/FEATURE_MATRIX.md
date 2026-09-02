@@ -261,10 +261,11 @@ recursive dotted tails, and complete targets. Success retains checked
 identifiers as well as diagnosed reserved hard keywords. Rejection records
 that neither component alternative is available, or preserves the consumed
 dot and exact first or later component failure. Successful remainders are
-unique and success/rejection are disjoint at each layer. Executable success and
-rejection reflection are exported through the public syntax umbrella and
-checked by dedicated and public-boundary consumers. This adds no
-rejection-endpoint or AST uniqueness claim.
+unique and success/rejection are disjoint at each layer. Exact deterministic
+outcome contracts additionally fix successful component lists and complete
+target ASTs together with every rejection endpoint. Executable reflection is
+exported through the public syntax umbrella and checked by dedicated and
+public-boundary consumers.
 
 Complete derive attributes now also have exact broad ordinary outcomes. The
 valid path exposes five rejection stages: hash, opening bracket, contextual
