@@ -138,6 +138,21 @@ example := @Syntax.DeclarativeGrammar.ContractDeriveAttaches
 example := @Syntax.DeclarativeGrammar.ContractMemberOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ContractMemberRejects
 example := @Syntax.DeclarativeGrammar.contractMemberDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryBoundaryStartsAt
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryStops
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryScanParses
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryParses
+example := @Syntax.DeclarativeGrammar.ContractMemberRecoveryRejects
+example := @Syntax.DeclarativeGrammar.contractMemberRecoveryDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractMemberRejectsWithPreservedWindow
+example := @Syntax.DeclarativeGrammar.ContractMemberTailOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractMemberTailOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.ContractMemberTailRejects
+example := @Syntax.DeclarativeGrammar.contractMemberTailDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractBodyOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractBodyOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.ContractBodyRejects
+example := @Syntax.DeclarativeGrammar.contractBodyDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.TypeAliasParametersOrdinaryParses
 example := @Syntax.DeclarativeGrammar.TypeAliasParametersRejects
 example := @Syntax.DeclarativeGrammar.typeAliasParametersDeterministicOutcomeSpec
@@ -353,6 +368,29 @@ example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_success_
 example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractInternals.contractMemberWithAttribute_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractInternals.recoveryBoundaryStartsAt_of_atContractRecoveryBoundary_eq_true
+example := @Syntax.Parser.ContractInternals.atContractRecoveryBoundary_eq_true_of_recoveryBoundaryStartsAt
+example := @Syntax.Parser.ContractInternals.contractMemberRecoveryStops_of_guard_eq_true
+example := @Syntax.Parser.ContractInternals.contractMemberRecoveryStops_of_advance?_eq_none
+example := @Syntax.Parser.ContractInternals.no_contractMemberRecoveryStops_of_nonBoundary_token
+example := @Syntax.Parser.ContractInternals.recoverContractMemberAux_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.recoverContractMember_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.recoverContractMember_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.recoverContractMember_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.recoverContractMember_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractMemberRejectsWithPreservedWindow_of_result
+example := @Syntax.Parser.ContractInternals.rewoundContractMember_declarativeRemainder_eq
+example := @Syntax.Parser.ContractInternals.cursor_lt_endIndex_of_atEnd_eq_false
+example := @Syntax.Parser.ContractInternals.contractMemberRecoveryBoundaryStartsAt_of_guard_eq_true
+example := @Syntax.Parser.ContractInternals.no_contractMemberRecoveryBoundaryStartsAt_of_guard_eq_false
+example := @Syntax.Parser.ContractInternals.closeContractBody_success_exact
+example := @Syntax.Parser.ContractInternals.closeContractBody_success_of_rightBrace_guard
+example := @Syntax.Parser.ContractInternals.contractMembers_success_ordinaryOutcome_sound_strong
+example := @Syntax.Parser.ContractInternals.contractMembers_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractBody_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractBody_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractBody_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractBody_ordinaryOutcomeSpec
 example := @Syntax.Parser.parseTypeAliasParameters_success_ordinaryOutcome_sound
 example := @Syntax.Parser.parseTypeAliasParameters_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.parseTypeAliasParameters_ordinaryOutcome_sound
@@ -554,6 +592,42 @@ example {input rejected : Syntax.Parser.State}
     Syntax.DeclarativeGrammar.ContractMemberRejects
       input.declarativeRemainder rejected.declarativeRemainder :=
   Syntax.Parser.ContractInternals.contractMemberWithAttribute_reject_ordinaryOutcome_sound
+    result
+
+example {input output : Syntax.Parser.State} {member : ContractMember}
+    (result : Syntax.Parser.ContractInternals.recoverContractMember input =
+      .ok member output) :
+    Syntax.DeclarativeGrammar.ContractMemberRecoveryParses
+      input.declarativeRemainder member output.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.recoverContractMember_success_ordinaryOutcome_sound
+    result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.ContractInternals.recoverContractMember input =
+      .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractMemberRecoveryRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.recoverContractMember_reject_ordinaryOutcome_sound
+    result
+
+example {input output : Syntax.Parser.State}
+    {body : Syntax.Parser.ContractInternals.ContractBody}
+    (result : Syntax.Parser.ContractInternals.contractBody input =
+      .ok body output) :
+    Syntax.DeclarativeGrammar.ContractBodyOrdinaryParses
+      input.declarativeRemainder body.span body.members
+        output.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractBody_success_ordinaryOutcome_sound
+    result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.ContractInternals.contractBody input =
+      .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractBodyRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractBody_reject_ordinaryOutcome_sound
     result
 
 example {input output : Syntax.Parser.State} {declaration : TypeAliasDecl}
