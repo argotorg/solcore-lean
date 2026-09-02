@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.ImportProperties
+import Solcore.Syntax.Parser.ImportTerminatorOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for canonical import parser contracts. -/
 
@@ -7,8 +8,16 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Syntax
+open Solcore.Syntax.DeclarativeGrammar
 open Solcore.Syntax.Parser
 
+example := @ImportTerminatorOrdinaryParses
+example := @ImportTerminatorRejects
+example := @importTerminatorDeterministicOutcomeSpec
+example := @importTerminator_success_ordinaryOutcome_sound
+example := @importTerminator_reject_ordinaryOutcome_sound
+example := @importTerminator_ordinaryOutcome_sound
+example := @importTerminator_ordinaryOutcomeSpec
 example := selectedAlias_validFor
 example := selectedAlias_preservesTokenWindow
 example := selectedAlias_preservesTokensOnSuccess
@@ -62,5 +71,19 @@ example := selectedImports_preservesTokenWindow
 example := selectedImports_preservesTokensOnSuccess
 example := selectedImports_cursorMonotoneOnSuccess
 example := selectedImports_startsAtCurrentTokenOnSuccess
+
+example (lastSpan : SourceSpan) {input output : State}
+    {endSpan : SourceSpan}
+    (result : ImportInternals.terminator lastSpan input = .ok endSpan output) :
+    ImportTerminatorOrdinaryParses lastSpan input.declarativeRemainder
+      endSpan output.declarativeRemainder :=
+  importTerminator_success_ordinaryOutcome_sound lastSpan result
+
+example (lastSpan : SourceSpan) {input rejected : State} {failure : Failure}
+    (result : ImportInternals.terminator lastSpan input =
+      .reject failure rejected) :
+    ImportTerminatorRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  importTerminator_reject_ordinaryOutcome_sound lastSpan result
 
 end Tests

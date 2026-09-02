@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.NamespaceImportOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.NamespaceImportSoundnessProperties
 
 /-! External consumers for diagnostic-free namespace-import soundness. -/
@@ -12,6 +13,9 @@ open Solcore.Syntax.Parser
 
 example := @NamespaceImportTailParses
 example := @NamespaceImportDeclParses
+example := @NamespaceImportOrdinaryParses
+example := @NamespaceImportRejects
+example := @namespaceImportDeterministicOutcomeSpec
 example := @contextual_ok_tokenAt
 example := @importBind_success_components
 example := @finishImport_success_value
@@ -22,6 +26,25 @@ example := @selectiveImport_success_value
 example := @namespaceImport_success_sound_of_diagnosticFree
 example := @importDecl_namespace_success_sound
 example := @importDecl_namespace_success_sound_and_validFor
+example := @namespaceImport_success_ordinaryOutcome_sound
+example := @namespaceImport_reject_ordinaryOutcome_sound
+example := @namespaceImport_ordinaryOutcome_sound
+example := @namespaceImport_ordinaryOutcomeSpec
+
+example (start : SourceSpan) {input next : State}
+    {declaration : ImportDecl}
+    (result : ImportInternals.namespaceImport start input =
+      .ok declaration next) :
+    NamespaceImportOrdinaryParses start input.declarativeRemainder declaration
+      next.declarativeRemainder :=
+  namespaceImport_success_ordinaryOutcome_sound start result
+
+example (start : SourceSpan) {input rejected : State} {failure : Failure}
+    (result : ImportInternals.namespaceImport start input =
+      .reject failure rejected) :
+    NamespaceImportRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  namespaceImport_reject_ordinaryOutcome_sound start result
 
 example (start : SourceSpan) {input next : State}
     {declaration : ImportDecl} (diagnosticFree : next.diagnosticsRev = [])

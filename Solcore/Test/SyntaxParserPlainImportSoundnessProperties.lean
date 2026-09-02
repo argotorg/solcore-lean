@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.PlainImportOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.PlainImportSoundnessProperties
 
 /-! External consumers for diagnostic-free plain-import soundness. -/
@@ -12,10 +13,32 @@ open Solcore.Syntax.Parser
 
 example := @PlainImportTailParses
 example := @PlainImportDeclParses
+example := @PlainImportOrdinaryParses
+example := @PlainImportRejects
+example := @plainImportDeterministicOutcomeSpec
 example := @importTerminator_success_sound_of_diagnosticFree
 example := @plainImport_success_sound_of_diagnosticFree
 example := @importDecl_plain_success_sound
 example := @importDecl_plain_success_sound_and_validFor
+example := @plainImport_success_ordinaryOutcome_sound
+example := @plainImport_reject_ordinaryOutcome_sound
+example := @plainImport_ordinaryOutcome_sound
+example := @plainImport_ordinaryOutcomeSpec
+
+example (start : SourceSpan) {input next : State}
+    {declaration : ImportDecl}
+    (result : ImportInternals.plainImport start input =
+      .ok declaration next) :
+    PlainImportOrdinaryParses start input.declarativeRemainder declaration
+      next.declarativeRemainder :=
+  plainImport_success_ordinaryOutcome_sound start result
+
+example (start : SourceSpan) {input rejected : State} {failure : Failure}
+    (result : ImportInternals.plainImport start input =
+      .reject failure rejected) :
+    PlainImportRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  plainImport_reject_ordinaryOutcome_sound start result
 
 example (start : SourceSpan) {input next : State}
     {declaration : ImportDecl} (diagnosticFree : next.diagnosticsRev = [])
