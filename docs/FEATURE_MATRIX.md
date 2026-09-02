@@ -175,6 +175,16 @@ empty-body recovery success at the parent remainder. Endpoints are deterministic
 and success/rejection exclusive; strict diagnostic-free `FallbackDeclParses`
 remains available as the canonical acceptance judgment.
 
+Broad ordinary contract-field outcomes preserve the exact checked name, colon,
+Core type, prioritized optional `=` initializer expression, and semicolon order.
+Success retains the exact field AST, name/semicolon cover span, and final
+remainder. Rejection records exactly five first-failing stages: name rejection,
+missing colon, type rejection, committed initializer-expression rejection after
+the exact `=`, or missing semicolon. Endpoints are deterministic and
+success/rejection exclusive. The existing parametric `ContractFieldParses`
+relation remains available alongside this broad outcome as the strict
+acceptance judgment.
+
 The implementation-method wrapper also has a broad ordinary outcome. It
 preserves the wrapped declaration span, empty parser-time leading comments,
 and exact remainder, while exposing only nested function-declaration
