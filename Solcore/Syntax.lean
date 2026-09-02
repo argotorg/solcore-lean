@@ -8,6 +8,7 @@ import Solcore.Syntax.Parser
 import Solcore.Syntax.Parser.CertifiedParseProperties
 import Solcore.Syntax.Parser.ConstructorSelectionSoundnessProperties
 import Solcore.Syntax.Parser.ContractDeclSoundnessProperties
+import Solcore.Syntax.Parser.ContractFieldOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CorePublicParseOrdinarySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
