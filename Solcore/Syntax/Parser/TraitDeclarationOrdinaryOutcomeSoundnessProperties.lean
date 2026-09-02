@@ -1,4 +1,5 @@
 import Solcore.Syntax.DeclarativeTraitDeclarationOutcomeProperties
+import Solcore.Syntax.Parser.TraitBodyOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.TraitDeclarationOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.TraitDeclarationOrdinarySuccessSoundnessProperties
 
