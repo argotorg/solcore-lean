@@ -130,6 +130,10 @@ example := @Syntax.DeclarativeGrammar.optionalContractFieldInitializerDeterminis
 example := @Syntax.DeclarativeGrammar.ContractFieldOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ContractFieldRejects
 example := @Syntax.DeclarativeGrammar.contractFieldDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractMemberCoreTokenPresentAt
+example := @Syntax.DeclarativeGrammar.ContractMemberCoreOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractMemberCoreRejects
+example := @Syntax.DeclarativeGrammar.contractMemberCoreDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.TypeAliasParametersOrdinaryParses
 example := @Syntax.DeclarativeGrammar.TypeAliasParametersRejects
 example := @Syntax.DeclarativeGrammar.typeAliasParametersDeterministicOutcomeSpec
@@ -317,6 +321,10 @@ example := @Syntax.Parser.ContractInternals.contractField_success_ordinaryOutcom
 example := @Syntax.Parser.ContractInternals.contractField_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractInternals.contractField_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractInternals.contractField_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractMemberCore_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractMemberCore_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractMemberCore_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractMemberCore_ordinaryOutcomeSpec
 example := @Syntax.Parser.parseTypeAliasParameters_success_ordinaryOutcome_sound
 example := @Syntax.Parser.parseTypeAliasParameters_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.parseTypeAliasParameters_ordinaryOutcome_sound
@@ -458,6 +466,23 @@ example {input rejected : Syntax.Parser.State}
     Syntax.DeclarativeGrammar.CoreExpressionPublicRejects
     Syntax.Parser.expression_ordinaryOutcome_sound.1
     Syntax.Parser.expression_ordinaryOutcome_sound.2 result
+
+example {input output : Syntax.Parser.State} {member : ContractMember}
+    (result : Syntax.Parser.ContractInternals.contractMemberCore input =
+      .ok member output) :
+    Syntax.DeclarativeGrammar.ContractMemberCoreOrdinaryParses
+      input.declarativeRemainder member output.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractMemberCore_success_ordinaryOutcome_sound
+    result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.ContractInternals.contractMemberCore input =
+      .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractMemberCoreRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractMemberCore_reject_ordinaryOutcome_sound
+    result
 
 example {input output : Syntax.Parser.State} {declaration : TypeAliasDecl}
     (result : Syntax.Parser.typeAlias input = .ok declaration output) :
