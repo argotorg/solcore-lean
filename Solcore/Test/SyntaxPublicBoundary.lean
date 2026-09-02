@@ -105,6 +105,10 @@ example := @Syntax.DeclarativeGrammar.ContractEntryModifiersOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ConstructorDeclOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ConstructorDeclRejects
 example := @Syntax.DeclarativeGrammar.constructorDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FallbackParameterValidationOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FallbackDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FallbackDeclRejects
+example := @Syntax.DeclarativeGrammar.fallbackDeclDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -150,5 +154,9 @@ example := @Syntax.Parser.constructorDecl_success_ordinaryOutcome_sound
 example := @Syntax.Parser.constructorDecl_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.constructorDecl_ordinaryOutcome_sound
 example := @Syntax.Parser.constructorDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.fallbackDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.fallbackDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.fallbackDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.fallbackDecl_ordinaryOutcomeSpec
 
 end Tests

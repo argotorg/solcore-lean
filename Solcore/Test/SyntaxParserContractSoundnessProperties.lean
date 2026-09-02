@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ContractDeclSoundnessProperties
+import Solcore.Syntax.Parser.FallbackDeclarationOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for strict and broad contract-declaration components. -/
 
@@ -18,6 +19,10 @@ example := @ConstructorDeclOrdinaryParses
 example := @ConstructorDeclRejects
 example := @constructorDeclDeterministicOutcomeSpec
 example := @FallbackDeclParses
+example := @FallbackParameterValidationOrdinaryParses
+example := @FallbackDeclOrdinaryParses
+example := @FallbackDeclRejects
+example := @fallbackDeclDeterministicOutcomeSpec
 example := @OptionalContractFieldInitializerParses
 example := @ContractFieldParses
 example := @ContractMemberCoreParses
@@ -39,6 +44,10 @@ example := @constructorDecl_success_ordinaryOutcome_sound
 example := @constructorDecl_reject_ordinaryOutcome_sound
 example := @constructorDecl_ordinaryOutcome_sound
 example := @constructorDecl_ordinaryOutcomeSpec
+example := @fallbackDecl_success_ordinaryOutcome_sound
+example := @fallbackDecl_reject_ordinaryOutcome_sound
+example := @fallbackDecl_ordinaryOutcome_sound
+example := @fallbackDecl_ordinaryOutcomeSpec
 
 example := @ContractInternals.contractBody_reflectsDiagnosticFreeOnSuccess
 example := @ContractInternals.contractBody_success_sound
@@ -96,5 +105,17 @@ example {input rejected : State} {failure : Failure}
     ConstructorDeclRejects input.declarativeRemainder
       rejected.declarativeRemainder :=
   constructorDecl_reject_ordinaryOutcome_sound result
+
+example {input next : State} {declaration : FallbackDecl}
+    (result : fallbackDecl input = .ok declaration next) :
+    FallbackDeclOrdinaryParses input.declarativeRemainder declaration
+      next.declarativeRemainder :=
+  fallbackDecl_success_ordinaryOutcome_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : fallbackDecl input = .reject failure rejected) :
+    FallbackDeclRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  fallbackDecl_reject_ordinaryOutcome_sound result
 
 end Solcore.Test.SyntaxParserContractSoundnessProperties
