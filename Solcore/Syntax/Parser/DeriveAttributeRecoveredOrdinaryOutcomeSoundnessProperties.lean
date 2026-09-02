@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDeriveAttributeRecoveryOutcomeProperties
+import Solcore.Syntax.DeclarativeDeriveAttributeRecoveryExactnessProperties
 import Solcore.Syntax.Parser.DeriveAttributeRecoveredOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DeriveAttributeRecoveredOrdinarySuccessSoundnessProperties
 
@@ -47,5 +47,42 @@ theorem deriveAttributeRecovered_ordinaryOutcomeSpec :
       DeclarativeGrammar.DeriveAttributeRecoveredParses
       DeclarativeGrammar.DeriveAttributeRecoveredRejects :=
   DeclarativeGrammar.deriveAttributeRecoveredDeterministicOutcomeSpec
+
+/-- Re-export exact recovered-path value and rejection-endpoint
+functionality. -/
+theorem deriveAttributeRecovered_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.DeriveAttributeRecoveredParses
+      DeclarativeGrammar.DeriveAttributeRecoveredRejects :=
+  DeclarativeGrammar.deriveAttributeRecoveredExactOutcomeSpec
+
+/-- Two successful recovered-path reflections have the same derive attribute
+and final declarative remainder. -/
+theorem deriveAttributeRecovered_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : DeriveAttribute}
+    (leftResult : DeriveAttributeInternals.recovered input =
+      .ok left leftOutput)
+    (rightResult : DeriveAttributeInternals.recovered input =
+      .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.DeriveAttributeRecoveredParses.result_unique
+    (deriveAttributeRecovered_success_ordinaryOutcome_sound leftResult)
+    (deriveAttributeRecovered_success_ordinaryOutcome_sound rightResult)
+
+/-- Two rejected recovered-path reflections have the same exact declarative
+endpoint. -/
+theorem deriveAttributeRecovered_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : DeriveAttributeInternals.recovered input =
+      .reject leftFailure leftOutput)
+    (rightResult : DeriveAttributeInternals.recovered input =
+      .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.DeriveAttributeRecoveredRejects.output_unique
+    (deriveAttributeRecovered_reject_ordinaryOutcome_sound leftResult)
+    (deriveAttributeRecovered_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser
