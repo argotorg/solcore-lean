@@ -63,6 +63,12 @@ example := @ImplInternals.implMethod_success_ordinaryOutcome_sound
 example := @ImplInternals.implMethod_reject_ordinaryOutcome_sound
 example := @ImplInternals.implMethod_ordinaryOutcome_sound
 example := @ImplInternals.implMethod_ordinaryOutcomeSpec
+example := @implMethodExactOutcomeSpecOfBody
+example := @implMethodExactOutcomeSpecOfStatementFuel
+example := @ImplInternals.implMethod_exactOutcomeSpec_of_body
+example := @ImplInternals.implMethod_exactOutcomeSpec_of_statementFuel
+example := @ImplInternals.implMethod_success_result_unique_of_body
+example := @ImplInternals.implMethod_reject_output_unique_of_body
 
 example := @ImplInternals.implBody_reflectsDiagnosticFreeOnSuccess
 example := @ImplInternals.implBody_success_sound

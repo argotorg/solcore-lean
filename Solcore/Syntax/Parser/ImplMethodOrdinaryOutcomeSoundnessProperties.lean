@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeImplMethodOutcomeProperties
+import Solcore.Syntax.DeclarativeImplMethodExactnessProperties
 import Solcore.Syntax.Parser.FunctionDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Impl
 
@@ -78,6 +78,60 @@ theorem implMethod_ordinaryOutcomeSpec :
       DeclarativeGrammar.ImplMethodOrdinaryParses
       DeclarativeGrammar.ImplMethodRejects :=
   DeclarativeGrammar.implMethodDeterministicOutcomeSpec
+
+/-- Re-export exact implementation-method outcomes from an exact isolated
+function body. -/
+theorem implMethod_exactOutcomeSpec_of_body
+    (bodyOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses .allow)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects .allow)) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ImplMethodOrdinaryParses
+      DeclarativeGrammar.ImplMethodRejects :=
+  DeclarativeGrammar.implMethodExactOutcomeSpecOfBody bodyOutcomes
+
+/-- Fixed-fuel Core statement exactness discharges the executable
+implementation-method contract. -/
+theorem implMethod_exactOutcomeSpec_of_statementFuel
+    (statementOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreStatementOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreStatementRejectsWithFuel fuel)) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ImplMethodOrdinaryParses
+      DeclarativeGrammar.ImplMethodRejects :=
+  DeclarativeGrammar.implMethodExactOutcomeSpecOfStatementFuel
+    statementOutcomes
+
+/-- With an exact isolated body, two executable implementation methods have
+the same AST and final declarative remainder. -/
+theorem implMethod_success_result_unique_of_body
+    (bodyOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses .allow)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects .allow))
+    {input leftOutput rightOutput : State} {left right : ImplMethod}
+    (leftResult : implMethod input = .ok left leftOutput)
+    (rightResult : implMethod input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.ImplMethodOrdinaryParses.result_unique_of_exact_body
+    bodyOutcomes (implMethod_success_ordinaryOutcome_sound leftResult)
+    (implMethod_success_ordinaryOutcome_sound rightResult)
+
+/-- With an exact isolated body, two implementation-method rejections have
+the same declarative endpoint. -/
+theorem implMethod_reject_output_unique_of_body
+    (bodyOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses .allow)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects .allow))
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : implMethod input = .reject leftFailure leftOutput)
+    (rightResult : implMethod input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.ImplMethodRejects.output_unique_of_exact_body
+    bodyOutcomes (implMethod_reject_ordinaryOutcome_sound leftResult)
+    (implMethod_reject_ordinaryOutcome_sound rightResult)
 
 end ImplInternals
 end Solcore.Syntax.Parser
