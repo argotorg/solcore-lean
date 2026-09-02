@@ -6,6 +6,8 @@ namespace Tests
 
 open Solcore.Syntax.Parser
 
+example := @DeriveAttributeInternals.startsDeriveContractField
+example := @DeriveAttributeInternals.atDeriveDeclarationBoundary
 example :=
   @DeriveAttributeInternals.recoverTail_ordinary_of_remainingCount_lt
 example :=

@@ -425,10 +425,12 @@ def valid : Parser DeriveAttribute := do
     pure ()
   pure { span, value := { targets } }
 
-private def startsDeriveContractField (state : State) : Bool :=
+/-- Proof-visible lookahead for a contract field following derive recovery. -/
+def startsDeriveContractField (state : State) : Bool :=
   isIdentifier state && state.peekOffsetKind? 1 == some (.symbol .colon)
 
-private def atDeriveDeclarationBoundary (state : State) : Bool :=
+/-- Proof-visible declaration boundary at which derive recovery stops. -/
+def atDeriveDeclarationBoundary (state : State) : Bool :=
   atTopItemStart state || startsDeriveContractField state ||
     isSymbol state .rightBrace
 
