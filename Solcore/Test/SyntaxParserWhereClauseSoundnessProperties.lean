@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.PredicateSequenceOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.WhereClauseSoundnessProperties
+import Solcore.Syntax.Parser.WhereClauseOrdinaryRejectionSoundnessProperties
 
-/-! External consumers for predicate-sequence and optional-where soundness. -/
+/-! External consumers for exact predicate-sequence and optional-where outcomes. -/
 
 set_option autoImplicit false
 
@@ -28,6 +28,8 @@ example := @PredicateSequenceParses
 example := @PredicateSequenceRejects
 example := @predicateSequenceDeterministicOutcomeSpec
 example := @OptionalWhereClauseParses
+example := @OptionalWhereClauseRejects
+example := @optionalWhereClauseDeterministicOutcomeSpec
 
 example := @PredicateInternals.barePredicates_success_sound
 example := @PredicateInternals.barePredicates_success_sound_and_validFor
@@ -43,6 +45,8 @@ example := @PredicateInternals.predicateSequence_reject_sound
 example := @PredicateInternals.predicateSequence_ordinaryOutcome_sound
 example := @whereClause_success_sound
 example := @whereClause_success_sound_and_validFor
+example := @whereClause_reject_sound
+example := @whereClause_ordinaryOutcome_sound
 
 example {input next : State}
     {predicates : NonemptyDelimitedList Predicate}
@@ -108,5 +112,11 @@ example {input next : State} {clause : Option WhereClause}
         next.declarativeRemainder ∧
       Option.ValidFor WhereClause.ValidFor input.file clause :=
   whereClause_success_sound_and_validFor inputValid result
+
+example {input rejected : State} {failure : Failure}
+    (result : whereClause input = .reject failure rejected) :
+    OptionalWhereClauseRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  whereClause_reject_sound result
 
 end Solcore.Test.SyntaxParserWhereClauseSoundnessProperties

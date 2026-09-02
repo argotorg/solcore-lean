@@ -76,6 +76,8 @@ example := @Syntax.DeclarativeGrammar.BarePredicateSequenceRejects
 example := @Syntax.DeclarativeGrammar.barePredicateSequenceDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.PredicateSequenceRejects
 example := @Syntax.DeclarativeGrammar.predicateSequenceDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalWhereClauseRejects
+example := @Syntax.DeclarativeGrammar.optionalWhereClauseDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -84,5 +86,7 @@ example := @Syntax.Parser.PredicateInternals.barePredicates_reject_sound
 example := @Syntax.Parser.PredicateInternals.barePredicates_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.predicateSequence_reject_sound
 example := @Syntax.Parser.PredicateInternals.predicateSequence_ordinaryOutcome_sound
+example := @Syntax.Parser.whereClause_reject_sound
+example := @Syntax.Parser.whereClause_ordinaryOutcome_sound
 
 end Tests
