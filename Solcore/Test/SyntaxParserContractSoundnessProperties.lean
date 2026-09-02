@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ContractDeclSoundnessProperties
 import Solcore.Syntax.Parser.ContractFieldOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.ContractMemberCoreOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.ContractMemberWithAttributeOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreTermPublicOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinaryOutcomeSoundnessProperties
 
@@ -38,6 +38,10 @@ example := @ContractMemberCoreTokenPresentAt
 example := @ContractMemberCoreOrdinaryParses
 example := @ContractMemberCoreRejects
 example := @contractMemberCoreDeterministicOutcomeSpec
+example := @ContractDeriveAttaches
+example := @ContractMemberOrdinaryParses
+example := @ContractMemberRejects
+example := @contractMemberDeterministicOutcomeSpec
 example := @ContractMemberCoreParses
 example := @ContractMemberParses
 example := @ContractMemberTailParses
@@ -50,6 +54,12 @@ example := @ContractInternals.contractMemberCore_success_ordinaryOutcome_sound
 example := @ContractInternals.contractMemberCore_reject_ordinaryOutcome_sound
 example := @ContractInternals.contractMemberCore_ordinaryOutcome_sound
 example := @ContractInternals.contractMemberCore_ordinaryOutcomeSpec
+example := @ContractInternals.attachContractDerive_success_ordinaryOutcome_sound
+example := @ContractInternals.attachContractDerive_total_success
+example := @ContractInternals.contractMemberWithAttribute_success_ordinaryOutcome_sound
+example := @ContractInternals.contractMemberWithAttribute_reject_ordinaryOutcome_sound
+example := @ContractInternals.contractMemberWithAttribute_ordinaryOutcome_sound
+example := @ContractInternals.contractMemberWithAttribute_ordinaryOutcomeSpec
 example := @ContractInternals.contractMemberWithAttribute_reflectsDiagnosticFreeOnSuccess
 example := @ContractInternals.contractMemberWithAttribute_success_sound
 
@@ -137,6 +147,30 @@ example {input rejected : State} {failure : Failure}
     ContractMemberCoreRejects input.declarativeRemainder
       rejected.declarativeRemainder :=
   ContractInternals.contractMemberCore_reject_ordinaryOutcome_sound result
+
+example {derive : DeriveAttribute} {coreMember attached : ContractMember}
+    {input output : State}
+    (result : ContractInternals.attachContractDerive derive coreMember input =
+      .ok attached output) :
+    ContractDeriveAttaches derive coreMember attached ∧
+      output.declarativeRemainder = input.declarativeRemainder :=
+  ContractInternals.attachContractDerive_success_ordinaryOutcome_sound result
+
+example {input output : State} {member : ContractMember}
+    (result : ContractInternals.contractMemberWithAttribute input =
+      .ok member output) :
+    ContractMemberOrdinaryParses input.declarativeRemainder member
+      output.declarativeRemainder :=
+  ContractInternals.contractMemberWithAttribute_success_ordinaryOutcome_sound
+    result
+
+example {input rejected : State} {failure : Failure}
+    (result : ContractInternals.contractMemberWithAttribute input =
+      .reject failure rejected) :
+    ContractMemberRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  ContractInternals.contractMemberWithAttribute_reject_ordinaryOutcome_sound
+    result
 
 example {input rejected : State} {failure : Failure}
     (result : constructorDecl input = .reject failure rejected) :
