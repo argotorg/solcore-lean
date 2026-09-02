@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryOutcomeSoundnessProperties
 
-/-! External consumers for canonical pragma success soundness. -/
+/-! External consumers for strict and exact ordinary pragma outcomes. -/
 
 set_option autoImplicit false
 

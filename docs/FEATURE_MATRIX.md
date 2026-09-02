@@ -244,6 +244,17 @@ and exclusive with rejection. Declarative and parser outcome packages are
 publicly exported and compile-time consumed; no broader top-item rejection is
 claimed here.
 
+Pragma item scanning and complete `pragmaDecl` also have exact broad ordinary
+outcomes. An immediate `;` is empty and nonconsuming. Otherwise checked names
+remain in forward order; comma absence stops without consumption, and comma
+followed by `;` consumes only that trailing comma. Complete pragmas compose
+exact `pragma`, a raw-identifier name that deliberately omits the checked-name
+hyphen diagnostic, the item scan, and an exact semicolon, with separate
+keyword, name, items, and semicolon rejection. Item-tail,
+item-list, and declaration successful remainders are deterministic, and
+success is disjoint from rejection. Public packages are compile-time consumed;
+no broad top-item or file rejection is claimed.
+
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
 optional `default`, nonempty implementation heads, member and method order,

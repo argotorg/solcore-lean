@@ -384,6 +384,17 @@ deterministic and exclusive with rejection. Public parser and declarative APIs
 are compile-time consumed at dedicated and umbrella boundaries. This claim is
 limited to export declarations, not a broad top-item rejection package.
 
+Pragma item scanning and complete `pragmaDecl` now likewise have exact broad
+ordinary outcomes. An immediate `;` is an empty, nonconsuming scan. Otherwise
+checked identifiers are retained in forward order; comma absence stops without
+consumption, while comma followed by `;` consumes only the trailing comma.
+Complete declarations compose exact `pragma`, a raw-identifier name, the item
+scan, and an exact semicolon. The raw name deliberately omits the checked-name
+hyphen diagnostic. Rejection distinguishes keyword, name, items, and semicolon
+stages. Item-tail, item-list, and declaration successful remainders are
+deterministic, and success is disjoint from rejection. The public packages are
+compile-time consumed without claiming broad top-item or file rejection.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

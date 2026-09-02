@@ -530,6 +530,18 @@ The declarative and parser outcome packages are exported publicly and checked
 by dedicated and public-boundary consumers; broader top-item rejection remains
 a separate boundary.
 
+Pragma item scanning and complete `pragmaDecl` now also have exact broad
+ordinary outcomes. An immediate `;` gives an empty, nonconsuming item scan;
+otherwise checked identifiers remain in forward order. Comma absence ends the
+scan without consumption, while comma followed by `;` consumes only the
+trailing comma. Complete pragmas compose exact `pragma`, a raw-identifier name
+(which deliberately omits the checked-name hyphen diagnostic), the item scan,
+and an exact semicolon. Rejection separates missing keyword,
+rejected name, rejected items, and missing semicolon. Item-tail, item-list, and
+declaration successful remainders are deterministic, and success is disjoint
+from rejection. The public packages are compile-time consumed; no broader
+top-item or file rejection package is claimed.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
