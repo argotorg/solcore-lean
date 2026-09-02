@@ -19,7 +19,7 @@ import Solcore.Syntax.Parser.DeriveAttributeSoundnessProperties
 import Solcore.Syntax.Parser.DeriveTargetSoundnessProperties
 import Solcore.Syntax.Parser.EnumDeclSoundnessProperties
 import Solcore.Syntax.Parser.EnumDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.ExportDeclSoundnessProperties
+import Solcore.Syntax.Parser.ExportDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ExportNameOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ExportPathOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ExportPathSoundnessProperties

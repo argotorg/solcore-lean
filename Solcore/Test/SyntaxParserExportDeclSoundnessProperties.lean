@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ExportDeclSoundnessProperties
+import Solcore.Syntax.Parser.ExportDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.LocalExportOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.PathExportOrdinaryOutcomeSoundnessProperties
 
@@ -29,6 +29,10 @@ example := @ItemsFromExportDeclParses
 example := @ModuleAsExportDeclParses
 example := @ModuleExportDeclParses
 example := @ExportDeclParses
+example := @ExportDeclLeftBracePresentAt
+example := @ExportDeclOrdinaryParses
+example := @ExportDeclRejects
+example := @exportDeclDeterministicOutcomeSpec
 
 example := @finishExport_success_sound
 example := @localExport_success_sound
@@ -43,6 +47,10 @@ example := @pathExport_ordinaryOutcome_sound
 example := @pathExport_ordinaryOutcomeSpec
 example := @exportDecl_success_sound
 example := @exportDecl_success_sound_and_validFor
+example := @exportDecl_success_ordinaryOutcome_sound
+example := @exportDecl_reject_ordinaryOutcome_sound
+example := @exportDecl_ordinaryOutcome_sound
+example := @exportDecl_ordinaryOutcomeSpec
 
 example {input next : State} {declaration : ExportDecl}
     (inputValid : input.ValidFor)
