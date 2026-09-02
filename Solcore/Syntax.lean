@@ -51,6 +51,7 @@ import Solcore.Syntax.Parser.TopItemSoundnessProperties
 import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
 import Solcore.Syntax.Parser.TypeAliasSoundnessProperties
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
+import Solcore.Syntax.Parser.WhereClauseOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.WhereClauseSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportNoHidingSoundnessProperties
 import Solcore.Syntax.Parser.WildcardImportSoundnessProperties
