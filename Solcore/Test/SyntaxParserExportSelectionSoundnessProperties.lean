@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ExportSelectionSoundnessProperties
+import Solcore.Syntax.Parser.ExportSelectionOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for remote export-selection grammar soundness. -/
 
@@ -11,8 +11,15 @@ open Solcore.Syntax.DeclarativeGrammar
 open Solcore.Syntax.Parser
 
 example := @ExportSelectionParses
+example := @ExportSelectionOrdinaryParses
+example := @ExportSelectionRejects
+example := @exportSelectionDeterministicOutcomeSpec
 example := @exportSelection_success_sound
 example := @exportSelection_success_sound_and_validFor
+example := @exportSelection_success_ordinaryOutcome_sound
+example := @exportSelection_reject_ordinaryOutcome_sound
+example := @exportSelection_ordinaryOutcome_sound
+example := @exportSelection_ordinaryOutcomeSpec
 
 example {input next : State} {selection : ExportSelection}
     (inputValid : input.ValidFor)
