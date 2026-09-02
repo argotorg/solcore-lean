@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFunctionParametersOutcomeProperties
+import Solcore.Syntax.DeclarativeFunctionParametersExactnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
@@ -76,5 +76,38 @@ theorem functionParameters_ordinaryOutcomeSpec :
       DeclarativeGrammar.FunctionParametersOrdinaryParses
       DeclarativeGrammar.FunctionParametersRejects :=
   DeclarativeGrammar.functionParametersDeterministicOutcomeSpec
+
+/-- Re-export full function-parameter-list AST and rejection-endpoint
+functionality. -/
+theorem functionParameters_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.FunctionParametersOrdinaryParses
+      DeclarativeGrammar.FunctionParametersRejects :=
+  DeclarativeGrammar.functionParametersExactOutcomeSpec
+
+/-- Two successful executable reflections have the same parameter-list AST
+and final declarative remainder. -/
+theorem functionParameters_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : DelimitedList FunctionParameter}
+    (leftResult : functionParameters input = .ok left leftOutput)
+    (rightResult : functionParameters input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.FunctionParametersOrdinaryParses.result_unique
+    (functionParameters_success_ordinaryOutcome_sound leftResult)
+    (functionParameters_success_ordinaryOutcome_sound rightResult)
+
+/-- Two rejected executable reflections have the same first failing
+declarative endpoint. -/
+theorem functionParameters_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : functionParameters input = .reject leftFailure leftOutput)
+    (rightResult : functionParameters input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.FunctionParametersRejects.output_unique
+    (functionParameters_reject_ordinaryOutcome_sound leftResult)
+    (functionParameters_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser

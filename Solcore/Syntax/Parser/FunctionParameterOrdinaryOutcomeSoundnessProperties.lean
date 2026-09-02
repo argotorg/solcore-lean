@@ -1,4 +1,5 @@
-import Solcore.Syntax.DeclarativeFunctionParameterPublicOutcomeProperties
+import Solcore.Syntax.DeclarativeFunctionParameterExactnessProperties
+import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaParameterRecoveryOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParameterBoundaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParameterCoreOrdinaryOutcomeSoundnessProperties
@@ -221,5 +222,52 @@ theorem namedParameter_ordinaryOutcomeSpec
         typeRejects)
       (DeclarativeGrammar.FunctionParameterRejects typeRejects) :=
   DeclarativeGrammar.functionParameterDeterministicOutcomeSpec typeOutcomes
+
+/-- Re-export exact named-parameter outcomes for the executable Core type
+grammar. -/
+theorem namedParameter_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.FunctionParameterOrdinaryParses
+        DeclarativeGrammar.TypeExprOrdinaryParses
+        DeclarativeGrammar.TypeExprRejects)
+      (DeclarativeGrammar.FunctionParameterRejects
+        DeclarativeGrammar.TypeExprRejects) :=
+  DeclarativeGrammar.functionParameterExactOutcomeSpec
+    DeclarativeGrammar.typeExprExactOutcomeSpec
+
+/-- Two successful executable reflections have the same parameter AST and
+final declarative remainder. -/
+theorem namedParameter_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : FunctionParameter}
+    (leftResult : namedParameter input = .ok left leftOutput)
+    (rightResult : namedParameter input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.FunctionParameterOrdinaryParses.result_unique
+    DeclarativeGrammar.typeExprExactOutcomeSpec
+    (namedParameter_success_ordinaryOutcome_sound
+      DeclarativeGrammar.TypeExprOrdinaryParses
+      DeclarativeGrammar.TypeExprRejects typeExpr_ordinaryOutcome_sound.1
+      typeExpr_ordinaryOutcome_sound.2 leftResult)
+    (namedParameter_success_ordinaryOutcome_sound
+      DeclarativeGrammar.TypeExprOrdinaryParses
+      DeclarativeGrammar.TypeExprRejects typeExpr_ordinaryOutcome_sound.1
+      typeExpr_ordinaryOutcome_sound.2 rightResult)
+
+/-- Two rejected executable reflections have the same declarative endpoint. -/
+theorem namedParameter_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : namedParameter input = .reject leftFailure leftOutput)
+    (rightResult : namedParameter input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.FunctionParameterRejects.output_unique
+    (namedParameter_reject_ordinaryOutcome_sound
+      DeclarativeGrammar.TypeExprRejects typeExpr_ordinaryOutcome_sound.2
+      leftResult)
+    (namedParameter_reject_ordinaryOutcome_sound
+      DeclarativeGrammar.TypeExprRejects typeExpr_ordinaryOutcome_sound.2
+      rightResult)
 
 end Solcore.Syntax.Parser
