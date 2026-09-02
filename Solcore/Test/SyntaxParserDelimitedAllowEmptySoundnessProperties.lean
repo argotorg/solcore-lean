@@ -1,3 +1,4 @@
+import Solcore.Syntax.DeclarativeDelimitedTrailingExactnessProperties
 import Solcore.Syntax.Parser.DelimitedAllowEmptySoundnessProperties
 
 /-! External consumers for allow-empty trailing-list grammar soundness. -/
@@ -11,6 +12,8 @@ open Solcore.Syntax.DeclarativeGrammar
 open Solcore.Syntax.Parser
 
 example := @TrailingDelimitedListParses
+example := @TrailingDelimitedListParses.value_unique
+example := @trailingDelimitedListExactOutcomeSpec
 example := @delimited_allowEmpty_trailing_success_sound
 
 example {α : Type} (opening closing : Symbol) (element : Parser α)

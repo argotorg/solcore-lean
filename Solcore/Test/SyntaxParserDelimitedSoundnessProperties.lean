@@ -1,3 +1,4 @@
+import Solcore.Syntax.DeclarativeDelimitedTrailingExactnessProperties
 import Solcore.Syntax.Parser.DelimitedSoundnessProperties
 import Solcore.Syntax.Parser.SelectorNameSoundnessProperties
 
@@ -13,6 +14,11 @@ open Solcore.Syntax.Parser
 
 example := @TrailingDelimitedTailParses
 example := @NonemptyTrailingDelimitedListParses
+example := @TrailingDelimitedTailParses.result_unique
+example := @NonemptyTrailingDelimitedListParses.value_unique
+example := @nonemptyTrailingDelimitedListExactOutcomeSpec
+example := @DelimitedTailRejects.output_unique
+example := @DelimitedListRejects.output_unique
 example := @delimited_nonempty_trailing_success_sound
 
 example {α : Type} (opening closing : Symbol) (element : Parser α)

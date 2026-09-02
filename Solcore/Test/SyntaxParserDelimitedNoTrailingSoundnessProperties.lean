@@ -1,3 +1,4 @@
+import Solcore.Syntax.DeclarativeDelimitedNoTrailingExactnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingSoundnessProperties
 
 /-! External consumers for no-trailing delimited-list soundness. -/
@@ -12,6 +13,8 @@ open Solcore.Syntax.Parser
 
 example := @NoTrailingDelimitedTailParses
 example := @NonemptyNoTrailingDelimitedListParses
+example := @NoTrailingDelimitedTailParses.result_unique
+example := @NonemptyNoTrailingDelimitedListParses.value_unique
 example := @delimitedNoTrailing_nonempty_success_sound
 
 example {α : Type} (opening closing : Symbol) (element : Parser α)

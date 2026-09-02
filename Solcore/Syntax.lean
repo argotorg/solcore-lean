@@ -2,6 +2,8 @@ import Solcore.Syntax.Declaration
 import Solcore.Syntax.CoreTermValidity
 import Solcore.Syntax.DeclarativeFileGrammar
 import Solcore.Syntax.DeclarativeGrammar
+import Solcore.Syntax.DeclarativeDelimitedNoTrailingExactnessProperties
+import Solcore.Syntax.DeclarativeDelimitedTrailingExactnessProperties
 import Solcore.Syntax.Lexer
 import Solcore.Syntax.Identifier
 import Solcore.Syntax.Parser
