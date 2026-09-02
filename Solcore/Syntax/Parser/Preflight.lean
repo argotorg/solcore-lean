@@ -1,4 +1,5 @@
 import Solcore.Syntax.Lexer.Contract
+import Solcore.Syntax.Parser.LexedValidation
 import Solcore.Syntax.Parser.Nesting
 import Solcore.Syntax.Parser.State
 
@@ -23,46 +24,15 @@ end Solcore.Syntax.Parser.State
 
 namespace Solcore.Syntax.Parser
 
-private def validateTokens (file : SourceFile) :
-    Nat → Nat → List Token → Except ParserInvariantError Unit
-  | _, _, [] => .ok ()
-  | index, previousEnd, token :: rest =>
-      if token.span.isValidFor file &&
-          previousEnd ≤ token.span.startByte &&
-          token.span.startByte < token.span.endByte then
-        validateTokens file (index + 1) token.span.endByte rest
-      else
-        .error (.invalidTokenSpan index token.span)
-
-private def validateComments (file : SourceFile) :
-    Nat → Nat → List Comment → Except ParserInvariantError Unit
-  | _, _, [] => .ok ()
-  | index, previousEnd, comment :: rest =>
-      if comment.span.isValidFor file &&
-          previousEnd ≤ comment.span.startByte &&
-          comment.span.startByte < comment.span.endByte then
-        validateComments file (index + 1) comment.span.endByte rest
-      else
-        .error (.invalidCommentSpan index comment.span)
-
-private def validateLexicalDiagnostics (file : SourceFile) :
-    Nat → List LexicalDiagnostic → Except ParserInvariantError Unit
-  | _, [] => .ok ()
-  | index, diagnostic :: rest =>
-      if diagnostic.span.isValidFor file then
-        validateLexicalDiagnostics file (index + 1) rest
-      else
-        .error (.invalidLexicalDiagnosticSpan index diagnostic.span)
-
 private theorem validateTokens_sound (file : SourceFile)
     (index previousEnd : Nat) (tokens : List Token)
-    (result : validateTokens file index previousEnd tokens = .ok ()) :
+    (result : LexedValidation.tokens file index previousEnd tokens = .ok ()) :
     SpanSequence.ValidFor file (fun token : Token => token.span)
       previousEnd tokens := by
   induction tokens generalizing index previousEnd with
   | nil => trivial
   | cons token rest ih =>
-      simp only [validateTokens] at result
+      simp only [LexedValidation.tokens] at result
       split at result
       · rename_i accepted
         simp only [Bool.and_eq_true,
@@ -76,13 +46,13 @@ private theorem validateTokens_sound (file : SourceFile)
 
 private theorem validateComments_sound (file : SourceFile)
     (index previousEnd : Nat) (comments : List Comment)
-    (result : validateComments file index previousEnd comments = .ok ()) :
+    (result : LexedValidation.comments file index previousEnd comments = .ok ()) :
     SpanSequence.ValidFor file (fun comment : Comment => comment.span)
       previousEnd comments := by
   induction comments generalizing index previousEnd with
   | nil => trivial
   | cons comment rest ih =>
-      simp only [validateComments] at result
+      simp only [LexedValidation.comments] at result
       split at result
       · rename_i accepted
         simp only [Bool.and_eq_true,
@@ -96,12 +66,12 @@ private theorem validateComments_sound (file : SourceFile)
 
 private theorem validateLexicalDiagnostics_sound (file : SourceFile)
     (index : Nat) (diagnostics : List LexicalDiagnostic)
-    (result : validateLexicalDiagnostics file index diagnostics = .ok ()) :
+    (result : LexedValidation.lexicalDiagnostics file index diagnostics = .ok ()) :
     ∀ diagnostic ∈ diagnostics, diagnostic.span.ValidFor file := by
   induction diagnostics generalizing index with
   | nil => simp
   | cons head tail ih =>
-      simp only [validateLexicalDiagnostics] at result
+      simp only [LexedValidation.lexicalDiagnostics] at result
       split at result
       · rename_i accepted
         intro diagnostic member
@@ -115,14 +85,14 @@ private theorem validateTokens_complete (file : SourceFile)
     (index previousEnd : Nat) (tokens : List Token)
     (valid : SpanSequence.ValidFor file
       (fun token : Token => token.span) previousEnd tokens) :
-    validateTokens file index previousEnd tokens = .ok () := by
+    LexedValidation.tokens file index previousEnd tokens = .ok () := by
   induction tokens generalizing index previousEnd with
   | nil => rfl
   | cons token rest ih =>
       simp only [SpanSequence.ValidFor] at valid
       rcases valid with
         ⟨spanValid, afterPrevious, nonempty, restValid⟩
-      simp only [validateTokens]
+      simp only [LexedValidation.tokens]
       have accepted :
           (token.span.isValidFor file &&
             decide (previousEnd ≤ token.span.startByte) &&
@@ -139,14 +109,14 @@ private theorem validateComments_complete (file : SourceFile)
     (index previousEnd : Nat) (comments : List Comment)
     (valid : SpanSequence.ValidFor file
       (fun comment : Comment => comment.span) previousEnd comments) :
-    validateComments file index previousEnd comments = .ok () := by
+    LexedValidation.comments file index previousEnd comments = .ok () := by
   induction comments generalizing index previousEnd with
   | nil => rfl
   | cons comment rest ih =>
       simp only [SpanSequence.ValidFor] at valid
       rcases valid with
         ⟨spanValid, afterPrevious, nonempty, restValid⟩
-      simp only [validateComments]
+      simp only [LexedValidation.comments]
       have accepted :
           (comment.span.isValidFor file &&
             decide (previousEnd ≤ comment.span.startByte) &&
@@ -163,11 +133,11 @@ private theorem validateLexicalDiagnostics_complete (file : SourceFile)
     (index : Nat) (diagnostics : List LexicalDiagnostic)
     (valid : ∀ diagnostic ∈ diagnostics,
       diagnostic.span.ValidFor file) :
-    validateLexicalDiagnostics file index diagnostics = .ok () := by
+    LexedValidation.lexicalDiagnostics file index diagnostics = .ok () := by
   induction diagnostics generalizing index with
   | nil => rfl
   | cons head tail ih =>
-      simp only [validateLexicalDiagnostics]
+      simp only [LexedValidation.lexicalDiagnostics]
       have headValid : head.span.isValidFor file = true :=
         (SourceSpan.isValidFor_eq_true_iff head.span file).mpr
           (valid head (by simp))
@@ -175,15 +145,6 @@ private theorem validateLexicalDiagnostics_complete (file : SourceFile)
       apply ih (index := index + 1)
       intro diagnostic member
       exact valid diagnostic (by simp [member])
-
-/-- Validate all provenance consumed or retained by `parseLexed`. -/
-def validateLexed (file : SourceFile)
-    (lexed : LexedFile) : Except ParserInvariantError Unit := do
-  if lexed.source ≠ file.id then
-    throw (.invalidLexedSource file.id lexed.source)
-  validateTokens file 0 0 lexed.tokens
-  validateComments file 0 0 lexed.comments
-  validateLexicalDiagnostics file 0 lexed.diagnostics
 
 /-- Successful parser preflight exposes its complete declarative contract. -/
 theorem validateLexed_ok_validFor (file : SourceFile) (lexed : LexedFile)
@@ -193,20 +154,20 @@ theorem validateLexed_ok_validFor (file : SourceFile) (lexed : LexedFile)
   split at result
   · contradiction
   · rename_i sourceAccepted
-    cases tokensResult : validateTokens file 0 0 lexed.tokens with
+    cases tokensResult : LexedValidation.tokens file 0 0 lexed.tokens with
     | error error =>
         rw [tokensResult] at result
         contradiction
     | ok witness =>
         cases witness
-        cases commentsResult : validateComments file 0 0 lexed.comments with
+        cases commentsResult : LexedValidation.comments file 0 0 lexed.comments with
         | error error =>
             rw [tokensResult, commentsResult] at result
             contradiction
         | ok witness =>
             cases witness
             cases diagnosticsResult :
-                validateLexicalDiagnostics file 0 lexed.diagnostics with
+                LexedValidation.lexicalDiagnostics file 0 lexed.diagnostics with
             | error error =>
                 rw [tokensResult, commentsResult, diagnosticsResult] at result
                 contradiction
