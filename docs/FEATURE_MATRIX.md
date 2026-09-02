@@ -162,6 +162,19 @@ Endpoints are deterministic and success/rejection are exclusive. The strict
 diagnostic-free `ConstructorDeclParses` judgment remains available alongside
 this broader malformed-source outcome contract.
 
+Broad ordinary `fallbackDecl` outcomes now retain the exact `fallback` keyword
+and recovery-aware parameter list through a pure validation stage. Empty
+parameters pass silently; nonempty parameters remain in the AST, emit their
+constraint diagnostic, and leave the declarative remainder unchanged. The
+fixed optional `public`-then-`payable` modifiers and isolated `.require` body
+follow in exact order. Success preserves the fallback AST, marker/body cover
+span, payable marker, and final remainder. Rejection exposes only marker
+absence, parameter rejection, or uncaptured body rejection after validation
+and modifier success. A balanced captured child rejection becomes diagnosed
+empty-body recovery success at the parent remainder. Endpoints are deterministic
+and success/rejection exclusive; strict diagnostic-free `FallbackDeclParses`
+remains available as the canonical acceptance judgment.
+
 The implementation-method wrapper also has a broad ordinary outcome. It
 preserves the wrapped declaration span, empty parser-time leading comments,
 and exact remainder, while exposing only nested function-declaration

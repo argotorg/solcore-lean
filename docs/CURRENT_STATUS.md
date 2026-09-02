@@ -374,6 +374,19 @@ rejection instead yields diagnosed empty-body recovery success at the parent
 remainder. Outcomes are deterministic and exclusive, while the existing
 `ConstructorDeclParses` relation remains the strict diagnostic-free judgment.
 
+A broad ordinary `fallbackDecl` outcome now begins with the exact `fallback`
+keyword and recovery-aware parameters, followed by a pure validation stage.
+Empty parameters pass silently; nonempty parameters remain in the AST and emit
+the fallback-specific diagnostic without changing the declarative remainder.
+Parsing then keeps the fixed optional `public`-then-`payable` modifier order and
+enters an isolated `.require` Core body. Success preserves the complete AST,
+marker-to-body cover span, retained parameters, payable marker, and exact final
+remainder. Rejection exposes exactly three external stages: missing marker,
+rejected parameters, or an uncaptured body rejection after validation and
+modifier success. A balanced captured child rejection instead becomes a
+diagnosed empty-body recovery success at the parent remainder. Outcomes are
+deterministic and exclusive; strict diagnostic-free `FallbackDeclParses` remains.
+
 The implementation-method wrapper now lifts that broad declaration outcome
 without adding syntax or rejection stages. Success retains the declaration
 span, an empty parser-time leading-comment list, and the exact final remainder;

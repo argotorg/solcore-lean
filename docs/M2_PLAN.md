@@ -262,6 +262,19 @@ recovery success at the exact parent remainder. Success is deterministic and
 exclusive with rejection; strict diagnostic-free `ConstructorDeclParses`
 continues to coexist as the canonical acceptance judgment.
 
+The broad ordinary `fallbackDecl` layer now follows the exact `fallback`
+keyword with recovery-aware parameters and a pure validation outcome. Empty
+parameters pass directly, while nonempty parameters are retained in the AST
+and emit their constraint diagnostic without changing the declarative
+remainder. Fixed optional `public`-then-`payable` modifiers then precede the
+isolated `.require` body. Success retains every AST field, the marker/body cover
+span, and the exact final remainder. Exact rejection has only marker absence,
+parameter rejection, or uncaptured body rejection after validation and
+modifier success. A balanced captured child rejection is absorbed as diagnosed
+empty-body recovery at the parent remainder. Success endpoints are deterministic
+and exclusive with rejection, while strict diagnostic-free
+`FallbackDeclParses` continues as the canonical acceptance judgment.
+
 The implementation-method wrapper now carries that broad declaration contract
 one level upward. Its exact AST adds only the empty parser-time comment list,
 and its final remainder is unchanged; its sole rejection stage is the nested
