@@ -10,6 +10,11 @@ open Solcore.Syntax
 open Solcore.Syntax.DeclarativeGrammar
 open Solcore.Syntax.Parser
 
+example := @TransactionalFallbackOrdinaryParses.value_unique
+example := @TransactionalFallbackOrdinaryParses.result_unique
+example := @TransactionalFallbackRejects.output_unique
+example := @transactionalFallbackExactOutcomeSpec
+
 example := @YulStatementParses
 example := @YulStatementOrdinaryParses
 example := @YulStatementPublicRejects
