@@ -1,6 +1,7 @@
 import Solcore.Syntax.DeclarativePragmaOutcomeProperties
 import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.PragmaDeclarationOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.PragmaSoundnessProperties
 
 /-! Complete executable ordinary outcomes for pragma declarations. -/
 

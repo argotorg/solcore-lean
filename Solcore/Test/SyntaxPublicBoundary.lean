@@ -242,6 +242,16 @@ example := @Syntax.DeclarativeGrammar.exportPathDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.FinishExportOrdinaryParses
 example := @Syntax.DeclarativeGrammar.FinishExportRejects
 example := @Syntax.DeclarativeGrammar.finishExportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PragmaItemsTokenPresentAt
+example := @Syntax.DeclarativeGrammar.PragmaItemsTailOrdinaryParses
+example := @Syntax.DeclarativeGrammar.PragmaItemsTailRejects
+example := @Syntax.DeclarativeGrammar.pragmaItemsTailDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PragmaItemsOrdinaryParses
+example := @Syntax.DeclarativeGrammar.PragmaItemsRejects
+example := @Syntax.DeclarativeGrammar.pragmaItemsDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.PragmaDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.PragmaDeclRejects
+example := @Syntax.DeclarativeGrammar.pragmaDeclDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -414,6 +424,14 @@ example := @Syntax.Parser.finishExport_success_ordinaryOutcome_sound
 example := @Syntax.Parser.finishExport_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.finishExport_ordinaryOutcome_sound
 example := @Syntax.Parser.finishExport_ordinaryOutcomeSpec
+example := @Syntax.Parser.rawIdentifier_ordinaryOutcome_sound
+example := @Syntax.Parser.rawIdentifier_ordinaryOutcomeSpec
+example := @Syntax.Parser.PragmaInternals.pragmaItems_ordinaryOutcome_sound
+example := @Syntax.Parser.PragmaInternals.pragmaItems_ordinaryOutcomeSpec
+example := @Syntax.Parser.pragmaDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.pragmaDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.pragmaDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.pragmaDecl_ordinaryOutcomeSpec
 
 example {input output : Syntax.Parser.State} {field : ContractField}
     (result : Syntax.Parser.ContractInternals.contractField
