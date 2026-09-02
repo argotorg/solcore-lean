@@ -340,6 +340,12 @@ validity. The ordinary component relations remain reusable for recovered
 parser outcomes; the diagnostic-free premise excludes such recoveries from
 these public conclusions.
 
+Selected-import aliases now expose an exact broad outcome: an absent `as`
+returns `none` without consumption, while a positive guard commits to one
+checked identifier. Its only rejection is the missing identifier immediately
+after the marker, retaining that exact remainder. Success is deterministic and
+exclusive with rejection.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

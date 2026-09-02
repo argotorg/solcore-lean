@@ -481,6 +481,12 @@ The component relations deliberately remain recovery-aware ordinary
 over-approximations, while the outer diagnostic-free premise excludes actual
 recovery successes at the complete-file boundary.
 
+Selected-import aliases now have an exact broad ordinary outcome. An absent
+`as` is a nonconsuming `none` success; a positive `as` guard commits to one
+checked identifier. The sole rejection is identifier absence immediately
+after the consumed marker, with its exact remainder. Success is deterministic
+and success/rejection are exclusive.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

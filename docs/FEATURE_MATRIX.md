@@ -217,6 +217,13 @@ separate marker, name, required-generic, optional-`where`, and body rejection.
 Each level has deterministic success endpoints and disjoint success/rejection;
 the strict diagnostic-free and source-validity families remain available.
 
+Selected-import alias outcomes preserve the optional branch priority exactly:
+no `as` gives a nonconsuming `none`, while a positively guarded `as` commits to
+one checked identifier. Missing that identifier is the sole rejection and
+stops immediately after the marker. The endpoint is deterministic and
+success/rejection are exclusive; complete import declarations still retain
+their existing strict diagnostic-free judgments.
+
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
 optional `default`, nonempty implementation heads, member and method order,
