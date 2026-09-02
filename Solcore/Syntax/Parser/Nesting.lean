@@ -1,4 +1,5 @@
 import Solcore.Syntax.Lexer.Contract
+import Solcore.Syntax.DeclarativeNestingOutcomeGrammar
 import Solcore.Syntax.Parser.Diagnostic
 
 /-! Bounded nesting preflight for the canonical syntax parser. -/
@@ -8,7 +9,8 @@ set_option autoImplicit false
 namespace Solcore.Syntax.Parser
 
 /-- Canonical parser guard applied before recursive token grammar. -/
-def maxSyntaxNesting : Nat := 128
+def maxSyntaxNesting : Nat :=
+  DeclarativeGrammar.canonicalNestingLimit
 
 private structure NestingState where
   delimiterDepth : Nat := 0
