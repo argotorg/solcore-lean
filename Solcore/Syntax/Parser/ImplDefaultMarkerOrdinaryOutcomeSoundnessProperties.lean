@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeImplDefaultMarkerOutcomeProperties
+import Solcore.Syntax.DeclarativeImplDefaultMarkerExactnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.ImplHeadSoundnessProperties
 
@@ -51,5 +51,37 @@ theorem implDefaultMarker_ordinaryOutcomeSpec :
       DeclarativeGrammar.OptionalImplDefaultMarkerOrdinaryParses
       DeclarativeGrammar.OptionalImplDefaultMarkerRejects :=
   DeclarativeGrammar.optionalImplDefaultMarkerDeterministicOutcomeSpec
+
+/-- Re-export exact optional-default values and rejection endpoints. -/
+theorem implDefaultMarker_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.OptionalImplDefaultMarkerOrdinaryParses
+      DeclarativeGrammar.OptionalImplDefaultMarkerRejects :=
+  DeclarativeGrammar.optionalImplDefaultMarkerExactOutcomeSpec
+
+/-- Two successful optional-default parses have the same marker and final
+declarative remainder. -/
+theorem implDefaultMarker_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : Option SourceSpan}
+    (leftResult : implDefaultMarker input = .ok left leftOutput)
+    (rightResult : implDefaultMarker input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalImplDefaultMarkerOrdinaryParses.result_unique
+    (implDefaultMarker_success_ordinaryOutcome_sound leftResult)
+    (implDefaultMarker_success_ordinaryOutcome_sound rightResult)
+
+/-- Two impossible optional-default rejections have the same declarative
+endpoint. -/
+theorem implDefaultMarker_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : implDefaultMarker input = .reject leftFailure leftOutput)
+    (rightResult : implDefaultMarker input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalImplDefaultMarkerRejects.output_unique
+    (implDefaultMarker_reject_ordinaryOutcome_sound leftResult)
+    (implDefaultMarker_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser.ImplInternals
