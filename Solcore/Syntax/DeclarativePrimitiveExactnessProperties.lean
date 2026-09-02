@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreExpressionPostfixOrdinaryProperties
+import Solcore.Syntax.DeclarativeCoreIdentifierOutcomeProperties
 import Solcore.Syntax.DeclarativeExactOutcomeSpec
 
 /-! Exact functionality of primitive declarative token outcomes. -/
