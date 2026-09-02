@@ -185,6 +185,17 @@ success/rejection exclusive. The existing parametric `ContractFieldParses`
 relation remains available alongside this broad outcome as the strict
 acceptance judgment.
 
+Broad ordinary type-alias outcomes preserve optional allow-empty,
+allow-trailing parenthesized parameters and the exact declaration order. A
+Core RHS may succeed directly; otherwise a nonempty malformed RHS is recovered
+as `.error` through the prefix before an unconsumed semicolon. An empty or
+immediate-boundary RHS rejects. Rejection records exactly six first-failing
+stages: missing `type`, rejected name, committed parameter-list rejection,
+missing `=`, RHS rejection, or missing semicolon. Success retains the exact
+alias AST, keyword/semicolon cover span, and final remainder; endpoints are
+deterministic and success/rejection exclusive. The strict diagnostic-free
+`TypeAliasDeclParses` relation remains available alongside this broad outcome.
+
 The implementation-method wrapper also has a broad ordinary outcome. It
 preserves the wrapped declaration span, empty parser-time leading comments,
 and exact remainder, while exposing only nested function-declaration
