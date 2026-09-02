@@ -114,10 +114,15 @@ normal `#[derive(...)]` attributes now have exact parser-independent grammars;
 the public attribute theorem uses diagnostic freedom only to exclude recovery.
 
 Shared generic parameters now have an exact nonempty `<...>` grammar with an
-optional trailing comma. The optional judgment preserves executable priority
-by requiring the leading `<` to be absent in its absent branch. Both the list
-and optional-wrapper parsers have unconditional success soundness and compose
-with their established source-validity contracts.
+optional trailing comma. Required-list rejection records the exact delimiter
+or nested checked-identifier failure. `requireGenericParameters` adds no
+reject branch; its defensive empty-list invariant is unreachable after a
+successful required-list parse. The optional judgment makes an absent `<` a
+nonconsuming success, while a present guard commits from the original input
+and retains positive evidence for that `<`. Required and optional success
+endpoints are deterministic and each is exclusive with exact rejection. Both
+parsers also retain unconditional success soundness and compose with their
+established source-validity contracts.
 
 Algebraic enum declarations now have exact grammar and unconditional success
 soundness from the contextual `enum` marker through the closing brace.

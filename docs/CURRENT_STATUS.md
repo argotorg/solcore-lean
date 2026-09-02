@@ -227,11 +227,14 @@ targets, and exact normal `#[derive(...)]` attributes; diagnostic-free public
 attribute soundness excludes its malformed recovery path.
 
 Shared generic parameters now have an exact nonempty `<...>` grammar with an
-optional trailing comma. Their prioritized optional wrapper records the
-absence of a leading `<` in its absent branch, so the declarative judgment
-matches the executable branch choice exactly. Both the list and
-optional-wrapper parsers have unconditional success soundness and
-source-validity compositions.
+optional trailing comma. Required-list rejection records the exact delimiter
+or nested checked-identifier failure. `requireGenericParameters` has no reject
+branch; its defensive empty-list invariant is unreachable after a successful
+required-list parse. An absent leading `<` is a nonconsuming optional success,
+while a present guard commits from the original input and retains positive
+evidence for that `<`. Required and optional success endpoints are
+deterministic and each is exclusive with exact rejection. Both parsers also
+retain unconditional success soundness and source-validity compositions.
 
 Algebraic enums now have exact parser-independent coverage from the contextual
 `enum` marker through the closing brace. Constructor payloads are selected by

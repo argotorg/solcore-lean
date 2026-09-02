@@ -54,14 +54,20 @@ published through Oracle v4.
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
 exported by the public syntax umbrella and checked by compile-time consumers.
-The generic optional judgment records exact leading-`<` priority. Enum
-constructor payloads are selected by a leading `(`; when present, they may
-contain zero fields but cannot have a trailing comma. Enum bodies admit an
-optional trailing comma while preserving forward constructor order. Every
-successful enum declaration is unconditionally grammar-sound, retains any
-supplied derive attribute in its AST, and uses that attribute's span as the
-outer span start. These registered theorem families are included in the
-successful full build and `lake test`.
+Required generic parameters are a nonempty `<...>` list with an optional
+trailing comma; exact rejection retains either the delimiter or nested checked
+identifier failure. `requireGenericParameters` contributes no rejection, only
+an unreachable defensive empty-list invariant. For optional generics, an
+absent `<` is a nonconsuming success, while a positive guard commits from the
+original input and preserves its `<` evidence. Required and optional success
+endpoints are deterministic and success/rejection exclusive. Enum constructor
+payloads are selected by a leading `(`; when present, they may contain zero
+fields but cannot have a trailing comma. Enum bodies admit an optional trailing
+comma while preserving forward constructor order. Every successful enum
+declaration is unconditionally grammar-sound, retains any supplied derive
+attribute in its AST, and uses that attribute's span as the outer span start.
+These registered theorem families are included in the successful full build
+and `lake test`.
 
 Backward diagnostic reflection composes through parser sequencing,
 transactional choice, token consumers, and delimiters. Its concrete instances
