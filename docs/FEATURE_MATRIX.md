@@ -61,13 +61,15 @@ an unreachable defensive empty-list invariant. For optional generics, an
 absent `<` is a nonconsuming success, while a positive guard commits from the
 original input and preserves its `<` evidence. Required and optional success
 endpoints are deterministic and success/rejection exclusive. Enum constructor
-payloads are selected by a leading `(`; when present, they may contain zero
-fields but cannot have a trailing comma. Enum bodies admit an optional trailing
-comma while preserving forward constructor order. Every successful enum
-declaration is unconditionally grammar-sound, retains any supplied derive
-attribute in its AST, and uses that attribute's span as the outer span start.
-These registered theorem families are included in the successful full build
-and `lake test`.
+payloads commit on a leading `(`; when present, they may contain zero fields
+but cannot have a trailing comma. The custom enum-body loop has exact
+allow-empty, allow-trailing success and rejection outcomes while preserving
+forward constructor order. Full declarations distinguish contextual-marker,
+name, optional-generic, and body rejection. Every constructor, body, and
+declaration outcome has a deterministic success endpoint and disjoint
+success/rejection. Supplied derive attributes remain non-consuming AST inputs
+and determine the outer span start. These registered theorem families are
+included in the successful full build and `lake test`.
 
 Backward diagnostic reflection composes through parser sequencing,
 transactional choice, token consumers, and delimiters. Its concrete instances

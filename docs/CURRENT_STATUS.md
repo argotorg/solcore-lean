@@ -236,14 +236,17 @@ evidence for that `<`. Required and optional success endpoints are
 deterministic and each is exclusive with exact rejection. Both parsers also
 retain unconditional success soundness and source-validity compositions.
 
-Algebraic enums now have exact parser-independent coverage from the contextual
-`enum` marker through the closing brace. Constructor payloads are selected by
-a leading `(`; when present, they may contain zero fields but cannot have a
-trailing comma. Enum bodies may be empty, admit an optional trailing comma,
-and retain constructors in forward source order. Every successful enum
-declaration is unconditionally grammar-sound. It retains an already supplied
-derive attribute in its AST field and uses that attribute's span as the outer
-span start; source validity composes with the supplied derive contract.
+Algebraic enums now have exact parser-independent ordinary success and
+rejection coverage from the contextual `enum` marker through the closing
+brace. A leading `(` commits constructor payload parsing; payloads may be empty
+but cannot have a trailing comma. The custom body loop is reflected into the
+allow-empty, allow-trailing delimited outcome relation with forward constructor
+order and exact rejection remainders. Full declarations distinguish marker,
+name, optional-generic, and body rejection. Constructor, body, and declaration
+outcomes have deterministic success endpoints and disjoint success/rejection.
+An already supplied derive attribute consumes no input, remains in the AST,
+and supplies the outer span start; source validity composes with its existing
+contract.
 
 Recursive type expressions now have exact parser-independent coverage for
 named, mapping, comptime, proxy, tuple, and function forms. Their mutually
