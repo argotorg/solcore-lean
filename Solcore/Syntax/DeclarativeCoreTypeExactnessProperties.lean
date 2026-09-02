@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeCoreTypeDispatcherRejectionExactnessProperties
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
-import Solcore.Syntax.DeclarativeCoreTypeSuccessExactnessProperties
+import Solcore.Syntax.DeclarativeCoreTypeCompositeSuccessExactnessProperties
 
 /-! Full value and rejection-endpoint functionality for recursive Core types. -/
 
