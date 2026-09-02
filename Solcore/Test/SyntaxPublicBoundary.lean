@@ -134,6 +134,18 @@ example := @Syntax.DeclarativeGrammar.typeAliasValueDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.TypeAliasDeclOrdinaryParses
 example := @Syntax.DeclarativeGrammar.TypeAliasDeclRejects
 example := @Syntax.DeclarativeGrammar.typeAliasDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalEnumConstructorFieldsOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalEnumConstructorFieldsRejects
+example := @Syntax.DeclarativeGrammar.optionalEnumConstructorFieldsDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.EnumConstructorOrdinaryParses
+example := @Syntax.DeclarativeGrammar.EnumConstructorRejects
+example := @Syntax.DeclarativeGrammar.enumConstructorDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.EnumBodyOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.EnumBodyRejects
+example := @Syntax.DeclarativeGrammar.enumBodyDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.EnumDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.EnumDeclRejects
+example := @Syntax.DeclarativeGrammar.enumDeclDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -208,6 +220,14 @@ example := @Syntax.Parser.typeAlias_success_ordinaryOutcome_sound
 example := @Syntax.Parser.typeAlias_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.typeAlias_ordinaryOutcome_sound
 example := @Syntax.Parser.typeAlias_ordinaryOutcomeSpec
+example := @Syntax.Parser.EnumInternals.enumConstructorFields_ordinaryOutcome_sound
+example := @Syntax.Parser.EnumInternals.enumConstructorFields_ordinaryOutcomeSpec
+example := @Syntax.Parser.EnumInternals.enumConstructor_ordinaryOutcome_sound
+example := @Syntax.Parser.EnumInternals.enumConstructor_ordinaryOutcomeSpec
+example := @Syntax.Parser.EnumInternals.enumBody_ordinaryOutcome_sound
+example := @Syntax.Parser.EnumInternals.enumBody_ordinaryOutcomeSpec
+example := @Syntax.Parser.enumDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.enumDecl_ordinaryOutcomeSpec
 
 example {input output : Syntax.Parser.State} {field : ContractField}
     (result : Syntax.Parser.ContractInternals.contractField
@@ -247,5 +267,12 @@ example {input rejected : Syntax.Parser.State}
     Syntax.DeclarativeGrammar.TypeAliasDeclRejects
       input.declarativeRemainder rejected.declarativeRemainder :=
   Syntax.Parser.typeAlias_reject_ordinaryOutcome_sound result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.enumDecl none input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.EnumDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.enumDecl_reject_ordinaryOutcome_sound none result
 
 end Tests
