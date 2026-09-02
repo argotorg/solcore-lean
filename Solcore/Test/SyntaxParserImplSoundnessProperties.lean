@@ -1,6 +1,7 @@
 import Solcore.Syntax.Parser.ImplDeclSoundnessProperties
+import Solcore.Syntax.Parser.ImplMethodOrdinaryOutcomeSoundnessProperties
 
-/-! External consumers for parametric implementation-declaration soundness. -/
+/-! External consumers for strict and broad implementation soundness. -/
 
 set_option autoImplicit false
 
@@ -13,6 +14,9 @@ open Solcore.Syntax.Parser
 example := @OptionalImplDefaultMarkerParses
 example := @ImplHeadArgumentsParses
 example := @ImplMethodParses
+example := @ImplMethodOrdinaryParses
+example := @ImplMethodRejects
+example := @implMethodDeterministicOutcomeSpec
 example := @ImplMethodTailParses
 example := @ImplBodyParses
 example := @ImplDeclParses
@@ -29,6 +33,10 @@ example := @ImplInternals.implMethod_reflectsDiagnosticFreeOnSuccess
 example := @ImplInternals.implMethod_success_sound
 example := @ImplInternals.implMethod_success_sound_and_validFor
 example := @ImplInternals.implMethod_validFor
+example := @ImplInternals.implMethod_success_ordinaryOutcome_sound
+example := @ImplInternals.implMethod_reject_ordinaryOutcome_sound
+example := @ImplInternals.implMethod_ordinaryOutcome_sound
+example := @ImplInternals.implMethod_ordinaryOutcomeSpec
 
 example := @ImplInternals.implBody_reflectsDiagnosticFreeOnSuccess
 example := @ImplInternals.implBody_success_sound
@@ -61,5 +69,17 @@ example
       ImplDecl.ValidFor statementValid input.file declaration :=
   implDecl_success_sound_and_validFor statementValid bodyParses bodyValid
     bodyWindow bodyReflects bodySound inputValid diagnosticFree result
+
+example {input next : State} {method : ImplMethod}
+    (result : ImplInternals.implMethod input = .ok method next) :
+    ImplMethodOrdinaryParses input.declarativeRemainder method
+      next.declarativeRemainder :=
+  ImplInternals.implMethod_success_ordinaryOutcome_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : ImplInternals.implMethod input = .reject failure rejected) :
+    ImplMethodRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  ImplInternals.implMethod_reject_ordinaryOutcome_sound result
 
 end Solcore.Test.SyntaxParserImplSoundnessProperties
