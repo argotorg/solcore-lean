@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.ExportDeclSoundnessProperties
+import Solcore.Syntax.Parser.LocalExportOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for complete export-declaration grammar soundness. -/
 
@@ -12,6 +13,9 @@ open Solcore.Syntax.Parser
 
 example := @FinishExportParses
 example := @LocalExportTailParses
+example := @LocalExportOrdinaryParses
+example := @LocalExportRejects
+example := @localExportDeterministicOutcomeSpec
 example := @ItemsFromExportTailParses
 example := @ModuleAsExportTailParses
 example := @ModuleExportTailParses
@@ -24,6 +28,10 @@ example := @ExportDeclParses
 
 example := @finishExport_success_sound
 example := @localExport_success_sound
+example := @localExport_success_ordinaryOutcome_sound
+example := @localExport_reject_ordinaryOutcome_sound
+example := @localExport_ordinaryOutcome_sound
+example := @localExport_ordinaryOutcomeSpec
 example := @pathExport_success_sound
 example := @exportDecl_success_sound
 example := @exportDecl_success_sound_and_validFor
