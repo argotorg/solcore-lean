@@ -395,6 +395,17 @@ stages. Item-tail, item-list, and declaration successful remainders are
 deterministic, and success is disjoint from rejection. The public packages are
 compile-time consumed without claiming broad top-item or file rejection.
 
+Dotted derive targets now have exact broad ordinary success and rejection at
+the component, recursive dotted-tail, and complete-target layers. Component
+success includes checked identifiers and diagnosed reserved hard keywords;
+component rejection requires both alternatives to be unavailable. Tail
+rejection retains the consumed dot and the exact first or later component
+failure. Each layer has a unique successful remainder and disjoint
+success/rejection. Executable success and rejection reflection are publicly
+registered and compile-time consumed at dedicated and umbrella boundaries.
+Rejection-endpoint and AST uniqueness, exact broad derive-attribute recovery,
+and derive-aware contract-member outcomes remain later work.
+
 Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
 its prioritized six-way dispatcher. Identifier-plus-colon field lookahead runs
 before `function`, `constructor`, `fallback`, `type`, and contextual `enum`;

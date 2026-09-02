@@ -255,6 +255,17 @@ item-list, and declaration successful remainders are deterministic, and
 success is disjoint from rejection. Public packages are compile-time consumed;
 no broad top-item or file rejection is claimed.
 
+Dotted derive targets now have exact broad ordinary outcomes for components,
+recursive dotted tails, and complete targets. Success retains checked
+identifiers as well as diagnosed reserved hard keywords. Rejection records
+that neither component alternative is available, or preserves the consumed
+dot and exact first or later component failure. Successful remainders are
+unique and success/rejection are disjoint at each layer. Executable success and
+rejection reflection are exported through the public syntax umbrella and
+checked by dedicated and public-boundary consumers. This adds no
+rejection-endpoint or AST uniqueness claim and does not yet cover exact broad
+derive-attribute recovery or derive-aware contract members.
+
 Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
 field, function, constructor, fallback, type-alias, and contextual-enum
 dispatch in executable priority order. Identifier-plus-colon field lookahead
