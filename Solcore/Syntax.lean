@@ -41,7 +41,7 @@ import Solcore.Syntax.Parser.ImplDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ImplMethodOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ImportDeclSoundnessProperties
 import Solcore.Syntax.Parser.LocalExportItemSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathSoundnessProperties
+import Solcore.Syntax.Parser.ModulePathOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.NamespaceImportSoundnessProperties
 import Solcore.Syntax.Parser.PlainImportSoundnessProperties
 import Solcore.Syntax.Parser.PlainTopItemDiagnosticReflectionProperties
@@ -58,7 +58,7 @@ import Solcore.Syntax.Parser.SelectedAliasOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportsSoundnessProperties
 import Solcore.Syntax.Parser.SelectiveImportSoundnessProperties
-import Solcore.Syntax.Parser.SelectorNameSoundnessProperties
+import Solcore.Syntax.Parser.SelectorNameOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.SourceFileSoundnessProperties
 import Solcore.Syntax.Parser.TopItemSoundnessProperties
 import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
