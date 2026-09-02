@@ -1,3 +1,4 @@
+import Solcore.Syntax.DeclarativeCoreTypeExactnessProperties
 import Solcore.Syntax.Parser.CoreFunctionTypeRejectionSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeNamedRejectionSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeSimpleRejectionSoundnessProperties
@@ -143,6 +144,40 @@ theorem typeExprWithFuel_ordinaryOutcome_sound (fuel : Nat) :
           input.declarativeRemainder rejected.declarativeRemainder) :=
   ⟨typeExprWithFuel_success_sound fuel, typeExprWithFuel_reject_sound fuel⟩
 
+/-- Re-export the exact outcome contract at one executable recursion fuel. -/
+theorem typeExprWithFuel_exactOutcomeSpec (fuel : Nat) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.TypeExprOrdinaryParses
+      (DeclarativeGrammar.TypeExprRejectsWithFuel fuel) :=
+  DeclarativeGrammar.typeExprExactOutcomeSpecWithFuel fuel
+
+/-- Two successful same-fuel executable reflections have the same type AST and
+final declarative remainder. -/
+theorem typeExprWithFuel_success_result_unique
+    (fuel : Nat) {input leftOutput rightOutput : State}
+    {left right : TypeExpr}
+    (leftResult : typeExprWithFuel fuel input = .ok left leftOutput)
+    (rightResult : typeExprWithFuel fuel input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.TypeExprParses.result_unique
+    (typeExprWithFuel_success_sound fuel leftResult)
+    (typeExprWithFuel_success_sound fuel rightResult)
+
+/-- Two rejected same-fuel executable reflections have the same exact
+declarative endpoint. -/
+theorem typeExprWithFuel_reject_output_unique
+    (fuel : Nat) {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : typeExprWithFuel fuel input =
+      .reject leftFailure leftOutput)
+    (rightResult : typeExprWithFuel fuel input =
+      .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  (typeExprWithFuel_exactOutcomeSpec fuel).rejectOutputUnique
+    (typeExprWithFuel_reject_sound fuel leftResult)
+    (typeExprWithFuel_reject_sound fuel rightResult)
+
 /-- Every public executable rejection uses the same remainder-derived fuel as
 the public parser-independent rejection relation. -/
 theorem typeExpr_reject_sound {input rejected : State} {failure : Failure}
@@ -168,5 +203,35 @@ theorem typeExpr_ordinaryOutcome_sound :
         DeclarativeGrammar.TypeExprRejects input.declarativeRemainder
           rejected.declarativeRemainder) :=
   ⟨typeExpr_success_sound, typeExpr_reject_sound⟩
+
+/-- Re-export full public Core type value and rejection-endpoint
+functionality. -/
+theorem typeExpr_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.TypeExprOrdinaryParses
+      DeclarativeGrammar.TypeExprRejects :=
+  DeclarativeGrammar.typeExprExactOutcomeSpec
+
+/-- Two successful public executable reflections have the same type AST and
+final declarative remainder. -/
+theorem typeExpr_success_result_unique
+    {input leftOutput rightOutput : State} {left right : TypeExpr}
+    (leftResult : typeExpr input = .ok left leftOutput)
+    (rightResult : typeExpr input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.TypeExprParses.result_unique
+    (typeExpr_success_sound leftResult) (typeExpr_success_sound rightResult)
+
+/-- Two rejected public executable reflections have the same exact
+declarative endpoint. -/
+theorem typeExpr_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : typeExpr input = .reject leftFailure leftOutput)
+    (rightResult : typeExpr input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.TypeExprRejects.output_unique
+    (typeExpr_reject_sound leftResult) (typeExpr_reject_sound rightResult)
 
 end Solcore.Syntax.Parser
