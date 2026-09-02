@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreTypeNameExactnessProperties
-import Solcore.Syntax.Parser.TypeExprSoundnessProperties
+import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 
 /-! External consumers for recursive type-expression grammar soundness. -/
 
@@ -22,9 +22,29 @@ example := @QualifiedNameParses.result_unique
 example := @TypeQualifiedNameTailRejects.output_unique
 example := @TypeQualifiedNameRejects.output_unique
 example := @typeQualifiedNameExactOutcomeSpec
+example := @FunctionTypeReturnsRejects.output_unique
+example := @FunctionTypeRejects.output_unique
+example := @ComptimeTypeRejects.output_unique
+example := @MappingTypeRejects.output_unique
+example := @ProxyTypeRejects.output_unique
+example := @TupleTypeRejects.output_unique
+example := @NamedTypeArgumentsRejects.output_unique
+example := @NamedTypeRejects.output_unique
+example := @TypeExprCoreRejects.output_unique
+example := @TypeExprParses.value_unique
+example := @TypeExprParses.result_unique
+example := @typeExprExactOutcomeSpecWithFuel
+example := @TypeExprRejects.output_unique
+example := @typeExprExactOutcomeSpec
 example := @typeExprWithFuel_success_sound
 example := @typeExpr_success_sound
 example := @typeExpr_success_sound_and_validFor
+example := @typeExprWithFuel_exactOutcomeSpec
+example := @typeExprWithFuel_success_result_unique
+example := @typeExprWithFuel_reject_output_unique
+example := @typeExpr_exactOutcomeSpec
+example := @typeExpr_success_result_unique
+example := @typeExpr_reject_output_unique
 
 example {input next : State} {value : TypeExpr}
     (result : typeExpr input = .ok value next) :
