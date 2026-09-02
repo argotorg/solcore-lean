@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeFunctionSignatureOutcomeProperties
+import Solcore.Syntax.DeclarativeFunctionSignatureExactnessProperties
 import Solcore.Syntax.Parser.FunctionSignatureOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.FunctionSignatureOrdinarySuccessSoundnessProperties
 
@@ -28,5 +28,41 @@ theorem functionSignature_ordinaryOutcomeSpec :
       DeclarativeGrammar.FunctionSignatureOrdinaryParses
       DeclarativeGrammar.FunctionSignatureRejects :=
   DeclarativeGrammar.functionSignatureDeterministicOutcomeSpec
+
+/-- Re-export complete location-independent signature exactness. -/
+theorem functionSignature_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.FunctionSignatureOrdinaryParses
+      DeclarativeGrammar.FunctionSignatureRejects :=
+  DeclarativeGrammar.functionSignatureExactOutcomeSpec
+
+/-- At any executable location, two successful signatures have the same AST
+and final declarative remainder. -/
+theorem functionSignature_success_result_unique
+    (location : FunctionLocation)
+    {input leftOutput rightOutput : State}
+    {left right : FunctionSignature}
+    (leftResult : functionSignature location input = .ok left leftOutput)
+    (rightResult : functionSignature location input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.FunctionSignatureOrdinaryParses.result_unique
+    (functionSignature_success_ordinaryOutcome_sound location leftResult)
+    (functionSignature_success_ordinaryOutcome_sound location rightResult)
+
+/-- At any executable location, two signature rejections have the same
+declarative endpoint. -/
+theorem functionSignature_reject_output_unique
+    (location : FunctionLocation)
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : functionSignature location input =
+      .reject leftFailure leftOutput)
+    (rightResult : functionSignature location input =
+      .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.FunctionSignatureRejects.output_unique
+    (functionSignature_reject_ordinaryOutcome_sound location leftResult)
+    (functionSignature_reject_ordinaryOutcome_sound location rightResult)
 
 end Solcore.Syntax.Parser

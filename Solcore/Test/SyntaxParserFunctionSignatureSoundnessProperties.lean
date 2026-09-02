@@ -20,6 +20,15 @@ example := @FunctionSignatureParses
 example := @FunctionSignatureOrdinaryParses
 example := @FunctionSignatureRejects
 example := @functionSignatureDeterministicOutcomeSpec
+example := @genericParametersExactOutcomeSpec
+example := @optionalGenericParametersExactOutcomeSpec
+example := @optionalReturnClauseExactOutcomeSpec
+example := @predicateExactOutcomeSpec
+example := @groupedPredicateSequenceExactOutcomeSpec
+example := @barePredicateSequenceExactOutcomeSpec
+example := @predicateSequenceExactOutcomeSpec
+example := @optionalWhereClauseExactOutcomeSpec
+example := @functionSignatureExactOutcomeSpec
 
 example := @optionalFunctionModifier_success_sound
 example := @optionalFunctionModifier_success_sound_and_validFor
@@ -48,6 +57,9 @@ example := @functionSignature_success_ordinaryOutcome_sound
 example := @functionSignature_reject_ordinaryOutcome_sound
 example := @functionSignature_ordinaryOutcome_sound
 example := @functionSignature_ordinaryOutcomeSpec
+example := @functionSignature_exactOutcomeSpec
+example := @functionSignature_success_result_unique
+example := @functionSignature_reject_output_unique
 
 example {input next : State} {signature : FunctionSignature}
     (inputValid : input.ValidFor) (diagnosticFree : next.diagnosticsRev = [])
