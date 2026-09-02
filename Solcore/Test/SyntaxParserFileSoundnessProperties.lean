@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.SourceFileSoundnessProperties
+import Solcore.Syntax.Parser.SourceFileOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.TopItemOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for parametric complete-file grammar soundness. -/
@@ -26,6 +27,18 @@ example := @TopItemDeriveAttaches
 example := @TopItemOrdinaryParses
 example := @TopItemRejects
 example := @topItemDeterministicOutcomeSpec
+example := @TopItemRecoveryStops
+example := @TopItemRecoveryScanParses
+example := @TopItemRecoveryParses
+example := @TopItemRecoveryRejects
+example := @topItemRecoveryDeterministicOutcomeSpec
+example := @TopItemRejectsWithPreservedWindow
+example := @FileItemsOrdinaryParses
+example := @FileItemsRejects
+example := @fileItemsDeterministicOutcomeSpec
+example := @SourceFileOrdinaryParses
+example := @SourceFileRejects
+example := @sourceFileDeterministicOutcomeSpec
 
 example := @FileInternals.plainTopItem_reflectsDiagnosticFreeOnSuccess
 example := @FileInternals.plainTopItem_success_sound
@@ -42,6 +55,25 @@ example := @FileInternals.topItem_success_ordinaryOutcome_sound
 example := @FileInternals.topItem_reject_ordinaryOutcome_sound
 example := @FileInternals.topItem_ordinaryOutcome_sound
 example := @FileInternals.topItem_ordinaryOutcomeSpec
+example := @FileInternals.atTopItemStart_eq_true_of_topItemRecoveryBoundary
+example := @FileInternals.topItemRecoveryStops_of_guard_eq_true
+example := @FileInternals.topItemRecoveryStops_of_advance?_eq_none
+example := @FileInternals.no_topItemRecoveryStops_of_nonBoundary_token
+example := @FileInternals.recoverTopItemAux_success_ordinaryOutcome_sound
+example := @FileInternals.recoverTopItem_success_ordinaryOutcome_sound
+example := @FileInternals.recoverTopItem_reject_ordinaryOutcome_sound
+example := @FileInternals.recoverTopItem_ordinaryOutcome_sound
+example := @FileInternals.recoverTopItem_ordinaryOutcomeSpec
+example := @FileInternals.topItemRejectsWithPreservedWindow_of_result
+example := @FileInternals.rewoundTopItem_declarativeRemainder_eq
+example := @FileInternals.parseItems_success_ordinaryOutcome_sound_strong
+example := @FileInternals.parseItems_reject_ordinaryOutcome_sound
+example := @FileInternals.parseItems_ordinaryOutcome_sound
+example := @FileInternals.parseItems_ordinaryOutcomeSpec
+example := @FileInternals.sourceFile_success_ordinaryOutcome_sound
+example := @FileInternals.sourceFile_reject_ordinaryOutcome_sound
+example := @FileInternals.sourceFile_ordinaryOutcome_sound
+example := @FileInternals.sourceFile_ordinaryOutcomeSpec
 example := @FileInternals.parseItems_success_sound_of_diagnosticFree
 example := @FileInternals.sourceFile_success_sound
 example := @FileInternals.sourceFile_success_sound_and_validFor
