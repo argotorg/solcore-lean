@@ -1,3 +1,4 @@
+import Solcore.Syntax.DeclarativeCoreTypeBranchOutcomeProperties
 import Solcore.Syntax.DeclarativeCoreTypeNameExactnessProperties
 import Solcore.Syntax.DeclarativeDelimitedFallbackProperties
 import Solcore.Syntax.DeclarativeDelimitedRejectionExactnessProperties
