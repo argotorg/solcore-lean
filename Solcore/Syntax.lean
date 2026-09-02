@@ -24,6 +24,7 @@ import Solcore.Syntax.Parser.FileItemsSoundnessProperties
 import Solcore.Syntax.Parser.FunctionDeclSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
 import Solcore.Syntax.Parser.FunctionSignatureSoundnessProperties
+import Solcore.Syntax.Parser.GenericParametersOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
 import Solcore.Syntax.Parser.GroupedPredicateSequenceOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.HidingClauseSoundnessProperties
