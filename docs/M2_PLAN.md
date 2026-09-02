@@ -487,6 +487,15 @@ Executable `checkNesting` returns `none` exactly when that relation clears and
 returns `some` exactly when the relation reports the mapped overflow span,
 dimension, and limit.
 
+Already-tokenized input validation now has its own parser-independent, total,
+functional outcome relation. Source mismatch has first priority, followed by
+the first invalid token, comment, and lexical-diagnostic span, with exact index
+and span payloads. Acceptance is equivalent to `LexedFile.ValidFor`, every
+executable validation result reflects the relation, and every arbitrary
+`parseLexed` error is exactly the mapped first validation rejection. The
+complementary certified branch supplies an actual successful public output,
+broad source-file syntax, exact retained carriers, and canonical validity.
+
 The public token-to-file and source-to-file parser boundaries now have broad
 syntax-only soundness without a diagnostic-free premise. Nesting overflow
 selects the exact empty parsed file; nesting clearance selects the
@@ -497,7 +506,10 @@ overflow branch, the complete `ParseOutput` is fixed, including its retained
 lexical carriers and unsuppressed singleton nesting diagnostic. Extending the
 normal branch to an exact full parse-diagnostic list remains a separate trace
 milestone because the current broad grammar does not retain parser diagnostic
-accumulation.
+accumulation. An exact executable witness now retains the normal branch's
+successful `sourceFile` reply, final state, complete output assembly, and
+diagnostic-filter equation without presenting that witness as an independent
+grammar trace.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

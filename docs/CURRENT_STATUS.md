@@ -644,6 +644,16 @@ span, dimension, and shared canonical limit. The executable checker is proved
 equivalent in both the `none` and `some` directions, so the implementation and
 declarative limit cannot drift.
 
+Already-tokenized input validation now also has a parser-independent exact
+outcome grammar. It checks source identity first, then the first invalid token
+span, comment span, or lexical-diagnostic span in that priority order, retaining
+the exact zero-based index and span. The scans and whole outcome are total and
+functional, and declarative acceptance is equivalent to `LexedFile.ValidFor`.
+The executable validators reflect those outcomes exactly. For every arbitrary
+`LexedFile`, a public `parseLexed` error is precisely the mapped first
+validation rejection; otherwise production parsing returns a broad public AST
+outcome with exact retained lexical carriers and canonical output validity.
+
 Broad successful `parseLexed` and `parse` syntax is now covered at the public
 boundary as well. A nesting overflow returns the exact empty parsed file with
 source id, full-file span, and retained comments. A clear nesting scan runs the
@@ -655,7 +665,9 @@ additionally fixes the entire `ParseOutput`: retained tokens, lexical
 diagnostics, and the unsuppressed singleton nesting diagnostic. The normal
 branch's complete parse-diagnostic trace is not yet claimed by this broad
 relation because the current declarative remainder deliberately carries no
-diagnostic accumulator.
+diagnostic accumulator. When nesting clears, a separate exact executable
+witness exposes the successful underlying `sourceFile` reply, final state, and
+the diagnostic-filter equation used to assemble the public output.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
