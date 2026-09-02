@@ -217,12 +217,14 @@ separate marker, name, required-generic, optional-`where`, and body rejection.
 Each level has deterministic success endpoints and disjoint success/rejection;
 the strict diagnostic-free and source-validity families remain available.
 
-Selected-import alias outcomes preserve the optional branch priority exactly:
-no `as` gives a nonconsuming `none`, while a positively guarded `as` commits to
-one checked identifier. Missing that identifier is the sole rejection and
-stops immediately after the marker. The endpoint is deterministic and
-success/rejection are exclusive; complete import declarations still retain
-their existing strict diagnostic-free judgments.
+Import leaf outcomes now preserve selector, alias, and module-path priorities.
+Without `(`, a selector is a checked identifier; with it, parsing commits to a
+nonempty maximal operator-symbol scan and exact close, separating identifier,
+empty-operator, and missing-close rejection. No `as` gives a nonconsuming
+`none`, while a positive guard commits to one identifier. No `@` selects a
+local qualified name, while positive `@` commits to an external name. Each
+endpoint is deterministic and success/rejection are exclusive; complete import
+declarations still retain their existing strict diagnostic-free judgments.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

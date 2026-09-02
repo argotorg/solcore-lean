@@ -340,11 +340,13 @@ validity. The ordinary component relations remain reusable for recovered
 parser outcomes; the diagnostic-free premise excludes such recoveries from
 these public conclusions.
 
-Selected-import aliases now expose an exact broad outcome: an absent `as`
+Import leaf outcomes now cover selector names, optional aliases, and module
+paths. Without `(`, selectors use one checked identifier; a positive `(`
+commits to a nonempty maximal operator-symbol scan and exact close, separating
+identifier, empty-operator, and missing-close rejection. An absent `as`
 returns `none` without consumption, while a positive guard commits to one
-checked identifier. Its only rejection is the missing identifier immediately
-after the marker, retaining that exact remainder. Success is deterministic and
-exclusive with rejection.
+identifier. Module paths likewise split an absent `@` local name from an exact
+`@` external name. Each endpoint is deterministic and exclusive with rejection.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

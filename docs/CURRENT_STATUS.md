@@ -481,10 +481,14 @@ The component relations deliberately remain recovery-aware ordinary
 over-approximations, while the outer diagnostic-free premise excludes actual
 recovery successes at the complete-file boundary.
 
-Selected-import aliases now have an exact broad ordinary outcome. An absent
-`as` is a nonconsuming `none` success; a positive `as` guard commits to one
-checked identifier. The sole rejection is identifier absence immediately
-after the consumed marker, with its exact remainder. Success is deterministic
+Import leaves now have exact broad outcomes for selector names, optional
+aliases, and module paths. Selector names choose a checked identifier when `(`
+is absent; a positive `(` commits to a nonempty maximal operator-symbol scan
+and exact `)`. Rejection distinguishes identifier failure, an empty operator,
+and a missing close after the maximal scan. An absent `as` is a nonconsuming
+`none`, while a positive guard commits to one checked identifier. Module paths
+similarly choose a local qualified name when `@` is absent and commit to an
+external qualified name after exact `@`. All three endpoints are deterministic
 and success/rejection are exclusive.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
