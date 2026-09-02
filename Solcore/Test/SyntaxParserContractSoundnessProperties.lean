@@ -5,6 +5,7 @@ import Solcore.Syntax.Parser.ContractDeclarationOrdinaryOutcomeSoundnessProperti
 import Solcore.Syntax.Parser.CoreTermPublicOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Test.SyntaxParserContractFieldExactnessProperties
+import Solcore.Test.SyntaxParserContractDeclarationExactnessProperties
 
 /-! External consumers for strict and broad contract-declaration components. -/
 
