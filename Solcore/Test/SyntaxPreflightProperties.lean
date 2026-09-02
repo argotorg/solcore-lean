@@ -7,7 +7,40 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Syntax
+open Solcore.Syntax.DeclarativeGrammar
 open Solcore.Syntax.Parser
+
+example := @IndexedSpan
+example := @LexedValidationFailure
+example := @OrderedSpanAccepted
+example := @OrderedSpanValidationScans
+example := @SpanValidationScans
+example := @TokenSpanValidationScans
+example := @CommentSpanValidationScans
+example := @LexicalDiagnosticSpanValidationScans
+example := @LexedFileValidationOutcome
+example := @LexedFileValidationAccepts
+example := @LexedFileValidationRejects
+example := @OrderedSpanValidationScans.result_unique
+example := @OrderedSpanValidationScans.exists_result
+example := @OrderedSpanValidationScans.none_iff_spanSequenceValidFor
+example := @SpanValidationScans.result_unique
+example := @SpanValidationScans.exists_result
+example := @SpanValidationScans.none_iff_forall_validFor
+example := @LexedFileValidationOutcome.exists_result
+example := @LexedFileValidationOutcome.result_unique
+example := @lexedFileValidationOutcome_total
+example := @LexedFileValidationRejects.disjointAccepts
+example := @LexedFileValidationRejects.failure_unique
+example := @lexedFileValidationAccepts_iff_validFor
+example := @lexedValidationInvariantError
+example := @validateLexed_eq_result_of_outcome
+example := @validateLexed_reflects_outcome
+example := @validateLexed_ok_iff_validationAccepts
+example := @validateLexed_error_iff_validationRejects
+example := @productionParseLexed_error_iff_validateLexed_error
+example := @productionParseLexed_error_iff_validationRejects
+example := @productionParseLexed_certifiedOutcome
 
 example (file : SourceFile) (lexed : LexedFile)
     (result : Lexer.lex file = .ok lexed) :
