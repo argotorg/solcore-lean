@@ -309,7 +309,9 @@ order to public derive parsing, core member parsing, and pure attachment.
 Rejection distinguishes plain-core failure, derive failure, and core failure
 after derive success. Executable success and rejection reflect these relations;
 successful remainders are deterministic and success/rejection are disjoint.
-Parser AST and rejection-endpoint uniqueness are not claimed.
+A conditional exact contract proves that the derive/attachment layer preserves
+AST and rejection-endpoint uniqueness from an exact attribute-free core; that
+core contract is the remaining prerequisite for an unconditional instance.
 
 Standalone contract-member recovery has exact broad success and rejection: it
 consumes one mandatory token, scans to but not through the next recovery
@@ -320,7 +322,9 @@ opening or tail rejection. Broad contract declarations compose exact `contract`,
 name, optional-generic, and body stages with four matching rejection cases.
 Every layer has deterministic successful remainders and disjoint
 success/rejection; its declarative API, executable reflection package, and
-outcome specification are public and compile-time consumed.
+outcome specification are public and compile-time consumed. Standalone recovery
+also has a unique error-member AST and final remainder and a unique rejection
+endpoint; its scan theorem fixes both retained endpoint spans.
 
 Attribute-free top-item dispatch now has exact broad outcomes for all nine
 declaration branches plus the final unrecognized case, with executable priority

@@ -599,15 +599,20 @@ attribute-free core directly. A present hash commits to the public derive
 parser, then the core member parser, and finally the pure attachment above.
 Rejection records exactly one of three first failing stages: plain core, derive,
 or core after a successful derive. Successful remainders are deterministic and
-success is disjoint from rejection, without adding AST or rejection-endpoint
-uniqueness for the parser outcome.
+success is disjoint from rejection. A conditional exactness theorem now proves
+that this derive-and-attachment layer preserves unique member ASTs and rejection
+endpoints whenever the attribute-free core supplies them; the core dispatcher
+remains the sole prerequisite for an unconditional exact instance.
 
 Standalone contract-member recovery now has exact broad outcomes. Success
 consumes one mandatory token, scans to the window end, a recovery boundary, or
 a missing carrier slot, and returns the exact error-member span without
 consuming the boundary. Rejection records only an unavailable mandatory first
 token. Successful remainders are deterministic and success is disjoint from
-rejection.
+rejection. For fixed first and last retained spans the scan fixes its error AST;
+the complete recovery path fixes those spans, the member AST, and final
+remainder, while rejection has one exact nonconsuming endpoint. These stronger
+laws are re-exported at the executable boundary and compile-time consumed.
 
 The recovery-aware contract body now composes right-brace priority, direct
 member progress, window-preserving rejection rewind, boundary-aware recovery,
