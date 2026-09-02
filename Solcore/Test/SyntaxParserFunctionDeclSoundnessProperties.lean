@@ -23,6 +23,12 @@ example := @functionDecl_success_ordinaryOutcome_sound
 example := @functionDecl_reject_ordinaryOutcome_sound
 example := @functionDecl_ordinaryOutcome_sound
 example := @functionDecl_ordinaryOutcomeSpec
+example := @functionDeclExactOutcomeSpecOfBody
+example := @functionDeclExactOutcomeSpecOfStatementFuel
+example := @functionDecl_exactOutcomeSpec_of_body
+example := @functionDecl_exactOutcomeSpec_of_statementFuel
+example := @functionDecl_success_result_unique_of_body
+example := @functionDecl_reject_output_unique_of_body
 
 example
     (bodyParses : Remainder → Block → Remainder → Prop)
