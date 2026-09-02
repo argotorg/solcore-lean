@@ -68,6 +68,21 @@ diagnostic exactly. -/
     filterParseDiagnostics file [] parsed = parsed := by
   simp [filterParseDiagnostics, suppressLexicalCascades]
 
+/-- A nesting overflow has no lexical-cascade origin and is retained even
+when ordinary lexical diagnostics occur at the same source location. -/
+@[simp] theorem filterParseDiagnostics_single_nestingExceeded
+    (file : SourceFile) (lexical : List LexicalDiagnostic)
+    (span : SourceSpan) (kind : NestingKind) (limit : Nat) :
+    filterParseDiagnostics file lexical [{
+      span
+      kind := .nestingExceeded kind limit
+    }] = [{
+      span
+      kind := .nestingExceeded kind limit
+    }] := by
+  simp [filterParseDiagnostics, suppressLexicalCascades,
+    isLexicalCascadeCandidate]
+
 /-- Diagnostic normalization can only remove parser diagnostics. -/
 theorem mem_of_mem_filterParseDiagnostics
     (file : SourceFile) (lexical : List LexicalDiagnostic)

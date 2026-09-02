@@ -9,6 +9,8 @@ namespace Tests
 open Solcore.Syntax
 open Solcore.Syntax.Parser
 
+example := @filterParseDiagnostics_single_nestingExceeded
+
 example (file : SourceFile) (lexical : List LexicalDiagnostic)
     (parsed : List ParseDiagnostic) (diagnostic : ParseDiagnostic)
     (member : diagnostic ∈ filterParseDiagnostics file lexical parsed) :
