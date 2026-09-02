@@ -1,6 +1,9 @@
+import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
+import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.FunctionParameterOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
 
-/-! External consumers for typed function-parameter grammar soundness. -/
+/-! External consumers for strict and recovery-aware function parameters. -/
 
 set_option autoImplicit false
 
@@ -12,6 +15,14 @@ open Solcore.Syntax.Parser
 
 example := @FunctionParameterParses
 example := @FunctionParametersParses
+example := @FunctionParameterTailOrdinaryParses
+example := @FunctionParameterCoreOrdinaryParses
+example := @FunctionParameterCoreRejects
+example := @FunctionParameterBoundaryStops
+example := @FunctionParameterOrdinaryParses
+example := @FunctionParameterRejects
+example := @functionParameterCoreDeterministicOutcomeSpec
+example := @functionParameterDeterministicOutcomeSpec
 
 example := @Parser.ReflectsDiagnosticFreeOnSuccess
 example := @Parser.pure_reflectsDiagnosticFreeOnSuccess
@@ -27,6 +38,18 @@ example := @namedParameter_success_sound
 example := @namedParameter_success_sound_and_validFor
 example := @functionParameters_success_sound
 example := @functionParameters_success_sound_and_validFor
+example := @FunctionParameterInternals.namedParameterCore_ordinaryOutcome_sound
+example := @FunctionParameterInternals.namedParameterCore_ordinaryOutcomeSpec
+example := @namedParameter_success_ordinaryOutcome_sound
+example := @namedParameter_reject_ordinaryOutcome_sound
+example := @namedParameter_ordinaryOutcome_sound
+example := @namedParameter_ordinaryOutcomeSpec
+
+example :
+    DeterministicOutcomeSpec
+      (FunctionParameterOrdinaryParses TypeExprOrdinaryParses TypeExprRejects)
+      (FunctionParameterRejects TypeExprRejects) :=
+  functionParameterDeterministicOutcomeSpec typeExprDeterministicOutcomeSpec
 
 example {input next : State} {parameter : FunctionParameter}
     (inputValid : input.ValidFor) (diagnosticFree : next.diagnosticsRev = [])
@@ -35,6 +58,20 @@ example {input next : State} {parameter : FunctionParameter}
         next.declarativeRemainder ∧
       parameter.ValidFor input.file :=
   namedParameter_success_sound_and_validFor inputValid diagnosticFree result
+
+example {input next : State} {parameter : FunctionParameter}
+    (result : namedParameter input = .ok parameter next) :
+    FunctionParameterOrdinaryParses TypeExprOrdinaryParses TypeExprRejects
+      input.declarativeRemainder parameter next.declarativeRemainder :=
+  namedParameter_success_ordinaryOutcome_sound TypeExprOrdinaryParses
+    TypeExprRejects typeExpr_success_sound typeExpr_reject_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : namedParameter input = .reject failure rejected) :
+    FunctionParameterRejects TypeExprRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  namedParameter_reject_ordinaryOutcome_sound TypeExprRejects
+    typeExpr_reject_sound result
 
 example {input next : State}
     {parameters : DelimitedList FunctionParameter}

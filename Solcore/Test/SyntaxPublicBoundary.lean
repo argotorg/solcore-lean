@@ -84,6 +84,11 @@ example := @Syntax.DeclarativeGrammar.GenericParametersRejects
 example := @Syntax.DeclarativeGrammar.genericParametersDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.OptionalGenericParametersRejects
 example := @Syntax.DeclarativeGrammar.optionalGenericParametersDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FunctionParameterCoreOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FunctionParameterCoreRejects
+example := @Syntax.DeclarativeGrammar.FunctionParameterOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FunctionParameterRejects
+example := @Syntax.DeclarativeGrammar.functionParameterDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -100,5 +105,10 @@ example := @Syntax.Parser.genericParameters_reject_sound
 example := @Syntax.Parser.genericParameters_ordinaryOutcome_sound
 example := @Syntax.Parser.optionalGenericParameters_reject_sound
 example := @Syntax.Parser.optionalGenericParameters_ordinaryOutcome_sound
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterCore_ordinaryOutcome_sound
+example := @Syntax.Parser.namedParameter_success_ordinaryOutcome_sound
+example := @Syntax.Parser.namedParameter_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.namedParameter_ordinaryOutcome_sound
+example := @Syntax.Parser.namedParameter_ordinaryOutcomeSpec
 
 end Tests
