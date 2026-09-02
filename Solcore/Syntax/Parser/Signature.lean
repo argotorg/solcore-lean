@@ -307,6 +307,18 @@ def functionModifiers
   let payableMarker ← optionalFunctionModifier .payableKw
   finishFunctionModifiers location publicMarker payableMarker
 
+/-- Finishing parsed modifiers only emits diagnostics and returns their value. -/
+theorem finishFunctionModifiers_ne_reject
+    (location : FunctionLocation)
+    (publicMarker payableMarker : Option SourceSpan) (input rejected : State)
+    (failure : Failure) :
+    finishFunctionModifiers location publicMarker payableMarker input ≠
+      .reject failure rejected := by
+  intro result
+  cases location <;> cases publicMarker <;> cases payableMarker <;>
+    simp [finishFunctionModifiers, emitModifierOutsideContract,
+      emitDiagnostic, modifyState, bind, pure] at result
+
 /-- Parse an optional canonical function return-type clause. -/
 def returnClause : Parser (Option ReturnClause) := do
   let state ← getState
