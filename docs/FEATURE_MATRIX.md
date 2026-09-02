@@ -87,6 +87,15 @@ maximal recovery scan. A carrier hole is reflected as recovery rejection.
 Success endpoints are deterministic and exclusive with rejection, while the
 strict `FunctionParameterParses` relation remains diagnostic-free.
 
+The canonical `TypeExpr` and recovery-aware `namedParameter` outcomes now lift
+to the `(` / `)` parameter list, with empty contents and a trailing comma
+allowed. Delimiter and nested rejection endpoints are exact: recovery stops
+leave an outer comma or right parenthesis unconsumed, a carrier hole remains a
+nested rejection, and recovery to the window end may then yield exact
+`delimiterMissing` rejection. Success endpoints are deterministic and
+exclusive with rejection; strict `FunctionParametersParses` remains the
+diagnostic-free list relation.
+
 Bare and grouped predicate sequences have unconditional soundness with exact
 grouped-first priority, and optional `where` retains exact marker priority. A
 bare `PredicateSequenceParses` derivation carries
