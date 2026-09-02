@@ -60,6 +60,64 @@ private def checkNestingAux :
 def checkNesting (tokens : List Token) : Option ParseDiagnostic :=
   checkNestingAux {} tokens
 
+/-- Convert a parser-independent nesting overflow to its public diagnostic. -/
+def nestingOverflowDiagnostic
+    (overflow : DeclarativeGrammar.NestingOverflow) : ParseDiagnostic := {
+  span := overflow.span
+  kind := .nestingExceeded
+    (match overflow.dimension with
+      | .delimiter => .delimiter
+      | .conditional => .conditional)
+    overflow.limit
+}
+
+private theorem checkNestingAux_eq_map_of_scan
+    {context : DeclarativeGrammar.NestingContext} {tokens : List Token}
+    {result : Option DeclarativeGrammar.NestingOverflow}
+    (scan : DeclarativeGrammar.NestingScans maxSyntaxNesting
+      context tokens result) :
+    checkNestingAux context tokens = result.map nestingOverflowDiagnostic := by
+  induction scan with
+  | done => rfl
+  | conditionalExceeded action exceeds =>
+      simp [checkNestingAux, action, if_pos exceeds, nestingError,
+        nestingOverflowDiagnostic, DeclarativeGrammar.nestingOverflow]
+  | conditionalContinues action within tail inductionHypothesis =>
+      have notExceeded :
+          ¬ maxSyntaxNesting < _ + 1 := Nat.not_lt_of_ge within
+      simp [checkNestingAux, action, if_neg notExceeded,
+        inductionHypothesis]
+  | groupExceeded action exceeds =>
+      simp [checkNestingAux, action, if_pos exceeds, nestingError,
+        nestingOverflowDiagnostic, DeclarativeGrammar.nestingOverflow]
+  | groupContinues action within tail inductionHypothesis =>
+      have notExceeded :
+          ¬ maxSyntaxNesting < _ + 1 := Nat.not_lt_of_ge within
+      simp [checkNestingAux, action, if_neg notExceeded,
+        inductionHypothesis]
+  | blockExceeded action exceeds =>
+      simp [checkNestingAux, action, if_pos exceeds, nestingError,
+        nestingOverflowDiagnostic, DeclarativeGrammar.nestingOverflow]
+  | blockContinues action within tail inductionHypothesis =>
+      have notExceeded :
+          ¬ maxSyntaxNesting < _ + 1 := Nat.not_lt_of_ge within
+      simp [checkNestingAux, action, if_neg notExceeded,
+        inductionHypothesis]
+  | close action tail inductionHypothesis =>
+      simp [checkNestingAux, action, inductionHypothesis]
+  | reset action tail inductionHypothesis =>
+      simp [checkNestingAux, action, inductionHypothesis]
+  | preserve action tail inductionHypothesis =>
+      simp [checkNestingAux, action, inductionHypothesis]
+
+/-- Every declarative root scan computes the identical executable result. -/
+theorem checkNesting_eq_map_of_outcome
+    {tokens : List Token}
+    {result : Option DeclarativeGrammar.NestingOverflow}
+    (outcome : DeclarativeGrammar.NestingOutcome tokens result) :
+    checkNesting tokens = result.map nestingOverflowDiagnostic := by
+  exact checkNestingAux_eq_map_of_scan outcome
+
 private theorem checkNestingAux_some_span_validFor
     (file : SourceFile) (state : NestingState) (tokens : List Token)
     (tokensValid : ∀ token ∈ tokens, token.span.ValidFor file)
