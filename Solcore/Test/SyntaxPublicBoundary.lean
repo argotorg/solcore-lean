@@ -209,6 +209,9 @@ example := @Syntax.DeclarativeGrammar.wildcardImportDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.SelectiveImportOrdinaryParses
 example := @Syntax.DeclarativeGrammar.SelectiveImportRejects
 example := @Syntax.DeclarativeGrammar.selectiveImportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImportDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ImportDeclRejects
+example := @Syntax.DeclarativeGrammar.importDeclDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -341,6 +344,10 @@ example := @Syntax.Parser.selectiveImport_success_ordinaryOutcome_sound
 example := @Syntax.Parser.selectiveImport_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.selectiveImport_ordinaryOutcome_sound
 example := @Syntax.Parser.selectiveImport_ordinaryOutcomeSpec
+example := @Syntax.Parser.importDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.importDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.importDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.importDecl_ordinaryOutcomeSpec
 
 example {input output : Syntax.Parser.State} {field : ContractField}
     (result : Syntax.Parser.ContractInternals.contractField
