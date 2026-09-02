@@ -1,5 +1,6 @@
 import Solcore.Syntax.DeclarativeDelimitedNoTrailingOutcomeProperties
 import Solcore.Syntax.DeclarativeDelimitedRejectionExactnessProperties
+import Solcore.Syntax.DeclarativeDelimitedFallbackProperties
 
 /-! Full functionality of no-trailing generic delimited-list outcomes. -/
 
@@ -127,6 +128,33 @@ theorem NoTrailingDelimitedListParses.value_unique {alpha : Type}
             (absent_conflicts_token leftClosingAbsent rightClosingToken)
       | nonempty rightClosingAbsent rightNonempty =>
           exact leftNonempty.value_unique outcomes rightNonempty
+
+/-- Required no-trailing delimited lists have fully functional success and
+rejection outcomes. -/
+theorem nonemptyNoTrailingDelimitedListExactOutcomeSpec {alpha : Type}
+    (opening closing : Symbol)
+    {ordinaryParses : Remainder → alpha → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (outcomes : ExactDeterministicOutcomeSpec ordinaryParses nestedRejects) :
+    ExactDeterministicOutcomeSpec
+      (NonemptyNoTrailingDelimitedListParses opening closing ordinaryParses)
+      (DelimitedListRejects opening closing false false ordinaryParses
+        nestedRejects) where
+  toDeterministicOutcomeSpec := {
+    successOutputUnique := by
+      intro input left right afterLeft afterRight leftParsed rightParsed
+      exact NonemptyNoTrailingDelimitedListParses.output_unique
+        (opening := opening) (closing := closing)
+        (elementParses := ordinaryParses) outcomes.successOutputUnique
+        leftParsed rightParsed
+    successRejectDisjoint := by
+      intro input rejected rejection
+      exact rejection.disjointNonemptyNoTrailing
+        outcomes.toDeterministicOutcomeSpec (fun parsed => parsed)
+  }
+  successValueUnique :=
+    NonemptyNoTrailingDelimitedListParses.value_unique outcomes
+  rejectOutputUnique := DelimitedListRejects.output_unique outcomes
 
 /-- Allow-empty no-trailing delimited lists have fully functional success and
 rejection outcomes. -/

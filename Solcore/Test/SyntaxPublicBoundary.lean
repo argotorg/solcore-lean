@@ -83,6 +83,7 @@ example := @Syntax.DeclarativeGrammar.DelimitedTailRejects.output_unique
 example := @Syntax.DeclarativeGrammar.DelimitedListRejects.output_unique
 example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedTailParses.result_unique
 example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListParses.value_unique
+example := @Syntax.DeclarativeGrammar.nonemptyNoTrailingDelimitedListExactOutcomeSpec
 example := @Syntax.DeclarativeGrammar.noTrailingDelimitedListExactOutcomeSpec
 example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailParses.result_unique
 example := @Syntax.DeclarativeGrammar.NonemptyTrailingDelimitedListParses.value_unique
