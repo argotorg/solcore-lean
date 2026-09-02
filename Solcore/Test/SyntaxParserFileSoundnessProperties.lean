@@ -1,6 +1,7 @@
 import Solcore.Syntax.Parser.SourceFileSoundnessProperties
 import Solcore.Syntax.Parser.SourceFileOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.TopItemOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.PublicNestingExceededOutputProperties
 
 /-! External consumers for parametric complete-file grammar soundness. -/
 
@@ -39,6 +40,13 @@ example := @fileItemsDeterministicOutcomeSpec
 example := @SourceFileOrdinaryParses
 example := @SourceFileRejects
 example := @sourceFileDeterministicOutcomeSpec
+example := @sourceFileRootRemainder
+example := @nestingExceededParsedFile
+example := @PublicSourceFileOrdinaryParses
+example := @publicSourceFileOrdinaryParses_iff
+example := @PublicSourceFileOrdinaryParses.shape
+example := @PublicSourceFileOrdinaryParses.eq_nestingExceededParsedFile
+example := @PublicSourceFileOrdinaryParses.sourceFile_of_clears
 
 example := @FileInternals.plainTopItem_reflectsDiagnosticFreeOnSuccess
 example := @FileInternals.plainTopItem_success_sound
@@ -74,6 +82,14 @@ example := @FileInternals.sourceFile_success_ordinaryOutcome_sound
 example := @FileInternals.sourceFile_reject_ordinaryOutcome_sound
 example := @FileInternals.sourceFile_ordinaryOutcome_sound
 example := @FileInternals.sourceFile_ordinaryOutcomeSpec
+example := @parseLexed_ok_publicSourceFileOrdinary_sound
+example := @parseLexed_ok_publicSourceFileOrdinary_sound_and_validFor
+example := @parse_ok_publicSourceFileOrdinary_sound
+example := @parse_ok_publicSourceFileOrdinary_sound_and_validFor
+example := @nestingExceededParseOutput
+example := @parseLexed_eq_ok_of_nestingExceeds
+example := @parseLexed_ok_eq_nestingExceededParseOutput
+example := @parseLexed_ok_parseDiagnostics_eq_of_nestingExceeds
 example := @FileInternals.parseItems_success_sound_of_diagnosticFree
 example := @FileInternals.sourceFile_success_sound
 example := @FileInternals.sourceFile_success_sound_and_validFor
