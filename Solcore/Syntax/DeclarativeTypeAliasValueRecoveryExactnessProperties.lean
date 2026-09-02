@@ -122,6 +122,27 @@ theorem TypeAliasValueOrdinaryParses.value_unique_of_typeExpr
           exact typeAliasValueRecoveryExactOutcomeSpec.successValueUnique
             leftRecovery rightRecovery
 
+/-- Under exact Core type outcomes, alias values fix both their value and
+final remainder. -/
+theorem TypeAliasValueOrdinaryParses.result_unique_of_typeExpr
+    (typeOutcomes : ExactDeterministicOutcomeSpec
+      TypeExprOrdinaryParses TypeExprRejects)
+    {input : Remainder} {left right : Syntax.TypeExpr}
+    {afterLeft afterRight : Remainder}
+    (leftParsed : TypeAliasValueOrdinaryParses input left afterLeft)
+    (rightParsed : TypeAliasValueOrdinaryParses input right afterRight) :
+    left = right ∧ afterLeft = afterRight :=
+  ⟨leftParsed.value_unique_of_typeExpr typeOutcomes rightParsed,
+    leftParsed.output_unique rightParsed⟩
+
+/-- Public alias-value rejection always has the rewound input endpoint. -/
+theorem TypeAliasValueRejects.output_unique
+    {input left right : Remainder}
+    (leftRejected : TypeAliasValueRejects input left)
+    (rightRejected : TypeAliasValueRejects input right) :
+    left = right :=
+  leftRejected.output_eq.trans rightRejected.output_eq.symm
+
 /-- Exact Core type outcomes lift through alias-value recovery without any
 further prerequisite. -/
 theorem typeAliasValueExactOutcomeSpecOfTypeExpr
@@ -132,8 +153,6 @@ theorem typeAliasValueExactOutcomeSpecOfTypeExpr
   toDeterministicOutcomeSpec := typeAliasValueDeterministicOutcomeSpec
   successValueUnique :=
     TypeAliasValueOrdinaryParses.value_unique_of_typeExpr typeOutcomes
-  rejectOutputUnique := by
-    intro input left right leftRejected rightRejected
-    exact leftRejected.output_eq.trans rightRejected.output_eq.symm
+  rejectOutputUnique := TypeAliasValueRejects.output_unique
 
 end Solcore.Syntax.DeclarativeGrammar

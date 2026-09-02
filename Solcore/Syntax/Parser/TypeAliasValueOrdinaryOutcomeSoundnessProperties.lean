@@ -169,5 +169,44 @@ theorem parseAliasValue_ordinaryOutcomeSpec :
       DeclarativeGrammar.TypeAliasValueRejects :=
   DeclarativeGrammar.typeAliasValueDeterministicOutcomeSpec
 
+/-- Exact Core type outcomes lift to exact recovery-aware executable alias
+values. -/
+theorem parseAliasValue_exactOutcomeSpec_of_typeExpr
+    (typeOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.TypeExprOrdinaryParses
+      DeclarativeGrammar.TypeExprRejects) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.TypeAliasValueOrdinaryParses
+      DeclarativeGrammar.TypeAliasValueRejects :=
+  DeclarativeGrammar.typeAliasValueExactOutcomeSpecOfTypeExpr typeOutcomes
+
+/-- Under exact Core type outcomes, two successful executable reflections
+have the same alias value and final declarative remainder. -/
+theorem parseAliasValue_success_result_unique_of_typeExpr
+    (typeOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.TypeExprOrdinaryParses
+      DeclarativeGrammar.TypeExprRejects)
+    {input leftOutput rightOutput : State} {left right : TypeExpr}
+    (leftResult : parseAliasValue input = .ok left leftOutput)
+    (rightResult : parseAliasValue input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.TypeAliasValueOrdinaryParses.result_unique_of_typeExpr
+    typeOutcomes
+    (parseAliasValue_success_ordinaryOutcome_sound leftResult)
+    (parseAliasValue_success_ordinaryOutcome_sound rightResult)
+
+/-- Two rejected executable alias-value reflections always have the same
+rewound declarative endpoint. -/
+theorem parseAliasValue_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : parseAliasValue input = .reject leftFailure leftOutput)
+    (rightResult : parseAliasValue input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.TypeAliasValueRejects.output_unique
+    (parseAliasValue_reject_ordinaryOutcome_sound leftResult)
+    (parseAliasValue_reject_ordinaryOutcome_sound rightResult)
+
 end TypeAliasInternals
 end Solcore.Syntax.Parser
