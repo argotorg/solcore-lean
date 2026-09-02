@@ -59,6 +59,7 @@ import Solcore.Syntax.Parser.SelectorNameSoundnessProperties
 import Solcore.Syntax.Parser.SourceFileSoundnessProperties
 import Solcore.Syntax.Parser.TopItemSoundnessProperties
 import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
+import Solcore.Syntax.Parser.TypeAliasDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.TypeAliasSoundnessProperties
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
 import Solcore.Syntax.Parser.WhereClauseOrdinaryRejectionSoundnessProperties
