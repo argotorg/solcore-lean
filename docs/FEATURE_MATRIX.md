@@ -149,6 +149,19 @@ deterministic and exclude simultaneous rejection. The existing
 location-policy-aware `FunctionDeclParses` relation continues to describe the
 strict diagnostic-free declaration boundary.
 
+Broad ordinary `constructorDecl` outcomes now preserve the exact required
+keyword, recovery-aware parameter list, fixed optional `public`-then-`payable`
+order, and isolated `.require` body. An explicit `public` marker emits a
+constraint diagnostic, is discarded from the AST, and leaves the declarative
+remainder unchanged. Success retains the exact parameters, payable marker,
+marker/body cover span, constructor AST, and final remainder. Rejection has
+only three external stages: marker absence, parameter rejection, or uncaptured
+body rejection after modifier success. A balanced captured child rejection is
+absorbed as diagnosed empty-body recovery success at the parent remainder.
+Endpoints are deterministic and success/rejection are exclusive. The strict
+diagnostic-free `ConstructorDeclParses` judgment remains available alongside
+this broader malformed-source outcome contract.
+
 The implementation-method wrapper also has a broad ordinary outcome. It
 preserves the wrapped declaration span, empty parser-time leading comments,
 and exact remainder, while exposing only nested function-declaration

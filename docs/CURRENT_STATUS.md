@@ -361,6 +361,19 @@ recovery success at the parent remainder. Declaration success endpoints are
 deterministic and exclusive with rejection. The existing location-policy-aware
 `FunctionDeclParses` theorem remains the stricter diagnostic-free judgment.
 
+A broad ordinary `constructorDecl` outcome now follows the executable stages
+exactly: the required `constructor` keyword, recovery-aware parameters,
+optional `public` then `payable`, and an isolated `.require` Core body. An
+explicit `public` marker emits its constraint diagnostic but is discarded from
+the AST, while diagnostic emission leaves the declarative remainder unchanged.
+Success preserves the parameter and payable fields, exact final remainder, and
+the marker-to-body cover span of the complete constructor AST. Rejection has
+exactly three external stages: missing marker, rejected parameters, or an
+uncaptured body rejection after modifier success. A balanced captured child
+rejection instead yields diagnosed empty-body recovery success at the parent
+remainder. Outcomes are deterministic and exclusive, while the existing
+`ConstructorDeclParses` relation remains the strict diagnostic-free judgment.
+
 The implementation-method wrapper now lifts that broad declaration outcome
 without adding syntax or rejection stages. Success retains the declaration
 span, an empty parser-time leading-comment list, and the exact final remainder;

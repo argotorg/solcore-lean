@@ -249,6 +249,19 @@ remainder. The combined declaration outcomes are deterministic and mutually
 exclusive. This complements, rather than replaces, the location-policy-aware
 diagnostic-free `FunctionDeclParses` boundary.
 
+The broad ordinary `constructorDecl` layer now records the exact executable
+order from the required `constructor` keyword through recovery-aware
+parameters, optional `public` then `payable`, and the isolated `.require` body.
+An explicit `public` marker emits a diagnostic but is omitted from the AST, and
+that emission does not change the declarative remainder. Successful derivations
+retain the exact parameter and payable fields, final remainder, and complete
+marker/body cover span. Exact rejection exposes only a missing marker, rejected
+parameters, or an uncaptured body rejection after successful modifiers. A
+rejection inside a balanced captured child becomes diagnosed empty-body
+recovery success at the exact parent remainder. Success is deterministic and
+exclusive with rejection; strict diagnostic-free `ConstructorDeclParses`
+continues to coexist as the canonical acceptance judgment.
+
 The implementation-method wrapper now carries that broad declaration contract
 one level upward. Its exact AST adds only the empty parser-time comment list,
 and its final remainder is unchanged; its sole rejection stage is the nested
