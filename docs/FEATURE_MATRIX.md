@@ -78,6 +78,15 @@ a diagnostic, so `FunctionParameterParses` and `FunctionParametersParses`
 characterize diagnostic-free typed parameters without admitting recovery
 nodes.
 
+The single public `namedParameter` also has a broad ordinary-outcome relation.
+A missing colon is a diagnosed `.error` Core success at the post-name
+remainder, not recovery. Only a Core rejection rewinds to the original cursor:
+end, comma, or right parenthesis gives exact nonconsuming rejection; otherwise
+the parser emits the failure diagnostic and performs its mandatory-first-token
+maximal recovery scan. A carrier hole is reflected as recovery rejection.
+Success endpoints are deterministic and exclusive with rejection, while the
+strict `FunctionParameterParses` relation remains diagnostic-free.
+
 Bare and grouped predicate sequences have unconditional soundness with exact
 grouped-first priority, and optional `where` retains exact marker priority. A
 bare `PredicateSequenceParses` derivation carries

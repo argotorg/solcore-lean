@@ -170,6 +170,15 @@ optionally trailing-comma parenthesized list. Diagnostic freedom excludes
 parameter error and recovery nodes, yielding strict element and list
 soundness with source-validity compositions.
 
+The single public `namedParameter` now also has a broad ordinary-outcome
+relation. A missing colon is a diagnosed `.error` Core success at the post-name
+remainder, not recovery. Only a Core rejection rewinds to the original cursor:
+end, comma, or right parenthesis gives exact nonconsuming rejection; otherwise
+the parser emits the failure diagnostic and performs its mandatory-first-token
+maximal recovery scan. A carrier hole is reflected as recovery rejection.
+Success endpoints are deterministic and exclusive with rejection, while the
+strict `FunctionParameterParses` relation remains diagnostic-free.
+
 Individual predicates, nonempty bare and grouped predicate sequences, and
 prioritized optional `where` clauses now have parser-independent grammars and
 unconditional success soundness. Bare tails preserve forward order and their

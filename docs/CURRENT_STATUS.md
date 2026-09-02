@@ -283,6 +283,15 @@ public success theorems require diagnostic freedom precisely to exclude error
 and recovery values; both compose with the established source-validity
 contracts.
 
+The single public `namedParameter` also has a broad ordinary-outcome relation.
+A missing colon is a diagnosed `.error` Core success at the post-name
+remainder, not recovery. Only a Core rejection rewinds to the original cursor:
+end, comma, or right parenthesis gives exact nonconsuming rejection; otherwise
+the parser emits the failure diagnostic and performs its mandatory-first-token
+maximal recovery scan. A carrier hole is reflected as recovery rejection.
+Success endpoints are deterministic and exclusive with rejection, while the
+strict `FunctionParameterParses` relation remains diagnostic-free.
+
 Predicates and optional `where` clauses also have exact component grammars and
 unconditional success soundness. Bare sequences retain forward predicate
 order and distinguish a final predicate from a trailing comma; grouped
