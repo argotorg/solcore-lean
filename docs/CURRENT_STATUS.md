@@ -509,6 +509,26 @@ every other token selects plain import. Branch failure never falls through to
 a later alternative, and the complete outcome remains deterministic and
 exclusive while preserving terminator recovery success.
 
+Export leaves, payloads, and the complete `exportDecl` now likewise have exact
+broad outcomes. Export paths consume maximal dotted checked names. Constructor
+selection prioritizes the `(*)` form over a nonempty, no-trailing-comma name
+list; export names prioritize `*`, then a parenthesized operator selector, then
+a checked identifier with optional constructor selection. A local item uses
+identifier-plus-offset-one-dot lookahead to commit to qualified `path.*`, and
+otherwise parses an export name. Remote selection chooses either `*` or an
+allow-empty, trailing-comma-permitting braced export-name list.
+
+Local payloads compose an allow-empty, trailing-comma-permitting item list with
+an exact, nonrecovering semicolon. Path payloads parse a maximal path, then
+prioritize dot plus selection, absent-dot `as` plus checked alias, and finally
+the bare module form; every branch ends at the same exact semicolon boundary.
+The aggregate consumes exact `export`, dispatches on a nonconsuming `{` guard,
+and retains exact AST, covering span, carrier, window, cursor, and first
+rejection. All endpoints are deterministic and success/rejection exclusive.
+The declarative and parser outcome packages are exported publicly and checked
+by dedicated and public-boundary consumers; broader top-item rejection remains
+a separate boundary.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

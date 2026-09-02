@@ -226,6 +226,24 @@ local qualified name, while positive `@` commits to an external name. Each
 endpoint is deterministic and success/rejection are exclusive; complete import
 declarations still retain their existing strict diagnostic-free judgments.
 
+Exact broad export outcomes now cover maximal dotted export paths, constructor
+selection, prioritized export names, local items, wildcard or braced remote
+selection, both payload forms, and complete `exportDecl`. Constructor
+selection chooses `(*)` before a nonempty no-trailing-comma name list; export
+names choose `*`, parenthesized operator, then checked identifier with optional
+constructors. Identifier-plus-offset-one-dot lookahead alone commits a local
+item to qualified `path.*`; otherwise it remains an export name. Braced remote
+selections and local-item lists allow empty content and a trailing comma.
+
+Local exports end their list with an exact nonrecovering semicolon. Path
+exports prioritize dot-selection, absent-dot `as` alias, then bare module, and
+use the same terminator. The aggregate consumes exact `export` and dispatches
+on a nonconsuming `{` guard while retaining exact AST, covering span, carrier,
+window, cursor, and first rejection. Every success endpoint is deterministic
+and exclusive with rejection. Declarative and parser outcome packages are
+publicly exported and compile-time consumed; no broader top-item rejection is
+claimed here.
+
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
 optional `default`, nonempty implementation heads, member and method order,
