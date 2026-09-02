@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.SourceFileSoundnessProperties
+import Solcore.Syntax.Parser.TopItemOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for parametric complete-file grammar soundness. -/
 
@@ -15,12 +16,32 @@ example := @PlainTopItemParses
 example := @TopItemParses
 example := @TopItemsParses
 example := @SourceFileParses
+example := @PlainTopItemTokenPresentAt
+example := @PlainTopItemBranch
+example := @PlainTopItemBranchSelected
+example := @PlainTopItemOrdinaryParses
+example := @PlainTopItemRejects
+example := @plainTopItemDeterministicOutcomeSpec
+example := @TopItemDeriveAttaches
+example := @TopItemOrdinaryParses
+example := @TopItemRejects
+example := @topItemDeterministicOutcomeSpec
 
 example := @FileInternals.plainTopItem_reflectsDiagnosticFreeOnSuccess
 example := @FileInternals.plainTopItem_success_sound
+example := @FileInternals.plainTopItem_success_ordinaryOutcome_sound
+example := @FileInternals.plainTopItem_reject_ordinaryOutcome_sound
+example := @FileInternals.plainTopItem_ordinaryOutcome_sound
+example := @FileInternals.plainTopItem_ordinaryOutcomeSpec
 example := @FileInternals.attachDeriveAttribute_reflectsDiagnosticFreeOnSuccess
+example := @FileInternals.attachDeriveAttribute_success_ordinaryOutcome_sound
+example := @FileInternals.attachDeriveAttribute_total_success
 example := @FileInternals.topItem_reflectsDiagnosticFreeOnSuccess
 example := @FileInternals.topItem_success_sound
+example := @FileInternals.topItem_success_ordinaryOutcome_sound
+example := @FileInternals.topItem_reject_ordinaryOutcome_sound
+example := @FileInternals.topItem_ordinaryOutcome_sound
+example := @FileInternals.topItem_ordinaryOutcomeSpec
 example := @FileInternals.parseItems_success_sound_of_diagnosticFree
 example := @FileInternals.sourceFile_success_sound
 example := @FileInternals.sourceFile_success_sound_and_validFor
