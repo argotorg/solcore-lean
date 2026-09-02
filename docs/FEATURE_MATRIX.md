@@ -128,6 +128,16 @@ trait-method semicolon. These parameter, predicate/`where`, modifier, and
 function-signature theorem families are exported through `Solcore.Syntax` and
 checked by compile-time consumers.
 
+A broad ordinary `functionSignature` outcome is now independent of location
+and modifier policy. Success preserves the exact keyword, name, generics,
+recovery-aware parameters, modifiers, returns, and `where` order, complete AST,
+signature cover span, and final remainder. Rejection records the first failing
+keyword, name, generics, parameter-list, returns, or `where` stage. Modifiers
+always succeed; module-location markers may instead emit diagnostics without
+changing the declarative remainder. Success endpoints are deterministic and
+exclusive with rejection, while `FunctionSignatureParses` remains the strict
+diagnostic-free, location-policy judgment.
+
 Trait methods, brace-delimited method bodies, and complete trait declarations
 now have exact parser-independent judgments. Diagnostic-free success preserves
 method source order, semicolons, closing-brace priority, required generic
