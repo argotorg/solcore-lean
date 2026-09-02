@@ -357,6 +357,14 @@ namespace, wildcard, and selective payload relations retain executable stage
 order, AST and covering span, token carrier, active window, cursor, and exact
 first rejection. Each endpoint is deterministic and exclusive with rejection.
 
+The complete broad `importDecl` relation consumes exact `import` and retains
+the dispatch lookahead without consuming it. Current `*` plus offset-one hard
+`as` commits to namespace import; current `*` without that lookahead commits to
+wildcard import. Otherwise current `{` commits to selective import, with plain
+import as the final branch. A committed branch never falls through after
+failure. The aggregate success/rejection pair is deterministic and exclusive,
+including diagnostic-bearing terminator recovery.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

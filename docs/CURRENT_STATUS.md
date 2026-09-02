@@ -501,6 +501,14 @@ the exact AST, covering span, cursor, token carrier, and active window, and
 separate the first rejecting stage. Every endpoint is deterministic and its
 success and rejection relations are exclusive.
 
+The complete broad `importDecl` outcome also records the exact leading
+`import` token and nonconsuming dispatch evidence. A leading `*` selects
+namespace import exactly when offset-one lookahead is hard `as`; otherwise it
+commits to wildcard import. Without `*`, `{` selects the selective branch and
+every other token selects plain import. Branch failure never falls through to
+a later alternative, and the complete outcome remains deterministic and
+exclusive while preserving terminator recovery success.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
