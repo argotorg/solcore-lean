@@ -397,15 +397,17 @@ rejection is exactly the nested function-declaration rejection. Module-policy
 diagnostics and captured-body recovery therefore remain ordinary successes.
 These method endpoints are deterministic and success/rejection are exclusive.
 
-Trait declarations now extend that signature boundary through exact method
-semicolons and brace-delimited bodies. `TraitMethodTailParses` preserves source
-order while recording closing-brace priority, and the fuel-bounded executable
-loop reflects diagnostic freedom backward through every retained method.
-Complete diagnostic-free trait success therefore derives
-`TraitDeclParses`, including its contextual marker, required generics,
-optional `where`, body span, method list, and final remainder. Method, body,
-and declaration soundness all compose with source validity and are exported
-through the public syntax umbrella.
+Trait methods now extend the broad module-signature outcome through an exact
+semicolon, retaining diagnostic-producing signature successes and separating
+signature from missing-semicolon rejection. Trait bodies reflect the custom
+right-brace-first loop with positive `function` guards, strict progress,
+forward method order, and exact unexpected, nested-method, and recursive
+rejection remainders. Complete declarations distinguish contextual marker,
+name, required generics, optional `where`, and body rejection. Method, body,
+and declaration success endpoints are deterministic and success/rejection
+exclusive. The strict diagnostic-free `TraitDeclParses` family and its
+source-validity compositions remain available beside the publicly exported
+broad outcomes.
 
 Ordinary function declarations and implementations now have parametric
 parser-independent judgments over an abstract block relation. Function

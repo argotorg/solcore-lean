@@ -284,14 +284,16 @@ function declaration. Module modifier diagnostics and captured-body recovery
 stay on the success path. The resulting method endpoints are deterministic and
 mutually exclusive.
 
-Trait methods now add the exact terminating semicolon to a module-policy
-signature. Trait bodies preserve forward method order, exact braces, the
-right-brace-first loop priority, and the retained body cover span. Backward
-diagnostic reflection through that loop yields complete diagnostic-free
-`TraitDeclParses` soundness from the contextual marker through required
-generics, optional `where`, and the final brace. Method, body, and declaration
-theorems have source-validity compositions, public registration, and
-compile-time consumers.
+Trait methods now add an exact semicolon to the broad module-policy signature
+outcome, so modifier diagnostics remain ordinary successes. Their only reject
+stages are the signature and missing semicolon. Trait bodies expose the custom
+right-brace-first loop directly: each method branch retains a positive
+`function` guard, strict progress, forward source order, and the exact
+unexpected, nested-method, or later rejection remainder. Full declarations
+then distinguish contextual marker, name, required generics, optional `where`,
+and body rejection. All three success endpoints are deterministic and
+success/rejection exclusive. The earlier diagnostic-free grammars and
+source-validity compositions remain registered beside these broad outcomes.
 
 Function declarations now compose exact location-indexed signatures with an
 abstract parser-independent block relation. Implementations lift the same

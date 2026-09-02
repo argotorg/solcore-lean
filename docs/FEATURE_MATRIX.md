@@ -206,10 +206,13 @@ successful outcomes. Method endpoints are deterministic and exclude
 simultaneous rejection.
 
 Trait methods, brace-delimited method bodies, and complete trait declarations
-now have exact parser-independent judgments. Diagnostic-free success preserves
-method source order, semicolons, closing-brace priority, required generic
-parameters, optional `where`, outer spans, and the final remainder. The three
-levels also compose with source validity and are publicly registered.
+now have exact broad success and rejection outcomes. Module-signature
+diagnostics remain successful before the exact method semicolon. The custom
+body loop retains closing-brace priority, positive `function` guards, strict
+progress, forward method order, and every rejecting remainder. Declarations
+separate marker, name, required-generic, optional-`where`, and body rejection.
+Each level has deterministic success endpoints and disjoint success/rejection;
+the strict diagnostic-free and source-validity families remain available.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
