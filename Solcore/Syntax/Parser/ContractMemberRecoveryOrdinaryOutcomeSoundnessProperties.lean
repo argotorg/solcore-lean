@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractMemberRecoveryOutcomeProperties
+import Solcore.Syntax.DeclarativeContractMemberRecoveryExactnessProperties
 import Solcore.Syntax.Parser.ContractMemberRecoveryBoundaryProperties
 import Solcore.Syntax.Parser.ContractRecoveryTotalityProperties
 
@@ -138,5 +138,39 @@ theorem recoverContractMember_ordinaryOutcomeSpec :
       DeclarativeGrammar.ContractMemberRecoveryParses
       DeclarativeGrammar.ContractMemberRecoveryRejects :=
   DeclarativeGrammar.contractMemberRecoveryDeterministicOutcomeSpec
+
+/-- Re-export exact contract-member recovery functionality at the executable
+boundary. -/
+theorem recoverContractMember_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ContractMemberRecoveryParses
+      DeclarativeGrammar.ContractMemberRecoveryRejects :=
+  DeclarativeGrammar.contractMemberRecoveryExactOutcomeSpec
+
+/-- Two successful recovery reflections have the same member AST and final
+declarative remainder. -/
+theorem recoverContractMember_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : ContractMember}
+    (leftResult : recoverContractMember input = .ok left leftOutput)
+    (rightResult : recoverContractMember input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.ContractMemberRecoveryParses.result_unique
+    (recoverContractMember_success_ordinaryOutcome_sound leftResult)
+    (recoverContractMember_success_ordinaryOutcome_sound rightResult)
+
+/-- Two recovery rejections have the same exact declarative endpoint. -/
+theorem recoverContractMember_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : recoverContractMember input =
+      .reject leftFailure leftOutput)
+    (rightResult : recoverContractMember input =
+      .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.ContractMemberRecoveryRejects.output_unique
+    (recoverContractMember_reject_ordinaryOutcome_sound leftResult)
+    (recoverContractMember_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser.ContractInternals
