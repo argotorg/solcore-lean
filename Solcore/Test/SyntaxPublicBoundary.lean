@@ -146,6 +146,18 @@ example := @Syntax.DeclarativeGrammar.enumBodyDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.EnumDeclOrdinaryParses
 example := @Syntax.DeclarativeGrammar.EnumDeclRejects
 example := @Syntax.DeclarativeGrammar.enumDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitMethodOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TraitMethodRejects
+example := @Syntax.DeclarativeGrammar.traitMethodDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitMethodTailOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.TraitMethodTailRejects
+example := @Syntax.DeclarativeGrammar.traitMethodTailDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitBodyOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.TraitBodyRejects
+example := @Syntax.DeclarativeGrammar.traitBodyDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TraitDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TraitDeclRejects
+example := @Syntax.DeclarativeGrammar.traitDeclDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -228,6 +240,12 @@ example := @Syntax.Parser.EnumInternals.enumBody_ordinaryOutcome_sound
 example := @Syntax.Parser.EnumInternals.enumBody_ordinaryOutcomeSpec
 example := @Syntax.Parser.enumDecl_ordinaryOutcome_sound
 example := @Syntax.Parser.enumDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.TraitInternals.traitMethod_ordinaryOutcome_sound
+example := @Syntax.Parser.TraitInternals.traitMethod_ordinaryOutcomeSpec
+example := @Syntax.Parser.TraitInternals.traitBody_ordinaryOutcome_sound
+example := @Syntax.Parser.TraitInternals.traitBody_ordinaryOutcomeSpec
+example := @Syntax.Parser.traitDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.traitDecl_ordinaryOutcomeSpec
 
 example {input output : Syntax.Parser.State} {field : ContractField}
     (result : Syntax.Parser.ContractInternals.contractField
@@ -274,5 +292,12 @@ example {input rejected : Syntax.Parser.State}
     Syntax.DeclarativeGrammar.EnumDeclRejects
       input.declarativeRemainder rejected.declarativeRemainder :=
   Syntax.Parser.enumDecl_reject_ordinaryOutcome_sound none result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.traitDecl input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.TraitDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.traitDecl_reject_ordinaryOutcome_sound result
 
 end Tests
