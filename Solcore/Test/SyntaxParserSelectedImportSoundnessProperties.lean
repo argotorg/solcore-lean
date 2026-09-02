@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
+import Solcore.Syntax.Parser.SelectedAliasOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for selected-import item grammar soundness. -/
 
@@ -11,10 +11,17 @@ open Solcore.Syntax.DeclarativeGrammar
 open Solcore.Syntax.Parser
 
 example := @SelectedAliasParses
+example := @SelectedAliasOrdinaryParses
+example := @SelectedAliasRejects
+example := @selectedAliasDeterministicOutcomeSpec
 example := @SelectedImportParses
 example := @keywordAbsentAt_of_isKeyword_eq_false
 example := @selectedAlias_success_sound
 example := @selectedAlias_success_sound_and_validFor
+example := @selectedAlias_success_ordinaryOutcome_sound
+example := @selectedAlias_reject_ordinaryOutcome_sound
+example := @selectedAlias_ordinaryOutcome_sound
+example := @selectedAlias_ordinaryOutcomeSpec
 example := @selectedImport_success_sound
 example := @selectedImport_success_sound_and_validFor
 

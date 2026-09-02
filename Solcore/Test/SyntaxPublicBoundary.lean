@@ -173,6 +173,9 @@ example := @Syntax.DeclarativeGrammar.traitBodyDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.TraitDeclOrdinaryParses
 example := @Syntax.DeclarativeGrammar.TraitDeclRejects
 example := @Syntax.DeclarativeGrammar.traitDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.SelectedAliasOrdinaryParses
+example := @Syntax.DeclarativeGrammar.SelectedAliasRejects
+example := @Syntax.DeclarativeGrammar.selectedAliasDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -269,6 +272,10 @@ example := @Syntax.Parser.TraitInternals.traitBody_ordinaryOutcome_sound
 example := @Syntax.Parser.TraitInternals.traitBody_ordinaryOutcomeSpec
 example := @Syntax.Parser.traitDecl_ordinaryOutcome_sound
 example := @Syntax.Parser.traitDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.selectedAlias_success_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedAlias_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedAlias_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedAlias_ordinaryOutcomeSpec
 
 example {input output : Syntax.Parser.State} {field : ContractField}
     (result : Syntax.Parser.ContractInternals.contractField
