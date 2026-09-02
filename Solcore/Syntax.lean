@@ -21,6 +21,7 @@ import Solcore.Syntax.Parser.EnumDeclSoundnessProperties
 import Solcore.Syntax.Parser.EnumDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ExportDeclSoundnessProperties
 import Solcore.Syntax.Parser.ExportNameSoundnessProperties
+import Solcore.Syntax.Parser.ExportPathOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ExportPathSoundnessProperties
 import Solcore.Syntax.Parser.ExportSelectionSoundnessProperties
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinaryOutcomeSoundnessProperties
