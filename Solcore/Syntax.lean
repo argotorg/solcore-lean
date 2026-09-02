@@ -54,6 +54,7 @@ import Solcore.Syntax.Parser.Properties
 import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
 import Solcore.Syntax.Parser.ReturnClauseOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ReturnClauseSoundnessProperties
+import Solcore.Syntax.Parser.SelectedAliasOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportsSoundnessProperties
 import Solcore.Syntax.Parser.SelectiveImportSoundnessProperties
