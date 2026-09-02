@@ -1,3 +1,4 @@
+import Solcore.Syntax.DeclarativeTypeAliasValueExactnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.TypeAliasProperties
 import Solcore.Syntax.Parser.TypeAliasValueRecoveryOrdinaryOutcomeSoundnessProperties
@@ -180,6 +181,13 @@ theorem parseAliasValue_exactOutcomeSpec_of_typeExpr
       DeclarativeGrammar.TypeAliasValueRejects :=
   DeclarativeGrammar.typeAliasValueExactOutcomeSpecOfTypeExpr typeOutcomes
 
+/-- Re-export unconditional exact recovery-aware alias-value outcomes. -/
+theorem parseAliasValue_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.TypeAliasValueOrdinaryParses
+      DeclarativeGrammar.TypeAliasValueRejects :=
+  DeclarativeGrammar.typeAliasValueExactOutcomeSpec
+
 /-- Under exact Core type outcomes, two successful executable reflections
 have the same alias value and final declarative remainder. -/
 theorem parseAliasValue_success_result_unique_of_typeExpr
@@ -193,6 +201,18 @@ theorem parseAliasValue_success_result_unique_of_typeExpr
       leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
   DeclarativeGrammar.TypeAliasValueOrdinaryParses.result_unique_of_typeExpr
     typeOutcomes
+    (parseAliasValue_success_ordinaryOutcome_sound leftResult)
+    (parseAliasValue_success_ordinaryOutcome_sound rightResult)
+
+/-- Two successful executable reflections have the same alias value and final
+declarative remainder. -/
+theorem parseAliasValue_success_result_unique
+    {input leftOutput rightOutput : State} {left right : TypeExpr}
+    (leftResult : parseAliasValue input = .ok left leftOutput)
+    (rightResult : parseAliasValue input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.TypeAliasValueOrdinaryParses.result_unique
     (parseAliasValue_success_ordinaryOutcome_sound leftResult)
     (parseAliasValue_success_ordinaryOutcome_sound rightResult)
 
