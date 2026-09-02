@@ -6,7 +6,7 @@ import Solcore.Syntax.Lexer
 import Solcore.Syntax.Identifier
 import Solcore.Syntax.Parser
 import Solcore.Syntax.Parser.CertifiedParseProperties
-import Solcore.Syntax.Parser.ConstructorSelectionSoundnessProperties
+import Solcore.Syntax.Parser.ConstructorSelectionOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ContractDeclSoundnessProperties
 import Solcore.Syntax.Parser.ContractFieldOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryOutcomeSoundnessProperties
@@ -20,7 +20,7 @@ import Solcore.Syntax.Parser.DeriveTargetSoundnessProperties
 import Solcore.Syntax.Parser.EnumDeclSoundnessProperties
 import Solcore.Syntax.Parser.EnumDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ExportDeclSoundnessProperties
-import Solcore.Syntax.Parser.ExportNameSoundnessProperties
+import Solcore.Syntax.Parser.ExportNameOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ExportPathOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ExportPathSoundnessProperties
 import Solcore.Syntax.Parser.ExportSelectionSoundnessProperties

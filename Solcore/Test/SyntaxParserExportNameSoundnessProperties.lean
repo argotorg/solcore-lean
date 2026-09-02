@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ExportNameSoundnessProperties
+import Solcore.Syntax.Parser.ExportNameOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for export-name grammar soundness. -/
 
@@ -12,8 +12,15 @@ open Solcore.Syntax.Parser
 
 example := @OptionalConstructorSelectionParses
 example := @ExportNameParses
+example := @ExportNameOrdinaryParses
+example := @ExportNameRejects
+example := @exportNameDeterministicOutcomeSpec
 example := @exportName_success_sound
 example := @exportName_success_sound_and_validFor
+example := @exportName_success_ordinaryOutcome_sound
+example := @exportName_reject_ordinaryOutcome_sound
+example := @exportName_ordinaryOutcome_sound
+example := @exportName_ordinaryOutcomeSpec
 
 example {input next : State} {name : ExportName}
     (inputValid : input.ValidFor)
