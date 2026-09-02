@@ -1,4 +1,5 @@
 import Solcore.Syntax.DeclarativeDeriveTargetOutcomeProperties
+import Solcore.Syntax.DeclarativeDeriveTargetExactnessProperties
 import Solcore.Syntax.Parser.DeriveTargetOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DeriveTargetSoundnessProperties
 
@@ -37,5 +38,36 @@ theorem deriveTarget_ordinaryOutcomeSpec :
       DeclarativeGrammar.DeriveTargetParses
       DeclarativeGrammar.DeriveTargetRejects :=
   DeclarativeGrammar.deriveTargetDeterministicOutcomeSpec
+
+/-- Re-export full value and rejection-endpoint functionality for derive
+targets at the executable reflection boundary. -/
+theorem deriveTarget_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.DeriveTargetParses
+      DeclarativeGrammar.DeriveTargetRejects :=
+  DeclarativeGrammar.deriveTargetExactOutcomeSpec
+
+/-- Two successful executable reflections have the same declarative target
+and final remainder. -/
+theorem deriveTarget_success_result_unique
+    {input leftOutput rightOutput : State} {left right : DeriveTarget}
+    (leftResult : deriveTarget input = .ok left leftOutput)
+    (rightResult : deriveTarget input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.DeriveTargetParses.result_unique
+    (deriveTarget_success_ordinaryOutcome_sound leftResult)
+    (deriveTarget_success_ordinaryOutcome_sound rightResult)
+
+/-- Two rejected executable reflections have the same exact declarative
+endpoint. -/
+theorem deriveTarget_reject_output_unique
+    {input leftOutput rightOutput : State} {leftFailure rightFailure : Failure}
+    (leftResult : deriveTarget input = .reject leftFailure leftOutput)
+    (rightResult : deriveTarget input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.DeriveTargetRejects.output_unique
+    (deriveTarget_reject_ordinaryOutcome_sound leftResult)
+    (deriveTarget_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser
