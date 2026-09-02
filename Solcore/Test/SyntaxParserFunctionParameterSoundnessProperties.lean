@@ -1,4 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
+import Solcore.Syntax.DeclarativeFunctionParametersExactnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParameterOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParametersOrdinaryOutcomeSoundnessProperties
@@ -24,9 +25,12 @@ example := @FunctionParameterOrdinaryParses
 example := @FunctionParameterRejects
 example := @functionParameterCoreDeterministicOutcomeSpec
 example := @functionParameterDeterministicOutcomeSpec
+example := @functionParameterRecoveryExactOutcomeSpec
+example := @functionParameterExactOutcomeSpec
 example := @FunctionParametersOrdinaryParses
 example := @FunctionParametersRejects
 example := @functionParametersDeterministicOutcomeSpec
+example := @functionParametersExactOutcomeSpec
 
 example := @Parser.ReflectsDiagnosticFreeOnSuccess
 example := @Parser.pure_reflectsDiagnosticFreeOnSuccess
@@ -48,16 +52,28 @@ example := @namedParameter_success_ordinaryOutcome_sound
 example := @namedParameter_reject_ordinaryOutcome_sound
 example := @namedParameter_ordinaryOutcome_sound
 example := @namedParameter_ordinaryOutcomeSpec
+example := @namedParameter_exactOutcomeSpec
+example := @namedParameter_success_result_unique
+example := @namedParameter_reject_output_unique
 example := @functionParameters_success_ordinaryOutcome_sound
 example := @functionParameters_reject_ordinaryOutcome_sound
 example := @functionParameters_ordinaryOutcome_sound
 example := @functionParameters_ordinaryOutcomeSpec
+example := @functionParameters_exactOutcomeSpec
+example := @functionParameters_success_result_unique
+example := @functionParameters_reject_output_unique
 
 example :
     DeterministicOutcomeSpec
       (FunctionParameterOrdinaryParses TypeExprOrdinaryParses TypeExprRejects)
       (FunctionParameterRejects TypeExprRejects) :=
   functionParameterDeterministicOutcomeSpec typeExprDeterministicOutcomeSpec
+
+example :
+    ExactDeterministicOutcomeSpec
+      (FunctionParameterOrdinaryParses TypeExprOrdinaryParses TypeExprRejects)
+      (FunctionParameterRejects TypeExprRejects) :=
+  functionParameterExactOutcomeSpec typeExprExactOutcomeSpec
 
 example {input next : State} {parameter : FunctionParameter}
     (inputValid : input.ValidFor) (diagnosticFree : next.diagnosticsRev = [])
