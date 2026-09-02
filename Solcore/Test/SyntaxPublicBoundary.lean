@@ -115,6 +115,25 @@ example := @Syntax.DeclarativeGrammar.optionalContractFieldInitializerDeterminis
 example := @Syntax.DeclarativeGrammar.ContractFieldOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ContractFieldRejects
 example := @Syntax.DeclarativeGrammar.contractFieldDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasParametersOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TypeAliasParametersRejects
+example := @Syntax.DeclarativeGrammar.typeAliasParametersDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalTypeAliasParametersOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalTypeAliasParametersRejects
+example := @Syntax.DeclarativeGrammar.optionalTypeAliasParametersDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasValueBoundaryStops
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryStops
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryScanParses
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryParses
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRecoveryRejects
+example := @Syntax.DeclarativeGrammar.typeAliasValueRecoveryDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasValueCoreRejectsWithPreservedWindow
+example := @Syntax.DeclarativeGrammar.TypeAliasValueOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TypeAliasValueRejects
+example := @Syntax.DeclarativeGrammar.typeAliasValueDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.TypeAliasDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.TypeAliasDeclRejects
+example := @Syntax.DeclarativeGrammar.typeAliasDeclDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -172,6 +191,23 @@ example := @Syntax.Parser.ContractInternals.contractField_success_ordinaryOutcom
 example := @Syntax.Parser.ContractInternals.contractField_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractInternals.contractField_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractInternals.contractField_ordinaryOutcomeSpec
+example := @Syntax.Parser.parseTypeAliasParameters_success_ordinaryOutcome_sound
+example := @Syntax.Parser.parseTypeAliasParameters_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.parseTypeAliasParameters_ordinaryOutcome_sound
+example := @Syntax.Parser.parseTypeAliasParameters_ordinaryOutcomeSpec
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValueAux_success_ordinary_sound
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_success_ordinary_sound
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_reject_ordinary_sound
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_ordinaryOutcome_sound
+example := @Syntax.Parser.TypeAliasInternals.recoverTypeAliasValue_ordinaryOutcomeSpec
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_success_ordinaryOutcome_sound
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_ordinaryOutcome_sound
+example := @Syntax.Parser.TypeAliasInternals.parseAliasValue_ordinaryOutcomeSpec
+example := @Syntax.Parser.typeAlias_success_ordinaryOutcome_sound
+example := @Syntax.Parser.typeAlias_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.typeAlias_ordinaryOutcome_sound
+example := @Syntax.Parser.typeAlias_ordinaryOutcomeSpec
 
 example {input output : Syntax.Parser.State} {field : ContractField}
     (result : Syntax.Parser.ContractInternals.contractField
@@ -198,5 +234,18 @@ example {input rejected : Syntax.Parser.State}
     Syntax.DeclarativeGrammar.CoreExpressionPublicRejects
     Syntax.Parser.expression_ordinaryOutcome_sound.1
     Syntax.Parser.expression_ordinaryOutcome_sound.2 result
+
+example {input output : Syntax.Parser.State} {declaration : TypeAliasDecl}
+    (result : Syntax.Parser.typeAlias input = .ok declaration output) :
+    Syntax.DeclarativeGrammar.TypeAliasDeclOrdinaryParses
+      input.declarativeRemainder declaration output.declarativeRemainder :=
+  Syntax.Parser.typeAlias_success_ordinaryOutcome_sound result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.typeAlias input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.TypeAliasDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.typeAlias_reject_ordinaryOutcome_sound result
 
 end Tests
