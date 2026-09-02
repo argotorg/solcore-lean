@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDeriveAttributeOutcomeProperties
+import Solcore.Syntax.DeclarativeDeriveAttributeExactnessProperties
 import Solcore.Syntax.Parser.DeriveAttributeRecoveredOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DeriveAttributeValidOrdinaryOutcomeSoundnessProperties
 
@@ -66,5 +66,38 @@ theorem deriveAttribute_ordinaryOutcomeSpec :
       DeclarativeGrammar.DeriveAttributeOrdinaryParses
       DeclarativeGrammar.DeriveAttributeRejects :=
   DeclarativeGrammar.deriveAttributeDeterministicOutcomeSpec
+
+/-- Re-export full value and rejection-endpoint functionality for public
+derive attributes at the executable reflection boundary. -/
+theorem deriveAttribute_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.DeriveAttributeOrdinaryParses
+      DeclarativeGrammar.DeriveAttributeRejects :=
+  DeclarativeGrammar.deriveAttributeExactOutcomeSpec
+
+/-- Two successful executable reflections have the same public derive
+attribute and final declarative remainder. -/
+theorem deriveAttribute_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : DeriveAttribute}
+    (leftResult : deriveAttribute input = .ok left leftOutput)
+    (rightResult : deriveAttribute input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.DeriveAttributeOrdinaryParses.result_unique
+    (deriveAttribute_success_ordinaryOutcome_sound leftResult)
+    (deriveAttribute_success_ordinaryOutcome_sound rightResult)
+
+/-- Two rejected executable reflections have the same exact public
+declarative endpoint. -/
+theorem deriveAttribute_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : deriveAttribute input = .reject leftFailure leftOutput)
+    (rightResult : deriveAttribute input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.DeriveAttributeRejects.output_unique
+    (deriveAttribute_reject_ordinaryOutcome_sound leftResult)
+    (deriveAttribute_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser
