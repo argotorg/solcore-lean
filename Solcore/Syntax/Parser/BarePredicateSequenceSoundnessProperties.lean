@@ -63,7 +63,8 @@ private theorem typeExprStartsAt_of_isIdentifier {input : State}
         rw [tokenEq] at tokenAt
         exact ⟨token.span, .identifier text, tokenAt, .identifier text⟩
 
-private theorem typeExprStartsAt_of_startsTypeExpr_eq_true {input : State}
+/-- Positive executable type lookahead is exact declarative start evidence. -/
+theorem typeExprStartsAt_of_startsTypeExpr_eq_true {input : State}
     (present : startsTypeExpr input = true) :
     DeclarativeGrammar.TypeExprStartsAt input.declarativeRemainder := by
   simp only [startsTypeExpr, Bool.or_eq_true] at present
