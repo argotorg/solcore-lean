@@ -82,4 +82,46 @@ theorem constructorDecl_reject_output_unique_of_children
       (constructorDecl_reject_ordinaryOutcome_sound leftResult)
       (constructorDecl_reject_ordinaryOutcome_sound rightResult)
 
+/-- Exact function parameters leave only the isolated body contract as a
+premise at the executable constructor boundary. -/
+theorem constructorDecl_exactOutcomeSpec_of_body
+    (bodyOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses .require)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects .require)) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ConstructorDeclOrdinaryParses
+      DeclarativeGrammar.ConstructorDeclRejects :=
+  DeclarativeGrammar.constructorDeclExactOutcomeSpecOfBody bodyOutcomes
+
+/-- With an exact isolated body, two executable successes have the same
+constructor AST and final declarative remainder. -/
+theorem constructorDecl_success_result_unique_of_body
+    (bodyOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses .require)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects .require))
+    {input leftOutput rightOutput : State}
+    {left right : ConstructorDecl}
+    (leftResult : constructorDecl input = .ok left leftOutput)
+    (rightResult : constructorDecl input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.ConstructorDeclOrdinaryParses.result_unique_of_exact_body
+    bodyOutcomes (constructorDecl_success_ordinaryOutcome_sound leftResult)
+    (constructorDecl_success_ordinaryOutcome_sound rightResult)
+
+/-- With an exact isolated body, two executable rejections have the same
+declarative endpoint. -/
+theorem constructorDecl_reject_output_unique_of_body
+    (bodyOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses .require)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects .require))
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : constructorDecl input = .reject leftFailure leftOutput)
+    (rightResult : constructorDecl input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.ConstructorDeclRejects.output_unique_of_exact_body
+    bodyOutcomes (constructorDecl_reject_ordinaryOutcome_sound leftResult)
+    (constructorDecl_reject_ordinaryOutcome_sound rightResult)
+
 end Solcore.Syntax.Parser

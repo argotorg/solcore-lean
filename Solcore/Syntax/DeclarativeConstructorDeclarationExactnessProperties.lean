@@ -1,5 +1,6 @@
 import Solcore.Syntax.DeclarativeContractEntryModifierExactnessProperties
 import Solcore.Syntax.DeclarativeExactOutcomeSpec
+import Solcore.Syntax.DeclarativeFunctionParametersExactnessProperties
 
 /-!
 Exactness transport through constructor declarations.
@@ -149,5 +150,41 @@ theorem constructorDeclExactOutcomeSpecOfChildren
   rejectOutputUnique :=
     ConstructorDeclRejects.output_unique_of_exact_children
       parameterOutcomes bodyOutcomes
+
+/-- Once named-parameter exactness is instantiated, an exact isolated body is
+the sole remaining premise for exact constructor outcomes. -/
+theorem constructorDeclExactOutcomeSpecOfBody
+    (bodyOutcomes : ExactDeterministicOutcomeSpec
+      (IsolatedCoreBlockPublicOrdinaryParses .require)
+      (IsolatedCoreBlockPublicRejects .require)) :
+    ExactDeterministicOutcomeSpec ConstructorDeclOrdinaryParses
+      ConstructorDeclRejects :=
+  constructorDeclExactOutcomeSpecOfChildren
+    functionParametersExactOutcomeSpec bodyOutcomes
+
+/-- With an exact isolated body, constructor success fixes its AST and final
+remainder. -/
+theorem ConstructorDeclOrdinaryParses.result_unique_of_exact_body
+    (bodyOutcomes : ExactDeterministicOutcomeSpec
+      (IsolatedCoreBlockPublicOrdinaryParses .require)
+      (IsolatedCoreBlockPublicRejects .require))
+    {input : Remainder} {left right : Syntax.ConstructorDecl}
+    {afterLeft afterRight : Remainder}
+    (leftParsed : ConstructorDeclOrdinaryParses input left afterLeft)
+    (rightParsed : ConstructorDeclOrdinaryParses input right afterRight) :
+    left = right ∧ afterLeft = afterRight :=
+  (constructorDeclExactOutcomeSpecOfBody bodyOutcomes).successResultUnique
+    leftParsed rightParsed
+
+/-- With an exact isolated body, constructor rejection fixes its endpoint. -/
+theorem ConstructorDeclRejects.output_unique_of_exact_body
+    (bodyOutcomes : ExactDeterministicOutcomeSpec
+      (IsolatedCoreBlockPublicOrdinaryParses .require)
+      (IsolatedCoreBlockPublicRejects .require))
+    {input left right : Remainder}
+    (leftRejects : ConstructorDeclRejects input left)
+    (rightRejects : ConstructorDeclRejects input right) : left = right :=
+  (constructorDeclExactOutcomeSpecOfBody bodyOutcomes).rejectOutputUnique
+    leftRejects rightRejects
 
 end Solcore.Syntax.DeclarativeGrammar
