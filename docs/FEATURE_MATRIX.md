@@ -84,13 +84,12 @@ exact primary and fallback branches determine the successful value and final
 remainder, while double rejection has the unique original-input endpoint.
 Concrete uses supply both branch contracts.
 
-Transparent type-alias parameters now have an unconditional exact value,
-remainder, and rejection contract. Malformed alias-value recovery likewise
-fixes its error type and endpoint. Recovery-aware alias values expose an exact
-contract conditional on exact Core `TypeExpr` outcomes, and their rejection
-endpoint is already unconditional. These declarative and executable APIs are
-publicly consumed; Core type-expression AST value exactness remains the
-prerequisite for the unconditional declaration-wide lift.
+Recursive Core `TypeExpr` outcomes now unconditionally fix the successful AST
+and final remainder and every rejecting endpoint, at fixed fuel and at the
+public boundary. Transparent type-alias parameters and malformed RHS recovery
+have exact contracts, and the Core type result lifts through recovery-aware
+alias values and the complete declaration. The resulting alias AST, remainder,
+and all first-failure endpoints are unconditional and publicly consumed.
 
 Backward diagnostic reflection composes through parser sequencing,
 transactional choice, token consumers, and delimiters. Its concrete instances
@@ -108,15 +107,19 @@ end, comma, or right parenthesis gives exact nonconsuming rejection; otherwise
 the parser emits the failure diagnostic and performs its mandatory-first-token
 maximal recovery scan. A carrier hole is reflected as recovery rejection.
 Success endpoints are deterministic and exclusive with rejection, while the
-strict `FunctionParameterParses` relation remains diagnostic-free.
+strict `FunctionParameterParses` relation remains diagnostic-free. Complete
+recovery, ordinary and contextual parameter forms, and rejection endpoints now
+also have an exact contract, instantiated by the Core `TypeExpr` exactness law.
 
 The canonical `TypeExpr` and recovery-aware `namedParameter` outcomes now lift
 to the `(` / `)` parameter list, with empty contents and a trailing comma
 allowed. Delimiter and nested rejection endpoints are exact: recovery stops
 leave an outer comma or right parenthesis unconsumed, a carrier hole remains a
 nested rejection, and recovery to the window end may then yield exact
-`delimiterMissing` rejection. Success endpoints are deterministic and
-exclusive with rejection; strict `FunctionParametersParses` remains the
+`delimiterMissing` rejection. Generic trailing-list exactness fixes the
+complete broad parameter-list AST, final remainder, and delimiter or nested
+rejection endpoint. These declarative and executable laws are public and
+compile-time consumed; strict `FunctionParametersParses` remains the
 diagnostic-free list relation.
 
 Bare and grouped predicate sequences have unconditional soundness with exact
@@ -183,7 +186,10 @@ body rejection after modifier success. A balanced captured child rejection is
 absorbed as diagnosed empty-body recovery success at the parent remainder.
 Endpoints are deterministic and success/rejection are exclusive. The strict
 diagnostic-free `ConstructorDeclParses` judgment remains available alongside
-this broader malformed-source outcome contract.
+this broader malformed-source outcome contract. Exact parameters and modifiers
+reduce complete constructor exactness to the isolated `.require` body premise;
+under it, ASTs, final remainders, and rejection endpoints are unique. The
+remaining dependency is fixed-fuel Core statement exactness.
 
 Broad ordinary `fallbackDecl` outcomes now retain the exact `fallback` keyword
 and recovery-aware parameter list through a pure validation stage. Empty
