@@ -1,3 +1,4 @@
+import Solcore.Syntax.Parser.PredicateSequenceOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.WhereClauseSoundnessProperties
 
 /-! External consumers for predicate-sequence and optional-where soundness. -/
@@ -14,23 +15,32 @@ example := @TypeExprStartToken
 example := @TypeExprStartsAt
 example := @TypeExprAbsentAt
 example := @BarePredicateTailParses
+example := @BarePredicateTailRejects
 example := @BarePredicateSequenceParses
+example := @BarePredicateSequenceRejects
+example := @barePredicateSequenceDeterministicOutcomeSpec
 example := @GroupedPredicateSequenceParses
 example := @GroupedPredicateSequenceUnavailable
 example := @GroupedPredicateSequenceRejects
 example := @groupedPredicateSequenceDeterministicOutcomeSpec
 example := @GroupedPredicateSequenceRejects.no_parse
 example := @PredicateSequenceParses
+example := @PredicateSequenceRejects
+example := @predicateSequenceDeterministicOutcomeSpec
 example := @OptionalWhereClauseParses
 
 example := @PredicateInternals.barePredicates_success_sound
 example := @PredicateInternals.barePredicates_success_sound_and_validFor
+example := @PredicateInternals.barePredicates_reject_sound
+example := @PredicateInternals.barePredicates_ordinaryOutcome_sound
 example := @PredicateInternals.groupedPredicates_success_sound
 example := @PredicateInternals.groupedPredicates_success_sound_and_validFor
 example := @PredicateInternals.groupedPredicates_reject_sound
 example := @PredicateInternals.groupedPredicates_ordinaryOutcome_sound
 example := @PredicateInternals.predicateSequence_success_sound
 example := @PredicateInternals.predicateSequence_success_sound_and_validFor
+example := @PredicateInternals.predicateSequence_reject_sound
+example := @PredicateInternals.predicateSequence_ordinaryOutcome_sound
 example := @whereClause_success_sound
 example := @whereClause_success_sound_and_validFor
 
@@ -60,6 +70,20 @@ example {input rejected : State} {failure : Failure}
     GroupedPredicateSequenceRejects input.declarativeRemainder
       rejected.declarativeRemainder :=
   PredicateInternals.groupedPredicates_reject_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : PredicateInternals.barePredicates input =
+      .reject failure rejected) :
+    BarePredicateSequenceRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  PredicateInternals.barePredicates_reject_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : PredicateInternals.predicateSequence input =
+      .reject failure rejected) :
+    PredicateSequenceRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  PredicateInternals.predicateSequence_reject_sound result
 
 example {input rejected : Remainder}
     (rejection : GroupedPredicateSequenceRejects input rejected) :
