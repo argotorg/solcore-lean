@@ -36,6 +36,7 @@ import Solcore.Syntax.Parser.PlainImportSoundnessProperties
 import Solcore.Syntax.Parser.PlainTopItemDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.PlainTopItemSoundnessProperties
 import Solcore.Syntax.Parser.PredicateOrdinaryRejectionSoundnessProperties
+import Solcore.Syntax.Parser.PredicateSequenceOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.PredicateSoundnessProperties
 import Solcore.Syntax.Parser.PragmaSoundnessProperties
 import Solcore.Syntax.Parser.Properties
