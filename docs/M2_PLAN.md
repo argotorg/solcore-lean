@@ -277,12 +277,17 @@ empty-body recovery at the parent remainder. Success endpoints are deterministic
 and exclusive with rejection, while strict diagnostic-free
 `FallbackDeclParses` continues as the canonical acceptance judgment.
 
-The implementation-method wrapper now carries that broad declaration contract
-one level upward. Its exact AST adds only the empty parser-time comment list,
-and its final remainder is unchanged; its sole rejection stage is the nested
-function declaration. Module modifier diagnostics and captured-body recovery
-stay on the success path. The resulting method endpoints are deterministic and
-mutually exclusive.
+Implementation outcomes now span the complete declaration. The method wrapper
+adds only empty parser-time comments to a broad module function declaration.
+The optional `default` prefix is deterministic and cannot reject; required
+head arguments use a nonempty, trailing-comma angle list of broad types. The
+custom body loop retains right-brace priority, a positive `function` guard,
+strict progress, forward method order, and exact unexpected or nested
+rejection remainders. Full declarations distinguish missing contextual marker,
+generic, name, head-argument, `where`, and body rejection after the default
+prefix. Default, head, method, body, and declaration endpoints are
+deterministic and success/rejection exclusive, while module diagnostics and
+captured-body recovery remain ordinary successes.
 
 Trait methods now add an exact semicolon to the broad module-policy signature
 outcome, so modifier diagnostics remain ordinary successes. Their only reject
@@ -295,12 +300,10 @@ and body rejection. All three success endpoints are deterministic and
 success/rejection exclusive. The earlier diagnostic-free grammars and
 source-validity compositions remain registered beside these broad outcomes.
 
-Function declarations now compose exact location-indexed signatures with an
-abstract parser-independent block relation. Implementations lift the same
-boundary through optional `default`, nonempty head arguments, optional
-`where`, module-policy methods, right-brace priority, strict progress, and
-forward-order body accumulation. Their diagnostic-free reflection,
-source-validity compositions, consumers, and public imports are complete.
+Function declarations still compose exact location-indexed signatures with an
+abstract parser-independent block relation. The strict diagnostic-free
+implementation grammar, reflection, and source-validity compositions remain
+registered beside the broad executable outcomes.
 Contract declarations now extend these parametric boundaries through exact
 member dispatch, enum-only derive attachment, brace-delimited forward member
 order, strict progress, and recovery exclusion by diagnostic commitment.

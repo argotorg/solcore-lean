@@ -390,12 +390,16 @@ modifier success. A balanced captured child rejection instead becomes a
 diagnosed empty-body recovery success at the parent remainder. Outcomes are
 deterministic and exclusive; strict diagnostic-free `FallbackDeclParses` remains.
 
-The implementation-method wrapper now lifts that broad declaration outcome
-without adding syntax or rejection stages. Success retains the declaration
-span, an empty parser-time leading-comment list, and the exact final remainder;
-rejection is exactly the nested function-declaration rejection. Module-policy
-diagnostics and captured-body recovery therefore remain ordinary successes.
-These method endpoints are deterministic and success/rejection are exclusive.
+Implementation outcomes now cover the optional `default` prefix, contextual
+marker, optional generics, trait name, required nonempty trailing-comma head
+types, optional `where`, custom method body, and complete AST. The default
+prefix cannot reject, and the pure nonempty refinement adds only an invariant
+branch. The right-brace-first body loop retains positive `function` guards,
+strict progress, forward method order, and exact unexpected or nested
+rejection remainders. Full declarations expose six rejecting stages after the
+default prefix: marker, generics, name, head arguments, `where`, and body.
+Default, head, method, body, and declaration outcomes are deterministic and
+exclusive; module diagnostics and captured-body recovery remain successes.
 
 Trait methods now extend the broad module-signature outcome through an exact
 semicolon, retaining diagnostic-producing signature successes and separating
@@ -409,11 +413,11 @@ exclusive. The strict diagnostic-free `TraitDeclParses` family and its
 source-validity compositions remain available beside the publicly exported
 broad outcomes.
 
-Ordinary function declarations and implementations now have parametric
-parser-independent judgments over an abstract block relation. Function
-soundness composes the exact location-specific signature, isolated body,
-outer cover span, and final remainder. Implementation soundness additionally
-retains optional-`default` priority, nonempty trailing-comma head arguments,
+Ordinary function declarations and strict diagnostic-free implementations
+retain parametric parser-independent judgments over an abstract block
+relation. Function soundness composes the exact location-specific signature,
+isolated body, outer cover span, and final remainder. Implementation soundness
+additionally retains optional-`default` priority, nonempty trailing-comma head arguments,
 module-policy methods, right-brace-first body dispatch, strict method progress,
 and forward method order. These APIs reflect diagnostic freedom through every
 nested body and have source-validity compositions, consumers, and public

@@ -198,12 +198,15 @@ alias AST, keyword/semicolon cover span, and final remainder; endpoints are
 deterministic and success/rejection exclusive. The strict diagnostic-free
 `TypeAliasDeclParses` relation remains available alongside this broad outcome.
 
-The implementation-method wrapper also has a broad ordinary outcome. It
-preserves the wrapped declaration span, empty parser-time leading comments,
-and exact remainder, while exposing only nested function-declaration
-rejection. Module modifier diagnostics and balanced-body recovery remain
-successful outcomes. Method endpoints are deterministic and exclude
-simultaneous rejection.
+Implementation broad outcomes now cover the infallible optional `default`
+prefix, contextual marker, optional generics, trait name, required nonempty
+trailing-comma head types, optional `where`, method loop, and complete
+declaration. The body retains closing-brace priority, positive `function`
+guards, strict progress, forward method order, and every rejecting remainder.
+Full rejection has exactly marker, generics, name, head-argument, `where`, and
+body stages after the default prefix. Default, head, method, body, and full
+declaration endpoints are deterministic and success/rejection exclusive;
+module diagnostics and balanced-body recovery remain successful outcomes.
 
 Trait methods, brace-delimited method bodies, and complete trait declarations
 now have exact broad success and rejection outcomes. Module-signature
