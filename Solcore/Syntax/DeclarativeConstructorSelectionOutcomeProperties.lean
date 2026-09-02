@@ -52,10 +52,20 @@ private theorem identifier_output_unique {input : Remainder}
   rcases leftParsed with ⟨leftToken, leftTokens, leftEndIndex, leftCursor⟩
   rcases rightParsed with
     ⟨rightToken, rightTokens, rightEndIndex, rightCursor⟩
-  apply Remainder.ext
-  · exact leftTokens.trans rightTokens.symm
-  · exact leftEndIndex.trans rightEndIndex.symm
-  · exact leftCursor.trans rightCursor.symm
+  rcases afterLeft with ⟨afterLeftTokens, afterLeftEndIndex,
+    afterLeftCursor⟩
+  rcases afterRight with ⟨afterRightTokens, afterRightEndIndex,
+    afterRightCursor⟩
+  have tokensEq : afterLeftTokens = afterRightTokens :=
+    leftTokens.trans rightTokens.symm
+  have endIndexEq : afterLeftEndIndex = afterRightEndIndex :=
+    leftEndIndex.trans rightEndIndex.symm
+  have cursorEq : afterLeftCursor = afterRightCursor :=
+    leftCursor.trans rightCursor.symm
+  cases tokensEq
+  cases endIndexEq
+  cases cursorEq
+  rfl
 
 private theorem identifier_outcome_spec :
     DeterministicOutcomeSpec IdentifierParses IdentifierRejects where
