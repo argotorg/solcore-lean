@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DeriveAttributeSoundnessProperties
+import Solcore.Syntax.Parser.DeriveAttributeValidOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for derive-attribute grammar soundness. -/
 
@@ -11,7 +11,14 @@ open Solcore.Syntax.DeclarativeGrammar
 open Solcore.Syntax.Parser
 
 example := @DeriveAttributeParses
+example := @DeriveAttributeValidRejects
+example := @deriveAttributeValidDeterministicOutcomeSpec
 example := @deriveAttributeValid_success_sound
+example := @DeriveAttributeInternals.valid_reject_ordinaryOutcome_sound
+example := @deriveAttributeValid_success_ordinaryOutcome_sound
+example := @deriveAttributeValid_reject_ordinaryOutcome_sound
+example := @deriveAttributeValid_ordinaryOutcome_sound
+example := @deriveAttributeValid_ordinaryOutcomeSpec
 example := @deriveAttribute_success_sound
 example := @deriveAttribute_success_sound_and_validFor
 
@@ -29,5 +36,12 @@ example {input next : State} {value : DeriveAttribute}
         next.declarativeRemainder ∧
       value.ValidFor input.file :=
   deriveAttribute_success_sound_and_validFor inputValid diagnosticFree result
+
+example {input rejected : State} {failure : Failure}
+    (result : DeriveAttributeInternals.valid input =
+      .reject failure rejected) :
+    DeriveAttributeValidRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  deriveAttributeValid_reject_ordinaryOutcome_sound result
 
 end Solcore.Test.SyntaxParserDeriveAttributeSoundnessProperties
