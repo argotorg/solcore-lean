@@ -240,13 +240,18 @@ absent contextual `where` marker is a nonconsuming success, while a present
 marker commits to the prioritized predicate sequence. Executable ordinary
 rejection is reflected exactly as that committed sequence rejection; optional
 `where` has a deterministic success remainder and exclusive success/rejection
-outcomes.
+outcomes. Predicate, grouped and bare sequence, grouped-first dispatch, and
+optional `where` contracts now also fix their complete ASTs, final remainders,
+and rejection endpoints. The bare tail theorem explicitly shares its preceding
+span, which complete sequences determine from their first exact predicate.
 
 For optional `returns`, an absent contextual marker is likewise a nonconsuming
 success, while a present marker commits to the allow-empty, allow-trailing
 parenthesized `TypeExpr` list. Executable ordinary rejection reflects the exact
 nested type or delimiter remainder. The success endpoint is deterministic and
-success/rejection outcomes are exclusive.
+success/rejection outcomes are exclusive. The completed Core `TypeExpr` exact
+contract lifts through the optional clause to fix its AST, remainder, and
+committed rejection endpoint.
 
 Optional function modifiers now preserve exact keyword absence or presence in
 the fixed `public`-then-`payable` order. Modifier grammar soundness is
@@ -270,7 +275,10 @@ keyword, name, generics, parameter-list, returns, or `where` stage. Modifiers
 always succeed; module-location markers may instead emit diagnostics without
 changing the declarative remainder. Success endpoints are deterministic and
 exclusive with rejection, while `FunctionSignatureParses` remains the strict
-diagnostic-free, location-policy judgment.
+diagnostic-free, location-policy judgment. Exact child contracts for every
+stage now make this broad signature contract unconditional: complete signature
+ASTs and final remainders are unique, as is every rejection endpoint, with
+matching executable reflection.
 
 The broad ordinary `functionDecl` layer is now complete and location
 independent. Its success judgment sequences the ordinary signature into the
@@ -281,7 +289,10 @@ ordinary signature success. A balanced captured child's rejection is instead
 an empty-body success with a retained recovery diagnostic and the exact parent
 remainder. The combined declaration outcomes are deterministic and mutually
 exclusive. This complements, rather than replaces, the location-policy-aware
-diagnostic-free `FunctionDeclParses` boundary.
+diagnostic-free `FunctionDeclParses` boundary. Signature exactness leaves only
+the isolated `.allow` body as the premise for declaration exactness. A second
+API accepts fixed-fuel Core statement exactness and supplies that body contract
+through balanced isolation.
 
 The broad ordinary `constructorDecl` layer now records the exact executable
 order from the required `constructor` keyword through recovery-aware
@@ -310,7 +321,10 @@ parameter rejection, or uncaptured body rejection after validation and
 modifier success. A balanced captured child rejection is absorbed as diagnosed
 empty-body recovery at the parent remainder. Success endpoints are deterministic
 and exclusive with rejection, while strict diagnostic-free
-`FallbackDeclParses` continues as the canonical acceptance judgment.
+`FallbackDeclParses` continues as the canonical acceptance judgment. Exact
+parameters, validation, and modifiers leave only the isolated `.require` body
+premise for fallback AST and rejection-endpoint exactness; fixed-fuel Core
+statement exactness supplies it directly.
 
 Implementation outcomes now span the complete declaration. The method wrapper
 adds only empty parser-time comments to a broad module function declaration.
@@ -364,6 +378,10 @@ exact dispatcher priority, optional termination, and block-boundary rejection.
 The mutually recursive Core expression, pattern, statement, and block parsers
 now likewise have fuel-indexed ordinary/reject closures, public production-fuel
 specializations, deterministic outcomes, and backward diagnostic reflection.
+Given exact Core statements at every fixed fuel, new generic lifts make raw
+block items, public raw blocks, balanced isolation/recovery, and both tail
+policies exact in their ASTs, closing spans, remainders, and rejection
+endpoints. Fixed-fuel statement exactness remains the explicit premise.
 The concrete `CoreSourceFileOrdinaryParses` grammar instantiates the completed
 parametric file theorem with public Core expressions and isolated `.allow` and
 `.require` bodies. `CoreSourceFileOrdinaryParsesFromStart` fixes its exact root

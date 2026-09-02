@@ -135,13 +135,17 @@ specifications exclude simultaneous success and rejection. An absent contextual
 `where` marker is a nonconsuming success, while a present marker commits to the
 prioritized predicate sequence. Executable ordinary rejection is reflected
 exactly as that committed sequence rejection; optional-`where` success has a
-deterministic remainder and is exclusive with rejection.
+deterministic remainder and is exclusive with rejection. Predicate ASTs,
+grouped and bare sequences, grouped-first dispatch, and optional `where` now
+also fix successful values/remainders and rejecting endpoints. Bare-tail
+exactness explicitly shares the preceding span supplied by the complete list.
 
 For optional `returns`, an absent contextual marker is likewise a nonconsuming
 success, while a present marker commits to the allow-empty, allow-trailing
 parenthesized `TypeExpr` list. Executable rejection reflects the exact nested
 type or delimiter remainder. The success endpoint is deterministic and
-success/rejection are exclusive.
+success/rejection are exclusive. Core `TypeExpr` exactness now fixes the
+optional return AST, final remainder, and committed rejection endpoint.
 
 Function modifiers have unconditional fixed-order `public`-then-`payable`
 grammar soundness. Diagnostic-free module success excludes both markers,
@@ -162,7 +166,9 @@ keyword, name, generics, parameter-list, returns, or `where` stage. Modifiers
 always succeed; module-location markers may instead emit diagnostics without
 changing the declarative remainder. Success endpoints are deterministic and
 exclusive with rejection, while `FunctionSignatureParses` remains the strict
-diagnostic-free, location-policy judgment.
+diagnostic-free, location-policy judgment. The broad signature is now
+unconditionally exact: every component AST and final remainder and every
+first-failure endpoint is unique, with executable reflection.
 
 Broad ordinary `functionDecl` outcomes are now location independent. Success
 threads an ordinary signature into the isolated `.allow` Core body while
@@ -173,7 +179,9 @@ balanced captured child is absorbed as diagnostic recovery and returns an
 ordinary empty body at the exact parent remainder. Successful endpoints are
 deterministic and exclude simultaneous rejection. The existing
 location-policy-aware `FunctionDeclParses` relation continues to describe the
-strict diagnostic-free declaration boundary.
+strict diagnostic-free declaration boundary. Exact signatures leave the
+isolated `.allow` body as the only premise for full declaration exactness;
+fixed-fuel Core statement exactness supplies it through block isolation.
 
 Broad ordinary `constructorDecl` outcomes now preserve the exact required
 keyword, recovery-aware parameter list, fixed optional `public`-then-`payable`
@@ -202,7 +210,9 @@ absence, parameter rejection, or uncaptured body rejection after validation
 and modifier success. A balanced captured child rejection becomes diagnosed
 empty-body recovery success at the parent remainder. Endpoints are deterministic
 and success/rejection exclusive; strict diagnostic-free `FallbackDeclParses`
-remains available as the canonical acceptance judgment.
+remains available as the canonical acceptance judgment. Exact parameters,
+validation, and modifiers leave only the isolated `.require` body premise for
+complete fallback exactness, supplied directly by fixed-fuel Core statements.
 
 Broad ordinary contract-field outcomes preserve the exact checked name, colon,
 Core type, prioritized optional `=` initializer expression, and semicolon order.
@@ -392,7 +402,11 @@ with source-order comment attachment, full-window consumption, and recovery
 exclusion. These theorem families are publicly registered. The fuel-indexed
 mutual Core closure and public Yul outcomes now instantiate that judgment as
 `CoreSourceFileOrdinaryParses`, with concrete public expression and isolated
-body relations for both block-tail policies.
+body relations for both block-tail policies. Exact fixed-fuel statement
+outcomes now lift through raw block item order, public blocks, and balanced
+isolation/recovery for both policies, fixing block ASTs, closing spans,
+remainders, and external rejection endpoints; the statement premise is not yet
+discharged.
 `CoreSourceFileOrdinaryParsesFromStart` fixes both the root window and the
 canonical terminal remainder, with the same carrier and `endIndex` and a final
 cursor equal to the token count. Diagnostic-free successful `parseLexed` and

@@ -362,13 +362,19 @@ exclusive. For optional `where`, an absent contextual marker is a nonconsuming
 success, while a present marker commits to the prioritized predicate sequence.
 Executable ordinary rejection is reflected exactly as that committed sequence
 rejection; the successful remainder is deterministic and success/rejection are
-exclusive.
+exclusive. Predicate ASTs, grouped and bare nonempty sequences, grouped-first
+dispatch, and optional `where` values are now exact as well. Bare-tail value
+uniqueness keeps the necessary shared preceding span explicit; complete
+sequences discharge it and fix their AST, final remainder, and rejection
+endpoint. Executable leaf APIs re-export the same result and endpoint laws.
 
 For optional `returns`, an absent contextual marker is likewise a nonconsuming
 success, while a present marker commits to the allow-empty, allow-trailing
 parenthesized `TypeExpr` list. Executable rejection reflects the exact nested
 type or delimiter remainder. The successful endpoint is deterministic and
-success/rejection are exclusive.
+success/rejection are exclusive. Core `TypeExpr` exactness now lifts through
+the complete optional clause, fixing the return AST, remainder, and committed
+rejection endpoint.
 
 Function modifiers are parsed in the fixed optional `public`-then-`payable`
 order, with unconditional grammar soundness. A diagnostic-free module parse
@@ -392,7 +398,10 @@ keyword, name, generics, parameter-list, returns, or `where` stage. Modifiers
 always succeed; module-location markers may instead emit diagnostics without
 changing the declarative remainder. Success endpoints are deterministic and
 exclusive with rejection, while `FunctionSignatureParses` remains the strict
-diagnostic-free, location-policy judgment.
+diagnostic-free, location-policy judgment. All six component stages now have
+exact child contracts, so the broad signature unconditionally fixes its
+complete AST and final remainder and fixes every rejection endpoint. These
+laws are reflected for every executable location and compile-time consumed.
 
 A broad ordinary `functionDecl` outcome is likewise independent of location.
 Success composes the ordinary signature directly into an isolated `.allow`
@@ -404,6 +413,10 @@ escape; isolation emits its diagnostic and returns an ordinary empty-body
 recovery success at the parent remainder. Declaration success endpoints are
 deterministic and exclusive with rejection. The existing location-policy-aware
 `FunctionDeclParses` theorem remains the stricter diagnostic-free judgment.
+Since the signature is exact, an exact isolated `.allow` body is the sole
+premise for complete function-declaration AST and endpoint exactness. The
+stronger conditional API accepts fixed-fuel Core statement exactness directly
+and supplies the isolated-body contract.
 
 A broad ordinary `constructorDecl` outcome now follows the executable stages
 exactly: the required `constructor` keyword, recovery-aware parameters,
@@ -434,7 +447,10 @@ remainder. Rejection exposes exactly three external stages: missing marker,
 rejected parameters, or an uncaptured body rejection after validation and
 modifier success. A balanced captured child rejection instead becomes a
 diagnosed empty-body recovery success at the parent remainder. Outcomes are
-deterministic and exclusive; strict diagnostic-free `FallbackDeclParses` remains.
+deterministic and exclusive; strict diagnostic-free `FallbackDeclParses`
+remains. Exact parameters, validation, and modifiers leave only the isolated
+`.require` body premise for complete fallback AST and rejection-endpoint
+exactness; fixed-fuel Core statement exactness supplies that premise directly.
 
 Implementation outcomes now cover the optional `default` prefix, contextual
 marker, optional generics, trait name, required nonempty trailing-comma head
@@ -498,7 +514,12 @@ outcome families. The public fuel bounds are explicit: expressions and
 patterns use the active-window remainder plus one, statements use it plus two,
 and blocks use the fixed statement fuel of the remainder plus one. Public
 success and rejection soundness, deterministic outcome specifications, and
-diagnostic reflection are registered for all four entry points.
+diagnostic reflection are registered for all four entry points. Exact statement
+outcomes at every fixed fuel now lift generically through raw block item lists,
+raw public blocks, balanced capture/recovery isolation, and both tail policies.
+The lift fixes block ASTs, closing spans, final remainders, and external
+rejection endpoints; fixed-fuel statement exactness remains its explicit
+premise.
 
 Inline-Yul coverage includes name sequences, the public expression layer,
 exact braced blocks, `let`, assignment, expression and source-level
