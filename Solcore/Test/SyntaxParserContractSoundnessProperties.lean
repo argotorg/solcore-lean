@@ -1,5 +1,7 @@
 import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ContractDeclSoundnessProperties
+import Solcore.Syntax.Parser.ContractFieldOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.CoreTermPublicOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for strict and broad contract-declaration components. -/
@@ -24,7 +26,13 @@ example := @FallbackDeclOrdinaryParses
 example := @FallbackDeclRejects
 example := @fallbackDeclDeterministicOutcomeSpec
 example := @OptionalContractFieldInitializerParses
+example := @OptionalContractFieldInitializerOrdinaryParses
+example := @OptionalContractFieldInitializerRejects
+example := @optionalContractFieldInitializerDeterministicOutcomeSpec
 example := @ContractFieldParses
+example := @ContractFieldOrdinaryParses
+example := @ContractFieldRejects
+example := @contractFieldDeterministicOutcomeSpec
 example := @ContractMemberCoreParses
 example := @ContractMemberParses
 example := @ContractMemberTailParses
@@ -48,6 +56,14 @@ example := @fallbackDecl_success_ordinaryOutcome_sound
 example := @fallbackDecl_reject_ordinaryOutcome_sound
 example := @fallbackDecl_ordinaryOutcome_sound
 example := @fallbackDecl_ordinaryOutcomeSpec
+example := @ContractInternals.optionalFieldInitializer_success_ordinaryOutcome_sound
+example := @ContractInternals.optionalFieldInitializer_reject_ordinaryOutcome_sound
+example := @ContractInternals.optionalFieldInitializer_ordinaryOutcome_sound
+example := @ContractInternals.optionalFieldInitializer_ordinaryOutcomeSpec
+example := @ContractInternals.contractField_success_ordinaryOutcome_sound
+example := @ContractInternals.contractField_reject_ordinaryOutcome_sound
+example := @ContractInternals.contractField_ordinaryOutcome_sound
+example := @ContractInternals.contractField_ordinaryOutcomeSpec
 
 example := @ContractInternals.contractBody_reflectsDiagnosticFreeOnSuccess
 example := @ContractInternals.contractBody_success_sound
@@ -117,5 +133,42 @@ example {input rejected : State} {failure : Failure}
     FallbackDeclRejects input.declarativeRemainder
       rejected.declarativeRemainder :=
   fallbackDecl_reject_ordinaryOutcome_sound result
+
+example {input next : State} {initializer : Option Expr}
+    (result : ContractInternals.optionalFieldInitializer expression input =
+      .ok initializer next) :
+    OptionalContractFieldInitializerOrdinaryParses
+      CoreExpressionOrdinaryParses input.declarativeRemainder initializer
+        next.declarativeRemainder :=
+  ContractInternals.optionalFieldInitializer_success_ordinaryOutcome_sound
+    expression CoreExpressionOrdinaryParses expression_success_ordinary_sound
+      result
+
+example {input rejected : State} {failure : Failure}
+    (result : ContractInternals.optionalFieldInitializer expression input =
+      .reject failure rejected) :
+    OptionalContractFieldInitializerRejects CoreExpressionPublicRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  ContractInternals.optionalFieldInitializer_reject_ordinaryOutcome_sound
+    expression CoreExpressionPublicRejects expression_reject_ordinary_sound
+      result
+
+example {input next : State} {field : ContractField}
+    (result : ContractInternals.contractField expression input =
+      .ok field next) :
+    ContractFieldOrdinaryParses CoreExpressionOrdinaryParses
+      input.declarativeRemainder field next.declarativeRemainder :=
+  ContractInternals.contractField_success_ordinaryOutcome_sound expression
+    CoreExpressionOrdinaryParses expression_success_ordinary_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : ContractInternals.contractField expression input =
+      .reject failure rejected) :
+    ContractFieldRejects CoreExpressionOrdinaryParses
+      CoreExpressionPublicRejects input.declarativeRemainder
+        rejected.declarativeRemainder :=
+  ContractInternals.contractField_reject_ordinaryOutcome_sound expression
+    CoreExpressionOrdinaryParses CoreExpressionPublicRejects
+      expression_success_ordinary_sound expression_reject_ordinary_sound result
 
 end Solcore.Test.SyntaxParserContractSoundnessProperties

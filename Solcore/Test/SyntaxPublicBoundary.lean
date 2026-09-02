@@ -109,6 +109,12 @@ example := @Syntax.DeclarativeGrammar.FallbackParameterValidationOrdinaryParses
 example := @Syntax.DeclarativeGrammar.FallbackDeclOrdinaryParses
 example := @Syntax.DeclarativeGrammar.FallbackDeclRejects
 example := @Syntax.DeclarativeGrammar.fallbackDeclDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalContractFieldInitializerOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalContractFieldInitializerRejects
+example := @Syntax.DeclarativeGrammar.optionalContractFieldInitializerDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractFieldOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractFieldRejects
+example := @Syntax.DeclarativeGrammar.contractFieldDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -158,5 +164,39 @@ example := @Syntax.Parser.fallbackDecl_success_ordinaryOutcome_sound
 example := @Syntax.Parser.fallbackDecl_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.fallbackDecl_ordinaryOutcome_sound
 example := @Syntax.Parser.fallbackDecl_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.optionalFieldInitializer_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractInternals.contractField_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractField_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractField_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractInternals.contractField_ordinaryOutcomeSpec
+
+example {input output : Syntax.Parser.State} {field : ContractField}
+    (result : Syntax.Parser.ContractInternals.contractField
+      Syntax.Parser.expression input = .ok field output) :
+    Syntax.DeclarativeGrammar.ContractFieldOrdinaryParses
+      Syntax.DeclarativeGrammar.CoreExpressionOrdinaryParses
+        input.declarativeRemainder field output.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractField_success_ordinaryOutcome_sound
+    Syntax.Parser.expression
+    Syntax.DeclarativeGrammar.CoreExpressionOrdinaryParses
+    Syntax.Parser.expression_ordinaryOutcome_sound.1 result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.ContractInternals.contractField
+      Syntax.Parser.expression input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractFieldRejects
+      Syntax.DeclarativeGrammar.CoreExpressionOrdinaryParses
+      Syntax.DeclarativeGrammar.CoreExpressionPublicRejects
+        input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.ContractInternals.contractField_reject_ordinaryOutcome_sound
+    Syntax.Parser.expression
+    Syntax.DeclarativeGrammar.CoreExpressionOrdinaryParses
+    Syntax.DeclarativeGrammar.CoreExpressionPublicRejects
+    Syntax.Parser.expression_ordinaryOutcome_sound.1
+    Syntax.Parser.expression_ordinaryOutcome_sound.2 result
 
 end Tests
