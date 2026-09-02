@@ -299,6 +299,12 @@ Executable ordinary rejection is reflected exactly as that committed sequence
 rejection; the successful remainder is deterministic and success/rejection are
 exclusive.
 
+For optional `returns`, an absent contextual marker is likewise a nonconsuming
+success, while a present marker commits to the allow-empty, allow-trailing
+parenthesized `TypeExpr` list. Executable rejection reflects the exact nested
+type or delimiter remainder. The successful endpoint is deterministic and
+success/rejection are exclusive.
+
 Function modifiers are parsed in the fixed optional `public`-then-`payable`
 order, with unconditional grammar soundness. A diagnostic-free module parse
 proves both markers absent because either marker commits an

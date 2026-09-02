@@ -87,6 +87,12 @@ prioritized predicate sequence. Executable ordinary rejection is reflected
 exactly as that committed sequence rejection; optional-`where` success has a
 deterministic remainder and is exclusive with rejection.
 
+For optional `returns`, an absent contextual marker is likewise a nonconsuming
+success, while a present marker commits to the allow-empty, allow-trailing
+parenthesized `TypeExpr` list. Executable rejection reflects the exact nested
+type or delimiter remainder. The success endpoint is deterministic and
+success/rejection are exclusive.
+
 Function modifiers have unconditional fixed-order `public`-then-`payable`
 grammar soundness. Diagnostic-free module success excludes both markers,
 whereas contract policy permits every syntactically ordered pair. A complete
