@@ -22,6 +22,7 @@ import Solcore.Syntax.Parser.ExportPathSoundnessProperties
 import Solcore.Syntax.Parser.ExportSelectionSoundnessProperties
 import Solcore.Syntax.Parser.FileItemsSoundnessProperties
 import Solcore.Syntax.Parser.FunctionDeclSoundnessProperties
+import Solcore.Syntax.Parser.FunctionDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParameterOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParametersOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
