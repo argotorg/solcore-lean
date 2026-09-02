@@ -1,3 +1,4 @@
+import Solcore.Syntax.DeclarativeCoreTypeNameExactnessProperties
 import Solcore.Syntax.Parser.TypeExprSoundnessProperties
 
 /-! External consumers for recursive type-expression grammar soundness. -/
@@ -15,6 +16,12 @@ example := @TypeExprTrailingDelimitedTailParses
 example := @TypeExprTrailingDelimitedListParses
 example := @OptionalNamedTypeArgumentsParses
 example := @OptionalFunctionTypeReturnsParses
+example := @DottedIdentifierTailParses.value_unique
+example := @QualifiedNameParses.value_unique
+example := @QualifiedNameParses.result_unique
+example := @TypeQualifiedNameTailRejects.output_unique
+example := @TypeQualifiedNameRejects.output_unique
+example := @typeQualifiedNameExactOutcomeSpec
 example := @typeExprWithFuel_success_sound
 example := @typeExpr_success_sound
 example := @typeExpr_success_sound_and_validFor

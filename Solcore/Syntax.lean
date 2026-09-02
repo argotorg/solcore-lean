@@ -1,5 +1,6 @@
 import Solcore.Syntax.Declaration
 import Solcore.Syntax.CoreTermValidity
+import Solcore.Syntax.DeclarativeCoreTypeNameExactnessProperties
 import Solcore.Syntax.DeclarativeFileGrammar
 import Solcore.Syntax.DeclarativeGrammar
 import Solcore.Syntax.DeclarativeDelimitedNoTrailingExactnessProperties
