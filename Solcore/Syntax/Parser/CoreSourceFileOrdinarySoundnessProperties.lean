@@ -33,6 +33,34 @@ theorem sourceFile_success_coreOrdinary_sound
       isolatedCoreBlockPublic_success_ordinary_sound .require bodyResult)
     diagnosticFree result
 
+/-- Every valid diagnostic-free complete-file success reaches the canonical
+terminal remainder of its preserved token window. -/
+theorem sourceFile_success_coreOrdinary_sound_toEnd
+    {comments : List Comment} {input next : State}
+    {parsedFile : ParsedFile} (inputValid : input.ValidFor)
+    (commentsValid : ∀ comment ∈ comments,
+      comment.span.ValidFor input.file)
+    (diagnosticFree : next.diagnosticsRev = [])
+    (result : sourceFile comments input = .ok parsedFile next) :
+    DeclarativeGrammar.CoreSourceFileOrdinaryParses input.file comments
+      input.declarativeRemainder parsedFile {
+        tokens := input.tokens
+        endIndex := input.window.endIndex
+        cursor := input.window.endIndex
+      } := by
+  have parsed := sourceFile_success_coreOrdinary_sound diagnosticFree result
+  have outputValid := sourceFile_complete_reply_validFor inputValid commentsValid
+  rw [result] at outputValid
+  have outputShape := sourceFile_complete_preservesTokenWindow comments input
+  rw [result] at outputShape
+  have cursorEq : next.cursor = input.window.endIndex := by
+    apply Nat.le_antisymm
+    · simpa [outputShape.2] using outputValid.2.1.cursor_le_endIndex
+    · simpa [State.declarativeRemainder, outputShape.2] using
+        parsed.output_atEnd
+  simpa [State.declarativeRemainder, outputShape.1, outputShape.2, cursorEq]
+    using parsed
+
 /-- Concrete complete-file ordinary soundness paired with canonical source
 validity. -/
 theorem sourceFile_success_coreOrdinary_sound_and_validFor

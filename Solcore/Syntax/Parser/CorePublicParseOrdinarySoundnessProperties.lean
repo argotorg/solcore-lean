@@ -69,11 +69,14 @@ theorem parseLexed_ok_coreOrdinary_sound
           have finalDiagnosticFree : finalState.diagnosticsRev = [] := by
             simpa [State.diagnostics] using parseFree
           have parsedByCore :=
-            FileInternals.sourceFile_success_coreOrdinary_sound
+            FileInternals.sourceFile_success_coreOrdinary_sound_toEnd
+              (comments := lexed.comments) (input := State.initial file lexed)
+              (next := finalState) (parsedFile := parsed)
+              (State.initial_validFor lexedValid)
+              (fun comment member => lexedValid.comment_span member)
               finalDiagnosticFree grammar
-          exact ⟨finalState.declarativeRemainder, by
-            simpa [State.initial, State.declarativeRemainder] using
-              parsedByCore⟩
+          simpa [DeclarativeGrammar.CoreSourceFileOrdinaryParsesFromStart,
+            State.initial, State.declarativeRemainder] using parsedByCore
       | reject failure rejected =>
           simp only [grammar] at result
           contradiction
