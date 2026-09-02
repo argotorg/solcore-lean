@@ -173,7 +173,12 @@ delimiter grammar. Transactional grouped-or-bare dispatch now records exact
 grouped-first priority. A bare result carries
 `GroupedPredicateSequenceUnavailable`, derived either from opening-parenthesis
 absence or from exact grouped rejection and its `no_parse` consequence before
-transactional fallback restarts at the original input.
+transactional fallback restarts at the original input. Exact rejection traces
+cover the bare tail, the complete bare sequence, and grouped-first dispatch.
+When both transactional alternatives reject, the grouped attempt's intermediate
+remainder is retained separately while the relation returns the final bare
+remainder reached from the original input. Bare and complete sequence outcomes
+have deterministic success remainders and exclude simultaneous rejection.
 
 Optional function modifiers now preserve exact keyword absence or presence in
 the fixed `public`-then-`payable` order. Modifier grammar soundness is

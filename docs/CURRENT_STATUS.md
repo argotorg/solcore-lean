@@ -288,7 +288,12 @@ now records the transactional parser's exact grouped-first priority. Its bare
 constructor carries `GroupedPredicateSequenceUnavailable`: this follows either
 from absence of the opening `(`, or from an exact grouped rejection whose
 `no_parse` theorem excludes every grouped derivation before transactional
-fallback runs the bare parser from the original input.
+fallback runs the bare parser from the original input. Exact rejection traces
+now also cover bare tails, complete bare sequences, and the grouped-first
+dispatcher. The fallback rejection retains the grouped attempt's intermediate
+remainder separately from the final bare rejection reached from the original
+input. Bare and complete sequence outcomes are deterministic and success/reject
+exclusive.
 
 Function modifiers are parsed in the fixed optional `public`-then-`payable`
 order, with unconditional grammar soundness. A diagnostic-free module parse
