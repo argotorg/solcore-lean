@@ -12,10 +12,7 @@ namespace Solcore.Syntax.Parser
 def maxSyntaxNesting : Nat :=
   DeclarativeGrammar.canonicalNestingLimit
 
-private structure NestingState where
-  delimiterDepth : Nat := 0
-  conditionalDepth : Nat := 0
-  conditionalBases : List Nat := []
+private abbrev NestingState := DeclarativeGrammar.NestingContext
 
 private def nestingError (kind : NestingKind)
     (token : Token) : ParseDiagnostic := {
@@ -23,29 +20,18 @@ private def nestingError (kind : NestingKind)
   kind := .nestingExceeded kind maxSyntaxNesting
 }
 
-private def closeDelimiter (state : NestingState) : NestingState := {
-  delimiterDepth := state.delimiterDepth - 1
-  conditionalDepth := state.conditionalBases.head?.getD 0
-  conditionalBases := state.conditionalBases.tail
-}
-
-private def resetConditional (state : NestingState) : NestingState := {
-  state with
-  conditionalDepth := state.conditionalBases.head?.getD 0
-}
-
 private def checkNestingAux :
     NestingState → List Token → Option ParseDiagnostic
   | _, [] => none
   | state, token :: rest =>
-      match token.value with
-      | .keyword .ifKw =>
+      match DeclarativeGrammar.nestingAction token.value with
+      | .conditional =>
           let depth := state.conditionalDepth + 1
           if depth > maxSyntaxNesting then
             some (nestingError .conditional token)
           else
             checkNestingAux { state with conditionalDepth := depth } rest
-      | .symbol .leftParen | .symbol .leftBracket =>
+      | .groupOpen =>
           let depth := state.delimiterDepth + 1
           if depth > maxSyntaxNesting then
             some (nestingError .delimiter token)
@@ -56,7 +42,7 @@ private def checkNestingAux :
               conditionalBases := state.conditionalDepth ::
                 state.conditionalBases
             } rest
-      | .symbol .leftBrace =>
+      | .blockOpen =>
           let depth := state.delimiterDepth + 1
           if depth > maxSyntaxNesting then
             some (nestingError .delimiter token)
@@ -66,12 +52,9 @@ private def checkNestingAux :
               conditionalDepth := 0
               conditionalBases := 0 :: state.conditionalBases
             } rest
-      | .symbol .rightParen | .symbol .rightBracket |
-          .symbol .rightBrace =>
-            checkNestingAux (closeDelimiter state) rest
-      | .symbol .comma | .symbol .semicolon =>
-          checkNestingAux (resetConditional state) rest
-      | _ => checkNestingAux state rest
+      | .close => checkNestingAux state.closeDelimiter rest
+      | .reset => checkNestingAux state.resetConditional rest
+      | .preserve => checkNestingAux state rest
 
 /-- First delimiter or conditional nesting violation, if one exists. -/
 def checkNesting (tokens : List Token) : Option ParseDiagnostic :=
@@ -92,44 +75,14 @@ private theorem checkNestingAux_some_span_validFor
           retained.span.ValidFor file := by
         intro retained member
         exact tokensValid retained (by simp [member])
-      cases kind : token.value with
-      | keyword keyword =>
-          cases keyword <;> simp only [checkNestingAux, kind] at result
-          all_goals first
-            | (split at result
-               · cases result
-                 exact tokenValid
-               · exact inductionHypothesis _ restValid result)
-            | exact inductionHypothesis _ restValid result
-      | symbol symbol =>
-          cases symbol <;> simp only [checkNestingAux, kind] at result
-          all_goals first
-            | (split at result
-               · cases result
-                 exact tokenValid
-               · exact inductionHypothesis _ restValid result)
-            | exact inductionHypothesis _ restValid result
-      | identifier text =>
-          exact inductionHypothesis _ restValid (by
-            simpa only [checkNestingAux, kind] using result)
-      | yulIdentifier text =>
-          exact inductionHypothesis _ restValid (by
-            simpa only [checkNestingAux, kind] using result)
-      | decimalLiteral spelling =>
-          exact inductionHypothesis _ restValid (by
-            simpa only [checkNestingAux, kind] using result)
-      | hexadecimalLiteral spelling =>
-          exact inductionHypothesis _ restValid (by
-            simpa only [checkNestingAux, kind] using result)
-      | stringLiteral spelling =>
-          exact inductionHypothesis _ restValid (by
-            simpa only [checkNestingAux, kind] using result)
-      | yulMetaBacktick spelling =>
-          exact inductionHypothesis _ restValid (by
-            simpa only [checkNestingAux, kind] using result)
-      | yulMetaInterpolation spelling =>
-          exact inductionHypothesis _ restValid (by
-            simpa only [checkNestingAux, kind] using result)
+      cases action : DeclarativeGrammar.nestingAction token.value <;>
+          simp only [checkNestingAux, action] at result
+      all_goals first
+        | (split at result
+           · cases result
+             exact tokenValid
+           · exact inductionHypothesis _ restValid result)
+        | exact inductionHypothesis _ restValid result
 
 /-- A reported nesting violation always points into the validated token file. -/
 theorem checkNesting_some_span_validFor
