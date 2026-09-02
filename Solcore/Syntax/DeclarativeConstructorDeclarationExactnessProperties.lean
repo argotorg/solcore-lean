@@ -1,4 +1,5 @@
 import Solcore.Syntax.DeclarativeContractEntryModifierExactnessProperties
+import Solcore.Syntax.DeclarativeCoreBlockIsolationExactnessProperties
 import Solcore.Syntax.DeclarativeExactOutcomeSpec
 import Solcore.Syntax.DeclarativeFunctionParametersExactnessProperties
 
@@ -186,5 +187,18 @@ theorem ConstructorDeclRejects.output_unique_of_exact_body
     (rightRejects : ConstructorDeclRejects input right) : left = right :=
   (constructorDeclExactOutcomeSpecOfBody bodyOutcomes).rejectOutputUnique
     leftRejects rightRejects
+
+/-- Fixed-fuel Core statement exactness discharges the complete constructor
+body and therefore the constructor itself. -/
+theorem constructorDeclExactOutcomeSpecOfStatementFuel
+    (statementOutcomes : ∀ fuel,
+      ExactDeterministicOutcomeSpec
+        (CoreStatementOrdinaryParsesWithFuel fuel)
+        (CoreStatementRejectsWithFuel fuel)) :
+    ExactDeterministicOutcomeSpec ConstructorDeclOrdinaryParses
+      ConstructorDeclRejects :=
+  constructorDeclExactOutcomeSpecOfBody
+    (isolatedCoreBlockPublicExactOutcomeSpecOfStatementFuel statementOutcomes
+      .require)
 
 end Solcore.Syntax.DeclarativeGrammar

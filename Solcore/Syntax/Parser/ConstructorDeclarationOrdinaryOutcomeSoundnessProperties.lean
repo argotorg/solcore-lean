@@ -124,4 +124,17 @@ theorem constructorDecl_reject_output_unique_of_body
     bodyOutcomes (constructorDecl_reject_ordinaryOutcome_sound leftResult)
     (constructorDecl_reject_ordinaryOutcome_sound rightResult)
 
+/-- Fixed-fuel Core statement exactness discharges the complete executable
+constructor contract. -/
+theorem constructorDecl_exactOutcomeSpec_of_statementFuel
+    (statementOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreStatementOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreStatementRejectsWithFuel fuel)) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ConstructorDeclOrdinaryParses
+      DeclarativeGrammar.ConstructorDeclRejects :=
+  DeclarativeGrammar.constructorDeclExactOutcomeSpecOfStatementFuel
+    statementOutcomes
+
 end Solcore.Syntax.Parser

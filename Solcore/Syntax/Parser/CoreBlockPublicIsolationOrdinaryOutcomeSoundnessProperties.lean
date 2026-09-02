@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeCoreBlockPublicIsolationOutcomeProperties
+import Solcore.Syntax.DeclarativeCoreBlockIsolationExactnessProperties
 import Solcore.Syntax.Parser.CoreTermPublicOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.IsolatedCoreBlockOrdinaryOutcomeSoundnessProperties
 
@@ -45,5 +45,61 @@ theorem isolatedCoreBlockPublic_reject_ordinary_sound
     DeclarativeGrammar.IsolatedCoreBlockPublicRejects policy.declarative
       input.declarativeRemainder rejected.declarativeRemainder :=
   (isolatedCoreBlockPublic_ordinaryOutcome_sound policy).2 result
+
+/-- Re-export exact public isolation from exact fixed-fuel statement
+outcomes. -/
+theorem isolatedCoreBlockPublic_exactOutcomeSpec_of_statementFuel
+    (statementOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreStatementOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreStatementRejectsWithFuel fuel))
+    (policy : TailExpressionPolicy) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses
+        policy.declarative)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects
+        policy.declarative) :=
+  DeclarativeGrammar.isolatedCoreBlockPublicExactOutcomeSpecOfStatementFuel
+    statementOutcomes policy.declarative
+
+/-- Under exact fixed-fuel statements, two isolated public successes have the
+same block AST and final declarative remainder. -/
+theorem isolatedCoreBlockPublic_success_result_unique_of_statementFuel
+    (statementOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreStatementOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreStatementRejectsWithFuel fuel))
+    (policy : TailExpressionPolicy)
+    {input leftOutput rightOutput : State} {left right : Block}
+    (leftResult : isolateBlock (block policy) input = .ok left leftOutput)
+    (rightResult : isolateBlock (block policy) input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  (isolatedCoreBlockPublic_exactOutcomeSpec_of_statementFuel
+      statementOutcomes policy)
+    |>.successResultUnique
+      (isolatedCoreBlockPublic_success_ordinary_sound policy leftResult)
+      (isolatedCoreBlockPublic_success_ordinary_sound policy rightResult)
+
+/-- Under exact fixed-fuel statements, two isolated public rejections have the
+same declarative endpoint. -/
+theorem isolatedCoreBlockPublic_reject_output_unique_of_statementFuel
+    (statementOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreStatementOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreStatementRejectsWithFuel fuel))
+    (policy : TailExpressionPolicy)
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : isolateBlock (block policy) input =
+      .reject leftFailure leftOutput)
+    (rightResult : isolateBlock (block policy) input =
+      .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  (isolatedCoreBlockPublic_exactOutcomeSpec_of_statementFuel
+      statementOutcomes policy)
+    |>.rejectOutputUnique
+      (isolatedCoreBlockPublic_reject_ordinary_sound policy leftResult)
+      (isolatedCoreBlockPublic_reject_ordinary_sound policy rightResult)
 
 end Solcore.Syntax.Parser
