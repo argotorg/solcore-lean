@@ -1,6 +1,7 @@
+import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ContractDeclSoundnessProperties
 
-/-! External consumers for parametric contract-declaration soundness. -/
+/-! External consumers for strict and broad contract-declaration components. -/
 
 set_option autoImplicit false
 
@@ -11,7 +12,11 @@ open Solcore.Syntax.DeclarativeGrammar
 open Solcore.Syntax.Parser
 
 example := @ContractEntryModifiersParses
+example := @ContractEntryModifiersOrdinaryParses
 example := @ConstructorDeclParses
+example := @ConstructorDeclOrdinaryParses
+example := @ConstructorDeclRejects
+example := @constructorDeclDeterministicOutcomeSpec
 example := @FallbackDeclParses
 example := @OptionalContractFieldInitializerParses
 example := @ContractFieldParses
@@ -25,6 +30,15 @@ example := @ContractInternals.contractMemberCore_reflectsDiagnosticFreeOnSuccess
 example := @ContractInternals.contractMemberCore_success_sound
 example := @ContractInternals.contractMemberWithAttribute_reflectsDiagnosticFreeOnSuccess
 example := @ContractInternals.contractMemberWithAttribute_success_sound
+
+example := @ContractEntryInternals.entryParameters_success_ordinaryOutcome_sound
+example := @ContractEntryInternals.entryParameters_reject_ordinaryOutcome_sound
+example := @ContractEntryInternals.implicitPublicModifiers_success_ordinaryOutcome_sound
+example := @ContractEntryInternals.implicitPublicModifiers_ne_reject
+example := @constructorDecl_success_ordinaryOutcome_sound
+example := @constructorDecl_reject_ordinaryOutcome_sound
+example := @constructorDecl_ordinaryOutcome_sound
+example := @constructorDecl_ordinaryOutcomeSpec
 
 example := @ContractInternals.contractBody_reflectsDiagnosticFreeOnSuccess
 example := @ContractInternals.contractBody_success_sound
@@ -70,5 +84,17 @@ example
     allowBodyParses requiredBodyParses expressionReflects expressionSound
     allowBodyReflects allowBodySound requiredBodyReflects requiredBodySound
     inputValid diagnosticFree result
+
+example {input next : State} {declaration : ConstructorDecl}
+    (result : constructorDecl input = .ok declaration next) :
+    ConstructorDeclOrdinaryParses input.declarativeRemainder declaration
+      next.declarativeRemainder :=
+  constructorDecl_success_ordinaryOutcome_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : constructorDecl input = .reject failure rejected) :
+    ConstructorDeclRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  constructorDecl_reject_ordinaryOutcome_sound result
 
 end Solcore.Test.SyntaxParserContractSoundnessProperties

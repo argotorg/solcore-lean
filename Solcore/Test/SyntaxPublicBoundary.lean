@@ -101,6 +101,10 @@ example := @Syntax.DeclarativeGrammar.functionDeclDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.ImplMethodOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ImplMethodRejects
 example := @Syntax.DeclarativeGrammar.implMethodDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractEntryModifiersOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ConstructorDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ConstructorDeclRejects
+example := @Syntax.DeclarativeGrammar.constructorDeclDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -138,5 +142,13 @@ example := @Syntax.Parser.ImplInternals.implMethod_success_ordinaryOutcome_sound
 example := @Syntax.Parser.ImplInternals.implMethod_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.ImplInternals.implMethod_ordinaryOutcome_sound
 example := @Syntax.Parser.ImplInternals.implMethod_ordinaryOutcomeSpec
+example := @Syntax.Parser.ContractEntryInternals.entryParameters_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractEntryInternals.entryParameters_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractEntryInternals.implicitPublicModifiers_success_ordinaryOutcome_sound
+example := @Syntax.Parser.ContractEntryInternals.implicitPublicModifiers_ne_reject
+example := @Syntax.Parser.constructorDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.constructorDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.constructorDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.constructorDecl_ordinaryOutcomeSpec
 
 end Tests
