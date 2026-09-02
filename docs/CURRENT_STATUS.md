@@ -636,6 +636,27 @@ packages, and outcome specifications are public and compile-time consumed.
 Unlike strict diagnostic-free acceptance, the broad boundary-stop outcome does
 not claim that every successful final cursor is at the window end.
 
+The public nesting preflight now has its own parser-independent exact outcome
+grammar. It classifies each token as conditional, group-open, block-open,
+close, reset, or preserving; carries the exact delimiter and conditional scope
+bases; and either clears the full token list or returns the first overflowing
+span, dimension, and shared canonical limit. The executable checker is proved
+equivalent in both the `none` and `some` directions, so the implementation and
+declarative limit cannot drift.
+
+Broad successful `parseLexed` and `parse` syntax is now covered at the public
+boundary as well. A nesting overflow returns the exact empty parsed file with
+source id, full-file span, and retained comments. A clear nesting scan runs the
+recovery-aware `SourceFileOrdinaryParses` relation from the exact root token
+window while existentially hiding the final remainder that `ParseOutput` does
+not expose. Both the direct token boundary and the complete source boundary
+compose with the full canonical output-validity contract. The overflow branch
+additionally fixes the entire `ParseOutput`: retained tokens, lexical
+diagnostics, and the unsuppressed singleton nesting diagnostic. The normal
+branch's complete parse-diagnostic trace is not yet claimed by this broad
+relation because the current declarative remainder deliberately carries no
+diagnostic accumulator.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

@@ -480,6 +480,25 @@ have deterministic successful remainders and disjoint success/rejection, and
 their public reflection packages are compile-time consumed. Broad success does
 not imply end-of-window when the recognized-start boundary-stop branch runs.
 
+Bounded nesting now has a parser-independent, total, functional scan relation.
+Its six token actions reproduce delimiter scopes, conditional bases, resets,
+and the first overflowing token exactly, using one shared canonical limit.
+Executable `checkNesting` returns `none` exactly when that relation clears and
+returns `some` exactly when the relation reports the mapped overflow span,
+dimension, and limit.
+
+The public token-to-file and source-to-file parser boundaries now have broad
+syntax-only soundness without a diagnostic-free premise. Nesting overflow
+selects the exact empty parsed file; nesting clearance selects the
+recovery-aware complete-file grammar from the exact root token window, with
+the unexposed final remainder existentially hidden. Both forms compose with
+complete output validity and use the exact retained public carriers. For the
+overflow branch, the complete `ParseOutput` is fixed, including its retained
+lexical carriers and unsuppressed singleton nesting diagnostic. Extending the
+normal branch to an exact full parse-diagnostic list remains a separate trace
+milestone because the current broad grammar does not retain parser diagnostic
+accumulation.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

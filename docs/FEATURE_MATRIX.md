@@ -43,9 +43,9 @@ published through Oracle v4.
 | Token and parsed AST catalog | Complete executable representation | Contextual well-formedness layer | High |
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
-| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, internal lexer/parser invariant errors are unreachable, and diagnostic-free successful `parseLexed` and `parse` outputs derive `CoreSourceFileOrdinaryParsesFromStart` with canonical parsed-file validity | Resolution, typing, and elaboration remain later stages | High |
+| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, internal lexer/parser invariant errors are unreachable, diagnostic-free outputs derive `CoreSourceFileOrdinaryParsesFromStart`, and every successful `parseLexed` or `parse` output has an exact broad public AST branch with canonical validity; nesting-overflow `ParseOutput` is exact through its singleton diagnostic | Exact normal-branch diagnostic traces remain a separate declarative milestone; resolution, typing, and elaboration remain later stages | High |
 | Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, backward diagnostic reflection through declarations and the complete file loop, and concrete fuel-indexed public Core and Yul outcomes | None at the current foundation boundary | High |
-| Declarative grammar and parser soundness | Active; complete for declarations and complete files, mutually recursive public Core expressions/patterns/statements/blocks, exact grouped-first predicate success and rejection outcomes, exact Yul blocks and statement forms, transactional rejection witnesses, and concrete complete-file Core specialization | Recovery-free clean Core acceptance and contextual well-formedness remain separate later boundaries | High |
+| Declarative grammar and parser soundness | Active; complete for declarations and complete files, mutually recursive public Core expressions/patterns/statements/blocks, exact grouped-first predicate success and rejection outcomes, exact Yul blocks and statement forms, transactional rejection witnesses, concrete complete-file Core specialization, total exact nesting preflight, and broad public source-file AST outcomes | Full normal-branch diagnostic traces and contextual well-formedness remain separate later boundaries | High |
 | Declaration, type, and Yul parser proofs | Complete source/state, totality, and concrete clean/ordinary/reject soundness boundaries for recursive types and every public Yul expression, statement, and braced body parser, including the assignment fallback | None at this boundary | High |
 | Core expression parser proofs | Complete source/state, totality, fuel-indexed ordinary/reject outcome soundness, diagnostic reflection, and public parser-independent registration across atoms, lambda, postfix, unary, binary, conditional, and block interaction | None at the current outcome boundary | High |
 | Pattern and statement parser proofs | Complete executable contracts plus fuel-indexed ordinary/reject outcomes and public registration for the mutually recursive pattern and statement parsers, covering `let`, `return`, assignment, `for`, `match`, assembly, block, `while`, `if`, `break`, and `continue` in exact dispatcher order | None at the current outcome boundary | High |
@@ -334,6 +334,18 @@ full-file span, comment attachment, comments, and the first rejection endpoint.
 The declarative and executable APIs and deterministic outcome specifications
 are public and compile-time consumed. Because boundary-stop may succeed inside
 the window, only the strict diagnostic-free grammar claims full consumption.
+
+The canonical nesting preflight now has a total and functional independent
+scan grammar over six exact token actions. It carries delimiter depth,
+conditional depth, and scope bases, and identifies the first overflow span,
+dimension, and shared limit. Executable `checkNesting` is equivalent to its
+clear and overflow outcomes. Above it, every successful public parser result
+has one of two exact AST shapes: the canonical empty file after overflow, or a
+recovery-aware `SourceFileOrdinaryParses` derivation from the root token window
+after clearance. These direct and source-level theorems use the exact retained
+tokens and comments and compose with canonical output validity. Overflow also
+fixes the complete public output and singleton parse diagnostic; the normal
+branch does not yet expose a complete declarative diagnostic trace.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
