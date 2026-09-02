@@ -527,8 +527,8 @@ and retains exact AST, covering span, carrier, window, cursor, and first
 rejection. Successful endpoints are deterministic and success/rejection
 exclusive.
 The declarative and parser outcome packages are exported publicly and checked
-by dedicated and public-boundary consumers; broader top-item rejection remains
-a separate boundary.
+by dedicated and public-boundary consumers. Their declaration-local guarantees
+feed the broader top-item boundary described below.
 
 Pragma item scanning and complete `pragmaDecl` now also have exact broad
 ordinary outcomes. An immediate `;` gives an empty, nonconsuming item scan;
@@ -539,8 +539,8 @@ trailing comma. Complete pragmas compose exact `pragma`, a raw-identifier name
 and an exact semicolon. Rejection separates missing keyword,
 rejected name, rejected items, and missing semicolon. Item-tail, item-list, and
 declaration successful remainders are deterministic, and success is disjoint
-from rejection. The public packages are compile-time consumed; no broader
-top-item or file rejection package is claimed.
+from rejection. The public packages are compile-time consumed and feed the
+broader top-item and file outcomes described below.
 
 Dotted derive targets now have exact broad ordinary outcomes at the component,
 recursive dotted-tail, and complete-target layers. Components retain both
@@ -610,8 +610,31 @@ contract declarations then compose exact `contract`, name, optional generics,
 and body stages with four matching rejection cases. Both layers have
 deterministic, exclusive outcomes. Their declarative relations, executable
 success/rejection packages, and outcome specifications are public and
-compile-time consumed. Broad top-item and complete-file outcome packages remain
-later work.
+compile-time consumed.
+
+Attribute-free top-item dispatch now has exact broad outcomes for import,
+export, pragma, type alias, function, enum, trait, implementation, and contract
+declarations in executable priority order, followed by an exact nonconsuming
+unrecognized case. Pure top-item derive attachment covers all ten item variants:
+enums retain the attribute, while every other item retains its payload and
+extends the appropriate outer and nested spans. The public derive-aware
+dispatcher records hash absence or commits to derive parsing, plain dispatch,
+and attachment, with each first rejecting stage represented. Successful
+remainders are deterministic and success is disjoint from rejection.
+
+Top-item recovery and the complete file loop now also have exact broad
+outcomes. Recovery consumes one mandatory malformed token, updates the last
+span while scanning, and stops without consuming the next top-item boundary;
+an unavailable first carrier is its only rejection. The file loop retains
+source order without exposing its reverse accumulator, enforces direct-item
+progress, rewinds a window-preserving item rejection, treats rejection at a
+recognized item start as a nonconsuming diagnostic success, and otherwise
+inserts the exact recovered error item. The complete `sourceFile` outcome keeps
+the input source id, full-file span, pure comment attachment, comments, and
+first rejection remainder exactly. These relations, executable reflection
+packages, and outcome specifications are public and compile-time consumed.
+Unlike strict diagnostic-free acceptance, the broad boundary-stop outcome does
+not claim that every successful final cursor is at the window end.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
