@@ -1,6 +1,7 @@
 import Solcore.Syntax.DeclarativeCoreTypeOutcomeProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParameterOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.FunctionParametersOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
 
 /-! External consumers for strict and recovery-aware function parameters. -/
@@ -23,6 +24,9 @@ example := @FunctionParameterOrdinaryParses
 example := @FunctionParameterRejects
 example := @functionParameterCoreDeterministicOutcomeSpec
 example := @functionParameterDeterministicOutcomeSpec
+example := @FunctionParametersOrdinaryParses
+example := @FunctionParametersRejects
+example := @functionParametersDeterministicOutcomeSpec
 
 example := @Parser.ReflectsDiagnosticFreeOnSuccess
 example := @Parser.pure_reflectsDiagnosticFreeOnSuccess
@@ -44,6 +48,10 @@ example := @namedParameter_success_ordinaryOutcome_sound
 example := @namedParameter_reject_ordinaryOutcome_sound
 example := @namedParameter_ordinaryOutcome_sound
 example := @namedParameter_ordinaryOutcomeSpec
+example := @functionParameters_success_ordinaryOutcome_sound
+example := @functionParameters_reject_ordinaryOutcome_sound
+example := @functionParameters_ordinaryOutcome_sound
+example := @functionParameters_ordinaryOutcomeSpec
 
 example :
     DeterministicOutcomeSpec
@@ -72,6 +80,19 @@ example {input rejected : State} {failure : Failure}
       rejected.declarativeRemainder :=
   namedParameter_reject_ordinaryOutcome_sound TypeExprRejects
     typeExpr_reject_sound result
+
+example {input next : State}
+    {parameters : DelimitedList FunctionParameter}
+    (result : functionParameters input = .ok parameters next) :
+    FunctionParametersOrdinaryParses input.declarativeRemainder parameters
+      next.declarativeRemainder :=
+  functionParameters_success_ordinaryOutcome_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : functionParameters input = .reject failure rejected) :
+    FunctionParametersRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  functionParameters_reject_ordinaryOutcome_sound result
 
 example {input next : State}
     {parameters : DelimitedList FunctionParameter}
