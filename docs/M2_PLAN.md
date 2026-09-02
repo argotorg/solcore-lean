@@ -113,6 +113,13 @@ export names, local export items, and remote selections. Derive targets and
 normal `#[derive(...)]` attributes now have exact parser-independent grammars;
 the public attribute theorem uses diagnostic freedom only to exclude recovery.
 
+All four generic delimiter policies now lift an exact nested outcome contract:
+required or allow-empty, each with or without a trailing comma. Their tails fix
+written element order, closing span, and final remainder; whole lists fix the
+complete `DelimitedList` value; and rejection fixes the first failing endpoint.
+The constructors are public and compile-time consumed, while concrete callers
+still need to establish exactness for their own nested production.
+
 Shared generic parameters now have an exact nonempty `<...>` grammar with an
 optional trailing comma. Required-list rejection records the exact delimiter
 or nested checked-identifier failure. `requireGenericParameters` adds no

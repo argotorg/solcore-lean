@@ -72,6 +72,13 @@ success/rejection. Supplied derive attributes remain non-consuming AST inputs
 and determine the outer span start. These registered theorem families are
 included in the successful full build and `lake test`.
 
+Generic delimited-list exactness transport covers all combinations of required
+or allow-empty contents and trailing-comma permission. From an exact nested
+outcome it fixes the forward element list, closing span, complete
+`DelimitedList` AST, final remainder, and first rejecting remainder. All four
+spec constructors are exported and compile-time consumed; the theorem remains
+conditional on each concrete nested production's exact contract.
+
 Backward diagnostic reflection composes through parser sequencing,
 transactional choice, token consumers, and delimiters. Its concrete instances
 cover recursive types, named and delimited function parameters, predicates,

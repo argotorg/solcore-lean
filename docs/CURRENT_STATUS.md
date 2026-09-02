@@ -226,6 +226,15 @@ includes ordinary and diagnosed reserved target components, maximal dotted
 targets, and exact normal `#[derive(...)]` attributes; diagnostic-free public
 attribute soundness excludes its malformed recovery path.
 
+Generic delimited outcomes now transport the stronger exact contract through
+all four required-or-empty and trailing-or-no-trailing policies. Given exact
+nested outcomes, tail relations fix forward elements, closing span, and final
+remainder; complete relations fix the full `DelimitedList` AST; and every
+delimiter rejection policy fixes its first failing remainder. The four exact
+spec constructors are exported and compile-time consumed. This is a reusable
+conditional law and does not assert that every existing nested production has
+already acquired an exact contract.
+
 Shared generic parameters now have an exact nonempty `<...>` grammar with an
 optional trailing comma. Required-list rejection records the exact delimiter
 or nested checked-identifier failure. `requireGenericParameters` has no reject
