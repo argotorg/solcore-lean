@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeDeriveAttributeValidOutcomeProperties
+import Solcore.Syntax.DeclarativeDeriveAttributeValidExactnessProperties
 import Solcore.Syntax.Parser.DeriveAttributeSoundnessProperties
 import Solcore.Syntax.Parser.DeriveAttributeValidOrdinaryRejectionSoundnessProperties
 
@@ -47,5 +47,41 @@ theorem deriveAttributeValid_ordinaryOutcomeSpec :
       DeclarativeGrammar.DeriveAttributeParses
       DeclarativeGrammar.DeriveAttributeValidRejects :=
   DeclarativeGrammar.deriveAttributeValidDeterministicOutcomeSpec
+
+/-- Re-export exact normal-path value and rejection-endpoint functionality. -/
+theorem deriveAttributeValid_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.DeriveAttributeParses
+      DeclarativeGrammar.DeriveAttributeValidRejects :=
+  DeclarativeGrammar.deriveAttributeValidExactOutcomeSpec
+
+/-- Two successful normal-path reflections have the same derive attribute and
+final declarative remainder. -/
+theorem deriveAttributeValid_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : DeriveAttribute}
+    (leftResult : DeriveAttributeInternals.valid input =
+      .ok left leftOutput)
+    (rightResult : DeriveAttributeInternals.valid input =
+      .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.DeriveAttributeParses.result_unique
+    (deriveAttributeValid_success_ordinaryOutcome_sound leftResult)
+    (deriveAttributeValid_success_ordinaryOutcome_sound rightResult)
+
+/-- Two rejected normal-path reflections have the same exact declarative
+endpoint. -/
+theorem deriveAttributeValid_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : DeriveAttributeInternals.valid input =
+      .reject leftFailure leftOutput)
+    (rightResult : DeriveAttributeInternals.valid input =
+      .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.DeriveAttributeValidRejects.output_unique
+    (deriveAttributeValid_reject_ordinaryOutcome_sound leftResult)
+    (deriveAttributeValid_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser
