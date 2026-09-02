@@ -277,9 +277,7 @@ original input after valid-path rejection; public rejection records both
 failed attempts. Valid, recovery-tail, complete-recovery, and public outcomes
 have unique successful remainders and disjoint success/rejection, with exported
 APIs checked by dedicated and public-boundary consumers. AST and
-rejection-endpoint uniqueness are not claimed. Exact broad derive attachment
-and derive-aware contract-member, contract-body, top-item, and complete-file
-outcomes remain later work.
+rejection-endpoint uniqueness are not claimed for attribute parsing.
 
 Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
 field, function, constructor, fallback, type-alias, and contextual-enum
@@ -289,8 +287,24 @@ through. Success retains its wrapped AST, declaration span, empty leading
 comments, carrier, window, cursor, and final remainder. Rejection records the
 selected leaf or an exact nonconsuming unrecognized-member case. Successful
 remainders are deterministic and success is disjoint from rejection. Existing
-strict member soundness remains available; derive-aware members, contract
-bodies, top items, and files are not claimed here.
+strict member soundness remains available.
+
+Exact pure derive attachment now covers all seven contract-member variants and
+gives every input one unique AST result. Enums alone retain the attribute. Other
+declaration variants preserve their payload while extending the outer and
+nested declaration spans, the error variant extends its outer span, and every
+branch preserves leading comments. Executable attachment always succeeds,
+reflects that exact transformation, and leaves the declarative remainder
+unchanged; diagnosed non-enum attachment introduces no rejection stage.
+
+Derive-aware `contractMemberWithAttribute` now also has exact broad ordinary
+outcomes. Hash absence runs the attribute-free core. Hash presence commits in
+order to public derive parsing, core member parsing, and pure attachment.
+Rejection distinguishes plain-core failure, derive failure, and core failure
+after derive success. Executable success and rejection reflect these relations;
+successful remainders are deterministic and success/rejection are disjoint.
+Parser AST and rejection-endpoint uniqueness are not claimed. Exact broad
+ordinary contract-body, top-item, and complete-file outcomes remain later work.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

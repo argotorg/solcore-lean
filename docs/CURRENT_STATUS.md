@@ -565,9 +565,8 @@ valid-path rejection, and a public rejection records rejection of both
 attempts. Valid, recovery-tail, complete-recovery, and public outcomes have
 unique successful remainders and disjoint success/rejection. Their declarative
 and executable APIs are exported and checked by dedicated and public-boundary
-consumers. This claims neither AST nor rejection-endpoint uniqueness. Exact
-broad derive attachment and derive-aware contract-member, contract-body,
-top-item, and complete-file outcomes remain later work.
+consumers. For attribute parsing, this claims neither AST nor
+rejection-endpoint uniqueness.
 
 Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
 its prioritized six-way dispatcher. Identifier-plus-colon field lookahead runs
@@ -577,8 +576,26 @@ the wrapped member AST, declaration span, empty leading comments, carrier,
 window, cursor, and final remainder. Rejection records the selected leaf or an
 exact nonconsuming unrecognized-member case. Successful remainders are
 deterministic and success is disjoint from rejection. Existing strict member
-soundness remains available; no derive-aware member, contract-body, top-item,
-or file broad rejection is claimed.
+soundness remains available.
+
+Contract-member derive attachment now has an exact pure relation for all seven
+member variants, with one unique AST result for every input. Only enums retain
+the attribute; the five other declaration variants keep their payload while
+extending both their member and nested declaration spans, and the error variant
+extends only its member span. Every branch preserves leading comments.
+Executable attachment unconditionally reflects this transformation and leaves
+the declarative remainder unchanged, including the non-enum branches that emit
+`deriveOnlyEnum`; attachment itself therefore has no rejecting outcome.
+
+The public derive-aware `contractMemberWithAttribute` boundary now has exact
+broad ordinary success and rejection outcomes. An absent hash selects the
+attribute-free core directly. A present hash commits to the public derive
+parser, then the core member parser, and finally the pure attachment above.
+Rejection records exactly one of three first failing stages: plain core, derive,
+or core after a successful derive. Successful remainders are deterministic and
+success is disjoint from rejection, without adding AST or rejection-endpoint
+uniqueness for the parser outcome. Exact broad ordinary contract-body,
+top-item, and complete-file outcome packages remain later work.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
