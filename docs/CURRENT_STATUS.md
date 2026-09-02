@@ -550,8 +550,24 @@ and the exact first or later component failure. Successful remainders are
 unique and success is disjoint from rejection at every layer. Executable
 success and rejection reflection are publicly exported and checked by
 dedicated and umbrella consumers. This does not claim rejection-endpoint or
-AST uniqueness, nor exact broad derive-attribute recovery or derive-aware
-contract-member outcomes.
+AST uniqueness.
+
+Complete derive attributes now also have exact broad ordinary outcomes. The
+valid path records five rejection stages: hash, opening bracket, contextual
+`derive` marker, no-trailing target list, and closing bracket. Recovery gives
+current `]` first priority and consumes it as malformed recovery; otherwise it
+stops without consumption at the window end, a top-item start, an
+identifier-plus-colon contract field, `}`, or a missing carrier slot inside
+the active window. Any other raw token advances the scan and updates its last
+span. After exact `#[` consumption, that tail has no ordinary rejection. The
+public transactional choice retries recovery from the original input after a
+valid-path rejection, and a public rejection records rejection of both
+attempts. Valid, recovery-tail, complete-recovery, and public outcomes have
+unique successful remainders and disjoint success/rejection. Their declarative
+and executable APIs are exported and checked by dedicated and public-boundary
+consumers. This claims neither AST nor rejection-endpoint uniqueness. Exact
+broad derive attachment and derive-aware contract-member, contract-body,
+top-item, and complete-file outcomes remain later work.
 
 Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
 its prioritized six-way dispatcher. Identifier-plus-colon field lookahead runs
