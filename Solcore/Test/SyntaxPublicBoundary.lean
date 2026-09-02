@@ -215,6 +215,9 @@ example := @Syntax.DeclarativeGrammar.importDeclDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.ExportPathOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ExportPathRejects
 example := @Syntax.DeclarativeGrammar.exportPathDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FinishExportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.FinishExportRejects
+example := @Syntax.DeclarativeGrammar.finishExportDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -355,6 +358,10 @@ example := @Syntax.Parser.exportPath_success_ordinaryOutcome_sound
 example := @Syntax.Parser.exportPath_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.exportPath_ordinaryOutcome_sound
 example := @Syntax.Parser.exportPath_ordinaryOutcomeSpec
+example := @Syntax.Parser.finishExport_success_ordinaryOutcome_sound
+example := @Syntax.Parser.finishExport_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.finishExport_ordinaryOutcome_sound
+example := @Syntax.Parser.finishExport_ordinaryOutcomeSpec
 
 example {input output : Syntax.Parser.State} {field : ContractField}
     (result : Syntax.Parser.ContractInternals.contractField
