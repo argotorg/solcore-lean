@@ -340,13 +340,22 @@ validity. The ordinary component relations remain reusable for recovered
 parser outcomes; the diagnostic-free premise excludes such recoveries from
 these public conclusions.
 
-Import leaf outcomes now cover selector names, optional aliases, and module
-paths. Without `(`, selectors use one checked identifier; a positive `(`
-commits to a nonempty maximal operator-symbol scan and exact close, separating
-identifier, empty-operator, and missing-close rejection. An absent `as`
-returns `none` without consumption, while a positive guard commits to one
-identifier. Module paths likewise split an absent `@` local name from an exact
-`@` external name. Each endpoint is deterministic and exclusive with rejection.
+Import leaf and payload outcomes now cover selector names, optional aliases,
+module paths, selected entries and nonempty braced lists, required and optional
+hiding, the recovery-aware terminator, and all four payload helpers. Without
+`(`, selectors use one checked identifier; a positive `(` commits to a
+nonempty maximal operator-symbol scan and exact close. An absent `as` or
+`hiding` guard returns its empty option without consumption, while a positive
+guard commits to the complete selected alias or hiding clause. Module paths
+split an absent `@` local name from an exact `@` external name. Selected-import
+and hiding lists require at least one element and permit a trailing comma.
+
+An exact semicolon terminates normally. A missing semicolon immediately before
+an exact top-item starter is a diagnostic-bearing, nonconsuming success that
+returns the last payload span; any other missing terminator rejects. Plain,
+namespace, wildcard, and selective payload relations retain executable stage
+order, AST and covering span, token carrier, active window, cursor, and exact
+first rejection. Each endpoint is deterministic and exclusive with rejection.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

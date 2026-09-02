@@ -481,15 +481,25 @@ The component relations deliberately remain recovery-aware ordinary
 over-approximations, while the outer diagnostic-free premise excludes actual
 recovery successes at the complete-file boundary.
 
-Import leaves now have exact broad outcomes for selector names, optional
-aliases, and module paths. Selector names choose a checked identifier when `(`
-is absent; a positive `(` commits to a nonempty maximal operator-symbol scan
-and exact `)`. Rejection distinguishes identifier failure, an empty operator,
-and a missing close after the maximal scan. An absent `as` is a nonconsuming
-`none`, while a positive guard commits to one checked identifier. Module paths
-similarly choose a local qualified name when `@` is absent and commit to an
-external qualified name after exact `@`. All three endpoints are deterministic
-and success/rejection are exclusive.
+Import leaves and payload helpers now have exact broad outcomes. Selector names
+choose a checked identifier when `(` is absent; a positive `(` commits to a
+nonempty maximal operator-symbol scan and exact `)`. An absent selected-name
+`as` is a nonconsuming `none`, while a positive guard commits to one checked
+identifier. Module paths similarly choose a local qualified name when `@` is
+absent and commit to an external qualified name after exact `@`. Selected
+entries parse source then alias, and both selected-import and hiding braces
+require a nonempty, trailing-comma-permitting list. Optional hiding is
+nonconsuming when its contextual marker is absent and commits to the complete
+clause when present.
+
+The import terminator consumes an exact semicolon. If it is missing immediately
+before one of the exact top-item starters, it instead records a diagnostic,
+returns the last payload span, and succeeds without consuming that starter;
+every other missing terminator rejects. Plain, namespace, wildcard, and
+selective payload outcomes compose these leaves in executable order, retain
+the exact AST, covering span, cursor, token carrier, and active window, and
+separate the first rejecting stage. Every endpoint is deterministic and its
+success and rejection relations are exclusive.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
