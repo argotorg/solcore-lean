@@ -178,7 +178,12 @@ cover the bare tail, the complete bare sequence, and grouped-first dispatch.
 When both transactional alternatives reject, the grouped attempt's intermediate
 remainder is retained separately while the relation returns the final bare
 remainder reached from the original input. Bare and complete sequence outcomes
-have deterministic success remainders and exclude simultaneous rejection.
+have deterministic success remainders and exclude simultaneous rejection. An
+absent contextual `where` marker is a nonconsuming success, while a present
+marker commits to the prioritized predicate sequence. Executable ordinary
+rejection is reflected exactly as that committed sequence rejection; optional
+`where` has a deterministic success remainder and exclusive success/rejection
+outcomes.
 
 Optional function modifiers now preserve exact keyword absence or presence in
 the fixed `public`-then-`payable` order. Modifier grammar soundness is

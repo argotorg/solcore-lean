@@ -293,6 +293,10 @@ now also cover bare tails, complete bare sequences, and the grouped-first
 dispatcher. The fallback rejection retains the grouped attempt's intermediate
 remainder separately from the final bare rejection reached from the original
 input. Bare and complete sequence outcomes are deterministic and success/reject
+exclusive. For optional `where`, an absent contextual marker is a nonconsuming
+success, while a present marker commits to the prioritized predicate sequence.
+Executable ordinary rejection is reflected exactly as that committed sequence
+rejection; the successful remainder is deterministic and success/rejection are
 exclusive.
 
 Function modifiers are parsed in the fixed optional `public`-then-`payable`

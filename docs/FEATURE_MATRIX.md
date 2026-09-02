@@ -81,7 +81,11 @@ transactional fallback restarts at the original input. Bare-tail, bare-sequence,
 and complete-dispatch rejection traces are also exact. A double rejection keeps
 the grouped attempt's intermediate remainder distinct from the final bare
 remainder returned after retrying from the original input; deterministic outcome
-specifications exclude simultaneous success and rejection.
+specifications exclude simultaneous success and rejection. An absent contextual
+`where` marker is a nonconsuming success, while a present marker commits to the
+prioritized predicate sequence. Executable ordinary rejection is reflected
+exactly as that committed sequence rejection; optional-`where` success has a
+deterministic remainder and is exclusive with rejection.
 
 Function modifiers have unconditional fixed-order `public`-then-`payable`
 grammar soundness. Diagnostic-free module success excludes both markers,
