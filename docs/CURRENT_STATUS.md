@@ -361,6 +361,13 @@ recovery success at the parent remainder. Declaration success endpoints are
 deterministic and exclusive with rejection. The existing location-policy-aware
 `FunctionDeclParses` theorem remains the stricter diagnostic-free judgment.
 
+The implementation-method wrapper now lifts that broad declaration outcome
+without adding syntax or rejection stages. Success retains the declaration
+span, an empty parser-time leading-comment list, and the exact final remainder;
+rejection is exactly the nested function-declaration rejection. Module-policy
+diagnostics and captured-body recovery therefore remain ordinary successes.
+These method endpoints are deterministic and success/rejection are exclusive.
+
 Trait declarations now extend that signature boundary through exact method
 semicolons and brace-delimited bodies. `TraitMethodTailParses` preserves source
 order while recording closing-brace priority, and the fuel-bounded executable

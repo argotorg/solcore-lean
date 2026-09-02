@@ -249,6 +249,13 @@ remainder. The combined declaration outcomes are deterministic and mutually
 exclusive. This complements, rather than replaces, the location-policy-aware
 diagnostic-free `FunctionDeclParses` boundary.
 
+The implementation-method wrapper now carries that broad declaration contract
+one level upward. Its exact AST adds only the empty parser-time comment list,
+and its final remainder is unchanged; its sole rejection stage is the nested
+function declaration. Module modifier diagnostics and captured-body recovery
+stay on the success path. The resulting method endpoints are deterministic and
+mutually exclusive.
+
 Trait methods now add the exact terminating semicolon to a module-policy
 signature. Trait bodies preserve forward method order, exact braces, the
 right-brace-first loop priority, and the retained body cover span. Backward

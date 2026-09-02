@@ -149,6 +149,13 @@ deterministic and exclude simultaneous rejection. The existing
 location-policy-aware `FunctionDeclParses` relation continues to describe the
 strict diagnostic-free declaration boundary.
 
+The implementation-method wrapper also has a broad ordinary outcome. It
+preserves the wrapped declaration span, empty parser-time leading comments,
+and exact remainder, while exposing only nested function-declaration
+rejection. Module modifier diagnostics and balanced-body recovery remain
+successful outcomes. Method endpoints are deterministic and exclude
+simultaneous rejection.
+
 Trait methods, brace-delimited method bodies, and complete trait declarations
 now have exact parser-independent judgments. Diagnostic-free success preserves
 method source order, semicolons, closing-brace priority, required generic
