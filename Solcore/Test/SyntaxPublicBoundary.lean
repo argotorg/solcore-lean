@@ -153,6 +153,9 @@ example := @Syntax.DeclarativeGrammar.ContractBodyOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ContractBodyOrdinaryOutcomeParses
 example := @Syntax.DeclarativeGrammar.ContractBodyRejects
 example := @Syntax.DeclarativeGrammar.contractBodyDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ContractDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ContractDeclRejects
+example := @Syntax.DeclarativeGrammar.contractDeclDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.TypeAliasParametersOrdinaryParses
 example := @Syntax.DeclarativeGrammar.TypeAliasParametersRejects
 example := @Syntax.DeclarativeGrammar.typeAliasParametersDeterministicOutcomeSpec
@@ -391,6 +394,10 @@ example := @Syntax.Parser.ContractInternals.contractBody_success_ordinaryOutcome
 example := @Syntax.Parser.ContractInternals.contractBody_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractInternals.contractBody_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractInternals.contractBody_ordinaryOutcomeSpec
+example := @Syntax.Parser.contractDecl_success_ordinaryOutcome_sound
+example := @Syntax.Parser.contractDecl_reject_ordinaryOutcome_sound
+example := @Syntax.Parser.contractDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.contractDecl_ordinaryOutcomeSpec
 example := @Syntax.Parser.parseTypeAliasParameters_success_ordinaryOutcome_sound
 example := @Syntax.Parser.parseTypeAliasParameters_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.parseTypeAliasParameters_ordinaryOutcome_sound
@@ -629,6 +636,19 @@ example {input rejected : Syntax.Parser.State}
       input.declarativeRemainder rejected.declarativeRemainder :=
   Syntax.Parser.ContractInternals.contractBody_reject_ordinaryOutcome_sound
     result
+
+example {input output : Syntax.Parser.State} {declaration : ContractDecl}
+    (result : Syntax.Parser.contractDecl input = .ok declaration output) :
+    Syntax.DeclarativeGrammar.ContractDeclOrdinaryParses
+      input.declarativeRemainder declaration output.declarativeRemainder :=
+  Syntax.Parser.contractDecl_success_ordinaryOutcome_sound result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.contractDecl input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ContractDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.contractDecl_reject_ordinaryOutcome_sound result
 
 example {input output : Syntax.Parser.State} {declaration : TypeAliasDecl}
     (result : Syntax.Parser.typeAlias input = .ok declaration output) :
