@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.DeriveAttributeValidOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.DeriveAttributeOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for derive-attribute grammar soundness. -/
 
@@ -13,12 +13,39 @@ open Solcore.Syntax.Parser
 example := @DeriveAttributeParses
 example := @DeriveAttributeValidRejects
 example := @deriveAttributeValidDeterministicOutcomeSpec
+example := @DeriveAttributeRecoveryDeclarationStartsAt
+example := @DeriveAttributeRecoveryStops
+example := @DeriveAttributeRecoveryTailParses
+example := @DeriveAttributeRecoveredParses
+example := @DeriveAttributeRecoveredRejects
+example := @deriveAttributeRecoveredDeterministicOutcomeSpec
+example := @DeriveAttributeOrdinaryParses
+example := @DeriveAttributeRejects
+example := @deriveAttributeDeterministicOutcomeSpec
 example := @deriveAttributeValid_success_sound
 example := @DeriveAttributeInternals.valid_reject_ordinaryOutcome_sound
 example := @deriveAttributeValid_success_ordinaryOutcome_sound
 example := @deriveAttributeValid_reject_ordinaryOutcome_sound
 example := @deriveAttributeValid_ordinaryOutcome_sound
 example := @deriveAttributeValid_ordinaryOutcomeSpec
+example :=
+  @DeriveAttributeInternals.recoveryDeclarationStartsAt_of_atDeriveDeclarationBoundary_eq_true
+example :=
+  @DeriveAttributeInternals.atDeriveDeclarationBoundary_eq_true_of_recoveryDeclarationStartsAt
+example := @DeriveAttributeInternals.recoveryStops_of_unclosedGuard_eq_true
+example := @DeriveAttributeInternals.recoveryStops_of_advance?_eq_none
+example := @DeriveAttributeInternals.no_recoveryStops_of_nonBoundary_token
+example := @DeriveAttributeInternals.recoverTail_success_ordinaryOutcome_sound
+example :=
+  @DeriveAttributeInternals.recoverTail_production_success_ordinaryOutcome_sound
+example := @deriveAttributeRecovered_success_ordinaryOutcome_sound
+example := @deriveAttributeRecovered_reject_ordinaryOutcome_sound
+example := @deriveAttributeRecovered_ordinaryOutcome_sound
+example := @deriveAttributeRecovered_ordinaryOutcomeSpec
+example := @deriveAttribute_success_ordinaryOutcome_sound
+example := @deriveAttribute_reject_ordinaryOutcome_sound
+example := @deriveAttribute_ordinaryOutcome_sound
+example := @deriveAttribute_ordinaryOutcomeSpec
 example := @deriveAttribute_success_sound
 example := @deriveAttribute_success_sound_and_validFor
 
@@ -43,5 +70,30 @@ example {input rejected : State} {failure : Failure}
     DeriveAttributeValidRejects input.declarativeRemainder
       rejected.declarativeRemainder :=
   deriveAttributeValid_reject_ordinaryOutcome_sound result
+
+example {input next : State} {value : DeriveAttribute}
+    (result : DeriveAttributeInternals.recovered input = .ok value next) :
+    DeriveAttributeRecoveredParses input.declarativeRemainder value
+      next.declarativeRemainder :=
+  deriveAttributeRecovered_success_ordinaryOutcome_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : DeriveAttributeInternals.recovered input =
+      .reject failure rejected) :
+    DeriveAttributeRecoveredRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  deriveAttributeRecovered_reject_ordinaryOutcome_sound result
+
+example {input next : State} {value : DeriveAttribute}
+    (result : deriveAttribute input = .ok value next) :
+    DeriveAttributeOrdinaryParses input.declarativeRemainder value
+      next.declarativeRemainder :=
+  deriveAttribute_success_ordinaryOutcome_sound result
+
+example {input rejected : State} {failure : Failure}
+    (result : deriveAttribute input = .reject failure rejected) :
+    DeriveAttributeRejects input.declarativeRemainder
+      rejected.declarativeRemainder :=
+  deriveAttribute_reject_ordinaryOutcome_sound result
 
 end Solcore.Test.SyntaxParserDeriveAttributeSoundnessProperties
