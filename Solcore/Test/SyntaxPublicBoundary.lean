@@ -101,6 +101,21 @@ example := @Syntax.DeclarativeGrammar.functionDeclDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.ImplMethodOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ImplMethodRejects
 example := @Syntax.DeclarativeGrammar.implMethodDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalImplDefaultMarkerOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalImplDefaultMarkerRejects
+example := @Syntax.DeclarativeGrammar.optionalImplDefaultMarkerDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplHeadArgumentsOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ImplHeadArgumentsRejects
+example := @Syntax.DeclarativeGrammar.implHeadArgumentsDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplMethodTailOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.ImplMethodTailRejects
+example := @Syntax.DeclarativeGrammar.implMethodTailDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplBodyOrdinaryOutcomeParses
+example := @Syntax.DeclarativeGrammar.ImplBodyRejects
+example := @Syntax.DeclarativeGrammar.implBodyDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ImplDeclOrdinaryParses
+example := @Syntax.DeclarativeGrammar.ImplDeclRejects
+example := @Syntax.DeclarativeGrammar.implDeclDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.ContractEntryModifiersOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ConstructorDeclOrdinaryParses
 example := @Syntax.DeclarativeGrammar.ConstructorDeclRejects
@@ -195,6 +210,14 @@ example := @Syntax.Parser.ImplInternals.implMethod_success_ordinaryOutcome_sound
 example := @Syntax.Parser.ImplInternals.implMethod_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.ImplInternals.implMethod_ordinaryOutcome_sound
 example := @Syntax.Parser.ImplInternals.implMethod_ordinaryOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implDefaultMarker_ordinaryOutcome_sound
+example := @Syntax.Parser.ImplInternals.implDefaultMarker_ordinaryOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implHeadArguments_ordinaryOutcome_sound
+example := @Syntax.Parser.ImplInternals.implHeadArguments_ordinaryOutcomeSpec
+example := @Syntax.Parser.ImplInternals.implBody_ordinaryOutcome_sound
+example := @Syntax.Parser.ImplInternals.implBody_ordinaryOutcomeSpec
+example := @Syntax.Parser.implDecl_ordinaryOutcome_sound
+example := @Syntax.Parser.implDecl_ordinaryOutcomeSpec
 example := @Syntax.Parser.ContractEntryInternals.entryParameters_success_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractEntryInternals.entryParameters_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.ContractEntryInternals.implicitPublicModifiers_success_ordinaryOutcome_sound
@@ -299,5 +322,12 @@ example {input rejected : Syntax.Parser.State}
     Syntax.DeclarativeGrammar.TraitDeclRejects
       input.declarativeRemainder rejected.declarativeRemainder :=
   Syntax.Parser.traitDecl_reject_ordinaryOutcome_sound result
+
+example {input rejected : Syntax.Parser.State}
+    {failure : Syntax.Parser.Failure}
+    (result : Syntax.Parser.implDecl input = .reject failure rejected) :
+    Syntax.DeclarativeGrammar.ImplDeclRejects
+      input.declarativeRemainder rejected.declarativeRemainder :=
+  Syntax.Parser.implDecl_reject_ordinaryOutcome_sound result
 
 end Tests
