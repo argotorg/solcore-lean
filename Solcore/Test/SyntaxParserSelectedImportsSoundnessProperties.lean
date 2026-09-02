@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.SelectedImportsSoundnessProperties
+import Solcore.Syntax.Parser.SelectedImportsOrdinaryOutcomeSoundnessProperties
 
 /-! External consumers for selected-import list grammar soundness. -/
 
@@ -11,9 +11,16 @@ open Solcore.Syntax.DeclarativeGrammar
 open Solcore.Syntax.Parser
 
 example := @SelectedImportsParses
+example := @SelectedImportsOrdinaryParses
+example := @SelectedImportsRejects
+example := @selectedImportsDeterministicOutcomeSpec
 example := @requireSelected_success_shape
 example := @selectedImports_success_sound
 example := @selectedImports_success_sound_and_validFor
+example := @selectedImports_success_ordinaryOutcome_sound
+example := @selectedImports_reject_ordinaryOutcome_sound
+example := @selectedImports_ordinaryOutcome_sound
+example := @selectedImports_ordinaryOutcomeSpec
 
 example {input next : State}
     {selection : NonemptyDelimitedList SelectedImport}

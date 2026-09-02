@@ -182,6 +182,18 @@ example := @Syntax.DeclarativeGrammar.modulePathDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.SelectedAliasOrdinaryParses
 example := @Syntax.DeclarativeGrammar.SelectedAliasRejects
 example := @Syntax.DeclarativeGrammar.selectedAliasDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.SelectedImportOrdinaryParses
+example := @Syntax.DeclarativeGrammar.SelectedImportRejects
+example := @Syntax.DeclarativeGrammar.selectedImportDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.SelectedImportsOrdinaryParses
+example := @Syntax.DeclarativeGrammar.SelectedImportsRejects
+example := @Syntax.DeclarativeGrammar.selectedImportsDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.HidingClauseOrdinaryParses
+example := @Syntax.DeclarativeGrammar.HidingClauseRejects
+example := @Syntax.DeclarativeGrammar.OptionalHidingOrdinaryParses
+example := @Syntax.DeclarativeGrammar.OptionalHidingRejects
+example := @Syntax.DeclarativeGrammar.hidingClauseDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.optionalHidingDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -286,6 +298,14 @@ example := @Syntax.Parser.selectedAlias_success_ordinaryOutcome_sound
 example := @Syntax.Parser.selectedAlias_reject_ordinaryOutcome_sound
 example := @Syntax.Parser.selectedAlias_ordinaryOutcome_sound
 example := @Syntax.Parser.selectedAlias_ordinaryOutcomeSpec
+example := @Syntax.Parser.selectedImport_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedImport_ordinaryOutcomeSpec
+example := @Syntax.Parser.selectedImports_ordinaryOutcome_sound
+example := @Syntax.Parser.selectedImports_ordinaryOutcomeSpec
+example := @Syntax.Parser.hidingClause_ordinaryOutcome_sound
+example := @Syntax.Parser.hidingClause_ordinaryOutcomeSpec
+example := @Syntax.Parser.optionalHiding_ordinaryOutcome_sound
+example := @Syntax.Parser.optionalHiding_ordinaryOutcomeSpec
 
 example {input output : Syntax.Parser.State} {field : ContractField}
     (result : Syntax.Parser.ContractInternals.contractField
