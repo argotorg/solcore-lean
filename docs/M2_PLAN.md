@@ -120,6 +120,12 @@ complete `DelimitedList` value; and rejection fixes the first failing endpoint.
 The constructors are public and compile-time consumed, while concrete callers
 still need to establish exactness for their own nested production.
 
+Prioritized transactional fallback now lifts exact contracts for both branches
+to one exact successful value/remainder and one original-input double-rejection
+endpoint. Primary success excludes fallback selection. The generic constructor
+is exported and compile-time consumed; concrete uses remain conditional on
+exact primary and fallback outcomes.
+
 Shared generic parameters now have an exact nonempty `<...>` grammar with an
 optional trailing comma. Required-list rejection records the exact delimiter
 or nested checked-identifier failure. `requireGenericParameters` adds no
@@ -161,6 +167,17 @@ recursive type success is already unconditional. Recursive type, shared
 generic-parameter, type-alias, and enum-declaration theorem families have
 compile-time consumers and public `Solcore.Syntax` registration. The full
 build and `lake test` pass with those registrations.
+
+Two type-alias exactness leaves are now complete. Optional alias parameters
+fix the complete optional identifier-list AST, final remainder, and rejection
+endpoint. Malformed RHS recovery fixes its error type, final remainder, and
+nonconsuming rejection endpoint. The recovery-aware alias-value layer exposes
+an exact contract conditional only on exact Core `TypeExpr` outcomes, while
+its rejection endpoint is unconditional because recovery rewinds to the
+original input. Parser reflection and both dedicated and public-boundary
+consumers compile against these APIs. Closing the Core type-expression AST
+value contract remains the prerequisite for an unconditional alias-value and
+declaration lift; diagnostic and failure payload equality is not claimed.
 
 Backward diagnostic reflection now provides the reusable bridge needed by
 strict diagnostic-free grammars: diagnostic-free successful output implies a

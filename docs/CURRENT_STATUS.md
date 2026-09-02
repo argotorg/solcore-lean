@@ -235,6 +235,13 @@ spec constructors are exported and compile-time consumed. This is a reusable
 conditional law and does not assert that every existing nested production has
 already acquired an exact contract.
 
+Prioritized transactional fallback now has the matching generic exact
+transport. Exact primary and fallback outcomes determine one successful value
+and final remainder; success in the primary excludes fallback selection; and a
+double rejection returns the unique original-input endpoint. The constructor
+is exported and compile-time consumed, while each concrete use must still
+supply exact contracts for both alternatives.
+
 Shared generic parameters now have an exact nonempty `<...>` grammar with an
 optional trailing comma. Required-list rejection records the exact delimiter
 or nested checked-identifier failure. `requireGenericParameters` has no reject
@@ -276,6 +283,19 @@ premise. Recursive type, shared generic-parameter, type-alias, and
 enum-declaration theorem families have compile-time consumers and public
 `Solcore.Syntax` registration. The full build and `lake test` pass with those
 registrations.
+
+The broad type-alias outcome has also advanced beyond endpoint determinism at
+two independent leaves. Its allow-empty, allow-trailing optional parameter
+list now fixes the complete optional identifier-list AST, final remainder, and
+committed rejection endpoint. Malformed alias-value recovery fixes its error
+type and final remainder and has one nonconsuming rejection endpoint. Public
+recovery-aware alias values unconditionally fix every rejection endpoint and
+conditionally fix successful values and remainders from an exact Core
+`TypeExpr` outcome contract. Executable reflection and dedicated/public
+consumers expose these laws. Exact Core type-expression values remain the
+explicit prerequisite before this conditional lift can become unconditional;
+diagnostics, failure payloads, and whole parser states remain outside the
+claim.
 
 Backward diagnostic reflection is now a reusable parser proof boundary. A
 diagnostic-free successful result can only have started from a diagnostic-free

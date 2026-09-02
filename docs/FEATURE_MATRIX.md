@@ -79,6 +79,19 @@ outcome it fixes the forward element list, closing span, complete
 spec constructors are exported and compile-time consumed; the theorem remains
 conditional on each concrete nested production's exact contract.
 
+Generic transactional fallback has the corresponding exactness transport:
+exact primary and fallback branches determine the successful value and final
+remainder, while double rejection has the unique original-input endpoint.
+Concrete uses supply both branch contracts.
+
+Transparent type-alias parameters now have an unconditional exact value,
+remainder, and rejection contract. Malformed alias-value recovery likewise
+fixes its error type and endpoint. Recovery-aware alias values expose an exact
+contract conditional on exact Core `TypeExpr` outcomes, and their rejection
+endpoint is already unconditional. These declarative and executable APIs are
+publicly consumed; Core type-expression AST value exactness remains the
+prerequisite for the unconditional declaration-wide lift.
+
 Backward diagnostic reflection composes through parser sequencing,
 transactional choice, token consumers, and delimiters. Its concrete instances
 cover recursive types, named and delimited function parameters, predicates,
