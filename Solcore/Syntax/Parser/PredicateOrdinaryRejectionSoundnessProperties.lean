@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePredicateOutcomeProperties
+import Solcore.Syntax.DeclarativePredicateExactnessProperties
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeNamedRejectionSoundnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
@@ -75,5 +75,31 @@ theorem predicate_ordinaryOutcome_sound :
         DeclarativeGrammar.PredicateRejects input.declarativeRemainder
           rejected.declarativeRemainder) :=
   ⟨predicate_success_sound, predicate_reject_sound⟩
+
+/-- Re-export exact single-predicate outcomes. -/
+theorem predicate_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.PredicateParses DeclarativeGrammar.PredicateRejects :=
+  DeclarativeGrammar.predicateExactOutcomeSpec
+
+/-- Two successful predicates have the same AST and declarative remainder. -/
+theorem predicate_success_result_unique
+    {input leftOutput rightOutput : State} {left right : Predicate}
+    (leftResult : predicate input = .ok left leftOutput)
+    (rightResult : predicate input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.PredicateParses.result_unique
+    (predicate_success_sound leftResult) (predicate_success_sound rightResult)
+
+/-- Two predicate rejections have the same declarative endpoint. -/
+theorem predicate_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : predicate input = .reject leftFailure leftOutput)
+    (rightResult : predicate input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.PredicateRejects.output_unique
+    (predicate_reject_sound leftResult) (predicate_reject_sound rightResult)
 
 end Solcore.Syntax.Parser

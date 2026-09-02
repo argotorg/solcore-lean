@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.BarePredicateSequenceOrdinaryRejectionSoundnessProperties
+import Solcore.Syntax.DeclarativePredicateSequenceExactnessProperties
 import Solcore.Syntax.Parser.PredicateSequenceSoundnessProperties
 
 /-! Exact executable rejection reflection for grouped-first predicate choice. -/
@@ -53,5 +54,36 @@ theorem predicateSequence_ordinaryOutcome_sound :
         DeclarativeGrammar.PredicateSequenceRejects
           input.declarativeRemainder rejected.declarativeRemainder) :=
   ⟨predicateSequence_success_sound, predicateSequence_reject_sound⟩
+
+/-- Re-export exact prioritized predicate-sequence outcomes. -/
+theorem predicateSequence_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.PredicateSequenceParses
+      DeclarativeGrammar.PredicateSequenceRejects :=
+  DeclarativeGrammar.predicateSequenceExactOutcomeSpec
+
+/-- Two prioritized predicate-sequence successes have the same AST and
+remainder. -/
+theorem predicateSequence_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : PredicateSequence}
+    (leftResult : predicateSequence input = .ok left leftOutput)
+    (rightResult : predicateSequence input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.PredicateSequenceParses.result_unique
+    (predicateSequence_success_sound leftResult)
+    (predicateSequence_success_sound rightResult)
+
+/-- Two prioritized predicate-sequence rejections have the same endpoint. -/
+theorem predicateSequence_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : predicateSequence input = .reject leftFailure leftOutput)
+    (rightResult : predicateSequence input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.PredicateSequenceRejects.output_unique
+    (predicateSequence_reject_sound leftResult)
+    (predicateSequence_reject_sound rightResult)
 
 end Solcore.Syntax.Parser.PredicateInternals

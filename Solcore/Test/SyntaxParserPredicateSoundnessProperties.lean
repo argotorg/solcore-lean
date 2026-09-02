@@ -13,10 +13,14 @@ open Solcore.Syntax.Parser
 example := @PredicateParses
 example := @PredicateRejects
 example := @predicateDeterministicOutcomeSpec
+example := @predicateExactOutcomeSpec
 example := @predicate_success_sound
 example := @predicate_success_sound_and_validFor
 example := @predicate_reject_sound
 example := @predicate_ordinaryOutcome_sound
+example := @predicate_exactOutcomeSpec
+example := @predicate_success_result_unique
+example := @predicate_reject_output_unique
 
 example {input next : State} {value : Predicate}
     (result : predicate input = .ok value next) :

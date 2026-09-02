@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeReturnClauseOutcomeProperties
+import Solcore.Syntax.DeclarativeReturnClauseExactnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
@@ -51,5 +51,35 @@ theorem returnClause_ordinaryOutcome_sound :
         DeclarativeGrammar.OptionalReturnClauseRejects
           input.declarativeRemainder rejected.declarativeRemainder) :=
   ⟨returnClause_success_sound, returnClause_reject_sound⟩
+
+/-- Re-export exact optional return-clause outcomes. -/
+theorem returnClause_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.OptionalReturnClauseParses
+      DeclarativeGrammar.OptionalReturnClauseRejects :=
+  DeclarativeGrammar.optionalReturnClauseExactOutcomeSpec
+
+/-- Two successful optional return clauses have the same AST and remainder. -/
+theorem returnClause_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : Option ReturnClause}
+    (leftResult : returnClause input = .ok left leftOutput)
+    (rightResult : returnClause input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalReturnClauseParses.result_unique
+    (returnClause_success_sound leftResult)
+    (returnClause_success_sound rightResult)
+
+/-- Two return-clause rejections have the same declarative endpoint. -/
+theorem returnClause_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : returnClause input = .reject leftFailure leftOutput)
+    (rightResult : returnClause input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalReturnClauseRejects.output_unique
+    (returnClause_reject_sound leftResult)
+    (returnClause_reject_sound rightResult)
 
 end Solcore.Syntax.Parser

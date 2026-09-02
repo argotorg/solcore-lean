@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeWhereClauseOutcomeProperties
+import Solcore.Syntax.DeclarativeWhereClauseExactnessProperties
 import Solcore.Syntax.Parser.CoreTypeOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.PredicateSequenceOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.WhereClauseSoundnessProperties
@@ -48,5 +48,33 @@ theorem whereClause_ordinaryOutcome_sound :
         DeclarativeGrammar.OptionalWhereClauseRejects
           input.declarativeRemainder rejected.declarativeRemainder) :=
   ⟨whereClause_success_sound, whereClause_reject_sound⟩
+
+/-- Re-export exact optional `where` outcomes. -/
+theorem whereClause_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.OptionalWhereClauseParses
+      DeclarativeGrammar.OptionalWhereClauseRejects :=
+  DeclarativeGrammar.optionalWhereClauseExactOutcomeSpec
+
+/-- Two successful optional `where` clauses have the same AST and remainder. -/
+theorem whereClause_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : Option WhereClause}
+    (leftResult : whereClause input = .ok left leftOutput)
+    (rightResult : whereClause input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalWhereClauseParses.result_unique
+    (whereClause_success_sound leftResult) (whereClause_success_sound rightResult)
+
+/-- Two `where` rejections have the same declarative endpoint. -/
+theorem whereClause_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : whereClause input = .reject leftFailure leftOutput)
+    (rightResult : whereClause input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalWhereClauseRejects.output_unique
+    (whereClause_reject_sound leftResult) (whereClause_reject_sound rightResult)
 
 end Solcore.Syntax.Parser

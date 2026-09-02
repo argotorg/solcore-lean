@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeGenericParametersOutcomeProperties
+import Solcore.Syntax.DeclarativeGenericParametersExactnessProperties
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
@@ -93,5 +93,67 @@ theorem optionalGenericParameters_ordinaryOutcome_sound :
           input.declarativeRemainder rejected.declarativeRemainder) :=
   ⟨optionalGenericParameters_success_sound,
     optionalGenericParameters_reject_sound⟩
+
+/-- Re-export exact required generic-parameter outcomes. -/
+theorem genericParameters_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.GenericParametersParses
+      DeclarativeGrammar.GenericParametersRejects :=
+  DeclarativeGrammar.genericParametersExactOutcomeSpec
+
+/-- Two successful required generic lists have the same AST and remainder. -/
+theorem genericParameters_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : GenericParameters}
+    (leftResult : genericParameters input = .ok left leftOutput)
+    (rightResult : genericParameters input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.GenericParametersParses.result_unique
+    (genericParameters_success_sound leftResult)
+    (genericParameters_success_sound rightResult)
+
+/-- Two required-generic rejections have the same declarative endpoint. -/
+theorem genericParameters_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : genericParameters input = .reject leftFailure leftOutput)
+    (rightResult : genericParameters input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.GenericParametersRejects.output_unique
+    (genericParameters_reject_sound leftResult)
+    (genericParameters_reject_sound rightResult)
+
+/-- Re-export exact optional generic-parameter outcomes. -/
+theorem optionalGenericParameters_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.OptionalGenericParametersParses
+      DeclarativeGrammar.OptionalGenericParametersRejects :=
+  DeclarativeGrammar.optionalGenericParametersExactOutcomeSpec
+
+/-- Two successful optional generic lists have the same value and remainder. -/
+theorem optionalGenericParameters_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : Option GenericParameters}
+    (leftResult : optionalGenericParameters input = .ok left leftOutput)
+    (rightResult : optionalGenericParameters input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalGenericParametersParses.result_unique
+    (optionalGenericParameters_success_sound leftResult)
+    (optionalGenericParameters_success_sound rightResult)
+
+/-- Two optional-generic rejections have the same declarative endpoint. -/
+theorem optionalGenericParameters_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : optionalGenericParameters input =
+      .reject leftFailure leftOutput)
+    (rightResult : optionalGenericParameters input =
+      .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalGenericParametersRejects.output_unique
+    (optionalGenericParameters_reject_sound leftResult)
+    (optionalGenericParameters_reject_sound rightResult)
 
 end Solcore.Syntax.Parser

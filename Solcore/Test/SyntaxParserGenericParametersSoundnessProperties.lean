@@ -13,9 +13,11 @@ open Solcore.Syntax.Parser
 example := @GenericParametersParses
 example := @GenericParametersRejects
 example := @genericParametersDeterministicOutcomeSpec
+example := @genericParametersExactOutcomeSpec
 example := @OptionalGenericParametersParses
 example := @OptionalGenericParametersRejects
 example := @optionalGenericParametersDeterministicOutcomeSpec
+example := @optionalGenericParametersExactOutcomeSpec
 example := @requireGenericParameters_success_shape
 example := @genericParameters_success_sound
 example := @genericParameters_success_sound_and_validFor
@@ -23,8 +25,14 @@ example := @optionalGenericParameters_success_sound
 example := @optionalGenericParameters_success_sound_and_validFor
 example := @genericParameters_reject_sound
 example := @genericParameters_ordinaryOutcome_sound
+example := @genericParameters_exactOutcomeSpec
+example := @genericParameters_success_result_unique
+example := @genericParameters_reject_output_unique
 example := @optionalGenericParameters_reject_sound
 example := @optionalGenericParameters_ordinaryOutcome_sound
+example := @optionalGenericParameters_exactOutcomeSpec
+example := @optionalGenericParameters_success_result_unique
+example := @optionalGenericParameters_reject_output_unique
 
 example {input next : State} {parameters : GenericParameters}
     (result : genericParameters input = .ok parameters next) :

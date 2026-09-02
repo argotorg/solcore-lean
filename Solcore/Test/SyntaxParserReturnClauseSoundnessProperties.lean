@@ -13,10 +13,14 @@ open Solcore.Syntax.Parser
 example := @OptionalReturnClauseParses
 example := @OptionalReturnClauseRejects
 example := @optionalReturnClauseDeterministicOutcomeSpec
+example := @optionalReturnClauseExactOutcomeSpec
 example := @returnClause_success_sound
 example := @returnClause_success_sound_and_validFor
 example := @returnClause_reject_sound
 example := @returnClause_ordinaryOutcome_sound
+example := @returnClause_exactOutcomeSpec
+example := @returnClause_success_result_unique
+example := @returnClause_reject_output_unique
 
 example {input next : State} {clause : Option ReturnClause}
     (result : returnClause input = .ok clause next) :

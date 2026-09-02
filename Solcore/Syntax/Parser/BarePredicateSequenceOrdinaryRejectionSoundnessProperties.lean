@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativePredicateSequenceOutcomeProperties
+import Solcore.Syntax.DeclarativePredicateSequenceExactnessProperties
 import Solcore.Syntax.Parser.BarePredicateSequenceSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.PredicateOrdinaryRejectionSoundnessProperties
@@ -87,5 +87,35 @@ theorem barePredicates_ordinaryOutcome_sound :
         DeclarativeGrammar.BarePredicateSequenceRejects
           input.declarativeRemainder rejected.declarativeRemainder) :=
   ⟨barePredicates_success_sound, barePredicates_reject_sound⟩
+
+/-- Re-export exact bare-predicate-sequence outcomes. -/
+theorem barePredicates_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.BarePredicateSequenceParses
+      DeclarativeGrammar.BarePredicateSequenceRejects :=
+  DeclarativeGrammar.barePredicateSequenceExactOutcomeSpec
+
+/-- Two bare-predicate successes have the same AST and remainder. -/
+theorem barePredicates_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : PredicateSequence}
+    (leftResult : barePredicates input = .ok left leftOutput)
+    (rightResult : barePredicates input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.barePredicateSequenceExactOutcomeSpec.successResultUnique
+    (barePredicates_success_sound leftResult)
+    (barePredicates_success_sound rightResult)
+
+/-- Two bare-predicate rejections have the same declarative endpoint. -/
+theorem barePredicates_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : barePredicates input = .reject leftFailure leftOutput)
+    (rightResult : barePredicates input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.BarePredicateSequenceRejects.output_unique
+    (barePredicates_reject_sound leftResult)
+    (barePredicates_reject_sound rightResult)
 
 end Solcore.Syntax.Parser.PredicateInternals
