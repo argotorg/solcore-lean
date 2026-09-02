@@ -563,11 +563,16 @@ the active window. Any other raw token advances the scan and updates its last
 span. After exact `#[` consumption, that tail has no ordinary rejection. The
 public transactional choice retries recovery from the original input after a
 valid-path rejection, and a public rejection records rejection of both
-attempts. Valid, recovery-tail, complete-recovery, and public outcomes have
-unique successful remainders and disjoint success/rejection. Their declarative
-and executable APIs are exported and checked by dedicated and public-boundary
-consumers. For attribute parsing, this claims neither AST nor
-rejection-endpoint uniqueness.
+attempts. Generic no-trailing lists now lift exact nested outcomes to a unique
+complete list AST and rejecting remainder. Consequently the valid path, the
+complete recovery path, and the public prioritized choice each fix the exact
+successful attribute AST and final remainder as well as every rejecting
+remainder. Recovery-tail value uniqueness is stated only for one fixed hash and
+last-retained span, which is exactly what the complete recovery prefix proves.
+Executable reflection exposes the public result and rejection-endpoint laws,
+and dedicated and public-boundary consumers compile against them. These laws
+concern declarative ASTs and remainders; they do not equate parser diagnostics,
+failure payloads, or complete parser states.
 
 Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
 its prioritized six-way dispatcher. Identifier-plus-colon field lookahead runs

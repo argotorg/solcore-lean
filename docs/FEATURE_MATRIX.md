@@ -277,9 +277,13 @@ scanned while updating the last span, and the tail has no ordinary rejection
 after exact `#[` consumption. Transactional public fallback retries from the
 original input after valid-path rejection; public rejection records both
 failed attempts. Valid, recovery-tail, complete-recovery, and public outcomes
-have unique successful remainders and disjoint success/rejection, with exported
-APIs checked by dedicated and public-boundary consumers. AST and
-rejection-endpoint uniqueness are not claimed for attribute parsing.
+have unique successful remainders and disjoint success/rejection. Generic
+no-trailing lists lift exact nested outcomes to exact list ASTs and rejection
+endpoints; this fixes the valid, complete-recovery, and public attribute ASTs
+and rejecting remainders as well. The recovery-tail theorem correctly shares
+its last-retained span. Public executable reflection and dedicated consumers
+check the resulting exact outcome contract. Diagnostics, failure payloads, and
+whole parser states remain outside that contract.
 
 Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
 field, function, constructor, fallback, type-alias, and contextual-enum

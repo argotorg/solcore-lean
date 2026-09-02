@@ -416,11 +416,15 @@ contract field, `}`, or an active-window carrier hole. Every other raw token
 is consumed while updating the last retained span. Once exact `#[` has been
 consumed, the tail cannot ordinarily reject. Public `orElse` retries recovery
 from the original input after valid-path rejection, and public rejection
-retains evidence that both attempts rejected. Valid, recovery-tail,
-complete-recovery, and public outcomes have unique successful remainders and
-disjoint success/rejection. Dedicated and umbrella consumers compile against
-the exported declarative and parser APIs. AST and rejection-endpoint uniqueness
-remain unclaimed for attribute parsing.
+retains evidence that both attempts rejected. Exact nested outcomes now lift
+through generic no-trailing lists, fixing their complete AST and every rejected
+endpoint. The valid path, complete recovery, and public prioritized outcome
+therefore fix the successful derive-attribute AST together with its final
+remainder and fix the public rejection endpoint. Tail value uniqueness keeps
+the necessary shared last-retained span explicit. Executable reflection
+re-exports these laws and dedicated and umbrella consumers compile against
+them; diagnostic lists, failure payloads, and whole parser-state equality are
+outside this declarative exactness claim.
 
 Attribute-free `contractMemberCore` now has exact broad ordinary outcomes for
 its prioritized six-way dispatcher. Identifier-plus-colon field lookahead runs
