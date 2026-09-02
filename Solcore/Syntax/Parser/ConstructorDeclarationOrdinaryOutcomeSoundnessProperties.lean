@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeConstructorDeclarationOutcomeProperties
+import Solcore.Syntax.DeclarativeConstructorDeclarationExactnessProperties
 import Solcore.Syntax.Parser.ConstructorDeclarationOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ConstructorDeclarationOrdinarySuccessSoundnessProperties
 
@@ -27,5 +27,59 @@ theorem constructorDecl_ordinaryOutcomeSpec :
       DeclarativeGrammar.ConstructorDeclOrdinaryParses
       DeclarativeGrammar.ConstructorDeclRejects :=
   DeclarativeGrammar.constructorDeclDeterministicOutcomeSpec
+
+/-- Exact parameter and isolated-body contracts lift to the executable
+constructor reflection boundary. -/
+theorem constructorDecl_exactOutcomeSpec_of_children
+    (parameterOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.FunctionParametersOrdinaryParses
+      DeclarativeGrammar.FunctionParametersRejects)
+    (bodyOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses .require)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects .require)) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ConstructorDeclOrdinaryParses
+      DeclarativeGrammar.ConstructorDeclRejects :=
+  DeclarativeGrammar.constructorDeclExactOutcomeSpecOfChildren
+    parameterOutcomes bodyOutcomes
+
+/-- Under exact child contracts, two executable successes have the same
+constructor AST and final declarative remainder. -/
+theorem constructorDecl_success_result_unique_of_children
+    (parameterOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.FunctionParametersOrdinaryParses
+      DeclarativeGrammar.FunctionParametersRejects)
+    (bodyOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses .require)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects .require))
+    {input leftOutput rightOutput : State}
+    {left right : ConstructorDecl}
+    (leftResult : constructorDecl input = .ok left leftOutput)
+    (rightResult : constructorDecl input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.ConstructorDeclOrdinaryParses.result_unique_of_exact_children
+      parameterOutcomes bodyOutcomes
+      (constructorDecl_success_ordinaryOutcome_sound leftResult)
+      (constructorDecl_success_ordinaryOutcome_sound rightResult)
+
+/-- Under exact child contracts, two executable rejections have the same
+declarative endpoint. -/
+theorem constructorDecl_reject_output_unique_of_children
+    (parameterOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.FunctionParametersOrdinaryParses
+      DeclarativeGrammar.FunctionParametersRejects)
+    (bodyOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.IsolatedCoreBlockPublicOrdinaryParses .require)
+      (DeclarativeGrammar.IsolatedCoreBlockPublicRejects .require))
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : constructorDecl input = .reject leftFailure leftOutput)
+    (rightResult : constructorDecl input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.ConstructorDeclRejects.output_unique_of_exact_children
+      parameterOutcomes bodyOutcomes
+      (constructorDecl_reject_ordinaryOutcome_sound leftResult)
+      (constructorDecl_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser
