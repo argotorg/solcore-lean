@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeTypeAliasValueOutcomeProperties
+import Solcore.Syntax.DeclarativeTypeAliasValueRecoveryExactnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.TypeAliasRecoveryTotalityProperties
 
@@ -270,6 +270,39 @@ theorem recoverTypeAliasValue_ordinaryOutcomeSpec :
       DeclarativeGrammar.TypeAliasValueRecoveryParses
       DeclarativeGrammar.TypeAliasValueRecoveryRejects :=
   DeclarativeGrammar.typeAliasValueRecoveryDeterministicOutcomeSpec
+
+/-- Re-export exact standalone alias-value recovery outcomes. -/
+theorem recoverTypeAliasValue_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.TypeAliasValueRecoveryParses
+      DeclarativeGrammar.TypeAliasValueRecoveryRejects :=
+  DeclarativeGrammar.typeAliasValueRecoveryExactOutcomeSpec
+
+/-- Two successful recovery reflections have the same error type and final
+declarative remainder. -/
+theorem recoverTypeAliasValue_success_result_unique
+    {input leftOutput rightOutput : State} {left right : TypeExpr}
+    (leftResult : recoverTypeAliasValue input = .ok left leftOutput)
+    (rightResult : recoverTypeAliasValue input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.TypeAliasValueRecoveryParses.result_unique
+    (recoverTypeAliasValue_success_ordinary_sound leftResult)
+    (recoverTypeAliasValue_success_ordinary_sound rightResult)
+
+/-- Two rejected recovery reflections have the same exact declarative
+endpoint. -/
+theorem recoverTypeAliasValue_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : recoverTypeAliasValue input =
+      .reject leftFailure leftOutput)
+    (rightResult : recoverTypeAliasValue input =
+      .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.TypeAliasValueRecoveryRejects.output_unique
+    (recoverTypeAliasValue_reject_ordinary_sound leftResult)
+    (recoverTypeAliasValue_reject_ordinary_sound rightResult)
 
 end TypeAliasInternals
 end Solcore.Syntax.Parser
