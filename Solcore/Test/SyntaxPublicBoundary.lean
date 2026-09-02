@@ -80,6 +80,10 @@ example := @Syntax.DeclarativeGrammar.OptionalWhereClauseRejects
 example := @Syntax.DeclarativeGrammar.optionalWhereClauseDeterministicOutcomeSpec
 example := @Syntax.DeclarativeGrammar.OptionalReturnClauseRejects
 example := @Syntax.DeclarativeGrammar.optionalReturnClauseDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.GenericParametersRejects
+example := @Syntax.DeclarativeGrammar.genericParametersDeterministicOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalGenericParametersRejects
+example := @Syntax.DeclarativeGrammar.optionalGenericParametersDeterministicOutcomeSpec
 example := @Syntax.Parser.predicate_reject_sound
 example := @Syntax.Parser.predicate_ordinaryOutcome_sound
 example := @Syntax.Parser.PredicateInternals.groupedPredicates_reject_sound
@@ -92,5 +96,9 @@ example := @Syntax.Parser.whereClause_reject_sound
 example := @Syntax.Parser.whereClause_ordinaryOutcome_sound
 example := @Syntax.Parser.returnClause_reject_sound
 example := @Syntax.Parser.returnClause_ordinaryOutcome_sound
+example := @Syntax.Parser.genericParameters_reject_sound
+example := @Syntax.Parser.genericParameters_ordinaryOutcome_sound
+example := @Syntax.Parser.optionalGenericParameters_reject_sound
+example := @Syntax.Parser.optionalGenericParameters_ordinaryOutcome_sound
 
 end Tests
