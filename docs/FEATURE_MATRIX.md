@@ -138,6 +138,17 @@ changing the declarative remainder. Success endpoints are deterministic and
 exclusive with rejection, while `FunctionSignatureParses` remains the strict
 diagnostic-free, location-policy judgment.
 
+Broad ordinary `functionDecl` outcomes are now location independent. Success
+threads an ordinary signature into the isolated `.allow` Core body while
+retaining the exact declaration AST, signature/body cover span, and final
+remainder. Exact rejection exposes only two stages: signature rejection, or an
+uncaptured body rejection after ordinary signature success. A rejection in a
+balanced captured child is absorbed as diagnostic recovery and returns an
+ordinary empty body at the exact parent remainder. Successful endpoints are
+deterministic and exclude simultaneous rejection. The existing
+location-policy-aware `FunctionDeclParses` relation continues to describe the
+strict diagnostic-free declaration boundary.
+
 Trait methods, brace-delimited method bodies, and complete trait declarations
 now have exact parser-independent judgments. Diagnostic-free success preserves
 method source order, semicolons, closing-brace priority, required generic

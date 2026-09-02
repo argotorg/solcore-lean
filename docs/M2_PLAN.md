@@ -238,6 +238,17 @@ changing the declarative remainder. Success endpoints are deterministic and
 exclusive with rejection, while `FunctionSignatureParses` remains the strict
 diagnostic-free, location-policy judgment.
 
+The broad ordinary `functionDecl` layer is now complete and location
+independent. Its success judgment sequences the ordinary signature into the
+isolated `.allow` Core body and preserves the exact declaration AST, outer
+signature/body cover span, and final remainder. Its exact rejection judgment
+has only the signature branch and the uncaptured body branch reached after
+ordinary signature success. A balanced captured child's rejection is instead
+an empty-body success with a retained recovery diagnostic and the exact parent
+remainder. The combined declaration outcomes are deterministic and mutually
+exclusive. This complements, rather than replaces, the location-policy-aware
+diagnostic-free `FunctionDeclParses` boundary.
+
 Trait methods now add the exact terminating semicolon to a module-policy
 signature. Trait bodies preserve forward method order, exact braces, the
 right-brace-first loop priority, and the retained body cover span. Backward
