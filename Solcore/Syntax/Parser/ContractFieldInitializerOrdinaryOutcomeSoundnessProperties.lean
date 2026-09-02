@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractFieldOutcomeProperties
+import Solcore.Syntax.DeclarativeContractFieldExactnessProperties
 import Solcore.Syntax.Parser.Contract
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 
@@ -130,6 +130,80 @@ theorem optionalFieldInitializer_ordinaryOutcomeSpec
         expressionRejects) :=
   DeclarativeGrammar.optionalContractFieldInitializerDeterministicOutcomeSpec
     expressionOutcomes
+
+/-- Re-export exact optional-initializer outcomes from an exact expression
+contract. -/
+theorem optionalFieldInitializer_exactOutcomeSpec
+    {expressionOrdinary : DeclarativeGrammar.Remainder → Expr →
+      DeclarativeGrammar.Remainder → Prop}
+    {expressionRejects : DeclarativeGrammar.Remainder →
+      DeclarativeGrammar.Remainder → Prop}
+    (expressionOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      expressionOrdinary expressionRejects) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.OptionalContractFieldInitializerOrdinaryParses
+        expressionOrdinary)
+      (DeclarativeGrammar.OptionalContractFieldInitializerRejects
+        expressionRejects) :=
+  DeclarativeGrammar.optionalContractFieldInitializerExactOutcomeSpec
+    expressionOutcomes
+
+/-- Under an exact expression contract, two executable initializer successes
+have the same value and declarative remainder. -/
+theorem optionalFieldInitializer_success_result_unique
+    (expression : Parser Expr)
+    (expressionOrdinary : DeclarativeGrammar.Remainder → Expr →
+      DeclarativeGrammar.Remainder → Prop)
+    (expressionRejects : DeclarativeGrammar.Remainder →
+      DeclarativeGrammar.Remainder → Prop)
+    (expressionOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      expressionOrdinary expressionRejects)
+    (expressionSuccessSound : ∀ {input output : State} {value : Expr},
+      expression input = .ok value output →
+        expressionOrdinary input.declarativeRemainder value
+          output.declarativeRemainder)
+    {input leftOutput rightOutput : State}
+    {left right : Option Expr}
+    (leftResult : optionalFieldInitializer expression input =
+      .ok left leftOutput)
+    (rightResult : optionalFieldInitializer expression input =
+      .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  (optionalFieldInitializer_exactOutcomeSpec expressionOutcomes)
+    |>.successResultUnique
+      (optionalFieldInitializer_success_ordinaryOutcome_sound expression
+        expressionOrdinary expressionSuccessSound leftResult)
+      (optionalFieldInitializer_success_ordinaryOutcome_sound expression
+        expressionOrdinary expressionSuccessSound rightResult)
+
+/-- Under an exact expression contract, two executable initializer
+rejections have the same declarative endpoint. -/
+theorem optionalFieldInitializer_reject_output_unique
+    (expression : Parser Expr)
+    (expressionOrdinary : DeclarativeGrammar.Remainder → Expr →
+      DeclarativeGrammar.Remainder → Prop)
+    (expressionRejects : DeclarativeGrammar.Remainder →
+      DeclarativeGrammar.Remainder → Prop)
+    (expressionOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      expressionOrdinary expressionRejects)
+    (expressionRejectSound : ∀ {input rejected : State}
+      {failure : Failure}, expression input = .reject failure rejected →
+        expressionRejects input.declarativeRemainder
+          rejected.declarativeRemainder)
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : optionalFieldInitializer expression input =
+      .reject leftFailure leftOutput)
+    (rightResult : optionalFieldInitializer expression input =
+      .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  (optionalFieldInitializer_exactOutcomeSpec expressionOutcomes)
+    |>.rejectOutputUnique
+      (optionalFieldInitializer_reject_ordinaryOutcome_sound expression
+        expressionRejects expressionRejectSound leftResult)
+      (optionalFieldInitializer_reject_ordinaryOutcome_sound expression
+        expressionRejects expressionRejectSound rightResult)
 
 end ContractInternals
 end Solcore.Syntax.Parser
