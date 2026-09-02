@@ -594,8 +594,24 @@ parser, then the core member parser, and finally the pure attachment above.
 Rejection records exactly one of three first failing stages: plain core, derive,
 or core after a successful derive. Successful remainders are deterministic and
 success is disjoint from rejection, without adding AST or rejection-endpoint
-uniqueness for the parser outcome. Exact broad ordinary contract-body,
-top-item, and complete-file outcome packages remain later work.
+uniqueness for the parser outcome.
+
+Standalone contract-member recovery now has exact broad outcomes. Success
+consumes one mandatory token, scans to the window end, a recovery boundary, or
+a missing carrier slot, and returns the exact error-member span without
+consuming the boundary. Rejection records only an unavailable mandatory first
+token. Successful remainders are deterministic and success is disjoint from
+rejection.
+
+The recovery-aware contract body now composes right-brace priority, direct
+member progress, window-preserving rejection rewind, boundary-aware recovery,
+forward member order, exact braces, and every first rejecting remainder. Broad
+contract declarations then compose exact `contract`, name, optional generics,
+and body stages with four matching rejection cases. Both layers have
+deterministic, exclusive outcomes. Their declarative relations, executable
+success/rejection packages, and outcome specifications are public and
+compile-time consumed. Broad top-item and complete-file outcome packages remain
+later work.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

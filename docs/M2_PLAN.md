@@ -446,8 +446,19 @@ that order. Exact rejection separates plain-core failure, derive failure, and
 core failure after a successful derive. Executable success and rejection are
 reflected into those relations. Successful remainders are deterministic and
 success is disjoint from rejection; parser AST and rejection-endpoint uniqueness
-remain outside this milestone. Exact broad ordinary contract-body, top-item,
-and complete-file outcomes remain later work.
+remain outside this milestone.
+
+Standalone contract-member recovery now has exact broad success and rejection.
+It consumes one mandatory token, scans without consuming the next recovery
+boundary, and exactly records window-end, boundary, and missing-carrier stops;
+only an unavailable first token rejects. Recovery-aware contract bodies compose
+that scan with right-brace priority, strict direct-member progress,
+window-preserving rejection rewind, forward member order, and exact opening or
+tail rejection. Broad contract declarations add exact marker, name, optional
+generic, and body stages with matching first rejection. All three outcome
+families have deterministic successful remainders, disjoint success/rejection,
+public executable reflection packages, and compile-time consumers. Broad
+top-item and complete-file outcome packages remain later work.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

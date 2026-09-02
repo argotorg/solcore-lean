@@ -303,8 +303,19 @@ order to public derive parsing, core member parsing, and pure attachment.
 Rejection distinguishes plain-core failure, derive failure, and core failure
 after derive success. Executable success and rejection reflect these relations;
 successful remainders are deterministic and success/rejection are disjoint.
-Parser AST and rejection-endpoint uniqueness are not claimed. Exact broad
-ordinary contract-body, top-item, and complete-file outcomes remain later work.
+Parser AST and rejection-endpoint uniqueness are not claimed.
+
+Standalone contract-member recovery has exact broad success and rejection: it
+consumes one mandatory token, scans to but not through the next recovery
+boundary, and rejects only when that first token is unavailable. The
+recovery-aware contract body adds right-brace priority, strict direct-member
+progress, exact rejection rewind, recovered members in source order, and exact
+opening or tail rejection. Broad contract declarations compose exact `contract`,
+name, optional-generic, and body stages with four matching rejection cases.
+Every layer has deterministic successful remainders and disjoint
+success/rejection; its declarative API, executable reflection package, and
+outcome specification are public and compile-time consumed. Broad top-item and
+complete-file outcome packages remain later work.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
