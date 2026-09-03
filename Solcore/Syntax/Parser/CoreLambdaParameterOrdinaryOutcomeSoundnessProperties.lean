@@ -1,6 +1,8 @@
+import Solcore.Syntax.DeclarativeCoreLambdaParameterExactnessProperties
 import Solcore.Syntax.Parser.CoreLambdaParameterBoundaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaParameterCoreOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreLambdaParameterRecoveryOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.CoreTypeOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ParameterProperties
 
 /-!
@@ -220,5 +222,40 @@ theorem lambdaParameter_ordinaryOutcomeSpec
         typeRejects)
       (DeclarativeGrammar.LambdaParameterRejects typeRejects) :=
   DeclarativeGrammar.lambdaParameterDeterministicOutcomeSpec typeOutcomes
+
+/-- Concrete public Core types discharge every lambda-parameter exactness premise. -/
+theorem lambdaParameter_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.LambdaParameterOrdinaryParses
+        DeclarativeGrammar.TypeExprOrdinaryParses DeclarativeGrammar.TypeExprRejects)
+      (DeclarativeGrammar.LambdaParameterRejects DeclarativeGrammar.TypeExprRejects) :=
+  DeclarativeGrammar.lambdaParameterPublicExactOutcomeSpec
+
+/-- Public executable parameter successes agree on their complete AST and remainder. -/
+theorem lambdaParameter_success_result_unique
+    {input leftOutput rightOutput : State} {left right : LambdaParameter}
+    (leftResult : lambdaParameter input = .ok left leftOutput)
+    (rightResult : lambdaParameter input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  lambdaParameter_exactOutcomeSpec.successResultUnique
+    (lambdaParameter_success_ordinaryOutcome_sound
+      DeclarativeGrammar.TypeExprOrdinaryParses DeclarativeGrammar.TypeExprRejects
+      typeExpr_success_sound typeExpr_reject_sound leftResult)
+    (lambdaParameter_success_ordinaryOutcome_sound
+      DeclarativeGrammar.TypeExprOrdinaryParses DeclarativeGrammar.TypeExprRejects
+      typeExpr_success_sound typeExpr_reject_sound rightResult)
+
+/-- Public executable parameter rejections agree on the complete rewound endpoint. -/
+theorem lambdaParameter_reject_output_unique
+    {input leftOutput rightOutput : State} {leftFailure rightFailure : Failure}
+    (leftResult : lambdaParameter input = .reject leftFailure leftOutput)
+    (rightResult : lambdaParameter input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  lambdaParameter_exactOutcomeSpec.rejectOutputUnique
+    (lambdaParameter_reject_ordinaryOutcome_sound DeclarativeGrammar.TypeExprRejects
+      typeExpr_reject_sound leftResult)
+    (lambdaParameter_reject_ordinaryOutcome_sound DeclarativeGrammar.TypeExprRejects
+      typeExpr_reject_sound rightResult)
 
 end Solcore.Syntax.Parser
