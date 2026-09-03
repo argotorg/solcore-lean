@@ -14,6 +14,27 @@ example := @TransactionalFallbackOrdinaryParses.value_unique
 example := @TransactionalFallbackOrdinaryParses.result_unique
 example := @TransactionalFallbackRejects.output_unique
 example := @transactionalFallbackExactOutcomeSpec
+example := @TransactionalFallbackOrdinaryParses.value_unique_of_success
+example := @TransactionalFallbackOrdinaryParses.result_unique_of_success
+
+example {alpha : Type}
+    (primaryParses fallbackParses : Remainder → alpha → Remainder → Prop)
+    (primaryRejects fallbackRejects : Remainder → Remainder → Prop)
+    (primaryOutcomes : DeterministicOutcomeSpec primaryParses primaryRejects)
+    (fallbackOutcomes : DeterministicOutcomeSpec fallbackParses fallbackRejects)
+    (primaryValues : ∀ {input left right afterLeft afterRight},
+      primaryParses input left afterLeft →
+      primaryParses input right afterRight → left = right)
+    (fallbackValues : ∀ {input left right afterLeft afterRight},
+      fallbackParses input left afterLeft →
+      fallbackParses input right afterRight → left = right) :
+    ExactDeterministicOutcomeSpec
+      (TransactionalFallbackOrdinaryParses primaryParses primaryRejects
+        fallbackParses)
+      (TransactionalFallbackRejects primaryRejects fallbackRejects) :=
+  transactionalFallbackExactOutcomeSpecOfSuccess primaryParses fallbackParses
+    primaryRejects fallbackRejects primaryOutcomes fallbackOutcomes
+    primaryValues fallbackValues
 
 example := @YulStatementParses
 example := @YulStatementOrdinaryParses
