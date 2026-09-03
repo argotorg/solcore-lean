@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeContractMemberCoreExactnessProperties
+import Solcore.Syntax.DeclarativeContractCoreTermExactnessProperties
 import Solcore.Syntax.Parser.ContractMemberCoreOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ContractMemberCoreOrdinarySuccessSoundnessProperties
 
@@ -68,6 +68,23 @@ theorem contractMemberCore_exactOutcomeSpec_of_termFuel
       DeclarativeGrammar.ContractMemberCoreRejects :=
   DeclarativeGrammar.contractMemberCoreExactOutcomeSpecOfTermFuel
     expressionOutcomes statementOutcomes enumOutcomes
+
+/-- Fixed-fuel Core expression and statement exactness alone supplies the
+attribute-free member contract; enum outcomes are unconditional. -/
+theorem contractMemberCore_exactOutcomeSpec_of_coreTermFuel
+    (expressionOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreExpressionOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreExpressionRejectsWithFuel fuel))
+    (statementOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreStatementOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreStatementRejectsWithFuel fuel)) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ContractMemberCoreOrdinaryParses
+      DeclarativeGrammar.ContractMemberCoreRejects :=
+  DeclarativeGrammar.contractMemberCoreExactOutcomeSpecOfCoreTermFuel
+    expressionOutcomes statementOutcomes
 
 /-- Any exact core contract fixes two executable success ASTs and endpoints. -/
 theorem contractMemberCore_success_result_unique

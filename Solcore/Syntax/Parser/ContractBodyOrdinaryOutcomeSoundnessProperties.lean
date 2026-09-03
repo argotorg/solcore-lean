@@ -98,6 +98,23 @@ theorem contractBody_exactOutcomeSpec_of_core
       DeclarativeGrammar.ContractBodyRejects :=
   DeclarativeGrammar.contractBodyExactOutcomeSpecOfCore coreOutcomes
 
+/-- Fixed-fuel Core expression and statement exactness alone supplies exact
+recovery-aware contract-body outcomes. -/
+theorem contractBody_exactOutcomeSpec_of_coreTermFuel
+    (expressionOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreExpressionOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreExpressionRejectsWithFuel fuel))
+    (statementOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreStatementOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreStatementRejectsWithFuel fuel)) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ContractBodyOrdinaryOutcomeParses
+      DeclarativeGrammar.ContractBodyRejects :=
+  DeclarativeGrammar.contractBodyExactOutcomeSpecOfCoreTermFuel
+    expressionOutcomes statementOutcomes
+
 /-- Under exact member outcomes, two executable bodies have the same value
 and declarative remainder. -/
 theorem contractBody_success_result_unique_of_member

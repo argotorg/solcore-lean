@@ -27,6 +27,11 @@ example := @ContractDeclOrdinaryParses.result_unique_of_body
 example := @ContractDeclRejects.output_unique_of_body
 example := @contractDeclExactOutcomeSpecOfBody
 example := @contractDeclExactOutcomeSpecOfCore
+example := @contractMemberCoreExactOutcomeSpecOfCoreTerms
+example := @contractMemberCoreExactOutcomeSpecOfCoreTermFuel
+example := @contractMemberExactOutcomeSpecOfCoreTermFuel
+example := @contractBodyExactOutcomeSpecOfCoreTermFuel
+example := @contractDeclExactOutcomeSpecOfCoreTermFuel
 
 example := @ContractInternals.contractMemberCore_exactOutcomeSpec_of_leaves
 example := @ContractInternals.contractMemberCore_exactOutcomeSpec_of_termFuel
@@ -41,5 +46,9 @@ example := @contractDecl_exactOutcomeSpec_of_body
 example := @contractDecl_exactOutcomeSpec_of_core
 example := @contractDecl_success_result_unique_of_body
 example := @contractDecl_reject_output_unique_of_body
+example := @ContractInternals.contractMemberCore_exactOutcomeSpec_of_coreTermFuel
+example := @ContractInternals.contractMemberWithAttribute_exactOutcomeSpec_of_coreTermFuel
+example := @ContractInternals.contractBody_exactOutcomeSpec_of_coreTermFuel
+example := @contractDecl_exactOutcomeSpec_of_coreTermFuel
 
 end Solcore.Test.SyntaxParserContractDeclarationExactnessProperties

@@ -50,6 +50,23 @@ theorem contractDecl_exactOutcomeSpec_of_core
       DeclarativeGrammar.ContractDeclRejects :=
   DeclarativeGrammar.contractDeclExactOutcomeSpecOfCore coreOutcomes
 
+/-- Fixed-fuel Core expression and statement exactness alone supplies exact
+complete contract-declaration outcomes. -/
+theorem contractDecl_exactOutcomeSpec_of_coreTermFuel
+    (expressionOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreExpressionOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreExpressionRejectsWithFuel fuel))
+    (statementOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreStatementOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreStatementRejectsWithFuel fuel)) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ContractDeclOrdinaryParses
+      DeclarativeGrammar.ContractDeclRejects :=
+  DeclarativeGrammar.contractDeclExactOutcomeSpecOfCoreTermFuel
+    expressionOutcomes statementOutcomes
+
 /-- Under an exact body contract, two executable declarations have the same
 AST and declarative remainder. -/
 theorem contractDecl_success_result_unique_of_body

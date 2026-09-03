@@ -40,6 +40,23 @@ theorem contractMemberWithAttribute_exactOutcomeSpec_of_core
       DeclarativeGrammar.ContractMemberRejects :=
   DeclarativeGrammar.contractMemberExactOutcomeSpecOfCore coreOutcomes
 
+/-- Fixed-fuel Core expression and statement exactness alone supplies exact
+derive-aware member outcomes. -/
+theorem contractMemberWithAttribute_exactOutcomeSpec_of_coreTermFuel
+    (expressionOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreExpressionOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreExpressionRejectsWithFuel fuel))
+    (statementOutcomes : ∀ fuel,
+      DeclarativeGrammar.ExactDeterministicOutcomeSpec
+        (DeclarativeGrammar.CoreStatementOrdinaryParsesWithFuel fuel)
+        (DeclarativeGrammar.CoreStatementRejectsWithFuel fuel)) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ContractMemberOrdinaryParses
+      DeclarativeGrammar.ContractMemberRejects :=
+  DeclarativeGrammar.contractMemberExactOutcomeSpecOfCoreTermFuel
+    expressionOutcomes statementOutcomes
+
 /-- Under an exact core contract, two successful executable reflections have
 the same member AST and final declarative remainder. -/
 theorem contractMemberWithAttribute_success_result_unique_of_core
