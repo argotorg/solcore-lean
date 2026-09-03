@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeYulBodyGrammar
+import Solcore.Syntax.DeclarativeYulBodyExactnessProperties
 import Solcore.Syntax.Parser.YulBlockOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.YulStatementPublicFuelSoundnessProperties
 
@@ -63,5 +63,37 @@ theorem yulBody_publicOutcomeSpec :
       DeclarativeGrammar.YulBodyOutcomeParses
       DeclarativeGrammar.YulBodyRejects :=
   DeclarativeGrammar.yulBodyDeterministicOutcomeSpec
+
+/-- Re-export fully exact public Yul body values and rejecting endpoints. -/
+theorem yulBody_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.YulBodyOutcomeParses
+      DeclarativeGrammar.YulBodyRejects :=
+  DeclarativeGrammar.yulBodyExactOutcomeSpec
+
+/-- Public executable bodies agree on their complete span, body, and remainder. -/
+theorem yulBody_success_result_unique
+    {input leftOutput rightOutput : State} {left right : YulParsedBlock}
+    (leftResult : yulBody input = .ok left leftOutput)
+    (rightResult : yulBody input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder := by
+  rcases DeclarativeGrammar.YulBodyOrdinaryParses.result_unique
+    (yulBody_success_ordinary_sound leftResult)
+    (yulBody_success_ordinary_sound rightResult) with ⟨spanEq, bodyEq, outputEq⟩
+  refine ⟨?_, outputEq⟩
+  cases left
+  cases right
+  simp_all
+
+/-- Public executable bodies agree on the complete first-failure endpoint. -/
+theorem yulBody_reject_output_unique
+    {input leftOutput rightOutput : State} {leftFailure rightFailure : Failure}
+    (leftResult : yulBody input = .reject leftFailure leftOutput)
+    (rightResult : yulBody input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.YulBodyRejects.output_unique
+    (yulBody_reject_ordinary_sound leftResult)
+    (yulBody_reject_ordinary_sound rightResult)
 
 end Solcore.Syntax.Parser
