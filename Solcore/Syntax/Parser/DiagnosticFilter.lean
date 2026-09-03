@@ -137,6 +137,41 @@ theorem filterParseDiagnostics_cons_recovered_of_retained
       exact False.elim (retained
         ((lexicalAnySuppresses_eq_true_iff file.content lexical span).mp anyEq))
 
+/-- An independently suppressed expectation failure is removed without changing
+its surrounding trace. The found token, expectations, and context stay explicit. -/
+theorem filterParseDiagnostics_cons_unexpected_of_suppressed
+    (file : SourceFile) (lexical : List LexicalDiagnostic)
+    (span : SourceSpan) (found : Option TokenKind)
+    (expected : NonemptyList ParseExpectation) (context : ParseContext)
+    (parsed : List ParseDiagnostic)
+    (suppressed : DeclarativeGrammar.LexicalCascadeSuppresses
+      file.content (lexical.map (·.span)) span) :
+    filterParseDiagnostics file lexical
+      ({ span, kind := .unexpected found expected context } :: parsed) =
+      filterParseDiagnostics file lexical parsed := by
+  have anyEq := (lexicalAnySuppresses_eq_true_iff file.content lexical span).mpr suppressed
+  simp [filterParseDiagnostics, suppressLexicalCascades, isLexicalCascadeCandidate, anyEq]
+
+/-- A retained expectation failure preserves its complete metadata and position. -/
+theorem filterParseDiagnostics_cons_unexpected_of_retained
+    (file : SourceFile) (lexical : List LexicalDiagnostic)
+    (span : SourceSpan) (found : Option TokenKind)
+    (expected : NonemptyList ParseExpectation) (context : ParseContext)
+    (parsed : List ParseDiagnostic)
+    (retained : ¬ DeclarativeGrammar.LexicalCascadeSuppresses
+      file.content (lexical.map (·.span)) span) :
+    filterParseDiagnostics file lexical
+      ({ span, kind := .unexpected found expected context } :: parsed) =
+      { span, kind := .unexpected found expected context } ::
+        filterParseDiagnostics file lexical parsed := by
+  cases anyEq : lexical.any (fun diagnostic =>
+      lexicalSpanSuppresses file.content diagnostic.span span) with
+  | false =>
+      simp [filterParseDiagnostics, suppressLexicalCascades, isLexicalCascadeCandidate, anyEq]
+  | true =>
+      exact False.elim (retained
+        ((lexicalAnySuppresses_eq_true_iff file.content lexical span).mp anyEq))
+
 /-- Filtering an empty parser trace cannot introduce a diagnostic. -/
 @[simp] theorem filterParseDiagnostics_nil_parsed
     (file : SourceFile) (lexical : List LexicalDiagnostic) :
