@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeEnumBodyOutcomeProperties
+import Solcore.Syntax.DeclarativeEnumBodyExactnessProperties
 import Solcore.Syntax.Parser.EnumBodyOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.EnumBodyOrdinarySuccessSoundnessProperties
 
@@ -28,5 +28,41 @@ theorem enumBody_ordinaryOutcomeSpec :
       DeclarativeGrammar.EnumBodyOrdinaryOutcomeParses
       DeclarativeGrammar.EnumBodyRejects :=
   DeclarativeGrammar.enumBodyDeterministicOutcomeSpec
+
+/-- Re-export unconditional exact enum-body outcomes. -/
+theorem enumBody_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.EnumBodyOrdinaryOutcomeParses
+      DeclarativeGrammar.EnumBodyRejects :=
+  DeclarativeGrammar.enumBodyExactOutcomeSpec
+
+/-- Two successful enum bodies have the same span, constructors, and remainder. -/
+theorem enumBody_success_result_unique
+    {input leftOutput rightOutput : State} {left right : EnumBody}
+    (leftResult : enumBody input = .ok left leftOutput)
+    (rightResult : enumBody input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder := by
+  rcases enumBody_exactOutcomeSpec.successResultUnique
+      (enumBody_success_ordinaryOutcome_sound leftResult)
+      (enumBody_success_ordinaryOutcome_sound rightResult) with
+    ⟨bodyEq, outputEq⟩
+  constructor
+  · cases left
+    cases right
+    cases bodyEq
+    rfl
+  · exact outputEq
+
+/-- Two enum-body rejections have the same declarative endpoint. -/
+theorem enumBody_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : enumBody input = .reject leftFailure leftOutput)
+    (rightResult : enumBody input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.EnumBodyRejects.output_unique
+    (enumBody_reject_ordinaryOutcome_sound leftResult)
+    (enumBody_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser.EnumInternals

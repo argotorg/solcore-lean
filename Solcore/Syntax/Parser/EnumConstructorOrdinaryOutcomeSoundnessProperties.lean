@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeEnumConstructorOutcomeProperties
+import Solcore.Syntax.DeclarativeEnumConstructorExactnessProperties
 import Solcore.Syntax.Parser.EnumConstructorOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.EnumConstructorOrdinarySuccessSoundnessProperties
 
@@ -47,5 +47,64 @@ theorem enumConstructor_ordinaryOutcomeSpec :
       DeclarativeGrammar.EnumConstructorOrdinaryParses
       DeclarativeGrammar.EnumConstructorRejects :=
   DeclarativeGrammar.enumConstructorDeterministicOutcomeSpec
+
+/-- Re-export exact optional enum-constructor payload outcomes. -/
+theorem enumConstructorFields_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.OptionalEnumConstructorFieldsOrdinaryParses
+      DeclarativeGrammar.OptionalEnumConstructorFieldsRejects :=
+  DeclarativeGrammar.optionalEnumConstructorFieldsExactOutcomeSpec
+
+/-- Two successful optional payloads fix the same value and remainder. -/
+theorem enumConstructorFields_success_result_unique
+    {input leftOutput rightOutput : State}
+    {left right : Option (DelimitedList TypeExpr)}
+    (leftResult : enumConstructorFields input = .ok left leftOutput)
+    (rightResult : enumConstructorFields input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalEnumConstructorFieldsOrdinaryParses.result_unique
+    (enumConstructorFields_success_ordinaryOutcome_sound leftResult)
+    (enumConstructorFields_success_ordinaryOutcome_sound rightResult)
+
+/-- Two optional payload rejections have the same declarative endpoint. -/
+theorem enumConstructorFields_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : enumConstructorFields input = .reject leftFailure leftOutput)
+    (rightResult : enumConstructorFields input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.OptionalEnumConstructorFieldsRejects.output_unique
+    (enumConstructorFields_reject_ordinaryOutcome_sound leftResult)
+    (enumConstructorFields_reject_ordinaryOutcome_sound rightResult)
+
+/-- Re-export unconditional exact enum-constructor outcomes. -/
+theorem enumConstructor_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.EnumConstructorOrdinaryParses
+      DeclarativeGrammar.EnumConstructorRejects :=
+  DeclarativeGrammar.enumConstructorExactOutcomeSpec
+
+/-- Two successful enum constructors have the same AST and remainder. -/
+theorem enumConstructor_success_result_unique
+    {input leftOutput rightOutput : State} {left right : EnumConstructor}
+    (leftResult : enumConstructor input = .ok left leftOutput)
+    (rightResult : enumConstructor input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.EnumConstructorOrdinaryParses.result_unique
+    (enumConstructor_success_ordinaryOutcome_sound leftResult)
+    (enumConstructor_success_ordinaryOutcome_sound rightResult)
+
+/-- Two enum-constructor rejections have the same declarative endpoint. -/
+theorem enumConstructor_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : enumConstructor input = .reject leftFailure leftOutput)
+    (rightResult : enumConstructor input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.EnumConstructorRejects.output_unique
+    (enumConstructor_reject_ordinaryOutcome_sound leftResult)
+    (enumConstructor_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser.EnumInternals

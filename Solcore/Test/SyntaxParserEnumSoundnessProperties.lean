@@ -27,6 +27,11 @@ example := @enumBodyDeterministicOutcomeSpec
 example := @EnumDeclOrdinaryParses
 example := @EnumDeclRejects
 example := @enumDeclDeterministicOutcomeSpec
+example := @enumConstructorFieldListExactOutcomeSpec
+example := @optionalEnumConstructorFieldsExactOutcomeSpec
+example := @enumConstructorExactOutcomeSpec
+example := @enumBodyExactOutcomeSpec
+example := @enumDeclExactOutcomeSpec
 example := @EnumInternals.enumConstructorFields_success_sound
 example := @EnumInternals.enumConstructor_success_sound
 example := @EnumInternals.enumBody_success_sound
@@ -49,6 +54,18 @@ example := @enumDecl_success_ordinaryOutcome_sound
 example := @enumDecl_reject_ordinaryOutcome_sound
 example := @enumDecl_ordinaryOutcome_sound
 example := @enumDecl_ordinaryOutcomeSpec
+example := @EnumInternals.enumConstructorFields_exactOutcomeSpec
+example := @EnumInternals.enumConstructorFields_success_result_unique
+example := @EnumInternals.enumConstructorFields_reject_output_unique
+example := @EnumInternals.enumConstructor_exactOutcomeSpec
+example := @EnumInternals.enumConstructor_success_result_unique
+example := @EnumInternals.enumConstructor_reject_output_unique
+example := @EnumInternals.enumBody_exactOutcomeSpec
+example := @EnumInternals.enumBody_success_result_unique
+example := @EnumInternals.enumBody_reject_output_unique
+example := @enumDecl_exactOutcomeSpec
+example := @enumDecl_success_result_unique
+example := @enumDecl_reject_output_unique
 
 example {input next : State} {declaration : EnumDecl}
     (result : enumDecl none input = .ok declaration next) :
@@ -69,5 +86,21 @@ example {input rejected : State} {failure : Failure}
     EnumDeclRejects input.declarativeRemainder
       rejected.declarativeRemainder :=
   enumDecl_reject_ordinaryOutcome_sound none result
+
+example (deriveAttribute : Option DeriveAttribute)
+    {input leftOutput rightOutput : State} {left right : EnumDecl}
+    (leftResult : enumDecl deriveAttribute input = .ok left leftOutput)
+    (rightResult : enumDecl deriveAttribute input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  enumDecl_success_result_unique deriveAttribute leftResult rightResult
+
+example (deriveAttribute : Option DeriveAttribute)
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : enumDecl deriveAttribute input = .reject leftFailure leftOutput)
+    (rightResult : enumDecl deriveAttribute input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  enumDecl_reject_output_unique deriveAttribute leftResult rightResult
 
 end Solcore.Test.SyntaxParserEnumSoundnessProperties
