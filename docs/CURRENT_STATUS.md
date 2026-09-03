@@ -895,6 +895,18 @@ production bound is proved adequate. Public token/source theorems retain every
 wrapped and comment-attached declaration in order; a proposed output diagnostic
 list is correct exactly when it equals the complete independent trace.
 
+Pragma rejection now has its own complete independent trace contract. Keyword,
+raw-name, checked-item, and final-semicolon failures are distinguished in first
+failure order. The grammar fixes the exact remainder, every uncommitted failure
+field, and all events from completed checked items. Source-file and full-window
+context are preserved without a validity assumption, including arbitrary prior
+diagnostics and malformed windows. At the public boundary, a recognized initial
+pragma stop produces no AST item, retains every lexical field and comment, and
+normalizes the earlier item events followed by exactly one committed failure.
+All earlier events are protected: only that final report can be suppressed.
+Canonical regressions cover missing items, missing semicolons, same-line lexical
+suppression, and ordered protected events across two successful declarations.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

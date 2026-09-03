@@ -52,7 +52,7 @@ published through Oracle v4.
 | Core expression parser proofs | Complete source/state, totality, ordinary/reject soundness, diagnostic reflection, and unconditional AST/remainder/rejection-endpoint exactness at fixed-fuel and public boundaries across atoms, lambda, maximal postfix, unary, binary, conditional, and block interaction | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Pattern and statement parser proofs | Complete executable contracts, ordinary/reject soundness, and unconditional AST/remainder/rejection-endpoint exactness for mutually recursive patterns and statements, including recovery and diagnosed successes in exact dispatcher order | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
-| Independent diagnostic traces | Complete raw traces for primitives, successful pragmas, and standalone top-item recovery; complete `ParseOutput` for empty tokens, one recovery-to-end, arbitrary successful pragma-only windows, and a missing-name pragma stop | Other recognized-start failures, nested isolation, and mixed arbitrary-declaration traces | High |
+| Independent diagnostic traces | Complete raw traces for primitives, pragma success/rejection, and standalone top-item recovery; complete `ParseOutput` for empty tokens, one recovery-to-end, arbitrary successful pragma-only windows, and any recognized initial pragma rejection | Other recognized-start failures, nested isolation, and mixed arbitrary-declaration traces | High |
 | Primitive traces and diagnostic normalization | Complete raw/checked identifier AST, remainder, and event suffix; exact silent keyword/symbol/contextual success and rejection reports; total unique mixed-report filtering with full metadata, protected kinds, and retained duplicate order | Composition across arbitrary declarations and nested blocks remains separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
@@ -485,6 +485,13 @@ including empty input. Independent grammar fixes every declaration, endpoint,
 and concatenated protected trace and erases to the ordinary file-item grammar.
 Production fuel suffices, reverse item prefixes are restored without renewed
 diagnostics, and all wrapped/comment-attached output items retain written order.
+All four pragma rejection stages fix exact remaining input, complete failure
+payloads, and earlier checked-item events, with no validity or empty-prior-trace
+assumption. Full file/window frame laws preserve diagnostic context. Recognized
+initial pragma rejection has complete public output equality after committing
+one failure report. Only this final report is eligible for suppression; earlier
+protected events survive unchanged. Canonical item/semicolon rejection examples
+and two-declaration examples verify actual lexical carriers and diagnostic order.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

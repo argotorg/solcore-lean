@@ -718,6 +718,18 @@ empty input. With root grammar and nesting clearance supplied, tokenized output
 is equivalent to validation plus exact trace equality, and canonical-source
 output is equivalent to exact trace equality after lexing supplies validation.
 
+All four pragma rejection stages now have independent trace soundness and
+completeness, including fixed complete failures, exact remainders, and arbitrary
+prior diagnostic prefixes. Checked-item failure traces expose their successful
+prefix existentially, since a rejected parser reply returns no item AST.
+Full file/window frame laws preserve report context without `ValidFor`.
+Recognized initial pragma rejection is connected through boundary rollback to
+complete token/source output: prior protected events survive, one failure is
+committed, and independent mixed filtering fixes the final diagnostic list.
+Its only alternatives are the full raw prefix with or without the final report.
+Ground regressions distinguish missing item after comma from missing semicolon
+and verify that same-line lexical suppression removes only the final expectation.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
