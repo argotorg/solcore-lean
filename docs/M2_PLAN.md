@@ -703,6 +703,10 @@ fixtures cover empty, whitespace-only, comment-only, and diagnosed tokenless
 source. Compositional sequencing and transactional-choice laws separately fix
 diagnostic retention versus rollback, including nonempty prior and discarded
 traces; their executable premises remain explicit.
+Ground successful-pragma outputs now cover raw-name hyphens, ordered checked
+item diagnostics with a trailing comma, protected reports beside a same-line
+lexical error, and exact comment attachment. Independent normalization stability
+also yields executable idempotence and concatenation laws for mixed traces.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

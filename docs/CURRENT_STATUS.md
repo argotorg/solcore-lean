@@ -880,6 +880,11 @@ Empty item lists and trailing commas are included. One independent pragma
 derivation reaching the root-window end fixes every public output field,
 including the comment-attached singleton AST and all protected item diagnostics.
 No assumed declaration or item reply is needed at that public boundary.
+Ground canonical-source proofs fix the raw-name/checked-item distinction,
+multiple hyphens per item, trailing commas, same-line lexical errors with
+protected item diagnostics, and retained/attached comments. Normalization is
+also proved idempotent and compatible with concatenating independently filtered
+traces, so repeated filtering cannot remove an already retained occurrence.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.

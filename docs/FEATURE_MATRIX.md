@@ -476,6 +476,10 @@ also fix complete normal outputs with retained comments/lexical diagnostics and
 no parser events. Separate executable composition laws preserve both suffixes
 under sequencing but discard rejected-left traces under transactional choice;
 these laws retain explicit branch-execution premises.
+Canonical-source regressions exercise raw-name hyphens, multiple checked items
+and a trailing comma, non-vacuous same-line lexical suppression with protected
+reports, and exact comment attachment. Repeated normalization is idempotent,
+and filtering concatenated traces equals concatenating their filtered results.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
