@@ -1,4 +1,5 @@
 import Solcore.Syntax
+import Solcore.Test.SyntaxParserYulStatementExactnessProperties
 
 /-! External consumers for public Yul statement and body soundness. -/
 

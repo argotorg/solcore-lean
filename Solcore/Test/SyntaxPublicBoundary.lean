@@ -1063,4 +1063,19 @@ example := @Syntax.Parser.yulExpression_exactOutcomeSpec
 example := @Syntax.Parser.yulExpression_success_result_unique
 example := @Syntax.Parser.yulExpression_reject_output_unique
 
+example := @Syntax.DeclarativeGrammar.yulStatementExactOutcomeSpecWithFuel
+example := @Syntax.DeclarativeGrammar.yulStatementPublicExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.yulStatementExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.yulBodyExactOutcomeSpec
+example := @Syntax.Parser.yulStatementWithFuel_exactOutcomeSpec
+example := @Syntax.Parser.yulStatementWithFuel_success_result_unique
+example := @Syntax.Parser.yulStatementWithFuel_reject_output_unique
+example := @Syntax.Parser.yulStatement_publicExactOutcomeSpec
+example := @Syntax.Parser.yulStatement_exactOutcomeSpec
+example := @Syntax.Parser.yulStatement_success_result_unique
+example := @Syntax.Parser.yulStatement_reject_output_unique
+example := @Syntax.Parser.yulBody_exactOutcomeSpec
+example := @Syntax.Parser.yulBody_success_result_unique
+example := @Syntax.Parser.yulBody_reject_output_unique
+
 end Tests
