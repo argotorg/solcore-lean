@@ -92,4 +92,3 @@ theorem coreStatementWithFuel_reject_output_unique (fuel : Nat)
     (coreStatementWithFuel_reject_ordinary_sound fuel rightResult)
 
 end Solcore.Syntax.Parser.TermInternals
-

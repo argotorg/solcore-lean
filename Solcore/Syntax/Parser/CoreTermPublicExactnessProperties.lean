@@ -93,4 +93,3 @@ theorem statement_reject_output_unique
     (statement_reject_ordinary_sound rightResult)
 
 end Solcore.Syntax.Parser
-

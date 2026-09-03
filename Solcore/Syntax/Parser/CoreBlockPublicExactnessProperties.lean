@@ -66,4 +66,3 @@ theorem isolatedCoreBlockPublic_reject_output_unique (policy : TailExpressionPol
     (isolatedCoreBlockPublic_reject_ordinary_sound policy rightResult)
 
 end Solcore.Syntax.Parser
-
