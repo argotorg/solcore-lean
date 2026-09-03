@@ -600,6 +600,24 @@ uniqueness includes both nesting branches over fixed file/tokens/comments;
 `parseLexed` and `parse` expose that independent AST law without claiming a
 public final cursor, diagnostic-trace equality, or whole-state equality.
 
+Ordinary completeness now follows from exactness, success/rejection soundness,
+and absence of invariant failures. The generic proof needs no axioms. Its
+public instances cover Core types/terms/lambda parameters, both block policies,
+Yul, every top-level declaration, derive paths, top-item dispatch, standalone
+recovery, and file-item accumulation. They preserve complete successful ASTs
+and declarative remainders or the rejected endpoint, not failure payloads.
+Internal APIs require only `State.ValidFor` where totality needs it; pragma,
+derive-target, recovered-derive, and top-item recovery correspondence is
+unconditional. File-loop APIs retain the shared reverse-prefix contract and
+have a production version without a separate fuel-adequacy premise.
+
+Public token-to-file AST correspondence is now an iff with independent
+validation acceptance and public syntax. Public source-to-file correspondence
+uses an actual canonical lexical witness. Both nesting branches and recovered
+ASTs are included, without diagnostic-free premises; arbitrary token payloads
+are not claimed to arise from canonical lexing. All public instances have
+dedicated/umbrella consumers and depend only on the allowed standard axioms.
+
 Bounded nesting now has a parser-independent, total, functional scan relation.
 Its six token actions reproduce delimiter scopes, conditional bases, resets,
 and the first overflowing token exactly, using one shared canonical limit.

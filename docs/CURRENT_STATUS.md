@@ -771,6 +771,26 @@ every independently derived public AST over the same file, tokens, and comments.
 The public AST theorem does not invent a final cursor that `ParseOutput` does
 not expose, or equate complete diagnostic traces and parser states.
 
+Ordinary grammar completeness now pairs those uniqueness laws with soundness
+and invariant-free execution. Independent success is equivalent to executable
+success with the same AST and remainder; independent rejection is equivalent
+to executable rejection at the same endpoint. Public Core types, expressions,
+patterns, statements, lambda parameters, both raw/isolated block policies,
+Yul expressions/statements/blocks, all top-level declarations, derive paths,
+top-item dispatch, recovery, and the file loop have compile-time consumers.
+Most internal boundaries require only a valid input state; pragmas and the
+unconditionally total recovery/derive leaves need no such premise. File-loop
+correspondence keeps the fixed forward prefix outside the grammar suffix and
+discharges its fuel condition at the production boundary.
+
+At `parseLexed`, a specified AST is returned exactly when the supplied lexical
+carriers pass validation and the public grammar derives that AST. At `parse`,
+the corresponding condition uses carriers produced by canonical lexing.
+Neither direction requires diagnostic freedom or nesting clearance. This is
+the recovery-aware syntax boundary, not a claim that every source is accepted
+without diagnostics, nor an independent characterization of lexer payloads.
+The public correspondence theorems depend only on the allowed standard axioms.
+
 The public nesting preflight now has its own parser-independent exact outcome
 grammar. It classifies each token as conditional, group-open, block-open,
 close, reset, or preserving; carries the exact delimiter and conditional scope
