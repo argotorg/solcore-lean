@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.LambdaParameterTotalityProperties
+import Solcore.Test.SyntaxParserLambdaParameterExactnessProperties
 
 set_option autoImplicit false
 

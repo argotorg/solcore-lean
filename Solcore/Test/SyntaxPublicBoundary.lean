@@ -178,6 +178,10 @@ example := @Syntax.Parser.isolatedCoreBlockPublic_reject_output_unique
 example := @Syntax.DeclarativeGrammar.coreBlockPublicExactOutcomeSpec
 example := @Syntax.DeclarativeGrammar.isolatedCoreBlockPublicExactOutcomeSpec
 example := @Syntax.DeclarativeGrammar.coreTermExactOutcomeSpecsWithFuel
+example := @Syntax.DeclarativeGrammar.lambdaParameterPublicExactOutcomeSpec
+example := @Syntax.Parser.lambdaParameter_exactOutcomeSpec
+example := @Syntax.Parser.lambdaParameter_success_result_unique
+example := @Syntax.Parser.lambdaParameter_reject_output_unique
 
 example := @Syntax.Parser.typeExpr_success_result_unique
 example := @Syntax.Parser.typeExpr_reject_output_unique
