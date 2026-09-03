@@ -602,7 +602,13 @@ namespace import exactly when offset-one lookahead is hard `as`; otherwise it
 commits to wildcard import. Without `*`, `{` selects the selective branch and
 every other token selects plain import. Branch failure never falls through to
 a later alternative, and the complete outcome remains deterministic and
-exclusive while preserving terminator recovery success.
+exclusive while preserving terminator recovery success. Stronger unconditional
+contracts now fix complete import ASTs, successful remainders, and first
+rejecting endpoints, including every alias, selected list, hiding clause, and
+payload form. Terminator exactness shares the preceding span; payload exactness
+shares the outer start. Selector operator parts are unique at a shared stopping
+index, while the maximal scan and complete selector are unconditionally exact.
+Public APIs and independent grammar-result consumers cover this full chain.
 
 Export leaves, payloads, and the complete `exportDecl` now likewise have exact
 broad outcomes. Export paths consume maximal dotted checked names. Constructor
@@ -634,8 +640,11 @@ trailing comma. Complete pragmas compose exact `pragma`, a raw-identifier name
 and an exact semicolon. Rejection separates missing keyword,
 rejected name, rejected items, and missing semicolon. Item-tail, item-list, and
 declaration successful remainders are deterministic, and success is disjoint
-from rejection. The public packages are compile-time consumed and feed the
-broader top-item and file outcomes described below.
+from rejection. Unconditional exactness additionally fixes all item lists,
+complete located declaration ASTs, and first rejecting endpoints. Production
+tail consumers share the reverse prefix, retaining forward result order.
+The public packages are compile-time consumed and feed the broader top-item
+and file outcomes described below.
 
 Dotted derive targets now have exact broad ordinary outcomes at the component,
 recursive dotted-tail, and complete-target layers. Components retain both

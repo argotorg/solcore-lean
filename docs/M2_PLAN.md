@@ -438,6 +438,11 @@ returns the last payload span; any other missing terminator rejects. Plain,
 namespace, wildcard, and selective payload relations retain executable stage
 order, AST and covering span, token carrier, active window, cursor, and exact
 first rejection. Each endpoint is deterministic and exclusive with rejection.
+Stronger unconditional exactness now fixes complete ASTs and first rejecting
+endpoints throughout aliases, selected lists, hiding clauses, all four payloads,
+and full imports. Shared start/preceding spans are explicit where required.
+Module paths, maximal selectors, export paths, and both terminators have exact
+leaf APIs; dedicated consumers compare independent grammar results.
 
 The complete broad `importDecl` relation consumes exact `import` and retains
 the dispatch lookahead without consuming it. Current `*` plus offset-one hard
@@ -474,8 +479,10 @@ Complete declarations compose exact `pragma`, a raw-identifier name, the item
 scan, and an exact semicolon. The raw name deliberately omits the checked-name
 hyphen diagnostic. Rejection distinguishes keyword, name, items, and semicolon
 stages. Item-tail, item-list, and declaration successful remainders are
-deterministic, and success is disjoint from rejection. The public packages are
-compile-time consumed and feed the broader top-item and file outcomes below.
+deterministic, and success is disjoint from rejection. Unconditional exactness
+also fixes complete item lists, located declaration ASTs, and rejection
+endpoints. Production-tail results retain the same supplied reverse prefix.
+Public exactness APIs and consumers feed the broader top-item and file outcomes.
 
 Dotted derive targets now have exact broad ordinary success and rejection at
 the component, recursive dotted-tail, and complete-target layers. Component

@@ -276,6 +276,11 @@ empty-operator, and missing-close rejection. No `as` gives a nonconsuming
 local qualified name, while positive `@` commits to an external name. Each
 endpoint is deterministic and success/rejection are exclusive; complete import
 declarations still retain their existing strict diagnostic-free judgments.
+Unconditional exactness now fixes full ASTs, final remainders, and rejecting
+endpoints across every import leaf, list, payload form, and complete declaration.
+Outer start and preceding spans are shared explicitly where required. Maximal
+selectors, module/export paths, and both terminators have exact public APIs and
+independent grammar-result consumers.
 
 Exact broad export outcomes now cover maximal dotted export paths, constructor
 selection, prioritized export names, local items, wildcard or braced remote
@@ -303,7 +308,9 @@ exact `pragma`, a raw-identifier name that deliberately omits the checked-name
 hyphen diagnostic, the item scan, and an exact semicolon, with separate
 keyword, name, items, and semicolon rejection. Item-tail,
 item-list, and declaration successful remainders are deterministic, and
-success is disjoint from rejection. Public packages are compile-time consumed;
+success is disjoint from rejection. Unconditional exactness also fixes item
+lists, complete declaration ASTs, and rejection endpoints. Public APIs and
+consumers retain the production tail's shared reverse prefix and forward order;
 their results feed the broader top-item and file outcomes below.
 
 Dotted derive targets now have exact broad ordinary outcomes for components,
