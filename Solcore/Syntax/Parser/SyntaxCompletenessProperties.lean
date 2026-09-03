@@ -10,6 +10,8 @@ import Solcore.Syntax.Parser.DeriveCompletenessProperties
 import Solcore.Syntax.Parser.YulPublicCompletenessProperties
 import Solcore.Syntax.Parser.ModuleDeclarationCompletenessProperties
 import Solcore.Syntax.Parser.TopItemCompletenessProperties
+import Solcore.Syntax.Parser.TopItemRecoveryCompletenessProperties
+import Solcore.Syntax.Parser.FileItemsCompletenessProperties
 import Solcore.Syntax.Parser.PublicParseCompletenessProperties
 
 /-! Public correspondence between independent ordinary syntax and execution.
