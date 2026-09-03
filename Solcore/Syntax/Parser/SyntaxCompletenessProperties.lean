@@ -1,0 +1,11 @@
+import Solcore.Syntax.Parser.CoreTypeCompletenessProperties
+import Solcore.Syntax.Parser.CoreTermPublicCompletenessProperties
+import Solcore.Syntax.Parser.CoreLambdaParameterCompletenessProperties
+import Solcore.Syntax.Parser.CoreBlockPublicCompletenessProperties
+import Solcore.Syntax.Parser.ModuleDeclarationCompletenessProperties
+import Solcore.Syntax.Parser.TopItemCompletenessProperties
+import Solcore.Syntax.Parser.PublicParseCompletenessProperties
+
+/-! Public correspondence between independent ordinary syntax and execution.
+Success identifies full ASTs and declarative remainders; rejection identifies
+its declarative endpoint, not failure payloads or complete parser states. -/
