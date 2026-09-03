@@ -60,4 +60,28 @@ theorem parseDiagnosticCascadeFilters_nil_lexical (source : String)
   | cons diagnostic raw ih =>
       exact .keep (by simp [ParseDiagnosticCascadeSuppresses, LexicalCascadeSuppresses]) ih
 
+/-- Independent filtering composes without reordering the concatenated traces. -/
+theorem ParseDiagnosticCascadeFilters.append
+    {source : String} {lexical : List SourceSpan}
+    {left right keptLeft keptRight : List ParseDiagnostic}
+    (leading : ParseDiagnosticCascadeFilters source lexical left keptLeft)
+    (trailing : ParseDiagnosticCascadeFilters source lexical right keptRight) :
+    ParseDiagnosticCascadeFilters source lexical (left ++ right) (keptLeft ++ keptRight) := by
+  induction leading with
+  | nil => exact trailing
+  | keep retained tail ih => exact .keep retained ih
+  | drop suppressed tail ih => exact .drop suppressed ih
+
+/-- An entirely protected trace survives regardless of lexical error locations. -/
+theorem parseDiagnosticCascadeFilters_of_protected (source : String)
+    (lexical : List SourceSpan) {trace : List ParseDiagnostic}
+    (protectedKinds : ∀ diagnostic ∈ trace, ¬ LexicalCascadeCandidate diagnostic.kind) :
+    ParseDiagnosticCascadeFilters source lexical trace trace := by
+  induction trace with
+  | nil => exact .nil
+  | cons diagnostic trace ih =>
+      exact parseDiagnosticCascadeFilters_protected_cons
+        (protectedKinds diagnostic (by simp))
+        (ih (fun member found => protectedKinds member (List.mem_cons_of_mem _ found)))
+
 end Solcore.Syntax.DeclarativeGrammar
