@@ -2,8 +2,9 @@ import Solcore.Syntax.Parser.PublicSingleRecoveryOutputProperties
 import Solcore.Syntax.Parser.UnexpectedDiagnosticCascadeProperties
 import Solcore.Syntax.Parser.SourceFileBoundaryStopTraceProperties
 import Solcore.Syntax.Parser.PublicPragmaNameRejectionOutputProperties
+import Solcore.Syntax.Parser.ParseDiagnosticCascadeProperties
+import Solcore.Syntax.Parser.IdentifierTraceProperties
 
-/-! Exact diagnostic traces for standalone top-item recovery, a single
-unrecognized recovery-to-end file, and a missing-name pragma boundary stop,
-including independent primitive rejection reports and lexical-cascade
-filtering and complete public output equality. -/
+/-! Exact identifier and recovery traces, primitive rejection reports, complete
+single-recovery and missing-pragma-name outputs, and independent mixed-report
+cascade filtering. General declaration and nested-isolation traces remain separate. -/
