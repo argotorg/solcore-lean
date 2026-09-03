@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.ImportDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ImportDeclSoundnessProperties
+import Solcore.Test.SyntaxParserImportExactnessProperties
 
 /-! External consumers for aggregate import grammar soundness. -/
 
