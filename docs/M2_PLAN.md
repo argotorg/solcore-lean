@@ -392,13 +392,16 @@ expression, statement, and braced-body parsers have complete fuel-indexed
 clean/ordinary/reject closures, including recovery, transactional rewind,
 exact dispatcher priority, optional termination, and block-boundary rejection.
 
-Inline-Yul expression exactness is now unconditional at fixed fuel and at the
-public boundary. Exact name/literal values, optional-call argument lists and
-rewind priority, and recovery scans compose to unique complete expression ASTs
-and final remainders. Every expression rejection has the same nonconsuming
-endpoint. Recovery scans explicitly share the first and last accumulated
-spans. Statement/body AST exactness and diagnostic-trace equality remain
-separate work; the expression result does not claim them.
+Inline-Yul expression, statement, and body exactness is now unconditional,
+including fixed-fuel and public recursive boundaries. Name/literal values,
+optional-call rewind, statement priority, optional termination, switch/default
+selection, and recursive blocks determine complete ASTs and final remainders.
+Diagnosed empty switches and recovery remain ordinary successes; body and arm
+lists retain source order. Recovery scans explicitly share the first and last
+accumulated spans. Expression and statement rejection have nonconsuming
+endpoints, while body rejection fixes the first failing position. Public APIs
+and dedicated consumers are included in the successful full build and tests.
+Diagnostic-trace, failure-payload, and whole-state equality are not claimed.
 
 The mutually recursive Core expression, pattern, statement, and block parsers
 now likewise have fuel-indexed ordinary/reject closures, public production-fuel

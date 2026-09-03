@@ -548,13 +548,18 @@ by fuel-indexed clean/ordinary/reject outcome families, including recovery,
 transactional rewind, exact statement priority, optional semicolons, and block
 boundaries.
 
-Inline-Yul expressions now also have unconditional exact AST and remainder
-contracts at fixed fuel and at the public boundary. Names, literals,
-identifier/call selection, transactional argument rewind, and recovery nodes
-all fix their successful values; rejection fixes its nonconsuming endpoint.
-Recovery-scan exactness shares both accumulated endpoint spans. These stronger
-expression laws do not yet establish exact ASTs for Yul statements or bodies,
-and they do not equate diagnostic traces or failure payloads.
+Inline-Yul expressions, statements, and bodies now also have unconditional
+exact AST and remainder contracts, including fixed-fuel and public recursive
+boundaries. Expression names, literals, identifier/call selection, and
+transactional argument rewind fix their successful values. Statement priority,
+optional semicolons, switch/default selection, diagnosed empty switches, and
+brace-delimited bodies preserve complete ASTs, forward order, and retained
+spans. Recovery-scan exactness shares both accumulated endpoint spans.
+Expression and statement rejection rewind to the input; body rejection fixes
+its first-failing endpoint. Declarative and executable APIs and dedicated
+consumers expose these laws, and the full build and test suite pass. Diagnostic
+traces, failure payloads, and whole parser-state equality remain outside this
+contract.
 
 `CoreTopItemOrdinaryParses` now supplies the public Core expression relation
 and the isolated `.allow` and `.require` block relations to the abstract

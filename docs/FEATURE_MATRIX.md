@@ -440,12 +440,16 @@ cursor equal to the token count. Diagnostic-free successful `parseLexed` and
 canonical parsed-file validity; its component relations remain recovery-aware
 ordinary judgments.
 
-Inline-Yul expression ASTs, final remainders, and nonconsuming rejection
-endpoints are now unconditionally unique at fixed fuel and publicly. The
-exact contract covers names, literals, identifier/call priority, transactional
-argument rewind, and recovery with shared first/last spans. Declarative and
-executable APIs and compile-time consumers expose it. Yul statement/body AST
-exactness and diagnostic-trace or failure-payload equality are not implied.
+Inline-Yul expression, statement, and body ASTs, final remainders, and rejection
+endpoints are now unconditionally unique, including fixed-fuel and public
+recursive boundaries. Exactness covers identifier/call priority, transactional
+rewind, optional semicolons, switch/default selection, diagnosed empty
+switches, and recursive blocks with source-order lists. Recovery shares its
+first/last spans. Expression and statement rejection rewind to the input;
+body rejection fixes its first-failing endpoint. Declarative and executable
+APIs and compile-time consumers are included in the passing full build and
+tests. Diagnostic traces, failure payloads, and whole-state equality remain
+outside these contracts.
 
 ## Semantic Core v3 feature inventory
 
