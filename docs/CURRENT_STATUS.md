@@ -835,7 +835,7 @@ executable witness. Standalone top-item recovery appends exactly one recovery
 event at the recovered AST span, while rejecting an unavailable first token
 adds none. Independent trace rules preserve prior diagnostic order explicitly.
 An independent lexical-cascade relation keeps or drops candidate spans in
-source order, retaining duplicates and the existing same-source, LF-line,
+input order, retaining duplicates and the existing same-source, LF-line,
 overlap, inclusive endpoint, and horizontal-whitespace rules. Its interpretation
 as top-item recovery diagnostics agrees with the executable filter both ways.
 
@@ -856,6 +856,16 @@ empty item list, retained comments and lexical carriers, and exact filtered
 expectation diagnostic. Its public correspondence needs no assumed parser reply.
 Other recognized-start failures, nested isolation, and arbitrary declaration
 diagnostic traces remain outside these completed slices.
+
+Identifier success now has an independent exact trace too. Raw names emit
+nothing; checked names append exactly one located hyphen diagnostic when their
+spelling contains `-`, even if it occurs repeatedly. The grammar fixes the full
+name, token remainder, and added diagnostic suffix, with a bidirectional
+executable correspondence and no input-validity or diagnostic-free premise.
+Filtering also has a total, unique independent relation over arbitrary mixed
+diagnostic lists, not only fixed-kind span lists. It preserves every retained
+report's metadata and occurrence order; identifier, grammar-constraint, and
+nesting diagnostics are protected even when their spans match lexical errors.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

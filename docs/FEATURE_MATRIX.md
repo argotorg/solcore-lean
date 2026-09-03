@@ -53,6 +53,7 @@ published through Oracle v4.
 | Pattern and statement parser proofs | Complete executable contracts, ordinary/reject soundness, and unconditional AST/remainder/rejection-endpoint exactness for mutually recursive patterns and statements, including recovery and diagnosed successes in exact dispatcher order | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
 | Independent diagnostic traces | Complete for standalone top-item recovery, one unrecognized recovery-to-end public file, and a missing-name pragma boundary stop; exact rejection reports, ordered raw events, independent lexical-cascade filtering, and all `ParseOutput` fields for these public slices | Other recognized-start failures, nested isolation, and arbitrary declaration traces | High |
+| Identifier traces and diagnostic normalization | Complete raw/checked identifier AST, remainder, and exact event suffix; total unique mixed-report lexical-cascade filtering with full metadata, protected kinds, and retained duplicate order | Composition across arbitrary declarations and nested blocks remains separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -451,6 +452,14 @@ window-end byte remain explicit in the current-token observation, including
 EOF. Primitive rejection emits nothing; the file boundary keeps failed-attempt
 diagnostics and appends the failure while rewinding only the cursor. Other
 declaration and nested-isolation traces remain open.
+
+Raw identifiers are independently proved silent, while checked identifiers
+append exactly one located report iff their spelling contains a hyphen. The
+full name, remainder, and added trace agree with execution in both directions.
+Independent filtering also covers arbitrary mixed diagnostic lists, preserving
+expectation/context/text/constraint payloads and repeated surviving occurrences.
+Identifier, constraint, and nesting reports stay protected even at a suppressed
+failure's span; input order is preserved without sorting or deduplication.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

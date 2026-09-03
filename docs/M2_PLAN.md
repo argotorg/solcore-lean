@@ -674,6 +674,15 @@ and determines complete `parseLexed` and `parse` outputs, including the empty
 AST item list and exact lexical-cascade filtering of the unexpected diagnostic.
 Other recognized-start and nested declaration/block traces remain next work.
 
+Raw and checked identifier success now expose exact independent AST/remainder
+and event-suffix correspondence. Raw names are silent; checked names emit one
+located report iff the spelling contains a hyphen. Arbitrary earlier diagnostics
+are preserved. Mixed-report cascade normalization also has a total and unique
+independent grammar equivalent to the executable filter. It retains complete
+payloads, order, and repeated surviving occurrences; identifier, constraint,
+and nesting reports cannot be removed as lexical cascades. These shared trace
+components support the remaining declaration and nested-block work.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
