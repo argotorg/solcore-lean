@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeFunctionParametersExactnessProperties
-import Solcore.Syntax.DeclarativeFunctionSignatureOutcomeProperties
+import Solcore.Syntax.DeclarativeFunctionModifierExactnessProperties
 import Solcore.Syntax.DeclarativeGenericParametersExactnessProperties
 import Solcore.Syntax.DeclarativeReturnClauseExactnessProperties
 import Solcore.Syntax.DeclarativeWhereClauseExactnessProperties
@@ -15,38 +15,6 @@ private theorem signature_absent_conflicts_exact {kind : TokenKind}
     (absent : TokenKindAbsentAt input.tokens input.endIndex input.cursor kind)
     (parsed : ExactTokenParses kind input span output) : False :=
   absent ⟨span, parsed.1⟩
-
-/-- One optional function modifier fixes its absent or present span. -/
-theorem OptionalFunctionModifierParses.value_unique
-    {keyword : HardKeyword} {input : Remainder}
-    {left right : Option SourceSpan} {afterLeft afterRight : Remainder}
-    (leftParsed : OptionalFunctionModifierParses keyword input left afterLeft)
-    (rightParsed : OptionalFunctionModifierParses keyword input right
-      afterRight) : left = right := by
-  cases leftParsed with
-  | absent leftAbsent =>
-      cases rightParsed with
-      | absent => rfl
-      | present rightSpan rightToken =>
-          exact False.elim
-            (signature_absent_conflicts_exact leftAbsent rightToken)
-  | present leftSpan leftToken =>
-      cases rightParsed with
-      | absent rightAbsent =>
-          exact False.elim
-            (signature_absent_conflicts_exact rightAbsent leftToken)
-      | present rightSpan rightToken =>
-          rw [leftToken.span_unique rightToken]
-
-/-- One optional function modifier fixes its value and final remainder. -/
-theorem OptionalFunctionModifierParses.result_unique
-    {keyword : HardKeyword} {input : Remainder}
-    {left right : Option SourceSpan} {afterLeft afterRight : Remainder}
-    (leftParsed : OptionalFunctionModifierParses keyword input left afterLeft)
-    (rightParsed : OptionalFunctionModifierParses keyword input right
-      afterRight) : left = right ∧ afterLeft = afterRight :=
-  ⟨leftParsed.value_unique rightParsed,
-    leftParsed.output_unique rightParsed⟩
 
 /-- The fixed `public`-then-`payable` sequence fixes its modifier AST. -/
 theorem FunctionModifiersParses.value_unique
