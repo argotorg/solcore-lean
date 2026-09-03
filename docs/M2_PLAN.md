@@ -708,6 +708,16 @@ item diagnostics with a trailing comma, protected reports beside a same-line
 lexical error, and exact comment attachment. Independent normalization stability
 also yields executable idempotence and concatenation laws for mixed traces.
 
+Arbitrary successful pragma-only windows now have independent sequence grammar,
+ordinary file-item erasure, exact declaration/remainder/trace uniqueness, and
+production execution correspondence. Declaration count bounds the required
+loop steps; a pre-existing reverse item prefix contributes no fresh diagnostic.
+The source-file wrapper preserves comment attachment and event order. Complete
+public output laws extend from one pragma to any finite sequence, including
+empty input. With root grammar and nesting clearance supplied, tokenized output
+is equivalent to validation plus exact trace equality, and canonical-source
+output is equivalent to exact trace equality after lexing supplies validation.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

@@ -886,6 +886,15 @@ protected item diagnostics, and retained/attached comments. Normalization is
 also proved idempotent and compatible with concatenating independently filtered
 traces, so repeated filtering cannot remove an already retained occurrence.
 
+The same complete-output boundary now covers any finite sequence of successful
+pragmas through the token-window end, including the empty sequence. Independent
+grammar fixes the declaration list, final remainder, and concatenated protected
+trace. Existing reverse item prefixes are restored once and are never diagnosed
+again. Declaration count supplies a sufficient execution bound, and the usual
+production bound is proved adequate. Public token/source theorems retain every
+wrapped and comment-attached declaration in order; a proposed output diagnostic
+list is correct exactly when it equals the complete independent trace.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
