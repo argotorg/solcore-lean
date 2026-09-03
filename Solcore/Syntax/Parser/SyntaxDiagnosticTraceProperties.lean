@@ -7,7 +7,11 @@ import Solcore.Syntax.Parser.IdentifierTraceProperties
 import Solcore.Syntax.Parser.ExactTokenPrimitiveRejectionTraceProperties
 import Solcore.Syntax.Parser.SourceFileSingleSuccessTraceProperties
 import Solcore.Syntax.DeclarativeIdentifierCascadeProperties
+import Solcore.Syntax.Parser.PublicPragmaSuccessOutputProperties
+import Solcore.Syntax.Parser.PublicEmptyTokensOutputProperties
+import Solcore.Syntax.Parser.TransactionalChoiceDiagnosticTraceProperties
 
-/-! Exact identifier and recovery traces, primitive rejection reports, complete
-single-recovery and missing-pragma-name outputs, and independent mixed-report
-cascade filtering. General declaration and nested-isolation traces remain separate. -/
+/-! Exact primitive, successful pragma, and recovery traces with independent
+mixed-report filtering. Complete public slices cover empty tokens, one top-item
+recovery, one successful pragma, and a missing pragma name. Sequencing and transactional
+choice have separate compositional execution laws; general traces remain open. -/
