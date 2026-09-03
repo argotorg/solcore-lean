@@ -83,6 +83,7 @@ import Solcore.Syntax.Parser.SelectiveImportSoundnessProperties
 import Solcore.Syntax.Parser.SelectorNameOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.SourceFileSoundnessProperties
 import Solcore.Syntax.Parser.SourceFileOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.SyntaxExactnessProperties
 import Solcore.Syntax.Parser.TopItemSoundnessProperties
 import Solcore.Syntax.Parser.TopItemOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
