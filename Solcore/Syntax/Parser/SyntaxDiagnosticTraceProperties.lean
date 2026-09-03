@@ -15,9 +15,12 @@ import Solcore.Syntax.Parser.PublicPragmaSequenceOutputProperties
 import Solcore.Syntax.Parser.PublicPragmaRejectionOutputProperties
 import Solcore.Syntax.DeclarativePragmaRejectionCascadeProperties
 import Solcore.Syntax.Parser.PublicPragmaPrefixBoundaryOutputProperties
+import Solcore.Syntax.DeclarativeIsolatedBlockTraceProperties
+import Solcore.Syntax.Parser.IsolatedBlockTraceCompletenessProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
 recovery, arbitrary successful pragma sequences, and successful pragma prefixes
-ending at recognized rejection. Sequencing and transactional choice have separate compositional
-execution laws; general traces remain open. -/
+ending at recognized rejection. Sequencing, transactional choice, and balanced
+isolation have compositional execution laws. Independent isolation traces lift
+explicit inner trace contracts; concrete general Core traces remain open. -/
