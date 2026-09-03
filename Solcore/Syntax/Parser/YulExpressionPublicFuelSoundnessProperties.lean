@@ -1,3 +1,4 @@
+import Solcore.Syntax.DeclarativeYulExpressionExactnessProperties
 import Solcore.Syntax.Parser.YulExpressionFuelCleanSoundnessProperties
 
 /-! Public executable bridges for the concrete recursive Yul-expression grammar. -/
@@ -73,5 +74,72 @@ theorem yulExpression_publicConcreteOutcomeSpec :
       DeclarativeGrammar.YulExpressionOrdinaryParses
       DeclarativeGrammar.YulExpressionRejects :=
   DeclarativeGrammar.yulExpressionPublicDeterministicOutcomeSpec
+
+namespace YulExpressionInternals
+
+/-- Re-export exact outcomes at each fixed recursive expression fuel. -/
+theorem withFuel_exactOutcomeSpec (fuel : Nat) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.YulExpressionOrdinaryParsesWithFuel fuel)
+      (DeclarativeGrammar.YulExpressionRejectsWithFuel fuel) :=
+  DeclarativeGrammar.yulExpressionExactOutcomeSpecWithFuel fuel
+
+/-- Fixed-fuel executable successes agree on their complete declarative result. -/
+theorem withFuel_success_result_unique (fuel : Nat)
+    {input leftOutput rightOutput : State} {left right : YulExpr}
+    (leftResult : withFuel fuel input = .ok left leftOutput)
+    (rightResult : withFuel fuel input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.YulExpressionOrdinaryParsesWithFuel.result_unique
+    (withFuel_success_ordinary_fuel_sound fuel leftResult)
+    (withFuel_success_ordinary_fuel_sound fuel rightResult)
+
+/-- Fixed-fuel executable rejections agree on their exact declarative endpoint. -/
+theorem withFuel_reject_output_unique (fuel : Nat)
+    {input leftOutput rightOutput : State} {leftFailure rightFailure : Failure}
+    (leftResult : withFuel fuel input = .reject leftFailure leftOutput)
+    (rightResult : withFuel fuel input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.YulExpressionRejectsWithFuel.output_unique
+    (withFuel_reject_fuel_sound fuel leftResult)
+    (withFuel_reject_fuel_sound fuel rightResult)
+
+end YulExpressionInternals
+
+/-- Re-export exact public ordinary outcomes with input-selected fuel. -/
+theorem yulExpression_publicExactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.YulExpressionOrdinaryParses
+      DeclarativeGrammar.YulExpressionPublicRejects :=
+  DeclarativeGrammar.yulExpressionPublicExactOutcomeSpec
+
+/-- Exact public expression outcomes against the concrete boundary rejection. -/
+theorem yulExpression_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.YulExpressionOrdinaryParses
+      DeclarativeGrammar.YulExpressionRejects :=
+  DeclarativeGrammar.yulExpressionExactOutcomeSpec
+
+/-- Public executable expression successes agree on their AST and remainder. -/
+theorem yulExpression_success_result_unique
+    {input leftOutput rightOutput : State} {left right : YulExpr}
+    (leftResult : yulExpression input = .ok left leftOutput)
+    (rightResult : yulExpression input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.YulExpressionOrdinaryParses.result_unique
+    (yulExpression_success_ordinary_sound leftResult)
+    (yulExpression_success_ordinary_sound rightResult)
+
+/-- Public executable expression rejections agree on their complete endpoint. -/
+theorem yulExpression_reject_output_unique
+    {input leftOutput rightOutput : State} {leftFailure rightFailure : Failure}
+    (leftResult : yulExpression input = .reject leftFailure leftOutput)
+    (rightResult : yulExpression input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  DeclarativeGrammar.YulExpressionPublicRejects.output_unique
+    (yulExpression_reject_public_sound leftResult)
+    (yulExpression_reject_public_sound rightResult)
 
 end Solcore.Syntax.Parser
