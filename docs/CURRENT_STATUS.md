@@ -873,6 +873,24 @@ uncommitted report. Contextual words remain identifier tokens with contextual
 expectations, not hard keywords. Protected identifier traces can be appended to
 an independently filtered mixed prefix without losing either order or metadata.
 
+These rules now cover successful complete pragma declarations. Only checked
+items contribute diagnostic events, in written order; the raw pragma name and
+punctuation are silent, and an accumulated item prefix is never diagnosed again.
+Empty item lists and trailing commas are included. One independent pragma
+derivation reaching the root-window end fixes every public output field,
+including the comment-attached singleton AST and all protected item diagnostics.
+No assumed declaration or item reply is needed at that public boundary.
+
+An empty token carrier has its own complete normal-output contract: retained
+comments and lexical diagnostics, no AST items, and no parser diagnostics.
+Validation alone suffices at the token boundary; canonical lexing supplies it
+for empty, whitespace-only, comment-only, and lexically diagnosed tokenless
+source. Separate compositional laws distinguish ordinary sequencing, which
+retains both executed diagnostic suffixes, from transactional choice, which
+retries the right alternative on the original state and discards the rejected
+left alternative's diagnostics. Those laws explicitly assume branch execution
+and are not presented as independent grammar judgments.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

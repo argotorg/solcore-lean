@@ -52,7 +52,7 @@ published through Oracle v4.
 | Core expression parser proofs | Complete source/state, totality, ordinary/reject soundness, diagnostic reflection, and unconditional AST/remainder/rejection-endpoint exactness at fixed-fuel and public boundaries across atoms, lambda, maximal postfix, unary, binary, conditional, and block interaction | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Pattern and statement parser proofs | Complete executable contracts, ordinary/reject soundness, and unconditional AST/remainder/rejection-endpoint exactness for mutually recursive patterns and statements, including recovery and diagnosed successes in exact dispatcher order | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
-| Independent diagnostic traces | Complete for standalone top-item recovery, one unrecognized recovery-to-end public file, and a missing-name pragma boundary stop; exact rejection reports, ordered raw events, independent lexical-cascade filtering, and all `ParseOutput` fields for these public slices | Other recognized-start failures, nested isolation, and arbitrary declaration traces | High |
+| Independent diagnostic traces | Complete raw traces for primitives, successful pragmas, and standalone top-item recovery; complete `ParseOutput` for empty tokens, one recovery-to-end, one successful pragma-to-end, and a missing-name pragma stop | Other recognized-start failures, nested isolation, and arbitrary declaration traces | High |
 | Primitive traces and diagnostic normalization | Complete raw/checked identifier AST, remainder, and event suffix; exact silent keyword/symbol/contextual success and rejection reports; total unique mixed-report filtering with full metadata, protected kinds, and retained duplicate order | Composition across arbitrary declarations and nested blocks remains separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
@@ -466,6 +466,16 @@ Contextual words retain their identifier spelling and contextual expectation.
 The correspondence permits arbitrary prior diagnostics and needs no input
 validity premise. Independent filtering composes over appended traces, so a
 protected identifier suffix survives normalization of a mixed earlier prefix.
+
+Successful pragma traces now cover the entire declaration, including empty
+item lists and trailing commas. Only checked item names emit events; raw names
+and punctuation are silent, and tail accumulators are not re-diagnosed. A root
+pragma reaching the end fixes the complete comment-attached singleton public
+output, with every protected spelling report retained. Empty token carriers
+also fix complete normal outputs with retained comments/lexical diagnostics and
+no parser events. Separate executable composition laws preserve both suffixes
+under sequencing but discard rejected-left traces under transactional choice;
+these laws retain explicit branch-execution premises.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

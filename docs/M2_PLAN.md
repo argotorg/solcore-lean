@@ -690,6 +690,20 @@ executable composition lemma carries a successful final top item through the
 file loop and comment attachment without adding or discarding diagnostics; its
 item-reply premise remains explicit rather than masquerading as grammar evidence.
 
+Complete successful pragma traces now concatenate only the checked items'
+events in written order, including empty and trailing-comma forms. Production
+tail completeness keeps an accumulated item prefix outside the newly emitted
+trace. Pragma success iff fixes the entire declaration, remainder, and added
+diagnostics without validity or diagnostic-free premises. One root pragma
+reaching the end determines the complete public singleton output and comment
+attachment; protected spelling reports all survive lexical normalization.
+Empty token input also has complete public-output equality, retaining comments
+and lexical diagnostics but introducing no parse diagnostics. Canonical lexical
+fixtures cover empty, whitespace-only, comment-only, and diagnosed tokenless
+source. Compositional sequencing and transactional-choice laws separately fix
+diagnostic retention versus rollback, including nonempty prior and discarded
+traces; their executable premises remain explicit.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
