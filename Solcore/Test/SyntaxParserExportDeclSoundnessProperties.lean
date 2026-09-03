@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.ExportDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Test.SyntaxParserExportExactnessProperties
 import Solcore.Syntax.Parser.LocalExportOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.PathExportOrdinaryOutcomeSoundnessProperties
 
