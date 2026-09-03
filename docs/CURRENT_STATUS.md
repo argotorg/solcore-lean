@@ -626,7 +626,10 @@ the bare module form; every branch ends at the same exact semicolon boundary.
 The aggregate consumes exact `export`, dispatches on a nonconsuming `{` guard,
 and retains exact AST, covering span, carrier, window, cursor, and first
 rejection. Successful endpoints are deterministic and success/rejection
-exclusive.
+exclusive. Stronger unconditional exactness now also fixes every complete
+export AST and rejecting endpoint, from constructor/name selection through
+local or remote payloads and the aggregate declaration. Supplied outer spans
+remain shared explicitly where required.
 The declarative and parser outcome packages are exported publicly and checked
 by dedicated and public-boundary consumers. Their declaration-local guarantees
 feed the broader top-item boundary described below.
@@ -757,6 +760,16 @@ first rejection remainder exactly. These relations, executable reflection
 packages, and outcome specifications are public and compile-time consumed.
 Unlike strict diagnostic-free acceptance, the broad boundary-stop outcome does
 not claim that every successful final cursor is at the window end.
+
+Complete syntax exactness is now unconditional. Exact import and export leaves
+close plain top-item dispatch; derive attachment closes the public dispatcher;
+and recovery and comment attachment lift the contract through the file loop to
+the complete parsed-file AST. Success fixes the full AST and declarative
+remainder, and rejection fixes its endpoint, without recursive exactness or
+diagnostic-free premises. Public `parseLexed` and `parse` results agree with
+every independently derived public AST over the same file, tokens, and comments.
+The public AST theorem does not invent a final cursor that `ParseOutput` does
+not expose, or equate complete diagnostic traces and parser states.
 
 The public nesting preflight now has its own parser-independent exact outcome
 grammar. It classifies each token as conditional, group-open, block-open,

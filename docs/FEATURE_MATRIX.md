@@ -300,6 +300,10 @@ and exclusive with rejection. Declarative and parser outcome packages are
 publicly exported and compile-time consumed; these declaration-local results
 feed the broader top-item outcome below.
 
+The stronger exact contract is unconditional throughout the export chain:
+complete constructor/name, selection, payload, and declaration ASTs and every
+rejecting endpoint are unique. Supplied outer spans are explicitly shared.
+
 Pragma item scanning and complete `pragmaDecl` also have exact broad ordinary
 outcomes. An immediate `;` is empty and nonconsuming. Otherwise checked names
 remain in forward order; comma absence stops without consumption, and comma
@@ -408,6 +412,14 @@ full-file span, comment attachment, comments, and the first rejection endpoint.
 The declarative and executable APIs and deterministic outcome specifications
 are public and compile-time consumed. Because boundary-stop may succeed inside
 the window, only the strict diagnostic-free grammar claims full consumption.
+
+Unconditional exactness now extends through plain and derive-aware top items,
+recovery-aware file items, and the complete source-file AST with comment
+attachment. It fixes full ASTs and declarative success/rejection endpoints
+without recursive exactness or diagnostic-free premises. Public `parseLexed`
+and `parse` value uniqueness compares independently derived ASTs over fixed
+file/tokens/comments, including both nesting branches. The public AST boundary
+does not expose a final cursor or claim diagnostic/whole-state equality.
 
 The canonical nesting preflight now has a total and functional independent
 scan grammar over six exact token actions. It carries delimiter depth,

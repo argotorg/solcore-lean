@@ -471,6 +471,11 @@ deterministic and exclusive with rejection. Public parser and declarative APIs
 are compile-time consumed at dedicated and umbrella boundaries. These
 declaration-local guarantees feed the broader top-item outcome below.
 
+Stronger unconditional export exactness now fixes the full constructor/name,
+selection, payload, and declaration ASTs and all rejecting endpoints. The
+constructor-name list retains its nonempty source order, maximal operator
+selection fixes the closing span, and supplied outer spans remain explicit.
+
 Pragma item scanning and complete `pragmaDecl` now likewise have exact broad
 ordinary outcomes. An immediate `;` is an empty, nonconsuming scan. Otherwise
 checked identifiers are retained in forward order; comma absence stops without
@@ -586,6 +591,14 @@ attachment, comments, carrier, window, cursor, and first rejection. All layers
 have deterministic successful remainders and disjoint success/rejection, and
 their public reflection packages are compile-time consumed. Broad success does
 not imply end-of-window when the recognized-start boundary-stop branch runs.
+
+Unconditional exact import/export contracts now discharge the final shared
+premises for complete syntax exactness. Plain and derive-aware top items,
+recovery-aware file items, and the source-file wrapper each fix the full AST
+and final remainder and every rejecting endpoint. Public parsed-file value
+uniqueness includes both nesting branches over fixed file/tokens/comments;
+`parseLexed` and `parse` expose that independent AST law without claiming a
+public final cursor, diagnostic-trace equality, or whole-state equality.
 
 Bounded nesting now has a parser-independent, total, functional scan relation.
 Its six token actions reproduce delimiter scopes, conditional bases, resets,
