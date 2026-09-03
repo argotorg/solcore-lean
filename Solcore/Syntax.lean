@@ -86,6 +86,7 @@ import Solcore.Syntax.Parser.SourceFileOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.SyntaxExactnessProperties
 import Solcore.Syntax.Parser.SyntaxCompletenessProperties
 import Solcore.Syntax.Parser.PublicSourceFileGrammarProperties
+import Solcore.Syntax.Parser.SyntaxDiagnosticTraceProperties
 import Solcore.Syntax.Parser.TopItemSoundnessProperties
 import Solcore.Syntax.Parser.TopItemOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
