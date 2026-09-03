@@ -1049,4 +1049,15 @@ example {input rejected : Syntax.Parser.State}
       input.declarativeRemainder rejected.declarativeRemainder :=
   Syntax.Parser.implDecl_reject_ordinaryOutcome_sound result
 
+example := @Syntax.DeclarativeGrammar.yulExpressionExactOutcomeSpecWithFuel
+example := @Syntax.DeclarativeGrammar.yulExpressionPublicExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.yulExpressionExactOutcomeSpec
+example := @Syntax.Parser.YulExpressionInternals.withFuel_exactOutcomeSpec
+example := @Syntax.Parser.YulExpressionInternals.withFuel_success_result_unique
+example := @Syntax.Parser.YulExpressionInternals.withFuel_reject_output_unique
+example := @Syntax.Parser.yulExpression_publicExactOutcomeSpec
+example := @Syntax.Parser.yulExpression_exactOutcomeSpec
+example := @Syntax.Parser.yulExpression_success_result_unique
+example := @Syntax.Parser.yulExpression_reject_output_unique
+
 end Tests

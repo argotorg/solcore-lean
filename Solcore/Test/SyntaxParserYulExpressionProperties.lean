@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Yul.ExpressionProperties
+import Solcore.Test.SyntaxParserYulExpressionExactnessProperties
 
 /-! External compile consumers for inline-Yul expression-layer contracts. -/
 
