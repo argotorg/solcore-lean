@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Test.SyntaxParserPragmaExactnessProperties
 
 /-! External consumers for strict and exact ordinary pragma outcomes. -/
 
