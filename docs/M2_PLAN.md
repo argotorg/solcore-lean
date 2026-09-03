@@ -730,6 +730,15 @@ Its only alternatives are the full raw prefix with or without the final report.
 Ground regressions distinguish missing item after comma from missing semicolon
 and verify that same-line lexical suppression removes only the final expectation.
 
+Successful pragma prefixes followed by recognized pragma rejection now have
+independent grammar, unique items/stopping remainder/report/trace, structural
+execution bounds, and complete production/public output correspondence. The
+stopping remainder points at the final pragma's start, not the internal failure
+site; the latter is retained in the report. Prior items are returned in source
+order and no item is fabricated for the rejected declaration. Ground two-pragma
+examples verify both retained and lexically suppressed final reports while
+keeping successful and rejecting checked-item events in their original order.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

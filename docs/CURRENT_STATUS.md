@@ -907,6 +907,15 @@ All earlier events are protected: only that final report can be suppressed.
 Canonical regressions cover missing items, missing semicolons, same-line lexical
 suppression, and ordered protected events across two successful declarations.
 
+The recognized-stop contract also extends across any successful pragma prefix.
+Independent grammar fixes the ordered retained declarations, the start of the
+final rejected pragma, its complete report, and all preceding events. Production
+execution rewinds only to that final start, retains earlier items, and appends
+the final report once. Complete public outputs preserve comments and all lexical
+fields, with exact mixed filtering. Canonical successful-then-rejected examples
+retain the first AST and both hyphen events; a same-line lexical error suppresses
+only the final expectation report, including its exact EOF byte position.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
