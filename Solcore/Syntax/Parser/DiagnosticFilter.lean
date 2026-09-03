@@ -1,4 +1,5 @@
 import Solcore.Syntax.Parser.Trivia
+import Solcore.Syntax.DeclarativeDiagnosticCascadeGrammar
 
 set_option autoImplicit false
 
@@ -55,11 +56,92 @@ private def suppressLexicalCascades (source : String)
       !lexical.any fun lexError =>
         lexicalSpanSuppresses source lexError.span diagnostic.span
 
+private theorem whitespaceAdjacent_eq_true_iff (source : String)
+    (lexical parsed : SourceSpan) :
+    whitespaceAdjacent source lexical parsed = true ↔
+      DeclarativeGrammar.HorizontalWhitespaceGap source lexical parsed := by
+  unfold whitespaceAdjacent DeclarativeGrammar.HorizontalWhitespaceGap
+  split
+  · rename_i reversed
+    simp only [Bool.false_eq_true, false_iff]
+    rintro ⟨ordered, _⟩
+    omega
+  · rename_i ordered
+    have bound : lexical.endByte ≤ parsed.startByte := by omega
+    cases gap : utf8Slice? source lexical.endByte parsed.startByte with
+    | none => simp [bound, gap]
+    | some text => simp [bound, gap]
+
+private theorem sourceId_beq_true_iff (left right : SourceId) :
+    (left == right) = true ↔ left = right := by
+  cases left with
+  | mk leftOrigin leftPath =>
+      cases right with
+      | mk rightOrigin rightPath =>
+          cases leftOrigin <;> cases rightOrigin <;>
+            simp [BEq.beq, instBEqSourceId.beq, instBEqSourceOrigin.beq]
+
+private theorem lexicalSpanSuppresses_eq_true_iff (source : String)
+    (lexical parsed : SourceSpan) :
+    lexicalSpanSuppresses source lexical parsed = true ↔
+      DeclarativeGrammar.LexicalSpanSuppresses source lexical parsed := by
+  by_cases owners : lexical.source = parsed.source
+  all_goals simp [lexicalSpanSuppresses, spansOverlap, lineIndex, utf8Slice?,
+    DeclarativeGrammar.LexicalSpanSuppresses, DeclarativeGrammar.cascadeLineIndex,
+    whitespaceAdjacent_eq_true_iff, sourceId_beq_true_iff, owners, or_assoc] <;> rfl
+
 /-- Normalize ordinary diagnostics without consulting display prose. -/
 def filterParseDiagnostics (file : SourceFile)
     (lexical : List LexicalDiagnostic)
     (parsed : List ParseDiagnostic) : List ParseDiagnostic :=
   suppressLexicalCascades file.content lexical parsed
+
+private theorem lexicalAnySuppresses_eq_true_iff (source : String)
+    (lexical : List LexicalDiagnostic) (span : SourceSpan) :
+    (lexical.any fun diagnostic => lexicalSpanSuppresses source diagnostic.span span) = true ↔
+      DeclarativeGrammar.LexicalCascadeSuppresses source (lexical.map (·.span)) span := by
+  constructor
+  · intro suppressed
+    rcases List.any_eq_true.mp suppressed with ⟨diagnostic, member, spanMatches⟩
+    exact ⟨diagnostic.span, List.mem_map.mpr ⟨diagnostic, member, rfl⟩,
+      (lexicalSpanSuppresses_eq_true_iff source diagnostic.span span).mp spanMatches⟩
+  · rintro ⟨lexicalSpan, member, spanMatches⟩
+    rcases List.mem_map.mp member with ⟨diagnostic, diagnosticMember, rfl⟩
+    exact List.any_eq_true.mpr ⟨diagnostic, diagnosticMember,
+      (lexicalSpanSuppresses_eq_true_iff source diagnostic.span span).mpr spanMatches⟩
+
+/-- An independently suppressed recovery event is removed at its exact list position. -/
+theorem filterParseDiagnostics_cons_recovered_of_suppressed
+    (file : SourceFile) (lexical : List LexicalDiagnostic)
+    (span : SourceSpan) (site : RecoverySite) (parsed : List ParseDiagnostic)
+    (suppressed : DeclarativeGrammar.LexicalCascadeSuppresses
+      file.content (lexical.map (·.span)) span) :
+    filterParseDiagnostics file lexical ({ span, kind := .recovered site } :: parsed) =
+      filterParseDiagnostics file lexical parsed := by
+  have anyEq := (lexicalAnySuppresses_eq_true_iff file.content lexical span).mpr suppressed
+  simp [filterParseDiagnostics, suppressLexicalCascades, isLexicalCascadeCandidate, anyEq]
+
+/-- Without an independent suppression witness, a recovery event is retained in order. -/
+theorem filterParseDiagnostics_cons_recovered_of_retained
+    (file : SourceFile) (lexical : List LexicalDiagnostic)
+    (span : SourceSpan) (site : RecoverySite) (parsed : List ParseDiagnostic)
+    (retained : ¬ DeclarativeGrammar.LexicalCascadeSuppresses
+      file.content (lexical.map (·.span)) span) :
+    filterParseDiagnostics file lexical ({ span, kind := .recovered site } :: parsed) =
+      { span, kind := .recovered site } :: filterParseDiagnostics file lexical parsed := by
+  cases anyEq : lexical.any (fun diagnostic =>
+      lexicalSpanSuppresses file.content diagnostic.span span) with
+  | false =>
+      simp [filterParseDiagnostics, suppressLexicalCascades, isLexicalCascadeCandidate, anyEq]
+  | true =>
+      exact False.elim (retained
+        ((lexicalAnySuppresses_eq_true_iff file.content lexical span).mp anyEq))
+
+/-- Filtering an empty parser trace cannot introduce a diagnostic. -/
+@[simp] theorem filterParseDiagnostics_nil_parsed
+    (file : SourceFile) (lexical : List LexicalDiagnostic) :
+    filterParseDiagnostics file lexical [] = [] := by
+  simp [filterParseDiagnostics, suppressLexicalCascades]
 
 /-- With no lexical errors, diagnostic normalization retains every parser
 diagnostic exactly. -/
