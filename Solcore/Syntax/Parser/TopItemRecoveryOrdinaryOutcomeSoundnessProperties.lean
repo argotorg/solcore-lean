@@ -1,3 +1,4 @@
+import Solcore.Syntax.DeclarativeTopItemRecoveryExactnessProperties
 import Solcore.Syntax.DeclarativeTopItemRecoveryOutcomeProperties
 import Solcore.Syntax.Parser.FileRecoveryTotalityProperties
 import Solcore.Syntax.Parser.TopItemRecoveryBoundaryProperties
@@ -135,5 +136,31 @@ theorem recoverTopItem_ordinaryOutcomeSpec :
       DeclarativeGrammar.TopItemRecoveryParses
       DeclarativeGrammar.TopItemRecoveryRejects :=
   DeclarativeGrammar.topItemRecoveryDeterministicOutcomeSpec
+
+/-- Standalone recovery fixes the full error-item AST and both outcome endpoints. -/
+theorem recoverTopItem_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.TopItemRecoveryParses DeclarativeGrammar.TopItemRecoveryRejects :=
+  DeclarativeGrammar.topItemRecoveryExactOutcomeSpec
+
+/-- Recovery successes agree on their complete AST and declarative remainder. -/
+theorem recoverTopItem_success_result_unique
+    {input leftOutput rightOutput : State} {left right : TopItem}
+    (leftResult : recoverTopItem input = .ok left leftOutput)
+    (rightResult : recoverTopItem input = .ok right rightOutput) :
+    left = right ∧ leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  recoverTopItem_exactOutcomeSpec.successResultUnique
+    (recoverTopItem_success_ordinaryOutcome_sound leftResult)
+    (recoverTopItem_success_ordinaryOutcome_sound rightResult)
+
+/-- Recovery rejections agree on their original-input declarative endpoint. -/
+theorem recoverTopItem_reject_output_unique
+    {input leftOutput rightOutput : State} {leftFailure rightFailure : Failure}
+    (leftResult : recoverTopItem input = .reject leftFailure leftOutput)
+    (rightResult : recoverTopItem input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  recoverTopItem_exactOutcomeSpec.rejectOutputUnique
+    (recoverTopItem_reject_ordinaryOutcome_sound leftResult)
+    (recoverTopItem_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser.FileInternals

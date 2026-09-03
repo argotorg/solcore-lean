@@ -71,6 +71,7 @@ import Solcore.Syntax.Parser.PredicateSoundnessProperties
 import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.Properties
 import Solcore.Syntax.Parser.PublicSourceFileExecutionWitnessProperties
+import Solcore.Syntax.Parser.PublicSourceFileValueProperties
 import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
 import Solcore.Syntax.Parser.ReturnClauseOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ReturnClauseSoundnessProperties
