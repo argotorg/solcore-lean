@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Trivia
-import Solcore.Syntax.DeclarativeDiagnosticCascadeGrammar
+import Solcore.Syntax.DeclarativeParseDiagnosticCascadeGrammar
 
 set_option autoImplicit false
 
@@ -171,6 +171,45 @@ theorem filterParseDiagnostics_cons_unexpected_of_retained
   | true =>
       exact False.elim (retained
         ((lexicalAnySuppresses_eq_true_iff file.content lexical span).mp anyEq))
+
+/-- Suppression of a complete diagnostic preserves the untouched suffix. -/
+theorem filterParseDiagnostics_cons_of_suppressed
+    (file : SourceFile) (lexical : List LexicalDiagnostic)
+    (diagnostic : ParseDiagnostic) (parsed : List ParseDiagnostic)
+    (suppressed : DeclarativeGrammar.ParseDiagnosticCascadeSuppresses
+      file.content (lexical.map (·.span)) diagnostic) :
+    filterParseDiagnostics file lexical (diagnostic :: parsed) =
+      filterParseDiagnostics file lexical parsed := by
+  rcases diagnostic with ⟨span, kind⟩
+  cases kind with
+  | unexpected found expected context =>
+      exact filterParseDiagnostics_cons_unexpected_of_suppressed
+        file lexical span found expected context parsed suppressed.2
+  | recovered site =>
+      exact filterParseDiagnostics_cons_recovered_of_suppressed
+        file lexical span site parsed suppressed.2
+  | invalidIdentifierHyphen text => exact False.elim suppressed.1
+  | constraintViolation constraint => exact False.elim suppressed.1
+  | nestingExceeded kind limit => exact False.elim suppressed.1
+
+/-- Every retained report keeps all metadata, including protected report kinds. -/
+theorem filterParseDiagnostics_cons_of_retained
+    (file : SourceFile) (lexical : List LexicalDiagnostic)
+    (diagnostic : ParseDiagnostic) (parsed : List ParseDiagnostic)
+    (retained : ¬ DeclarativeGrammar.ParseDiagnosticCascadeSuppresses
+      file.content (lexical.map (·.span)) diagnostic) :
+    filterParseDiagnostics file lexical (diagnostic :: parsed) =
+      diagnostic :: filterParseDiagnostics file lexical parsed := by
+  rcases diagnostic with ⟨span, kind⟩
+  cases kind with
+  | unexpected found expected context =>
+      exact filterParseDiagnostics_cons_unexpected_of_retained
+        file lexical span found expected context parsed (fun h => retained ⟨trivial, h⟩)
+  | recovered site =>
+      exact filterParseDiagnostics_cons_recovered_of_retained
+        file lexical span site parsed (fun h => retained ⟨trivial, h⟩)
+  | invalidIdentifierHyphen text | constraintViolation constraint | nestingExceeded kind limit =>
+      simp [filterParseDiagnostics, suppressLexicalCascades, isLexicalCascadeCandidate]
 
 /-- Filtering an empty parser trace cannot introduce a diagnostic. -/
 @[simp] theorem filterParseDiagnostics_nil_parsed
