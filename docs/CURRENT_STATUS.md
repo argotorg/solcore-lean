@@ -417,10 +417,9 @@ escape; isolation emits its diagnostic and returns an ordinary empty-body
 recovery success at the parent remainder. Declaration success endpoints are
 deterministic and exclusive with rejection. The existing location-policy-aware
 `FunctionDeclParses` theorem remains the stricter diagnostic-free judgment.
-Since the signature is exact, an exact isolated `.allow` body is the sole
-premise for complete function-declaration AST and endpoint exactness. The
-stronger conditional API accepts fixed-fuel Core statement exactness directly
-and supplies the isolated-body contract.
+Exact signatures and unconditional isolated `.allow` bodies now give complete
+function-declaration AST and endpoint exactness without additional premises.
+The earlier body- and statement-parameterized APIs remain available.
 
 A broad ordinary `constructorDecl` outcome now follows the executable stages
 exactly: the required `constructor` keyword, recovery-aware parameters,
@@ -434,11 +433,8 @@ uncaptured body rejection after modifier success. A balanced captured child
 rejection instead yields diagnosed empty-body recovery success at the parent
 remainder. Outcomes are deterministic and exclusive, while the existing
 `ConstructorDeclParses` relation remains the strict diagnostic-free judgment.
-Exact parameter lists and exact `public`/`payable` modifiers have narrowed the
-constructor exactness lift to one premise: exact outcomes for the isolated
-`.require` body. Under that premise, constructor successes fix the complete AST
-and remainder and rejections fix their endpoint. The remaining dependency is
-fixed-fuel Core statement exactness underneath isolated Core blocks.
+Exact parameters, modifiers, and isolated `.require` bodies now make constructor
+ASTs, final remainders, and rejection endpoints unconditionally unique.
 
 A broad ordinary `fallbackDecl` outcome now begins with the exact `fallback`
 keyword and recovery-aware parameters, followed by a pure validation stage.
@@ -452,9 +448,8 @@ rejected parameters, or an uncaptured body rejection after validation and
 modifier success. A balanced captured child rejection instead becomes a
 diagnosed empty-body recovery success at the parent remainder. Outcomes are
 deterministic and exclusive; strict diagnostic-free `FallbackDeclParses`
-remains. Exact parameters, validation, and modifiers leave only the isolated
-`.require` body premise for complete fallback AST and rejection-endpoint
-exactness; fixed-fuel Core statement exactness supplies that premise directly.
+remains. Exact parameters, validation, modifiers, and isolated `.require` bodies
+now make the complete fallback AST and rejection-endpoint contract unconditional.
 
 Implementation outcomes now cover the optional `default` prefix, contextual
 marker, optional generics, trait name, required nonempty trailing-comma head
@@ -469,10 +464,9 @@ deterministic, and success/rejection are exclusive; module diagnostics and
 captured-body recovery remain successes.
 The optional default marker and required head arguments now unconditionally
 fix their ASTs and final remainders, with exact head rejection endpoints and
-no default-marker rejection. Method, body, and complete declaration exactness
-remain conditional on exact isolated `.allow` Core bodies. Fixed-fuel Core
-statement exactness supplies that premise and therefore fixes their complete
-ASTs, final remainders, and rejection endpoints.
+no default-marker rejection. Unconditional isolated `.allow` Core-body exactness
+now also fixes complete method, body, and declaration ASTs, final remainders,
+and rejection endpoints without further assumptions.
 
 Trait methods now extend the broad module-signature outcome through an exact
 semicolon, retaining diagnostic-producing signature successes and separating
@@ -529,12 +523,18 @@ outcome families. The public fuel bounds are explicit: expressions and
 patterns use the active-window remainder plus one, statements use it plus two,
 and blocks use the fixed statement fuel of the remainder plus one. Public
 success and rejection soundness, deterministic outcome specifications, and
-diagnostic reflection are registered for all four entry points. Exact statement
-outcomes at every fixed fuel now lift generically through raw block item lists,
-raw public blocks, balanced capture/recovery isolation, and both tail policies.
-The lift fixes block ASTs, closing spans, final remainders, and external
-rejection endpoints; fixed-fuel statement exactness remains its explicit
-premise.
+diagnostic reflection are registered for all four entry points. A single fuel
+induction now proves unconditional AST and endpoint exactness for all three
+mutually recursive term families. This covers lambda parameters and bodies,
+maximal postfixes, operator precedence, tuple/pattern order, diagnosed statement
+successes, prioritized transactional fallback, and recovery with fixed first
+and last spans. Exact statements lift through raw block items, public blocks,
+balanced capture/recovery isolation, and both tail policies, fixing complete
+block ASTs, closing spans, final remainders, and external rejection endpoints.
+Public executable APIs and consumers compare results with independently derived
+grammar outcomes. The full build and tests pass; no diagnostic-free assumption,
+diagnostic-trace equality, failure-payload equality, or whole-state equality is
+required or claimed by these exactness laws.
 
 Inline-Yul coverage includes name sequences, the public expression layer,
 exact braced blocks, `let`, assignment, expression and source-level
@@ -676,13 +676,11 @@ first, followed by `function`, `constructor`, `fallback`, `type`, and contextual
 the wrapped member AST, declaration span, empty leading comments, carrier,
 window, cursor, and final remainder. Rejection records the selected leaf or an
 exact nonconsuming unrecognized-member case. Successful remainders are
-deterministic and success is disjoint from rejection. Its stronger exact
-contract remains conditional on Core expression and isolated Core-body
-exactness. Field exactness needs the initializer expression contract; function,
-constructor, and fallback exactness need their `.allow` or `.require` body
-contract. Type aliases and enums are already unconditionally exact. Fixed-fuel
-Core expression and statement exactness discharge all remaining leaves, with
-no separate enum premise. Existing strict member soundness remains available.
+deterministic and success is disjoint from rejection. Its stronger AST and
+endpoint contract is now unconditional: public Core expressions fix field
+initializers, isolated `.allow`/`.require` bodies fix the three body-bearing
+declarations, and type aliases and enums are independently exact. Existing
+conditional APIs and strict member soundness remain available.
 
 Contract-member derive attachment now has an exact pure relation for all seven
 member variants, with one unique AST result for every input. Only enums retain
@@ -699,11 +697,9 @@ attribute-free core directly. A present hash commits to the public derive
 parser, then the core member parser, and finally the pure attachment above.
 Rejection records exactly one of three first failing stages: plain core, derive,
 or core after a successful derive. Successful remainders are deterministic and
-success is disjoint from rejection. A conditional exactness theorem now proves
-that this derive-and-attachment layer preserves unique member ASTs and rejection
-endpoints whenever the attribute-free core supplies them. Consequently its
-remaining exactness frontier is the same Core expression and statement
-contracts, not derive parsing or attachment.
+success is disjoint from rejection. Exact attribute-free members and pure
+attachment now make derive-aware member ASTs and rejection endpoints
+unconditionally unique; the generic conditional lift remains available.
 
 Standalone contract-member recovery now has exact broad outcomes. Success
 consumes one mandatory token, scans to the window end, a recovery boundary, or
@@ -721,12 +717,11 @@ forward member order, exact braces, and every first rejecting remainder. Broad
 contract declarations then compose exact `contract`, name, optional generics,
 and body stages with four matching rejection cases. Both layers have
 deterministic successful remainders and disjoint success/rejection. Stronger
-conditional exactness now lifts from derive-aware members through the
-recovery-aware body and complete
-declaration, fixing the full AST, final remainder, and rejection endpoint.
-Recovery is already exact; Core expression and statement exactness are the
-remaining shared prerequisites for this complete contract chain. Its
-declarative and executable APIs are public and compile-time consumed. These
+unconditional exactness now lifts from derive-aware members through the
+recovery-aware body and complete declaration, fixing the full AST, final
+remainder, and rejection endpoint. Core terms discharge the earlier shared
+premises. The earlier conditional declarative and executable APIs remain
+public and compile-time consumed. These
 claims do not equate diagnostic traces, failure payloads, or whole parser
 states.
 
