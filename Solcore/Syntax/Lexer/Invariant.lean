@@ -1,17 +1,19 @@
 import Solcore.Syntax.Lexer.Character
-import Std.Tactic.BVDecide
 
 set_option autoImplicit false
 
 namespace Solcore.Syntax
 
+set_option maxRecDepth 4096 in
 private theorem utf8FirstByte_not_continuation (byte : UInt8)
     (first : byte.IsUTF8FirstByte) :
     isUtf8ContinuationByte byte = false := by
-  simp only [isUtf8ContinuationByte, Bool.and_eq_false_iff,
-    decide_eq_false_iff_not]
-  simp only [UInt8.IsUTF8FirstByte] at first
-  bv_decide
+  have checked : ∀ value : Fin 256,
+      (UInt8.ofNat value.val).IsUTF8FirstByte →
+        isUtf8ContinuationByte (UInt8.ofNat value.val) = false := by decide
+  have checkedByte : byte.IsUTF8FirstByte → isUtf8ContinuationByte byte = false := by
+    simpa only [UInt8.ofNat_toNat] using checked ⟨byte.toNat, byte.toNat_lt⟩
+  exact checkedByte first
 
 /-- The end of a string prefix is a boundary in the appended source. -/
 theorem isUtf8Boundary_append_left (leading trailing : String) :
