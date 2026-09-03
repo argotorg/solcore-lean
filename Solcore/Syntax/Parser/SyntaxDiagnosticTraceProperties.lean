@@ -11,8 +11,9 @@ import Solcore.Syntax.Parser.PublicPragmaSuccessOutputProperties
 import Solcore.Syntax.Parser.PublicEmptyTokensOutputProperties
 import Solcore.Syntax.Parser.TransactionalChoiceDiagnosticTraceProperties
 import Solcore.Syntax.Parser.ParseDiagnosticCascadeStabilityProperties
+import Solcore.Syntax.Parser.PublicPragmaSequenceOutputProperties
 
 /-! Exact primitive, successful pragma, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
-recovery, one successful pragma, and a missing pragma name. Sequencing and transactional
+recovery, arbitrary successful pragma sequences, and a missing pragma name. Sequencing and transactional
 choice have separate compositional execution laws; general traces remain open. -/
