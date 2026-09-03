@@ -916,6 +916,19 @@ fields, with exact mixed filtering. Canonical successful-then-rejected examples
 retain the first AST and both hyphen events; a same-line lexical error suppresses
 only the final expectation report, including its exact EOF byte position.
 
+Balanced block isolation now has exact compositional diagnostic laws and an
+independent conditional trace grammar. The child starts with an empty trace and
+uses its captured closing-byte boundary; the parent resumes after that capture
+with its original file, tokens, and full window. Child events follow parent
+events, and only recovered ordinary rejection appends its report once. Invariants
+remain invariants. Independent grammar erases to the existing ordinary isolation
+outcomes and lifts inner AST/remainder/report/trace uniqueness. Explicit inner
+success/rejection soundness and completeness contracts yield outer trace iff
+theorems, including suffix existence for every execution and exact duplicate
+order. These are lifting contracts, not a claim that all concrete Core block
+traces have already been specified. Repeated isolation does not recommit a
+failure already recovered by an inner wrapper.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

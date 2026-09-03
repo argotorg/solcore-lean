@@ -52,8 +52,9 @@ published through Oracle v4.
 | Core expression parser proofs | Complete source/state, totality, ordinary/reject soundness, diagnostic reflection, and unconditional AST/remainder/rejection-endpoint exactness at fixed-fuel and public boundaries across atoms, lambda, maximal postfix, unary, binary, conditional, and block interaction | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Pattern and statement parser proofs | Complete executable contracts, ordinary/reject soundness, and unconditional AST/remainder/rejection-endpoint exactness for mutually recursive patterns and statements, including recovery and diagnosed successes in exact dispatcher order | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
-| Independent diagnostic traces | Complete raw traces for primitives, pragma success/rejection, and standalone top-item recovery; complete `ParseOutput` for empty tokens, one recovery-to-end, arbitrary successful pragma-only windows, and successful pragma prefixes ending in recognized pragma rejection | Other recognized-start failures, nested isolation, and mixed arbitrary-declaration traces | High |
+| Independent diagnostic traces | Complete raw traces for primitives, pragma success/rejection, and standalone top-item recovery; complete `ParseOutput` for empty tokens, one recovery-to-end, arbitrary successful pragma-only windows, and successful pragma prefixes ending in recognized pragma rejection | Other recognized-start failures and concrete nested/mixed arbitrary-declaration traces | High |
 | Primitive traces and diagnostic normalization | Complete raw/checked identifier AST, remainder, and event suffix; exact silent keyword/symbol/contextual success and rejection reports; total unique mixed-report filtering with full metadata, protected kinds, and retained duplicate order | Composition across arbitrary declarations and nested blocks remains separate | High |
+| Balanced block isolation traces | Complete compositional execution laws and conditional independent trace soundness/completeness/exactness; child context, parent frame, report commitment, and duplicate order are exact | Concrete inner Core block trace contracts remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -498,6 +499,13 @@ start, and commit its report once after every earlier event. Independent grammar
 fixes all four result components, with sufficient production bounds derived from
 token progress. Canonical successful-then-rejected examples cover both final
 report retention and same-line suppression without losing earlier AST or events.
+Balanced isolation now has conditional independent trace grammar and exact
+execution correspondence, in addition to compositional merge/reset/frame laws.
+Children use their captured byte endpoint, and the original parent window is
+restored after either success or recovered rejection. Only recovery adds the
+failure report; invariants propagate. Exactness and trace iff lift explicit
+inner contracts without asserting concrete Core trace completeness. Nested
+isolation consumers verify that an already recovered report is not committed again.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

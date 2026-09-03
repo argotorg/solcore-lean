@@ -739,6 +739,17 @@ order and no item is fabricated for the rejected declaration. Ground two-pragma
 examples verify both retained and lexically suppressed final reports while
 keeping successful and rejecting checked-item events in their original order.
 
+Balanced block isolation has a separate conditional trace boundary. Independent
+direct/captured/recovered judgments retain explicit source/end-byte context,
+exact AST/remainder, and ordered diagnostics. Fixed-context inner functionality
+and disjointness lift to outer exactness; capture uniqueness resolves the child
+window. Execution laws reset child diagnostics, restore the complete parent
+frame, append child events, and commit only recovered rejection. Four explicit
+inner soundness/completeness contracts lift to outer success/rejection iff laws.
+Soundness guarantees an appended suffix for every result; fixed-trace iff alone
+is not substituted for that guarantee. Concrete inner Core trace contracts
+remain a subsequent obligation, distinct from this completed wrapper proof.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
