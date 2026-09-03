@@ -844,8 +844,18 @@ root-window end, these laws fix the complete `parseLexed` or `parse` output:
 the comment-attached error AST, retained tokens and lexical diagnostics, and
 the entire filtered parse-diagnostic list. Validation and nesting clearance
 remain explicit, and canonical lexing supplies validation at the source boundary.
-General recognized-start rejections, nested isolation, and arbitrary declaration
-diagnostic traces are still outside this first trace slice.
+
+A recognized-start trace is also complete when `pragma` has no following raw
+identifier. Independent current-input observations fix the exact found token
+and failure span, including EOF and unavailable carrier slots, with source and
+window-end byte supplied explicitly. Raw and checked identifier rejection add
+no diagnostic themselves. The file boundary rewinds only the cursor, preserves
+the failed attempt's diagnostics, and appends its unexpected report. This
+missing-name prefix therefore fixes every public output field, including the
+empty item list, retained comments and lexical carriers, and exact filtered
+expectation diagnostic. Its public correspondence needs no assumed parser reply.
+Other recognized-start failures, nested isolation, and arbitrary declaration
+diagnostic traces remain outside these completed slices.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

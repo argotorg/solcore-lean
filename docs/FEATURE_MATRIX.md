@@ -52,7 +52,7 @@ published through Oracle v4.
 | Core expression parser proofs | Complete source/state, totality, ordinary/reject soundness, diagnostic reflection, and unconditional AST/remainder/rejection-endpoint exactness at fixed-fuel and public boundaries across atoms, lambda, maximal postfix, unary, binary, conditional, and block interaction | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Pattern and statement parser proofs | Complete executable contracts, ordinary/reject soundness, and unconditional AST/remainder/rejection-endpoint exactness for mutually recursive patterns and statements, including recovery and diagnosed successes in exact dispatcher order | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
-| Independent diagnostic traces | Complete for standalone top-item recovery and a single unrecognized recovery-to-end public file; exact ordered raw events, independent lexical-cascade filtering, and all `ParseOutput` fields | General recognized-start failures, nested isolation, and arbitrary declaration traces | High |
+| Independent diagnostic traces | Complete for standalone top-item recovery, one unrecognized recovery-to-end public file, and a missing-name pragma boundary stop; exact rejection reports, ordered raw events, independent lexical-cascade filtering, and all `ParseOutput` fields for these public slices | Other recognized-start failures, nested isolation, and arbitrary declaration traces | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -443,8 +443,14 @@ branch does not yet expose a complete declarative diagnostic trace.
 A separate normal-branch trace contract covers one unrecognized recovery to the
 root-window end. It fixes the raw singleton recovery event, its independent
 lexical-cascade keep/drop decision, and every field of the public output.
-Earlier raw diagnostic order and duplicate retained spans are preserved. The
-general declaration and nested-isolation trace boundary remains open.
+Earlier raw diagnostic order and duplicate retained spans are preserved.
+A recognized pragma marker followed by an unavailable raw name also determines
+the complete public output: no AST item, retained carriers and comments, and
+the exact unexpected report after independent cascade filtering. Source and
+window-end byte remain explicit in the current-token observation, including
+EOF. Primitive rejection emits nothing; the file boundary keeps failed-attempt
+diagnostics and appends the failure while rewinding only the cursor. Other
+declaration and nested-isolation traces remain open.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

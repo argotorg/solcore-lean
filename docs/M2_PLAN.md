@@ -662,8 +662,17 @@ unrecognized-item failure. Declarative cascade filtering fixes retained event
 order and duplicates with the pinned LF-only, overlap, inclusive-boundary,
 and whitespace conditions. Executable interpretation is equivalent in both
 directions. Together with validation and nesting clearance, these rules fix
-all fields of public `ParseOutput`, not merely its AST. Full traces for
-recognized-start failures and nested declaration/block paths remain next work.
+all fields of public `ParseOutput`, not merely its AST.
+
+The next recognized-start slice is complete for a `pragma` keyword followed by
+an unavailable raw name. Independent current-input and rejection-report rules
+fix source, end-byte context, found token, expectations, and failure span.
+Primitive rejection is silent; the recognized-start file boundary retains the
+failed attempt's earlier diagnostics, rewinds only its cursor, and appends the
+exact failure report. The missing-name prefix crosses all top-item dispatchers
+and determines complete `parseLexed` and `parse` outputs, including the empty
+AST item list and exact lexical-cascade filtering of the unexpected diagnostic.
+Other recognized-start and nested declaration/block traces remain next work.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
