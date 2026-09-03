@@ -10,6 +10,7 @@ import Solcore.Syntax.DeclarativeIdentifierCascadeProperties
 import Solcore.Syntax.Parser.PublicPragmaSuccessOutputProperties
 import Solcore.Syntax.Parser.PublicEmptyTokensOutputProperties
 import Solcore.Syntax.Parser.TransactionalChoiceDiagnosticTraceProperties
+import Solcore.Syntax.Parser.ParseDiagnosticCascadeStabilityProperties
 
 /-! Exact primitive, successful pragma, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
