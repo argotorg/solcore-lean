@@ -618,6 +618,11 @@ ASTs are included, without diagnostic-free premises; arbitrary token payloads
 are not claimed to arise from canonical lexing. All public instances have
 dedicated/umbrella consumers and depend only on the allowed standard axioms.
 
+The correspondence now also gives independent public AST existence, uniqueness,
+and recursive provenance over validated carriers, with no parser-reply premise.
+Contract field/member/body/recovery completeness exposes the same precise
+internal boundaries without strengthening diagnostic or whole-state claims.
+
 Bounded nesting now has a parser-independent, total, functional scan relation.
 Its six token actions reproduce delimiter scopes, conditional bases, resets,
 and the first overflowing token exactly, using one shared canonical limit.
@@ -648,6 +653,17 @@ accumulation. An exact executable witness now retains the normal branch's
 successful `sourceFile` reply, final state, complete output assembly, and
 diagnostic-filter equation without presenting that witness as an independent
 grammar trace.
+
+The first independent normal-branch trace vertical is now closed for one
+unrecognized top-item recovery to the root-window end. Recovery has an exact
+singleton-span event trace, or an empty trace on mandatory-token rejection;
+the raw file loop retains earlier diagnostics and does not emit its inner
+unrecognized-item failure. Declarative cascade filtering fixes retained event
+order and duplicates with the pinned LF-only, overlap, inclusive-boundary,
+and whitespace conditions. Executable interpretation is equivalent in both
+directions. Together with validation and nesting clearance, these rules fix
+all fields of public `ParseOutput`, not merely its AST. Full traces for
+recognized-start failures and nested declaration/block paths remain next work.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

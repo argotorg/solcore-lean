@@ -44,14 +44,15 @@ published through Oracle v4.
 | Token and parsed AST catalog | Complete executable representation | Contextual well-formedness layer | High |
 | Unicode identifier classification | Complete | None at the executable syntax boundary | High |
 | Canonical lexer | Complete executable and proof boundary; every source returns a full valid lexical carrier and the exceptional fuel branch is unreachable | None at the current lexical contract | High |
-| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, arbitrary tokenized input has an exact validation-error or certified-success branch, diagnostic-free outputs derive `CoreSourceFileOrdinaryParsesFromStart`, and every successful `parseLexed` or `parse` output has an exact broad public AST branch with canonical validity; nesting-overflow `ParseOutput` is exact through its singleton diagnostic | Exact normal-branch diagnostic traces remain a separate declarative milestone; resolution, typing, and elaboration remain later stages | High |
+| Canonical parser | Complete executable and total source-to-AST boundary; every source returns an ordinary output, arbitrary tokenized input has an exact validation-error or certified-success branch, diagnostic-free outputs derive `CoreSourceFileOrdinaryParsesFromStart`, and every successful `parseLexed` or `parse` output has an exact broad public AST branch with canonical validity; nesting-overflow `ParseOutput` is exact through its singleton diagnostic | General normal-branch diagnostic traces remain a separate declarative milestone; resolution, typing, and elaboration remain later stages | High |
 | Lexer and parser foundation proofs | Complete for source provenance, parser-state preservation, progress, production-fuel adequacy, public totality, backward diagnostic reflection through declarations and the complete file loop, and concrete fuel-indexed public Core and Yul outcomes | None at the current foundation boundary | High |
-| Ordinary syntax completeness | Complete public Core/Yul, declaration, derive, top-item/recovery, file-loop, and source-file AST correspondence; independent grammar success/rejection iff executable success/rejection with the same AST and declarative endpoint | Public token input requires validation; source input retains canonical lexical provenance. Normal diagnostic traces, strict diagnostic-free acceptance completeness, and independent lexer-payload characterization are not claimed | High |
+| Ordinary syntax completeness | Complete public Core/Yul, declaration, derive, top-item/recovery, file-loop, and source-file AST correspondence; independent grammar success/rejection iff executable success/rejection with the same AST and declarative endpoint | Public token input requires validation; source input retains canonical lexical provenance. General normal diagnostic traces, strict diagnostic-free acceptance completeness, and independent lexer-payload characterization are not claimed | High |
 | Declarative grammar and parser soundness | Active; complete for declarations and complete files, mutually recursive public Core expressions/patterns/statements/blocks, exact grouped-first predicate success and rejection outcomes, exact Yul blocks and statement forms, transactional rejection witnesses, concrete complete-file Core specialization, total exact nesting preflight, and broad public source-file AST outcomes | Full normal-branch diagnostic traces and contextual well-formedness remain separate later boundaries | High |
 | Declaration, type, and Yul parser proofs | Complete source/state, totality, and concrete clean/ordinary/reject soundness boundaries for recursive types and every public Yul expression, statement, and braced body parser, including the assignment fallback | None at this boundary | High |
 | Core expression parser proofs | Complete source/state, totality, ordinary/reject soundness, diagnostic reflection, and unconditional AST/remainder/rejection-endpoint exactness at fixed-fuel and public boundaries across atoms, lambda, maximal postfix, unary, binary, conditional, and block interaction | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Pattern and statement parser proofs | Complete executable contracts, ordinary/reject soundness, and unconditional AST/remainder/rejection-endpoint exactness for mutually recursive patterns and statements, including recovery and diagnosed successes in exact dispatcher order | Diagnostic traces, failure payloads, and whole-state equality are not claimed | High |
 | Public Lean source interface | Complete | None; resolution, typing, and elaboration remain separate stages | High |
+| Independent diagnostic traces | Complete for standalone top-item recovery and a single unrecognized recovery-to-end public file; exact ordered raw events, independent lexical-cascade filtering, and all `ParseOutput` fields | General recognized-start failures, nested isolation, and arbitrary declaration traces | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -422,6 +423,11 @@ and `parse` value uniqueness compares independently derived ASTs over fixed
 file/tokens/comments, including both nesting branches. The public AST boundary
 does not expose a final cursor or claim diagnostic/whole-state equality.
 
+Validated carriers additionally determine one independently derived public AST,
+and every derivation has recursive Core/item/comment source provenance without
+requiring a parser-reply hypothesis. Contract-internal fields, both member
+dispatchers, bodies, and recovery expose matching completeness boundaries.
+
 The canonical nesting preflight now has a total and functional independent
 scan grammar over six exact token actions. It carries delimiter depth,
 conditional depth, and scope bases, and identifies the first overflow span,
@@ -433,6 +439,12 @@ after clearance. These direct and source-level theorems use the exact retained
 tokens and comments and compose with canonical output validity. Overflow also
 fixes the complete public output and singleton parse diagnostic; the normal
 branch does not yet expose a complete declarative diagnostic trace.
+
+A separate normal-branch trace contract covers one unrecognized recovery to the
+root-window end. It fixes the raw singleton recovery event, its independent
+lexical-cascade keep/drop decision, and every field of the public output.
+Earlier raw diagnostic order and duplicate retained spans are preserved. The
+general declaration and nested-isolation trace boundary remains open.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

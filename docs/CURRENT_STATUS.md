@@ -791,6 +791,12 @@ the recovery-aware syntax boundary, not a claim that every source is accepted
 without diagnostics, nor an independent characterization of lexer payloads.
 The public correspondence theorems depend only on the allowed standard axioms.
 
+Validated carriers also have exactly one independently derived public AST, and
+every such derivation satisfies recursive source provenance for its complete
+Core syntax, top-level items, and comments. No executable parser reply is needed
+as a caller premise. Contract-internal fields, plain/derive-aware members,
+braced bodies, and standalone member recovery have matching completeness APIs.
+
 The public nesting preflight now has its own parser-independent exact outcome
 grammar. It classifies each token as conditional, group-open, block-open,
 close, reset, or preserving; carries the exact delimiter and conditional scope
@@ -823,6 +829,23 @@ relation because the current declarative remainder deliberately carries no
 diagnostic accumulator. When nesting clears, a separate exact executable
 witness exposes the successful underlying `sourceFile` reply, final state, and
 the diagnostic-filter equation used to assemble the public output.
+
+A first normal-branch diagnostic-trace slice is now exact independently of that
+executable witness. Standalone top-item recovery appends exactly one recovery
+event at the recovered AST span, while rejecting an unavailable first token
+adds none. Independent trace rules preserve prior diagnostic order explicitly.
+An independent lexical-cascade relation keeps or drops candidate spans in
+source order, retaining duplicates and the existing same-source, LF-line,
+overlap, inclusive endpoint, and horizontal-whitespace rules. Its interpretation
+as top-item recovery diagnostics agrees with the executable filter both ways.
+
+When all top-item starts are absent and one independent recovery reaches the
+root-window end, these laws fix the complete `parseLexed` or `parse` output:
+the comment-attached error AST, retained tokens and lexical diagnostics, and
+the entire filtered parse-diagnostic list. Validation and nesting clearance
+remain explicit, and canonical lexing supplies validation at the source boundary.
+General recognized-start rejections, nested isolation, and arbitrary declaration
+diagnostic traces are still outside this first trace slice.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
