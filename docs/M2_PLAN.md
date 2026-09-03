@@ -682,6 +682,13 @@ independent grammar equivalent to the executable filter. It retains complete
 payloads, order, and repeated surviving occurrences; identifier, constraint,
 and nesting reports cannot be removed as lexical cascades. These shared trace
 components support the remaining declaration and nested-block work.
+Hard-keyword, symbol, and contextual primitives now have the same exact silent
+success and uncommitted-rejection correspondence, including fixed expectation
+categories and EOF context. Protected identifier traces survive concatenation
+with arbitrary independently normalized diagnostic prefixes. A separate
+executable composition lemma carries a successful final top item through the
+file loop and comment attachment without adding or discarding diagnostics; its
+item-reply premise remains explicit rather than masquerading as grammar evidence.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

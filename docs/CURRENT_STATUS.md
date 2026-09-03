@@ -866,6 +866,12 @@ Filtering also has a total, unique independent relation over arbitrary mixed
 diagnostic lists, not only fixed-kind span lists. It preserves every retained
 report's metadata and occurrence order; identifier, grammar-constraint, and
 nesting diagnostics are protected even when their spans match lexical errors.
+Exact hard-keyword, symbol, and contextual-word primitives now also have
+bidirectional trace correspondence. A successful token step emits nothing;
+rejection preserves the input and its existing diagnostics while fixing the
+uncommitted report. Contextual words remain identifier tokens with contextual
+expectations, not hard keywords. Protected identifier traces can be appended to
+an independently filtered mixed prefix without losing either order or metadata.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
