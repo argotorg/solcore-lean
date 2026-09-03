@@ -5,6 +5,9 @@ import Solcore.Syntax.Parser.CoreBlockPublicCompletenessProperties
 import Solcore.Syntax.Parser.FunctionDeclarationCompletenessProperties
 import Solcore.Syntax.Parser.ImplementationDeclarationCompletenessProperties
 import Solcore.Syntax.Parser.ContractDeclarationCompletenessProperties
+import Solcore.Syntax.Parser.ContractMemberCompletenessProperties
+import Solcore.Syntax.Parser.ContractBodyCompletenessProperties
+import Solcore.Syntax.Parser.ContractMemberRecoveryCompletenessProperties
 import Solcore.Syntax.Parser.SimpleDeclarationCompletenessProperties
 import Solcore.Syntax.Parser.DeriveCompletenessProperties
 import Solcore.Syntax.Parser.YulPublicCompletenessProperties
