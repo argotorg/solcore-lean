@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExportNameOutcomeProperties
+import Solcore.Syntax.DeclarativeExportNameExactnessProperties
 import Solcore.Syntax.Parser.ExportNameOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ExportNameSoundnessProperties
 
@@ -35,5 +35,35 @@ theorem exportName_ordinaryOutcomeSpec :
       DeclarativeGrammar.ExportNameOrdinaryParses
       DeclarativeGrammar.ExportNameRejects :=
   DeclarativeGrammar.exportNameDeterministicOutcomeSpec
+
+/-- Re-export exact exportName outcomes with all supplied span data fixed. -/
+theorem exportName_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ExportNameOrdinaryParses
+      DeclarativeGrammar.ExportNameRejects :=
+  DeclarativeGrammar.exportNameExactOutcomeSpec
+
+/-- Two exportName successes fix the complete AST and declarative remainder. -/
+theorem exportName_success_result_unique
+    {input leftOutput rightOutput : State} {left right : ExportName}
+    (leftResult : ExportInternals.exportName input = .ok left leftOutput)
+    (rightResult : ExportInternals.exportName input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  exportName_exactOutcomeSpec.successResultUnique
+    (exportName_success_ordinaryOutcome_sound leftResult)
+    (exportName_success_ordinaryOutcome_sound rightResult)
+
+/-- Two exportName rejections fix their declarative endpoints; diagnostic
+payload equality is not asserted. -/
+theorem exportName_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : ExportInternals.exportName input = .reject leftFailure leftOutput)
+    (rightResult : ExportInternals.exportName input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  exportName_exactOutcomeSpec.rejectOutputUnique
+    (exportName_reject_ordinaryOutcome_sound leftResult)
+    (exportName_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser

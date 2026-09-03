@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeLocalExportOutcomeProperties
+import Solcore.Syntax.DeclarativeLocalExportExactnessProperties
 import Solcore.Syntax.Parser.LocalExportOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.LocalExportSoundnessProperties
 
@@ -36,5 +36,35 @@ theorem localExport_ordinaryOutcomeSpec (start : SourceSpan) :
       (DeclarativeGrammar.LocalExportOrdinaryParses start)
       DeclarativeGrammar.LocalExportRejects :=
   DeclarativeGrammar.localExportDeterministicOutcomeSpec start
+
+/-- Re-export exact localExport outcomes with all supplied span data fixed. -/
+theorem localExport_exactOutcomeSpec (start : SourceSpan) :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      (DeclarativeGrammar.LocalExportOrdinaryParses start)
+      DeclarativeGrammar.LocalExportRejects :=
+  DeclarativeGrammar.localExportExactOutcomeSpec start
+
+/-- Two localExport successes fix the complete AST and declarative remainder. -/
+theorem localExport_success_result_unique (start : SourceSpan)
+    {input leftOutput rightOutput : State} {left right : ExportDecl}
+    (leftResult : ExportInternals.localExport start input = .ok left leftOutput)
+    (rightResult : ExportInternals.localExport start input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  (localExport_exactOutcomeSpec start).successResultUnique
+    (localExport_success_ordinaryOutcome_sound start leftResult)
+    (localExport_success_ordinaryOutcome_sound start rightResult)
+
+/-- Two localExport rejections fix their declarative endpoints; diagnostic
+payload equality is not asserted. -/
+theorem localExport_reject_output_unique (start : SourceSpan)
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : ExportInternals.localExport start input = .reject leftFailure leftOutput)
+    (rightResult : ExportInternals.localExport start input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  (localExport_exactOutcomeSpec start).rejectOutputUnique
+    (localExport_reject_ordinaryOutcome_sound start leftResult)
+    (localExport_reject_ordinaryOutcome_sound start rightResult)
 
 end Solcore.Syntax.Parser

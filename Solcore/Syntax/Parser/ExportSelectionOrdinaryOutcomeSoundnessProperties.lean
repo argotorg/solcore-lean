@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeExportSelectionOutcomeProperties
+import Solcore.Syntax.DeclarativeExportSelectionExactnessProperties
 import Solcore.Syntax.Parser.ExportSelectionOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ExportSelectionSoundnessProperties
 
@@ -35,5 +35,35 @@ theorem exportSelection_ordinaryOutcomeSpec :
       DeclarativeGrammar.ExportSelectionOrdinaryParses
       DeclarativeGrammar.ExportSelectionRejects :=
   DeclarativeGrammar.exportSelectionDeterministicOutcomeSpec
+
+/-- Re-export exact exportSelection outcomes with all supplied span data fixed. -/
+theorem exportSelection_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ExportSelectionOrdinaryParses
+      DeclarativeGrammar.ExportSelectionRejects :=
+  DeclarativeGrammar.exportSelectionExactOutcomeSpec
+
+/-- Two exportSelection successes fix the complete AST and declarative remainder. -/
+theorem exportSelection_success_result_unique
+    {input leftOutput rightOutput : State} {left right : ExportSelection}
+    (leftResult : ExportInternals.exportSelection input = .ok left leftOutput)
+    (rightResult : ExportInternals.exportSelection input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  exportSelection_exactOutcomeSpec.successResultUnique
+    (exportSelection_success_ordinaryOutcome_sound leftResult)
+    (exportSelection_success_ordinaryOutcome_sound rightResult)
+
+/-- Two exportSelection rejections fix their declarative endpoints; diagnostic
+payload equality is not asserted. -/
+theorem exportSelection_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : ExportInternals.exportSelection input = .reject leftFailure leftOutput)
+    (rightResult : ExportInternals.exportSelection input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  exportSelection_exactOutcomeSpec.rejectOutputUnique
+    (exportSelection_reject_ordinaryOutcome_sound leftResult)
+    (exportSelection_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser

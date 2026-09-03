@@ -1,4 +1,4 @@
-import Solcore.Syntax.DeclarativeConstructorSelectionOutcomeProperties
+import Solcore.Syntax.DeclarativeConstructorSelectionExactnessProperties
 import Solcore.Syntax.Parser.ConstructorSelectionOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ConstructorSelectionSoundnessProperties
 
@@ -36,5 +36,35 @@ theorem constructorSelection_ordinaryOutcomeSpec :
       DeclarativeGrammar.ConstructorSelectionOrdinaryParses
       DeclarativeGrammar.ConstructorSelectionRejects :=
   DeclarativeGrammar.constructorSelectionDeterministicOutcomeSpec
+
+/-- Re-export exact constructorSelection outcomes with all supplied span data fixed. -/
+theorem constructorSelection_exactOutcomeSpec :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ConstructorSelectionOrdinaryParses
+      DeclarativeGrammar.ConstructorSelectionRejects :=
+  DeclarativeGrammar.constructorSelectionExactOutcomeSpec
+
+/-- Two constructorSelection successes fix the complete AST and declarative remainder. -/
+theorem constructorSelection_success_result_unique
+    {input leftOutput rightOutput : State} {left right : ConstructorSelection}
+    (leftResult : ExportInternals.constructorSelection input = .ok left leftOutput)
+    (rightResult : ExportInternals.constructorSelection input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  constructorSelection_exactOutcomeSpec.successResultUnique
+    (constructorSelection_success_ordinaryOutcome_sound leftResult)
+    (constructorSelection_success_ordinaryOutcome_sound rightResult)
+
+/-- Two constructorSelection rejections fix their declarative endpoints; diagnostic
+payload equality is not asserted. -/
+theorem constructorSelection_reject_output_unique
+    {input leftOutput rightOutput : State}
+    {leftFailure rightFailure : Failure}
+    (leftResult : ExportInternals.constructorSelection input = .reject leftFailure leftOutput)
+    (rightResult : ExportInternals.constructorSelection input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  constructorSelection_exactOutcomeSpec.rejectOutputUnique
+    (constructorSelection_reject_ordinaryOutcome_sound leftResult)
+    (constructorSelection_reject_ordinaryOutcome_sound rightResult)
 
 end Solcore.Syntax.Parser
