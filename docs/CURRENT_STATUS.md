@@ -1181,6 +1181,20 @@ use the real `typeExpr` child for `<a-b,> tail` and `<a-b,+> tail`, preserving
 the prior events, checked-name event, complete state, and unconsumed tail.
 These are concrete examples, not general recursive type trace contracts.
 
+Raw named types now compose exact qualified-name, optional-argument, and
+finishing traces in that order, with five execution contracts under nested
+type contracts. Successful ASTs and all spans are fixed; name/argument failures
+retain the exact uncommitted failure and earlier events, without running the
+finishing stage. Independent success erases componentwise, while rejection
+erases to the existing raw named-type rejection; neither silently assumes the
+type dispatcher's priority guards. Joint exactness and protected normalization
+are public. Consumers fix arbitrary argument states and events before the
+mapping constraint, bypass every nested child when arguments are absent, and
+verify canonical `mapping tail` success versus `mapping<+> tail` rejection
+with a real type child. The latter emits no premature mapping constraint.
+Prior reports, complete states, and unconsumed tokens are retained. General
+recursive type traces and prioritized type dispatch still remain separate.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

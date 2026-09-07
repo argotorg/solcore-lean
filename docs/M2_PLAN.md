@@ -923,6 +923,14 @@ failure and earlier events. Joint exactness and protected normalization are
 public, with real-type-child canonical success/rejection examples. General
 recursive type trace contracts and named-type composition remain separate.
 
+Raw named-type traces now compose name, optional arguments, and finishing
+diagnostics under nested type contracts. Every earlier event survives failure;
+the mapping constraint is emitted only after arguments succeed. Componentwise
+ordinary erasure and raw rejection remain distinct from prioritized dispatch.
+Joint exactness, protected suffixes, full-state consumers, and canonical bare
+mapping success/failed mapping arguments are verified. General recursive type
+trace contracts and type-dispatch integration remain open.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
