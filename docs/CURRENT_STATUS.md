@@ -1141,6 +1141,19 @@ protected-suffix normalization are separated from child progress/window laws.
 Consumers keep duplicate events and failed child states exactly; they remain
 conditional, not complete traces for lambda parameters, bodies, or full lambdas.
 
+Qualified names now have unconditional independent success/rejection traces,
+five generic execution contracts, and exact complete output-state laws. Every
+checked component contributes its spelling event in source order; dots are
+silent and absence of the next dot ends the maximal name. A selected dot with
+no following identifier rejects at that position, retaining earlier events and
+the complete context-specific failure without committing it. Raw tail laws
+support arbitrary first/last/reversed prefixes and adequate or production fuel;
+the full parser uses its actual post-first-name fuel. No input-validity premise
+is needed. Independent joint exactness and protected normalization are public.
+Canonical three-name success and two-name-prefix rejection fix all spans,
+carriers, windows, cursors, and following tokens in every context and phase.
+These close the name component, not argument-list or recursive type traces.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

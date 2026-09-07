@@ -901,6 +901,13 @@ not a missing-marker failure. Selected annotations preserve complete child
 states, reports, and duplicate events; protected suffixes normalize unchanged
 under child protection laws. Parameters and complete lambda traces remain open.
 
+Qualified names now expose unconditional exact diagnostic success/rejection
+and complete-state correspondence in every context/phase, including maximal
+silent dots, ordered checked-name events, uncommitted identifier failures, and
+arbitrary raw reverse prefixes. Independent exactness/protection and canonical
+three-name success/two-name-prefix failure consumers are verified. Remaining
+type arguments and recursive type traces still need separate composition.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
