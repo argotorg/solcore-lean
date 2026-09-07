@@ -55,6 +55,9 @@ import Solcore.Syntax.DeclarativeProxyExpressionRejectionTraceProperties
 import Solcore.Syntax.Parser.ProxyExpressionSuccessTraceProperties
 import Solcore.Syntax.Parser.ProxyExpressionRejectionTraceProperties
 import Solcore.Syntax.Parser.NamedTypeFinishingTraceProperties
+import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceExactnessProperties
+import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceProtectionProperties
+import Solcore.Syntax.Parser.OptionalLambdaReturnTypeRejectionTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -74,4 +77,5 @@ parenthesized groups/tuples have conditional exact traces with silent closes and
 right-paren-only reports after non-comma successful children;
 proxy expressions retain nested type events and exact raw failures under type contracts;
 named-type finishing unconditionally records bare-mapping constraint events;
+optional lambda return annotations lift real type outcomes and bypass absent arrows;
 general expressions and remaining statement traces remain open. -/

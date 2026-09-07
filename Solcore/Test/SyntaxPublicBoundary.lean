@@ -2139,4 +2139,29 @@ example := @Syntax.Parser.finishNamedType_success_context
 example := @Syntax.Parser.finishNamedType_trace_success_iff
 example := @Syntax.Parser.finishNamedType_ne_reject
 
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.optionalLambdaReturnTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.cursor_le
+example := @Syntax.DeclarativeGrammar.OptionalLambdaReturnTypeTraceParses.present_cursor_lt
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_eq_none_of_absent
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_eq_of_present
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_reject_iff_type
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.optionalLambdaReturnType_trace_reject_failure_iff
+
 end Tests
