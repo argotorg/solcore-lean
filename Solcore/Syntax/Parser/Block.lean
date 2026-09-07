@@ -355,6 +355,26 @@ private theorem validateBlockTails_file_shape :
             (validateExpressionSemicolon first state)).trans
               (validateExpressionSemicolon_file_shape first state)
 
+/-- Closing and delayed tail validation preserve the complete source and
+active token/byte window, regardless of all incoming or emitted events. -/
+theorem closeCoreBlock_success_context_eq
+    (opening : Token) (policy : TailExpressionPolicy) (bodyRev : List Statement)
+    {input output : State} {body : Block}
+    (result : closeCoreBlock opening policy bodyRev input = .ok body output) :
+    output.file = input.file ∧ output.window = input.window := by
+  unfold closeCoreBlock at result
+  simp only [bind] at result
+  cases closingResult : symbol .rightBrace .statement input with
+  | invariant error => simp [closingResult] at result
+  | reject failure rejected => simp [closingResult] at result
+  | ok closing afterClosing =>
+      simp only [closingResult, modifyState, pure] at result
+      cases result
+      have fileEq := validateBlockTails_file_shape policy bodyRev.reverse afterClosing
+      have windowEq := validateBlockTails_window_shape policy bodyRev.reverse afterClosing
+      have shape := (symbol_ok_tokenAt .rightBrace .statement closingResult).2
+      simpa only [shape] using And.intro fileEq windowEq
+
 private theorem validateExpressionSemicolon_validFor
     (statementValid : SourceFile → Statement → Prop)
     (statementSpan : ∀ file statement,
