@@ -61,6 +61,12 @@ import Solcore.Syntax.Parser.OptionalLambdaReturnTypeRejectionTraceProperties
 import Solcore.Syntax.DeclarativeQualifiedNameTraceOutcomeProperties
 import Solcore.Syntax.Parser.QualifiedNameTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.QualifiedNameRejectionTraceStateProperties
+import Solcore.Syntax.DeclarativeDelimitedTrailingTraceOutcomeProperties
+import Solcore.Syntax.DeclarativeDelimitedTrailingTraceProtectionProperties
+import Solcore.Syntax.DeclarativeDelimitedTrailingRejectionTraceProtectionProperties
+import Solcore.Syntax.Parser.DelimitedTrailingTraceContextProperties
+import Solcore.Syntax.Parser.DelimitedTrailingRejectionTraceCorrespondenceProperties
+import Solcore.Syntax.Parser.DelimitedTrailingRejectionTraceTailCorrespondenceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -82,4 +88,5 @@ proxy expressions retain nested type events and exact raw failures under type co
 named-type finishing unconditionally records bare-mapping constraint events;
 optional lambda return annotations lift real type outcomes and bypass absent arrows;
 qualified names unconditionally retain checked components and full success/rejection states;
+trailing-enabled lists preserve comma-first and immediate-close priority under child contracts;
 general expressions and remaining statement traces remain open. -/
