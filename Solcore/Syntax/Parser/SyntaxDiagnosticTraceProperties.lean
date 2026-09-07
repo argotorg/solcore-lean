@@ -58,6 +58,9 @@ import Solcore.Syntax.Parser.NamedTypeFinishingTraceProperties
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceExactnessProperties
 import Solcore.Syntax.DeclarativeOptionalLambdaReturnTypeTraceProtectionProperties
 import Solcore.Syntax.Parser.OptionalLambdaReturnTypeRejectionTraceProperties
+import Solcore.Syntax.DeclarativeQualifiedNameTraceOutcomeProperties
+import Solcore.Syntax.Parser.QualifiedNameTraceCorrespondenceProperties
+import Solcore.Syntax.Parser.QualifiedNameRejectionTraceStateProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -78,4 +81,5 @@ right-paren-only reports after non-comma successful children;
 proxy expressions retain nested type events and exact raw failures under type contracts;
 named-type finishing unconditionally records bare-mapping constraint events;
 optional lambda return annotations lift real type outcomes and bypass absent arrows;
+qualified names unconditionally retain checked components and full success/rejection states;
 general expressions and remaining statement traces remain open. -/
