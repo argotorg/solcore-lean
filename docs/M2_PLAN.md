@@ -750,6 +750,16 @@ Soundness guarantees an appended suffix for every result; fixed-trace iff alone
 is not substituted for that guarantee. Concrete inner Core trace contracts
 remain a subsequent obligation, distinct from this completed wrapper proof.
 
+Core block closing has a completed trace boundary. Independent per-statement
+and whole-tail judgments determine termination reports, including the final
+`allow`/`require` distinction, full statement spans, order, and duplicates.
+Existence, uniqueness, protection, and empty-trace/old-validity equivalence are
+proved. A proof-only seam for the private validator supports exact successful
+closing iff with the actual closing-token span kept existential (cover spans
+need not be injective). Rejection is exactly the silent right-brace primitive
+failure and does not run tail validation. Filtering any earlier mixed trace
+followed by this protected suffix preserves that suffix in its final position.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

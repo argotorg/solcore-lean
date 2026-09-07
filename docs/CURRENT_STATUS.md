@@ -929,6 +929,18 @@ order. These are lifting contracts, not a claim that all concrete Core block
 traces have already been specified. Repeated isolation does not recommit a
 failure already recovered by an inner wrapper.
 
+Core block closing now has complete independent tail-validation traces. Every
+non-final unterminated expression emits one constraint at its full statement
+span; only the final expression is exempt under `allow`. These traces are total,
+unique, ordered, and protected from lexical suppression. An empty trace is
+equivalent to the existing tail-validity predicate. Exact right-brace recognition,
+the source-order body, remainder, and complete appended trace characterize
+successful closing. A missing brace rejects before any tail validation and
+preserves the whole input, with an exact uncommitted failure. Mixed filtering
+acts on preceding diagnostics while retaining the full validation suffix.
+The existing parser behavior is unchanged; a small proof-only seam exposes
+the private validator's diagnostic effect.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

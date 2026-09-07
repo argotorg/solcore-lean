@@ -55,6 +55,7 @@ published through Oracle v4.
 | Independent diagnostic traces | Complete raw traces for primitives, pragma success/rejection, and standalone top-item recovery; complete `ParseOutput` for empty tokens, one recovery-to-end, arbitrary successful pragma-only windows, and successful pragma prefixes ending in recognized pragma rejection | Other recognized-start failures and concrete nested/mixed arbitrary-declaration traces | High |
 | Primitive traces and diagnostic normalization | Complete raw/checked identifier AST, remainder, and event suffix; exact silent keyword/symbol/contextual success and rejection reports; total unique mixed-report filtering with full metadata, protected kinds, and retained duplicate order | Composition across arbitrary declarations and nested blocks remains separate | High |
 | Balanced block isolation traces | Complete compositional execution laws and conditional independent trace soundness/completeness/exactness; child context, parent frame, report commitment, and duplicate order are exact | Concrete inner Core block trace contracts remain separate | High |
+| Core block closing traces | Complete independent tail-validation traces and exact brace-closing success/rejection correspondence; policy, full spans, ordered protected events, and failure reports are exact | Statement-event traces and complete raw block composition remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -506,6 +507,13 @@ restored after either success or recovered rejection. Only recovery adds the
 failure report; invariants propagate. Exactness and trace iff lift explicit
 inner contracts without asserting concrete Core trace completeness. Nested
 isolation consumers verify that an already recovered report is not committed again.
+Core closing independently fixes the required expression-semicolon reports,
+including the final-expression policy and complete statement spans. Trace
+existence, uniqueness, protection, and equivalence between an empty trace and
+the old validity predicate are proved. Successful closing fixes the brace,
+source-order AST, remainder, and diagnostic suffix; a missing brace rejects
+without running validation or changing the input. Mixed normalization preserves
+the complete validation suffix after any earlier filtered events.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
