@@ -820,6 +820,13 @@ and joint outcome laws compose, and successful source/full-window preservation
 requires only the inner frame. Concrete recursive statement dispatch remains
 separate from this conditional block-statement layer.
 
+Boolean-first expression-name traces and actual identifier-expression contracts
+are now unconditional. Checked-name events preserve full spelling/span metadata;
+success fixes the entire one-token state update and ordered diagnostic suffix.
+Fallback rejection fixes the unchanged input and identifier-specific report.
+Independent output shape, existence, and joint exactness close the corresponding
+expression assumptions, including a concrete checked-name return instance.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

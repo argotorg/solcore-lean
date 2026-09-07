@@ -61,6 +61,7 @@ published through Oracle v4.
 | Return diagnostic traces | Conditional optional-value and return success/rejection correspondence, full reports, joint exactness, and separate outcome existence under expression laws; unconditional empty-return execution | Concrete general expression contracts, mixed-statement dispatch, and whole-file composition remain separate | High |
 | Literal/Boolean diagnostic traces | Unconditional exact silent primitive traces and complete literal-expression contracts; independent existence/exactness closes literal-return instances | Other expression leaves/layers and mixed statement/file traces remain separate | High |
 | Block-statement diagnostic traces | Conditional exact raw required-tail block trace mapping, five statement execution contracts, joint exactness, and successful full-context preservation | Concrete recursive statement dispatch and whole-file traces remain separate | High |
+| Identifier-expression diagnostic traces | Unconditional Boolean-first name and identifier-expression correspondence, full state updates, checked-name events, independent existence/exactness, and five expression contracts | Recursive expression layers and mixed statement/file composition remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -558,6 +559,10 @@ Raw block statements now inherit exact traces under explicit inner statement
 laws. Their AST wrapper preserves the successful output state, while raw failure
 propagates unchanged without isolation or report commitment. Independent
 structural/exactness laws and successful full-context preservation are proved.
+Expression names now have exact Boolean-first traces, with silent Boolean values
+and located spelling diagnostics for checked identifiers. The actual identifier
+expression fixes the full successful state and unchanged-state first failure,
+and supplies unconditional execution and independent expression contracts.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

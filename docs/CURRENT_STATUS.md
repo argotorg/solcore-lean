@@ -1020,6 +1020,17 @@ exactness compose from the raw block relations. Successful file/full-window
 preservation is proved from the inner frame alone, including delayed validation;
 the parser file adds only a proof exposing its existing validator frame.
 
+Expression names and the real identifier-expression leaf now have unconditional
+exact traces. Boolean keywords take priority and remain silent identifier-shaped
+values; ordinary identifiers retain the checked spelling event when they contain
+hyphens. Independent ordinary erasure, output shape, uniqueness, disjointness,
+and outcome existence match the executable branch order. Successful execution
+fixes the entire state: one token is consumed and the fresh trace is appended
+to existing diagnostics. Rejection preserves the whole input and reports the
+identifier expectation after both Boolean guards fail. The identifier-expression
+leaf supplies all five expression contracts and independent expression laws,
+including concrete nonempty returns that retain a single hyphen event.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
