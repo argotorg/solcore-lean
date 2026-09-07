@@ -1079,6 +1079,23 @@ once, recovers an empty body, and restores the parent window and unread tail.
 Independent restricted block exactness and raw protected-suffix normalization
 use the concrete child laws, with no general expression assumptions.
 
+Leading-dot constructors and their optional argument lists now have independent
+successful and rejecting traces, conditional execution contracts, and exact
+AST/remainder/report/event correspondence. Boolean-first checked-name events
+precede argument events; absent arguments leave the entire state unchanged,
+while written empty parentheses remain a present empty list. No-argument and
+empty-list consumers require no child contract. Raw dot invocation also covers
+missing-dot rejection; erasure into the older dispatcher-selected rejection
+grammar explicitly separates that case. Dot/name/argument failures remain
+uncommitted, and protected name/argument suffixes retain all metadata and order.
+Joint independent exactness requires only child uniqueness and disjointness,
+not outcome existence or concrete recursive expression execution.
+
+Canonical constructor fixtures connect actual lexing and initial states to a
+three-name successful trace and a two-name prefix before argument rejection.
+They retain the separate dot/name/list spans, full parent window, unread tail,
+and uncommitted identifier failure with arbitrary incoming diagnostics.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

@@ -860,6 +860,19 @@ unchanged child failure; outer isolation alone appends that report once and
 restores the parent continuation. Independent restricted exactness and raw
 normalization consumers compose the same array/return/block laws.
 
+Leading-dot constructor traces now compose the real Boolean-first checked name
+with conditional no-trailing argument traces. Optional absence preserves the
+whole state; absent and empty arguments bypass any child. Raw dot rejection
+includes a missing-dot report and explicitly separates that case when erasing
+to the old selected ordinary grammar. Name events precede argument events on
+both outcomes; reports stay uncommitted, and protected suffixes survive actual
+normalization. Independent joint exactness and five expression execution
+contracts keep recursive child assumptions explicit.
+
+Canonical constructor consumers now connect lexing directly to initial states,
+fixing the complete three-event success or two-event rejected prefix alongside
+separate dot/name/list spans, parent window, and unconsumed following tokens.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
