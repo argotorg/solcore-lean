@@ -760,6 +760,19 @@ need not be injective). Rejection is exactly the silent right-brace primitive
 failure and does not run tail validation. Filtering any earlier mixed trace
 followed by this protected suffix preserves that suffix in its final position.
 
+Raw Core block trace composition is complete under explicit statement contracts.
+Independent item/full-block success and rejection judgments fix branch priority,
+AST/remainder/report/trace and erase to the established ordinary grammars.
+Exact statement outcomes lift to joint raw and isolated block exactness.
+Execution soundness supplies a suffix for every ordinary result; completeness
+uses strict cursor progress and full-window preservation to establish sufficient
+production fuel. Fixed-trace success/rejection iff and full-Failure rejection
+iff retain arbitrary incoming diagnostics. Existing reverse item prefixes are
+included once in final whole-body validation, while only new statements emit
+fresh statement events. Rejection runs no delayed validation. Raw contracts
+compose directly through isolation under the same statement assumptions.
+Concrete general statement traces and whole-file traces remain later work.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

@@ -941,6 +941,20 @@ acts on preceding diagnostics while retaining the full validation suffix.
 The existing parser behavior is unchanged; a small proof-only seam exposes
 the private validator's diagnostic effect.
 
+Raw Core blocks now have independent successful and rejecting trace grammars,
+with exact braces, branch priority, AST order, remainders, and full reports.
+Success concatenates all statement events before the single whole-body tail
+validation pass. Rejection retains earlier statement events without performing
+that validation. Statement trace soundness/completeness and source/full-window
+preservation lift to raw success/rejection iff theorems, including sufficient
+production fuel, arbitrary prior diagnostics, and fixed complete failures.
+These contracts also compose through balanced isolation: successful raw traces
+are retained, and recovered raw rejection appends one report at the parent
+resume point. Independent statement outcome exactness supplies joint raw and
+isolated block exactness; no totality claim is inferred from uniqueness alone.
+Normalization keeps the entire delayed validation suffix after filtering earlier
+statement events. Concrete general statement trace contracts remain separate.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

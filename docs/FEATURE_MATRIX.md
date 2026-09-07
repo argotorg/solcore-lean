@@ -55,7 +55,8 @@ published through Oracle v4.
 | Independent diagnostic traces | Complete raw traces for primitives, pragma success/rejection, and standalone top-item recovery; complete `ParseOutput` for empty tokens, one recovery-to-end, arbitrary successful pragma-only windows, and successful pragma prefixes ending in recognized pragma rejection | Other recognized-start failures and concrete nested/mixed arbitrary-declaration traces | High |
 | Primitive traces and diagnostic normalization | Complete raw/checked identifier AST, remainder, and event suffix; exact silent keyword/symbol/contextual success and rejection reports; total unique mixed-report filtering with full metadata, protected kinds, and retained duplicate order | Composition across arbitrary declarations and nested blocks remains separate | High |
 | Balanced block isolation traces | Complete compositional execution laws and conditional independent trace soundness/completeness/exactness; child context, parent frame, report commitment, and duplicate order are exact | Concrete inner Core block trace contracts remain separate | High |
-| Core block closing traces | Complete independent tail-validation traces and exact brace-closing success/rejection correspondence; policy, full spans, ordered protected events, and failure reports are exact | Statement-event traces and complete raw block composition remain separate | High |
+| Core block closing traces | Complete independent tail-validation traces and exact brace-closing success/rejection correspondence; policy, full spans, ordered protected events, and failure reports are exact | Concrete statement-event traces remain separate | High |
+| Raw and isolated Core block traces | Complete conditional success/rejection grammar, exactness, production execution correspondence, and diagnostic normalization under explicit statement contracts | Concrete general statement trace contracts and whole-file composition remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -514,6 +515,14 @@ the old validity predicate are proved. Successful closing fixes the brace,
 source-order AST, remainder, and diagnostic suffix; a missing brace rejects
 without running validation or changing the input. Mixed normalization preserves
 the complete validation suffix after any earlier filtered events.
+Raw Core block traces now compose all statement events before delayed tail
+validation and exclude that validation on rejection. Independent branch and
+report grammars have exact ordinary erasure, uniqueness, and success/rejection
+disjointness under statement outcome laws. Statement execution contracts lift
+to raw and isolated block success/rejection iff theorems, with sufficient
+production fuel, arbitrary prior events, fixed failures, and exact parent resume
+points. These are conditional block contracts; concrete general statement
+diagnostic traces have not yet been supplied.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
