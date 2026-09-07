@@ -931,6 +931,14 @@ Joint exactness, protected suffixes, full-state consumers, and canonical bare
 mapping success/failed mapping arguments are verified. General recursive type
 trace contracts and type-dispatch integration remain open.
 
+Raw mapping-type traces now preserve contextual marker and exact AST spans,
+key/value event order, and all six first-failure positions under nested child
+contracts. Raw prefix failures remain distinct from selected ordinary rejection.
+No unsupported child progress premise is added; a non-advancing-child execution
+was independently checked. Joint exactness, protected suffixes, and canonical
+real-type-child success/closing failure are verified. General recursive type
+contracts and dispatcher composition remain separate.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

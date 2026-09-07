@@ -1195,6 +1195,20 @@ with a real type child. The latter emits no premature mapping constraint.
 Prior reports, complete states, and unconsumed tokens are retained. General
 recursive type traces and prioritized type dispatch still remain separate.
 
+Raw `mapping(key => value)` types now have independent exact success/rejection
+traces and five execution contracts under recursive child contracts. The
+contextual marker is the actual identifier token, and key events precede value
+events. Every AST span and each first failure at marker/open/key/arrow/value/close
+is fixed, including the expected contextual marker or single punctuation and
+the complete uncommitted report. Raw missing-marker/opening cases stay separate
+from the older selected mapping rejection. No child progress is assumed: this
+straight-line parser accepts successful non-advancing children, unlike list
+loops. Ordinary carrier laws remain separate from runtime source/window framing.
+Joint exactness and protected suffixes are public. Canonical real-type-child
+success and closing failure retain both checked-name events, full output states,
+and following tokens. A reusable positive-fuel checked-name leaf helper supplies
+these concrete children without asserting general recursive type contracts.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
