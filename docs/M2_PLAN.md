@@ -853,6 +853,13 @@ ordered checked-name events, empty/numeric arrays, delimiter failure, and child
 rejection after comma. Canonical lexer-to-initial-state connections cover four
 success/rejection fixtures. General recursive expression contracts remain open.
 
+Concrete checked-name array returns now discharge all five statement contracts
+and run through raw and isolated Core blocks under both tail policies. Canonical
+fixtures retain two ordered success events or one earlier event followed by the
+unchanged child failure; outer isolation alone appends that report once and
+restores the parent continuation. Independent restricted exactness and raw
+normalization consumers compose the same array/return/block laws.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

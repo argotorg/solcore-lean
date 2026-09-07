@@ -1072,6 +1072,13 @@ lexer fixtures connect directly through initial parser states to actual array
 outcomes, with exact spans, ordered diagnostics, and unread following tokens.
 These wrappers do not yet supply the general recursive expression contracts.
 
+Checked-name arrays also compose through actual return-only raw and isolated
+blocks. Canonical source examples connect directly to both successful execution
+and exact child-failure propagation; only outer isolation commits that report
+once, recovers an empty body, and restores the parent window and unread tail.
+Independent restricted block exactness and raw protected-suffix normalization
+use the concrete child laws, with no general expression assumptions.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
