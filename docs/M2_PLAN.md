@@ -980,7 +980,7 @@ Monotonicity is now verified for trailing lists, every raw type form, and both
 dispatcher outcomes. Replacing child evidence by pointwise implication keeps
 all indexed values, remainders, events, and reports unchanged. Consumers erase
 auxiliary protection annotations without losing the protected exact suffix.
-Recursive trace construction remains a separate obligation.
+These laws alone do not construct the recursive trace relation.
 
 Generic pointwise and unrestricted completeness bridges now combine both trace
 soundness laws with independent exactness and explicit invariant exclusion.
@@ -1004,10 +1004,23 @@ precise AST/report spans, arbitrary prior events, and following tokens.
 Independent recursive joint exactness is now verified by strong induction,
 using heterogeneous child agreement lifted through trailing lists, raw forms,
 and dispatch. It assumes no recursive uniqueness. Pointwise completeness and
-exact-failure equivalences follow under explicit invariant exclusion; production
-corollaries currently use valid states. Since validity includes earlier
-diagnostic spans, unrestricted completeness still needs a separate totality
-argument. Joint exactness remains distinct from trace outcome existence.
+exact-failure equivalences follow under explicit invariant exclusion. Joint
+exactness remains distinct from trace outcome existence.
+
+Unrestricted recursive type totality now discharges invariant exclusion for
+every state. The new generic list/raw-type argument requires only child
+end-index preservation, strict successful progress, and ordinary execution
+below its resource bound. Actual opening/comma consumption pays for recursive
+steps without global validity. All five type trace contracts and exact
+success/rejection/full-Failure equivalences now quantify over arbitrary earlier
+diagnostics and noncanonical windows. General expression, statement, and
+whole-file diagnostic composition remain separate.
+
+Totality plus soundness also give execution-derived trace existence for every
+State and independent remainder. Noncanonical reverse consumers cover malformed
+provenance/ranges, absent backing tokens, and past-window cursors with arbitrary
+prior events. A synthetic child that changes every unconstrained field and
+overshoots endIndex verifies the resource contract's minimal frame boundary.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

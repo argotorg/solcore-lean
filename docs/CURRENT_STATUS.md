@@ -1328,12 +1328,31 @@ through trailing lists, all raw forms, and the selected dispatcher. Simultaneous
 strong induction compares an annotated left derivation with an arbitrary right
 derivation, without assuming recursive uniqueness as a premise. Actual-reply
 consumers fix every independently claimed event and rule out an opposite
-outcome. Pointwise reverse correspondence now needs only explicit invariant
-exclusion; the existing production totality theorem supplies it on valid input
-states. These validity-restricted completeness and full-failure equivalences
-do not yet quantify over arbitrary prior diagnostic spans. Unrestricted
-completeness and trace outcome existence remain separate obligations; the
-joint specification itself still asserts only uniqueness and disjointness.
+outcome. Pointwise reverse correspondence isolates invariant exclusion as an
+explicit premise; the joint specification itself still asserts only uniqueness
+and disjointness.
+
+That execution premise is now discharged on arbitrary states. A minimal child
+resource contract requires only ordinary execution below its bound, successful
+end-index preservation, and strict cursor progress. Actual opening/comma tokens
+pay for decreasing bounds before nested execution, so no source, token-carrier,
+diagnostic, rejected-state, or global-validity premise is needed. The generic
+list loops and all raw type forms compose into unrestricted production totality.
+Recursive types consequently have all five diagnostic-trace contracts and
+success/rejection/full-Failure equivalences with arbitrary prior diagnostics,
+including noncanonical token windows. This is complete type-trace correspondence,
+not general expression, statement, or whole-file diagnostic-trace completion.
+
+Separate execution-derived existence theorems provide an actual traced ordinary
+reply for every State and a success or rejection derivation for every independent
+remainder/source/endByte. They use unrestricted totality plus soundness, not
+joint exactness. Reverse-correspondence consumers include foreign reversed token
+spans, empty source text, oversized windows, missing backing tokens, and cursors
+past the active window, while retaining arbitrary prior events and full
+State/Failure results. A synthetic-child list consumer independently verifies
+the minimal resource contract: changing source, tokens, endByte, and diagnostics
+and overshooting endIndex still permits ordinary execution. That synthetic
+contract is not a diagnostic-preservation contract.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
