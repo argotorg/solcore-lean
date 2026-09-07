@@ -31,6 +31,7 @@ import Solcore.Syntax.DeclarativeLiteralExpressionTraceExactnessProperties
 import Solcore.Syntax.Parser.BooleanIdentifierRejectionTraceProperties
 import Solcore.Syntax.Parser.LiteralExpressionTraceProperties
 import Solcore.Syntax.Parser.BlockStatementTraceProperties
+import Solcore.Syntax.Parser.IdentifierExpressionTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -40,6 +41,6 @@ isolation have compositional execution laws. Independent isolation traces lift
 explicit inner trace contracts. Raw and isolated Core blocks have full trace
 correspondence under statement contracts. Concrete break/continue leaves have
 unconditional exact traces. Return traces compose explicit expression contracts.
-Literal/Boolean primitives and the literal-expression leaf have exact traces;
+Literal/Boolean primitives and literal/identifier-expression leaves have exact traces;
 Raw block statements inherit exact traces under inner statement contracts;
 general expressions and remaining statement traces remain open. -/
