@@ -787,6 +787,8 @@ from joint exactness and covers missing slots in malformed carriers as well as
 window exhaustion. Raw and isolated restricted-block exactness follows with
 no abstract statement premise. Nonempty token-carrier consumers retain prior
 events, compare both tail policies, and verify recovered parent continuation.
+Two source fixtures now bridge canonical lexing to these success/rejection
+consumers without deciding the execution of the complete block parser.
 General expressions and remaining statement forms are the next trace layer.
 
 At the complete diagnostic-free declaration level, strict soundness now covers

@@ -973,8 +973,11 @@ windows and missing array slots. These leaf laws instantiate raw and isolated
 restricted-block exactness without abstract statement assumptions. Concrete
 token-carrier consumers exercise two-statement success and later-semicolon
 rejection under both tail policies, retaining arbitrary prior events and the
-post-recovery parent window and following token. General statement traces and
-canonical-lexer correspondence for these consumers remain separate.
+post-recovery parent window and following token. Two canonical source fixtures
+also connect actual lexing to break-pair success and break/continue rejection
+priority, including recovered parent continuation. Their lexer results are
+kernel checked; parser outcomes follow the independent trace proofs. General
+statement and whole-file traces remain separate.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.

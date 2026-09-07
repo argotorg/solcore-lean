@@ -534,6 +534,8 @@ existence/uniqueness/disjointness even on malformed carriers. The same laws
 provide joint exactness for raw and isolated blocks restricted to either leaf.
 Concrete token-carrier examples cover two-statement success, later semicolon
 failure, keyword-first priority, and one-report recovery before a parent token.
+Two canonical-source consumers connect actual lexing to these restricted-block
+success and rejection proofs; broader mixed-statement/file traces remain open.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
