@@ -60,6 +60,7 @@ published through Oracle v4.
 | Break/continue diagnostic traces | Unconditional independent leaf existence/exactness, complete success/rejection correspondence, and statement execution contracts; concrete raw/isolated restricted-block consumers | Other statement forms, mixed-statement dispatch, and whole-file traces remain separate | High |
 | Return diagnostic traces | Conditional optional-value and return success/rejection correspondence, full reports, joint exactness, and separate outcome existence under expression laws; unconditional empty-return execution | Concrete general expression contracts, mixed-statement dispatch, and whole-file composition remain separate | High |
 | Literal/Boolean diagnostic traces | Unconditional exact silent primitive traces and complete literal-expression contracts; independent existence/exactness closes literal-return instances | Other expression leaves/layers and mixed statement/file traces remain separate | High |
+| Block-statement diagnostic traces | Conditional exact raw required-tail block trace mapping, five statement execution contracts, joint exactness, and successful full-context preservation | Concrete recursive statement dispatch and whole-file traces remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -553,6 +554,10 @@ exactness without extending that claim to general expressions.
 Canonical `return 42;` and `return 42` consumers verify success and exact EOF
 failure. A separate token-carrier block combines literal and empty returns and
 preserves the full parent context and next token after isolation.
+Raw block statements now inherit exact traces under explicit inner statement
+laws. Their AST wrapper preserves the successful output state, while raw failure
+propagates unchanged without isolation or report commitment. Independent
+structural/exactness laws and successful full-context preservation are proved.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

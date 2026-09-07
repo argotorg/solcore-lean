@@ -812,6 +812,14 @@ Canonical source consumers cover a decimal return and its missing-semicolon
 failure; an explicit-token block combines literal and empty returns, retaining
 both ASTs, all prior events, and the post-isolation parent continuation.
 
+Block-statement traces now wrap the raw required-tail Core block, not balanced
+isolation. Inner statement contracts lift to five outer contracts and exact
+success/rejection/full-failure iff. Success maps only the AST; failure retains
+the entire raw rejected state and its uncommitted report. Independent structural
+and joint outcome laws compose, and successful source/full-window preservation
+requires only the inner frame. Concrete recursive statement dispatch remains
+separate from this conditional block-statement layer.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

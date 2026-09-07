@@ -1011,6 +1011,15 @@ expression parser. A separate explicit-token block mixes literal and empty
 returns under both tail policies and proves raw/isolated success with arbitrary
 prior diagnostics, restored parent context, and an unread following token.
 
+Raw block statements now have independent traces and all five execution
+contracts under explicit inner statement laws. They wrap `coreBlock .require`:
+the successful AST is mapped to a block statement with the same output state,
+and rejection propagates the complete failure and state without committing a
+report or performing isolation. Erasure, progress, token-window laws, and joint
+exactness compose from the raw block relations. Successful file/full-window
+preservation is proved from the inner frame alone, including delayed validation;
+the parser file adds only a proof exposing its existing validator frame.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
