@@ -1059,8 +1059,7 @@ name/type/finishing order, and the absence of an ordinary-name warning after a
 marker. Separate totality and soundness supply explicit traced outcome existence
 for arbitrary States and independent remainders. Reverse consumers distinguish
 raw outcomes on the same input and verify selected success over a bypassed raw
-failure. Public named rewind/recovery is composed below; complete lambda-parameter
-traces remain separate.
+failure. Public named and lambda rewind/recovery are composed separately below.
 
 Lambda tails now have unconditional five contracts and complete State/Failure
 equivalences. Typed tails retag the exact named-tail AST and retain its events;
@@ -1081,7 +1080,7 @@ equivalences are unconditional. Separate ordinary execution and soundness supply
 actual trace existence without reading existence into independent joint exactness.
 Reverse consumers distinguish terminal reports from committed reports, retain
 name warnings and prior duplicates, and verify conditional mixed-event filtering.
-Complete lambda parameters and general recursive expressions remain open.
+Public lambda parameters are composed below; general recursive expressions remain open.
 
 Raw ordinary/comptime lambda parameters and their selected non-recovering core
 now have unconditional five contracts, exact State/Failure equivalences, and
@@ -1089,8 +1088,19 @@ independent joint exactness/protection. The core additionally has separate
 execution-derived trace existence for arbitrary States and remainders. Reusable
 independent witnesses verify ordinary inference over a bypassed raw failure,
 marked missing-type error success, all three nested events, second-name silence,
-and full child rejection. Public lambda recovery and expression composition
-remain separate stages.
+and full child rejection. Public lambda recovery is composed below; expressions
+remain a separate stage.
+
+Standalone lambda recovery now retags only the recovered error AST while keeping
+the exact State, Failure, and event suffix. Its unconditional five contracts,
+whole-State equivalences, joint exactness, and conditional filters reuse the
+function-recovery specification. Public lambda parameters compose that recovery
+with cursor-only core rewind and exact original-report commitment. Their five
+contracts and State/Failure equivalences are unconditional, and separate ordinary
+execution proves trace existence on every State and independent remainder.
+Consumers distinguish inference and missing-type core success from recovery,
+and retain ordered mixed events, prior duplicates, and separate terminal reports.
+Parameter lists and complete lambda/general expression traces remain separate.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

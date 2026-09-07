@@ -1414,8 +1414,8 @@ joint exactness is distinct from execution-derived outcome existence, which is
 also provided for every State and independent remainder. Consumers reconstruct
 whole replies, preserve arbitrary earlier events through lexical filtering,
 and verify that diagnosed ordinary success wins over a bypassed raw failure.
-Public named-parameter rewind/recovery is composed below; complete lambda
-parameters and whole-file traces remain separate obligations.
+Public named-parameter and lambda-parameter rewind/recovery are composed below;
+whole-file traces remain a separate obligation.
 
 Lambda-parameter tails now have unconditional five trace contracts and exact
 whole-State/full-Failure correspondence. Typed paths preserve the named-tail
@@ -1443,7 +1443,8 @@ uncommitted terminal report even when its payload equals the committed original.
 Reverse consumers check cursor rewind, unchanged prior duplicates, no repeated
 identifier checks while skipping, and protected name events through conditional
 filtering of the committed report and recovery event. This completes the public
-named-parameter slice, not lambda parameters, general expressions, or file traces.
+named-parameter slice, not general expressions or file traces; lambda parameters
+are handled separately below.
 
 Both raw lambda-parameter paths and their selected non-recovering core now have
 unconditional five trace contracts and exact whole-State/Failure equivalences.
@@ -1453,7 +1454,23 @@ separate actual and independent outcome existence on arbitrary inputs. Reverse
 consumers reconstruct nested name/type/finishing events, silence after a second
 comptime name, exact missing-type covers, and full child failure; arbitrary
 earlier events and protected core suffixes are retained. Public lambda rewind
-and recovery, lambda expressions, and general recursive expressions are separate.
+and recovery are handled below; lambda expressions remain a separate composition.
+
+Standalone lambda recovery now inherits exact function-recovery traces, changing
+only the recovered error AST's carrier. It has unconditional five contracts,
+whole-State/Failure equivalences, independent joint exactness, and conditional
+recovery-event filtering. Reverse consumers reuse the function fixtures for
+mandatory consumption, later delimiter stops, missing backing, and prior reports.
+
+The public lambda-parameter parser now also has unconditional five contracts,
+exact whole-State/Failure equivalences, and separate actual/independent trace
+existence. Its cursor-only rewind, boundary report policy, and one original-report
+commitment match the independent specification without validity assumptions.
+Reverse consumers preserve prior duplicates and mixed diagnostic filtering;
+ordinary inference and marked missing-type error success explicitly bypass
+recovery. Both public parameter slices are complete at this trace boundary.
+Parameter lists, lambda expressions, general recursive expressions, and whole-file
+traces remain separate composition obligations.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
