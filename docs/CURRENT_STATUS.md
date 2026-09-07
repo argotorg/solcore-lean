@@ -994,6 +994,17 @@ existence are separate assumptions: the former lifts to return and restricted
 raw/isolated block exactness, while the latter supplies return outcome existence.
 General expression trace contracts are still abstract at this boundary.
 
+Core literal and Boolean primitives now have unconditional exact silent
+success/rejection traces. Decimal, hexadecimal, and string spellings are retained
+verbatim; Boolean keywords retain the existing identifier-shaped AST. Success
+changes only the cursor by one token; rejection retains the whole input state
+and fixes the complete failure, including the distinct literal versus expression
+expectations. Independent existence, uniqueness, and disjointness cover arbitrary
+carriers and windows. The actual literal-expression leaf supplies all five
+expression execution contracts and both independent expression laws, discharging
+the abstract assumptions for empty/one-literal returns and restricted raw/isolated
+return block exactness. General expressions are not implied by this leaf result.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

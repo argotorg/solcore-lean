@@ -59,6 +59,7 @@ published through Oracle v4.
 | Raw and isolated Core block traces | Complete conditional success/rejection grammar, exactness, production execution correspondence, and diagnostic normalization under explicit statement contracts | Concrete general statement trace contracts and whole-file composition remain separate | High |
 | Break/continue diagnostic traces | Unconditional independent leaf existence/exactness, complete success/rejection correspondence, and statement execution contracts; concrete raw/isolated restricted-block consumers | Other statement forms, mixed-statement dispatch, and whole-file traces remain separate | High |
 | Return diagnostic traces | Conditional optional-value and return success/rejection correspondence, full reports, joint exactness, and separate outcome existence under expression laws; unconditional empty-return execution | Concrete general expression contracts, mixed-statement dispatch, and whole-file composition remain separate | High |
+| Literal/Boolean diagnostic traces | Unconditional exact silent primitive traces and complete literal-expression contracts; independent existence/exactness closes literal-return instances | Other expression leaves/layers and mixed statement/file traces remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -543,6 +544,12 @@ Expression contracts provide return execution correspondence and restricted
 block composition; empty returns bypass expression execution unconditionally.
 Independent expression exactness and outcome existence remain separate inputs,
 and no general concrete expression trace claim is implied.
+Core literal and Boolean primitives now have unconditional silent traces with
+exact payloads, one-token successful state updates, and unchanged-state failures
+whose expectations remain distinct. Their independent outcomes are total and
+exact. The real literal-expression leaf supplies all execution and independent
+expression contracts, closing empty/one-literal return and restricted-block
+exactness without extending that claim to general expressions.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

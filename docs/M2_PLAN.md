@@ -801,6 +801,14 @@ expression execution. Restricted return block composition uses the resulting
 five statement contracts. Concrete general expressions and remaining statement
 forms are the next trace layer.
 
+Literal/Boolean primitive traces are now unconditional: silent one-token
+success preserves every payload and prior event, while silent rejection fixes
+the full unchanged state and expectation-specific report. Their independent
+outcomes exist and are exact on arbitrary carriers. The actual literal-expression
+leaf discharges the five expression execution contracts, joint exactness, and
+outcome existence. Literal-only return instances therefore need no abstract
+expression premise, including their restricted raw/isolated block laws.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
