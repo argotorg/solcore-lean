@@ -1482,6 +1482,14 @@ and retain all child recovery events. The lambda law targets the existing inline
 parser rather than adding a new runtime helper. These list results do not assert
 unconditional cascade protection, signature traces, or complete lambda expressions.
 
+Independent reverse consumers now cover both actual lists on shared token
+carriers: empty, single and optional-trailing-comma success, comma-first
+`[comma, rightParen]` delimiter failure, first-child boundary rejection, and
+recovered children with arbitrary duplicate prior diagnostics. The same untyped
+name is erroneous for a function but inferred for a lambda; the exact AST,
+remaining semicolon, complete Failure, and ordered event suffix are checked.
+Separate consumers retain outcome existence on a numerically invalid window.
+
 Raw lambda-expression traces now compose the concrete recovering parameter list,
 optional recursive return type, and an explicitly supplied body relation. The
 five contracts require only the corresponding body contracts; success and reject
@@ -1493,7 +1501,14 @@ or joint exactness. All four first failures preserve complete terminal reports,
 and pointwise laws show early failures bypass any body parser. Parameter and body
 events are filtered explicitly around the protected return-type events. This is
 a raw, body-conditional composition, not a complete recursive expression parser
-or an atom-dispatch result; concrete reverse consumers are a separate check.
+or an atom-dispatch result. Concrete `lam(+) -> a-b {}` consumers retain parameter
+recovery reports/events before the return-name warning and supplied body events,
+including arbitrary prior diagnostics and complete body Failure/State forwarding.
+Marker, hidden list-opening, and return-type failures bypass any body parser;
+mixed filters explicitly suppress recovery events while retaining the return
+warning. A real empty Core block bypasses any supplied statement parser and
+leaves the following semicolon unread; general nonempty body behavior stays
+explicitly conditional.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.

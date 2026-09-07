@@ -1111,6 +1111,12 @@ child or validity premises. Empty lists, trailing commas, and recovery events
 retain the existing runtime behavior. Signature and lambda-expression traces,
 including their following returns and bodies, are separate composition stages.
 
+Shared-carrier reverse consumers check both lists' exact empty/single/trailing
+success, ordered delimiter report, first-child boundary failure, recovering
+child events with duplicate prior diagnostics, and invalid-window trace existence.
+They distinguish function missing-type errors from lambda inference while
+retaining the complete AST, State, Failure, and unread semicolon.
+
 Raw lambda expressions now compose the real parameter list and optional return
 with explicit body trace contracts. All five contracts and full-Failure suffix
 iff laws are available; complete successful/rejected States require the respective
@@ -1121,6 +1127,12 @@ failures are distinguished, and pointwise early failures bypass any supplied bod
 Mixed filtering retains the protected return events between explicit parameter
 and body filters. General recursive expression and atom-selection trace completion
 are still open; raw body-conditional laws do not close those obligations.
+
+Concrete raw-lambda consumers now exercise recovering parameters followed by a
+hyphenated return name, arbitrary body success/failure and ordered body events,
+all body-before-execution failure positions, conditional mixed filtering, and
+the real empty Core block with an arbitrary bypassed statement parser. General
+body results remain explicit pointwise assumptions; the empty case is concrete.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
