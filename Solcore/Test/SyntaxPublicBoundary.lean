@@ -2101,4 +2101,29 @@ example := @Syntax.Parser.ExpressionAtomInternals.tupleTailTrace_comma_present
 example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_trace_success_complete
 example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_trace_success_complete
 
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.marker_present
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.ordinary_of_marker_present
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.proxyExpressionTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceParses
+example := @Syntax.DeclarativeGrammar.ProxyExpressionTraceRejects
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_reject_iff_components
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_success_iff_components
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_success_iff
+
 end Tests

@@ -51,6 +51,9 @@ import Solcore.Syntax.DeclarativeParenthesizedTraceProtectionProperties
 import Solcore.Syntax.DeclarativeParenthesizedRejectionTraceProtectionProperties
 import Solcore.Syntax.Parser.ParenthesizedTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.ParenthesizedRejectionTraceCorrespondenceProperties
+import Solcore.Syntax.DeclarativeProxyExpressionRejectionTraceProperties
+import Solcore.Syntax.Parser.ProxyExpressionSuccessTraceProperties
+import Solcore.Syntax.Parser.ProxyExpressionRejectionTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -68,4 +71,5 @@ array literals inherit five expression contracts and exact AST mapping;
 leading-dot constructors preserve Boolean-first name events before argument traces;
 parenthesized groups/tuples have conditional exact traces with silent closes and
 right-paren-only reports after non-comma successful children;
+proxy expressions retain nested type events and exact raw failures under type contracts;
 general expressions and remaining statement traces remain open. -/
