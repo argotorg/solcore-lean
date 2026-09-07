@@ -63,6 +63,7 @@ published through Oracle v4.
 | Block-statement diagnostic traces | Conditional exact raw required-tail block trace mapping, five statement execution contracts, joint exactness, and successful full-context preservation | Concrete recursive statement dispatch and whole-file traces remain separate | High |
 | Identifier-expression diagnostic traces | Unconditional Boolean-first name and identifier-expression correspondence, full state updates, checked-name events, independent existence/exactness, and five expression contracts | Recursive expression layers and mixed statement/file composition remain separate | High |
 | Protected statement trace normalization | Success/rejection composition through returns and raw/nested block statements, retaining complete fresh protected traces while filtering prior events | Final uncommitted reports and isolated-recovery reports are not presumed protected | High |
+| No-trailing delimiter diagnostic traces | Conditional independent success/rejection exactness and execution correspondence for both empty policies, actual production fuel, arbitrary prior/reverse prefixes, comma priority, ordered duplicate expectations, and protected child suffixes | Child execution/frame laws remain explicit; token-carrier preservation is separate for ordinary success erasure; recursive expression and file traces remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are

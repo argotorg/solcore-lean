@@ -835,6 +835,16 @@ Concrete nested break blocks and canonical checked-name return fixtures exercise
 ordered events, exact inner failure propagation, single outer recovery, and
 parent continuation without broadening to general statement traces.
 
+Generic no-trailing delimiter traces now cover both empty policies, successful
+and rejecting tails/lists, independent joint exactness, and protected suffixes.
+Five arbitrary-result execution contracts separate child traces from successful
+source/full-window preservation. Soundness and completeness retain arbitrary
+prior events and reverse prefixes, using the real after-opening production fuel.
+No token-carrier law is hidden in trace grammar; whole-list ordinary erasure
+requests it explicitly. Comma priority, direct child invocation after comma,
+and ordered possibly duplicate delimiter expectations are preserved. These are
+conditional list laws, not concrete recursive expression or full-file traces.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

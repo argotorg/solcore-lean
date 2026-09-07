@@ -1048,6 +1048,19 @@ two-name events and later semicolon failure, with exact raw/recovered diagnostic
 order, restored parent contexts, and unread following tokens. These remain
 restricted statement/leaf instances rather than general expression/file traces.
 
+Generic no-trailing lists now have independent successful and rejecting traces
+for either empty-list policy. Child contracts give exact AST/remainder/report
+and complete appended-event correspondence, with arbitrary prior diagnostics
+and reverse element prefixes. Successful children preserve source and the full
+active window; token-carrier preservation is separate and needed only when
+erasing whole-list success to the older ordinary grammar. Completeness uses
+the actual production fuel measured immediately after the opening delimiter.
+Commas take priority over closing symbols, even when both symbols are comma;
+after a comma the child runs directly without a closing-absence guard. Missing
+delimiters report comma then closing, retaining duplicate expectations. Joint
+independent exactness and protected-suffix normalization compose from child
+laws without asserting child totality or general expression trace completion.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
