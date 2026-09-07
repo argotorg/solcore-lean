@@ -154,6 +154,13 @@ import Solcore.Syntax.DeclarativeLambdaParameterCoreTraceGrammar
 import Solcore.Syntax.DeclarativeLambdaParameterCoreTraceProperties
 import Solcore.Syntax.Parser.LambdaParameterCoreTraceProperties
 import Solcore.Syntax.Parser.LambdaParameterCoreTraceExistenceProperties
+import Solcore.Syntax.DeclarativeLambdaParameterRecoveryTraceGrammar
+import Solcore.Syntax.DeclarativeLambdaParameterRecoveryTraceProperties
+import Solcore.Syntax.Parser.LambdaParameterRecoveryTraceProperties
+import Solcore.Syntax.DeclarativeLambdaParameterTraceGrammar
+import Solcore.Syntax.DeclarativeLambdaParameterTraceProperties
+import Solcore.Syntax.Parser.LambdaParameterTraceProperties
+import Solcore.Syntax.Parser.LambdaParameterTraceStateProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -202,4 +209,6 @@ lambda parameter tails retag exact typed outcomes and distinguish inferred absen
 standalone parameter recovery has exact full-State traces with conditional recovery-event filtering;
 public named parameters compose cursor-only rewind, one report commitment, and exact recovery outcomes;
 raw lambda parameters and their pair-selected core preserve exact inferred/typed/error outcomes and complete traces;
+standalone lambda recovery preserves function-recovery states and events while retagging only the error AST;
+public lambda parameters have exact rewind/recovery traces, whole-State equivalences, and separate outcome existence;
 general expressions and remaining statement traces remain open. -/
