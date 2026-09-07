@@ -122,6 +122,16 @@ import Solcore.Syntax.DeclarativeParameterNameFinishingTraceProperties
 import Solcore.Syntax.Parser.ParameterNameFinishingTraceProperties
 import Solcore.Syntax.Parser.ParameterSourceFrameProperties
 import Solcore.Syntax.Parser.ParameterDispatchTraceProperties
+import Solcore.Syntax.DeclarativeNamedParameterRawTraceGrammar
+import Solcore.Syntax.DeclarativeNamedParameterRawTraceProperties
+import Solcore.Syntax.DeclarativeNamedParameterRawRejectionTraceProperties
+import Solcore.Syntax.Parser.OrdinaryNamedParameterTraceProperties
+import Solcore.Syntax.Parser.ComptimeNamedParameterTraceProperties
+import Solcore.Syntax.Parser.NamedParameterRawTraceStateProperties
+import Solcore.Syntax.DeclarativeNamedParameterCoreTraceGrammar
+import Solcore.Syntax.DeclarativeNamedParameterCoreTraceProperties
+import Solcore.Syntax.Parser.NamedParameterCoreTraceProperties
+import Solcore.Syntax.Parser.NamedParameterCoreTraceExistenceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -164,4 +174,6 @@ proxy expressions and optional lambda returns instantiate concrete unrestricted 
 typed and error parameter finishers retain exact values and append only their own constraint events;
 named parameter tails have unconditional five contracts, whole-State equivalences, and ordered type/finishing events;
 ordinary name checks preserve exact prefix events, while both parameter dispatchers select the same window-visible pair;
+raw named parameters and their selected non-recovering core have unconditional exact traces and whole-State correspondence;
+separate core totality and soundness give non-vacuous traced outcome existence on arbitrary inputs;
 general expressions and remaining statement traces remain open. -/
