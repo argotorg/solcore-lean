@@ -3225,4 +3225,36 @@ example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_success_stat
 example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_reject_failure_state_iff
 example := @Syntax.Parser.ExpressionAtomInternals.recoverAtom_trace_reject_state_iff
 
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchFinalTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchRawTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchRawTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchFinalTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceParses.raw_of_selected
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects.raw_of_selected
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceParses.not_final
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects.final_iff
+example := @Syntax.DeclarativeGrammar.expressionAtomDispatchRawTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomDispatchTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.expressionAtomDispatchTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_context
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomDispatchTraceInternals.raw_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_trace_sound
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_success_state_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_failure_state_iff
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_state_iff
+
 end Tests

@@ -178,6 +178,11 @@ import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceGrammar
 import Solcore.Syntax.DeclarativeExpressionAtomRecoveryTraceProperties
 import Solcore.Syntax.Parser.ExpressionAtomRecoveryTraceStateProperties
 import Solcore.Syntax.Parser.ExpressionAtomRecoveryTraceProperties
+import Solcore.Syntax.DeclarativeExpressionAtomDispatchTraceGrammar
+import Solcore.Syntax.DeclarativeExpressionAtomDispatchTraceProperties
+import Solcore.Syntax.Parser.ExpressionAtomDispatchSuccessTraceProperties
+import Solcore.Syntax.Parser.ExpressionAtomDispatchRejectionTraceProperties
+import Solcore.Syntax.Parser.ExpressionAtomDispatchTraceCorrespondenceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -232,4 +237,5 @@ actual function and inline lambda parameter lists inherit unconditional exact tr
 raw lambda expressions compose concrete parameters and returns with explicit body trace contracts and conditional filters;
 expression-atom guards independently select one of eight raw branches on arbitrary token remainders;
 standalone atom recovery preserves exact error ASTs and singleton events, with conditional lexical filtering;
+one selected atom-core layer has exact raw trace correspondence under explicit nested-expression and body contracts;
 general expressions and remaining statement traces remain open. -/
