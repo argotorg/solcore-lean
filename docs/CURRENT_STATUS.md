@@ -1548,7 +1548,8 @@ scan, and emits exactly one recovered-expression event at the error AST's span.
 An unavailable initial token rejects without committing its report; missing
 backing after consumption terminates the scan successfully. Recovery-event
 filtering is explicitly conditional. Caller report commitment and the public
-atom's rewind/recovery composition remain separate obligations.
+atom's rewind/recovery composition are covered separately below under explicit
+core contracts.
 
 Independent recovery consumers now reconstruct exact replies for initial
 semicolon/else consumption, subsequent else/semicolon stopping, skipped
@@ -1556,6 +1557,26 @@ hyphenated identifiers without replayed checks, initial missing-backing rejectio
 versus established-scan success, and hidden first/following tokens. They retain
 arbitrary prior and duplicate events, leave the stopping token unread, and show
 both concrete lexical-filter retention and removal of the recovery event.
+
+The public atom wrapper now has independent core-or-recovered success and
+boundary-or-recovery rejection traces over explicit core relations. Runtime
+soundness/completeness and complete State/Failure equivalences require the
+matching core contracts and rejected file/end-byte frame, not unchanged token
+arrays or end indices. Successful State reconstruction additionally uses the
+core's successful file/end-byte frame. Only the cursor is rewound; the original
+report is committed exactly once on the non-boundary path, and the recovery
+terminal report remains separate. Full-window context is a stronger, separately
+stated law. Independent joint exactness is conditional on core exactness;
+non-vacuous State/remainder outcome existence separately requires core ordinary
+execution and soundness. This is a conditional wrapper, not general expression
+or file trace completion.
+
+A concrete stationary-child counterexample now verifies the limit of the trace
+contracts: both children have all five contracts, ordinary execution, and exact
+joint specifications, yet the selected parenthesized atom reports a `noProgress`
+invariant. Completeness together with that exact execution rules out both
+independent trace outcomes for this input. Neither child ordinary execution nor
+joint uniqueness substitutes for the strict progress needed by collections.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.

@@ -1141,7 +1141,7 @@ unselected-child independence. This does not establish recursive trace existence
 Standalone atom recovery has unconditional five trace contracts and whole-State/
 Failure equivalences, with a mandatory initial token, boundary scan, singleton
 event, and conditional cascade filtering. Public atom rewind and report commitment
-remain to be composed with the selected core trace.
+are covered below under explicit core contracts.
 Standalone reverse consumers additionally distinguish mandatory-first behavior
 from later boundary/missing-backing stops, active-window hiding, original report
 non-replay, duplicate prior events, and concrete conditional lexical filtering.
@@ -1156,6 +1156,16 @@ recursive totality and non-vacuous trace existence are still separate obligation
 Separate rejection-context composition preserves a chosen window observation,
 including file/end-byte-only frames that permit failed token/end-index changes.
 It requires no body success, token preservation, validity, or progress contract.
+
+Public atom rewind/recovery now has conditional independent traces, exact
+State/Failure equivalences, and explicit core file/end-byte frames that preserve
+changed failed carriers/end indices. Non-boundary recovery commits the core
+report once; boundary and recovery terminal reports remain separate. Ordinary
+execution and trace existence require an explicit core ordinary contract.
+A stationary-child consumer satisfies all five child trace contracts and joint
+exactness but reaches the actual parenthesized noProgress invariant; completeness
+proves that neither independent atom outcome exists there. Recursive progress
+and totality remain distinct obligations.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
