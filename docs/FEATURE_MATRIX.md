@@ -523,6 +523,10 @@ to raw and isolated block success/rejection iff theorems, with sufficient
 production fuel, arbitrary prior events, fixed failures, and exact parent resume
 points. These are conditional block contracts; concrete general statement
 diagnostic traces have not yet been supplied.
+A test-only checked-name adapter supplies nonempty token-carrier consumers of
+these contracts, including ordered name/tail events and recovered rejection
+with parent-window and next-token preservation; it is not a Core grammar or
+canonical-lexer claim.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

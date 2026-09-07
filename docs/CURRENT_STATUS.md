@@ -955,6 +955,14 @@ isolated block exactness; no totality claim is inferred from uniqueness alone.
 Normalization keeps the entire delayed validation suffix after filtering earlier
 statement events. Concrete general statement trace contracts remain separate.
 
+A test-only checked-identifier statement adapter exercises these contracts on
+nonempty hand-constructed token carriers. Two hyphenated names emit both name
+events before either delayed termination event; allowing the final expression
+removes only its termination event. Rejection after the first name emits no
+termination event, and isolation commits the unexpected-token report once while
+restoring the parent window and leaving the next token untouched. These examples
+do not claim a Core statement grammar or canonical-lexer correspondence.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

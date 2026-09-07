@@ -773,6 +773,12 @@ fresh statement events. Rejection runs no delayed validation. Raw contracts
 compose directly through isolation under the same statement assumptions.
 Concrete general statement traces and whole-file traces remain later work.
 
+Nonempty contract consumers now instantiate a test-only checked-name statement
+parser on explicit token carriers. They verify name-event ordering before all
+tail checks, the final-expression policy difference, rejection without tail
+validation, and one-report captured recovery preserving the parent window and
+following token. This adapter is not the concrete Core statement parser.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
