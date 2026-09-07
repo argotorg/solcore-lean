@@ -2342,4 +2342,30 @@ example := @Syntax.Parser.parseMappingType_trace_reject_failure_iff
 example := @Syntax.Parser.parseMappingType_reject_trace_sound
 example := @Syntax.Parser.parseMappingType_trace_reject_complete
 
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.marker_present
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.ordinary_components
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.ordinary_of_marker_present
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.proxyTypeTraceExactOutcomeSpec
+example := @Syntax.Parser.parseProxyType_success_iff_components
+example := @Syntax.Parser.parseProxyType_trace_success_sound
+example := @Syntax.Parser.parseProxyType_trace_success_complete
+example := @Syntax.Parser.parseProxyType_success_context
+example := @Syntax.Parser.parseProxyType_trace_success_iff
+example := @Syntax.Parser.parseProxyType_reject_iff_components
+example := @Syntax.Parser.parseProxyType_reject_trace_sound
+example := @Syntax.Parser.parseProxyType_trace_reject_complete
+example := @Syntax.Parser.parseProxyType_trace_reject_iff
+example := @Syntax.Parser.parseProxyType_trace_reject_failure_iff
+
 end Tests

@@ -79,6 +79,9 @@ import Solcore.Syntax.DeclarativeMappingTypeTraceOutcomeProperties
 import Solcore.Syntax.DeclarativeMappingTypeRejectionTraceProtectionProperties
 import Solcore.Syntax.Parser.MappingTypeTraceProperties
 import Solcore.Syntax.Parser.MappingTypeRejectionTraceCorrespondenceProperties
+import Solcore.Syntax.DeclarativeProxyTypeRejectionTraceProperties
+import Solcore.Syntax.Parser.ProxyTypeSuccessTraceProperties
+import Solcore.Syntax.Parser.ProxyTypeRejectionTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -104,4 +107,5 @@ trailing-enabled lists preserve comma-first and immediate-close priority under c
 optional named-type arguments inherit exact nonempty-list outcomes and silent absence;
 raw named types compose name, argument, and finishing events without dispatch assumptions;
 raw mapping types retain exact key/value events and all six first-failure positions;
+raw proxy types forward nested type outcomes with no extra success/rejection frame premise;
 general expressions and remaining statement traces remain open. -/

@@ -160,6 +160,8 @@ import Solcore.Test.SyntaxNamedTypeTraceProperties
 import Solcore.Test.SyntaxCanonicalNamedTypeTraceExamples
 import Solcore.Test.SyntaxMappingTypeTraceProperties
 import Solcore.Test.SyntaxCheckedTypeLeafTraceSupport
+import Solcore.Test.SyntaxCanonicalProxyTypeTraceExamples
+import Solcore.Test.SyntaxProtectedProxyTypeTraceProperties
 import Solcore.Test.SyntaxCanonicalMappingTypeTraceExamples
 import Solcore.Test.SyntaxParserPublicPragmaNameRejectionExamples
 import Solcore.Test.SyntaxParserPublicPragmaNameCascadeExamples
