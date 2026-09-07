@@ -1354,6 +1354,30 @@ the minimal resource contract: changing source, tokens, endByte, and diagnostics
 and overshooting endIndex still permits ordinary execution. That synthetic
 contract is not a diagnostic-preservation contract.
 
+Recursive type trace equivalences now reconstruct the complete success and
+rejection State. Source preservation is proved separately for primitives,
+delimiter loops, raw types, and all recursive bounds without input validity.
+Reconstruction retains the independent remainder's tokens, endIndex, and cursor,
+the original source/endByte, and exactly the appended diagnostic suffix.
+Nested reverse consumers retain full Failure values and following tokens;
+separate counterexamples rule out forgetting tokens or endIndex in cursor-only
+state updates.
+
+Raw proxy expressions and optional lambda return annotations now instantiate
+the concrete unrestricted type contracts. Their five execution contracts,
+success/rejection/full-Failure equivalences, independent joint exactness, and
+protected suffixes no longer require caller-supplied child contracts. Consumers
+start from independent type derivations and preserve arbitrary earlier events.
+These are two type-bearing components, not complete expression or lambda traces.
+
+Typed and error parameter finishers now have independent event judgments with
+existence, uniqueness, and cascade protection. Exact execution fixes their full
+AST and State: only an outer comptime type adds its type-span constraint;
+proxy-of-comptime remains silent. Finishing never replays earlier name/type
+events, and duplicate constraints retain their order. Both missing-type error
+constraints retain their specified spans. These are finishing-only components;
+parameter names, tails, dispatch, and recovery still require composition.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

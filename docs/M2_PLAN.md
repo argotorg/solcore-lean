@@ -1022,6 +1022,21 @@ provenance/ranges, absent backing tokens, and past-window cursors with arbitrary
 prior events. A synthetic child that changes every unconstrained field and
 overshoots endIndex verifies the resource contract's minimal frame boundary.
 
+Separate source-preservation laws now lift type trace equivalences to exact
+whole-State success and rejection on arbitrary inputs. Reconstruction uses
+every independent remainder field, with explicit counterexamples for dropping
+token-carrier or end-index equality. Nested consumers recover the complete
+Failure and retain untouched following tokens and arbitrary prior events.
+
+Raw proxy expressions and optional lambda return annotations now consume the
+actual unrestricted type contracts, making all five execution contracts and
+trace equivalences unconditional. Independent reverse consumers also preserve
+protected diagnostic suffixes. Full expression and lambda composition remain
+open. Parameter finishing is a separate completed leaf: independent event
+existence/uniqueness and exact full-State execution preserve earlier events,
+append only an outer-comptime or specified missing-type constraint, and retain
+duplicates. Name/tail selection and recovery are not covered by this leaf.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
