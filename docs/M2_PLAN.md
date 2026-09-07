@@ -939,6 +939,12 @@ was independently checked. Joint exactness, protected suffixes, and canonical
 real-type-child success/closing failure are verified. General recursive type
 contracts and dispatcher composition remain separate.
 
+Raw proxy-type traces now forward exact child success/rejection without an
+extra frame premise; successful framing is a separate contract. Independent
+joint uniqueness/disjointness, raw/selected rejection separation, protected
+suffixes, whole-state marker bypass, and canonical real-type-child success and
+failure are verified. General recursive type contracts and dispatch remain open.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

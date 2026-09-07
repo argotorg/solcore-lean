@@ -1209,6 +1209,17 @@ success and closing failure retain both checked-name events, full output states,
 and following tokens. A reusable positive-fuel checked-name leaf helper supplies
 these concrete children without asserting general recursive type contracts.
 
+Raw proxy types `@T` now have independent exact success/rejection traces and
+five execution contracts. Success and rejection forwarding require only the
+corresponding child contracts, with successful source/window framing proved
+separately. The marker and complete proxy AST spans, child state, events, and
+uncommitted failure are exact; a missing marker bypasses every child on the
+unchanged state. Raw marker failure remains separate from selected ordinary
+rejection. Joint uniqueness/disjointness and protected ordered suffixes are
+public. Canonical `@a-b tail` and `@+ tail` consumers use the real type child and
+verify complete states and unconsumed tails. These type results are distinct
+from proxy-expression traces and do not complete general recursive type traces.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
