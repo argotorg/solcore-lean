@@ -1031,6 +1031,23 @@ identifier expectation after both Boolean guards fail. The identifier-expression
 leaf supplies all five expression contracts and independent expression laws,
 including concrete nonempty returns that retain a single hyphen event.
 
+Protected event traces now compose through optional return values, returns,
+raw block items/blocks, and block statements on both success and rejection.
+Checked-name events and delayed termination constraints survive arbitrary
+lexical cascade filtering with all metadata, order, and duplicates intact.
+Executable filter consumers show that prior diagnostics may be normalized while
+the complete fresh suffix remains unchanged, including nested return blocks.
+Uncommitted failure reports are kept separate, and reports appended by isolated
+recovery are deliberately not presumed protected.
+
+Concrete two-level break-block consumers verify nested AST order and spans,
+direct propagation of an inner semicolon failure without skipping closing
+braces, and one-report recovery only when isolation is applied to the outer
+block. Checked-name return blocks have canonical lexer fixtures for successful
+two-name events and later semicolon failure, with exact raw/recovered diagnostic
+order, restored parent contexts, and unread following tokens. These remain
+restricted statement/leaf instances rather than general expression/file traces.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

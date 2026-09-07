@@ -62,6 +62,7 @@ published through Oracle v4.
 | Literal/Boolean diagnostic traces | Unconditional exact silent primitive traces and complete literal-expression contracts; independent existence/exactness closes literal-return instances | Other expression leaves/layers and mixed statement/file traces remain separate | High |
 | Block-statement diagnostic traces | Conditional exact raw required-tail block trace mapping, five statement execution contracts, joint exactness, and successful full-context preservation | Concrete recursive statement dispatch and whole-file traces remain separate | High |
 | Identifier-expression diagnostic traces | Unconditional Boolean-first name and identifier-expression correspondence, full state updates, checked-name events, independent existence/exactness, and five expression contracts | Recursive expression layers and mixed statement/file composition remain separate | High |
+| Protected statement trace normalization | Success/rejection composition through returns and raw/nested block statements, retaining complete fresh protected traces while filtering prior events | Final uncommitted reports and isolated-recovery reports are not presumed protected | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -563,6 +564,12 @@ Expression names now have exact Boolean-first traces, with silent Boolean values
 and located spelling diagnostics for checked identifiers. The actual identifier
 expression fixes the full successful state and unchanged-state first failure,
 and supplies unconditional execution and independent expression contracts.
+Protected event lists compose through returns and raw block statements on both
+success and rejection; executable filtering retains the complete fresh suffix
+while independently normalizing prior events. Concrete nested break blocks and
+canonical checked-name return fixtures verify inner failure propagation,
+single outer recovery, and exact parent continuation. Final failure reports are
+not included in the protected raw trace claim.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

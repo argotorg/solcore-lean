@@ -827,6 +827,14 @@ Fallback rejection fixes the unchanged input and identifier-specific report.
 Independent output shape, existence, and joint exactness close the corresponding
 expression assumptions, including a concrete checked-name return instance.
 
+Protected trace composition now covers successful and rejected returns, raw
+Core blocks, and block statements. Complete checked-name and delayed constraint
+events survive lexical normalization while arbitrary prior candidates can still
+be filtered. Uncommitted and isolated-recovery reports are not assumed protected.
+Concrete nested break blocks and canonical checked-name return fixtures exercise
+ordered events, exact inner failure propagation, single outer recovery, and
+parent continuation without broadening to general statement traces.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
