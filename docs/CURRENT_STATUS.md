@@ -1520,6 +1520,19 @@ Boolean keywords versus identifiers, hidden/missing backing, invalid windows,
 unselected child independence, and the final uncommitted expression report.
 These are dispatch-selection laws, not recursive trace outcome existence.
 
+One selected atom-core layer now has independent success/rejection traces and
+all five execution contracts over explicit nested-expression and body relations.
+Literal/name leaves, proxy types, lambda parameters, and return types use their
+concrete contracts. Nested collection traces require successful child file/window
+frames; a final lambda body needs only its corresponding soundness/completeness
+law. No rejection frame, progress, validity, or ordinary premise is needed for
+these four trace laws. Suffix and full-Failure equivalences retain all ordered
+events; successful whole-State reconstruction adds the body success context,
+while rejected reconstruction states only a core file/end-byte frame and permits
+the returned token carrier/endIndex to differ. Independent exactness assumes
+nested/body joint exactness. Neither these contracts nor uniqueness establishes
+recursive production totality or trace outcome existence.
+
 Standalone expression-atom recovery now has unconditional five trace contracts,
 independent joint exactness, source/full-window frames, and complete State/Failure
 equivalences. It consumes a mandatory first token, follows the existing boundary

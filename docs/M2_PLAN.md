@@ -1146,6 +1146,14 @@ Standalone reverse consumers additionally distinguish mandatory-first behavior
 from later boundary/missing-backing stops, active-window hiding, original report
 non-replay, duplicate prior events, and concrete conditional lexical filtering.
 
+The selected atom core now composes all raw trace branches under explicit nested
+expression and body contracts. Four soundness/completeness laws need no rejection
+frame, validity, progress, or ordinary execution; collection children retain an
+explicit success context. Complete State equivalences add only the relevant
+success context or rejected file/end-byte frame, preserving exact returned
+carriers/end indices. Joint exactness depends on nested/body joint specifications;
+recursive totality and non-vacuous trace existence are still separate obligations.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
