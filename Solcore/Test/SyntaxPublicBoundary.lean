@@ -2547,4 +2547,27 @@ example := @Syntax.Parser.trace_reject_exists_reject_of_sound
 example := @Syntax.Parser.trace_success_complete_of_sound
 example := @Syntax.Parser.trace_reject_complete_of_sound
 
+example := @Syntax.DeclarativeGrammar.TypeTraceQuery
+example := @Syntax.DeclarativeGrammar.TypeTraceLayer
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects
+example := @Syntax.DeclarativeGrammar.TypeTraceLayer.mono
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast.induction
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast.roll
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast.unroll
+example := @Syntax.DeclarativeGrammar.TypeTraceLeast.strong_induction
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.unroll_iff
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects.unroll_iff
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.roll
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects.roll
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.TypeExprTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.TypeExprTraceRejects.cascadeFilters
+example := @Syntax.Parser.typeExprWithFuel_trace_success_sound
+example := @Syntax.Parser.typeExprWithFuel_reject_trace_sound
+example := @Syntax.Parser.typeExpr_trace_success_sound
+example := @Syntax.Parser.typeExpr_reject_trace_sound
+
 end Tests
