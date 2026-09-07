@@ -1445,6 +1445,16 @@ identifier checks while skipping, and protected name events through conditional
 filtering of the committed report and recovery event. This completes the public
 named-parameter slice, not lambda parameters, general expressions, or file traces.
 
+Both raw lambda-parameter paths and their selected non-recovering core now have
+unconditional five trace contracts and exact whole-State/Failure equivalences.
+Explicit pair guards select ordinary inference, typed parameters, or marked
+missing-type error success without admitting bypassed raw failures. The core has
+separate actual and independent outcome existence on arbitrary inputs. Reverse
+consumers reconstruct nested name/type/finishing events, silence after a second
+comptime name, exact missing-type covers, and full child failure; arbitrary
+earlier events and protected core suffixes are retained. Public lambda rewind
+and recovery, lambda expressions, and general recursive expressions are separate.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

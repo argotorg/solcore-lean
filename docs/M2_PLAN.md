@@ -1083,6 +1083,15 @@ Reverse consumers distinguish terminal reports from committed reports, retain
 name warnings and prior duplicates, and verify conditional mixed-event filtering.
 Complete lambda parameters and general recursive expressions remain open.
 
+Raw ordinary/comptime lambda parameters and their selected non-recovering core
+now have unconditional five contracts, exact State/Failure equivalences, and
+independent joint exactness/protection. The core additionally has separate
+execution-derived trace existence for arbitrary States and remainders. Reusable
+independent witnesses verify ordinary inference over a bypassed raw failure,
+marked missing-type error success, all three nested events, second-name silence,
+and full child rejection. Public lambda recovery and expression composition
+remain separate stages.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
