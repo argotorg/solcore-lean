@@ -2296,4 +2296,27 @@ example := @Syntax.Parser.requireNonempty_ne_invariant_of_trace
 example := @Syntax.Parser.parseNamedTypeArguments_eq_none_of_absent
 example := @Syntax.Parser.parseNamedTypeArguments_eq_of_present
 
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.ordinary_components
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.progress
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.namedTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.disjoint_success
+example := @Syntax.Parser.parseNamedType_success_iff_components
+example := @Syntax.Parser.parseNamedType_trace_success_sound
+example := @Syntax.Parser.parseNamedType_trace_success_complete
+example := @Syntax.Parser.parseNamedType_success_context
+example := @Syntax.Parser.parseNamedType_trace_success_iff
+example := @Syntax.Parser.parseNamedType_reject_iff_components
+example := @Syntax.Parser.parseNamedType_reject_trace_sound
+example := @Syntax.Parser.parseNamedType_trace_reject_complete
+example := @Syntax.Parser.parseNamedType_trace_reject_iff
+example := @Syntax.Parser.parseNamedType_trace_reject_failure_iff
+
 end Tests
