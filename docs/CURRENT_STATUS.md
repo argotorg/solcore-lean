@@ -1124,6 +1124,14 @@ execute the real simple-name and rejecting type paths, fixing the hyphen event
 or type-specific failure, full windows, cursors, and unread tokens. They do not
 establish general recursive type diagnostic contracts or full-file traces.
 
+Named-type finishing now has an unconditional independent diagnostic trace:
+exactly an unqualified `mapping` spelling emits the canonical-form constraint,
+with a span covering any supplied type arguments. Qualified and other spellings
+are silent. Execution always succeeds and changes only the appended events;
+the entire type AST, input carrier/window/cursor, prior reports, and duplicates
+are exact. Constraint events survive normalization. This finishing-only result
+does not yet close qualified-name, argument-list, or recursive type traces.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

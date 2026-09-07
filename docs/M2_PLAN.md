@@ -890,6 +890,11 @@ the final report stays uncommitted. Joint exactness and protected normalization
 retain type assumptions. Canonical checked-name success and type rejection
 provide concrete restricted consumers, not general type trace completeness.
 
+Named-type finishing now unconditionally distinguishes bare `mapping` from
+qualified or other spellings. Its unique protected constraint event covers any
+supplied arguments; full-state execution keeps every other field and all prior
+diagnostics, including duplicates. Recursive type trace contracts remain open.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
