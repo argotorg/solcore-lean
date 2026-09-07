@@ -165,6 +165,12 @@ import Solcore.Syntax.DeclarativeParameterListTraceGrammar
 import Solcore.Syntax.DeclarativeParameterListTraceProperties
 import Solcore.Syntax.Parser.FunctionParametersTraceProperties
 import Solcore.Syntax.Parser.LambdaParametersTraceProperties
+import Solcore.Syntax.DeclarativeLambdaExpressionTraceGrammar
+import Solcore.Syntax.DeclarativeLambdaExpressionTraceProperties
+import Solcore.Syntax.Parser.LambdaExpressionSuccessTraceProperties
+import Solcore.Syntax.Parser.LambdaExpressionRejectionTraceProperties
+import Solcore.Syntax.Parser.LambdaExpressionRejectionTraceStateProperties
+import Solcore.Syntax.Parser.LambdaExpressionTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -216,4 +222,5 @@ raw lambda parameters and their pair-selected core preserve exact inferred/typed
 standalone lambda recovery preserves function-recovery states and events while retagging only the error AST;
 public lambda parameters have exact rewind/recovery traces, whole-State equivalences, and separate outcome existence;
 actual function and inline lambda parameter lists inherit unconditional exact traces and separate outcome existence;
+raw lambda expressions compose concrete parameters and returns with explicit body trace contracts and conditional filters;
 general expressions and remaining statement traces remain open. -/
