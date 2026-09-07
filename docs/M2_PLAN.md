@@ -789,7 +789,17 @@ no abstract statement premise. Nonempty token-carrier consumers retain prior
 events, compare both tail policies, and verify recovered parent continuation.
 Two source fixtures now bridge canonical lexing to these success/rejection
 consumers without deciding the execution of the complete block parser.
-General expressions and remaining statement forms are the next trace layer.
+Return trace composition now lifts explicit expression contracts through the
+semicolon-first optional value and final required semicolon. Independent
+success/rejection grammars preserve exact ASTs, first reports, and ordered
+expression events, with ordinary erasure and joint exactness. Conditional
+expression existence separately supplies optional-value/return existence, not
+block totality. Successful trace correspondence requires no expression context
+frame; full-window/source preservation is explicit where final rejection reports
+or successful context are claimed. Empty `return;` is unconditional and skips
+expression execution. Restricted return block composition uses the resulting
+five statement contracts. Concrete general expressions and remaining statement
+forms are the next trace layer.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

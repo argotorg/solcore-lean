@@ -58,6 +58,7 @@ published through Oracle v4.
 | Core block closing traces | Complete independent tail-validation traces and exact brace-closing success/rejection correspondence; policy, full spans, ordered protected events, and failure reports are exact | Concrete statement-event traces remain separate | High |
 | Raw and isolated Core block traces | Complete conditional success/rejection grammar, exactness, production execution correspondence, and diagnostic normalization under explicit statement contracts | Concrete general statement trace contracts and whole-file composition remain separate | High |
 | Break/continue diagnostic traces | Unconditional independent leaf existence/exactness, complete success/rejection correspondence, and statement execution contracts; concrete raw/isolated restricted-block consumers | Other statement forms, mixed-statement dispatch, and whole-file traces remain separate | High |
+| Return diagnostic traces | Conditional optional-value and return success/rejection correspondence, full reports, joint exactness, and separate outcome existence under expression laws; unconditional empty-return execution | Concrete general expression contracts, mixed-statement dispatch, and whole-file composition remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -536,6 +537,12 @@ Concrete token-carrier examples cover two-statement success, later semicolon
 failure, keyword-first priority, and one-report recovery before a parent token.
 Two canonical-source consumers connect actual lexing to these restricted-block
 success and rejection proofs; broader mixed-statement/file traces remain open.
+Return traces now preserve the optional expression's full event list and first
+failure, with semicolon-first omission and exact later semicolon reports.
+Expression contracts provide return execution correspondence and restricted
+block composition; empty returns bypass expression execution unconditionally.
+Independent expression exactness and outcome existence remain separate inputs,
+and no general concrete expression trace claim is implied.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

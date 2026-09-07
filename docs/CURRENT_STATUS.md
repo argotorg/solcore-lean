@@ -979,6 +979,21 @@ priority, including recovered parent continuation. Their lexer results are
 kernel checked; parser outcomes follow the independent trace proofs. General
 statement and whole-file traces remain separate.
 
+Return statements now have independent optional-value and full-statement
+success/rejection traces. A current semicolon selects no value without invoking
+the expression parser. Otherwise the expression's AST, complete event order,
+and first rejection report are preserved; a later missing semicolon keeps the
+successful expression's events and its own report remains uncommitted.
+Expression trace contracts lift to all five return statement contracts and
+exact execution iff theorems, including the full failure record and arbitrary
+prior events. Successful trace correspondence needs no expression context
+assumption; source/full-window preservation is explicit for the frame and final
+semicolon-failure report. The empty `return;` execution is unconditional and
+changes only the cursor by two tokens. Independent expression exactness and
+existence are separate assumptions: the former lifts to return and restricted
+raw/isolated block exactness, while the latter supplies return outcome existence.
+General expression trace contracts are still abstract at this boundary.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
