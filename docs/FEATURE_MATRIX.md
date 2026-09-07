@@ -550,6 +550,9 @@ whose expectations remain distinct. Their independent outcomes are total and
 exact. The real literal-expression leaf supplies all execution and independent
 expression contracts, closing empty/one-literal return and restricted-block
 exactness without extending that claim to general expressions.
+Canonical `return 42;` and `return 42` consumers verify success and exact EOF
+failure. A separate token-carrier block combines literal and empty returns and
+preserves the full parent context and next token after isolation.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,

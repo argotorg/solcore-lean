@@ -808,6 +808,9 @@ outcomes exist and are exact on arbitrary carriers. The actual literal-expressio
 leaf discharges the five expression execution contracts, joint exactness, and
 outcome existence. Literal-only return instances therefore need no abstract
 expression premise, including their restricted raw/isolated block laws.
+Canonical source consumers cover a decimal return and its missing-semicolon
+failure; an explicit-token block combines literal and empty returns, retaining
+both ASTs, all prior events, and the post-isolation parent continuation.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

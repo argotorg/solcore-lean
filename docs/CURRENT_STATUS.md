@@ -1005,6 +1005,12 @@ expression execution contracts and both independent expression laws, discharging
 the abstract assumptions for empty/one-literal returns and restricted raw/isolated
 return block exactness. General expressions are not implied by this leaf result.
 
+Concrete consumers now connect canonical lexing to `return 42;` and the exact
+window-end semicolon failure for `return 42`. Empty `return;` bypasses an arbitrary
+expression parser. A separate explicit-token block mixes literal and empty
+returns under both tail policies and proves raw/isolated success with arbitrary
+prior diagnostics, restored parent context, and an unread following token.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
