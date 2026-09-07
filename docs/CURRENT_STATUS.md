@@ -1286,6 +1286,14 @@ the whole state and reports the active-window EOF span without emitting an
 event. This is one-layer correspondence, not general recursive production
 trace completion or an assertion that every input has an ordinary outcome.
 
+Child-relation implication now lifts through trailing lists, all raw type
+forms, and the prioritized dispatcher. These monotonicity laws preserve every
+indexed AST, token carrier, window, cursor, diagnostic event, and failure report;
+they neither add outcomes nor reorder or deduplicate events. Public consumers
+forget auxiliary child protection annotations while retaining exact events and
+protected normalization. This is infrastructure for recursive trace proofs,
+not a recursive completeness or outcome-existence result.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

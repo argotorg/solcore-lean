@@ -976,6 +976,12 @@ Keyword/contextual/window boundary consumers and complete final failures are
 verified. General recursive production traces and outcome existence still need
 separate proofs; the one-layer contract does not imply either.
 
+Monotonicity is now verified for trailing lists, every raw type form, and both
+dispatcher outcomes. Replacing child evidence by pointwise implication keeps
+all indexed values, remainders, events, and reports unchanged. Consumers erase
+auxiliary protection annotations without losing the protected exact suffix.
+Recursive trace construction remains a separate obligation.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

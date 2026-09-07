@@ -82,6 +82,7 @@ published through Oracle v4.
 | Raw function-type diagnostic traces | Conditional five contracts, exact parameter-before-return events and AST end span, full component States/Failures, independent erasure/joint/protection, and canonical real-type-child success/return failure | Prioritized dispatcher and general recursive trace composition remain separate | High |
 | Recursive type success source/window frame | Unconditional full source and active-window preservation at explicit and production fuel, existing token-frame composition, and a deliberately noncanonical-carrier execution | Framing alone is not recursive diagnostic-trace soundness/completeness | High |
 | One-layer type-dispatch diagnostic traces | Exact independent priority selection and six raw/final outcomes, ordinary erasure/joint/protection, conditional positive-fuel trace correspondence with unconditional framing, and keyword/contextual/window boundary consumers | General recursive production trace correspondence and outcome existence remain separate | High |
+| Type-trace relation monotonicity | Pointwise child implication lifts through trailing lists, all raw type forms, and dispatch with unchanged ASTs, remainders, events, and reports; protected-annotation erasure consumers | Infrastructure only; does not establish recursive completeness or outcome existence | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
