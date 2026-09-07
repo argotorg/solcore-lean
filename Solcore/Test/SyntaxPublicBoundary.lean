@@ -1975,4 +1975,26 @@ example := @Syntax.Parser.afterDelimitedElement_noTrailing_production_trace_reje
 example := @Syntax.Parser.afterDelimitedElement_noTrailing_production_trace_reject_iff
 example := @Syntax.Parser.afterDelimitedElement_noTrailing_production_trace_reject_failure_iff
 
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceRejects
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.cursor_lt
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ArrayLiteralTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.arrayLiteralTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_success_iff_raw
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_reject_iff_raw
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_success_complete
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_reject_sound
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_reject_complete
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_success_iff
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_reject_iff
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_trace_reject_failure_iff
+
 end Tests
