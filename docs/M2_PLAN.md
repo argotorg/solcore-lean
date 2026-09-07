@@ -1043,14 +1043,23 @@ correspondence, independent joint exactness/protection, and ordinary execution
 distinguish missing-colon error success from typed success and type rejection.
 Nested reverse consumers verify type-before-finishing order, skipped finishing
 on failure, duplicate preservation, and untouched following tokens. Selected
-parameter-core and recovery traces remain separate.
+parameter-core and recovery traces are separate composition stages.
 
 Ordinary-name finishing and checked-prefix composition now retain exact event
 order through arbitrary continuations. Both parameter cores share a reflected
 window-visible contextual-name pair; source preservation also covers their raw
 helpers and cores. Consumers verify hidden/missing second tokens, duplicate
 earlier warnings, and no ordinary-name warning after a selected comptime marker.
-These prefix and selection laws do not yet establish full core/recovery traces.
+These prefix and selection laws are distinct from full core/recovery traces.
+
+Raw ordinary/comptime named parameters and their selected non-recovering core
+now have all five unconditional trace contracts and exact whole-State/Failure
+equivalences. Independent raw first failures and pair guards preserve priority,
+name/type/finishing order, and the absence of an ordinary-name warning after a
+marker. Separate totality and soundness supply explicit traced outcome existence
+for arbitrary States and independent remainders. Reverse consumers distinguish
+raw outcomes on the same input and verify selected success over a bypassed raw
+failure. Public rewind/recovery and complete lambda-parameter traces remain open.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

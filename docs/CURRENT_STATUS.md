@@ -1376,7 +1376,7 @@ AST and State: only an outer comptime type adds its type-span constraint;
 proxy-of-comptime remains silent. Finishing never replays earlier name/type
 events, and duplicate constraints retain their order. Both missing-type error
 constraints retain their specified spans. These are finishing-only components;
-parameter names, dispatch, and recovery still require composition.
+full parameter composition remains separate from these finishing leaves.
 
 Named-parameter tails now compose those finishers with the actual recursive
 type parser. Independent success and rejection judgments have unique, disjoint
@@ -1387,7 +1387,7 @@ colon runs the type before finishing, and a type rejection skips finishing.
 Constructive reverse consumers retain nested comptime/name events in order,
 duplicate earlier constraints, exact spans and windows, and untouched following
 tokens. Terminal type-failure reports remain uncommitted. This is the raw tail,
-not selected parameter-core or public recovery trace completion.
+not itself selected parameter-core or public recovery trace completion.
 
 Ordinary parameter-name checking now has an independent finishing trace and
 a checked-prefix composition that retains identifier-before-warning order.
@@ -1397,7 +1397,25 @@ function and lambda cores, including active-window limits and missing backing
 tokens. Separate source laws cover all raw function/lambda parameter helpers
 and cores, not public recovery. Consumers verify window-dependent selection,
 duplicate warnings, and the absence of an ordinary-name warning after a
-selected comptime marker. Guard reflection is not a full core trace contract.
+selected comptime marker. Guard reflection remains separate from a full core
+trace contract.
+
+Both raw named-parameter paths now have unconditional five trace contracts,
+independent exactness/protection, ordinary execution, and complete State/Failure
+equivalences. Ordinary names run their spelling check before the tail, while
+names after a comptime marker receive identifier checking only. Every raw
+first-failure stage is represented. Reverse consumers distinguish the raw paths
+on the same input and retain name-before-type-before-finishing events.
+
+The selected non-recovering function-parameter core now has the same complete
+trace correspondence on arbitrary states. Explicit pair guards exclude the
+raw comptime marker/name failures when that branch is selected. Independent
+joint exactness is distinct from execution-derived outcome existence, which is
+also provided for every State and independent remainder. Consumers reconstruct
+whole replies, preserve arbitrary earlier events through lexical filtering,
+and verify that diagnosed ordinary success wins over a bypassed raw failure.
+Public parameter rewind/recovery, complete lambda parameters, and whole-file
+traces remain separate obligations.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
