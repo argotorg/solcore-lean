@@ -1059,7 +1059,8 @@ name/type/finishing order, and the absence of an ordinary-name warning after a
 marker. Separate totality and soundness supply explicit traced outcome existence
 for arbitrary States and independent remainders. Reverse consumers distinguish
 raw outcomes on the same input and verify selected success over a bypassed raw
-failure. Public rewind/recovery and complete lambda-parameter traces remain open.
+failure. Public named rewind/recovery is composed below; complete lambda-parameter
+traces remain separate.
 
 Lambda tails now have unconditional five contracts and complete State/Failure
 equivalences. Typed tails retag the exact named-tail AST and retain its events;
@@ -1072,7 +1073,15 @@ joint exactness, and full-State reverse consumers. Mandatory first consumption,
 later delimiter stops, and initial versus later missing backing are distinct.
 The one newly appended recovery event has conditional lexical-cascade keep/drop
 laws; the already committed original report is never replayed. Public named
-rewind/recovery remains a separate composition stage.
+rewind/recovery is covered by a separate composition stage below.
+
+Public named parameters now compose core traces, cursor-only rewind, boundary
+rejection, and standalone recovery. All five contracts and whole-State/Failure
+equivalences are unconditional. Separate ordinary execution and soundness supply
+actual trace existence without reading existence into independent joint exactness.
+Reverse consumers distinguish terminal reports from committed reports, retain
+name warnings and prior duplicates, and verify conditional mixed-event filtering.
+Complete lambda parameters and general recursive expressions remain open.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

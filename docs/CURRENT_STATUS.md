@@ -1414,8 +1414,8 @@ joint exactness is distinct from execution-derived outcome existence, which is
 also provided for every State and independent remainder. Consumers reconstruct
 whole replies, preserve arbitrary earlier events through lexical filtering,
 and verify that diagnosed ordinary success wins over a bypassed raw failure.
-Public parameter rewind/recovery, complete lambda parameters, and whole-file
-traces remain separate obligations.
+Public named-parameter rewind/recovery is composed below; complete lambda
+parameters and whole-file traces remain separate obligations.
 
 Lambda-parameter tails now have unconditional five trace contracts and exact
 whole-State/full-Failure correspondence. Typed paths preserve the named-tail
@@ -1430,8 +1430,20 @@ checking later comma/right-paren stops. Missing backing ends an established scan
 but rejects an initial recovery attempt, even inside the numeric window. Only
 one recovery event is appended; an earlier committed report is not re-emitted.
 Recovery events are lexical-cascade candidates, with separate explicit keep/drop
-conditions, not unconditional protected events. Public rewind composition is
-still a separate obligation.
+conditions, not unconditional protected events. Public named rewind composition
+is covered separately below.
+
+The public named-parameter parser now has unconditional five trace contracts,
+complete State/Failure equivalences, and separate execution-derived outcome
+existence on every State and independent remainder. Its independent judgment
+preserves the failed carrier and end index while rewinding only the cursor.
+Boundary rejection commits no terminal report; otherwise the original report is
+committed once before recovery. A recovery rejection retains its distinct,
+uncommitted terminal report even when its payload equals the committed original.
+Reverse consumers check cursor rewind, unchanged prior duplicates, no repeated
+identifier checks while skipping, and protected name events through conditional
+filtering of the committed report and recovery event. This completes the public
+named-parameter slice, not lambda parameters, general expressions, or file traces.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
