@@ -98,6 +98,7 @@ import Solcore.Syntax.DeclarativeTypeDispatchTraceOrdinaryProperties
 import Solcore.Syntax.Parser.TypeDispatchSuccessTraceProperties
 import Solcore.Syntax.Parser.TypeDispatchRejectionTraceProperties
 import Solcore.Syntax.DeclarativeTypeDispatchTraceMonotonicityProperties
+import Solcore.Syntax.Parser.DiagnosticTraceCompletenessFromSoundnessProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -131,4 +132,5 @@ raw function types retain exact parameter-before-return events and complete comp
 all recursive type successes unconditionally preserve source and full active window;
 one type-dispatch layer preserves all prioritized guards and exact outcomes under child trace contracts;
 child-relation implication lifts through lists, raw types, and dispatch without altering any traced data;
+both trace soundness laws plus independent exactness and explicit invariant exclusion yield completeness;
 general expressions and remaining statement traces remain open. -/

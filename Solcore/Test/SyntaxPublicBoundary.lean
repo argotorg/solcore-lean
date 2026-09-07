@@ -2542,4 +2542,9 @@ example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses.mono
 example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.mono
 example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.mono
 
+example := @Syntax.Parser.trace_success_exists_ok_of_sound
+example := @Syntax.Parser.trace_reject_exists_reject_of_sound
+example := @Syntax.Parser.trace_success_complete_of_sound
+example := @Syntax.Parser.trace_reject_complete_of_sound
+
 end Tests
