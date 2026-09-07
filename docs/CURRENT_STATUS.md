@@ -1482,6 +1482,19 @@ and retain all child recovery events. The lambda law targets the existing inline
 parser rather than adding a new runtime helper. These list results do not assert
 unconditional cascade protection, signature traces, or complete lambda expressions.
 
+Raw lambda-expression traces now compose the concrete recovering parameter list,
+optional recursive return type, and an explicitly supplied body relation. The
+five contracts require only the corresponding body contracts; success and reject
+soundness/completeness do not require a body frame. Whole-State equivalences state
+successful or rejected body file/window preservation separately. Independent
+joint exactness requires the body's joint specification, while separate trace
+existence uses body ordinary execution and its two soundness laws, not completeness
+or joint exactness. All four first failures preserve complete terminal reports,
+and pointwise laws show early failures bypass any body parser. Parameter and body
+events are filtered explicitly around the protected return-type events. This is
+a raw, body-conditional composition, not a complete recursive expression parser
+or an atom-dispatch result; concrete reverse consumers are a separate check.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

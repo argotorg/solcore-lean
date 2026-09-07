@@ -1111,6 +1111,17 @@ child or validity premises. Empty lists, trailing commas, and recovery events
 retain the existing runtime behavior. Signature and lambda-expression traces,
 including their following returns and bodies, are separate composition stages.
 
+Raw lambda expressions now compose the real parameter list and optional return
+with explicit body trace contracts. All five contracts and full-Failure suffix
+iff laws are available; complete successful/rejected States require the respective
+body context law explicitly. Independent joint exactness assumes only body joint
+exactness. Separate ordinary execution plus body soundness proves traced outcome
+existence without deriving it from uniqueness. Marker, parameter, return, and body
+failures are distinguished, and pointwise early failures bypass any supplied body.
+Mixed filtering retains the protected return events between explicit parameter
+and body filters. General recursive expression and atom-selection trace completion
+are still open; raw body-conditional laws do not close those obligations.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
