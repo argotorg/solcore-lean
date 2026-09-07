@@ -1417,6 +1417,22 @@ and verify that diagnosed ordinary success wins over a bypassed raw failure.
 Public parameter rewind/recovery, complete lambda parameters, and whole-file
 traces remain separate obligations.
 
+Lambda-parameter tails now have unconditional five trace contracts and exact
+whole-State/full-Failure correspondence. Typed paths preserve the named-tail
+trace while retagging its complete AST. Missing colons infer ordinary names
+silently but produce a covered missing-type error for comptime names. Reverse
+consumers preserve earlier duplicates and forward child rejection unchanged;
+these are tail contracts, not full lambda-parameter or expression completion.
+
+Standalone function-parameter recovery now has unconditional exact traces and
+whole-State/full-Failure equivalences. It consumes a mandatory first token before
+checking later comma/right-paren stops. Missing backing ends an established scan
+but rejects an initial recovery attempt, even inside the numeric window. Only
+one recovery event is appended; an earlier committed report is not re-emitted.
+Recovery events are lexical-cascade candidates, with separate explicit keep/drop
+conditions, not unconditional protected events. Public rewind composition is
+still a separate obligation.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

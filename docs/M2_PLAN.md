@@ -1061,6 +1061,19 @@ for arbitrary States and independent remainders. Reverse consumers distinguish
 raw outcomes on the same input and verify selected success over a bypassed raw
 failure. Public rewind/recovery and complete lambda-parameter traces remain open.
 
+Lambda tails now have unconditional five contracts and complete State/Failure
+equivalences. Typed tails retag the exact named-tail AST and retain its events;
+missing colons distinguish silent inference from a comptime missing-type error.
+Consumers verify earlier duplicates, ordered type/finishing events, and complete
+child-failure forwarding. These results do not yet cover the full lambda parser.
+
+Standalone parameter recovery now has unconditional five contracts, independent
+joint exactness, and full-State reverse consumers. Mandatory first consumption,
+later delimiter stops, and initial versus later missing backing are distinct.
+The one newly appended recovery event has conditional lexical-cascade keep/drop
+laws; the already committed original report is never replayed. Public named
+rewind/recovery remains a separate composition stage.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
