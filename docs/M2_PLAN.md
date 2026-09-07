@@ -895,6 +895,12 @@ qualified or other spellings. Its unique protected constraint event covers any
 supplied arguments; full-state execution keeps every other field and all prior
 diagnostics, including duplicates. Recursive type trace contracts remain open.
 
+Optional lambda return annotations now inherit exact type success/rejection
+traces conditionally. An absent arrow is an unconditional same-state success,
+not a missing-marker failure. Selected annotations preserve complete child
+states, reports, and duplicate events; protected suffixes normalize unchanged
+under child protection laws. Parameters and complete lambda traces remain open.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

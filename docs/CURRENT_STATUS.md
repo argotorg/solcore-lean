@@ -1132,6 +1132,15 @@ the entire type AST, input carrier/window/cursor, prior reports, and duplicates
 are exact. Constraint events survive normalization. This finishing-only result
 does not yet close qualified-name, argument-list, or recursive type traces.
 
+Optional lambda return annotations now have independent exact success/rejection
+traces under real type-parser contracts. Arrow absence returns `none` with the
+whole state unchanged and cannot reject; a present arrow silently forwards the
+type AST or complete failure and all child events. The raw missing-arrow case
+is therefore not a rejection rule. Structural erasure, joint exactness, and
+protected-suffix normalization are separated from child progress/window laws.
+Consumers keep duplicate events and failed child states exactly; they remain
+conditional, not complete traces for lambda parameters, bodies, or full lambdas.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
