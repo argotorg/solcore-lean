@@ -1389,6 +1389,16 @@ duplicate earlier constraints, exact spans and windows, and untouched following
 tokens. Terminal type-failure reports remain uncommitted. This is the raw tail,
 not selected parameter-core or public recovery trace completion.
 
+Ordinary parameter-name checking now has an independent finishing trace and
+a checked-prefix composition that retains identifier-before-warning order.
+Whole-Reply continuation laws preserve all earlier events without replay or
+deduplication. The same exact contextual-name pair guard is reflected for both
+function and lambda cores, including active-window limits and missing backing
+tokens. Separate source laws cover all raw function/lambda parameter helpers
+and cores, not public recovery. Consumers verify window-dependent selection,
+duplicate warnings, and the absence of an ordinary-name warning after a
+selected comptime marker. Guard reflection is not a full core trace contract.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

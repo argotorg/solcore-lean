@@ -90,6 +90,7 @@ published through Oracle v4.
 | Recursive type whole-State traces | Unconditional source frames and exact whole-State success/rejection equivalences; nested independent reverse consumers and separate token/end-index omission counterexamples | Cursor-only reconstruction requires explicit carrier/window equalities | High |
 | Parameter-finishing diagnostic traces | Independent event existence, uniqueness, protection, exact AST/full-State execution, outer-comptime-only validation, specified missing-type constraints, and duplicate-preserving consumers | Finishing leaf; named tails are covered separately, complete names, dispatch, and recovery remain open | High |
 | Named-parameter tail diagnostic traces | Unconditional five contracts, ordinary execution, whole-State/full-Failure equivalences, independent exactness/protection, missing-colon error success, and nested reverse consumers with ordered type/finishing events | Raw tail only; selected parameter-core and recovery traces remain open | High |
+| Parameter-name diagnostics and pair selection | Independent ordinary-name finishing and checked-prefix traces, exact continuation replies, raw/core source preservation, and shared window-aware pair reflection with duplicate/missing-token consumers | Prefix/selection laws only; full selected-core and public recovery traces remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are

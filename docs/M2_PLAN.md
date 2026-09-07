@@ -1045,6 +1045,13 @@ Nested reverse consumers verify type-before-finishing order, skipped finishing
 on failure, duplicate preservation, and untouched following tokens. Selected
 parameter-core and recovery traces remain separate.
 
+Ordinary-name finishing and checked-prefix composition now retain exact event
+order through arbitrary continuations. Both parameter cores share a reflected
+window-visible contextual-name pair; source preservation also covers their raw
+helpers and cores. Consumers verify hidden/missing second tokens, duplicate
+earlier warnings, and no ordinary-name warning after a selected comptime marker.
+These prefix and selection laws do not yet establish full core/recovery traces.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
