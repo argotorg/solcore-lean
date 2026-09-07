@@ -1,4 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreBlockGrammar
+import Solcore.Syntax.DeclarativeCoreBlockTailTraceGrammar
 import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
 import Solcore.Syntax.Parser.DiagnosticReflectionProperties
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
@@ -127,6 +128,68 @@ def coreBlock (statement : Parser Statement)
         (next.remainingCount + 1) [] next
   | .reject failure next => .reject failure next
   | .invariant error => .invariant error
+
+private theorem validateExpressionSemicolon_trace_sound (statement : Statement) (state : State) :
+    ∃ trace, DeclarativeGrammar.CoreBlockStatementDiagnosticTrace statement trace ∧
+      (validateExpressionSemicolon statement state).diagnostics = state.diagnostics ++ trace := by
+  rcases statement with ⟨span, value⟩
+  cases value <;> try exact ⟨[], .clean trivial, by simp [validateExpressionSemicolon]⟩
+  case expression expression trailingSemicolon =>
+    cases trailingSemicolon with
+    | true => exact ⟨[], .clean trivial, by simp [validateExpressionSemicolon]⟩
+    | false =>
+        exact ⟨_, .missing (fun impossible => impossible), by
+          simp [validateExpressionSemicolon, State.emit, State.diagnostics]⟩
+
+private theorem validateBlockTails_trace_sound :
+    ∀ policy statements state,
+      ∃ trace, DeclarativeGrammar.CoreBlockTailsDiagnosticTrace policy.declarative statements trace ∧
+        (validateBlockTails policy statements state).diagnostics = state.diagnostics ++ trace := by
+  intro policy statements
+  induction statements with
+  | nil => intro state; exact ⟨[], .nil, by simp [validateBlockTails]⟩
+  | cons first rest ih =>
+      intro state
+      cases rest with
+      | nil =>
+          cases policy with
+          | allow => exact ⟨[], .lastAllowed, by simp [validateBlockTails]⟩
+          | require =>
+              rcases validateExpressionSemicolon_trace_sound first state with
+                ⟨trace, checked, diagnosticEq⟩
+              exact ⟨trace, .lastRequired checked, diagnosticEq⟩
+      | cons second tail =>
+          rcases validateExpressionSemicolon_trace_sound first state with
+            ⟨headTrace, checked, headEq⟩
+          rcases ih (validateExpressionSemicolon first state) with
+            ⟨tailTrace, tailChecked, tailEq⟩
+          refine ⟨headTrace ++ tailTrace, .cons checked tailChecked, ?_⟩
+          change (validateBlockTails policy (second :: tail)
+            (validateExpressionSemicolon first state)).diagnostics = _
+          rw [tailEq, headEq, List.append_assoc]
+
+/-- Raw block closing emits precisely the independent source-ordered tail
+validation events, after every incoming diagnostic and the silent brace. -/
+theorem closeCoreBlock_success_trace_sound
+    (opening : Token) (policy : TailExpressionPolicy) (bodyRev : List Statement)
+    {input next : State} {body : Block}
+    (result : closeCoreBlock opening policy bodyRev input = .ok body next) :
+    ∃ trace, DeclarativeGrammar.CoreBlockTailsDiagnosticTrace
+        policy.declarative bodyRev.reverse trace ∧
+      next.diagnostics = input.diagnostics ++ trace := by
+  unfold closeCoreBlock at result
+  simp only [bind] at result
+  cases closingResult : symbol .rightBrace .statement input with
+  | invariant error => simp [closingResult] at result
+  | reject failure rejected => simp [closingResult] at result
+  | ok closing afterClosing =>
+      simp only [closingResult, modifyState, pure] at result
+      cases result
+      rcases validateBlockTails_trace_sound policy bodyRev.reverse afterClosing with
+        ⟨trace, checked, diagnosticEq⟩
+      refine ⟨trace, checked, ?_⟩
+      have shape := (symbol_ok_tokenAt .rightBrace .statement closingResult).2
+      simpa only [shape, State.diagnostics] using diagnosticEq
 
 private theorem validateExpressionSemicolon_state_shape
     (statement : Statement) (state : State) :
