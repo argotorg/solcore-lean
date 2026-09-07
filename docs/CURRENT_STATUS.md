@@ -1061,6 +1061,17 @@ delimiters report comma then closing, retaining duplicate expectations. Joint
 independent exactness and protected-suffix normalization compose from child
 laws without asserting child totality or general expression trace completion.
 
+Array-literal wrappers lift these list laws to all five expression trace
+contracts and exact success/rejection/full-failure correspondence. Mapping
+changes only the AST, preserving the full output state and uncommitted failure.
+Independent structure, joint exactness, and protected-event laws compose under
+explicit child assumptions. Concrete identifier and literal children cover
+two checked names, empty arrays, numeric arrays, later-child rejection, missing
+delimiters, and a trailing comma rejected by the identifier child. Four canonical
+lexer fixtures connect directly through initial parser states to actual array
+outcomes, with exact spans, ordered diagnostics, and unread following tokens.
+These wrappers do not yet supply the general recursive expression contracts.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

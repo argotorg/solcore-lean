@@ -845,6 +845,14 @@ requests it explicitly. Comma priority, direct child invocation after comma,
 and ordered possibly duplicate delimiter expectations are preserved. These are
 conditional list laws, not concrete recursive expression or full-file traces.
 
+Array-literal traces now wrap no-trailing lists without changing their output
+states or failure reports. Five expression contracts and success/reject/full
+failure iff compose explicit child laws; independent exactness and protected
+events compose separately. Actual identifier/literal child consumers exercise
+ordered checked-name events, empty/numeric arrays, delimiter failure, and child
+rejection after comma. Canonical lexer-to-initial-state connections cover four
+success/rejection fixtures. General recursive expression contracts remain open.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
