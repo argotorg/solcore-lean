@@ -883,6 +883,13 @@ measured after the first child. Canonical empty/group/tuple and closing-failure
 consumers retain full ASTs, windows, unread tokens, arbitrary prior events, and
 uncommitted reports. Recursive child contracts remain explicit.
 
+Proxy traces now lift the actual type parser's explicit success/rejection
+contracts, preserving its full AST, ordered events, and unchanged returned
+failure/state. Raw marker absence is separate from selected ordinary erasure;
+the final report stays uncommitted. Joint exactness and protected normalization
+retain type assumptions. Canonical checked-name success and type rejection
+provide concrete restricted consumers, not general type trace completeness.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

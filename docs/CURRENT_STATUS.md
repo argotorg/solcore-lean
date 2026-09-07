@@ -1112,6 +1112,18 @@ failures, including exact spans, remaining tokens, windows, and ordered events.
 These are concrete restricted-child consumers, not general recursive-expression
 or mixed-file trace completeness.
 
+Proxy expressions now have independent success/raw-rejection traces and exact
+execution correspondences under explicit contracts for the real type parser.
+The silent `@` marker retains its own span while the full type AST and every
+child event are propagated unchanged. Missing-marker rejection keeps the whole
+input state and is separated from selected ordinary erasure; type rejection
+retains its complete failure and returned state without committing its report.
+Independent joint exactness and protected-suffix laws remain conditional on
+type properties. Canonical `@a-b tail` and `@+ tail` consumers independently
+execute the real simple-name and rejecting type paths, fixing the hyphen event
+or type-specific failure, full windows, cursors, and unread tokens. They do not
+establish general recursive type diagnostic contracts or full-file traces.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
