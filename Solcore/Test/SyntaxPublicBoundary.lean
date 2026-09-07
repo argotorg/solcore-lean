@@ -2417,4 +2417,31 @@ example := @Syntax.Parser.parseTupleType_trace_success_complete
 example := @Syntax.Parser.parseTupleType_success_context
 example := @Syntax.Parser.parseTupleType_trace_success_iff
 
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.marker_present
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.functionReturnsTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.present_token
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.some_progress
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.cursor_le
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.cascadeFilters
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_reject_trace_sound
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_reject_complete
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_reject_iff
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_reject_failure_iff
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_eq_none_of_absent
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_eq_of_present
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_reject_iff_list
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_success_sound
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_success_complete
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_success_context
+example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_success_iff
+
 end Tests
