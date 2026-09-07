@@ -963,6 +963,19 @@ termination event, and isolation commits the unexpected-token report once while
 restoring the parent window and leaving the next token untouched. These examples
 do not claim a Core statement grammar or canonical-lexer correspondence.
 
+The real Core `break` and `continue` leaves now have unconditional independent
+diagnostic traces, with success/rejection correspondence, complete failure
+records, and all five statement execution contracts. Success changes only the
+cursor by two tokens and is silent; rejection is also silent and selects the
+missing keyword before the missing semicolon. Independent outcome existence,
+uniqueness, and disjointness cover arbitrary carriers, including exhausted
+windows and missing array slots. These leaf laws instantiate raw and isolated
+restricted-block exactness without abstract statement assumptions. Concrete
+token-carrier consumers exercise two-statement success and later-semicolon
+rejection under both tail policies, retaining arbitrary prior events and the
+post-recovery parent window and following token. General statement traces and
+canonical-lexer correspondence for these consumers remain separate.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

@@ -779,6 +779,16 @@ tail checks, the final-expression policy difference, rejection without tail
 validation, and one-report captured recovery preserving the parent window and
 following token. This adapter is not the concrete Core statement parser.
 
+The actual `break`/`continue` leaves now discharge all five statement trace
+contracts unconditionally. Silent success fixes the full AST and cursor-only
+two-token state update; silent rejection fixes the first missing keyword or
+semicolon and the full failure record. Independent leaf existence is separate
+from joint exactness and covers missing slots in malformed carriers as well as
+window exhaustion. Raw and isolated restricted-block exactness follows with
+no abstract statement premise. Nonempty token-carrier consumers retain prior
+events, compare both tail policies, and verify recovered parent continuation.
+General expressions and remaining statement forms are the next trace layer.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

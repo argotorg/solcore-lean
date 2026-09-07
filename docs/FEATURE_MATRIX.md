@@ -57,6 +57,7 @@ published through Oracle v4.
 | Balanced block isolation traces | Complete compositional execution laws and conditional independent trace soundness/completeness/exactness; child context, parent frame, report commitment, and duplicate order are exact | Concrete inner Core block trace contracts remain separate | High |
 | Core block closing traces | Complete independent tail-validation traces and exact brace-closing success/rejection correspondence; policy, full spans, ordered protected events, and failure reports are exact | Concrete statement-event traces remain separate | High |
 | Raw and isolated Core block traces | Complete conditional success/rejection grammar, exactness, production execution correspondence, and diagnostic normalization under explicit statement contracts | Concrete general statement trace contracts and whole-file composition remain separate | High |
+| Break/continue diagnostic traces | Unconditional independent leaf existence/exactness, complete success/rejection correspondence, and statement execution contracts; concrete raw/isolated restricted-block consumers | Other statement forms, mixed-statement dispatch, and whole-file traces remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are
@@ -527,6 +528,12 @@ A test-only checked-name adapter supplies nonempty token-carrier consumers of
 these contracts, including ordered name/tail events and recovered rejection
 with parent-window and next-token preservation; it is not a Core grammar or
 canonical-lexer claim.
+Actual break/continue leaves also have unconditional silent trace contracts,
+exact two-token successful state updates, first-failure reports, and independent
+existence/uniqueness/disjointness even on malformed carriers. The same laws
+provide joint exactness for raw and isolated blocks restricted to either leaf.
+Concrete token-carrier examples cover two-statement success, later semicolon
+failure, keyword-first priority, and one-report recovery before a parent token.
 
 Function declarations, implementations, and contracts now extend the strict
 boundary over abstract expression and block judgments. Exact signature policy,
