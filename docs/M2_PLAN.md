@@ -997,6 +997,10 @@ unconditional, as are actual explicit-bound and production soundness. Public
 consumers retain arbitrary prior diagnostics. Independent recursive joint
 exactness, completeness, and ordinary outcome existence remain open.
 
+Three-level canonical proxy/comptime/name success and closing failure now
+consume public recursive soundness. Component proofs retain full states,
+precise AST/report spans, arbitrary prior events, and following tokens.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

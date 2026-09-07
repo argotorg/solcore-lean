@@ -1314,6 +1314,13 @@ separate. Public consumers use these recursive contracts without child premises
 or state validity. Recursive independent uniqueness/disjointness, completeness,
 and ordinary outcome existence remain separate proof obligations.
 
+Canonical public-parser consumers now cover the three-level nested success
+`@comptime<a-b> tail` and missing-closing rejection `@comptime<a-b +> tail`.
+Constructive component execution and recursive soundness retain the exact
+single hyphen event after arbitrary prior diagnostics, complete AST spans and
+states, active windows, and untouched following tokens. Rejection reports only
+the missing greater symbol and does not commit that report as an event.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
