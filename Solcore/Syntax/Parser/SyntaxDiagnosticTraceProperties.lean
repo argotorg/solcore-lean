@@ -46,6 +46,11 @@ import Solcore.Syntax.DeclarativeDotConstructorTraceProtectionProperties
 import Solcore.Syntax.DeclarativeDotConstructorRejectionTraceProtectionProperties
 import Solcore.Syntax.Parser.DotConstructorSuccessTraceProperties
 import Solcore.Syntax.Parser.DotConstructorRejectionTraceProperties
+import Solcore.Syntax.DeclarativeParenthesizedTraceOutcomeProperties
+import Solcore.Syntax.DeclarativeParenthesizedTraceProtectionProperties
+import Solcore.Syntax.DeclarativeParenthesizedRejectionTraceProtectionProperties
+import Solcore.Syntax.Parser.ParenthesizedTraceCorrespondenceProperties
+import Solcore.Syntax.Parser.ParenthesizedRejectionTraceCorrespondenceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -61,4 +66,6 @@ protected earlier events compose through successful and rejected raw statements;
 generic no-trailing lists have exact success/rejection traces under child contracts;
 array literals inherit five expression contracts and exact AST mapping;
 leading-dot constructors preserve Boolean-first name events before argument traces;
+parenthesized groups/tuples have conditional exact traces with silent closes and
+right-paren-only reports after non-comma successful children;
 general expressions and remaining statement traces remain open. -/
