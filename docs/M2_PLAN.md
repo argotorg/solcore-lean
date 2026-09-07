@@ -959,6 +959,15 @@ empty child bypass, joint uniqueness/disjointness, protected suffixes, and
 canonical real-type-child success/separator-failure consumers are verified.
 Function-type and general recursive trace composition remain separate.
 
+Raw function types now preserve exact parameter-before-return events and choose
+the correct full AST end span under nested contracts. Five contracts, full-state
+component correspondences, independent erasure/joint/protection, and canonical
+real-type-child success/return failure are verified. Recursive type success also
+has an unconditional source/full-window frame at explicit and production fuel,
+with a noncanonical-carrier consumer. This frame is not recursive trace
+soundness/completeness; prioritized trace dispatch and recursive composition
+remain separate obligations.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

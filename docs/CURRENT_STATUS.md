@@ -1250,6 +1250,27 @@ public. Canonical empty returns bypass every possible child; real-type-child
 singleton success and separator failure retain full states and following tokens.
 This optional clause does not itself complete function-type or recursive traces.
 
+Raw function types now compose the keyword, parameter list, and optional
+returns with exact parameter-before-return diagnostic order. The complete AST
+uses the returns-list end span when present and the parameter-list end span
+otherwise. Five contracts, exact component success/failure equivalences,
+independent ordinary erasure, joint uniqueness/disjointness, and protected
+suffixes are public under nested contracts. Raw missing-keyword failure stays
+separate from selected ordinary rejection. Canonical real-type-child success
+and return-list failure retain both checked-name events, complete states, and
+following tokens; missing keywords and absent returns preserve their exact
+component states. Reusable checked-type singleton-list helpers supply these
+concrete executions without general recursive diagnostic-trace assumptions.
+
+Every successful recursive type parse now unconditionally preserves its full
+source file and active window, both at arbitrary explicit fuel and at the
+actual production bound. This composes the six raw type frames without
+`ValidFor`, carrier-validity, or diagnostic-silence assumptions. Consumers combine
+the frame with existing token preservation and execute a deliberately invalid
+carrier/window fixture. The frame is not a general recursive trace correspondence;
+prioritized trace dispatch and recursive success/rejection composition remain
+separate obligations.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
