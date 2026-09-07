@@ -908,6 +908,14 @@ arbitrary raw reverse prefixes. Independent exactness/protection and canonical
 three-name success/two-name-prefix failure consumers are verified. Remaining
 type arguments and recursive type traces still need separate composition.
 
+Generic trailing-enabled list traces now compose explicit child contracts for
+both empty policies. Comma-first priority, immediate post-comma close bypass,
+arbitrary reverse prefixes/events, and actual post-opening fuel are exact;
+successful source/full-window framing is separate from ordinary carrier laws.
+Joint uniqueness/disjointness and protected suffixes are public. Canonical
+checked-name success and two distinct rejection paths verify real execution,
+but do not supply real type-argument or lambda-parameter child contracts.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

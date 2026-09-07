@@ -1154,6 +1154,20 @@ Canonical three-name success and two-name-prefix rejection fix all spans,
 carriers, windows, cursors, and following tokens in every context and phase.
 These close the name component, not argument-list or recursive type traces.
 
+Generic trailing-enabled lists now have independent success/rejection traces
+and five execution contracts under explicit child contracts. Commas retain
+priority over closing delimiters, including a comma-valued closing symbol;
+an immediate post-comma close bypasses the child entirely. Both empty policies,
+strict child progress, arbitrary reverse prefixes/prior events, and the actual
+post-opening production fuel are exact. Successful child file/full-window
+preservation suffices for execution; separate carrier laws support ordinary
+erasure. Joint exactness asserts uniqueness/disjointness, not existence.
+Canonical checked-name lists cover trailing success, child failure after a
+comma, and the distinct ordered comma/closing report when neither is present.
+Protected fresh events survive normalization with order and multiplicity intact;
+final rejection reports remain uncommitted. This generic boundary does not yet
+close real type-argument, lambda-parameter, or recursive expression traces.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
