@@ -2126,4 +2126,17 @@ example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_success_
 example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_success_context
 example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_trace_success_iff
 
+example := @Syntax.DeclarativeGrammar.namedTypeTraceValue
+example := @Syntax.DeclarativeGrammar.UnqualifiedMappingSpelling
+example := @Syntax.DeclarativeGrammar.NamedTypeFinishingTrace
+example := @Syntax.DeclarativeGrammar.namedTypeFinishingTrace_exists
+example := @Syntax.DeclarativeGrammar.NamedTypeFinishingTrace.trace_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeFinishingTrace.cascadeFilters
+example := @Syntax.Parser.makeNamedType_eq_traceValue
+example := @Syntax.Parser.finishNamedType_eq_ok_of_trace
+example := @Syntax.Parser.finishNamedType_success_trace_sound
+example := @Syntax.Parser.finishNamedType_success_context
+example := @Syntax.Parser.finishNamedType_trace_success_iff
+example := @Syntax.Parser.finishNamedType_ne_reject
+
 end Tests

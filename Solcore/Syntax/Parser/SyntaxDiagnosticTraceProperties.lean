@@ -54,6 +54,7 @@ import Solcore.Syntax.Parser.ParenthesizedRejectionTraceCorrespondenceProperties
 import Solcore.Syntax.DeclarativeProxyExpressionRejectionTraceProperties
 import Solcore.Syntax.Parser.ProxyExpressionSuccessTraceProperties
 import Solcore.Syntax.Parser.ProxyExpressionRejectionTraceProperties
+import Solcore.Syntax.Parser.NamedTypeFinishingTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -72,4 +73,5 @@ leading-dot constructors preserve Boolean-first name events before argument trac
 parenthesized groups/tuples have conditional exact traces with silent closes and
 right-paren-only reports after non-comma successful children;
 proxy expressions retain nested type events and exact raw failures under type contracts;
+named-type finishing unconditionally records bare-mapping constraint events;
 general expressions and remaining statement traces remain open. -/
