@@ -994,12 +994,20 @@ closed relation of the selected layer. Fixed-point roll/unroll and simultaneous
 induction are verified independently of execution. Successful ordinary erasure,
 token carrier/window preservation, and both protected-event laws are
 unconditional, as are actual explicit-bound and production soundness. Public
-consumers retain arbitrary prior diagnostics. Independent recursive joint
-exactness, completeness, and ordinary outcome existence remain open.
+consumers retain arbitrary prior diagnostics. This forward result alone does
+not establish reverse correspondence or ordinary outcome existence.
 
 Three-level canonical proxy/comptime/name success and closing failure now
 consume public recursive soundness. Component proofs retain full states,
 precise AST/report spans, arbitrary prior events, and following tokens.
+
+Independent recursive joint exactness is now verified by strong induction,
+using heterogeneous child agreement lifted through trailing lists, raw forms,
+and dispatch. It assumes no recursive uniqueness. Pointwise completeness and
+exact-failure equivalences follow under explicit invariant exclusion; production
+corollaries currently use valid states. Since validity includes earlier
+diagnostic spans, unrestricted completeness still needs a separate totality
+argument. Joint exactness remains distinct from trace outcome existence.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

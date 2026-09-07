@@ -1311,8 +1311,8 @@ Successful traces erase to ordinary types and preserve the token carrier and
 active end index. Both outcomes preserve protected, ordered, duplicate-retaining
 events after arbitrary earlier diagnostics; the final rejection report remains
 separate. Public consumers use these recursive contracts without child premises
-or state validity. Recursive independent uniqueness/disjointness, completeness,
-and ordinary outcome existence remain separate proof obligations.
+or state validity. Soundness alone does not imply completeness or ordinary
+outcome existence.
 
 Canonical public-parser consumers now cover the three-level nested success
 `@comptime<a-b> tail` and missing-closing rejection `@comptime<a-b +> tail`.
@@ -1320,6 +1320,20 @@ Constructive component execution and recursive soundness retain the exact
 single hyphen event after arbitrary prior diagnostics, complete AST spans and
 states, active windows, and untouched following tokens. Rejection reports only
 the missing greater symbol and does not commit that report as an event.
+
+Independent recursive type outcomes now have unconditional AST/remainder/event
+uniqueness, rejection remainder/report/event uniqueness, and success/rejection
+disjointness. A pairwise agreement contract compares distinct child relations
+through trailing lists, all raw forms, and the selected dispatcher. Simultaneous
+strong induction compares an annotated left derivation with an arbitrary right
+derivation, without assuming recursive uniqueness as a premise. Actual-reply
+consumers fix every independently claimed event and rule out an opposite
+outcome. Pointwise reverse correspondence now needs only explicit invariant
+exclusion; the existing production totality theorem supplies it on valid input
+states. These validity-restricted completeness and full-failure equivalences
+do not yet quantify over arbitrary prior diagnostic spans. Unrestricted
+completeness and trace outcome existence remain separate obligations; the
+joint specification itself still asserts only uniqueness and disjointness.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
