@@ -178,6 +178,7 @@ import Solcore.Test.SyntaxTypeTraceMonotonicityProperties
 import Solcore.Test.SyntaxTraceCompletenessFromSoundnessProperties
 import Solcore.Test.SyntaxTypeExprTraceProperties
 import Solcore.Test.SyntaxCanonicalTypeExprTraceExamples
+import Solcore.Test.SyntaxTypeExprTraceOutcomeProperties
 import Solcore.Test.SyntaxCanonicalMappingTypeTraceExamples
 import Solcore.Test.SyntaxParserPublicPragmaNameRejectionExamples
 import Solcore.Test.SyntaxParserPublicPragmaNameCascadeExamples
