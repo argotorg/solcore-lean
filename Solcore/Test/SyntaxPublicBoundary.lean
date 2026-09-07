@@ -2517,4 +2517,29 @@ example := @Syntax.Parser.typeExprWithFuel_dispatch_trace_success_complete
 example := @Syntax.Parser.typeExprWithFuel_dispatch_success_context
 example := @Syntax.Parser.typeExprWithFuel_dispatch_trace_success_iff
 
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedTailTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.TypeDispatchRawTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TypeDispatchRawTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.TypeDispatchTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.mono
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.mono
+example := @Syntax.DeclarativeGrammar.NamedTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.ProxyTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.TupleTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.ComptimeTypeTraceParses.mono
+example := @Syntax.DeclarativeGrammar.FunctionReturnsTraceParses.mono
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.mono
+
 end Tests
