@@ -2751,4 +2751,34 @@ example := @Syntax.Parser.FunctionParameterInternals.errorParameter_trace_succes
 example := @Syntax.Parser.FunctionParameterInternals.errorParameter_ne_reject
 example := @Syntax.Parser.FunctionParameterInternals.errorParameter_ne_invariant
 
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceParses
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects.colon_present
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NamedParameterTailTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.namedParameterTailTraceExactOutcomeSpec
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_eq_of_absent
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_eq_of_present
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_eq_ok_of_trace
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_eq_reject_of_trace
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_success_sound
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_reject_trace_sound
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_success_complete
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_complete
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_ordinary
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_ne_invariant
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_success_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_failure_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_success_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_failure_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_trace_reject_state_iff
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_preservesFile
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_success_context
+example := @Syntax.Parser.FunctionParameterInternals.namedParameterTail_reject_context
+
 end Tests

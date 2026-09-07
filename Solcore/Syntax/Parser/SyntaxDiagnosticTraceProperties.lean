@@ -114,6 +114,10 @@ import Solcore.Syntax.Parser.TypeExprTraceStateProperties
 import Solcore.Syntax.DeclarativeTypedParameterFinishingTraceGrammar
 import Solcore.Syntax.DeclarativeTypedParameterFinishingTraceProperties
 import Solcore.Syntax.Parser.TypedParameterFinishingTraceProperties
+import Solcore.Syntax.DeclarativeNamedParameterTailTraceGrammar
+import Solcore.Syntax.DeclarativeNamedParameterTailTraceProperties
+import Solcore.Syntax.Parser.NamedParameterTailTraceProperties
+import Solcore.Syntax.Parser.NamedParameterTailTraceStateProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -154,4 +158,5 @@ separate totality and soundness supply an actual traced outcome on every state a
 recursive type traces reconstruct every field of successful and rejected states;
 proxy expressions and optional lambda returns instantiate concrete unrestricted type contracts;
 typed and error parameter finishers retain exact values and append only their own constraint events;
+named parameter tails have unconditional five contracts, whole-State equivalences, and ordered type/finishing events;
 general expressions and remaining statement traces remain open. -/
