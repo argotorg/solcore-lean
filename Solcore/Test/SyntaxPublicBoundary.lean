@@ -2444,4 +2444,31 @@ example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_succe
 example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_success_context
 example := @Syntax.Parser.TypeFunctionInternals.parseFunctionReturns_trace_success_iff
 
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.ordinary_of_marker_present
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.functionTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.functionTypeTraceValue
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.progress
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.FunctionTypeTraceParses.cascadeFilters
+example := @Syntax.Parser.parseFunctionType_reject_iff_components
+example := @Syntax.Parser.parseFunctionType_reject_trace_sound
+example := @Syntax.Parser.parseFunctionType_trace_reject_complete
+example := @Syntax.Parser.parseFunctionType_trace_reject_iff
+example := @Syntax.Parser.parseFunctionType_trace_reject_failure_iff
+example := @Syntax.Parser.parseFunctionType_success_iff_components
+example := @Syntax.Parser.parseFunctionType_trace_success_sound
+example := @Syntax.Parser.parseFunctionType_trace_success_complete
+example := @Syntax.Parser.parseFunctionType_success_context
+example := @Syntax.Parser.parseFunctionType_trace_success_iff
+example := @Syntax.Parser.typeExprWithFuel_success_context
+example := @Syntax.Parser.typeExpr_success_context
+
 end Tests

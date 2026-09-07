@@ -91,6 +91,9 @@ import Solcore.Syntax.Parser.TupleTypeRejectionTraceProperties
 import Solcore.Syntax.DeclarativeFunctionReturnsRejectionTraceProperties
 import Solcore.Syntax.Parser.FunctionReturnsTraceProperties
 import Solcore.Syntax.Parser.FunctionReturnsRejectionTraceProperties
+import Solcore.Syntax.DeclarativeFunctionTypeRejectionTraceProperties
+import Solcore.Syntax.Parser.FunctionTypeRejectionTraceProperties
+import Solcore.Syntax.Parser.TypeSuccessContextProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -120,4 +123,6 @@ raw proxy types forward nested type outcomes with no extra success/rejection fra
 raw comptime types retain the nested event suffix and all four first-failure positions;
 raw tuple types retain every element, including empty and singleton lists;
 optional function returns preserve silent absence and exact trailing-list outcomes;
+raw function types retain exact parameter-before-return events and complete component states;
+all recursive type successes unconditionally preserve source and full active window;
 general expressions and remaining statement traces remain open. -/
