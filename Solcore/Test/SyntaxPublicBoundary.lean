@@ -2958,4 +2958,33 @@ example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_succ
 example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_reject_failure_state_iff
 example := @Syntax.Parser.FunctionParameterInternals.recoverParameter_trace_reject_state_iff
 
+example := @Syntax.DeclarativeGrammar.parameterTraceRewind
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceParses
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceRejects
+example := @Syntax.DeclarativeGrammar.parameterTraceRewind_fields
+example := @Syntax.DeclarativeGrammar.parameterTraceRewind_eq_input_of_carrier
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NamedParameterTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.namedParameterTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.functionParameterRecoveryTraceRejects_missingToken_of_nonboundary
+example := @Syntax.DeclarativeGrammar.namedParameterRecoveryTrace_cascadeFilters
+example := @Syntax.Parser.namedParameter_trace_success_sound
+example := @Syntax.Parser.namedParameter_reject_trace_sound
+example := @Syntax.Parser.namedParameter_preservesFile
+example := @Syntax.Parser.namedParameter_success_context
+example := @Syntax.Parser.namedParameter_reject_context
+example := @Syntax.Parser.namedParameter_ordinary_unrestricted
+example := @Syntax.Parser.namedParameter_ne_invariant_unrestricted
+example := @Syntax.Parser.namedParameter_trace_success_complete
+example := @Syntax.Parser.namedParameter_trace_reject_complete
+example := @Syntax.Parser.namedParameter_trace_success_iff
+example := @Syntax.Parser.namedParameter_trace_reject_iff
+example := @Syntax.Parser.namedParameter_trace_reject_failure_iff
+example := @Syntax.Parser.namedParameter_trace_success_state_iff
+example := @Syntax.Parser.namedParameter_trace_reject_failure_state_iff
+example := @Syntax.Parser.namedParameter_trace_reject_state_iff
+example := @Syntax.Parser.namedParameter_exists_trace_outcome
+example := @Syntax.Parser.namedParameterTrace_outcome_exists
+
 end Tests

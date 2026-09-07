@@ -140,6 +140,10 @@ import Solcore.Syntax.DeclarativeParameterRecoveryTraceGrammar
 import Solcore.Syntax.DeclarativeParameterRecoveryTraceProperties
 import Solcore.Syntax.Parser.ParameterRecoveryTraceStateProperties
 import Solcore.Syntax.Parser.ParameterRecoveryTraceProperties
+import Solcore.Syntax.DeclarativeNamedParameterTraceGrammar
+import Solcore.Syntax.DeclarativeNamedParameterTraceProperties
+import Solcore.Syntax.Parser.NamedParameterTraceProperties
+import Solcore.Syntax.Parser.NamedParameterTraceStateProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -186,4 +190,5 @@ raw named parameters and their selected non-recovering core have unconditional e
 separate core totality and soundness give non-vacuous traced outcome existence on arbitrary inputs;
 lambda parameter tails retag exact typed outcomes and distinguish inferred absence from comptime errors;
 standalone parameter recovery has exact full-State traces with conditional recovery-event filtering;
+public named parameters compose cursor-only rewind, one report commitment, and exact recovery outcomes;
 general expressions and remaining statement traces remain open. -/
