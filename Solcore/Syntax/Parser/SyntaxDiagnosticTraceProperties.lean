@@ -67,6 +67,10 @@ import Solcore.Syntax.DeclarativeDelimitedTrailingRejectionTraceProtectionProper
 import Solcore.Syntax.Parser.DelimitedTrailingTraceContextProperties
 import Solcore.Syntax.Parser.DelimitedTrailingRejectionTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.DelimitedTrailingRejectionTraceTailCorrespondenceProperties
+import Solcore.Syntax.DeclarativeNamedTypeArgumentsTraceOutcomeProperties
+import Solcore.Syntax.DeclarativeNamedTypeArgumentsRejectionTraceProtectionProperties
+import Solcore.Syntax.Parser.NamedTypeArgumentsTraceProperties
+import Solcore.Syntax.Parser.NamedTypeArgumentsRejectionTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -89,4 +93,5 @@ named-type finishing unconditionally records bare-mapping constraint events;
 optional lambda return annotations lift real type outcomes and bypass absent arrows;
 qualified names unconditionally retain checked components and full success/rejection states;
 trailing-enabled lists preserve comma-first and immediate-close priority under child contracts;
+optional named-type arguments inherit exact nonempty-list outcomes and silent absence;
 general expressions and remaining statement traces remain open. -/

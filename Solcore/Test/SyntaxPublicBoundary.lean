@@ -2265,4 +2265,35 @@ example := @Syntax.Parser.delimited_trace_reject_failure_iff
 example := @Syntax.Parser.afterDelimitedElement_trailing_reject_trace_sound
 example := @Syntax.Parser.delimited_reject_trace_sound
 
+example := @Syntax.DeclarativeGrammar.namedTypeArgumentsTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses
+example := @Syntax.DeclarativeGrammar.TrailingDelimitedListTraceParses.nonempty_elements
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.present_token
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.cursor_le
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.some_progress
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.ordinary
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects
+example := @Syntax.Parser.parseNamedTypeArguments_reject_iff_list
+example := @Syntax.Parser.parseNamedTypeArguments_reject_trace_sound
+example := @Syntax.Parser.parseNamedTypeArguments_trace_reject_complete
+example := @Syntax.Parser.parseNamedTypeArguments_trace_reject_iff
+example := @Syntax.Parser.parseNamedTypeArguments_trace_reject_failure_iff
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.opening_present
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.ordinary
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.NamedTypeArgumentsTraceRejects.disjoint_success
+example := @Syntax.Parser.parseNamedTypeArguments_trace_success_sound
+example := @Syntax.Parser.parseNamedTypeArguments_trace_success_complete
+example := @Syntax.Parser.parseNamedTypeArguments_success_context
+example := @Syntax.Parser.parseNamedTypeArguments_trace_success_iff
+example := @Syntax.Parser.requireNonempty_success_iff_toList
+example := @Syntax.Parser.requireNonempty_eq_ok_of_toList
+example := @Syntax.Parser.requireNonempty_ne_invariant_of_trace
+example := @Syntax.Parser.parseNamedTypeArguments_eq_none_of_absent
+example := @Syntax.Parser.parseNamedTypeArguments_eq_of_present
+
 end Tests
