@@ -1529,6 +1529,13 @@ backing after consumption terminates the scan successfully. Recovery-event
 filtering is explicitly conditional. Caller report commitment and the public
 atom's rewind/recovery composition remain separate obligations.
 
+Independent recovery consumers now reconstruct exact replies for initial
+semicolon/else consumption, subsequent else/semicolon stopping, skipped
+hyphenated identifiers without replayed checks, initial missing-backing rejection
+versus established-scan success, and hidden first/following tokens. They retain
+arbitrary prior and duplicate events, leave the stopping token unread, and show
+both concrete lexical-filter retention and removal of the recovery event.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

@@ -1142,6 +1142,9 @@ Standalone atom recovery has unconditional five trace contracts and whole-State/
 Failure equivalences, with a mandatory initial token, boundary scan, singleton
 event, and conditional cascade filtering. Public atom rewind and report commitment
 remain to be composed with the selected core trace.
+Standalone reverse consumers additionally distinguish mandatory-first behavior
+from later boundary/missing-backing stops, active-window hiding, original report
+non-replay, duplicate prior events, and concrete conditional lexical filtering.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
