@@ -1376,7 +1376,18 @@ AST and State: only an outer comptime type adds its type-span constraint;
 proxy-of-comptime remains silent. Finishing never replays earlier name/type
 events, and duplicate constraints retain their order. Both missing-type error
 constraints retain their specified spans. These are finishing-only components;
-parameter names, tails, dispatch, and recovery still require composition.
+parameter names, dispatch, and recovery still require composition.
+
+Named-parameter tails now compose those finishers with the actual recursive
+type parser. Independent success and rejection judgments have unique, disjoint
+outcomes and protected events. All five execution contracts, whole-State and
+full-Failure equivalences, and ordinary execution hold on arbitrary inputs.
+An absent colon produces an error-valued success without advancing; a present
+colon runs the type before finishing, and a type rejection skips finishing.
+Constructive reverse consumers retain nested comptime/name events in order,
+duplicate earlier constraints, exact spans and windows, and untouched following
+tokens. Terminal type-failure reports remain uncommitted. This is the raw tail,
+not selected parameter-core or public recovery trace completion.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.

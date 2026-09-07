@@ -1035,7 +1035,15 @@ protected diagnostic suffixes. Full expression and lambda composition remain
 open. Parameter finishing is a separate completed leaf: independent event
 existence/uniqueness and exact full-State execution preserve earlier events,
 append only an outer-comptime or specified missing-type constraint, and retain
-duplicates. Name/tail selection and recovery are not covered by this leaf.
+duplicates. Name selection and recovery are not covered by this leaf.
+
+Raw named-parameter tails now unconditionally compose real recursive types and
+finishing traces. The five contracts, exact whole-State/full-Failure reverse
+correspondence, independent joint exactness/protection, and ordinary execution
+distinguish missing-colon error success from typed success and type rejection.
+Nested reverse consumers verify type-before-finishing order, skipped finishing
+on failure, duplicate preservation, and untouched following tokens. Selected
+parameter-core and recovery traces remain separate.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
