@@ -1100,7 +1100,16 @@ contracts and State/Failure equivalences are unconditional, and separate ordinar
 execution proves trace existence on every State and independent remainder.
 Consumers distinguish inference and missing-type core success from recovery,
 and retain ordered mixed events, prior duplicates, and separate terminal reports.
-Parameter lists and complete lambda/general expression traces remain separate.
+Parameter lists are composed below; complete lambda/general expression traces
+remain separate.
+
+Actual functionParameters and the inline lambda parameter list now instantiate
+the trailing-enabled list contracts with public recovering parameters. All five
+contracts, complete State/Failure iff laws, joint exactness, unrestricted ordinary
+execution, and separate actual/independent trace existence are available without
+child or validity premises. Empty lists, trailing commas, and recovery events
+retain the existing runtime behavior. Signature and lambda-expression traces,
+including their following returns and bodies, are separate composition stages.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

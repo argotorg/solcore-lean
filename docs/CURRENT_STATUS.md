@@ -1469,8 +1469,18 @@ commitment match the independent specification without validity assumptions.
 Reverse consumers preserve prior duplicates and mixed diagnostic filtering;
 ordinary inference and marked missing-type error success explicitly bypass
 recovery. Both public parameter slices are complete at this trace boundary.
-Parameter lists, lambda expressions, general recursive expressions, and whole-file
-traces remain separate composition obligations.
+Parameter lists are composed below; lambda expressions, general recursive
+expressions, and whole-file traces remain separate obligations.
+
+The actual function-parameter list and inline lambda-parameter list now have
+unconditional five trace contracts, complete State/Failure equivalences, and
+independent joint exactness. Production totality uses the public parameter's
+strict progress and successful end-index frame, with no validity requirement;
+separate totality and soundness prove trace existence for every State and
+independent remainder. Both lists allow empty input lists and a trailing comma,
+and retain all child recovery events. The lambda law targets the existing inline
+parser rather than adding a new runtime helper. These list results do not assert
+unconditional cascade protection, signature traces, or complete lambda expressions.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
