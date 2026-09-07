@@ -1220,6 +1220,26 @@ public. Canonical `@a-b tail` and `@+ tail` consumers use the real type child an
 verify complete states and unconsumed tails. These type results are distinct
 from proxy-expression traces and do not complete general recursive type traces.
 
+Raw `comptime<T>` types now retain the contextual identifier marker, inner AST,
+angle and outer spans, and exact nested events under child trace contracts.
+All four first failures (marker/opening/child/closing) have exact uncommitted
+reports; raw prefix failures remain distinct from selected ordinary rejection.
+Success forwarding needs no child frame, while a closing report uses the
+successful child's source/full-window frame. Joint uniqueness/disjointness and
+protected suffixes are public. Canonical real-type-child success and closing
+failure preserve the whole state, remainder, prior events, and following tokens;
+raw prefix failures bypass every child.
+
+Raw tuple-type traces now reuse trailing-enabled lists with empty-list priority,
+strict child progress, and exact production fuel. Every list arity remains a
+tuple type, including `()` and `(a-b,)`; no expression-group reinterpretation
+is introduced. Five execution contracts, independent ordinary erasure with
+separate carrier laws, joint uniqueness/disjointness, protected suffixes, and
+raw/selected rejection separation are public. Canonical real-type-child empty,
+singleton, two-element, and missing-separator cases fix the full AST/state,
+checked-name event order, and ordered comma/right-paren expectation. These two
+raw type slices do not complete recursive type or prioritized dispatch traces.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

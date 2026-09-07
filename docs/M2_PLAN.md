@@ -945,6 +945,14 @@ joint uniqueness/disjointness, raw/selected rejection separation, protected
 suffixes, whole-state marker bypass, and canonical real-type-child success and
 failure are verified. General recursive type contracts and dispatch remain open.
 
+Raw comptime-type traces now cover exact marker/angle/outer spans and all four
+first failures. Success needs no child frame; closing-report composition uses
+the successful source/window frame. Raw tuple-type traces inherit trailing-list
+priority/progress and retain empty and singleton tuples. Both slices expose
+conditional five contracts, independent joint uniqueness/disjointness, protected
+suffixes, raw/selected rejection separation, and canonical real-type-child
+full-state consumers. Recursive type and dispatcher trace composition remain open.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
