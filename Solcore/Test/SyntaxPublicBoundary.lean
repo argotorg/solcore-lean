@@ -3257,4 +3257,15 @@ example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_succe
 example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_failure_state_iff
 example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_trace_reject_state_iff
 
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.literalExpression_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.identifierExpression_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.proxyExpression_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_source_endByte
+
 end Tests
