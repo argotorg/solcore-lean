@@ -982,6 +982,13 @@ all indexed values, remainders, events, and reports unchanged. Consumers erase
 auxiliary protection annotations without losing the protected exact suffix.
 Recursive trace construction remains a separate obligation.
 
+Generic pointwise and unrestricted completeness bridges now combine both trace
+soundness laws with independent exactness and explicit invariant exclusion.
+Checked-name consumers preserve arbitrary prior events and complete failure
+states. Countermodels verify that neither joint exactness nor vacuous complete
+contracts assert ordinary outcome existence; invariant exclusion remains an
+explicit additional obligation for recursive instantiation.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

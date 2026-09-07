@@ -1294,6 +1294,14 @@ forget auxiliary child protection annotations while retaining exact events and
 protected normalization. This is infrastructure for recursive trace proofs,
 not a recursive completeness or outcome-existence result.
 
+A generic bridge now derives trace completeness from both execution soundness
+laws, independent uniqueness/disjointness, and explicit exclusion of invariant
+failure. Pointwise and unrestricted versions impose no hidden state-validity or
+frame premise. The actual checked-name leaf consumes all four bridges with
+arbitrary prior diagnostics. Formal countermodels show why soundness plus joint
+exactness cannot replace invariant exclusion, and why even both completeness
+contracts can be vacuous rather than assert an ordinary outcome's existence.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
