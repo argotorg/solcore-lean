@@ -185,6 +185,11 @@ import Solcore.Syntax.Parser.ExpressionAtomDispatchRejectionTraceProperties
 import Solcore.Syntax.Parser.ExpressionAtomDispatchTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.ExpressionCollectionRejectionContextProperties
 import Solcore.Syntax.Parser.ExpressionAtomDispatchRejectionContextProperties
+import Solcore.Syntax.DeclarativeExpressionAtomTraceGrammar
+import Solcore.Syntax.DeclarativeExpressionAtomTraceProperties
+import Solcore.Syntax.Parser.ExpressionAtomTraceContextProperties
+import Solcore.Syntax.Parser.ExpressionAtomTraceProperties
+import Solcore.Syntax.Parser.ExpressionAtomTraceStateProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -241,4 +246,5 @@ expression-atom guards independently select one of eight raw branches on arbitra
 standalone atom recovery preserves exact error ASTs and singleton events, with conditional lexical filtering;
 one selected atom-core layer has exact raw trace correspondence under explicit nested-expression and body contracts;
 separate rejection frames preserve a chosen window observation, including end-byte-only frames that allow end-index changes;
+public atoms compose abstract core traces with exact cursor-only rewind and recovery under explicit source/end-byte frames;
 general expressions and remaining statement traces remain open. -/

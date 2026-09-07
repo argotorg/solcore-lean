@@ -3268,4 +3268,37 @@ example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_cont
 example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_context
 example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_reject_source_endByte
 
+example := @Syntax.DeclarativeGrammar.expressionAtomTraceRewind
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceRejects
+example := @Syntax.DeclarativeGrammar.expressionAtomTraceRewind_fields
+example := @Syntax.DeclarativeGrammar.expressionAtomTraceRewind_eq_input_of_carrier
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionAtomTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.expressionAtomTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.expressionAtomRecoveryTraceRejects_missingToken_of_nonboundary
+example := @Syntax.DeclarativeGrammar.expressionAtomRecoveryTrace_cascadeFilters
+example := @Syntax.Parser.isAtomBoundary_true_iff
+example := @Syntax.Parser.isAtomBoundary_false_iff
+example := @Syntax.Parser.expressionAtom_preservesFile
+example := @Syntax.Parser.expressionAtom_success_source_end
+example := @Syntax.Parser.expressionAtom_reject_source_end
+example := @Syntax.Parser.expressionAtom_success_context
+example := @Syntax.Parser.expressionAtom_reject_context
+example := @Syntax.Parser.expressionAtom_ordinary_of_core
+example := @Syntax.Parser.expressionAtom_ne_invariant_of_core
+example := @Syntax.Parser.expressionAtom_trace_success_sound
+example := @Syntax.Parser.expressionAtom_reject_trace_sound
+example := @Syntax.Parser.expressionAtom_trace_success_complete
+example := @Syntax.Parser.expressionAtom_trace_reject_complete
+example := @Syntax.Parser.expressionAtom_trace_success_iff
+example := @Syntax.Parser.expressionAtom_trace_reject_iff
+example := @Syntax.Parser.expressionAtom_trace_reject_failure_iff
+example := @Syntax.Parser.expressionAtom_trace_success_state_iff
+example := @Syntax.Parser.expressionAtom_trace_reject_failure_state_iff
+example := @Syntax.Parser.expressionAtom_trace_reject_state_iff
+example := @Syntax.Parser.expressionAtom_exists_trace_outcome
+example := @Syntax.Parser.expressionAtomTrace_outcome_exists
+
 end Tests
