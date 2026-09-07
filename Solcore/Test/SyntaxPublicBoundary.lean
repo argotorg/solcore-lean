@@ -2319,4 +2319,27 @@ example := @Syntax.Parser.parseNamedType_trace_reject_complete
 example := @Syntax.Parser.parseNamedType_trace_reject_iff
 example := @Syntax.Parser.parseNamedType_trace_reject_failure_iff
 
+example := @Syntax.DeclarativeGrammar.mappingTypeTraceExactOutcomeSpec
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.ordinary_cases
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.ordinary_of_prefix
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.ordinary_components
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.output_window
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses.cascadeFilters
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceRejects.cascadeFilters
+example := @Syntax.DeclarativeGrammar.mappingTypeTraceValue
+example := @Syntax.DeclarativeGrammar.MappingTypeTraceParses
+example := @Syntax.Parser.parseMappingType_success_iff_components
+example := @Syntax.Parser.parseMappingType_trace_success_sound
+example := @Syntax.Parser.parseMappingType_trace_success_complete
+example := @Syntax.Parser.parseMappingType_success_context
+example := @Syntax.Parser.parseMappingType_trace_success_iff
+example := @Syntax.Parser.parseMappingType_trace_reject_iff
+example := @Syntax.Parser.parseMappingType_trace_reject_failure_iff
+example := @Syntax.Parser.parseMappingType_reject_trace_sound
+example := @Syntax.Parser.parseMappingType_trace_reject_complete
+
 end Tests
