@@ -104,6 +104,16 @@ import Solcore.Syntax.Parser.TypeExprTraceSoundnessProperties
 import Solcore.Syntax.Parser.TypeExprTraceCompletenessProperties
 import Solcore.Syntax.Parser.TypeExprTraceUnrestrictedProperties
 import Solcore.Syntax.Parser.TypeExprTraceExistenceProperties
+import Solcore.Syntax.Parser.ProxyExpressionTypeTraceProperties
+import Solcore.Syntax.Parser.OptionalLambdaReturnTypeConcreteTraceProperties
+import Solcore.Syntax.Parser.SourceFrameProperties
+import Solcore.Syntax.Parser.DelimitedSourceFrameProperties
+import Solcore.Syntax.Parser.TypeSourceFrameProperties
+import Solcore.Syntax.Parser.DiagnosticTraceStateProperties
+import Solcore.Syntax.Parser.TypeExprTraceStateProperties
+import Solcore.Syntax.DeclarativeTypedParameterFinishingTraceGrammar
+import Solcore.Syntax.DeclarativeTypedParameterFinishingTraceProperties
+import Solcore.Syntax.Parser.TypedParameterFinishingTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -141,4 +151,7 @@ both trace soundness laws plus independent exactness and explicit invariant excl
 recursive type successes and rejections have unconditional fuel-free traces with protected events;
 independent recursive type outcomes are unique and disjoint, with unconditional production trace completeness;
 separate totality and soundness supply an actual traced outcome on every state and independent remainder;
+recursive type traces reconstruct every field of successful and rejected states;
+proxy expressions and optional lambda returns instantiate concrete unrestricted type contracts;
+typed and error parameter finishers retain exact values and append only their own constraint events;
 general expressions and remaining statement traces remain open. -/
