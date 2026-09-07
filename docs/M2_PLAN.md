@@ -873,6 +873,16 @@ Canonical constructor consumers now connect lexing directly to initial states,
 fixing the complete three-event success or two-event rejected prefix alongside
 separate dot/name/list spans, parent window, and unconsumed following tokens.
 
+Parenthesized group/tuple traces now have conditional success/rejection
+correspondence, independent exactness, and protected child-event composition.
+The bespoke comma tail keeps a singleton trailing-comma form as a group and
+preserves forward tuple order; immediate closes bypass any child. A missing
+close after a non-comma child expects only right parenthesis. Raw missing-marker
+cases stay separate from selected ordinary erasure, and production fuel is
+measured after the first child. Canonical empty/group/tuple and closing-failure
+consumers retain full ASTs, windows, unread tokens, arbitrary prior events, and
+uncommitted reports. Recursive child contracts remain explicit.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

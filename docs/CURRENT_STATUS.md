@@ -1096,6 +1096,22 @@ three-name successful trace and a two-name prefix before argument rejection.
 They retain the separate dot/name/list spans, full parent window, unread tail,
 and uncommitted identifier failure with arbitrary incoming diagnostics.
 
+Parenthesized expressions and their comma tails now have independent success
+and raw rejection traces, conditional sound/complete correspondence, and joint
+uniqueness/disjointness. Empty parentheses form an empty tuple; a singleton
+remains a group even with a trailing comma, while larger tuples preserve source
+order. Immediate closing bypasses any child and is silent. After a successful
+child without a following comma, a failed close expects only `)`, not the generic
+comma/closing pair. Raw missing-opening and missing-comma failures are separated
+from the older selected ordinary grammar. The tail uses the actual production
+fuel after the first child, retains arbitrary reverse prefixes and prior events,
+and needs successful child file/full-window preservation, not input validity.
+Protected child traces survive normalization; the final report is uncommitted.
+Canonical checked-name fixtures verify empty/group/tuple ASTs and two closing
+failures, including exact spans, remaining tokens, windows, and ordered events.
+These are concrete restricted-child consumers, not general recursive-expression
+or mixed-file trace completeness.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
