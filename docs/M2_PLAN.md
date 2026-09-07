@@ -953,6 +953,12 @@ conditional five contracts, independent joint uniqueness/disjointness, protected
 suffixes, raw/selected rejection separation, and canonical real-type-child
 full-state consumers. Recursive type and dispatcher trace composition remain open.
 
+Optional function-return clauses now compose exact contextual markers and
+empty-allowed trailing-list outcomes under child contracts. Silent absence,
+empty child bypass, joint uniqueness/disjointness, protected suffixes, and
+canonical real-type-child success/separator-failure consumers are verified.
+Function-type and general recursive trace composition remain separate.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

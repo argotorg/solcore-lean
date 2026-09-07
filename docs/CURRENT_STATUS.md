@@ -1240,6 +1240,16 @@ singleton, two-element, and missing-separator cases fix the full AST/state,
 checked-name event order, and ordered comma/right-paren expectation. These two
 raw type slices do not complete recursive type or prioritized dispatch traces.
 
+Optional function-type `returns(...)` clauses now have independent exact
+success/rejection traces and five contracts under nested type contracts. An
+absent contextual identifier succeeds with `none` on the unchanged whole state;
+a present marker delegates to the empty-allowed trailing list, including raw
+opening failure. Exact list ASTs, spans, emitted events, and uncommitted failures
+are retained. Joint uniqueness/disjointness and protected ordered suffixes are
+public. Canonical empty returns bypass every possible child; real-type-child
+singleton success and separator failure retain full states and following tokens.
+This optional clause does not itself complete function-type or recursive traces.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
