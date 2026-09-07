@@ -1533,6 +1533,14 @@ the returned token carrier/endIndex to differ. Independent exactness assumes
 nested/body joint exactness. Neither these contracts nor uniqueness establishes
 recursive production totality or trace outcome existence.
 
+Separate raw-collection, lambda, and selected-core rejection context laws now
+preserve the file and an explicitly chosen window observation. The whole-window
+and end-byte-only specializations require corresponding rejected-child frames
+and the nested expression's success context, but no body success, token-carrier,
+progress, validity, or ordinary contract. The weaker law permits rejected children
+to change both token arrays and end indices without preventing exact State
+reconstruction or later cursor-only rewind.
+
 Standalone expression-atom recovery now has unconditional five trace contracts,
 independent joint exactness, source/full-window frames, and complete State/Failure
 equivalences. It consumes a mandatory first token, follows the existing boundary

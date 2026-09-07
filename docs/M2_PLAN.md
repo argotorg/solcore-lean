@@ -1153,6 +1153,9 @@ explicit success context. Complete State equivalences add only the relevant
 success context or rejected file/end-byte frame, preserving exact returned
 carriers/end indices. Joint exactness depends on nested/body joint specifications;
 recursive totality and non-vacuous trace existence are still separate obligations.
+Separate rejection-context composition preserves a chosen window observation,
+including file/end-byte-only frames that permit failed token/end-index changes.
+It requires no body success, token preservation, validity, or progress contract.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
