@@ -19,11 +19,14 @@ import Solcore.Syntax.DeclarativeIsolatedBlockTraceProperties
 import Solcore.Syntax.Parser.IsolatedBlockTraceCompletenessProperties
 import Solcore.Syntax.DeclarativeCoreBlockTailCascadeProperties
 import Solcore.Syntax.Parser.CoreBlockClosingTraceProperties
+import Solcore.Syntax.DeclarativeCoreBlockTraceExactnessProperties
+import Solcore.Syntax.DeclarativeCoreBlockCascadeProperties
+import Solcore.Syntax.Parser.CoreBlockIsolationTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
 recovery, arbitrary successful pragma sequences, and successful pragma prefixes
 ending at recognized rejection. Sequencing, transactional choice, and balanced
 isolation have compositional execution laws. Independent isolation traces lift
-explicit inner trace contracts. Core closing has exact tail-validation traces;
-concrete general Core traces remain open. -/
+explicit inner trace contracts. Raw and isolated Core blocks have full trace
+correspondence under statement contracts; concrete general statements remain open. -/
