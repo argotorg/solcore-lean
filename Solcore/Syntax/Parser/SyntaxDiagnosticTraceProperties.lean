@@ -94,6 +94,9 @@ import Solcore.Syntax.Parser.FunctionReturnsRejectionTraceProperties
 import Solcore.Syntax.DeclarativeFunctionTypeRejectionTraceProperties
 import Solcore.Syntax.Parser.FunctionTypeRejectionTraceProperties
 import Solcore.Syntax.Parser.TypeSuccessContextProperties
+import Solcore.Syntax.DeclarativeTypeDispatchTraceOrdinaryProperties
+import Solcore.Syntax.Parser.TypeDispatchSuccessTraceProperties
+import Solcore.Syntax.Parser.TypeDispatchRejectionTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -125,4 +128,5 @@ raw tuple types retain every element, including empty and singleton lists;
 optional function returns preserve silent absence and exact trailing-list outcomes;
 raw function types retain exact parameter-before-return events and complete component states;
 all recursive type successes unconditionally preserve source and full active window;
+one type-dispatch layer preserves all prioritized guards and exact outcomes under child trace contracts;
 general expressions and remaining statement traces remain open. -/
