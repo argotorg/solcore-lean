@@ -118,6 +118,10 @@ import Solcore.Syntax.DeclarativeNamedParameterTailTraceGrammar
 import Solcore.Syntax.DeclarativeNamedParameterTailTraceProperties
 import Solcore.Syntax.Parser.NamedParameterTailTraceProperties
 import Solcore.Syntax.Parser.NamedParameterTailTraceStateProperties
+import Solcore.Syntax.DeclarativeParameterNameFinishingTraceProperties
+import Solcore.Syntax.Parser.ParameterNameFinishingTraceProperties
+import Solcore.Syntax.Parser.ParameterSourceFrameProperties
+import Solcore.Syntax.Parser.ParameterDispatchTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -159,4 +163,5 @@ recursive type traces reconstruct every field of successful and rejected states;
 proxy expressions and optional lambda returns instantiate concrete unrestricted type contracts;
 typed and error parameter finishers retain exact values and append only their own constraint events;
 named parameter tails have unconditional five contracts, whole-State equivalences, and ordered type/finishing events;
+ordinary name checks preserve exact prefix events, while both parameter dispatchers select the same window-visible pair;
 general expressions and remaining statement traces remain open. -/
