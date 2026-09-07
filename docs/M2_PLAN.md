@@ -916,6 +916,13 @@ Joint uniqueness/disjointness and protected suffixes are public. Canonical
 checked-name success and two distinct rejection paths verify real execution,
 but do not supply real type-argument or lambda-parameter child contracts.
 
+Optional named-type argument traces now inherit the nonempty trailing list's
+five contracts under nested type contracts. Silent absence and nonempty
+conversion preserve whole states; selected rejection preserves its exact
+failure and earlier events. Joint exactness and protected normalization are
+public, with real-type-child canonical success/rejection examples. General
+recursive type trace contracts and named-type composition remain separate.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

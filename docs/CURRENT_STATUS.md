@@ -1130,7 +1130,7 @@ with a span covering any supplied type arguments. Qualified and other spellings
 are silent. Execution always succeeds and changes only the appended events;
 the entire type AST, input carrier/window/cursor, prior reports, and duplicates
 are exact. Constraint events survive normalization. This finishing-only result
-does not yet close qualified-name, argument-list, or recursive type traces.
+is one compositional stage; recursive type traces remain separate.
 
 Optional lambda return annotations now have independent exact success/rejection
 traces under real type-parser contracts. Arrow absence returns `none` with the
@@ -1167,6 +1167,19 @@ comma, and the distinct ordered comma/closing report when neither is present.
 Protected fresh events survive normalization with order and multiplicity intact;
 final rejection reports remain uncommitted. This generic boundary does not yet
 close real type-argument, lambda-parameter, or recursive expression traces.
+
+Optional named-type arguments now compose the nonempty trailing-enabled list
+into independent exact success/rejection traces under nested type contracts.
+Absent `<` returns `none` with the entire state unchanged, bypassing every
+child. Present arguments retain their complete nonempty carrier and span;
+the silent `requireNonempty` conversion cannot fail its defensive invariant
+after successful nonempty parsing. Rejection requires positive `<` lookahead
+and forwards the complete list failure/state without committing its report.
+Independent erasure, uniqueness/disjointness, and protected suffix laws remain
+separate from execution and child carrier preservation. Canonical consumers
+use the real `typeExpr` child for `<a-b,> tail` and `<a-b,+> tail`, preserving
+the prior events, checked-name event, complete state, and unconsumed tail.
+These are concrete examples, not general recursive type trace contracts.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
