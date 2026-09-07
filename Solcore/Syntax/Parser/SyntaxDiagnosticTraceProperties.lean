@@ -34,6 +34,11 @@ import Solcore.Syntax.Parser.BlockStatementTraceProperties
 import Solcore.Syntax.Parser.IdentifierExpressionTraceProperties
 import Solcore.Syntax.DeclarativeExpressionNameTraceProtectionProperties
 import Solcore.Syntax.DeclarativeRejectionTraceProtectionProperties
+import Solcore.Syntax.DeclarativeDelimitedNoTrailingTraceOutcomeProperties
+import Solcore.Syntax.DeclarativeDelimitedNoTrailingTraceProtectionProperties
+import Solcore.Syntax.Parser.DelimitedNoTrailingTraceContextProperties
+import Solcore.Syntax.Parser.DelimitedNoTrailingRejectionTraceCorrespondenceProperties
+import Solcore.Syntax.Parser.DelimitedNoTrailingTailRejectionTraceCorrespondenceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -46,4 +51,5 @@ unconditional exact traces. Return traces compose explicit expression contracts.
 Literal/Boolean primitives and literal/identifier-expression leaves have exact traces;
 Raw block statements inherit exact traces under inner statement contracts;
 protected earlier events compose through successful and rejected raw statements;
+generic no-trailing lists have exact success/rejection traces under child contracts;
 general expressions and remaining statement traces remain open. -/
