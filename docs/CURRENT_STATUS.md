@@ -1302,6 +1302,18 @@ arbitrary prior diagnostics. Formal countermodels show why soundness plus joint
 exactness cannot replace invariant exclusion, and why even both completeness
 contracts can be vacuous rather than assert an ordinary outcome's existence.
 
+General recursive type execution now has unconditional success and rejection
+trace soundness, both at explicit resource bounds and at the production parser.
+The independent specification is the least closed relation of the selected
+type layer, with simultaneous success/rejection queries and exact roll/unroll
+and induction laws. It contains no executable parser or resource parameter.
+Successful traces erase to ordinary types and preserve the token carrier and
+active end index. Both outcomes preserve protected, ordered, duplicate-retaining
+events after arbitrary earlier diagnostics; the final rejection report remains
+separate. Public consumers use these recursive contracts without child premises
+or state validity. Recursive independent uniqueness/disjointness, completeness,
+and ordinary outcome existence remain separate proof obligations.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

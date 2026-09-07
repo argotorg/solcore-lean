@@ -989,6 +989,14 @@ states. Countermodels verify that neither joint exactness nor vacuous complete
 contracts assert ordinary outcome existence; invariant exclusion remains an
 explicit additional obligation for recursive instantiation.
 
+Recursive type success and rejection soundness now target a fuel-free least
+closed relation of the selected layer. Fixed-point roll/unroll and simultaneous
+induction are verified independently of execution. Successful ordinary erasure,
+token carrier/window preservation, and both protected-event laws are
+unconditional, as are actual explicit-bound and production soundness. Public
+consumers retain arbitrary prior diagnostics. Independent recursive joint
+exactness, completeness, and ordinary outcome existence remain open.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
