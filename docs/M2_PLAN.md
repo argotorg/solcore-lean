@@ -968,6 +968,14 @@ with a noncanonical-carrier consumer. This frame is not recursive trace
 soundness/completeness; prioritized trace dispatch and recursive composition
 remain separate obligations.
 
+The one-layer type dispatcher now has independent exact priority selection,
+all six raw outcomes plus final type-only rejection, ordinary erasure, joint
+uniqueness/disjointness, and protected events. Positive-fuel correspondence
+retains preceding-child trace contracts while using the unconditional frame.
+Keyword/contextual/window boundary consumers and complete final failures are
+verified. General recursive production traces and outcome existence still need
+separate proofs; the one-layer contract does not imply either.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

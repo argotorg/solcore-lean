@@ -1271,6 +1271,21 @@ carrier/window fixture. The frame is not a general recursive trace correspondenc
 prioritized trace dispatch and recursive success/rejection composition remain
 separate obligations.
 
+One prioritized type-dispatch trace layer now composes all six raw forms and
+the final expected-type rejection. Independent selection records every earlier
+absence and the exact positive marker or two-token contextual prefix. Raw
+prefix failures cannot masquerade as selected failures; named ordinary erasure
+receives the comptime/mapping exclusions. Joint uniqueness/disjointness,
+carrier-preserving erasure, and protected suffixes are public. Actual positive
+fuel has five compositional contracts and success/rejection/full-failure
+equivalences under the preceding parser's trace contracts; its source/window
+frame is supplied unconditionally. Consumers distinguish keyword tokens from
+same-spelling identifiers, bare/mismatched contextual names from special forms,
+and hidden backing-array tokens from visible window tokens. Final failure keeps
+the whole state and reports the active-window EOF span without emitting an
+event. This is one-layer correspondence, not general recursive production
+trace completion or an assertion that every input has an ordinary outcome.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
