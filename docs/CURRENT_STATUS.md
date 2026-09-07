@@ -1510,6 +1510,25 @@ warning. A real empty Core block bypasses any supplied statement parser and
 leaves the following semicolon unread; general nonempty body behavior stays
 explicitly conditional.
 
+Expression-atom lookahead now has a separate independent eight-way selection
+judgment, including the final fallback. Every later branch retains all earlier
+failed guards. Selection exists uniquely on arbitrary token remainders, and
+equal current-token observations suffice even across different carriers and
+cursor positions. The actual core has exactly the selected raw parser's whole
+Reply with no recursive-child contract. Concrete consumers cover all branches,
+Boolean keywords versus identifiers, hidden/missing backing, invalid windows,
+unselected child independence, and the final uncommitted expression report.
+These are dispatch-selection laws, not recursive trace outcome existence.
+
+Standalone expression-atom recovery now has unconditional five trace contracts,
+independent joint exactness, source/full-window frames, and complete State/Failure
+equivalences. It consumes a mandatory first token, follows the existing boundary
+scan, and emits exactly one recovered-expression event at the error AST's span.
+An unavailable initial token rejects without committing its report; missing
+backing after consumption terminates the scan successfully. Recovery-event
+filtering is explicitly conditional. Caller report commitment and the public
+atom's rewind/recovery composition remain separate obligations.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

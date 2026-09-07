@@ -1134,6 +1134,15 @@ all body-before-execution failure positions, conditional mixed filtering, and
 the real empty Core block with an arbitrary bypassed statement parser. General
 body results remain explicit pointwise assumptions; the empty case is concrete.
 
+The atom dispatcher now independently selects all eight ordered branches on
+arbitrary remainders, with uniqueness, separate selection existence, and exact
+raw Reply reflection. Concrete consumers cover token/window distinctions and
+unselected-child independence. This does not establish recursive trace existence.
+Standalone atom recovery has unconditional five trace contracts and whole-State/
+Failure equivalences, with a mandatory initial token, boundary scan, singleton
+event, and conditional cascade filtering. Public atom rewind and report commitment
+remain to be composed with the selected core trace.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
