@@ -120,6 +120,14 @@ theorem AvoidsLocalName.bindFresh_hasType_iff {name : String} {source : Syntax.E
       · intro typing
         cases typing with
         | lessEqual left right => exact .lessEqual (leftIH.mpr left) (rightIH.mpr right)
+  | less _ _ leftIH rightIH =>
+      constructor
+      · intro typing
+        cases typing with
+        | less left right => exact .less (leftIH.mp left) (rightIH.mp right)
+      · intro typing
+        cases typing with
+        | less left right => exact .less (leftIH.mpr left) (rightIH.mpr right)
   | bitAnd _ _ leftIH rightIH =>
       constructor
       · intro typing

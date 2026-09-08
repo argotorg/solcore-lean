@@ -54,6 +54,10 @@ theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Reso
       obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
       obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
       exact ⟨_, .lessEqual leftResolved rightResolved, .unary (.binary leftTyped rightTyped)⟩
+  | less _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .less leftResolved rightResolved, .wordLt leftTyped rightTyped⟩
   | bitAnd _ _ leftIH rightIH =>
       obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
       obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
@@ -125,6 +129,9 @@ theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context 
       | unary comparisonTyped =>
           cases comparisonTyped with
           | binary leftTyped rightTyped => exact .lessEqual (leftIH leftTyped) (rightIH rightTyped)
+  | less _ _ leftIH rightIH =>
+      cases typing with
+      | wordLt leftTyped rightTyped => exact .less (leftIH leftTyped) (rightIH rightTyped)
   | bitAnd _ _ leftIH rightIH =>
       cases typing with
       | binary leftTyped rightTyped => exact .bitAnd (leftIH leftTyped) (rightIH rightTyped)

@@ -30,6 +30,7 @@ theorem ResolvesLocalExpression.mapIds {table : LocalNameTable}
   | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
   | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
   | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
+  | less _ _ leftIH rightIH => exact .less leftIH rightIH
   | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
   | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
   | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
@@ -89,6 +90,10 @@ theorem resolvesLocalExpression_mapIds_iff_exists (mapping : Resolved.LocalId �
         obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
         obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
         exact ⟨.unary .boolNot (.binary .wordGt originalLeft originalRight), .lessEqual leftChild rightChild, rfl⟩
+    | less _ _ leftIH rightIH =>
+        obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
+        obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
+        exact ⟨.wordLt originalLeft originalRight, .less leftChild rightChild, rfl⟩
     | bitAnd _ _ leftIH rightIH =>
         obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
         obtain ⟨originalRight, rightChild, rfl⟩ := rightIH

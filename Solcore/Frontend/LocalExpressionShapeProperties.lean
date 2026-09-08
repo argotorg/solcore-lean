@@ -112,6 +112,14 @@ theorem resolveLocalExpression?_lessEqual_spans (table : LocalNameTable) (left r
         { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .lessEqual⟩ right } := by
   simp only [resolveLocalExpression?]
 
+/-- Unsigned less-than retains both ordered operands and ignores only source ranges. -/
+theorem resolveLocalExpression?_less_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .less⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .less⟩ right } := by
+  simp only [resolveLocalExpression?]
+
 /-- Word conjunction keeps both operand trees and ignores only the operator/outer ranges. -/
 theorem resolveLocalExpression?_bitAnd_spans (table : LocalNameTable) (left right : Syntax.Expr)
     (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
