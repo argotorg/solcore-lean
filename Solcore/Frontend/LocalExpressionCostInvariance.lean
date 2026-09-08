@@ -35,6 +35,7 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
     | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
     | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
     | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
+    | less _ _ leftIH rightIH => exact .less leftIH rightIH
     | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
     | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
     | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
@@ -62,6 +63,7 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
     | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
     | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
     | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
+    | less _ _ leftIH rightIH => exact .less leftIH rightIH
     | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
     | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
     | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
@@ -169,6 +171,14 @@ theorem AvoidsLocalName.bindFresh_cost_iff {name : String} {source : Syntax.Expr
       · intro evaluation
         cases evaluation with
         | greater left right => exact .greater (leftIH.mpr left) (rightIH.mpr right)
+  | less _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | less left right => exact .less (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | less left right => exact .less (leftIH.mpr left) (rightIH.mpr right)
   | equal _ _ leftIH rightIH =>
       constructor
       · intro evaluation

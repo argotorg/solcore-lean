@@ -1,5 +1,7 @@
 import Solcore.Frontend.LocalExpressionCost
 import Solcore.Frontend.LocalExpressionCostStepComposition
+import Solcore.Frontend.WordLessLocalRightCostProperties
+import Solcore.Resolved.LocalFragmentProperties
 
 /-! Independent source costs are exact Core path lengths. Whole structural
 resolution and runtime identity-order lowering are explicit; no typing or
@@ -98,6 +100,14 @@ theorem LocalExpressionEvaluatesWithCost.toStepsWithContinuation
           | binary lowerLeft lowerRight =>
               exact CostStepComposition.binary
                 (leftIH leftChild lowerLeft _) (rightIH rightChild lowerRight _) rfl
+  | less _ _ leftIH rightIH =>
+      cases resolution with
+      | less leftChild rightChild =>
+          cases lowered with
+          | wordLt lowerLeft lowerRight =>
+              exact CostStepComposition.wordLt_of_local_right
+                (leftIH leftChild lowerLeft) (rightIH rightChild lowerRight)
+                lowerRight.localFragment continuation
   | equal _ _ leftIH rightIH =>
       cases resolution with
       | equal leftChild rightChild =>

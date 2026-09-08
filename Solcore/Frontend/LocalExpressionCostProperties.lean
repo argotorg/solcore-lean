@@ -92,6 +92,13 @@ theorem LocalExpressionEvaluatesWithCost.deterministic {table : LocalNameTable}
           obtain ⟨sameRight, storeEq, rfl⟩ := rightIH rightChild
           cases sameLeft; cases sameRight
           exact ⟨rfl, storeEq, rfl⟩
+  | less _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | less leftChild rightChild =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq, rfl⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq, rfl⟩
   | equal _ _ leftIH rightIH =>
       cases rightEvaluation with
       | equal leftChild rightChild =>

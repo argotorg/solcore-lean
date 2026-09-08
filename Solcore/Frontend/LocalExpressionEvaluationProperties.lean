@@ -55,6 +55,9 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | greater _ _ leftIH rightIH =>
       cases evaluation with
       | greater leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
+  | less _ _ leftIH rightIH =>
+      cases evaluation with
+      | less leftChild rightChild => exact .wordLt (leftIH leftChild) (rightIH rightChild)
   | equal _ _ leftIH rightIH =>
       cases evaluation with
       | equal leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
@@ -162,6 +165,9 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
           case word.word leftWord rightWord =>
             cases applied
             exact .greater (leftIH leftChild) (rightIH rightChild)
+  | less _ _ leftIH rightIH =>
+      cases evaluation with
+      | wordLt leftChild rightChild => exact .less (leftIH leftChild) (rightIH rightChild)
   | equal _ _ leftIH rightIH =>
       cases evaluation with
       | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>

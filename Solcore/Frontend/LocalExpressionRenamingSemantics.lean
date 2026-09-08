@@ -59,6 +59,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
     | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
     | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
     | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
+    | less _ _ leftIH rightIH => exact .less leftIH rightIH
     | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
     | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
     | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
@@ -84,6 +85,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
     | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
     | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
     | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
+    | less _ _ leftIH rightIH => exact .less leftIH rightIH
     | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
     | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
     | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH

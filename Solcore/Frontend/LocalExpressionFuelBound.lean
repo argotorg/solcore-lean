@@ -27,6 +27,8 @@ def localExpressionFuelBound (source : Syntax.Expr) : Nat :=
       localExpressionFuelBound left + localExpressionFuelBound right + 3
   | ⟨_, .binary left ⟨_, .greater⟩ right⟩ =>
       localExpressionFuelBound left + localExpressionFuelBound right + 3
+  | ⟨_, .binary left ⟨_, .less⟩ right⟩ =>
+      localExpressionFuelBound left + localExpressionFuelBound right + 9
   | ⟨_, .binary left ⟨_, .equal⟩ right⟩ =>
       localExpressionFuelBound left + localExpressionFuelBound right + 3
   | ⟨_, .binary left ⟨_, .notEqual⟩ right⟩ =>
@@ -71,6 +73,7 @@ theorem LocalExpressionEvaluatesWithCost.cost_le_fuelBound
   | bitOr _ _ leftIH rightIH => simp only [localExpressionFuelBound]; omega
   | bitXor _ _ leftIH rightIH => simp only [localExpressionFuelBound]; omega
   | greater _ _ leftIH rightIH => simp only [localExpressionFuelBound]; omega
+  | less _ _ leftIH rightIH => simp only [localExpressionFuelBound]; omega
   | equal _ _ leftIH rightIH => simp only [localExpressionFuelBound]; omega
   | notEqual _ _ leftIH rightIH => simp only [localExpressionFuelBound]; omega
   | lessEqual _ _ leftIH rightIH => simp only [localExpressionFuelBound]; omega
