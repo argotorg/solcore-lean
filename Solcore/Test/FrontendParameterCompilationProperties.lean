@@ -1,3 +1,4 @@
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionParameterCompilationProperties
 import Solcore.Frontend.RuntimeFunctionConditionalParameterCompilationProperties
 import Solcore.Frontend.RuntimeFunctionCompilationOwnerProperties
@@ -143,19 +144,19 @@ theorem valid_parameters_do_not_bypass_the_condition_or_written_else_arm (payloa
     have sameInputs := accepted.parameters.result_unique (declared owner payload .word)
     have checked := accepted.body.complete
     rw [sameInputs] at checked
-    change elaborateTypedLetReturnBody? _ owner (inputs owner payload .word)
+    change elaborateTypedLetReturnTree? _ owner (inputs owner payload .word)
       (selected "t" "f") = some (candidate.core, candidate.returnType) at checked
     have conditionAccepted : elaborateLocalExpression? (inputs owner payload .word).names
         (inputs owner payload .word).context (ref "c") = some (.var 2, .word) :=
       (declared owner payload .word).reference_elaborates_at (index := 0) rfl (conditionMeaning payload .word) span span
-    simp only [selected, elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, conditionAccepted, bind, Option.bind_some,
+    simp only [selected, elaborateTypedLetReturnTree?, conditionAccepted, bind, Option.bind_some,
       reduceCtorEq, ↓reduceIte] at checked
   · apply compileRuntimeFunction?_eq_none_iff.mpr
     rintro ⟨candidate, accepted⟩
     have sameInputs := accepted.parameters.result_unique (declared owner payload .bool)
     have checked := accepted.body.complete
     rw [sameInputs] at checked
-    simp [elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, elaborateReturnBody?,
+    simp [elaborateTypedLetReturnTree?, elaborateReturnBody?,
       elaborateLocalExpression?, resolveLocalExpression?, entry, selected, returned, ref, inputs,
       LocalTypeInputs.names, LocalTypeInputs.context, LocalTypeInputs.bindFresh, LocalTypeInputs.empty,
       LocalNameTable.lookup?] at checked

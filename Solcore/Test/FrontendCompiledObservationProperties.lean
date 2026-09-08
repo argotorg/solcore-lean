@@ -1,3 +1,5 @@
+import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionObservationProperties
 import Solcore.Core.ModularArithmetic
 
@@ -54,7 +56,7 @@ private theorem compilation (variant : Bool) : RuntimeFunctionCompiles (table va
         (.var ⟨owner variant, 0⟩) (.var ⟨owner variant, 0⟩)) :=
     .conditional (.greater (.add (.identifier .head) (.wordLiteral (zeroMeaning variant)))
       (.wordLiteral (zeroMeaning variant))) (.identifier .head) (.identifier .head)
-  refine ⟨header variant _ _, declared variant, .terminal <| .single <| .expression ?_
+  refine ⟨header variant _ _, declared variant, TypedLetReturnBodyElaborates.returnTree <| .terminal <| .single <| .expression ?_
     (.ifE (.binary (.binary (.var .head) .word) .word) (.var .head) (.var .head))
     (.ifE (.binary (.binary (.var .head) .word) .word) (.var .head) (.var .head))⟩
   cases variant
@@ -111,6 +113,7 @@ private theorem originalCost (value : Core.Word) (store : Core.Store) :
       (.bool (decide (value > Core.Word.zero))) store 9 :=
     .greater (leftValue := value) (rightValue := Core.Word.zero) (leftCost := 5) (rightCost := 1) sum literal
   apply RuntimeFunctionEvaluatesWithCost.intro (prepares value)
+  apply TypedLetReturnBodyEvaluatesWithCost.returnTree
   apply TypedLetReturnBodyEvaluatesWithCost.terminal
   apply TerminalReturnTreeEvaluatesWithCost.single
   apply ReturnBodyEvaluatesWithCost.expression
@@ -148,7 +151,7 @@ private def guardCompiled (swapped : Bool) : CompiledRuntimeFunction :=
 private theorem guardCompilation (swapped : Bool) :
     RuntimeFunctionCompiles guardTable (owner false) (guardEntry swapped) (guardCompiled swapped) := by
   refine ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, ?_,
-    .terminal <| .single <| .expression (.wordLiteral (zeroMeaning false)) .word .word⟩
+    TypedLetReturnBodyElaborates.returnTree <| .terminal <| .single <| .expression (.wordLiteral (zeroMeaning false)) .word .word⟩
   cases swapped
   · exact .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons (.named (.tail (by decide) .head)) (by change "b" ∉ ["a"]; decide) .nil)
@@ -158,7 +161,7 @@ private def emptyEntry := declaration false [] (zero false)
 private def emptyCompiled : CompiledRuntimeFunction := ⟨LocalTypeInputs.empty, .word .zero, .word⟩
 private theorem emptyCompilation : RuntimeFunctionCompiles guardTable (owner false) emptyEntry emptyCompiled :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, .nil,
-    .terminal <| .single <| .expression (.wordLiteral (zeroMeaning false)) .word .word⟩
+    TypedLetReturnBodyElaborates.returnTree <| .terminal <| .single <| .expression (.wordLiteral (zeroMeaning false)) .word .word⟩
 private def guardedArguments (value : Core.Word) : List TypedRuntimeArgument :=
   [argument value, ⟨.bool, .bool false, .bool⟩]
 
@@ -190,8 +193,8 @@ private theorem simpleCompilation (addition : Bool) : RuntimeFunctionCompiles (t
     (simpleEntry addition) (simpleCompiled addition) := by
   refine ⟨header false _ _, declared false, ?_⟩
   cases addition
-  · exact .terminal <| .single <| .expression (.identifier .head) (.var .head) (.var .head)
-  · exact .terminal <| .single <| .expression (.add (.identifier .head) (.wordLiteral (zeroMeaning false)))
+  · exact TypedLetReturnBodyElaborates.returnTree <| .terminal <| .single <| .expression (.identifier .head) (.var .head) (.var .head)
+  · exact TypedLetReturnBodyElaborates.returnTree <| .terminal <| .single <| .expression (.add (.identifier .head) (.wordLiteral (zeroMeaning false)))
       (.binary (.var .head) .word) (.binary (.var .head) .word)
 
 theorem equal_eventual_values_do_not_preserve_exact_core_or_fuel

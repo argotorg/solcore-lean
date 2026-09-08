@@ -1,8 +1,11 @@
+import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionOwnerProperties
 import Solcore.Frontend.RuntimeFunctionStoreProperties
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
 import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
+import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
 
 /-! Value-free recursive compilation and actual-argument execution are distinct
 contracts. Original parameter order, exact Core and genuine states are retained. -/
@@ -54,7 +57,7 @@ private theorem elaborated (depth : Nat) (type : Core.Ty) :
       (.single (.expression (.identifier .head) (.var .head) (.var .head)))
 private theorem compilation (depth : Nat) (type : Core.Ty) :
     RuntimeFunctionCompiles (types type) owner (declaration depth) (compiled depth type) :=
-  ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared type, .terminal (elaborated depth type)⟩
+  ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared type, TypedLetReturnBodyElaborates.returnTree <| .terminal (elaborated depth type)⟩
 
 theorem arbitrary_depth_and_types_compile_from_independent_whole_source_provenance
     (depth : Nat) (type : Core.Ty) (definitions : Core.DataEnvironment) :
@@ -96,7 +99,7 @@ private def prepared {type : Core.Ty} (depth : Nat) (choice : Bool) (left right 
 private theorem preparation {type : Core.Ty} (depth : Nat) (choice : Bool) (left right : Actual type) :
     RuntimeFunctionPrepares (types type) owner (declaration depth) (arguments choice left right) (prepared depth choice left right) :=
   ⟨(compilation depth type).header, .cons (.named (.tail (by decide) .head)) (by simp [LocalInputs.empty, LocalInputs.names])
-    (.cons (.named .head) (by change "x" ∉ ["c"]; decide) (.cons (.named .head) (by change "y" ∉ ["x", "c"]; decide) .nil)), .terminal (elaborated depth type)⟩
+    (.cons (.named .head) (by change "x" ∉ ["c"]; decide) (.cons (.named .head) (by change "y" ∉ ["x", "c"]; decide) .nil)), TypedLetReturnBodyElaborates.returnTree <| .terminal (elaborated depth type)⟩
 private theorem conditionCost {type : Core.Ty} (choice : Bool) (left right : Actual type) (store : Core.Store) :
     LocalExpressionEvaluatesWithCost (inputs choice left right).names (inputs choice left right).environment
       store (ref "c") (.bool choice) store 1 := .identifier (.tail yc (.tail xc .head)) (.tail i20 (.tail i10 .head))
@@ -114,6 +117,7 @@ private theorem costed {type : Core.Ty} (depth : Nat) (choice : Bool) (left righ
     RuntimeFunctionEvaluatesWithCost (types type) owner (declaration (depth + 1)) (arguments choice left right)
       store type (result choice left right) store (required depth choice) := by
   apply RuntimeFunctionEvaluatesWithCost.intro (preparation (depth + 1) choice left right)
+  apply TypedLetReturnBodyEvaluatesWithCost.returnTree
   apply TypedLetReturnBodyEvaluatesWithCost.terminal
   have y : LocalExpressionEvaluatesWithCost (inputs choice left right).names (inputs choice left right).environment
       store (ref "y") right.val store 1 := .identifier .head .head
@@ -151,18 +155,22 @@ private theorem treeBound (depth : Nat) : terminalReturnTreeFuelBound (body dept
     simp only [body, branch, terminalReturnTreeFuelBound, ih, returned, returnBodyFuelBound,
       ref, localExpressionFuelBound]
     omega
+private theorem recursiveBound (depth : Nat) : typedLetReturnTreeFuelBound (body depth) = 3 * depth + 1 := by
+  induction depth with
+  | zero => simp [body, returned, ref, typedLetReturnTreeFuelBound, returnBodyFuelBound, localExpressionFuelBound]
+  | succ depth ih =>
+    simp only [body, branch, typedLetReturnTreeFuelBound, ih, returned, returnBodyFuelBound, ref, localExpressionFuelBound]
+    omega
 theorem all_three_entry_bound_contracts_use_the_recursive_bound
     {type : Core.Ty} (depth : Nat) (choice : Bool) (left right : Actual type) (store : Core.Store) :
-    required depth choice ≤ typedLetReturnBodyFuelBound (declaration (depth + 1)).value.body ∧
+    required depth choice ≤ typedLetReturnTreeFuelBound (declaration (depth + 1)).value.body ∧
     (∃ value, Core.ValueHasType value type ∧ runRuntimeFunction? (types type) owner (declaration (depth + 1))
       (arguments choice left right) (3 * (depth + 1) + 1) store = some (type, .done value store)) ∧
     (∃ value, Core.ValueHasType value type ∧ runRuntimeFunction? (types type) owner (declaration (depth + 1))
       (arguments choice left right) (3 * (depth + 1) + 1) store = some (type, .done value store) ∧
       Core.runStateful (3 * (depth + 1) + 1) (Core.State.initial (core (depth + 1)) [right.val, left.val, .bool choice] store) = .done value store) := by
-  have enough : typedLetReturnBodyFuelBound (declaration (depth + 1)).value.body ≤ 3 * (depth + 1) + 1 := by
-    simp only [declaration, body, branch, typedLetReturnBodyFuelBound]
-    change terminalReturnTreeFuelBound (body (depth + 1)) ≤ _
-    rw [treeBound]; exact Nat.le_refl _
+  have enough : typedLetReturnTreeFuelBound (declaration (depth + 1)).value.body ≤ 3 * (depth + 1) + 1 :=
+    Nat.le_of_eq (recursiveBound _)
   exact ⟨(costed depth choice left right store).cost_le_fuelBound,
     (preparation _ choice left right).hasType.run_done_of_fuelBound store _ enough,
     (compilation _ type).run_done_of_fuelBound (arguments choice left right) rfl store _ enough⟩

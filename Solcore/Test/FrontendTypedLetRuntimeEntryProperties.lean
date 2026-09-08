@@ -1,4 +1,7 @@
 import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionOwnerProperties
 import Solcore.Frontend.RuntimeFunctionStoreProperties
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
@@ -64,7 +67,7 @@ private theorem compilation (names : List String) (type : Core.Ty) (distinct : n
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
     .cons (.named (.tail (by decide) .head)) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons (.named .head) (by change "seed" ∉ ["flag"]; decide) .nil),
-    chainElaborated names "seed" type (initial type) _ distinct fresh (.identifier .head) (.var .head) (.var .head)⟩
+    (chainElaborated names "seed" type (initial type) _ distinct fresh (.identifier .head) (.var .head) (.var .head)).returnTree⟩
 
 theorem arbitrary_length_whole_entry_compilation_needs_no_runtime_values
     (names : List String) (type : Core.Ty) (distinct : names.Nodup)
@@ -119,7 +122,7 @@ private theorem costed {type : Core.Ty} (names : List String) (flag : Bool) (act
     (distinct : names.Nodup) (fresh : ∀ name ∈ names, name ∉ ["seed", "flag"]) :
     RuntimeFunctionEvaluatesWithCost (types type) owner (declaration names) (arguments flag actual) store type actual.val store (3 * names.length + 1) :=
   .intro (preparation names flag actual distinct fresh)
-    (chainCost names "seed" (inputs flag actual).names (inputs flag actual).environment actual.val store (.identifier .head .head))
+    (chainCost names "seed" (inputs flag actual).names (inputs flag actual).environment actual.val store (.identifier .head .head)).returnTree
 private theorem bound (names : List String) (previous : String) :
     typedLetReturnBodyFuelBound (chain names previous) = 3 * names.length + 1 := by
   induction names generalizing previous with
@@ -152,16 +155,25 @@ theorem independent_whole_entry_cost_proves_all_fuel_thresholds_and_actual_core_
     (costed names flag actual store distinct fresh).run_done_iff, (costed names flag actual store distinct fresh).run_outOfFuel_iff,
     (compilation names type distinct fresh).compiled_never_faults (arguments flag actual) rfl fuel store error state⟩
 
+private theorem recursiveBound (names : List String) (previous : String) :
+    typedLetReturnTreeFuelBound (chain names previous) = 3 * names.length + 1 := by
+  induction names generalizing previous with
+  | nil => simp [chain, statements, ref, typedLetReturnTreeFuelBound, returnBodyFuelBound, localExpressionFuelBound]
+  | cons name rest ih =>
+      simp only [chain, statements, binding, typedLetReturnTreeFuelBound, ref, localExpressionFuelBound, List.length_cons]
+      have tail := ih name
+      simp only [chain] at tail
+      rw [tail]; omega
 theorem all_three_entry_bounds_include_strict_prefix_work
     {type : Core.Ty} (names : List String) (flag : Bool) (actual : Actual type) (store : Core.Store)
     (distinct : names.Nodup) (fresh : ∀ name ∈ names, name ∉ ["seed", "flag"]) :
-    3 * names.length + 1 ≤ typedLetReturnBodyFuelBound (declaration names).value.body ∧
+    3 * names.length + 1 ≤ typedLetReturnTreeFuelBound (declaration names).value.body ∧
     (∃ value, Core.ValueHasType value type ∧ runRuntimeFunction? (types type) owner (declaration names)
       (arguments flag actual) (3 * names.length + 1) store = some (type, .done value store)) ∧
     (∃ value, Core.ValueHasType value type ∧ runRuntimeFunction? (types type) owner (declaration names)
       (arguments flag actual) (3 * names.length + 1) store = some (type, .done value store) ∧
       Core.runStateful (3 * names.length + 1) (Core.State.initial (core names.length) [actual.val, .bool flag] store) = .done value store) := by
-  have enough : typedLetReturnBodyFuelBound (declaration names).value.body ≤ 3 * names.length + 1 := Nat.le_of_eq (bound names "seed")
+  have enough : typedLetReturnTreeFuelBound (declaration names).value.body ≤ 3 * names.length + 1 := Nat.le_of_eq (recursiveBound names "seed")
   exact ⟨(costed names flag actual store distinct fresh).cost_le_fuelBound,
     (preparation names flag actual distinct fresh).hasType.run_done_of_fuelBound store _ enough,
     (compilation names type distinct fresh).run_done_of_fuelBound (arguments flag actual) rfl store _ enough⟩

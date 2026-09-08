@@ -1,3 +1,4 @@
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
 import Solcore.Frontend.ConditionalReturnBodyExecutionProperties
 import Solcore.Frontend.ConditionalReturnBodyFuelBoundProperties
 import Solcore.Frontend.ConditionalReturnBodyResumptionProperties
@@ -243,7 +244,7 @@ theorem old_singleton_rejects_but_runtime_entry_compiles_conditional_statements
       ⟨LocalTypeInputs.empty.bindFresh owner "c" .bool, .ifE (.var 0) .unit .unit, .unit⟩ :=
     ⟨⟨rfl, rfl, rfl, rfl, .absent⟩,
       .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil,
-      .terminal <| .conditional (.identifier .head) (.var .head) (.var .head) (.single .bare) (.single .bare)⟩
+      TypedLetReturnBodyElaborates.returnTree <| .terminal <| .conditional (.identifier .head) (.var .head) (.var .head) (.single .bare) (.single .bare)⟩
   exact ⟨rfl, compilation.header, compilation.parameters, compilation.complete⟩
 
 end Tests.FrontendConditionalReturnBody

@@ -1,4 +1,5 @@
 import Solcore.Frontend.TypedLetReturnBodyProperties
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
 import Solcore.Frontend.TypedLetReturnBodyEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
 import Solcore.Core.Safety
@@ -210,7 +211,7 @@ theorem valid_header_and_parameter_compile_the_exact_prefix_while_the_tree_adapt
   have compiled : RuntimeFunctionCompiles (types type) owner declaration ⟨inputs type, twoCore, type⟩ :=
     ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
       .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil,
-      twoElaborated type span span span span⟩
+      (twoElaborated type span span span span).returnTree⟩
   exact compiled.complete
 
 private def otherId : Resolved.LocalId := ⟨{ owner with declarationIndex := 1 }, 999⟩

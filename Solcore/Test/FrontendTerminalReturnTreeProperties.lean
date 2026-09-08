@@ -1,3 +1,4 @@
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
 import Solcore.Frontend.TerminalReturnTreeEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
 import Solcore.Frontend.ConditionalReturnBodyEvaluation
@@ -258,7 +259,7 @@ theorem a_valid_header_and_complete_parameters_compile_the_exact_deep_tree
       (.cons (.named .head) (by change "x" ∉ ["c"]; decide) (.cons (.named .head) (by change "y" ∉ ["x", "c"]; decide) .nil))
   have compilation : RuntimeFunctionCompiles (types type) owner (entry depth)
       ⟨inputs type, spineCore (depth + 2) (.var 1) (.var 0), type⟩ :=
-    ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared, .terminal (spineElab _ type type (xElab type) (yElab type))⟩
+    ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared, TypedLetReturnBodyElaborates.returnTree <| .terminal (spineElab _ type type (xElab type) (yElab type))⟩
   exact ⟨compilation.header, declared, compilation.complete⟩
 
 end Tests.FrontendTerminalReturnTree
