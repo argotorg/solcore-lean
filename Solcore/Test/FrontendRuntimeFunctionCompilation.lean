@@ -29,7 +29,7 @@ private def table (type : Core.Ty) : TypeNameTable := [(["Arg"], type), (["Resul
 private def bare := declaration [] none (returned none)
 private def bareCompiled : CompiledRuntimeFunction := ⟨.empty, .unit, .unit⟩
 private theorem bareCompiles : RuntimeFunctionCompiles [] owner bare bareCompiled :=
-  ⟨⟨rfl, rfl, rfl, rfl, .absent⟩, .nil, .single .bare⟩
+  ⟨⟨rfl, rfl, rfl, rfl, .absent⟩, .nil, .terminal (.single .bare)⟩
 
 theorem bare_unit_has_independent_value_free_compilation_and_exact_core_typing :
     RuntimeFunctionCompiles [] owner bare bareCompiled ∧
@@ -44,7 +44,7 @@ private theorem identityCompiles (type : Core.Ty) :
     RuntimeFunctionCompiles (table type) owner identity (identityCompiled type) :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named (.tail (by decide) .head))⟩,
     .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil,
-    .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
+    .terminal <| .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
 
 theorem arbitrary_annotation_compiles_to_open_not_closed_core (type : Core.Ty) :
     RuntimeFunctionCompiles (table type) owner identity (identityCompiled type) ∧
@@ -82,7 +82,7 @@ private theorem conditionalCompiles (type : Core.Ty) :
     .cons (.named (.tail (by decide) (.tail (by decide) .head)))
       (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons (.named .head) (by change "x" ∉ ["c"]; simp) .nil),
-    .single <| .expression (.conditional (.identifier (.tail (by change "x" ≠ "c"; decide) .head)) (.identifier .head) (.identifier .head))
+    .terminal <| .single <| .expression (.conditional (.identifier (.tail (by change "x" ≠ "c"; decide) .head)) (.identifier .head) (.identifier .head))
       (.ifE (.var (.tail (by change id 1 ≠ id 0; decide) .head)) (.var .head) (.var .head))
       (.ifE (.var (.tail (by change id 1 ≠ id 0; decide) .head)) (.var .head) (.var .head))⟩
 
@@ -148,11 +148,11 @@ private theorem runtimePrepares (flag : Bool) :
     RuntimeFunctionPrepares (table .bool) owner identity [boolArg flag] (runtimeIdentity flag) :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named (.tail (by decide) .head))⟩,
     .cons (.named .head) (by simp [LocalInputs.empty, LocalInputs.names]) .nil,
-    .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
+    .terminal <| .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
 private theorem runtimeCost (flag : Bool) (store : Core.Store) :
     RuntimeFunctionEvaluatesWithCost (table .bool) owner identity [boolArg flag]
       store .bool (.bool flag) store 1 :=
-  .intro (runtimePrepares flag) (.single <| .expression (.identifier .head .head))
+  .intro (runtimePrepares flag) (.terminal <| .single <| .expression (.identifier .head .head))
 
 theorem different_values_share_the_compiled_result_but_not_the_returned_value (store : Core.Store) :
     compileRuntimeFunction? (table .bool) owner identity = some (identityCompiled .bool) ∧
@@ -186,7 +186,7 @@ theorem whole_header_and_body_restrictions_apply_without_any_runtime_arguments :
   have bodyAbsent : ¬ ∃ compiled, RuntimeFunctionCompiles [] owner emptyBody compiled := by
     rintro ⟨compiled, evidence⟩
     cases evidence.body with
-    | single body => cases body
+    | terminal tree => cases tree with | single body => cases body
   exact ⟨headerAbsent, compileRuntimeFunction?_eq_none_iff.mpr headerAbsent,
     bodyAbsent, compileRuntimeFunction?_eq_none_iff.mpr bodyAbsent⟩
 

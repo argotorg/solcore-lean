@@ -73,7 +73,7 @@ private theorem elaborated (id : Resolved.DeclarationId) (type : Core.Ty) (condi
 private theorem compilation (id : Resolved.DeclarationId) (type : Core.Ty) (conditional : Bool) :
     RuntimeFunctionCompiles (types type) id (declaration conditional) (compiled id type conditional) :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named (.tail (by decide) .head))⟩,
-    declared id type, elaborated id type conditional⟩
+    declared id type, .terminal (elaborated id type conditional)⟩
 private def projection (output : CompiledRuntimeFunction) := (output.core, output.returnType, output.inputs.context.values)
 
 theorem arbitrary_types_have_independent_static_provenance_and_open_core_typing
@@ -193,7 +193,7 @@ theorem invalid_unselected_arm_remains_none_for_every_owner_and_type
     have sameInputs := accepted.parameters.result_unique (declared leftOwner type)
     have checked := accepted.body.complete
     rw [sameInputs] at checked
-    simp [elaborateTerminalReturnTree?, elaborateReturnBody?,
+    simp [elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, elaborateReturnBody?,
       elaborateLocalExpression?, resolveLocalExpression?, missing, returned, ref, inputs, LocalTypeInputs.names,
       LocalTypeInputs.context, LocalTypeInputs.bindFresh, LocalTypeInputs.empty, LocalNameTable.lookup?] at checked
   refine ⟨rejected, ?_⟩

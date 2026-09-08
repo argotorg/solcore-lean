@@ -45,7 +45,7 @@ private theorem bound (owner : Resolved.DeclarationId) (argument : TypedRuntimeA
 private theorem preparation (owner : Resolved.DeclarationId) (argument : TypedRuntimeArgument) :
     RuntimeFunctionPrepares (types argument.type) owner declaration (args argument) (prepared owner argument) :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named (.tail (by decide) .head))⟩, bound owner argument,
-    .single <| .expression (.conditional (.identifier (.tail namesDifferent .head)) (.identifier .head) (.identifier .head))
+    .terminal <| .single <| .expression (.conditional (.identifier (.tail namesDifferent .head)) (.identifier .head) (.identifier .head))
       (.ifE (.var (.tail (idsDifferent owner) .head)) (.var .head) (.var .head))
       (.ifE (.var (.tail (idsDifferent owner) .head)) (.var .head) (.var .head))⟩
 private theorem cost (owner : Resolved.DeclarationId) (argument : TypedRuntimeArgument) (store : Core.Store) :
@@ -57,7 +57,7 @@ private theorem cost (owner : Resolved.DeclarationId) (argument : TypedRuntimeAr
   have selected : LocalExpressionEvaluatesWithCost (inputs owner argument).names
       (inputs owner argument).environment store (ref "x") argument.value store 1 :=
     .identifier .head .head
-  exact .intro (preparation owner argument) (.single <| .expression (.ifTrue condition selected))
+  exact .intro (preparation owner argument) (.terminal <| .single <| .expression (.ifTrue condition selected))
 
 theorem injective_owner_transport_keeps_independent_parameters_and_exact_preparation
     (owner : Resolved.DeclarationId) (argument : TypedRuntimeArgument)
@@ -125,16 +125,18 @@ private theorem missingRejected (owner : Resolved.DeclarationId) (argument : Typ
   have body := accepted.body
   rw [sameInputs] at body
   cases body with
-  | single body =>
-      cases body with
-      | expression resolution _ _ =>
-          cases resolution with
-          | conditional _ _ right =>
-              cases right with
-              | identifier found =>
-                  have impossible := LocalNameTable.lookup?_iff.mpr found
-                  change none = some _ at impossible
-                  cases impossible
+  | terminal tree =>
+      cases tree with
+      | single body =>
+          cases body with
+          | expression resolution _ _ =>
+              cases resolution with
+              | conditional _ _ right =>
+                  cases right with
+                  | identifier found =>
+                      have impossible := LocalNameTable.lookup?_iff.mpr found
+                      change none = some _ at impossible
+                      cases impossible
 
 theorem skipped_missing_reference_remains_a_whole_entry_failure_after_owner_change
     (leftOwner rightOwner : Resolved.DeclarationId) (argument : TypedRuntimeArgument)

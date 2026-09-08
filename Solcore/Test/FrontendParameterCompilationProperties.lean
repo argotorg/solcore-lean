@@ -143,19 +143,19 @@ theorem valid_parameters_do_not_bypass_the_condition_or_written_else_arm (payloa
     have sameInputs := accepted.parameters.result_unique (declared owner payload .word)
     have checked := accepted.body.complete
     rw [sameInputs] at checked
-    change elaborateTerminalReturnTree? (inputs owner payload .word).names
-      (inputs owner payload .word).context (selected "t" "f") = some (candidate.core, candidate.returnType) at checked
+    change elaborateTypedLetReturnBody? _ owner (inputs owner payload .word)
+      (selected "t" "f") = some (candidate.core, candidate.returnType) at checked
     have conditionAccepted : elaborateLocalExpression? (inputs owner payload .word).names
         (inputs owner payload .word).context (ref "c") = some (.var 2, .word) :=
       (declared owner payload .word).reference_elaborates_at (index := 0) rfl (conditionMeaning payload .word) span span
-    simp only [selected, elaborateTerminalReturnTree?, conditionAccepted, bind, Option.bind_some,
+    simp only [selected, elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, conditionAccepted, bind, Option.bind_some,
       reduceCtorEq, ↓reduceIte] at checked
   · apply compileRuntimeFunction?_eq_none_iff.mpr
     rintro ⟨candidate, accepted⟩
     have sameInputs := accepted.parameters.result_unique (declared owner payload .bool)
     have checked := accepted.body.complete
     rw [sameInputs] at checked
-    simp [elaborateTerminalReturnTree?, elaborateReturnBody?,
+    simp [elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, elaborateReturnBody?,
       elaborateLocalExpression?, resolveLocalExpression?, entry, selected, returned, ref, inputs,
       LocalTypeInputs.names, LocalTypeInputs.context, LocalTypeInputs.bindFresh, LocalTypeInputs.empty,
       LocalNameTable.lookup?] at checked

@@ -209,7 +209,7 @@ private theorem compilation : RuntimeFunctionCompiles types owner (declaration "
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
     .cons wordAnnotation (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons wordAnnotation (by change "r" ∉ ["l"]; simp) .nil),
-    .single <| .expression (.equal (.identifier (.tail names_ne .head)) (.identifier .head))
+    .terminal <| .single <| .expression (.equal (.identifier (.tail names_ne .head)) (.identifier .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))⟩
 private def arguments (left right : Core.Word) : List TypedRuntimeArgument :=
@@ -233,7 +233,7 @@ theorem independent_compilation_preparation_and_exact_bool_entry_cost
       some (.bool, .done (.bool (left == right)) store) ↔ 5 ≤ fuel) := by
   have evaluation : RuntimeFunctionEvaluatesWithCost types owner (declaration "Bool") (arguments left right)
       store .bool (.bool (left == right)) store 5 :=
-    .intro (preparation left right) (.single <| .expression (costed left right store))
+    .intro (preparation left right) (.terminal <| .single <| .expression (costed left right store))
   exact ⟨compilation, compilation.complete, preparation left right, evaluation, fun _ => evaluation.run_done_iff⟩
 
 theorem declared_word_return_rejects_a_bool_equality_result :

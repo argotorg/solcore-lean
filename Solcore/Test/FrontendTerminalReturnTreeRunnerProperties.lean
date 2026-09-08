@@ -260,7 +260,7 @@ theorem deep_body_execution_and_exact_function_entry_compilation_agree
     .cons (.named (.tail (by decide) .head)) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons (.named .head) (by change "x" ∉ ["c"]; decide) (.cons (.named .head) (by change "y" ∉ ["x", "c"]; decide) .nil))
   have compilation : RuntimeFunctionCompiles (types type) owner entry ⟨declaredInputs type, core, type⟩ :=
-    ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared, elaborated true left right⟩
+    ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared, .terminal (elaborated true left right)⟩
   exact ⟨compilation.header, declared,
     (actual_typed_cost_existence_and_both_sufficient_fuel_interfaces true left right store).2.2.2, compilation.complete⟩
 

@@ -230,7 +230,7 @@ theorem original_singleton_rejects_and_ill_scoped_function_entry_still_rejects
   have sameInputs : candidate.inputs = .empty := accepted.parameters.result_unique .nil
   have checked := accepted.body.complete
   rw [sameInputs] at checked
-  simp [elaborateTerminalReturnTree?, declaration, conditional,
+  simp [elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, declaration, conditional,
     branch, ref, elaborateLocalExpression?, resolveLocalExpression?, LocalTypeInputs.empty,
     LocalTypeInputs.names, LocalTypeInputs.context, LocalNameTable.lookup?] at checked
 

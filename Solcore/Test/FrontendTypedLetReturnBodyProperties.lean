@@ -197,21 +197,21 @@ private def declaration : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "prefix"⟩, none, ⟨span, [parameter]⟩, ⟨none, none⟩,
     some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, twoBody span span span span⟩⟩
 
-theorem valid_header_and_parameter_do_not_extend_the_unchanged_tree_or_function_entry (type : Core.Ty) :
+theorem valid_header_and_parameter_compile_the_exact_prefix_while_the_tree_adapter_still_rejects (type : Core.Ty) :
     RuntimeFunctionHeader (types type) declaration.value.signature type ∧
     RuntimeParametersDeclare (types type) owner [parameter] (inputs type) ∧
     elaborateTypedLetReturnBody? (types type) owner (inputs type) declaration.value.body = some (twoCore, type) ∧
     elaborateTerminalReturnTree? (inputs type).names (inputs type).context declaration.value.body = none ∧
-    compileRuntimeFunction? (types type) owner declaration = none := by
+    compileRuntimeFunction? (types type) owner declaration = some ⟨inputs type, twoCore, type⟩ := by
   refine ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
     .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil,
     (twoElaborated type span span span span).complete,
     by simp [declaration, twoBody, binding, elaborateTerminalReturnTree?], ?_⟩
-  apply compileRuntimeFunction?_eq_none_iff.mpr
-  rintro ⟨candidate, compiled⟩
-  have impossible := compiled.body.complete
-  simp only [declaration, twoBody, binding, elaborateTerminalReturnTree?] at impossible
-  cases impossible
+  have compiled : RuntimeFunctionCompiles (types type) owner declaration ⟨inputs type, twoCore, type⟩ :=
+    ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
+      .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil,
+      twoElaborated type span span span span⟩
+  exact compiled.complete
 
 private def otherId : Resolved.LocalId := ⟨{ owner with declarationIndex := 1 }, 999⟩
 private def sparse (type : Core.Ty) : LocalTypeInputs := ⟨

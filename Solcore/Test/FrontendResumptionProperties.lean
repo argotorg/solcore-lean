@@ -162,7 +162,7 @@ private def prepared (type : Core.Ty) (value : Core.Value) (typed : Core.ValueHa
 private theorem compilation (type : Core.Ty) : RuntimeFunctionCompiles (types type) owner declaration (compiled type) :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
     .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil,
-    .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
+    .terminal <| .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
 private theorem preparation (type : Core.Ty) (value : Core.Value) (typed : Core.ValueHasType value type) :
     RuntimeFunctionPrepares (types type) owner declaration [argument type value typed] (prepared type value typed) :=
   ⟨(compilation type).header,
@@ -181,7 +181,7 @@ theorem independent_entry_and_compilation_resume_the_actual_argument_from_zero_s
     runRuntimeFunction? (types type) owner declaration [argument type value typed] additional store =
       some (type, Core.runStateful additional (Core.State.initial (.var 0) [value] store)) := by
   have evaluated : RuntimeFunctionEvaluatesWithCost (types type) owner declaration [argument type value typed]
-      store type value store 1 := .intro (preparation type value typed) (.single <| .expression (.identifier .head .head))
+      store type value store 1 := .intro (preparation type value typed) (.terminal <| .single <| .expression (.identifier .head .head))
   have exhausted : runRuntimeFunction? (types type) owner declaration [argument type value typed] 0 store =
       some (type, .outOfFuel (Core.State.initial (.var 0) [value] store)) := by
     rw [runRuntimeFunction?, (preparation type value typed).complete]; rfl

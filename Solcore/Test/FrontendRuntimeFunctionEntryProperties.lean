@@ -1,4 +1,5 @@
 import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
+import Solcore.Frontend.TypedLetReturnBodyEmbeddingProperties
 
 /-! ADR-0170: independent entry preparation checks the complete declared
 contract and retains exact Core. Returning a value is not a source call. -/
@@ -29,7 +30,7 @@ private def boolArg (value : Bool) : TypedRuntimeArgument := ⟨.bool, .bool val
 private def bare := declaration [] none (returned none)
 private def barePrepared : PreparedRuntimeFunction := ⟨LocalInputs.empty, .unit, .unit⟩
 private theorem barePrepares : RuntimeFunctionPrepares [] owner bare [] barePrepared :=
-  ⟨⟨rfl, rfl, rfl, rfl, .absent⟩, .nil, .single .bare⟩
+  ⟨⟨rfl, rfl, rfl, rfl, .absent⟩, .nil, .terminal (.single .bare)⟩
 
 theorem absent_return_contract_prepares_bare_unit_and_has_exact_one_step (store : Core.Store) :
     RuntimeFunctionPrepares [] owner bare [] barePrepared ∧
@@ -37,7 +38,7 @@ theorem absent_return_contract_prepares_bare_unit_and_has_exact_one_step (store 
     RuntimeFunctionEvaluatesWithCost [] owner bare [] store .unit .unit store 1 ∧
     runRuntimeFunction? [] owner bare [] 0 store = some (.unit, .outOfFuel (Core.State.initial .unit [] store)) ∧
     runRuntimeFunction? [] owner bare [] 1 store = some (.unit, .done .unit store) := by
-  refine ⟨barePrepares, barePrepares.complete, .intro barePrepares (.single .bare), ?_, ?_⟩
+  refine ⟨barePrepares, barePrepares.complete, .intro barePrepares (.terminal (.single .bare)), ?_, ?_⟩
   · rw [runRuntimeFunction?, barePrepares.complete]; rfl
   · rw [runRuntimeFunction?, barePrepares.complete]; rfl
 
@@ -48,7 +49,7 @@ private theorem identityPrepares (argument : TypedRuntimeArgument) :
     RuntimeFunctionPrepares (table argument.type) owner identity [argument] (identityPrepared argument) :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named (.tail (by decide) .head))⟩,
     .cons (.named .head) (by simp [LocalInputs.empty, LocalInputs.names]) .nil,
-    .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
+    .terminal <| .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
 
 theorem explicit_aliases_return_arbitrary_structurally_typed_values_without_added_cost
     (argument : TypedRuntimeArgument) (store : Core.Store) (fuel : Nat) :
@@ -60,7 +61,7 @@ theorem explicit_aliases_return_arbitrary_structurally_typed_values_without_adde
       some (argument.type, .done argument.value store) ↔ 1 ≤ fuel) := by
   have evaluated : RuntimeFunctionEvaluatesWithCost (table argument.type) owner identity [argument]
       store argument.type argument.value store 1 :=
-    .intro (identityPrepares argument) (.single <| .expression (.identifier .head .head))
+    .intro (identityPrepares argument) (.terminal <| .single <| .expression (.identifier .head .head))
   refine ⟨identityPrepares argument, (identityPrepares argument).complete, evaluated, ?_⟩
   rw [runRuntimeFunction?_done_iff_cost]
   constructor
@@ -78,7 +79,7 @@ theorem identity_entry_exhaustion_is_present_and_retains_its_exact_initial_state
     RuntimeFunctionHasType (table argument.type) owner identity [argument] argument.type := by
   have evaluated : RuntimeFunctionEvaluatesWithCost (table argument.type) owner identity [argument]
       store argument.type argument.value store 1 :=
-    .intro (identityPrepares argument) (.single <| .expression (.identifier .head .head))
+    .intro (identityPrepares argument) (.terminal <| .single <| .expression (.identifier .head .head))
   exact ⟨by rw [runRuntimeFunction?, (identityPrepares argument).complete]; rfl,
     evaluated.run_outOfFuel_iff, evaluated.hasType⟩
 
@@ -93,7 +94,7 @@ private theorem pairPrepares (first second : Bool) : RuntimeFunctionPrepares (ta
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named (.tail (by decide) .head))⟩,
     .cons (.named .head) (by simp [LocalInputs.empty, LocalInputs.names])
       (.cons (.named .head) (by change "second" ∉ ["first"]; simp) .nil),
-    .single <| .expression (.identifier (.tail (by change "second" ≠ "first"; decide) .head))
+    .terminal <| .single <| .expression (.identifier (.tail (by change "second" ≠ "first"; decide) .head))
       (.var (.tail differentIds .head)) (.var (.tail differentIds .head))⟩
 
 theorem same_typed_source_order_arguments_select_their_exact_core_position
@@ -133,7 +134,9 @@ theorem successful_word_body_does_not_satisfy_a_boolean_return_contract (fuel : 
     have body : ReturnBodyElaborates prepared.inputs.names prepared.inputs.context mismatched.value.body (.word .zero) .word :=
       .expression (.wordLiteral zeroMeaning) .word .word
     have impossible := (header.type_unique derived.header).trans
-      ((TerminalReturnTreeElaborates.single body).result_unique derived.body).2.symm
+      ((TypedLetReturnBodyElaborates.terminal
+        (inputs := prepared.inputs.toTypeInputs) (.single (by
+          simpa only [LocalInputs.toTypeInputs_names, LocalInputs.toTypeInputs_context] using body))).result_unique derived.body).2.symm
     cases impossible
   have rejected := prepareRuntimeFunction?_eq_none_iff.mpr noPreparation
   exact ⟨(ReturnBodyElaborates.expression (.wordLiteral zeroMeaning) .word .word).complete,
@@ -188,7 +191,7 @@ theorem raw_skipped_missing_evaluation_is_not_a_whole_entry_contract (fuel : Nat
     have accepted := derived.body.complete
     rw [← sameInputs] at accepted
     rw [show missingDecl.value.body = ⟨span, [⟨span, .returnStmt (some missingSource)⟩]⟩ from rfl,
-      elaborateTerminalReturnTree?_single] at accepted
+      elaborateTypedLetReturnBody?_single] at accepted
     change (identityPrepared (boolArg true)).inputs.checkReturnBody? missingDecl.value.body = some _ at accepted
     rw [bodyRejected] at accepted
     cases accepted
