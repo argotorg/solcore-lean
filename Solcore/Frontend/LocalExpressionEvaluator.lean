@@ -42,6 +42,7 @@ def evaluateLocalExpressionWithCost? (table : LocalNameTable) (environment : Res
   | ⟨_, .literal literal⟩ => do
       return (.word (← interpretWordLiteral? literal), 1)
   | ⟨_, .group inner⟩ => evaluateLocalExpressionWithCost? table environment inner
+  | ⟨_, .tuple ⟨_, []⟩⟩ => some (.unit, 1)
   | ⟨_, .tuple ⟨_, [left, right]⟩⟩ => do
       let (leftValue, leftCost) ← evaluateLocalExpressionWithCost? table environment left
       let (rightValue, rightCost) ← evaluateLocalExpressionWithCost? table environment right

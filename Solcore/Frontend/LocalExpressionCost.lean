@@ -29,6 +29,9 @@ inductive LocalExpressionEvaluatesWithCost
         initialStore inner value finalStore childCost) :
       LocalExpressionEvaluatesWithCost table environment initialStore
         { span, value := .group inner } value finalStore childCost
+  | unit {store : Core.Store} {span tupleSpan : Syntax.SourceSpan} :
+      LocalExpressionEvaluatesWithCost table environment store
+        { span, value := .tuple ⟨tupleSpan, []⟩ } .unit store 1
   | pair {initialStore middleStore finalStore : Core.Store}
       {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {leftValue rightValue : Core.Value} {leftCost rightCost : Nat}

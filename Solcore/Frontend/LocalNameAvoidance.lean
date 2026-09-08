@@ -21,6 +21,8 @@ inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr}
       (child : AvoidsLocalName name inner) :
       AvoidsLocalName name { span, value := .group inner }
+  | unit {span tupleSpan : Syntax.SourceSpan} :
+      AvoidsLocalName name { span, value := .tuple ⟨tupleSpan, []⟩ }
   | pair {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
       AvoidsLocalName name { span, value := .tuple ⟨tupleSpan, [left, right]⟩ }

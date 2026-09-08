@@ -5,7 +5,7 @@ import Solcore.Resolved.Typing
 Logical negation and short-circuit operators require Boolean operands;
 Word complement, arithmetic and bitwise operations require Word operands.
 Unsigned Word comparisons and equality/inequality require two Words and return Bool.
-Binary tuples retain arbitrary ordered component types. Conditionals require a Boolean
+Empty tuples have Unit type; binary tuples retain ordered component types. Conditionals require a Boolean
 condition and equally typed branches. Numeric literals use the explicit strict
 Word projection only in this monomorphic adapter. Names and local identities
 come from caller tables; no general literal conversion or coercion is introduced. -/
@@ -27,6 +27,8 @@ inductive LocalExpressionHasType (table : LocalNameTable) (context : Resolved.Co
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr} {type : Core.Ty}
       (typing : LocalExpressionHasType table context inner type) :
       LocalExpressionHasType table context { span, value := .group inner } type
+  | unit {span tupleSpan : Syntax.SourceSpan} :
+      LocalExpressionHasType table context { span, value := .tuple ⟨tupleSpan, []⟩ } .unit
   | pair {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {leftType rightType : Core.Ty}
       (leftTyped : LocalExpressionHasType table context left leftType)

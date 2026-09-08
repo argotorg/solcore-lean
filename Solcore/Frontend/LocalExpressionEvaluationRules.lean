@@ -8,7 +8,8 @@ Evaluation requires only the selected branch, not whole-expression resolution.
 Short-circuit forms forward any selected right value at this raw boundary;
 source typing separately requires both operands to be Boolean. Word arithmetic,
 bitwise operations, unsigned comparisons, Word equality/inequality and binary tuples
-evaluate both operands left to right. Tuples retain arbitrary actual component values.
+evaluate both operands left to right. Binary tuples retain arbitrary actual component
+values; an empty tuple denotes unit without any lookup.
 Both stores are explicit even though every constructor is store-preserving. Strict Word literals
 return their independently denoted value without consulting caller tables. -/
 
@@ -34,6 +35,9 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       (child : LocalExpressionEvaluates table environment initialStore inner value finalStore) :
       LocalExpressionEvaluates table environment initialStore
         { span, value := .group inner } value finalStore
+  | unit {store : Core.Store} {span tupleSpan : Syntax.SourceSpan} :
+      LocalExpressionEvaluates table environment store
+        { span, value := .tuple ⟨tupleSpan, []⟩ } .unit store
   | pair {initialStore middleStore finalStore : Core.Store}
       {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {leftValue rightValue : Core.Value}
@@ -212,6 +216,7 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
   induction evaluation with
   | identifier => rfl
   | wordLiteral => rfl
+  | unit => rfl
   | group _ ih | logicalNot _ ih | bitNot _ ih | andFalse _ ih | orTrue _ ih => exact ih
   | ifTrue _ _ conditionIH branchIH | ifFalse _ _ conditionIH branchIH =>
       exact branchIH.trans conditionIH
