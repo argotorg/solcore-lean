@@ -37,6 +37,7 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
     | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
     | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
     | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
+    | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
     | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
     | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
     | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
@@ -63,6 +64,7 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
     | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
     | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
     | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
+    | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
     | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
     | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
     | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
@@ -183,6 +185,14 @@ theorem AvoidsLocalName.bindFresh_cost_iff {name : String} {source : Syntax.Expr
       · intro evaluation
         cases evaluation with
         | notEqual left right => exact .notEqual (leftIH.mpr left) (rightIH.mpr right)
+  | lessEqual _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | lessEqual left right => exact .lessEqual (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | lessEqual left right => exact .lessEqual (leftIH.mpr left) (rightIH.mpr right)
   | bitAnd _ _ leftIH rightIH =>
       constructor
       · intro evaluation

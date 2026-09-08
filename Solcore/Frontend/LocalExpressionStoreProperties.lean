@@ -29,6 +29,7 @@ theorem LocalExpressionEvaluatesWithCost.change_store
   | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
   | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
   | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
+  | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
   | andTrue _ _ leftIH rightIH => exact .andTrue leftIH rightIH
   | andFalse _ ih => exact .andFalse ih
   | orTrue _ ih => exact .orTrue ih
