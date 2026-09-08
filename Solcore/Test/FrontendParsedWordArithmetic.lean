@@ -190,7 +190,19 @@ def frontendParsedWordArithmeticTests : IO Unit := do
           s!"c ? l : 0 {symbol} {Core.wordModulus}", s!"c ? {Core.wordModulus} {symbol} 0 : r"] do
         checkRejected selected content false
     checkParameterPositions symbol sourceOperator operator operation
-  for content in ["l / r", "l % r", "l < r", "l == r"] do
+  let equality ← expression "l == r"
+  let equalityCore := Core.Expr.binary .wordEq (.var 2) (.var 1)
+  assertTrue (decide (supplied.check? equality = some (equalityCore, .bool)))
+    "Word equality must check as the actual Bool-valued Core primitive"
+  let equalityInitial := Core.State.initial equalityCore supplied.environment.values store
+  for fuel in [0, 4, 5, 10] do
+    assertTrue (decide (supplied.run? fuel equality store =
+      some (.bool, Core.runStateful fuel equalityInitial))) "equality changed the checked Core execution"
+  assertTrue (match Core.runStateful 4 equalityInitial with | .outOfFuel _ => true | _ => false)
+    "equality completed below its five-transition cost"
+  assertTrue (decide (supplied.run? 5 equality store = some (.bool, .done (.bool false) store)))
+    "equality lost its Bool result or exact five-transition cost"
+  for content in ["l / r", "l % r", "l < r"] do
     checkRejected supplied content false
   checkShapes
   for content in ["-1", "+1", "8 -", "2 *", "8 - 3 2", "2 * 3 trailing", "l -= r", "l *= r"] do

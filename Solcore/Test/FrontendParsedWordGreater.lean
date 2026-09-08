@@ -193,7 +193,8 @@ def frontendParsedWordGreaterTests : IO Unit := do
         "l > r && missing > 0", "r > l || 0 > missing", s!"r > l || 0 > {Core.wordModulus}",
         "c ? r > l : missing > 0", s!"c ? {Core.wordModulus} > 0 : r > l"] do
       checkRejected selected content false
-  for content in ["l < r", "l <= r", "l >= r", "l == r", "l != r", "l / r", "l % r"] do
+  checkRun supplied "l == r" (.binary .wordEq (.var 2) (.var 1)) .bool (.bool false) 5
+  for content in ["l < r", "l <= r", "l >= r", "l != r", "l / r", "l % r"] do
     checkRejected supplied content false
   checkParameterPositions
   checkReturnContract
