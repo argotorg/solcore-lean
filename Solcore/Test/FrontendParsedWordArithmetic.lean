@@ -2,8 +2,8 @@ import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RuntimeFunctionPreparationFactorization
 import Solcore.Frontend.LocalInputsExecution
 
-/-! Complete canonical sources preserve addition's exact tree, modular values,
-strict checking, parameter positions, and checked machine fuel boundaries. -/
+/-! Fully parsed subtraction and multiplication retain ordered syntax/Core,
+modular results, strict checking, and exact pending-frame fuel boundaries. -/
 
 set_option autoImplicit false
 
@@ -15,10 +15,10 @@ private def assertTrue (condition : Bool) (label : String) : IO Unit := do
   unless condition do throw (IO.userError label)
 
 private def owner : Resolved.DeclarationId :=
-  ⟨⟨.main, ⟨[⟨"ParsedAddition", by decide⟩], by decide⟩⟩, 3⟩
+  ⟨⟨.main, ⟨[⟨"ParsedArithmetic", by decide⟩], by decide⟩⟩, 5⟩
 private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 private def literal (value : Nat) : Core.Expr := .word (word value)
-private def store : Core.Store := [.word (word 91), .bool true]
+private def store : Core.Store := [.word (word 91), .bool false]
 private def types : TypeNameTable := [(["Word"], .word), (["Bool"], .bool)]
 private def inputs (choice : Bool) : LocalInputs :=
   ((LocalInputs.empty.bindFresh owner "l" .word (.word (word 7)) .word).bindFresh
@@ -26,7 +26,7 @@ private def inputs (choice : Bool) : LocalInputs :=
 
 private def parsed? {α : Type} (parser : Syntax.Parser.Parser α) (content : String) :
     IO (Option α) := do
-  let file : Syntax.SourceFile := { id := ⟨.main, "parsed-addition.sol"⟩, content }
+  let file : Syntax.SourceFile := { id := ⟨.main, "parsed-arithmetic.sol"⟩, content }
   let lexed ← match Syntax.Lexer.lex file with
     | .ok lexed => pure lexed
     | .error error => throw (IO.userError s!"{content}: lexer invariant {reprStr error}")
@@ -74,39 +74,43 @@ private def checkRejected (supplied : LocalInputs) (content : String) (resolves 
     s!"{content}: invalid whole body compiled"
 
 private def checkShapes : IO Unit := do
-  let leftAssociated ← expression "1 + 2 + 3"
+  let leftAssociated ← expression "8 - 3 - 2"
   assertTrue (match leftAssociated.value with
-    | .binary ⟨_, .binary _ ⟨_, .add⟩ _⟩ ⟨_, .add⟩ _ => true
-    | _ => false) "addition parser changed left associativity"
-  let rightGrouped ← expression "1 + (2 + 3)"
+    | .binary ⟨_, .binary _ ⟨_, .subtract⟩ _⟩ ⟨_, .subtract⟩ _ => true
+    | _ => false) "subtraction parser changed left associativity"
+  let rightGrouped ← expression "8 - (3 - 2)"
   assertTrue (match rightGrouped.value with
-    | .binary _ ⟨_, .add⟩ ⟨_, .group ⟨_, .binary _ ⟨_, .add⟩ _⟩⟩ => true
-    | _ => false) "addition parser lost explicit right grouping"
-  let mixed ← expression "1 | 2 ^ 3 & 4 + 5"
+    | .binary _ ⟨_, .subtract⟩ ⟨_, .group ⟨_, .binary _ ⟨_, .subtract⟩ _⟩⟩ => true
+    | _ => false) "subtraction parser lost right grouping"
+  let multiplyAssociated ← expression "2 * 3 * 4"
+  assertTrue (match multiplyAssociated.value with
+    | .binary ⟨_, .binary _ ⟨_, .multiply⟩ _⟩ ⟨_, .multiply⟩ _ => true
+    | _ => false) "multiplication parser changed left associativity"
+  let mixed ← expression "8 - 2 * 3 | 1"
   assertTrue (match mixed.value with
-    | .binary _ ⟨_, .bitOr⟩ ⟨_, .binary _ ⟨_, .bitXor⟩
-        ⟨_, .binary _ ⟨_, .bitAnd⟩ ⟨_, .binary _ ⟨_, .add⟩ _⟩⟩⟩ => true
-    | _ => false) "addition/bitwise parser precedence changed"
+    | .binary ⟨_, .binary _ ⟨_, .subtract⟩ ⟨_, .binary _ ⟨_, .multiply⟩ _⟩⟩ ⟨_, .bitOr⟩ _ => true
+    | _ => false) "arithmetic/bitwise parser precedence changed"
 
-/-- Every tested pair of source positions is retained in open Core, including
-nonadjacent and repeated positions. Same-typed values remain individually visible. -/
-private def checkParameterPositions : IO Unit := do
+/-- Check each tested source pair, not just endpoint parameters. The pending
+frame distinguishes left and right even when multiplication results commute. -/
+private def checkParameterPositions (symbol : String) (sourceOperator : Syntax.BinaryOp)
+    (operator : Core.BinaryOp) (operation : Core.Word → Core.Word → Core.Word) : IO Unit := do
   for arity in [2, 3, 4] do
     let indices := List.range arity
     let parameters := String.intercalate ", " (indices.map fun index => s!"p{index}: Word")
     for left in indices do
       for right in indices do
-        let content := s!"function sum_{arity}_{left}_{right}({parameters}) returns (Word)"
-          ++ " { return " ++ s!"p{left} + p{right};" ++ " }"
+        let content := s!"function arithmetic_{arity}_{left}_{right}({parameters}) returns (Word)"
+          ++ " { return " ++ s!"p{left} {symbol} p{right};" ++ " }"
         let some declaration ← parsed? (Syntax.Parser.functionDecl .module) content
           | throw (IO.userError s!"{content}: expected complete declaration")
         assertTrue (match declaration.value.body.value with
-          | [⟨_, .returnStmt (some ⟨_, .binary ⟨_, .identifier l⟩ ⟨_, .add⟩ ⟨_, .identifier r⟩⟩)⟩] =>
-              l.value == s!"p{left}" && r.value == s!"p{right}"
-          | _ => false) s!"{content}: source parameter references changed"
+          | [⟨_, .returnStmt (some ⟨_, .binary ⟨_, .identifier l⟩ ⟨_, op⟩ ⟨_, .identifier r⟩⟩)⟩] =>
+              op == sourceOperator && l.value == s!"p{left}" && r.value == s!"p{right}"
+          | _ => false) s!"{content}: source operator or parameter references changed"
         let some compiled := compileRuntimeFunction? types owner declaration
           | throw (IO.userError s!"{content}: value-free compilation failed")
-        let expectedCore := Core.Expr.binary .wordAdd (.var (arity - 1 - left)) (.var (arity - 1 - right))
+        let expectedCore := Core.Expr.binary operator (.var (arity - 1 - left)) (.var (arity - 1 - right))
         assertTrue (decide (compiled.core = expectedCore ∧ compiled.returnType = .word))
           s!"{content}: compilation changed exact open Core/type"
         assertTrue (decide (compiled.inputs.context.values = List.replicate arity Core.Ty.word))
@@ -135,54 +139,65 @@ private def checkParameterPositions : IO Unit := do
           some (.word, .outOfFuel initial))) s!"{content}: wrong exact zero-fuel state"
         let leftValue := word (10 * left + 1)
         let rightValue := word (10 * right + 1)
-        let beforeAdd : Core.State := ⟨.ret (.word rightValue), [.binaryApply .wordAdd (.word leftValue)], store⟩
+        let pending : Core.State := ⟨.ret (.word rightValue), [.binaryApply operator (.word leftValue)], store⟩
         assertTrue (decide (runRuntimeFunction? types owner declaration arguments 4 store =
-          some (.word, .outOfFuel beforeAdd))) s!"{content}: wrong left/right values or fuel-four state"
+          some (.word, .outOfFuel pending))) s!"{content}: wrong left/right values or fuel-four state"
         assertTrue (decide (runRuntimeFunction? types owner declaration arguments 5 store =
-          some (.word, .done (.word (leftValue.add rightValue)) store))) s!"{content}: wrong exact five-fuel result"
+          some (.word, .done (.word (operation leftValue rightValue)) store))) s!"{content}: wrong exact five-fuel result"
 
-def frontendParsedWordAdditionTests : IO Unit := do
+private def operations : List (String × Syntax.BinaryOp × Core.BinaryOp × (Core.Word → Core.Word → Core.Word)) :=
+  [("-", .subtract, .wordSub, Core.Word.sub), ("*", .multiply, .wordMul, Core.Word.mul)]
+
+def frontendParsedWordArithmeticTests : IO Unit := do
   let supplied := inputs true
-  checkRun supplied "1 + 2" (.binary .wordAdd (literal 1) (literal 2)) (word 3) 5
-  checkRun supplied "/* left */ 0x01 + /* right */ 0002" (.binary .wordAdd (literal 1) (literal 2)) (word 3) 5
-  checkRun supplied s!"{Core.Word.maximum.val} + 1"
-    (.binary .wordAdd (.word Core.Word.maximum) (literal 1)) Core.Word.zero 5
-  checkRun supplied "0 + l" (.binary .wordAdd (literal 0) (.var 2)) (word 7) 5
-  checkRun supplied "r + 0" (.binary .wordAdd (.var 1) (literal 0)) (word 9) 5
-  checkRun supplied "l - r" (.binary .wordSub (.var 2) (.var 1)) ((word 7).sub (word 9)) 5
-  checkRun supplied "l * r" (.binary .wordMul (.var 2) (.var 1)) (word 63) 5
-  checkRun supplied "1 + 2 + 3" (.binary .wordAdd (.binary .wordAdd (literal 1) (literal 2)) (literal 3)) (word 6) 9
-  checkRun supplied "((1 + 2)) + 3" (.binary .wordAdd (.binary .wordAdd (literal 1) (literal 2)) (literal 3)) (word 6) 9
-  checkRun supplied "1 + (2 + 3)" (.binary .wordAdd (literal 1) (.binary .wordAdd (literal 2) (literal 3))) (word 6) 9
-  checkRun supplied "1 | 2 ^ 3 & 4 + 5" (.binary .wordOr (literal 1)
-    (.binary .wordXor (literal 2) (.binary .wordAnd (literal 3) (.binary .wordAdd (literal 4) (literal 5))))) (word 3) 17
-  checkRun supplied "1 + 2 & 4 + 5" (.binary .wordAnd
-    (.binary .wordAdd (literal 1) (literal 2)) (.binary .wordAdd (literal 4) (literal 5))) (word 1) 13
-  checkRun supplied "1 + (2 & 4) + 5" (.binary .wordAdd
-    (.binary .wordAdd (literal 1) (.binary .wordAnd (literal 2) (literal 4))) (literal 5)) (word 6) 13
-  checkRun supplied "~(l + r)" (.unary .wordNot (.binary .wordAdd (.var 2) (.var 1))) (word 16).bitNot 7
-  for choice in [false, true] do
-    let selected := inputs choice
-    checkRun selected "c ? l + r : 0"
-      (.ifE (.var 0) (.binary .wordAdd (.var 2) (.var 1)) (literal 0))
-      (word (if choice then 16 else 0)) (if choice then 8 else 4)
-    checkRun selected "c ? 0 : l + r"
-      (.ifE (.var 0) (literal 0) (.binary .wordAdd (.var 2) (.var 1)))
-      (word (if choice then 0 else 16)) (if choice then 4 else 8)
-    for content in ["c + l", "l + c", "c ? l : 0 + c", "c ? c + 0 : r"] do
-      checkRejected selected content true
-    for content in ["0 + missing", "missing + 0", s!"0 + {Core.wordModulus}",
-        s!"{Core.wordModulus} + 0", "c ? l : 0 + missing", "c ? missing + 0 : r",
-        s!"c ? l : 0 + {Core.wordModulus}", s!"c ? {Core.wordModulus} + 0 : r",
-        "0 + \"1\"", "l / r", "l % r", "l < r"] do
-      checkRejected selected content false
+  checkRun supplied "0 - 1" (.binary .wordSub (literal 0) (literal 1)) Core.Word.maximum 5
+  checkRun supplied s!"{Core.Word.maximum.val} * 2"
+    (.binary .wordMul (.word Core.Word.maximum) (literal 2)) (word (Core.wordModulus - 2)) 5
+  checkRun supplied "l - r" (.binary .wordSub (.var 2) (.var 1)) (word (Core.wordModulus - 2)) 5
+  checkRun supplied "r - l" (.binary .wordSub (.var 1) (.var 2)) (word 2) 5
+  checkRun supplied "/* left */ 0x09 - /* right */ 0007" (.binary .wordSub (literal 9) (literal 7)) (word 2) 5
+  checkRun supplied "8 - 3 - 2" (.binary .wordSub (.binary .wordSub (literal 8) (literal 3)) (literal 2)) (word 3) 9
+  checkRun supplied "8 - (3 - 2)" (.binary .wordSub (literal 8) (.binary .wordSub (literal 3) (literal 2))) (word 7) 9
+  checkRun supplied "2 * 3 * 4" (.binary .wordMul (.binary .wordMul (literal 2) (literal 3)) (literal 4)) (word 24) 9
+  checkRun supplied "1 + 2 * 3" (.binary .wordAdd (literal 1) (.binary .wordMul (literal 2) (literal 3))) (word 7) 9
+  checkRun supplied "8 - 3 * 2" (.binary .wordSub (literal 8) (.binary .wordMul (literal 3) (literal 2))) (word 2) 9
+  checkRun supplied "(8 - 3) * 2" (.binary .wordMul (.binary .wordSub (literal 8) (literal 3)) (literal 2)) (word 10) 9
+  checkRun supplied "8 - 2 * 3 | 1" (.binary .wordOr
+    (.binary .wordSub (literal 8) (.binary .wordMul (literal 2) (literal 3))) (literal 1)) (word 3) 13
+  checkRun supplied "1 ^ 8 - 2 * 3" (.binary .wordXor (literal 1)
+    (.binary .wordSub (literal 8) (.binary .wordMul (literal 2) (literal 3)))) (word 3) 13
+  for (symbol, sourceOperator, operator, operation) in operations do
+    checkRun supplied s!"l {symbol} r" (.binary operator (.var 2) (.var 1)) (operation (word 7) (word 9)) 5
+    for identity in [0, 1] do
+      checkRun supplied s!"{identity} {symbol} l" (.binary operator (literal identity) (.var 2))
+        (operation (word identity) (word 7)) 5
+      checkRun supplied s!"l {symbol} {identity}" (.binary operator (.var 2) (literal identity))
+        (operation (word 7) (word identity)) 5
+    for choice in [false, true] do
+      let selected := inputs choice
+      checkRun selected s!"c ? l {symbol} r : 0"
+        (.ifE (.var 0) (.binary operator (.var 2) (.var 1)) (literal 0))
+        (if choice then operation (word 7) (word 9) else Core.Word.zero) (if choice then 8 else 4)
+      checkRun selected s!"c ? 0 : l {symbol} r"
+        (.ifE (.var 0) (literal 0) (.binary operator (.var 2) (.var 1)))
+        (if choice then Core.Word.zero else operation (word 7) (word 9)) (if choice then 4 else 8)
+      for content in [s!"c {symbol} l", s!"l {symbol} c", s!"c ? l : 0 {symbol} c", s!"c ? c {symbol} 0 : r"] do
+        checkRejected selected content true
+      for content in [s!"0 {symbol} missing", s!"missing {symbol} 0", s!"1 {symbol} missing", s!"missing {symbol} 1",
+          s!"0 {symbol} {Core.wordModulus}", s!"{Core.wordModulus} {symbol} 0",
+          s!"0 {symbol} \"1\"", s!"\"1\" {symbol} 0",
+          s!"c ? l : 0 {symbol} missing", s!"c ? missing {symbol} 0 : r",
+          s!"c ? l : 0 {symbol} {Core.wordModulus}", s!"c ? {Core.wordModulus} {symbol} 0 : r"] do
+        checkRejected selected content false
+    checkParameterPositions symbol sourceOperator operator operation
+  for content in ["l / r", "l % r", "l < r", "l == r"] do
+    checkRejected supplied content false
   checkShapes
-  checkParameterPositions
-  for content in ["+1", "-1", "1 +", "1 + 2 3", "1 + 2 trailing", "l += r"] do
+  for content in ["-1", "+1", "8 -", "2 *", "8 - 3 2", "2 * 3 trailing", "l -= r", "l *= r"] do
     assertTrue (← parsed? Syntax.Parser.expression content).isNone
       s!"{content}: malformed, unsupported prefix, or unconsumed source accepted"
   assertTrue (← parsed? (Syntax.Parser.functionDecl .module)
-    "function trailing() returns (Word) { return 1 + 2; } trailing").isNone
+    "function trailing() returns (Word) { return 8 - 3 * 2; } trailing").isNone
     "function parser helper accepted only a valid prefix"
 
 end Tests
