@@ -1,6 +1,4 @@
-import Solcore.Frontend.ReturnBodyElaboration
-import Solcore.Frontend.LocalExpressionRenamingProperties
-import Solcore.Frontend.LocalInputsRenaming
+import Solcore.Frontend.ReturnBodyRenamingProperties
 import Solcore.Frontend.RuntimeParametersOwnerProperties
 import Solcore.Frontend.RuntimeFunctionEntryProperties
 
@@ -11,20 +9,6 @@ by an injective swap, never by overwriting every local identity's owner. -/
 set_option autoImplicit false
 
 namespace Solcore.Frontend
-
-theorem ReturnBodyElaborates.mapIds {table : LocalNameTable} {context : Resolved.Context}
-    {body : Syntax.Block} {core : Core.Expr} {type : Core.Ty}
-    (elaboration : ReturnBodyElaborates table context body core type)
-    (mapping : Resolved.LocalId → Resolved.LocalId) (injective : Function.Injective mapping) :
-    ReturnBodyElaborates (LocalNameTable.mapIds mapping table)
-      (Resolved.LocalScope.mapIds mapping context) body core type := by
-  cases elaboration with
-  | bare => exact .bare
-  | expression resolution lowered typing =>
-      refine .expression (resolution.mapIds mapping) ?_
-        ((Resolved.typing_renameIds_iff mapping injective).mpr typing)
-      rw [Resolved.LocalScope.ids_mapIds]
-      exact (Resolved.lowers_renameIds_iff mapping injective).mpr lowered
 
 /-- Covariance uses a globally injective owner map and leaves binder indices
 unchanged. The exact Core and declared type are retained in the output record. -/
