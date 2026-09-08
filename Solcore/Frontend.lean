@@ -94,6 +94,9 @@ import Solcore.Core.LocalFragmentInferenceInsertionProperties
 import Solcore.Core.LocalFragmentInsertionPaths
 import Solcore.Core.LocalFragmentExactInsertionProperties
 import Solcore.Resolved.LocalFragmentProperties
+import Solcore.Core.LocalRightWordLessTypingProperties
+import Solcore.Core.LocalRightWordLessEvaluationProperties
+import Solcore.Frontend.WordLessLocalRightCostProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,

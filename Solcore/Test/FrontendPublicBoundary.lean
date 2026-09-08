@@ -668,5 +668,11 @@ example := @Solcore.Core.Expr.LocalFragment.steps_reflect_insert
 example := @Solcore.Core.Expr.LocalFragment.steps_insert_iff
 example := @Solcore.Core.Steps.weakenAt_zero_localFragment
 example := @Solcore.Core.Steps.reflect_weakenAt_zero_localFragment
+example := @Solcore.Core.Expr.LocalFragment.wordLt
+example := @Solcore.Core.HasType.wordLt_inv_local_right
+example := @Solcore.Core.Evaluates.wordLt_local_right
+example := @Solcore.Core.Evaluates.wordLt_inv_local_right
+example := @Solcore.Core.wordLt_evaluates_iff_local_right
+example := @Solcore.Frontend.CostStepComposition.wordLt_of_local_right
 
 end Tests

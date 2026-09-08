@@ -124,6 +124,20 @@ equating distinct suspended states or executing an outer continuation early.
 This adds no typing or runtime-world premise and does not yet enable canonical
 `<` or `>=`.
 
+The existing ordered Core Word less-than expansion now consumes these insertion
+foundations directly (ADR-0191). With only the right operand in the local
+fragment, typing inversion recovers the Bool result and both original Word
+operand typings. Raw evaluation preserves and reflects original left-to-right
+operand evaluations with their actual intermediate/final stores. Left Core
+effects remain unrestricted; no runtime typing, world, freshness or scope premise
+is added. Original continuation-independent operand paths compose at their costs
+plus nine without requiring callers to supply a shifted-right path. Whole
+expansion membership requires both operands to be local. The right restriction
+cannot be dropped: allocating a captured closure may change the literal store
+under insertion even when the right operand returns the same Word. This proof
+bridge preserves existing Core APIs and does not yet change the Resolved or
+canonical source expression representation.
+
 The resolved fragment alone is not a canonical source adapter. It does not interpret literal
 spelling, resolve `true`/`false` or overloaded operators, allocate source-wide IDs,
 decide source shadowing or mutable-declaration semantics, or cover imports,

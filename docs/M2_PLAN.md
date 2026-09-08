@@ -95,6 +95,16 @@ at empty-continuation final endpoints. Existing fuel and resumption laws can
 be reused while genuine suspended states remain distinct. Canonical ordered
 `<` integration remains a separate representation-and-adapter change.
 
+The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
+Right-local membership alone supports exact typing inversion and raw ordered
+evaluation equivalence for the original operands, with arbitrary left effects
+and actual ordered stores. Original operand paths compose at their costs plus
+nine using exact insertion internally. Both children must be local only when
+establishing membership of the whole expansion. A stored-closure counterexample
+retains the necessary right-side boundary. Existing Core comparison APIs remain
+unchanged; dedicated resolved representation and the canonical source adapter
+are the next distinct integration steps, without a hidden LocalId allocator.
+
 Canonical identifiers and grouping now have an exact explicit-table adapter
 to typed resolved references and Core variables (ADR-0155). The name table does
 not replace source scope construction. Execution correspondence retains exact
