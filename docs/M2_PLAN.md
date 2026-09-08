@@ -378,6 +378,17 @@ distinct stores are not equated; each genuine state is resumed separately.
 This is not general Core or arbitrary-continuation store independence, and does
 not extend source mutation, calls, inference, binding policy or runtime entries.
 
+Typed-prefix owner covariance (ADR-0213) additionally relabels every input owner
+and the supplied owner together under a global injective declaration map, leaving
+binder indices and ordered types/values fixed. Fresh allocation commutes on any
+mixed/sparse/repeated-ID scope, and value-free fresh binding needs no additional
+index-equality or runtime-inhabitation premise. Exact elaboration and whole typing
+transport; recursive checker equality preserves failures without surjectivity.
+The checked wrapper keeps full optional results and genuine checkpoints equal
+at fixed fuel/store. This does not equate the owner-bearing inputs, generalize
+allocation to arbitrary index-changing/owner-collapsing maps, introduce raw/cost
+owner transport or change existing parameter and runtime-entry profiles.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while

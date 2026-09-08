@@ -1085,6 +1085,13 @@ example := @Solcore.Frontend.typedLetReturnBodyEvaluatesWithCost_store_iff
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_done_store_iff
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_outOfFuel_store_iff
 
+example := @Solcore.Frontend.LocalTypeInputs.bindFresh_mapOwner
+example := @Solcore.Frontend.TypedLetReturnBodyElaborates.mapOwner
+example := @Solcore.Frontend.TypedLetReturnBodyHasType.mapOwner
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_mapOwner
+example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnBody?_mapOwner
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_mapOwner
+
 section RecursiveEntryContracts
 
 open Solcore Solcore.Frontend

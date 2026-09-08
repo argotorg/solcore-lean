@@ -94,6 +94,7 @@ example := @Solcore.Resolved.freshLocalId_cons_fresh_binderIndex
 example := @Solcore.Resolved.freshLocalId_cons_fresh_ne
 example := @Solcore.Resolved.freshLocalId_cons_of_ne_owner
 example := @Solcore.Resolved.freshLocalId_eq_of_perm
+example := @Solcore.Resolved.freshLocalId_map_owner
 example := @Solcore.Resolved.LocalScope.IndexOf.insert_fresh
 example := @Solcore.Resolved.Lowers.insert_fresh
 example := @Solcore.Resolved.Lowers.weaken_fresh

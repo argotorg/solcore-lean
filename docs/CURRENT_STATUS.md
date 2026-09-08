@@ -879,6 +879,29 @@ retaining their own stores and captured values. Opaque cell/closure returns do
 not imply that reading cells or running arbitrary pending continuations is
 store-independent. No Core, entry, mutation or binding-policy extension is made.
 
+### Typed local-declaration prefixes: owner covariance
+
+The separate prefix adapter now preserves exact elaboration and whole checking
+under a globally injective declaration-owner map (ADR-0213). Every input owner
+and the adapter's supplied owner change together; binder indices, source
+spellings, types, row order and actual values stay fixed. Fresh allocation
+commutes with this relabeling on arbitrary scopes, including mixed owners,
+sparse indices and repeated IDs. Value-free fresh binding therefore commutes
+without an extra fresh-index premise or inhabitants of arbitrary static types.
+
+Independent exact elaboration and whole typing transport through every original
+initializer and freshly extended tail. Structural checker equality retains
+both success and rejection even for non-surjective injective owner maps. The
+actual typed-input wrapper preserves complete optional results at the same fuel
+and store, including identical genuine checkpoints and resumption. Owner-bearing
+input IDs themselves are relabeled, not equated. This differs from store replay,
+where complete states retain different stores.
+
+This is not allocator covariance under arbitrary index-changing local-ID maps
+or owner-collapsing maps. Existing runtime-parameter owner laws and runtime-entry
+profiles are unchanged; body proofs have no reverse dependency on them. No
+raw/cost owner-transport API, inference, parser, Core or binding policy is added.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime

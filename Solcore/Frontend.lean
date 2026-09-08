@@ -163,6 +163,9 @@ import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
 import Solcore.Frontend.TypedLetReturnBodyRunnerEmbeddingProperties
 import Solcore.Frontend.TypedLetReturnBodyStoreProperties
+import Solcore.Frontend.LocalTypeInputsOwnerProperties
+import Solcore.Frontend.TypedLetReturnBodyOwnerProperties
+import Solcore.Frontend.TypedLetReturnBodyRunnerOwnerProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -184,6 +187,8 @@ value-free static adapter with exact nested Core letE. Independent raw evaluatio
 and cost correspond to the actual checked Core and exact continuation paths.
 A separate checked body runner adds exact fuel thresholds, a source-only bound
 and genuine-state resumption. Store replay preserves values and costs, with
-each completed or suspended observation retaining its own store. No runtime-entry
+each completed or suspended observation retaining its own store. Injective
+owner-only relabeling commutes with fresh binding and preserves exact Core,
+whole optional results and checkpoints at a fixed store. No runtime-entry
 integration, type inference or broader binding policy is added for this profile.
 -/
