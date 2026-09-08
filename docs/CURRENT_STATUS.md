@@ -276,6 +276,38 @@ Noninjective merging can change which row a reference selects and is excluded.
 No global ownership/allocator guarantee or commutation with subsequent fresh
 allocation is claimed.
 
+### Exact local-expression execution thresholds
+
+Independent source evaluation now carries an exact Core-transition cost
+(ADR-0165). Erasing it recovers the previous evaluation relation, and every
+previous evaluation has a positive cost. The value, final store, and cost are
+jointly unique even for raw evaluations with unresolved skipped branches.
+No checking or executable-run premise is built into the cost relation.
+
+Identifiers and Word literals cost one; grouping adds nothing; unary operators
+add two. Strict bitwise binaries cost both operands plus three. A conditional
+costs its condition and selected branch plus two. Short-circuit selection costs
+both visited operands plus two; skipping the right costs the left plus three,
+including the generated Boolean constant. Both initial and final stores and
+left-to-right operand order remain explicit.
+
+Whole resolution and lowering in runtime ID order turn that source derivation
+into a Core path of exactly the same length, even with a retained continuation.
+The terminal-path instance proves that a checked run completes with the exact
+value and store if and only if fuel reaches that cost; less fuel returns an
+exhausted result retaining its state. Typed aligned inputs supply the successful
+cost derivation and a value of the checked type. `LocalInputs` exposes the same
+fixed-fuel correspondence, keeping whole source typing distinct from raw cost.
+Failed checking remains absent, not an exhausted execution.
+
+The auxiliary path-length uniqueness theorem is restricted to terminal states.
+A return control with pending frames is not final, and recognizing an already
+final state needs zero transitions. Consumers protect those boundaries and all
+source cost formulas. These counts are not gas, elapsed time, frontend lookup
+or numeric-decoding complexity, nor the work performed by failing executions.
+The parser, evaluator, wire interfaces, and existing input-invariance APIs are
+unchanged.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

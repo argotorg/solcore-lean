@@ -31,9 +31,14 @@ import Solcore.Frontend.NumericDigits
 import Solcore.Frontend.NumericDigitsProperties
 import Solcore.Frontend.WordLiteral
 import Solcore.Frontend.WordLiteralProperties
+import Solcore.Frontend.LocalExpressionCost
+import Solcore.Frontend.LocalExpressionCostProperties
+import Solcore.Frontend.LocalExpressionCostStepComposition
+import Solcore.Frontend.LocalExpressionCostCorrespondence
+import Solcore.Frontend.LocalExpressionCostExecutionProperties
 
 /-!
-Canonical local-reference, Boolean/Word-complement, and conditional-expression semantic adapters with
+Canonical local-reference, Boolean/Word, and conditional-expression semantic adapters with
 explicit caller-supplied name, type, and runtime tables. Independent source
 typing and evaluation correspond exactly to checked Core execution. No source
 program resolution, parser change, or wire publication is implied.

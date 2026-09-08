@@ -1,6 +1,7 @@
 import Solcore.Core.Data
 import Solcore.Core.Safety
 import Solcore.Core.Check
+import Solcore.Core.ExactFuelProperties
 import Solcore.Core.Host
 import Solcore.Core.HostSafety
 import Solcore.Core.HostMachine

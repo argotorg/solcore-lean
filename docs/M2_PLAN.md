@@ -140,6 +140,16 @@ composition, nonempty stores, and the four/five-transition exhaustion/completion
 boundary. Arithmetic, comparison, assignment, and general overload policy remain
 separate; no parser or Core-machine changes are needed.
 
+Independent source costs now count the exact successful Core transitions for
+the entire supported fragment (ADR-0165). Erasure, existence, positivity, and
+joint value/store/cost uniqueness are proved without whole typing or resolution.
+With whole resolution and runtime-order lowering, continuation-local Core paths
+have exactly that cost; checked and bundled execution complete iff fuel is at
+least that threshold and exhaust below it. Raw costs do not bypass whole
+checking. Terminal detection is free; nonterminal path lengths do not supply
+completion bounds. This is not a gas or frontend-time model and does not change
+any executable behavior or strengthen the input-invariance APIs.
+
 The next semantic work should extend the supported local-expression fragment
 to more canonical syntax and source scope construction, preserving binding identity and
 the established Core execution correspondence. It must not treat the resolved

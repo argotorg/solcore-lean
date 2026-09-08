@@ -22,6 +22,8 @@ import Solcore.Test.FrontendLocalWordComplementProperties
 import Solcore.Test.FrontendLocalWordLiteralProperties
 import Solcore.Test.FrontendParsedWordBitwise
 import Solcore.Test.FrontendLocalWordBitwiseProperties
+import Solcore.Test.CoreExactFuelProperties
+import Solcore.Test.FrontendLocalExpressionCostProperties
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
