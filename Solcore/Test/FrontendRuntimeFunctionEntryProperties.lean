@@ -133,7 +133,7 @@ theorem successful_word_body_does_not_satisfy_a_boolean_return_contract (fuel : 
     have body : ReturnBodyElaborates prepared.inputs.names prepared.inputs.context mismatched.value.body (.word .zero) .word :=
       .expression (.wordLiteral zeroMeaning) .word .word
     have impossible := (header.type_unique derived.header).trans
-      ((TerminalReturnBodyElaborates.single body).result_unique derived.body).2.symm
+      ((TerminalReturnTreeElaborates.single body).result_unique derived.body).2.symm
     cases impossible
   have rejected := prepareRuntimeFunction?_eq_none_iff.mpr noPreparation
   exact ⟨(ReturnBodyElaborates.expression (.wordLiteral zeroMeaning) .word .word).complete,
@@ -187,6 +187,8 @@ theorem raw_skipped_missing_evaluation_is_not_a_whole_entry_contract (fuel : Nat
     have sameInputs := RuntimeParametersBindFrom.result_unique (identityPrepares (boolArg true)).parameters derived.parameters
     have accepted := derived.body.complete
     rw [← sameInputs] at accepted
+    rw [show missingDecl.value.body = ⟨span, [⟨span, .returnStmt (some missingSource)⟩]⟩ from rfl,
+      elaborateTerminalReturnTree?_single] at accepted
     change (identityPrepared (boolArg true)).inputs.checkReturnBody? missingDecl.value.body = some _ at accepted
     rw [bodyRejected] at accepted
     cases accepted

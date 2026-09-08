@@ -187,7 +187,6 @@ theorem whole_header_and_body_restrictions_apply_without_any_runtime_arguments :
     rintro ⟨compiled, evidence⟩
     cases evidence.body with
     | single body => cases body
-    | conditional body => cases body
   exact ⟨headerAbsent, compileRuntimeFunction?_eq_none_iff.mpr headerAbsent,
     bodyAbsent, compileRuntimeFunction?_eq_none_iff.mpr bodyAbsent⟩
 

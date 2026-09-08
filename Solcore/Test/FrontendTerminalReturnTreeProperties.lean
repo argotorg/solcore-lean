@@ -247,21 +247,18 @@ private def entry (depth : Nat) : Syntax.FunctionDecl :=
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, spine (depth + 2) x y⟩⟩
 private def inputs (type : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh owner "c" .bool).bindFresh owner "x" type).bindFresh owner "y" type
-theorem a_valid_header_and_complete_parameters_do_not_extend_the_existing_entry_compiler
+theorem a_valid_header_and_complete_parameters_compile_the_exact_deep_tree
     (depth : Nat) (type : Core.Ty) :
     RuntimeFunctionHeader (types type) (entry depth).value.signature type ∧
     RuntimeParametersDeclare (types type) owner (entry depth).value.signature.parameters.elements (inputs type) ∧
-    compileRuntimeFunction? (types type) owner (entry depth) = none := by
+    compileRuntimeFunction? (types type) owner (entry depth) =
+      some ⟨inputs type, spineCore (depth + 2) (.var 1) (.var 0), type⟩ := by
   have declared : RuntimeParametersDeclare (types type) owner (entry depth).value.signature.parameters.elements (inputs type) :=
     .cons (.named (.tail (by decide) .head)) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons (.named .head) (by change "x" ∉ ["c"]; decide) (.cons (.named .head) (by change "y" ∉ ["x", "c"]; decide) .nil))
-  refine ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared, ?_⟩
-  apply compileRuntimeFunction?_eq_none_iff.mpr
-  rintro ⟨candidate, accepted⟩
-  have checked := accepted.body.complete
-  rw [accepted.parameters.result_unique declared] at checked
-  change elaborateTerminalReturnBody? names (context type) (spine (depth + 2) x y) = some (candidate.core, candidate.returnType) at checked
-  rw [(the_old_terminal_adapter_still_rejects_every_genuinely_deep_good_tree depth type).2] at checked
-  cases checked
+  have compilation : RuntimeFunctionCompiles (types type) owner (entry depth)
+      ⟨inputs type, spineCore (depth + 2) (.var 1) (.var 0), type⟩ :=
+    ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared, spineElab _ type type (xElab type) (yElab type)⟩
+  exact ⟨compilation.header, declared, compilation.complete⟩
 
 end Tests.FrontendTerminalReturnTree

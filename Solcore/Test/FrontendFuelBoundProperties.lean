@@ -234,7 +234,7 @@ theorem independently_compiled_identity_uses_only_its_actual_typed_argument
     (type : Core.Ty) (value : Core.Value) (typed : Core.ValueHasType value type)
     (store : Core.Store) (fuel : Nat) (enough : 1 ≤ fuel) :
     RuntimeFunctionEvaluatesWithCost (types type) owner declaration [argument type value typed]
-      store type value store 1 ∧ 1 ≤ terminalReturnBodyFuelBound declaration.value.body ∧
+      store type value store 1 ∧ 1 ≤ terminalReturnTreeFuelBound declaration.value.body ∧
     (∃ result, Core.ValueHasType result type ∧ runRuntimeFunction? (types type) owner declaration
       [argument type value typed] fuel store = some (type, .done result store)) ∧
     (∃ result, Core.ValueHasType result type ∧ runRuntimeFunction? (types type) owner declaration
@@ -242,8 +242,8 @@ theorem independently_compiled_identity_uses_only_its_actual_typed_argument
       Core.runStateful fuel (Core.State.initial (.var 0) [value] store) = .done result store) := by
   have evaluated : RuntimeFunctionEvaluatesWithCost (types type) owner declaration [argument type value typed]
       store type value store 1 := .intro (preparation type value typed) (.single <| .expression (.identifier .head .head))
-  have bounded : terminalReturnBodyFuelBound declaration.value.body ≤ fuel := by
-    simpa [declaration, body, terminalReturnBodyFuelBound, returnBodyFuelBound, ref, localExpressionFuelBound] using enough
+  have bounded : terminalReturnTreeFuelBound declaration.value.body ≤ fuel := by
+    simpa [declaration, body, terminalReturnTreeFuelBound, returnBodyFuelBound, ref, localExpressionFuelBound] using enough
   exact ⟨evaluated, evaluated.cost_le_fuelBound,
     (preparation type value typed).hasType.run_done_of_fuelBound store fuel bounded,
     (compilation type).run_done_of_fuelBound [argument type value typed] rfl store fuel bounded⟩

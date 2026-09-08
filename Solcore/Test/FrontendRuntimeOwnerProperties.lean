@@ -135,7 +135,6 @@ private theorem missingRejected (owner : Resolved.DeclarationId) (argument : Typ
                   have impossible := LocalNameTable.lookup?_iff.mpr found
                   change none = some _ at impossible
                   cases impossible
-  | conditional body => cases body
 
 theorem skipped_missing_reference_remains_a_whole_entry_failure_after_owner_change
     (leftOwner rightOwner : Resolved.DeclarationId) (argument : TypedRuntimeArgument)

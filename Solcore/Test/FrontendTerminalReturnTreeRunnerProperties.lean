@@ -250,24 +250,18 @@ private def entry : Syntax.FunctionDecl :=
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, tree⟩⟩
 private def declaredInputs (type : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh owner "c" .bool).bindFresh owner "x" type).bindFresh owner "y" type
-theorem deep_body_execution_does_not_extend_the_existing_function_entry_profile
+theorem deep_body_execution_and_exact_function_entry_compilation_agree
     {type : Core.Ty} (left right : Actual type) (store : Core.Store) :
     RuntimeFunctionHeader (types type) entry.value.signature type ∧
     RuntimeParametersDeclare (types type) owner entry.value.signature.parameters.elements (declaredInputs type) ∧
     (inputs true left right).runTerminalReturnTree? 7 tree store = some (type, .done left.val store) ∧
-    compileRuntimeFunction? (types type) owner entry = none := by
+    compileRuntimeFunction? (types type) owner entry = some ⟨declaredInputs type, core, type⟩ := by
   have declared : RuntimeParametersDeclare (types type) owner entry.value.signature.parameters.elements (declaredInputs type) :=
     .cons (.named (.tail (by decide) .head)) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons (.named .head) (by change "x" ∉ ["c"]; decide) (.cons (.named .head) (by change "y" ∉ ["x", "c"]; decide) .nil))
-  have guard : elaborateLocalExpression? (declaredInputs type).names (declaredInputs type).context (ref "c") = some (.var 2, .bool) :=
-    elaborateLocalExpression?_complete (.identifier (.tail yc (.tail xc .head)))
-      (.var (.tail i20 (.tail i10 .head))) (.var (.tail i20 (.tail i10 .head)))
-  refine ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared,
-    (actual_typed_cost_existence_and_both_sufficient_fuel_interfaces true left right store).2.2.2, ?_⟩
-  apply compileRuntimeFunction?_eq_none_iff.mpr
-  rintro ⟨candidate, accepted⟩
-  have checked := accepted.body.complete
-  rw [accepted.parameters.result_unique declared] at checked
-  simp [entry, tree, branch, elaborateTerminalReturnBody?, elaborateConditionalReturnBody?, guard, elaborateReturnBody?] at checked
+  have compilation : RuntimeFunctionCompiles (types type) owner entry ⟨declaredInputs type, core, type⟩ :=
+    ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, declared, elaborated true left right⟩
+  exact ⟨compilation.header, declared,
+    (actual_typed_cost_existence_and_both_sufficient_fuel_interfaces true left right store).2.2.2, compilation.complete⟩
 
 end Tests.FrontendTerminalReturnTreeRunner

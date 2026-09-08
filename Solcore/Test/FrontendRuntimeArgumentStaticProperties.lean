@@ -141,7 +141,6 @@ private theorem missingRejected : prepareRuntimeFunction? (table .bool) owner (d
                   have accepted := LocalNameTable.lookup?_iff.mpr found
                   change none = some _ at accepted
                   cases accepted
-  | conditional body => cases body
 
 theorem skipped_missing_branch_rejects_for_both_argument_values (fuel : Nat) (store : Core.Store) :
     ReturnBodyEvaluatesWithCost (inputs (boolArg false)).names (inputs (boolArg false)).environment
@@ -167,7 +166,7 @@ private theorem mismatchRejected : prepareRuntimeFunction? (table .bool) owner (
     .expression (.identifier .head) (.var .head) (.var .head)
   have declared : RuntimeFunctionHeader (table .bool) (declaration (ref "c") "Word").value.signature .word :=
     ⟨rfl, rfl, rfl, rfl, .single (.named (.tail (by decide) (.tail (by decide) .head)))⟩
-  have impossible := ((TerminalReturnBodyElaborates.single expectedBody).result_unique body).2.trans
+  have impossible := ((TerminalReturnTreeElaborates.single expectedBody).result_unique body).2.trans
     (declared.type_unique preparation.header).symm
   cases impossible
 

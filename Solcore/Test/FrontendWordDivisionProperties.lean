@@ -227,12 +227,12 @@ private def compiled (kind : Kind) : CompiledRuntimeFunction :=
 private theorem compilation (kind : Kind) : RuntimeFunctionCompiles types owner (declaration kind) (compiled kind) := by
   refine ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
     .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
-      (.cons (.named .head) (by change "r" ∉ ["l"]; simp) .nil), .conditional <| .intro
+      (.cons (.named .head) (by change "r" ∉ ["l"]; simp) .nil), .conditional
     (.equal (.identifier (.tail names_ne .head)) (.identifier .head))
     (.binary (.var (.tail ids_ne .head)) (.var .head)) (.binary (.var (.tail ids_ne .head)) (.var .head))
-    (.expression (resolved kind .zero .zero) (.binary (.var (.tail ids_ne .head)) (.var .head))
-      ((resolved kind .zero .zero).preserves_type (typed kind .zero .zero)))
-    (.expression (.identifier (.tail names_ne .head)) (.var (.tail ids_ne .head)) (.var (.tail ids_ne .head)))⟩
+    (.single (.expression (resolved kind .zero .zero) (.binary (.var (.tail ids_ne .head)) (.var .head))
+      ((resolved kind .zero .zero).preserves_type (typed kind .zero .zero))))
+    (.single (.expression (.identifier (.tail names_ne .head)) (.var (.tail ids_ne .head)) (.var (.tail ids_ne .head))))⟩
 private def arguments (left right : Core.Word) : List TypedRuntimeArgument :=
   [⟨.word, .word left, .word⟩, ⟨.word, .word right, .word⟩]
 private theorem preparation (kind : Kind) (left right : Core.Word) :
@@ -256,8 +256,8 @@ theorem terminal_compilation_uses_actual_arguments_and_selected_exact_cost
       store (ref "r") (.word right) store 1 := .identifier .head .head
   have comparison := LocalExpressionEvaluatesWithCost.equal (span := span) (operatorSpan := span) l r
   cases choice : (left == right)
-  · exact .conditional (.ifFalse (by simpa only [choice] using comparison) (.expression l))
-  · exact .conditional (.ifTrue (by simpa only [choice] using comparison) (.expression (costed kind left right store)))
+  · exact .ifFalse (by simpa only [choice] using comparison) (.single (.expression l))
+  · exact .ifTrue (by simpa only [choice] using comparison) (.single (.expression (costed kind left right store)))
 
 theorem terminal_selected_threshold_bound_and_actual_compiled_path
     (kind : Kind) (left right : Core.Word) (store : Core.Store) (fuel : Nat) :
@@ -267,7 +267,7 @@ theorem terminal_selected_threshold_bound_and_actual_compiled_path
     Core.Steps (if left == right then 12 else 8)
       (Core.State.initial (compiled kind).core ((arguments left right).reverse.map (·.value)) store)
       (Core.State.final (.word (if left == right then result kind left right else left)) store) ∧
-    (if left == right then 12 else 8) ≤ terminalReturnBodyFuelBound (declaration kind).value.body := by
+    (if left == right then 12 else 8) ≤ terminalReturnTreeFuelBound (declaration kind).value.body := by
   have evaluation := (terminal_compilation_uses_actual_arguments_and_selected_exact_cost kind left right store fuel).2.2.1
   exact ⟨evaluation.run_done_iff, evaluation.compiled_toSteps (compilation kind), evaluation.cost_le_fuelBound⟩
 

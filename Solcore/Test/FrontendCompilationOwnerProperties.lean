@@ -52,7 +52,7 @@ private theorem declared (id : Resolved.DeclarationId) (type : Core.Ty) :
     (.cons (.named .head) (by change "x" ∉ ["c"]; decide)
       (.cons (.named .head) (by change "y" ∉ ["x", "c"]; decide) .nil))
 private theorem elaborated (id : Resolved.DeclarationId) (type : Core.Ty) (conditional : Bool) :
-    TerminalReturnBodyElaborates (inputs id type).names (inputs id type).context (body conditional) (core conditional) type := by
+    TerminalReturnTreeElaborates (inputs id type).names (inputs id type).context (body conditional) (core conditional) type := by
   have names : (inputs id type).names = [("y", ⟨id, 2⟩), ("x", ⟨id, 1⟩), ("c", ⟨id, 0⟩)] := by
     simp only [inputs, LocalTypeInputs.bindFresh_names, LocalTypeInputs.bindFresh_ids,
       LocalTypeInputs.empty_names, LocalTypeInputs.empty_ids, Resolved.freshLocalId_empty, freshOne, freshTwo]
@@ -66,10 +66,10 @@ private theorem elaborated (id : Resolved.DeclarationId) (type : Core.Ty) (condi
   rw [names, context] at x
   cases conditional
   · exact .single x
-  · exact .conditional <| .intro (.identifier (.tail (by decide) (.tail (by decide) .head)))
+  · exact .conditional (.identifier (.tail (by decide) (.tail (by decide) .head)))
       (.var (.tail (indices_ne id (by decide)) (.tail (indices_ne id (by decide)) .head)))
-      (.var (.tail (indices_ne id (by decide)) (.tail (indices_ne id (by decide)) .head))) x
-      (.expression (.identifier .head) (.var .head) (.var .head))
+      (.var (.tail (indices_ne id (by decide)) (.tail (indices_ne id (by decide)) .head))) (.single x)
+      (.single (.expression (.identifier .head) (.var .head) (.var .head)))
 private theorem compilation (id : Resolved.DeclarationId) (type : Core.Ty) (conditional : Bool) :
     RuntimeFunctionCompiles (types type) id (declaration conditional) (compiled id type conditional) :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named (.tail (by decide) .head))⟩,
@@ -193,7 +193,7 @@ theorem invalid_unselected_arm_remains_none_for_every_owner_and_type
     have sameInputs := accepted.parameters.result_unique (declared leftOwner type)
     have checked := accepted.body.complete
     rw [sameInputs] at checked
-    simp [elaborateTerminalReturnBody?, elaborateConditionalReturnBody?, elaborateReturnBody?,
+    simp [elaborateTerminalReturnTree?, elaborateReturnBody?,
       elaborateLocalExpression?, resolveLocalExpression?, missing, returned, ref, inputs, LocalTypeInputs.names,
       LocalTypeInputs.context, LocalTypeInputs.bindFresh, LocalTypeInputs.empty, LocalNameTable.lookup?] at checked
   refine ⟨rejected, ?_⟩

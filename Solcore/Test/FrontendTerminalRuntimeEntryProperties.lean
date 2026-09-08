@@ -2,6 +2,9 @@ import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionOwnerProperties
 import Solcore.Frontend.RuntimeFunctionStoreProperties
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
+import Solcore.Frontend.TerminalReturnTreeEmbeddingProperties
+import Solcore.Frontend.TerminalReturnTreeEvaluationEmbeddingProperties
+import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
 
 /-! Independent terminal-entry contracts use actual arguments, unequal selected
 costs and real suspended environments. Static compilation invents no values. -/
@@ -55,12 +58,12 @@ private theorem bodyElab : TerminalReturnBodyElaborates staticInputs.names stati
 private theorem compiles : RuntimeFunctionCompiles types owner (declaration body) compiled :=
   ⟨header, .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
     (.cons (.named (.tail (by decide) .head)) (by change "t" ∉ ["c"]; simp)
-      (.cons (.named (.tail (by decide) .head)) (by change "f" ∉ ["t", "c"]; simp) .nil)), bodyElab⟩
+      (.cons (.named (.tail (by decide) .head)) (by change "f" ∉ ["t", "c"]; simp) .nil)), bodyElab.returnTree⟩
 private theorem prepares (choice : Bool) (left right : Core.Word) :
     RuntimeFunctionPrepares types owner (declaration body) (arguments choice left right) (prepared choice left right) :=
   ⟨header, .cons (.named .head) (by simp [LocalInputs.empty, LocalInputs.names])
     (.cons (.named (.tail (by decide) .head)) (by change "t" ∉ ["c"]; simp)
-      (.cons (.named (.tail (by decide) .head)) (by change "f" ∉ ["t", "c"]; simp) .nil)), bodyElab⟩
+      (.cons (.named (.tail (by decide) .head)) (by change "f" ∉ ["t", "c"]; simp) .nil)), bodyElab.returnTree⟩
 private theorem conditionCost (choice : Bool) (left right : Core.Word) (store : Core.Store) :
     LocalExpressionEvaluatesWithCost (inputs choice left right).names (inputs choice left right).environment
       store (ref "c") (.bool choice) store 1 :=
@@ -78,6 +81,7 @@ private theorem costed (choice : Bool) (left right : Core.Word) (store : Core.St
     RuntimeFunctionEvaluatesWithCost types owner (declaration body) (arguments choice left right)
       store .word (result choice left right) store (required choice) := by
   apply RuntimeFunctionEvaluatesWithCost.intro (prepares choice left right)
+  apply TerminalReturnBodyEvaluatesWithCost.returnTree
   apply TerminalReturnBodyEvaluatesWithCost.conditional
   cases choice
   · exact .ifFalse (conditionCost false left right store) (noCost false left right store)
@@ -139,13 +143,14 @@ theorem terminal_bound_is_six_while_the_unchanged_singleton_bound_is_zero
     (∃ value, Core.ValueHasType value .word ∧
       runRuntimeFunction? types owner (declaration body) (arguments choice left right) 6 store = some (.word, .done value store) ∧
       Core.runStateful 6 (Core.State.initial core [.word right, .word left, .bool choice] store) = .done value store) := by
-  have enough : terminalReturnBodyFuelBound (declaration body).value.body ≤ 6 := by
-    change terminalReturnBodyFuelBound body ≤ 6
-    rw [bound]
-    exact Nat.le_refl 6
+  have treeBound : terminalReturnTreeFuelBound body = 6 := by
+    simp [body, branch, returned, yes, ref, terminalReturnTreeFuelBound, returnBodyFuelBound, localExpressionFuelBound]
+  have enough : terminalReturnTreeFuelBound (declaration body).value.body ≤ 6 := by
+    change terminalReturnTreeFuelBound body ≤ 6
+    rw [treeBound]; exact Nat.le_refl 6
   refine ⟨bound, rfl, ?_, (prepares choice left right).hasType.run_done_of_fuelBound store 6 enough,
     compiles.run_done_of_fuelBound (arguments choice left right) rfl store 6 enough⟩
-  simpa only [show (declaration body).value.body = body from rfl, bound]
+  simpa only [show (declaration body).value.body = body from rfl, treeBound]
     using (costed choice left right store).cost_le_fuelBound
 
 theorem a_same_typed_hand_built_core_does_not_supply_compilation_provenance :
@@ -234,12 +239,12 @@ theorem arbitrary_typed_values_are_returned_without_invocation_or_allocation
       .cons (.named .head) (by simp [LocalInputs.empty, LocalInputs.names])
         (.cons (.named (.tail (by decide) .head)) (by change "t" ∉ ["c"]; simp)
           (.cons (.named (.tail (by decide) .head)) (by change "f" ∉ ["t", "c"]; simp) .nil)),
-      .conditional (.intro (.identifier (.tail (show "f" ≠ "c" by decide) (.tail (show "t" ≠ "c" by decide) .head)))
+      .conditional (.identifier (.tail (show "f" ≠ "c" by decide) (.tail (show "t" ≠ "c" by decide) .head)))
         (.var (.tail (show id 2 ≠ id 0 by decide) (.tail (show id 1 ≠ id 0 by decide) .head)))
         (.var (.tail (show id 2 ≠ id 0 by decide) (.tail (show id 1 ≠ id 0 by decide) .head)))
-        (.expression (.identifier (.tail (show "f" ≠ "t" by decide) .head))
-          (.var (.tail (show id 2 ≠ id 1 by decide) .head)) (.var (.tail (show id 2 ≠ id 1 by decide) .head)))
-        (.expression (.identifier .head) (.var .head) (.var .head)))⟩
+        (.single (.expression (.identifier (.tail (show "f" ≠ "t" by decide) .head))
+          (.var (.tail (show id 2 ≠ id 1 by decide) .head)) (.var (.tail (show id 2 ≠ id 1 by decide) .head))))
+        (.single (.expression (.identifier .head) (.var .head) (.var .head)))⟩
   have condition : LocalExpressionEvaluatesWithCost candidate.inputs.names candidate.inputs.environment
       store (ref "c") (.bool choice) store 1 :=
     .identifier (.tail (show "f" ≠ "c" by decide) (.tail (show "t" ≠ "c" by decide) .head))
@@ -252,6 +257,7 @@ theorem arbitrary_typed_values_are_returned_without_invocation_or_allocation
   have evaluated : RuntimeFunctionEvaluatesWithCost (valueTypes argument) owner (declaration selectBody)
       (supplied choice argument) store argument.type argument.value store 4 := by
     apply RuntimeFunctionEvaluatesWithCost.intro preparation
+    apply TerminalReturnBodyEvaluatesWithCost.returnTree
     apply TerminalReturnBodyEvaluatesWithCost.conditional
     cases choice
     · exact .ifFalse condition noValue
@@ -266,8 +272,8 @@ theorem raw_selected_success_does_not_accept_an_unresolved_unselected_arm
       store missing (.word left.bitNot) store 6 ∧
     prepareRuntimeFunction? types owner (declaration missing) (arguments true left right) = none ∧
     runRuntimeFunction? types owner (declaration missing) (arguments true left right) fuel store = none := by
-  have bodyRejected : (inputs true left right).checkTerminalReturnBody? missing = none := by
-    simp [LocalInputs.checkTerminalReturnBody?, elaborateTerminalReturnBody?, elaborateConditionalReturnBody?,
+  have bodyRejected : (inputs true left right).checkTerminalReturnTree? missing = none := by
+    simp [LocalInputs.checkTerminalReturnTree?, elaborateTerminalReturnTree?,
       missing, branch, yes, returned, ref, elaborateReturnBody?, elaborateLocalExpression?, resolveLocalExpression?,
       inputs, LocalInputs.names, LocalInputs.context, LocalInputs.bindFresh, LocalInputs.empty, LocalNameTable.lookup?]
   have noPreparation : ¬ ∃ candidate, RuntimeFunctionPrepares types owner (declaration missing)
@@ -276,7 +282,7 @@ theorem raw_selected_success_does_not_accept_an_unresolved_unselected_arm
     have same := (prepares true left right).parameters.result_unique accepted.parameters
     have checked := accepted.body.complete
     rw [← same] at checked
-    change (inputs true left right).checkTerminalReturnBody? missing = some _ at checked
+    change (inputs true left right).checkTerminalReturnTree? missing = some _ at checked
     rw [bodyRejected] at checked
     cases checked
   have rejected := prepareRuntimeFunction?_eq_none_iff.mpr noPreparation

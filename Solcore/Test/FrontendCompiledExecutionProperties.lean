@@ -169,7 +169,6 @@ theorem independent_body_failure_blocks_every_supplied_argument_list
     rintro ⟨compiled, evidence⟩
     cases evidence.body with
     | single body => cases body
-    | conditional body => cases body
   refine ⟨absent, ?_⟩
   rw [runRuntimeFunction?_factorization, compileRuntimeFunction?_eq_none_iff.mpr absent]
   rfl

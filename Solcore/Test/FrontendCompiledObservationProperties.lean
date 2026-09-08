@@ -111,7 +111,7 @@ private theorem originalCost (value : Core.Word) (store : Core.Store) :
       (.bool (decide (value > Core.Word.zero))) store 9 :=
     .greater (leftValue := value) (rightValue := Core.Word.zero) (leftCost := 5) (rightCost := 1) sum literal
   apply RuntimeFunctionEvaluatesWithCost.intro (prepares value)
-  apply TerminalReturnBodyEvaluatesWithCost.single
+  apply TerminalReturnTreeEvaluatesWithCost.single
   apply ReturnBodyEvaluatesWithCost.expression
   by_cases positive : value > Core.Word.zero
   · exact .ifTrue (by simpa only [positive, decide_true] using comparison) leaf
