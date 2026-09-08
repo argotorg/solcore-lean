@@ -23,5 +23,7 @@ import Solcore.Resolved.LocalFragmentProperties
 /-!
 Semantic frontend foundation for already-resolved local expressions. Exact
 lookup, elaboration, typing, evaluation, and executable Core correspondence;
-not a canonical source resolver or a complete source-to-Core pipeline.
+ordered binary products retain the original child scopes and actual values.
+This is not a canonical source resolver or a complete source-to-Core pipeline,
+and does not itself enable a canonical tuple adapter.
 -/

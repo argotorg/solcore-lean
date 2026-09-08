@@ -126,4 +126,10 @@ example := @Solcore.Resolved.HasType.wordLt
 example := @Solcore.Resolved.Evaluates.wordLt
 example := @Solcore.Resolved.WellScoped.wordLt
 
+example := @Solcore.Resolved.Expr.pair
+example := @Solcore.Resolved.Lowers.pair
+example := @Solcore.Resolved.HasType.pair
+example := @Solcore.Resolved.Evaluates.pair
+example := @Solcore.Resolved.WellScoped.pair
+
 end Tests

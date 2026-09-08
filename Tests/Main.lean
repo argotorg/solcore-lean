@@ -78,6 +78,8 @@ import Solcore.Test.CoreLocalRightWordLessProperties
 import Solcore.Test.CoreLocalRightWordLessBoundary
 import Solcore.Test.ResolvedWordLessProperties
 import Solcore.Test.ResolvedWordLessBoundary
+import Solcore.Test.ResolvedPairProperties
+import Solcore.Test.ResolvedPairBoundary
 import Solcore.Test.FrontendWordLessProperties
 import Solcore.Test.FrontendParsedWordLess
 import Solcore.Test.FrontendWordGreaterEqualProperties
@@ -5665,6 +5667,7 @@ def testCanonicalRawLexing : IO Unit := do
 
 def run : IO Unit := do
   coreLocalFragmentPairBoundaryTests
+  resolvedPairBoundaryTests
   resolvedLocalSemanticsTests
   frontendParsedLocalExpressionTests
   frontendParsedWordLiteralTests

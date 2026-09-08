@@ -138,8 +138,30 @@ prefixes, opaque values, nominal static types, missing/wrong children and actual
 pair checkpoints/resumption. Neither state equality nor typed inhabitants are
 assumed. Core semantics and frozen wire rejection are unchanged; projections,
 closures/calls and cell access remain excluded from this predicate. Resolved
-pair representation and canonical two-element tuple acceptance remain separate
-next steps, with no decision here about larger tuples or tuple type syntax.
+pair representation is added in ADR-0229 below; canonical two-element tuple
+acceptance remains a separate next step, with no decision here about larger
+tuples or tuple type syntax.
+
+Resolved immutable expressions now include ordered binary pairs (ADR-0229).
+Their independent lowering, typing, whole-scope and raw evaluation constructors
+retain both original child scopes/environments, arbitrary component types and
+actual ordered values with left-to-right store threading. All 54 generic proof
+contracts in the affected modules keep their original names and premises.
+Core correspondence, complete inference, determinism/store preservation,
+whole-scope closure and fresh insertion/reflection now include this case.
+Rename identity/composition still allow arbitrary maps; first-match lookup,
+lowering and semantic transport retain their existing injectivity condition.
+Fresh insertion preserves its suffix-fresh boundary, and reflection still
+requires original whole-scoping. No pair creates or allocates a binder.
+
+Independent proof and executable consumers cover nested products/lets, exact
+ordered Core and values, duplicate first matches, nominal open types without
+inhabitants, opaque values, raw skipped-child success versus whole rejection,
+and the existing renaming/freshness boundaries. Separate Core paths and actual
+checkpoints preserve exact cost and both stores; same-typed wrong output is not
+treated as correct lowering. Existing Core semantics, source tuple rejection,
+runtime entry gates and wire formats are unchanged. No new evaluator, cost
+judgment or source tuple arity/type/projection policy is introduced.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

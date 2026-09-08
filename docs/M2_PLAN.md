@@ -104,9 +104,23 @@ continuations, and each side retains its own pair frames and captured environmen
 Independent proof and executable consumers cover nesting, retained prefixes,
 opaque values, nominal static types without inhabitants, missing/wrong children
 and real checkpoint resumption. Core semantics, projections, closure/cell
-exclusions and wire policies do not change. Resolved pair representation and
-canonical two-element source tuples are separate next integration steps;
+exclusions and wire policies do not change. Resolved pair representation follows
+in ADR-0229; canonical two-element source tuples remain a separate next step;
 larger tuples, tuple type syntax and projection spelling remain undecided here.
+
+Resolved binary products (ADR-0229) now lower both original children in the same
+scope to ordered Core pairs, with independent product typing, whole-child scope
+validity and actual-value/store evaluation. The affected modules' 54 generic
+proof contracts retain their names and assumptions, including complete checker
+and Core correspondence, store/determinism, structural renaming and semantic
+transport, and fresh insertion/reflection. Rename identity/composition allow
+arbitrary maps; lookup/lowering/evaluation transport retain existing injectivity.
+Pairs introduce no binder or allocation condition, and a left-local let cannot
+alter the right operand's scope. Nominal static/opaque raw and duplicate-ID
+consumers retain the old raw/whole, suffix-fresh and original-scoping boundaries.
+Independent ordered Core paths and checkpoints test cost and execution without
+changing any runner. Canonical tuples and their arity/type/projection policies
+remain a separate adapter change, and source/wire rejections are preserved.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
