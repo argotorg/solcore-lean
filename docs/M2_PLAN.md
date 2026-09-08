@@ -34,6 +34,24 @@ their declarative rules remain the formal specification authority.
 
 ## Current executable coverage
 
+### Active semantic priority
+
+Further diagnostic-trace proof work is paused in favor of frontend semantics.
+The first semantic slice, ADR-0154, introduces structured resolved declaration
+and local identities, exact local-table lookup, and a monomorphic local
+expression language. Independent typing and evaluation correspond in both
+directions to a total Core elaborator and the existing Core checker/evaluator.
+Closed typed expressions execute with sufficient fuel, preserve the store, and
+cannot fault. Source spelling, fresh-ID allocation, name resolution, source
+mutation, overloading, and staging remain outside this slice.
+
+The next semantic work should extend resolution and connect canonical parsed
+syntax to independently typed resolved inputs, preserving binding identity and
+the established Core execution correspondence. It must not treat the resolved
+immutable expression binder as a decision about mutable source declarations.
+
+### Source-to-AST coverage
+
 The source-to-AST path is operational and public as a Lean library. It
 includes:
 

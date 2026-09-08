@@ -1,4 +1,6 @@
 import Solcore
+import Solcore.Test.ResolvedPublicBoundary
+import Solcore.Test.ResolvedLocalSemantics
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5515,6 +5517,7 @@ def testCanonicalRawLexing : IO Unit := do
       s!"canonical source {reprStr raw.id} exceeded the lexer bound"
 
 def run : IO Unit := do
+  resolvedLocalSemanticsTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

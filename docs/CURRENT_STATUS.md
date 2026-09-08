@@ -34,6 +34,34 @@ grammar; this does not block use of the Lean parser API.
 
 ## What works now
 
+### Resolved local-expression semantics
+
+Frontend semantic work now takes priority over additional diagnostic-trace
+proof depth. `Solcore.Resolved` provides the first local-expression foundation
+between source syntax and Semantic Core, as specified by ADR-0154.
+
+Structured declaration/local identities retain module and library ownership.
+Independent first-match lookup and positional judgments prove exact binding
+selection, uniqueness, and non-dangling references. The monomorphic expression
+fragment includes semantic unit/Boolean/Word values, local references, selected
+Core unary/binary primitives, immutable expression binding, and conditionals.
+Its total elaborator preserves lexical scope and rejects unresolved references.
+
+Independent typing and named-environment evaluation are connected to Core in
+both directions. Every typed expression has a type-preserving elaboration,
+the checker accepts exactly independently typed expressions, and elaboration
+preserves the exact evaluation result and store. Independent evaluation is
+deterministic and store-preserving even when an unselected branch prevents
+whole-expression elaboration. Closed typed expressions have an evaluation,
+return the same result at all sufficient Core fuel, and never machine-fault.
+
+This is not yet a canonical source adapter. It does not interpret literal
+spelling, resolve `true`/`false` or overloaded operators, allocate fresh IDs,
+decide source shadowing or mutable-declaration semantics, or cover imports,
+polymorphism, functions, and staging. Repeated IDs have explicit first-match
+table behavior; that is not a proof that a source resolver allocates unique IDs.
+No Oracle or wire interface changes.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.
@@ -1756,8 +1784,10 @@ ordinary specialization is now public and compile-time consumed. Recovered
 malformed output remains separate so that recovery is not confused with
 language acceptance.
 
-Resolution, source type checking, and elaboration into checked Semantic Core
-are separate later stages. No new frontend result is published through Oracle
+Full source resolution, source type checking, and elaboration into checked
+Semantic Core remain separate later stages. The resolved local-expression
+foundation above does not yet connect to canonical parsed source.
+No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 
 ## What is not yet claimed

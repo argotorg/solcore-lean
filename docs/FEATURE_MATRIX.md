@@ -713,13 +713,14 @@ Wire v1 and v2 remain frozen and reject their later forms.
 
 | Feature | Status | Missing work | Syntax coupling |
 | --- | --- | --- | --- |
-| Abstract resolved-name language | Planned | structured identities, declarations, occurrences, scopes | Low |
-| Source type checking | Planned after resolved IR | type and effect rules over abstract identities | Medium |
+| Abstract resolved-name language | Local-expression foundation implemented (ADR-0154) | module/library-owned declaration and binder IDs, exact first-match lookup, non-dangling positional references; source declaration collection and fresh allocation remain open | Low |
+| Resolved local typing and evaluation | Implemented for monomorphic unit/Boolean/Word, references, selected primitives, immutable expression bindings, and conditionals | independent checker/elaborator correspondence, type preservation/reflection, exact value/store simulation, determinism and sufficient-fuel execution; no source spelling semantics | Low |
+| Source type checking | Planned after source-to-Resolved adapter | canonical source type/effect rules; local resolved typing alone is not source typing | Medium |
 | Parametric polymorphism | Planned | type application and preservation | Low |
 | Tabled class resolution | Planned | evidence language, finite search, inconclusive boundary | Low |
 | Comptime/runtime staging | Blocked | staging decision and effect rules | Low |
 | Canonical Syntax-to-Resolved adapter | Planned | connect parsed declarations and occurrences to structured identity | High |
-| Resolved-to-Core elaboration | Planned after source typing | type, effect, and stage preservation | Medium |
+| Resolved-to-Core elaboration | Exact local-expression fragment implemented | full source coverage, effects beyond the store-preserving fragment, and stage preservation remain open | Medium |
 
 ## Contract and runtime semantics
 
