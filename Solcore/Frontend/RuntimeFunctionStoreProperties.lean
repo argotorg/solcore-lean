@@ -1,8 +1,8 @@
-import Solcore.Frontend.ReturnBodyStoreProperties
+import Solcore.Frontend.TerminalReturnBodyStoreProperties
 import Solcore.Frontend.RuntimeFunctionCompiledExecutionProperties
 
-/-! Store-independent values and exact costs lift through unchanged return and
-entry contracts. Full results are not equated: each retains its own store. -/
+/-! Store-independent values and exact costs lift through terminal-body and
+whole-entry contracts. Full results are not equated: each retains its own store. -/
 
 set_option autoImplicit false
 
