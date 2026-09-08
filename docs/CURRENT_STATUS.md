@@ -1598,6 +1598,15 @@ but the failed carrier's leading semicolon is a boundary after cursor-only rewin
 Exact core and public State/Failure equivalences retain that carrier, the child
 event, and arbitrary duplicate prior events without committing the terminal report.
 
+Concrete public-atom reverse consumers use the real literal leaf as the nested
+parser. In `.a-b(+) ;`, the checked-name event precedes the exact literal failure;
+rewind/recovery then commits that report once and stops before the right parenthesis,
+without replaying the skipped name warning. Full State/Failure checks also cover
+name-success bypass, immediate boundary rejection, and missing backing where the
+core and recovery reports have equal payloads but only the original is committed.
+Mixed lexical filtering drops the committed report/recovery event while retaining
+the protected name warning and arbitrary prior duplicates remain intact.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

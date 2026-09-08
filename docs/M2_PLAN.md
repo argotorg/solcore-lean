@@ -1177,6 +1177,12 @@ including an independent public remainder outcome. General recursive closure is
 still open. A changed-carrier consumer verifies that public boundary testing uses
 the failed tokens/endIndex after cursor-only rewind, not the original carrier.
 
+Concrete reverse public consumers use a literal-only nested parser to check
+checked-name-before-failure-before-recovery order, no replay on skipped names,
+unread right parentheses, name-success bypass, uncommitted boundary failures,
+and initial missing backing with exactly one committed original report. Lexical
+filtering explicitly distinguishes protected name events from recovery/report events.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
