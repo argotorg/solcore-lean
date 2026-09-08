@@ -55,6 +55,9 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | greater _ _ leftIH rightIH =>
       cases evaluation with
       | greater leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
+  | equal _ _ leftIH rightIH =>
+      cases evaluation with
+      | equal leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
   | logicalAnd _ _ leftIH rightIH =>
       cases evaluation with
       | andTrue leftChild rightChild => exact .ifTrue (leftIH leftChild) (rightIH rightChild)
@@ -153,6 +156,14 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
           case word.word leftWord rightWord =>
             cases applied
             exact .greater (leftIH leftChild) (rightIH rightChild)
+  | equal _ _ leftIH rightIH =>
+      cases evaluation with
+      | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>
+          cases leftValue <;> cases rightValue <;>
+            simp only [Core.BinaryOp.apply, reduceCtorEq] at applied
+          case word.word leftWord rightWord =>
+            cases applied
+            exact .equal (leftIH leftChild) (rightIH rightChild)
   | logicalAnd _ _ leftIH rightIH =>
       cases evaluation with
       | ifTrue leftChild rightChild => exact .andTrue (leftIH leftChild) (rightIH rightChild)

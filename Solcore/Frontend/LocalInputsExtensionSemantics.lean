@@ -100,6 +100,14 @@ theorem AvoidsLocalName.bindFresh_evaluates_iff {name : String} {source : Syntax
       · intro evaluation
         cases evaluation with
         | greater left right => exact .greater (leftIH.mpr left) (rightIH.mpr right)
+  | equal _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | equal left right => exact .equal (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | equal left right => exact .equal (leftIH.mpr left) (rightIH.mpr right)
   | bitAnd _ _ leftIH rightIH =>
       constructor
       · intro evaluation

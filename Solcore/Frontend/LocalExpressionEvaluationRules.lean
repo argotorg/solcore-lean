@@ -7,7 +7,7 @@ import Solcore.Resolved.EvaluationProperties
 Evaluation requires only the selected branch, not whole-expression resolution.
 Short-circuit forms forward any selected right value at this raw boundary;
 source typing separately requires both operands to be Boolean. Word arithmetic,
-bitwise operations, and unsigned comparison evaluate both operands left to right.
+bitwise operations, unsigned comparison, and Word equality evaluate both operands left to right.
 Both stores are explicit even though every constructor is store-preserving. Strict Word literals
 return their independently denoted value without consulting caller tables. -/
 
@@ -99,6 +99,14 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       LocalExpressionEvaluates table environment initialStore
         { span, value := .binary left ⟨operatorSpan, .greater⟩ right }
         (.bool (decide (leftValue > rightValue))) finalStore
+  | equal {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.word leftValue) middleStore)
+      (rightEvaluation : LocalExpressionEvaluates table environment middleStore right (.word rightValue) finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .equal⟩ right }
+        (.bool (leftValue == rightValue)) finalStore
   | andTrue {initialStore middleStore finalStore : Core.Store}
       {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr} {value : Core.Value}
       (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.bool true) middleStore)
@@ -153,6 +161,7 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
       exact branchIH.trans conditionIH
   | add _ _ leftIH rightIH | bitAnd _ _ leftIH rightIH | bitOr _ _ leftIH rightIH | bitXor _ _ leftIH rightIH
   | subtract _ _ leftIH rightIH | multiply _ _ leftIH rightIH | greater _ _ leftIH rightIH
+  | equal _ _ leftIH rightIH
   | andTrue _ _ leftIH rightIH | orFalse _ _ leftIH rightIH =>
       exact rightIH.trans leftIH
 

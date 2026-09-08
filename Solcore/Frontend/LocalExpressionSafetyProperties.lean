@@ -90,6 +90,13 @@ theorem LocalExpressionHasType.evaluates
       | word =>
           cases rightTyped with
           | word => exact ⟨_, .greater leftEvaluation rightEvaluation, .bool⟩
+  | equal _ _ leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
+      obtain ⟨rightValue, rightEvaluation, rightTyped⟩ := rightIH
+      cases leftTyped with
+      | word =>
+          cases rightTyped with
+          | word => exact ⟨_, .equal leftEvaluation rightEvaluation, .bool⟩
   | logicalAnd _ _ leftIH rightIH =>
       obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
       obtain ⟨decision, rfl⟩ := leftTyped.bool_shape

@@ -27,6 +27,7 @@ theorem LocalExpressionEvaluatesWithCost.change_store
   | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
   | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
   | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
+  | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
   | andTrue _ _ leftIH rightIH => exact .andTrue leftIH rightIH
   | andFalse _ ih => exact .andFalse ih
   | orTrue _ ih => exact .orTrue ih
