@@ -20,6 +20,11 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
       | identifier otherNamed found =>
           cases named.id_unique otherNamed
           exact .var found
+  | wordLiteral meaning =>
+      cases evaluation with
+      | wordLiteral otherMeaning =>
+          cases meaning.value_unique otherMeaning
+          exact .word
   | group _ ih =>
       cases evaluation with
       | group child => exact ih child
@@ -53,6 +58,9 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
   | identifier named =>
       cases evaluation with
       | var found => exact .identifier named found
+  | wordLiteral meaning =>
+      cases evaluation with
+      | word => exact .wordLiteral meaning
   | group _ ih => exact .group (ih evaluation)
   | logicalNot _ ih =>
       cases evaluation with

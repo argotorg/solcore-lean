@@ -3,7 +3,7 @@ import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Core.Safety
 
 /-! Direct source-level existence and type/store preservation for the local
-Boolean/Word-complement/conditional fragment. Identity order and positional environment typing
+Boolean/Word/conditional fragment. Identity order and positional environment typing
 remain explicit; no closedness or general resolved-evaluation existence theorem is used. -/
 
 set_option autoImplicit false
@@ -29,6 +29,7 @@ theorem LocalExpressionHasType.evaluates
       have envIndex := sameIds ▸ indexed
       exact ⟨value, .identifier named
         (Resolved.LocalScope.lookup_of_indexed envIndex atValue), valueTyped⟩
+  | wordLiteral meaning => exact ⟨_, .wordLiteral meaning, .word⟩
   | group _ ih =>
       obtain ⟨value, evaluation, valueTyped⟩ := ih
       exact ⟨value, .group evaluation, valueTyped⟩

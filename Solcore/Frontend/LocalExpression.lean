@@ -1,10 +1,13 @@
 import Solcore.Frontend.LocalReference
+import Solcore.Frontend.WordLiteral
 
-/-! An additive canonical adapter for identifiers, grouping, conditionals, and
-the Boolean operators `!`, `&&`, and `||`, and Word complement `~`. Its explicit
-name table supplies all identities, including any bindings for `true` or `false`.
-Literal interpretation, other operators, source bindings, and global resolution remain
-outside this fragment. Unsupported syntax is not a source-language rejection. -/
+/-! An additive canonical adapter for identifiers, strict Word literals, grouping,
+conditionals, Boolean operators, and Word complement. Its explicit name table
+supplies identities, including any bindings for `true` or `false`; literals do
+not consult that table. This fixed literal interpretation is local to the adapter,
+not a general source conversion or overload policy. Other operators, source
+bindings, and global resolution remain outside this fragment. Unsupported syntax
+is not a source-language rejection. -/
 
 set_option autoImplicit false
 
@@ -12,11 +15,12 @@ namespace Solcore.Frontend
 
 /-- Resolve every child of a supported expression, preserving conditional shape.
 Grouping and source ranges are ignored. No lexical or span validity is assumed;
-resolution itself assigns no types or truthiness conversions. -/
+literal conversion is strict Word-only and no truthiness conversion is performed. -/
 def resolveLocalExpression? (table : LocalNameTable) (source : Syntax.Expr) :
     Option Resolved.Expr :=
   match source with
   | ⟨_, .identifier name⟩ => (table.lookup? name.value).map Resolved.Expr.var
+  | ⟨_, .literal literal⟩ => (interpretWordLiteral? literal).map Resolved.Expr.word
   | ⟨_, .group inner⟩ => resolveLocalExpression? table inner
   | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ =>
       (resolveLocalExpression? table operand).map (Resolved.Expr.unary .boolNot)
@@ -41,6 +45,9 @@ inductive ResolvesLocalExpression (table : LocalNameTable) :
   | identifier {span : Syntax.SourceSpan} {name : Syntax.Identifier} {id : Resolved.LocalId}
       (found : LocalNameTable.Lookup table name.value id) :
       ResolvesLocalExpression table { span, value := .identifier name } (.var id)
+  | wordLiteral {span : Syntax.SourceSpan} {literal : Syntax.CoreLiteral} {word : Core.Word}
+      (meaning : WordLiteralDenotes literal word) :
+      ResolvesLocalExpression table { span, value := .literal literal } (.word word)
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr} {resolved : Resolved.Expr}
       (child : ResolvesLocalExpression table inner resolved) :
       ResolvesLocalExpression table { span, value := .group inner } resolved

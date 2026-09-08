@@ -36,6 +36,9 @@ theorem AvoidsLocalName.resolves_cons_iff {name : String} {source : Syntax.Expr}
         cases resolution with
         | identifier found =>
             exact .identifier ((LocalNameTable.lookup_cons_iff_of_ne different).mpr found)
+  | literal =>
+      constructor <;> intro resolution <;> cases resolution with
+      | wordLiteral meaning => exact .wordLiteral meaning
   | group _ ih =>
       constructor
       · intro resolution

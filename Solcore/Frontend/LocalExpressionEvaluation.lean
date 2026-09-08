@@ -1,12 +1,14 @@
 import Solcore.Frontend.LocalExpression
 import Solcore.Frontend.LocalReferenceProperties
+import Solcore.Frontend.WordLiteralProperties
 import Solcore.Resolved.EvaluationProperties
 
 /-! Independent canonical evaluation for the local conditional/operator fragment.
 Evaluation requires only the selected branch, not whole-expression resolution.
 Short-circuit forms forward any selected right value at this raw boundary;
 source typing separately requires both operands to be Boolean. Both stores are
-explicit even though every constructor is store-preserving. -/
+explicit even though every constructor is store-preserving. Strict Word literals
+return their independently denoted value without consulting caller tables. -/
 
 set_option autoImplicit false
 
@@ -20,6 +22,11 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       (found : Resolved.LocalScope.Lookup environment id value) :
       LocalExpressionEvaluates table environment store
         { span, value := .identifier name } value store
+  | wordLiteral {store : Core.Store} {span : Syntax.SourceSpan}
+      {literal : Syntax.CoreLiteral} {word : Core.Word}
+      (meaning : WordLiteralDenotes literal word) :
+      LocalExpressionEvaluates table environment store
+        { span, value := .literal literal } (.word word) store
   | group {initialStore finalStore : Core.Store} {span : Syntax.SourceSpan}
       {inner : Syntax.Expr} {value : Core.Value}
       (child : LocalExpressionEvaluates table environment initialStore inner value finalStore) :
@@ -83,6 +90,7 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
     finalStore = initialStore := by
   induction evaluation with
   | identifier => rfl
+  | wordLiteral => rfl
   | group _ ih | logicalNot _ ih | bitNot _ ih | andFalse _ ih | orTrue _ ih => exact ih
   | ifTrue _ _ conditionIH branchIH | ifFalse _ _ conditionIH branchIH =>
       exact branchIH.trans conditionIH
@@ -102,6 +110,11 @@ theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
       | identifier otherNamed otherFound =>
           cases named.id_unique otherNamed
           exact ⟨found.value_unique otherFound, rfl⟩
+  | wordLiteral meaning =>
+      cases rightEvaluation with
+      | wordLiteral otherMeaning =>
+          cases meaning.value_unique otherMeaning
+          exact ⟨rfl, rfl⟩
   | group _ ih =>
       cases rightEvaluation with
       | group child => exact ih child

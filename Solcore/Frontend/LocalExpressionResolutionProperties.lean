@@ -1,5 +1,6 @@
 import Solcore.Frontend.LocalExpression
 import Solcore.Frontend.LocalReferenceProperties
+import Solcore.Frontend.WordLiteralProperties
 
 /-! Exact structural resolution for the supported canonical expression fragment.
 All written children must resolve, including short-circuit operands; branch
@@ -16,6 +17,8 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
   induction resolution with
   | identifier found =>
       simp only [resolveLocalExpression?, LocalNameTable.lookup?_iff.mpr found, Option.map_some]
+  | wordLiteral meaning =>
+      simp only [resolveLocalExpression?, interpretWordLiteral?_complete meaning, Option.map_some]
   | group _ ih => simpa only [resolveLocalExpression?] using ih
   | logicalNot _ ih | bitNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
   | logicalAnd _ _ leftIH rightIH | logicalOr _ _ leftIH rightIH =>
@@ -37,6 +40,11 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
             simp only [found, Option.map_some, Option.some.injEq] at result
             cases result
             exact .identifier (LocalNameTable.lookup?_iff.mp found)
+      case literal literal =>
+        simp only [Option.map_eq_some_iff] at result
+        obtain ⟨word, interpreted, same⟩ := result
+        cases same
+        exact .wordLiteral (interpretWordLiteral?_sound interpreted)
       case group inner => exact .group (resolveLocalExpression?_sound result)
       case unary operator operand =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
@@ -113,6 +121,14 @@ theorem resolveLocalExpression?_span (table : LocalNameTable) (source : Syntax.E
       case binary left operator right =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> simp only [resolveLocalExpression?]
+
+/-- Literal spelling is retained, while both literal and outer ranges are ignored. -/
+theorem resolveLocalExpression?_literal_spans (table : LocalNameTable)
+    (payload : Syntax.CoreLiteralValue)
+    (span literalSpan otherSpan otherLiteralSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table ⟨span, .literal ⟨literalSpan, payload⟩⟩ =
+      resolveLocalExpression? table ⟨otherSpan, .literal ⟨otherLiteralSpan, payload⟩⟩ := by
+  simp only [resolveLocalExpression?, interpretWordLiteral?]
 
 /-- Conditional punctuation and the outer range carry no resolution meaning. -/
 theorem resolveLocalExpression?_conditional_spans (table : LocalNameTable)

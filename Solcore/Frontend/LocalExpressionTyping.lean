@@ -4,9 +4,9 @@ import Solcore.Resolved.Typing
 /-! Independent typing for the supported canonical local-expression fragment.
 Logical negation and short-circuit operators require Boolean operands;
 Word complement requires a Word operand. Conditionals require a Boolean
-condition and equally typed branches. Names and
-local identities come from explicit caller tables; no literal meaning,
-coercion, or typing rule for other canonical constructors is introduced. -/
+condition and equally typed branches. Numeric literals use the explicit strict
+Word projection only in this monomorphic adapter. Names and local identities
+come from caller tables; no general literal conversion or coercion is introduced. -/
 
 set_option autoImplicit false
 
@@ -19,6 +19,9 @@ inductive LocalExpressionHasType (table : LocalNameTable) (context : Resolved.Co
       (named : LocalNameTable.Lookup table name.value id)
       (found : Resolved.LocalScope.Lookup context id type) :
       LocalExpressionHasType table context { span, value := .identifier name } type
+  | wordLiteral {span : Syntax.SourceSpan} {literal : Syntax.CoreLiteral} {word : Core.Word}
+      (meaning : WordLiteralDenotes literal word) :
+      LocalExpressionHasType table context { span, value := .literal literal } .word
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr} {type : Core.Ty}
       (typing : LocalExpressionHasType table context inner type) :
       LocalExpressionHasType table context { span, value := .group inner } type

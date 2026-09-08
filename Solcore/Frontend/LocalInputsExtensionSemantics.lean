@@ -54,6 +54,14 @@ theorem AvoidsLocalName.bindFresh_hasType_iff {name : String} {source : Syntax.E
         | identifier named found =>
             exact .identifier ((LocalNameTable.lookup_cons_iff_of_ne different).mpr named)
               ((identity_lookup_cons_iff (fresh_ne_of_named inputs owner named)).mpr found)
+  | literal =>
+      constructor
+      · intro typing
+        cases typing with
+        | wordLiteral meaning => exact .wordLiteral meaning
+      · intro typing
+        cases typing with
+        | wordLiteral meaning => exact .wordLiteral meaning
   | group _ ih =>
       constructor
       · intro typing
@@ -130,6 +138,14 @@ theorem AvoidsLocalName.bindFresh_evaluates_iff {name : String} {source : Syntax
         | identifier named found =>
             exact .identifier ((LocalNameTable.lookup_cons_iff_of_ne different).mpr named)
               ((identity_lookup_cons_iff (fresh_ne_of_named inputs owner named)).mpr found)
+  | literal =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | wordLiteral meaning => exact .wordLiteral meaning
+      · intro evaluation
+        cases evaluation with
+        | wordLiteral meaning => exact .wordLiteral meaning
   | group _ ih =>
       constructor
       · intro evaluation

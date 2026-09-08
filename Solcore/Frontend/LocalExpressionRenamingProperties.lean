@@ -19,6 +19,7 @@ theorem ResolvesLocalExpression.mapIds {table : LocalNameTable}
   induction resolution with
   | identifier found =>
       exact .identifier ((LocalNameTable.lookup_mapIds_iff_exists mapping).mpr ⟨_, found, rfl⟩)
+  | wordLiteral meaning => exact .wordLiteral meaning
   | group _ ih => exact .group ih
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
@@ -40,6 +41,7 @@ theorem resolvesLocalExpression_mapIds_iff_exists (mapping : Resolved.LocalId �
         obtain ⟨original, originalFound, rfl⟩ :=
           (LocalNameTable.lookup_mapIds_iff_exists mapping).mp found
         exact ⟨.var original, .identifier originalFound, rfl⟩
+    | wordLiteral meaning => exact ⟨_, .wordLiteral meaning, rfl⟩
     | group _ ih =>
         obtain ⟨original, child, rfl⟩ := ih
         exact ⟨original, .group child, rfl⟩

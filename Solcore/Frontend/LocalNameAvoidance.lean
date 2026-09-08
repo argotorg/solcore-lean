@@ -1,19 +1,23 @@
 import Solcore.Syntax.Term
 
-/-! A spelling-avoidance condition only for the supported local-expression
-fragment. This is not a free-name analysis for other canonical syntax forms. -/
+/-! A spelling-avoidance condition for the local-expression shapes. Every literal
+payload avoids all names, even if malformed, overflowing, or a string. This is
+not a free-name analysis for other canonical syntax forms. -/
 
 set_option autoImplicit false
 
 namespace Solcore.Frontend
 
-/-- No identifier in this supported local expression has the specified spelling.
+/-- No identifier in this expression has the specified spelling. Literal validity
+is not required, since literal payloads do not perform name lookup.
 All conditional children and both short-circuit operands are checked, including
 children that a particular runtime environment might skip. -/
 inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | identifier {span : Syntax.SourceSpan} {identifier : Syntax.Identifier}
       (different : name ≠ identifier.value) :
       AvoidsLocalName name { span, value := .identifier identifier }
+  | literal {span : Syntax.SourceSpan} {literal : Syntax.CoreLiteral} :
+      AvoidsLocalName name { span, value := .literal literal }
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr}
       (child : AvoidsLocalName name inner) :
       AvoidsLocalName name { span, value := .group inner }

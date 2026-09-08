@@ -51,6 +51,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
         obtain ⟨id, oldNamed, same⟩ := (LocalNameTable.lookup_mapIds_iff_exists mapping).mp named
         rw [← same] at found
         exact .identifier oldNamed ((Resolved.LocalScope.lookup_mapIds_iff mapping injective).mp found)
+    | wordLiteral meaning => exact .wordLiteral meaning
     | group _ ih => exact .group ih
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
@@ -65,6 +66,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
     | identifier named found =>
         exact .identifier ((LocalNameTable.lookup_mapIds_iff mapping injective).mpr named)
           ((Resolved.LocalScope.lookup_mapIds_iff mapping injective).mpr found)
+    | wordLiteral meaning => exact .wordLiteral meaning
     | group _ ih => exact .group ih
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
