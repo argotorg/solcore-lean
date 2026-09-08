@@ -62,6 +62,8 @@ import Solcore.Test.FrontendWordEqualityProperties
 import Solcore.Test.FrontendParsedWordEquality
 import Solcore.Test.FrontendWordInequalityProperties
 import Solcore.Test.FrontendParsedWordInequality
+import Solcore.Test.FrontendWordLessEqualProperties
+import Solcore.Test.FrontendParsedWordLessEqual
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5600,6 +5602,7 @@ def run : IO Unit := do
   frontendParsedResumptionTests
   frontendParsedWordEqualityTests
   frontendParsedWordInequalityTests
+  frontendParsedWordLessEqualTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

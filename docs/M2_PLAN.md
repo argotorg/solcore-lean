@@ -320,6 +320,13 @@ seven, and resumption from either genuine checkpoint are retained. All generic
 static and dynamic proofs include this derived form; source bounds account for
 the extra negation, and whole entry contracts are unchanged. Cost erasure and
 cost determinism are split while keeping existing names and imports available.
+Unsigned Word `<=` (ADR-0186) uses ordered `boolNot(wordGt(left, right))` with
+the same child costs plus five, preserved fuel-five/six checkpoints, and seven
+transitions for leaves. Equal operands return true; unsigned order and actual
+argument positions remain explicit. Independent typing/evaluation reflection
+peels both nodes and generic cost, store, fuel-bound, resumption and entry proofs
+cover the form. Relational precedence stays above equality and non-associative;
+mixed parsed forms still obey Word-only comparison/equality operand types.
 Division, remainder, other comparisons, unary signs, assignment, and general
 overload policy remain separate.
 

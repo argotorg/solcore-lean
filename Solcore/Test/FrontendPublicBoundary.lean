@@ -624,5 +624,11 @@ example := @Solcore.Frontend.AvoidsLocalName.notEqual
 example := @Solcore.Frontend.LocalExpressionEvaluates.notEqual
 example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.notEqual
 example := @Solcore.Frontend.resolveLocalExpression?_notEqual_spans
+example := @Solcore.Frontend.ResolvesLocalExpression.lessEqual
+example := @Solcore.Frontend.LocalExpressionHasType.lessEqual
+example := @Solcore.Frontend.AvoidsLocalName.lessEqual
+example := @Solcore.Frontend.LocalExpressionEvaluates.lessEqual
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.lessEqual
+example := @Solcore.Frontend.resolveLocalExpression?_lessEqual_spans
 
 end Tests
