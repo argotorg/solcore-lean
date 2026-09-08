@@ -156,13 +156,13 @@ private def parameter (name typeName : String) : Syntax.FunctionParameter := ⟨
 private def declaration : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "sibling"⟩, none, ⟨span, [parameter "c" "Flag", parameter "x" "Payload", parameter "y" "Payload"]⟩,
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, sibling⟩⟩
-theorem valid_header_and_parameters_do_not_expand_the_old_body_or_entry :
+theorem valid_header_and_parameters_compile_recursive_bodies_while_old_adapters_reject :
     RuntimeFunctionHeader (types .word) declaration.value.signature .word ∧
     RuntimeParametersDeclare (types .word) owner declaration.value.signature.parameters.elements inputs ∧
     elaborateTypedLetReturnTree? (types .word) owner inputs sibling = some (siblingCore, .word) ∧
     elaborateTerminalReturnTree? inputs.names inputs.context sibling = none ∧
     elaborateTypedLetReturnBody? (types .word) owner inputs sibling = none ∧
-    compileRuntimeFunction? (types .word) owner declaration = none := by
+    compileRuntimeFunction? (types .word) owner declaration = some ⟨inputs, siblingCore, .word⟩ := by
   have header : RuntimeFunctionHeader (types .word) declaration.value.signature .word := ⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩
   have declared : RuntimeParametersDeclare (types .word) owner declaration.value.signature.parameters.elements inputs :=
     .cons (.named (.tail (by decide) (.tail (by decide) .head))) (by decide)
@@ -172,14 +172,8 @@ theorem valid_header_and_parameters_do_not_expand_the_old_body_or_entry :
   have oldPrefix : elaborateTypedLetReturnBody? (types .word) owner inputs sibling = none := by
     simpa only [sibling, branch, elaborateTypedLetReturnBody?] using oldTree
   refine ⟨header, declared, siblingElaborated.complete, oldTree, oldPrefix, ?_⟩
-  apply compileRuntimeFunction?_eq_none_iff.mpr
-  rintro ⟨candidate, compilation⟩
-  have same := compilation.parameters.result_unique declared
-  have accepted := compilation.body.complete
-  rw [same] at accepted
-  change elaborateTypedLetReturnBody? (types .word) owner inputs sibling = some _ at accepted
-  rw [oldPrefix] at accepted
-  cases accepted
+  exact (show RuntimeFunctionCompiles (types .word) owner declaration ⟨inputs, siblingCore, .word⟩ from
+    ⟨header, declared, siblingElaborated⟩).complete
 
 private def badBodies : List Syntax.Block :=
   [bind "unused" (ref "x") (returned "x") "Missing",

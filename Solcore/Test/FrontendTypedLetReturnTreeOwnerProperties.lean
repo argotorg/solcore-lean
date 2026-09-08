@@ -1,4 +1,5 @@
 import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
+import Solcore.Frontend.TypedLetReturnBodyProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
 
@@ -221,13 +222,18 @@ theorem an_unknown_unselected_annotation_remains_whole_none_under_a_nonsurjectiv
 private def closedBody := branch guard (binding "x" zero (returned "x")) (binding "x" zero (returned "x"))
 private def declaration : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "closed"⟩, none, ⟨span, []⟩, ⟨none, none⟩, some ⟨span, ⟨span, [annotation]⟩⟩, none⟩, closedBody⟩⟩
-theorem valid_recursive_bodies_do_not_expand_the_existing_function_entry :
+theorem valid_recursive_bodies_compile_at_each_owner_while_old_prefixes_reject :
     RuntimeFunctionHeader (types .word) declaration.value.signature .word ∧
     RuntimeParametersDeclare (types .word) (owner 0) declaration.value.signature.parameters.elements .empty ∧
     elaborateTypedLetReturnTree? (types .word) (owner 0) .empty closedBody =
       some (.ifE guardCore (.letE (.word .zero) (.var 0)) (.letE (.word .zero) (.var 0)), .word) ∧
-    compileRuntimeFunction? (types .word) (owner 0) declaration = none ∧ compileRuntimeFunction? (types .word) (owner 5) declaration = none := by
-  have accepted : TypedLetReturnTreeElaborates (types .word) (owner 0) .empty closedBody
+    elaborateTypedLetReturnBody? (types .word) (owner 0) .empty closedBody = none ∧
+    elaborateTypedLetReturnBody? (types .word) (owner 5) .empty closedBody = none ∧
+    compileRuntimeFunction? (types .word) (owner 0) declaration =
+      some ⟨.empty, .ifE guardCore (.letE (.word .zero) (.var 0)) (.letE (.word .zero) (.var 0)), .word⟩ ∧
+    compileRuntimeFunction? (types .word) (owner 5) declaration =
+      some ⟨.empty, .ifE guardCore (.letE (.word .zero) (.var 0)) (.letE (.word .zero) (.var 0)), .word⟩ := by
+  have accepted (declarationOwner : Resolved.DeclarationId) : TypedLetReturnTreeElaborates (types .word) declarationOwner .empty closedBody
       (.ifE guardCore (.letE (.word .zero) (.var 0)) (.letE (.word .zero) (.var 0))) .word :=
     .conditional (.equal (.wordLiteral zeroMeaning) (.wordLiteral zeroMeaning)) (.binary .word .word) (.binary .word .word)
       (.binding (.named .head) (by decide) (.wordLiteral zeroMeaning) .word .word
@@ -238,17 +244,11 @@ theorem valid_recursive_bodies_do_not_expand_the_existing_function_entry :
     simp [closedBody, branch, binding, elaborateTerminalReturnTree?]
   have oldPrefix (declarationOwner : Resolved.DeclarationId) : elaborateTypedLetReturnBody? (types .word) declarationOwner .empty closedBody = none := by
     simpa only [closedBody, branch, elaborateTypedLetReturnBody?] using oldTree
-  have entryNone (declarationOwner : Resolved.DeclarationId) : compileRuntimeFunction? (types .word) declarationOwner declaration = none := by
-    apply compileRuntimeFunction?_eq_none_iff.mpr
-    rintro ⟨candidate, compilation⟩
-    have declared : RuntimeParametersDeclare (types .word) declarationOwner declaration.value.signature.parameters.elements .empty := .nil
-    have same := compilation.parameters.result_unique declared
-    have bodyAccepted := compilation.body.complete
-    rw [same] at bodyAccepted
-    change elaborateTypedLetReturnBody? (types .word) declarationOwner .empty closedBody = some _ at bodyAccepted
-    rw [oldPrefix] at bodyAccepted
-    cases bodyAccepted
-  exact ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, .nil, accepted.complete, entryNone _, entryNone _⟩
+  have compilation (declarationOwner : Resolved.DeclarationId) : RuntimeFunctionCompiles (types .word) declarationOwner declaration
+      ⟨.empty, .ifE guardCore (.letE (.word .zero) (.var 0)) (.letE (.word .zero) (.var 0)), .word⟩ :=
+    ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, .nil, accepted declarationOwner⟩
+  exact ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, .nil, (accepted _).complete,
+    oldPrefix _, oldPrefix _, (compilation _).complete, (compilation _).complete⟩
 
 private def collapse (_ : Resolved.DeclarationId) := owner 0
 private def indexShift (identifier : Resolved.LocalId) : Resolved.LocalId := { identifier with binderIndex := identifier.binderIndex + 10 }

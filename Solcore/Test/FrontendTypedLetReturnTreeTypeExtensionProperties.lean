@@ -1,6 +1,7 @@
 import Solcore.Frontend.TypedLetReturnTreeRunnerTypeExtensionProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnBodyProperties
 
 /-! Independent recursive provenance distinguishes meaning extension from row
 membership. Fixed actual inputs retain every result and their real checkpoints. -/
@@ -271,13 +272,27 @@ theorem qualified_components_do_not_collapse_to_a_dotted_key (type : Core.Ty) :
     (oneElab type _ qualified (.named (.tail (by decide) .head))).complete, ?_⟩
   simp [tree, binding, elaborateTypedLetReturnTree?, interpretTypeName?, qualified, qualifiedTypeNameKey, TypeNameTable.lookup?, Syntax.NonemptyList.toList]
 
-theorem branch_local_bindings_remain_outside_the_existing_entry (table : TypeNameTable) (inputs : LocalTypeInputs)
-    (declaration : Syntax.FunctionDecl) (shape : declaration.value.body = body) :
-    elaborateTypedLetReturnBody? table owner inputs body = none ∧ compileRuntimeFunction? table owner declaration = none := by
-  have oldNone (original : LocalTypeInputs) : elaborateTypedLetReturnBody? table owner original body = none := by
-    cases checked : elaborateLocalExpression? original.names original.context (ref "c") with
-    | none => simp [body, branch, binding, elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, checked]
-    | some pair => rcases pair with ⟨core, type⟩; simp [body, branch, binding, elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, checked]
-  exact ⟨oldNone inputs, by simp [compileRuntimeFunction?, shape, oldNone]⟩
+theorem branch_local_bindings_remain_outside_the_old_prefix_adapter (table : TypeNameTable) (inputs : LocalTypeInputs) :
+    elaborateTypedLetReturnBody? table owner inputs body = none := by
+  cases checked : elaborateLocalExpression? inputs.names inputs.context (ref "c") with
+  | none => simp [body, branch, binding, elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, checked]
+  | some pair => rcases pair with ⟨core, type⟩; simp [body, branch, binding, elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, checked]
+private def closedArm := binding (named "Payload") "z" zero (returned "z")
+private def closedEntry : Syntax.FunctionDecl := ⟨span, ⟨⟨span, ⟨span, "closed"⟩, none, ⟨span, []⟩,
+  ⟨none, none⟩, some ⟨span, ⟨span, [named "Payload"]⟩⟩, none⟩, branch guard closedArm closedArm⟩⟩
+private def closedCore : Core.Expr := .ifE (.binary .wordEq (.word .zero) (.word .zero))
+  (.letE (.word .zero) (.var 0)) (.letE (.word .zero) (.var 0))
+theorem valid_recursive_entry_has_independent_header_parameters_and_exact_compilation :
+    RuntimeFunctionHeader (types .word) closedEntry.value.signature .word ∧
+    RuntimeParametersDeclare (types .word) owner [] .empty ∧
+    RuntimeFunctionCompiles (types .word) owner closedEntry ⟨.empty, closedCore, .word⟩ ∧
+    compileRuntimeFunction? (types .word) owner closedEntry = some ⟨.empty, closedCore, .word⟩ := by
+  have arm : TypedLetReturnTreeElaborates (types .word) owner .empty closedArm (.letE (.word .zero) (.var 0)) .word :=
+    .binding (.named .head) (by decide) (.wordLiteral zeroMeaning) .word .word
+      (.single (.expression (.identifier .head) (.var .head) (.var .head)))
+  have compiled : RuntimeFunctionCompiles (types .word) owner closedEntry ⟨.empty, closedCore, .word⟩ :=
+    ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩, .nil,
+      .conditional (.equal (.wordLiteral zeroMeaning) (.wordLiteral zeroMeaning)) (.binary .word .word) (.binary .word .word) arm arm⟩
+  exact ⟨compiled.header, compiled.parameters, compiled, compiled.complete⟩
 
 end Tests.FrontendTypedLetReturnTreeTypeExtension
