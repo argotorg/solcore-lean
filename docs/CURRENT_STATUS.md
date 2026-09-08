@@ -617,6 +617,21 @@ argument acceptance, adding zero preserves a final value but changes the Core
 and cost, and matching argument types cannot replace the actual supplied values.
 No optimizer, source transformation, runner, or evaluation relation is added.
 
+The current restricted frontend is also independent of initial store contents
+(ADR-0181), not just store-preserving. Induction on independent expression cost
+evidence replays the same value and exact cost on any replacement store; raw
+evaluation, singleton return bodies, and independently prepared entry costs
+inherit this transport. Raw skipped invalid branches require no whole typing
+or resolution, while checked entry execution still requires its complete contract.
+At every fixed fuel, terminal values and whether fuel is exhausted agree across
+stores, including proven compiled Core with matching actual typed arguments.
+Each result retains its own store: full results and suspended states are not
+equated across distinct stores. Returned references/closures are not dereferenced
+or called, and arbitrary effectful Core is outside this theorem. Independent
+consumers include a store-preserving Core read with store-dependent results;
+fully parsed entries cover distinct empty/nonempty stores, selected arithmetic
+and short-circuit costs, supplied references/closures, and whole guard rejection.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

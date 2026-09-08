@@ -73,6 +73,8 @@ import Solcore.Frontend.RuntimeFunctionPreparationFactorization
 import Solcore.Frontend.RuntimeFunctionExecutionFactorization
 import Solcore.Frontend.RuntimeFunctionCompiledExecutionProperties
 import Solcore.Frontend.RuntimeFunctionObservationProperties
+import Solcore.Frontend.LocalExpressionStoreProperties
+import Solcore.Frontend.RuntimeFunctionStoreProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,

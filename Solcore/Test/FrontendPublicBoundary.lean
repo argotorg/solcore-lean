@@ -577,5 +577,17 @@ example := @Solcore.Frontend.RuntimeFunctionCompiles.compiled_never_faults
 example := @Solcore.Frontend.RuntimeFunctionCompiles.returnType_eq_of_same_core
 example := @Solcore.Frontend.RuntimeFunctionCompiles.run_eq_of_same_core
 example := @Solcore.Frontend.RuntimeFunctionCompiles.cost_iff_of_same_core
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.change_store
+example := @Solcore.Frontend.LocalExpressionEvaluates.change_store
+example := @Solcore.Frontend.localExpressionEvaluatesWithCost_store_iff
+example := @Solcore.Frontend.localExpressionEvaluates_store_iff
+example := @Solcore.Frontend.ReturnBodyEvaluates.change_store
+example := @Solcore.Frontend.ReturnBodyEvaluatesWithCost.change_store
+example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.change_store
+example := @Solcore.Frontend.runtimeFunctionEvaluatesWithCost_store_iff
+example := @Solcore.Frontend.runRuntimeFunction?_done_store_iff
+example := @Solcore.Frontend.runRuntimeFunction?_outOfFuel_store_iff
+example := @Solcore.Frontend.RuntimeFunctionCompiles.compiled_done_store_iff
+example := @Solcore.Frontend.RuntimeFunctionCompiles.compiled_outOfFuel_store_iff
 
 end Tests

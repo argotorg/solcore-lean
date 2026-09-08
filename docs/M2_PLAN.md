@@ -256,6 +256,15 @@ it does not infer Core equality from surface renaming or final-value agreement.
 Counterexamples distinguish context/arity changes, adding zero, and substituting
 different values with the same argument types. No new runner or relation is used.
 
+Initial-store independence (ADR-0181) transports independent raw expression,
+return-body, and checked entry cost evidence to arbitrary replacement stores
+with the same value and exact cost. Fixed-fuel terminal/exhaustion observations
+also agree for entries and proven compiled Core with matching actual arguments.
+This does not equate store-carrying results or suspended states across stores,
+nor apply to arbitrary Core reads/effects or execution of supplied closures.
+Raw skipped-invalid-branch examples remain distinct from whole checked rejection;
+parsed tests retain each empty/nonempty store and exact selected-path costs.
+
 Binary Word addition (ADR-0176) now extends the expression fragment through
 existing body, entry, and value-free compilation bridges. Its independent
 rules require two Word operands, preserve strict left-to-right evaluation,
