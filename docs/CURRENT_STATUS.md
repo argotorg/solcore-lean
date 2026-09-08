@@ -617,9 +617,10 @@ genuine suspended states retain their pending condition/arm frames on resumption
 Independent and parsed tests cover actual typed values including existing cells
 and closures, bare Unit returns, unequal arm costs and invalid skipped arms.
 Absent else, extra statements, nested statement conditionals and return-type
-mismatch are rejected. Existing singleton body and runtime-function entry APIs
-remain unchanged; this is not yet conditional-function compilation, general
-early-return unwinding, source mutation or sequential statement semantics.
+mismatch are rejected. Existing singleton body APIs remain unchanged. The
+body adapter itself does not establish a function header contract; runtime
+entry integration is described below (ADR-0198). General early-return unwinding,
+source mutation and sequential statement semantics remain separate.
 
 ### Common nonrecursive terminal-body interface
 
@@ -636,9 +637,9 @@ execution, all completion/exhaustion thresholds and genuine-state resumption.
 Its full optional result equals the original runner at every fuel and store,
 including failed checks and complete suspended states. Independent and parsed
 consumers retain actual Unit/Word/Bool/cell/closure values, unequal arm costs,
-pending frames and invalid-unselected-arm rejection. Existing singleton entry
-compilation still behaves as before and still rejects statement conditionals;
-entry integration and its owner/store/provenance contracts remain subsequent work.
+pending frames and invalid-unselected-arm rejection. Singleton execution keeps
+its original meaning; the entry integration below now uses this same interface
+for both body shapes while retaining its own header and parameter requirements.
 
 Body-level identity and store invariance now cover all three return profiles
 (ADR-0197). Injective ID relabeling preserves independent exact elaboration,
@@ -649,18 +650,31 @@ fuel exhaustion has equivalent presence, not identical checkpoints across stores
 Noninjective ID merging still changes first-match lookup and may change results.
 The three existing singleton body renaming/replay proofs were relocated without
 changing their statements or proofs and remain available through the old runtime
-imports. Body-level modules now have no runtime-function dependency or cycle,
-preparing for later entry integration without changing current entry behavior.
+imports. Body-level modules have no runtime-function dependency or cycle, allowing
+entry integration to reuse these laws without reversing the dependency direction.
 
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime
-parameters, and single-return body in one entry (ADR-0170). Independent exact
+parameters, and terminal return body in one entry (ADR-0170, ADR-0198). Independent exact
 preparation retains both the actual lowered Core and its declared return type,
 not merely some Core of that type. Success and failure correspond to this
 independent relation, and a whole-entry typing contract is distinct from
 body-only typing. A Bool-return declaration with a Word body is rejected here
 while remaining a Word body at the existing body-only endpoint.
+
+The compiler, preparer, whole-entry typing and independent entry cost now use
+the common terminal-body judgments. Both singleton returns and explicit terminal
+if/else bodies are supported, with singleton returns in each arm. The original
+entry APIs and compiled/prepared record layouts are retained. Their exact-Core,
+type-only/actual-argument factorization, owner, store and checkpoint contracts
+extend to both shapes; the entry adds no transitions. Entry fuel-bound theorems
+now use `terminalReturnBodyFuelBound`, including the maximum arm for conditionals.
+The old singleton body's bound is still zero for a conditional and supplies no
+entry completion guarantee. Genuine invalid headers, parameters and unselected
+arms remain rejected; nested statement conditionals and extra statements remain
+outside this profile. Independent and parsed regressions retain actual argument
+values, unequal branch costs, nonempty stores and every checkpoint's own state.
 
 The restricted header excludes generics, where clauses, and contract modifiers.
 No return clause means Unit; an explicit clause has exactly one supported

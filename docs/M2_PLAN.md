@@ -256,8 +256,8 @@ all fuel thresholds, max-arm bounds and genuine-state resumption are proved.
 No binding/identity allocation or extra return operation is introduced. Parsed
 and independent consumers preserve actual typed arguments and test invalid
 unselected arms, extra/nested statements and absent else. Existing singleton
-body and function entry contracts remain unchanged; integrating this new body
-form into a broader explicitly specified entry profile is a subsequent step.
+body contracts remain unchanged; ADR-0198 below integrates the conditional
+form into the separately checked whole-entry contract.
 
 The nonrecursive `TerminalReturnBody` union (ADR-0196) provides a common body-only
 interface for singleton and explicit-if/else profiles. Shape dispatch and the
@@ -266,8 +266,8 @@ Typing/exact elaboration, raw and cost laws, exact continuation paths, all fuel
 thresholds, source bounds and genuine-state resumption lift from the original
 profiles. Full optional runner results are equal to the selected old runner,
 including failure and suspended states. Parsed tests retain actual values and
-confirm old singleton entries still work while conditional entries remain
-rejected. The two conditional arms remain singleton bodies, not recursive unions.
+original singleton behavior. The two conditional arms remain singleton bodies,
+not recursive unions; both shapes now connect to whole entries through ADR-0198.
 
 The body identity/store layer (ADR-0197) now gives injective exact-elaboration
 transport and unconditional optional checker/full same-fuel runner equality for
@@ -276,7 +276,8 @@ at arbitrary stores; completed observations and exhaustion presence retain each
 store rather than equating entire results. Existing singleton map/replay laws
 move unchanged out of runtime-owner/store modules into acyclic body-only modules,
 with old-import availability retained. Noninjective lookup counterexamples remain
-explicit. Runtime entries, input-shadowing policy and accepted syntax do not change.
+explicit. This layer itself does not change entries, input-shadowing policy or
+accepted syntax; its acyclic imports allow the entry integration below.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
@@ -286,6 +287,17 @@ Absent returns mean Unit; one explicit named type is supported, but empty or
 multiple return lists, generics, where clauses, and modifiers stay outside this
 profile. Actual complete declarations exercise this boundary. Neither hand-built
 prepared records nor arbitrary source functions receive unconditional safety.
+
+Terminal entry integration (ADR-0198) connects the existing compiler/preparer to
+the common body checker and their independent provenance, typing and cost to
+the terminal judgments. Original singleton Core/value/store/cost behavior is
+retained. Valid explicit terminal if/else entries now compile and run using
+actual ordered arguments, with the same factorization, owner/store invariance,
+safe compiled execution and genuine-state resumption. The three entry-bound
+theorems explicitly migrate to `terminalReturnBodyFuelBound`; the unchanged old
+singleton bound cannot justify execution of conditionals. Both written arms are
+checked. Headers, parameter policy, nested/extra-statement rejection and the
+absence of general source-call/early-return semantics remain unchanged.
 
 Arbitrary-position parameter semantics (ADR-0171) now connect source index `k`
 to identity `(owner, k)`, exact Core position `n - 1 - k`, and the original
