@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Term
 import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.LocalInputsExecution
 import Solcore.Resolved.Eval
 import Solcore.Core.Machine
 
@@ -75,6 +76,29 @@ private def checkIllTyped (content : String) : IO Unit := do
   assertTrue (decide (elaborateLocalExpression? names context source = none))
     s!"{content}: ill-typed conditional unexpectedly checked"
 
+private def bundledInputs (choice : Bool) : LocalInputs :=
+  ((LocalInputs.empty.bindFresh (localId 0).owner "e" .word (word 22) .word).bindFresh
+    (localId 0).owner "t" .word (word 11) .word).bindFresh
+      (localId 0).owner "c" .bool (.bool choice) .bool
+
+private def checkBundledRun : IO Unit := do
+  let source ← parsedExpression "c ? t : e"
+  let unsupported ← parsedExpression "c ? t : missing"
+  for choice in [false, true] do
+    let inputs := bundledInputs choice
+    let expectedCore : Core.Expr := .ifE (.var 0) (.var 1) (.var 2)
+    let expectedValue := if choice then word 11 else word 22
+    assertTrue (decide (inputs.check? source = some (expectedCore, .word)))
+      "bundled source check returned the wrong Core or type"
+    assertTrue (decide (inputs.run? 4 source store = some (.word, .done expectedValue store)))
+      "bundled source execution changed the checked type, selected value, or store"
+    assertTrue (decide (inputs.run? 0 source store = some (.word,
+      .outOfFuel (Core.State.initial expectedCore
+        (Resolved.LocalScope.values inputs.environment) store))))
+      "bundled source fuel exhaustion was lost or confused with failed checking"
+    assertTrue (decide (inputs.run? 4 unsupported store = none))
+      "bundled source execution skipped whole-expression checking"
+
 def frontendParsedLocalExpressionTests : IO Unit := do
   let simple : Core.Expr := .ifE (.var 1) (.var 2) (.var 3)
   checkRun "c ? t : e" simple true false (word 11) 4
@@ -102,5 +126,6 @@ def frontendParsedLocalExpressionTests : IO Unit := do
     pure false
   catch error => pure (error.toString == "t e: unconsumed source tokens")
   assertTrue rejectsTrailingTokens "source-text test helper accepted an incomplete expression parse"
+  checkBundledRun
 
 end Tests
