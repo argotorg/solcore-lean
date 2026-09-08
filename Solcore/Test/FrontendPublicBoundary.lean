@@ -456,5 +456,13 @@ example := @Solcore.Frontend.RuntimeFunctionPrepares.header
 example := @Solcore.Frontend.RuntimeFunctionPrepares.parameters
 example := @Solcore.Frontend.RuntimeFunctionPrepares.body
 example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.intro
+example := @Solcore.Frontend.RuntimeParametersBind.position
+example := @Solcore.Frontend.RuntimeParametersBind.reference_resolves_at
+example := @Solcore.Frontend.RuntimeParametersBind.reference_elaborates_at
+example := @Solcore.Frontend.RuntimeParametersBind.reference_cost_at
+example := @Solcore.Frontend.RuntimeParametersBind.reference_return_elaborates_at
+example := @Solcore.Frontend.runtimeFunction_parameter_prepares
+example := @Solcore.Frontend.runtimeFunction_parameter_cost
+example := @Solcore.Frontend.runRuntimeFunction?_parameter
 
 end Tests

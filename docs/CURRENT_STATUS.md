@@ -422,6 +422,25 @@ contracts, actual Core/input order, every fuel boundary, and typed closure or
 unallocated cell-reference returns. This external entry is not general function
 calling, mutable statement/control-flow semantics, or a new wire interface.
 
+### Arbitrary runtime parameter positions
+
+The ordered parameter layout now connects to semantic lookup and execution at
+every source position (ADR-0171), not only the small fixed-arity examples. An
+independently bound parameter at index `k` selects its exact argument type/value,
+identity `(owner, k)`, and Core position `n - 1 - k`. Actual source and argument
+lookups establish the index bound; unique names and identities justify the
+first-match name, context, and environment lookups. No out-of-range meaning is
+inferred from natural-number subtraction.
+
+The selected canonical reference and its singleton-return body retain that
+exact variable, value, unchanged store, and one-transition cost. An entry also
+requires its complete independent header contract and parameter binding; the
+selected argument alone cannot bypass an invalid declaration. Arbitrary-index
+proof consumers and fully parsed functions cover mixed and repeated types,
+every position across one through eight arguments, typed closures, and
+unallocated references. This strengthens existing semantics without changing
+the executable adapters or adding a public synthesis interface.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

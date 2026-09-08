@@ -195,6 +195,14 @@ multiple return lists, generics, where clauses, and modifiers stay outside this
 profile. Actual complete declarations exercise this boundary. Neither hand-built
 prepared records nor arbitrary source functions receive unconditional safety.
 
+Arbitrary-position parameter semantics (ADR-0171) now connect source index `k`
+to identity `(owner, k)`, exact Core position `n - 1 - k`, and the original
+argument's type/value. Independent row layout, index bounds, and unique-name/ID
+lookup proofs compose with source reference, singleton return, and a complete
+matching entry contract. Exact zero/one fuel behavior is preserved. Parsed
+regressions check all positions across several arities and mixed argument types;
+no executable semantics or supported source form is changed by this proof layer.
+
 Further frontend semantics should preserve exact identity, binding, and Core
 execution correspondence while extending supported expressions and declarations.
 General calls and control flow remain separate. The resolved immutable expression

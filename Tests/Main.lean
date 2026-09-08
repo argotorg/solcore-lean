@@ -33,6 +33,7 @@ import Solcore.Test.FrontendReturnBodyProperties
 import Solcore.Test.FrontendParsedReturnBodies
 import Solcore.Test.FrontendParsedRuntimeFunctionEntries
 import Solcore.Test.FrontendRuntimeFunctionEntryProperties
+import Solcore.Test.FrontendRuntimeParameterPositionProperties
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
