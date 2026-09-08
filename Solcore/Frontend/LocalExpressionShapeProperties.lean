@@ -80,6 +80,22 @@ theorem resolveLocalExpression?_multiply_spans (table : LocalNameTable) (left ri
         { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .multiply⟩ right } := by
   simp only [resolveLocalExpression?]
 
+/-- Word division keeps both operand trees and ignores only the operator/outer ranges. -/
+theorem resolveLocalExpression?_divide_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .divide⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .divide⟩ right } := by
+  simp only [resolveLocalExpression?]
+
+/-- Word remainder keeps both operand trees and ignores only the operator/outer ranges. -/
+theorem resolveLocalExpression?_modulo_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .modulo⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .modulo⟩ right } := by
+  simp only [resolveLocalExpression?]
+
 /-- Unsigned comparison retains operand order and ignores only the operator/outer ranges. -/
 theorem resolveLocalExpression?_greater_spans (table : LocalNameTable) (left right : Syntax.Expr)
     (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :

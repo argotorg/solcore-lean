@@ -22,6 +22,7 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
   | group _ ih => simpa only [resolveLocalExpression?] using ih
   | logicalNot _ ih | bitNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
   | add _ _ leftIH rightIH | subtract _ _ leftIH rightIH | multiply _ _ leftIH rightIH
+  | divide _ _ leftIH rightIH | modulo _ _ leftIH rightIH
   | greater _ _ leftIH rightIH | equal _ _ leftIH rightIH | notEqual _ _ leftIH rightIH
   | lessEqual _ _ leftIH rightIH | less _ _ leftIH rightIH
   | greaterEqual _ _ leftIH rightIH
@@ -67,7 +68,7 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
             exact .bitNot (resolveLocalExpression?_sound operandResult)
       case binary left operator right =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
-        cases operatorValue <;> try simp only [resolveLocalExpression?, reduceCtorEq] at result
+        cases operatorValue <;> try simp only [resolveLocalExpression?] at result
         case add =>
           simp only [bind, Option.bind_eq_some_iff, pure] at result
           obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
@@ -85,6 +86,18 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
           obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
           cases same
           exact .multiply (resolveLocalExpression?_sound leftResult)
+            (resolveLocalExpression?_sound rightResult)
+        case divide =>
+          simp only [bind, Option.bind_eq_some_iff, pure] at result
+          obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+          cases same
+          exact .divide (resolveLocalExpression?_sound leftResult)
+            (resolveLocalExpression?_sound rightResult)
+        case modulo =>
+          simp only [bind, Option.bind_eq_some_iff, pure] at result
+          obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+          cases same
+          exact .modulo (resolveLocalExpression?_sound leftResult)
             (resolveLocalExpression?_sound rightResult)
         case greater =>
           simp only [bind, Option.bind_eq_some_iff, pure] at result

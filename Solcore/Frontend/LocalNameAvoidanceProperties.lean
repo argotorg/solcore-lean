@@ -87,6 +87,22 @@ theorem AvoidsLocalName.resolves_cons_iff {name : String} {source : Syntax.Expr}
       · intro resolution
         cases resolution with
         | multiply left right => exact .multiply (leftIH.mpr left) (rightIH.mpr right)
+  | divide _ _ leftIH rightIH =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | divide left right => exact .divide (leftIH.mp left) (rightIH.mp right)
+      · intro resolution
+        cases resolution with
+        | divide left right => exact .divide (leftIH.mpr left) (rightIH.mpr right)
+  | modulo _ _ leftIH rightIH =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | modulo left right => exact .modulo (leftIH.mp left) (rightIH.mp right)
+      · intro resolution
+        cases resolution with
+        | modulo left right => exact .modulo (leftIH.mpr left) (rightIH.mpr right)
   | greater _ _ leftIH rightIH =>
       constructor
       · intro resolution

@@ -26,6 +26,8 @@ theorem ResolvesLocalExpression.mapIds {table : LocalNameTable}
   | add _ _ leftIH rightIH => exact .add leftIH rightIH
   | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
   | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
+  | divide _ _ leftIH rightIH => exact .divide leftIH rightIH
+  | modulo _ _ leftIH rightIH => exact .modulo leftIH rightIH
   | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
   | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
   | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
@@ -75,6 +77,14 @@ theorem resolvesLocalExpression_mapIds_iff_exists (mapping : Resolved.LocalId �
         obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
         obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
         exact ⟨.binary .wordMul originalLeft originalRight, .multiply leftChild rightChild, rfl⟩
+    | divide _ _ leftIH rightIH =>
+        obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
+        obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
+        exact ⟨.binary .wordDiv originalLeft originalRight, .divide leftChild rightChild, rfl⟩
+    | modulo _ _ leftIH rightIH =>
+        obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
+        obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
+        exact ⟨.binary .wordMod originalLeft originalRight, .modulo leftChild rightChild, rfl⟩
     | greater _ _ leftIH rightIH =>
         obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
         obtain ⟨originalRight, rightChild, rfl⟩ := rightIH

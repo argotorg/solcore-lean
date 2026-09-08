@@ -6,8 +6,8 @@ conditionals, Boolean operators, Word arithmetic/bitwise operators, unsigned
 Word comparisons and equality/inequality. Its explicit name table
 supplies identities, including any bindings for `true` or `false`; literals do
 not consult that table. This fixed literal interpretation is local to the adapter,
-not a general source conversion or overload policy. Other operators, source
-bindings, and global resolution remain outside this fragment. Unsupported syntax
+not a general source conversion or overload policy. Other expression forms,
+source bindings, and global resolution remain outside this fragment. Unsupported syntax
 is not a source-language rejection. -/
 
 set_option autoImplicit false
@@ -35,6 +35,12 @@ def resolveLocalExpression? (table : LocalNameTable) (source : Syntax.Expr) :
         (← resolveLocalExpression? table right)
   | ⟨_, .binary left ⟨_, .multiply⟩ right⟩ => do
       return .binary .wordMul (← resolveLocalExpression? table left)
+        (← resolveLocalExpression? table right)
+  | ⟨_, .binary left ⟨_, .divide⟩ right⟩ => do
+      return .binary .wordDiv (← resolveLocalExpression? table left)
+        (← resolveLocalExpression? table right)
+  | ⟨_, .binary left ⟨_, .modulo⟩ right⟩ => do
+      return .binary .wordMod (← resolveLocalExpression? table left)
         (← resolveLocalExpression? table right)
   | ⟨_, .binary left ⟨_, .greater⟩ right⟩ => do
       return .binary .wordGt (← resolveLocalExpression? table left)
@@ -120,6 +126,20 @@ inductive ResolvesLocalExpression (table : LocalNameTable) :
       ResolvesLocalExpression table
         { span, value := .binary left ⟨operatorSpan, .multiply⟩ right }
         (.binary .wordMul resolvedLeft resolvedRight)
+  | divide {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {resolvedLeft resolvedRight : Resolved.Expr}
+      (leftChild : ResolvesLocalExpression table left resolvedLeft)
+      (rightChild : ResolvesLocalExpression table right resolvedRight) :
+      ResolvesLocalExpression table
+        { span, value := .binary left ⟨operatorSpan, .divide⟩ right }
+        (.binary .wordDiv resolvedLeft resolvedRight)
+  | modulo {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {resolvedLeft resolvedRight : Resolved.Expr}
+      (leftChild : ResolvesLocalExpression table left resolvedLeft)
+      (rightChild : ResolvesLocalExpression table right resolvedRight) :
+      ResolvesLocalExpression table
+        { span, value := .binary left ⟨operatorSpan, .modulo⟩ right }
+        (.binary .wordMod resolvedLeft resolvedRight)
   | greater {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {resolvedLeft resolvedRight : Resolved.Expr}
       (leftChild : ResolvesLocalExpression table left resolvedLeft)

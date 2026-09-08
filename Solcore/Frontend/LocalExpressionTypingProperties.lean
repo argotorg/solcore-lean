@@ -38,6 +38,14 @@ theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Reso
       obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
       obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
       exact ⟨_, .multiply leftResolved rightResolved, .binary leftTyped rightTyped⟩
+  | divide _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .divide leftResolved rightResolved, .binary leftTyped rightTyped⟩
+  | modulo _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .modulo leftResolved rightResolved, .binary leftTyped rightTyped⟩
   | greater _ _ leftIH rightIH =>
       obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
       obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
@@ -117,6 +125,12 @@ theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context 
   | multiply _ _ leftIH rightIH =>
       cases typing with
       | binary leftTyped rightTyped => exact .multiply (leftIH leftTyped) (rightIH rightTyped)
+  | divide _ _ leftIH rightIH =>
+      cases typing with
+      | binary leftTyped rightTyped => exact .divide (leftIH leftTyped) (rightIH rightTyped)
+  | modulo _ _ leftIH rightIH =>
+      cases typing with
+      | binary leftTyped rightTyped => exact .modulo (leftIH leftTyped) (rightIH rightTyped)
   | greater _ _ leftIH rightIH =>
       cases typing with
       | binary leftTyped rightTyped => exact .greater (leftIH leftTyped) (rightIH rightTyped)
