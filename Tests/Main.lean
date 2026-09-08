@@ -3,6 +3,9 @@ import Solcore.Test.ResolvedPublicBoundary
 import Solcore.Test.ResolvedLocalSemantics
 import Solcore.Test.ResolvedIdentityRenamingProperties
 import Solcore.Test.ResolvedScopeProperties
+import Solcore.Test.FrontendPublicBoundary
+import Solcore.Test.FrontendLocalReferenceProperties
+import Solcore.Test.FrontendLocalReferenceExecutionProperties
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
