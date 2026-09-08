@@ -3,7 +3,7 @@ import Solcore.Resolved.Typing
 
 /-! Independent typing for the supported canonical local-expression fragment.
 Logical negation and short-circuit operators require Boolean operands;
-Word complement and binary bitwise operations require Word operands.
+Word complement, addition, and binary bitwise operations require Word operands.
 Conditionals require a Boolean condition and equally typed branches. Numeric literals use the explicit strict
 Word projection only in this monomorphic adapter. Names and local identities
 come from caller tables; no general literal conversion or coercion is introduced. -/
@@ -33,6 +33,11 @@ inductive LocalExpressionHasType (table : LocalNameTable) (context : Resolved.Co
       (operandTyped : LocalExpressionHasType table context operand .word) :
       LocalExpressionHasType table context
         { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand } .word
+  | add {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftTyped : LocalExpressionHasType table context left .word)
+      (rightTyped : LocalExpressionHasType table context right .word) :
+      LocalExpressionHasType table context
+        { span, value := .binary left ⟨operatorSpan, .add⟩ right } .word
   | bitAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       (leftTyped : LocalExpressionHasType table context left .word)
       (rightTyped : LocalExpressionHasType table context right .word) :

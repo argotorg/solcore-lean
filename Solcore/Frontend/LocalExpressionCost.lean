@@ -43,6 +43,16 @@ inductive LocalExpressionEvaluatesWithCost
       LocalExpressionEvaluatesWithCost table environment initialStore
         { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand }
         (.word value.bitNot) finalStore (childCost + 2)
+  | add {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word} {leftCost rightCost : Nat}
+      (leftEvaluation : LocalExpressionEvaluatesWithCost table environment
+        initialStore left (.word leftValue) middleStore leftCost)
+      (rightEvaluation : LocalExpressionEvaluatesWithCost table environment
+        middleStore right (.word rightValue) finalStore rightCost) :
+      LocalExpressionEvaluatesWithCost table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .add⟩ right }
+        (.word (leftValue.add rightValue)) finalStore (leftCost + rightCost + 3)
   | bitAnd {initialStore middleStore finalStore : Core.Store}
       {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {leftValue rightValue : Core.Word} {leftCost rightCost : Nat}

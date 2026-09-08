@@ -49,6 +49,13 @@ theorem LocalExpressionEvaluatesWithCost.toStepsWithContinuation
       | bitNot child =>
           cases lowered with
           | unary lowerChild => exact CostStepComposition.unary (ih child lowerChild _) rfl
+  | add _ _ leftIH rightIH =>
+      cases resolution with
+      | add leftChild rightChild =>
+          cases lowered with
+          | binary lowerLeft lowerRight =>
+              exact CostStepComposition.binary
+                (leftIH leftChild lowerLeft _) (rightIH rightChild lowerRight _) rfl
   | bitAnd _ _ leftIH rightIH =>
       cases resolution with
       | bitAnd leftChild rightChild =>

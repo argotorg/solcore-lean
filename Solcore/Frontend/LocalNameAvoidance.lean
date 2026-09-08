@@ -27,6 +27,9 @@ inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | bitNot {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr}
       (child : AvoidsLocalName name operand) :
       AvoidsLocalName name { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand }
+  | add {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
+      AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .add⟩ right }
   | bitAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
       AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .bitAnd⟩ right }

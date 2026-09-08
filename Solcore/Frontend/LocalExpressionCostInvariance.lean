@@ -31,6 +31,7 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
     | group _ ih => exact .group ih
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
+    | add _ _ leftIH rightIH => exact .add leftIH rightIH
     | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
     | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
     | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
@@ -51,6 +52,7 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
     | group _ ih => exact .group ih
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
+    | add _ _ leftIH rightIH => exact .add leftIH rightIH
     | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
     | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
     | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
@@ -123,6 +125,14 @@ theorem AvoidsLocalName.bindFresh_cost_iff {name : String} {source : Syntax.Expr
       · intro evaluation
         cases evaluation with
         | bitNot child => exact .bitNot (ih.mpr child)
+  | add _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | add left right => exact .add (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | add left right => exact .add (leftIH.mpr left) (rightIH.mpr right)
   | bitAnd _ _ leftIH rightIH =>
       constructor
       · intro evaluation

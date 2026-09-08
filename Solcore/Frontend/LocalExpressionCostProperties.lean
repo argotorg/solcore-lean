@@ -20,6 +20,7 @@ theorem LocalExpressionEvaluatesWithCost.erase {table : LocalNameTable}
   | group _ ih => exact .group ih
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
+  | add _ _ leftIH rightIH => exact .add leftIH rightIH
   | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
   | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
   | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
@@ -48,6 +49,10 @@ theorem LocalExpressionEvaluates.exists_cost {table : LocalNameTable}
   | bitNot _ ih =>
       obtain ⟨cost, child⟩ := ih
       exact ⟨_, .bitNot child⟩
+  | add _ _ leftIH rightIH =>
+      obtain ⟨leftCost, left⟩ := leftIH
+      obtain ⟨rightCost, right⟩ := rightIH
+      exact ⟨_, .add left right⟩
   | bitAnd _ _ leftIH rightIH =>
       obtain ⟨leftCost, left⟩ := leftIH
       obtain ⟨rightCost, right⟩ := rightIH
@@ -140,6 +145,13 @@ theorem LocalExpressionEvaluatesWithCost.deterministic {table : LocalNameTable}
       | bitNot child =>
           obtain ⟨same, storeEq, rfl⟩ := ih child
           cases same
+          exact ⟨rfl, storeEq, rfl⟩
+  | add _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | add leftChild rightChild =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq, rfl⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
           exact ⟨rfl, storeEq, rfl⟩
   | bitAnd _ _ leftIH rightIH =>
       cases rightEvaluation with

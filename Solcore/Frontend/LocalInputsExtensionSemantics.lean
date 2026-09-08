@@ -86,6 +86,14 @@ theorem AvoidsLocalName.bindFresh_hasType_iff {name : String} {source : Syntax.E
       · intro typing
         cases typing with
         | bitNot child => exact .bitNot (ih.mpr child)
+  | add _ _ leftIH rightIH =>
+      constructor
+      · intro typing
+        cases typing with
+        | add left right => exact .add (leftIH.mp left) (rightIH.mp right)
+      · intro typing
+        cases typing with
+        | add left right => exact .add (leftIH.mpr left) (rightIH.mpr right)
   | bitAnd _ _ leftIH rightIH =>
       constructor
       · intro typing
@@ -194,6 +202,14 @@ theorem AvoidsLocalName.bindFresh_evaluates_iff {name : String} {source : Syntax
       · intro evaluation
         cases evaluation with
         | bitNot child => exact .bitNot (ih.mpr child)
+  | add _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | add left right => exact .add (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | add left right => exact .add (leftIH.mpr left) (rightIH.mpr right)
   | bitAnd _ _ leftIH rightIH =>
       constructor
       · intro evaluation

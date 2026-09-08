@@ -34,6 +34,9 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | bitNot _ ih =>
       cases evaluation with
       | bitNot child => exact .unary (ih child) rfl
+  | add _ _ leftIH rightIH =>
+      cases evaluation with
+      | add leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
   | bitAnd _ _ leftIH rightIH =>
       cases evaluation with
       | bitAnd leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
@@ -85,6 +88,14 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
           case word value =>
             cases applied
             exact .bitNot (ih child)
+  | add _ _ leftIH rightIH =>
+      cases evaluation with
+      | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>
+          cases leftValue <;> cases rightValue <;>
+            simp only [Core.BinaryOp.apply, reduceCtorEq] at applied
+          case word.word leftWord rightWord =>
+            cases applied
+            exact .add (leftIH leftChild) (rightIH rightChild)
   | bitAnd _ _ leftIH rightIH =>
       cases evaluation with
       | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>

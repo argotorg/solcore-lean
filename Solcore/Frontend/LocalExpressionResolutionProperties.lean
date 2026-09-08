@@ -21,7 +21,8 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
       simp only [resolveLocalExpression?, interpretWordLiteral?_complete meaning, Option.map_some]
   | group _ ih => simpa only [resolveLocalExpression?] using ih
   | logicalNot _ ih | bitNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
-  | bitAnd _ _ leftIH rightIH | bitOr _ _ leftIH rightIH | bitXor _ _ leftIH rightIH
+  | add _ _ leftIH rightIH | bitAnd _ _ leftIH rightIH
+  | bitOr _ _ leftIH rightIH | bitXor _ _ leftIH rightIH
   | logicalAnd _ _ leftIH rightIH | logicalOr _ _ leftIH rightIH =>
       simp [resolveLocalExpression?, leftIH, rightIH]
   | conditional _ _ _ conditionIH thenIH elseIH =>
@@ -63,6 +64,12 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
       case binary left operator right =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> try simp only [resolveLocalExpression?, reduceCtorEq] at result
+        case add =>
+          simp only [bind, Option.bind_eq_some_iff, pure] at result
+          obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+          cases same
+          exact .add (resolveLocalExpression?_sound leftResult)
+            (resolveLocalExpression?_sound rightResult)
         case bitAnd =>
           simp only [bind, Option.bind_eq_some_iff, pure] at result
           obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
@@ -174,6 +181,14 @@ theorem resolveLocalExpression?_bitNot_spans (table : LocalNameTable) (operand :
     resolveLocalExpression? table { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand } =
       resolveLocalExpression? table
         { span := otherSpan, value := .unary ⟨otherOperatorSpan, .bitNot⟩ operand } := by
+  simp only [resolveLocalExpression?]
+
+/-- Word addition keeps both operand trees and ignores only the operator/outer ranges. -/
+theorem resolveLocalExpression?_add_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .add⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .add⟩ right } := by
   simp only [resolveLocalExpression?]
 
 /-- Word conjunction keeps both operand trees and ignores only the operator/outer ranges. -/
