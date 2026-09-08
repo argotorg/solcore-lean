@@ -2,8 +2,8 @@ import Solcore.Frontend.LocalInputsExtensionProperties
 import Solcore.Frontend.LocalInputsRenamingProperties
 import Solcore.Core.UnaryPrimitives
 
-/-! ADR-0161: fixed Word complement, distinct from Boolean negation and from
-acceptance of numeric source literals or untyped short-circuit expressions. -/
+/-! ADR-0161: fixed Word complement is distinct from Boolean negation.
+Strings and untyped short-circuit expressions remain outside checked operands. -/
 
 set_option autoImplicit false
 
@@ -121,17 +121,18 @@ theorem logical_and_word_negation_do_not_convert_operand_types (word : Core.Word
         (supplied .bool (.bool flag) .bool).context (negate (ref "x")) .bool := .logicalNot (.identifier .head .head)
     cases typing with | bitNot operand => cases actual.type_unique operand
 
-private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .decimal "7"⟩⟩
+private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .string "7"⟩⟩
 private def badOperands : List Syntax.Expr := [ref "missing", unsupported]
 
-theorem missing_names_and_numeric_syntax_remain_rejected (word : Core.Word) :
+theorem missing_names_and_string_syntax_remain_rejected (word : Core.Word) :
     ∀ operand ∈ badOperands, resolveLocalExpression? (inputs word).names (complement operand) = none ∧
       (inputs word).check? (complement operand) = none := by
   intro operand member
   simp only [badOperands, List.mem_cons, List.not_mem_nil, or_false] at member
   rcases member with rfl | rfl
   all_goals constructor <;> simp [LocalInputs.check?, elaborateLocalExpression?, resolveLocalExpression?, complement, ref,
-    unsupported, inputs, supplied, LocalInputs.names, LocalInputs.bindFresh, LocalInputs.empty, LocalNameTable.lookup?]
+    unsupported, interpretWordLiteral?, numericLiteralValue?, inputs, supplied,
+    LocalInputs.names, LocalInputs.bindFresh, LocalInputs.empty, LocalNameTable.lookup?]
 
 private def withFlag (word : Core.Word) (flag : Bool) : LocalInputs :=
   (inputs word).bindFresh owner "a" .bool (.bool flag) .bool

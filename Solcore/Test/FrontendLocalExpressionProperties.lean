@@ -100,7 +100,7 @@ theorem word_condition_and_mismatched_branches_have_no_type :
     elaborateLocalExpression?_eq_none_iff.mp word_condition_rejected,
     elaborateLocalExpression?_eq_none_iff.mp mismatched_branches_rejected⟩
 
-private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .decimal "7"⟩⟩
+private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .string "7"⟩⟩
 private def withSkipped (right : Syntax.Expr) : Syntax.Expr := branch (ref "cond") (ref "left") right
 
 /-- Raw dynamic rules inspect only the selected left branch; all three different
@@ -115,7 +115,8 @@ theorem unselected_bad_branches_are_static_failures (store : Core.Store) :
     LocalExpressionEvaluates names (environment true) store (withSkipped wordCondition) (.bool false) store := by
   refine ⟨?_, ?_, ?_, selected_left _ store, selected_left _ store, selected_left _ store⟩
   all_goals simp [elaborateLocalExpression?, resolveLocalExpression?, LocalNameTable.lookup?, names, context,
-    withSkipped, unsupported, wordCondition, branch, ref, Resolved.Expr.lower?, Resolved.LocalScope.ids,
+    withSkipped, unsupported, interpretWordLiteral?, numericLiteralValue?,
+    wordCondition, branch, ref, Resolved.Expr.lower?, Resolved.LocalScope.ids,
     Resolved.LocalScope.values, Resolved.LocalScope.index?, localId]
   intro type inferred
   cases Core.infer_sound inferred with

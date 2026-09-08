@@ -113,7 +113,7 @@ theorem conditional_check_and_present_execution_boundary (choice : Bool) (store 
       [.bool choice, .bool false, .bool true, .word Core.Word.zero] store)) = _
     cases choice <;> simp [Core.runStateful, Core.State.initial, Core.advance, core]
 
-private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .decimal "7"⟩⟩
+private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .string "7"⟩⟩
 private def wordCondition : Syntax.Expr := branch (ref "word") (ref "left") (ref "right")
 private def badForms : List Syntax.Expr := [ref "missing", unsupported, wordCondition]
 
@@ -123,7 +123,8 @@ private theorem bad_check (bad : Syntax.Expr) (member : bad ∈ badForms) :
   simp only [badForms, List.mem_cons, List.not_mem_nil, or_false] at member
   rcases member with rfl | rfl | rfl
   all_goals simp [elaborateLocalExpression?, resolveLocalExpression?, LocalNameTable.lookup?, names, context,
-    unsupported, wordCondition, branch, ref, Resolved.Expr.lower?, Resolved.LocalScope.ids,
+    unsupported, interpretWordLiteral?, numericLiteralValue?,
+    wordCondition, branch, ref, Resolved.Expr.lower?, Resolved.LocalScope.ids,
     Resolved.LocalScope.values, Resolved.LocalScope.index?, localId]
   intro type inferred
   cases Core.infer_sound inferred with

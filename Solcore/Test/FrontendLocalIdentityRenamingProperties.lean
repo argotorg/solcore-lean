@@ -74,13 +74,14 @@ theorem same_fuel_preserves_complete_suspended_and_done_results (choice : Bool) 
   · rw [renamed, LocalInputs.run?_mapIds, LocalInputs.run?, checked]; cases choice <;> rfl
   · rw [renamed, LocalInputs.run?_mapIds, LocalInputs.run?, checked]; cases choice <;> rfl
 
-private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .decimal "7"⟩⟩
+private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .string "7"⟩⟩
 private def badRights : List Syntax.Expr := [ref "missing", unsupported]
 private theorem bad_check (right : Syntax.Expr) (member : right ∈ badRights) :
     (inputs false).check? (andE (ref "a") right) = none := by
   simp only [badRights, List.mem_cons, List.not_mem_nil, or_false] at member
   rcases member with rfl | rfl
   all_goals simp [LocalInputs.check?, elaborateLocalExpression?, resolveLocalExpression?, andE, ref, unsupported,
+    interpretWordLiteral?, numericLiteralValue?,
     inputs, LocalInputs.names, LocalInputs.bindFresh, LocalInputs.empty, LocalNameTable.lookup?]
 
 theorem skipped_failed_syntax_keeps_raw_evaluation_iff_and_check_failure

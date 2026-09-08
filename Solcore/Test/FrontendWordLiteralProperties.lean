@@ -1,9 +1,9 @@
 import Solcore.Frontend.WordLiteralProperties
-import Solcore.Frontend.LocalInputsExecutionProperties
 import Solcore.Core.Primitive
 
 /-! ADR-0162 consumers: complete ASCII spellings have independent natural
-meanings, strict Word bounds do not wrap, and local expressions remain separate. -/
+meanings and strict Word bounds do not wrap. These tests do not require an
+expression adapter; its integration is tested in FrontendLocalWordLiteralProperties. -/
 
 set_option autoImplicit false
 
@@ -152,15 +152,5 @@ theorem span_changes_do_not_change_interpretation_or_independent_meaning
     (WordLiteralDenotes ⟨location, payload⟩ word ↔ WordLiteralDenotes ⟨otherLocation, payload⟩ word) :=
   ⟨interpretWordLiteral?_span payload location otherLocation,
     wordLiteralDenotes_span payload location otherLocation word⟩
-
-theorem standalone_acceptance_does_not_add_literal_expression_support
-    (inputs : LocalInputs) (outerSpan : Syntax.SourceSpan) (fuel : Nat) (store : Core.Store) :
-    interpretWordLiteral? (literal (.decimal "42")) = some fortyTwo ∧
-    inputs.check? ⟨outerSpan, .literal (literal (.decimal "42"))⟩ = none ∧
-    inputs.run? fuel ⟨outerSpan, .literal (literal (.decimal "42"))⟩ store = none := by
-  have rejected : inputs.check? ⟨outerSpan, .literal (literal (.decimal "42"))⟩ = none := by
-    simp [LocalInputs.check?, elaborateLocalExpression?, resolveLocalExpression?]
-  exact ⟨interpretWordLiteral?_complete decimalMeaning, rejected,
-    (inputs.run?_eq_none_iff fuel store).mpr rejected⟩
 
 end Tests.FrontendWordLiteral

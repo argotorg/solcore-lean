@@ -102,7 +102,7 @@ theorem selected_non_boolean_right_is_forwarded_only_at_the_raw_boundary (left :
     rintro ⟨type, typing⟩
     cases typing with | logicalOr _ right => cases typed.type_unique right
 
-private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .decimal "7"⟩⟩
+private def unsupported : Syntax.Expr := ⟨span, .literal ⟨span, .string "7"⟩⟩
 private def badRights : List Syntax.Expr := [ref "missing", unsupported]
 private theorem bad_resolutions (right : Syntax.Expr) (member : right ∈ badRights) :
     resolveLocalExpression? (inputs false true).names (andE (ref "l") right) = none ∧
@@ -110,6 +110,7 @@ private theorem bad_resolutions (right : Syntax.Expr) (member : right ∈ badRig
   simp only [badRights, List.mem_cons, List.not_mem_nil, or_false] at member
   rcases member with rfl | rfl
   all_goals constructor <;> simp [resolveLocalExpression?, andE, orE, ref, unsupported,
+    interpretWordLiteral?, numericLiteralValue?,
     inputs, pair, LocalInputs.names, LocalInputs.bindFresh, LocalInputs.empty, LocalNameTable.lookup?]
 
 theorem skipped_missing_or_unsupported_right_still_fails_whole_checking (store : Core.Store) :
