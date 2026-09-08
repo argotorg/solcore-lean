@@ -18,6 +18,7 @@ theorem LocalExpressionEvaluatesWithCost.erase {table : LocalNameTable}
   | identifier named found => exact .identifier named found
   | wordLiteral meaning => exact .wordLiteral meaning
   | group _ ih => exact .group ih
+  | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
   | add _ _ leftIH rightIH => exact .add leftIH rightIH
@@ -53,6 +54,10 @@ theorem LocalExpressionEvaluates.exists_cost {table : LocalNameTable}
   | group _ ih =>
       obtain ⟨cost, child⟩ := ih
       exact ⟨_, .group child⟩
+  | pair _ _ leftIH rightIH =>
+      obtain ⟨leftCost, left⟩ := leftIH
+      obtain ⟨rightCost, right⟩ := rightIH
+      exact ⟨_, .pair left right⟩
   | logicalNot _ ih =>
       obtain ⟨cost, child⟩ := ih
       exact ⟨_, .logicalNot child⟩

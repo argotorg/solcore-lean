@@ -31,6 +31,13 @@ theorem LocalExpressionEvaluatesWithCost.deterministic {table : LocalNameTable}
   | group _ ih =>
       cases rightEvaluation with
       | group child => exact ih child
+  | pair _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | pair leftChild rightChild =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq, rfl⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq, rfl⟩
   | logicalNot _ ih =>
       cases rightEvaluation with
       | logicalNot child =>

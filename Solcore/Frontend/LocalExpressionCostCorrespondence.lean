@@ -11,6 +11,23 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
+private theorem pair_steps
+    {environment : Core.Environment} {initialStore middleStore finalStore : Core.Store}
+    {left right : Core.Expr} {leftValue rightValue : Core.Value}
+    {continuation : List Core.Frame} {leftCost rightCost : Nat}
+    (leftPath : Core.Steps leftCost
+      ⟨.eval left environment, .pairRight right environment :: continuation, initialStore⟩
+      ⟨.ret leftValue, .pairRight right environment :: continuation, middleStore⟩)
+    (rightPath : Core.Steps rightCost
+      ⟨.eval right environment, .pairApply leftValue :: continuation, middleStore⟩
+      ⟨.ret rightValue, .pairApply leftValue :: continuation, finalStore⟩) :
+    Core.Steps (leftCost + rightCost + 3)
+      ⟨.eval (.pair left right) environment, continuation, initialStore⟩
+      ⟨.ret (.pair leftValue rightValue), continuation, finalStore⟩ := by
+  have path := Core.Steps.cons .enterPair
+    (leftPath.trans (.cons .enterPairRight (rightPath.trans (.cons .applyPair .refl))))
+  simpa only [Nat.add_assoc] using path
+
 theorem LocalExpressionEvaluatesWithCost.toStepsWithContinuation
     {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {source : Syntax.Expr}
@@ -41,6 +58,12 @@ theorem LocalExpressionEvaluatesWithCost.toStepsWithContinuation
   | group _ ih =>
       cases resolution with
       | group child => exact ih child lowered continuation
+  | pair _ _ leftIH rightIH =>
+      cases resolution with
+      | pair leftChild rightChild =>
+          cases lowered with
+          | pair lowerLeft lowerRight =>
+              exact pair_steps (leftIH leftChild lowerLeft _) (rightIH rightChild lowerRight _)
   | logicalNot _ ih =>
       cases resolution with
       | logicalNot child =>
