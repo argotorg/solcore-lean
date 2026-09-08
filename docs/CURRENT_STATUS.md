@@ -156,7 +156,7 @@ to checked execution. Tests distinguish this boundary from raw evaluation that
 skips a missing or unsupported operand, which still prevents whole checking.
 Parsed precedence, grouping, and nested right operands exercise exact fuel
 differences between selected and skipped paths. Comparisons other than unsigned
-Word `>`/`==` and arithmetic other than the separately specified Word addition,
+Word `>`/`==`/`!=` and arithmetic other than the separately specified Word addition,
 subtraction, and multiplication remain unsupported.
 
 Word complement `~` is also supported as a fixed Word-only operation
@@ -237,8 +237,8 @@ Fully parsed expressions and declarations retain arithmetic/bitwise/comparison/
 Boolean precedence, non-associative comparison boundaries, all 29 tested ordered
 parameter pairs, and exact fuel-four pending Word operands followed by a Bool
 at five. Existing source range/spelling/grouping laws are split into a small
-module with their public names and old import path preserved. `<`, `<=`, `>=`,
-and `!=` remain separate; operand swapping is not a comparison lowering.
+module with their public names and old import path preserved. `<`, `<=`, and `>=`
+remain separate; operand swapping is not a comparison lowering.
 
 Word `==` now also produces Bool through the direct ordered `wordEq` node
 (ADR-0184). Both operands must be Words; matching Bool/reference/closure types
@@ -254,6 +254,19 @@ five, computed guards, strict whole rejection and declared return contracts.
 Symmetric final results do not license swapping the source/Core operands or
 actual argument values. Parsing still preserves equality's non-associative
 precedence below relational operators and above Boolean short-circuit forms.
+
+Word `!=` uses ordered equality followed by Boolean negation (ADR-0185). Its
+resolved and Core trees retain the outer `boolNot` and inner `wordEq`, and the
+independent source rules still require two Word operands. Both child costs plus
+five account for the full expansion: two leaves leave equality pending at fuel
+five, negation pending at six, and return the inequality Bool at seven. Source
+fuel bounds use the same extra five transitions. Evaluation reflection peels
+both nodes; continuation-aware paths compose the ordered binary path with the
+outer unary path. Generic safety, stores, renaming, unused-input, compiled entry
+and genuine-checkpoint resumption proofs cover the form. Cost erasure/existence
+and determinism are split without changing prior public names or import paths.
+Consumers preserve actual operand positions, both pending frames, whole Word-only
+checking, non-associative parsing and exact declared return contracts.
 
 ### Numeric spelling and strict Word interpretation
 
@@ -355,7 +368,8 @@ jointly unique even for raw evaluations with unresolved skipped branches.
 No checking or executable-run premise is built into the cost relation.
 
 Identifiers and Word literals cost one; grouping adds nothing; unary operators
-add two. Strict Word arithmetic, bitwise, greater-than, and equality binaries cost both operands plus three. A conditional
+add two. Strict Word arithmetic, bitwise, greater-than, and equality binaries
+cost both operands plus three; derived Word inequality adds five. A conditional
 costs its condition and selected branch plus two. Short-circuit selection costs
 both visited operands plus two; skipping the right costs the left plus three,
 including the generated Boolean constant. Both initial and final stores and
@@ -2398,7 +2412,7 @@ language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
 Semantic Core remain separate later stages. Canonical local references, Boolean
-operators, Word addition/subtraction/multiplication, bitwise operations, unsigned greater-than and Word equality, strict Word literals, and conditionals connect through the explicit-table adapters described above.
+operators, Word addition/subtraction/multiplication, bitwise operations, unsigned greater-than and Word equality/inequality, strict Word literals, and conditionals connect through the explicit-table adapters described above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 

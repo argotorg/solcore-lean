@@ -313,6 +313,13 @@ actual argument/operand order despite symmetric final values, exact fuel-four
 frames and five-step results, declaration return contracts, and whole rejection
 of non-Word operands or invalid unselected branches. Evaluation rules are split
 from determinism while preserving old names and the historical import boundary.
+Word inequality `!=` (ADR-0185) is ordered `boolNot(wordEq(left, right))` with
+Word-only operands, a Bool result and both child costs plus five. The exact
+nested Core shape, two distinct pending frames at fuels five/six, completion at
+seven, and resumption from either genuine checkpoint are retained. All generic
+static and dynamic proofs include this derived form; source bounds account for
+the extra negation, and whole entry contracts are unchanged. Cost erasure and
+cost determinism are split while keeping existing names and imports available.
 Division, remainder, other comparisons, unary signs, assignment, and general
 overload policy remain separate.
 

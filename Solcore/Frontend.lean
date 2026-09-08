@@ -36,6 +36,7 @@ import Solcore.Frontend.NumericDigitsProperties
 import Solcore.Frontend.WordLiteral
 import Solcore.Frontend.WordLiteralProperties
 import Solcore.Frontend.LocalExpressionCost
+import Solcore.Frontend.LocalExpressionCostErasureProperties
 import Solcore.Frontend.LocalExpressionCostProperties
 import Solcore.Frontend.LocalExpressionCostStepComposition
 import Solcore.Frontend.LocalExpressionCostCorrespondence
