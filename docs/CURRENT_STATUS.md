@@ -134,6 +134,16 @@ typing or a source-text execution service. The narrower reference adapter stays
 unchanged. Source declarations, literals, overloaded operations, calls, mutation,
 and staging remain separate; no parser or Oracle behavior changes.
 
+Boolean negation `!` now extends this internal adapter (ADR-0158), using the
+existing direct Core `boolNot` primitive. Its independent typing rule requires
+a Boolean operand and result, and evaluation negates the operand exactly once.
+The full resolution/typing/evaluation correspondence, typed execution, and
+unused-name insertion laws include this case. A named operand completes in
+three Core transitions. Parsed negated conditions, double negation, and nested
+conditionals are tested; operator source ranges have no semantic effect.
+`true`/`false` still use caller bindings. There is no truthiness, overload
+search, bitwise `~`, or binary-operator support in this extension.
+
 ### Typed local input execution
 
 `LocalInputs` now bundles each spelling, unique ID, type, value, and structural
@@ -157,7 +167,7 @@ values or source declaration collection. Structural typing of a cell reference
 does not assert that its location is allocated. A repeated-name insertion may
 change existing source meaning; fresh IDs do not prevent name shadowing.
 
-For an identifier/group/conditional expression that avoids the newly added
+For an identifier/group/negation/conditional expression that avoids the newly added
 spelling in every child, fresh insertion preserves and reflects source typing
 and evaluation, including the exact value and both stores. Checking changes
 only the free Core positions by one; the assigned type and failure boundary
@@ -1888,8 +1898,8 @@ malformed output remains separate so that recovery is not confused with
 language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
-Semantic Core remain separate later stages. Canonical local references and
-conditionals currently connect through the explicit-table adapters described above.
+Semantic Core remain separate later stages. Canonical local references, Boolean
+negation, and conditionals connect through the explicit-table adapters described above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 

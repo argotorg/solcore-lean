@@ -4,6 +4,9 @@
 - Decision date: 2026-09-08
 - Scope: explicit-table identifier, grouping, and conditional expression fragment
 
+ADR-0158 subsequently extends the internal adapter and these semantic
+guarantees with fixed Boolean negation; existing supported inputs are unchanged.
+
 ## Decision
 
 Extend the canonical frontend semantic boundary with a separate local-expression

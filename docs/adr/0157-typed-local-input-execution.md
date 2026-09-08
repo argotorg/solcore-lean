@@ -4,6 +4,10 @@
 - Decision date: 2026-09-08
 - Scope: bundled typed inputs for the canonical local-expression fragment
 
+ADR-0158 extends the underlying local-expression adapter with Boolean
+negation and extends the unused-name laws to its operand; the bundle and
+checked runner keep their existing input/result representations.
+
 ## Decision
 
 Provide a single explicit input bundle for ADR-0156's local-expression adapter.

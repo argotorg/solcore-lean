@@ -715,16 +715,17 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | --- | --- | --- | --- |
 | Abstract resolved-name language | Local-expression foundation implemented (ADR-0154) | module/library-owned IDs, exact lookup, non-dangling references, and scope-relative fresh allocation; source declaration collection and global allocation remain open | Low |
 | Resolved local typing and evaluation | Implemented for monomorphic unit/Boolean/Word, references, selected primitives, immutable expression bindings, and conditionals | independent checker/elaborator correspondence, type preservation/reflection, exact value/store simulation, determinism and sufficient-fuel execution; no source spelling semantics | Low |
-| Source type checking | Explicit-table local reference/conditional fragment implemented | independent source typing iff checked elaboration; declarations, literals, overloaded operators, general source types/effects remain open | Medium |
+| Source type checking | Explicit-table local reference/negation/conditional fragment implemented | independent source typing iff checked elaboration; declarations, literals, overloaded operators, general source types/effects remain open | Medium |
 | Resolved scope and identity renaming | Complete for the local-expression fragment | scope iff elaboration existence; injective renaming preserves exact Core output, types, values, and store; non-injective capture counterexample; no source allocator claim | Low |
 | Fresh local binding insertion | Implemented for explicit scopes | owner-relative non-collision, exact free-index weakening, type/evaluation preservation under inner binders; evaluation reflection requires original scoping, freshness covers only the supplied scope | Low |
 | Parametric polymorphism | Planned | type application and preservation | Low |
 | Tabled class resolution | Planned | evidence language, finite search, inconclusive boundary | Low |
 | Comptime/runtime staging | Blocked | staging decision and effect rules | Low |
-| Canonical Syntax-to-Resolved adapter | Identifier/group/conditional fragment implemented (ADR-0155/0156) | exact structure/type/value/store correspondence for explicit tables; source declaration collection, ID assignment, and general expression resolution remain open | High |
+| Canonical Syntax-to-Resolved adapter | Identifier/group/negation/conditional fragment implemented (ADR-0155/0156/0158) | exact structure/type/value/store correspondence for explicit tables; source declaration collection, ID assignment, and general expression resolution remain open | High |
 | Canonical local conditional execution | Implemented for the explicit-table fragment | Boolean condition, same-type branches, selected-branch-only evaluation, typed open-environment totality and sufficient Core fuel; no source literal or operator policy | High |
 | Typed local input construction and execution | Implemented (ADR-0157) | unique IDs, fresh insertion, exact row lookup and automatically aligned typed tables; checked runner preserves type/value/store and separates check failure from fuel exhaustion; not source declaration collection | Low |
-| Unused-name local input extension | Proved for identifiers/groups/conditionals | source typing/evaluation equivalence, exact checked Core weakening and failure preservation, identical completed observations; spelling avoidance covers all branches and is essential | High |
+| Unused-name local input extension | Proved for identifiers/groups/negations/conditionals | source typing/evaluation equivalence, exact checked Core weakening and failure preservation, identical completed observations; spelling avoidance covers all branches and is essential | High |
+| Canonical Boolean negation | Implemented (ADR-0158) | fixed Bool-only `!`, independent typing/evaluation, exact direct-Core lowering and three-transition named operand; no truthiness or general overload resolution | High |
 | Resolved-to-Core elaboration | Exact local-expression fragment implemented | full source coverage, effects beyond the store-preserving fragment, and stage preservation remain open | Medium |
 
 ## Contract and runtime semantics

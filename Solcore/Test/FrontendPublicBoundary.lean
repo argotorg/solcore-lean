@@ -134,5 +134,10 @@ example := @Solcore.Frontend.AvoidsLocalName.bindFresh_evaluates_iff
 example := @Solcore.Frontend.AvoidsLocalName.check_bindFresh_complete
 example := @Solcore.Frontend.AvoidsLocalName.check_bindFresh_eq
 example := @Solcore.Frontend.AvoidsLocalName.bindFresh_run_done_iff
+example := @Solcore.Frontend.ResolvesLocalExpression.logicalNot
+example := @Solcore.Frontend.LocalExpressionHasType.logicalNot
+example := @Solcore.Frontend.LocalExpressionEvaluates.logicalNot
+example := @Solcore.Frontend.AvoidsLocalName.logicalNot
+example := @Solcore.Frontend.resolveLocalExpression?_logicalNot_spans
 
 end Tests

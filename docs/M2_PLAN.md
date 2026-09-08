@@ -86,7 +86,13 @@ free-index shift (including check failures), and completed value/store results.
 The premise covers both conditional branches and deliberately excludes
 same-name shadowing; it does not assert equality of suspended machine states.
 
-The next semantic work should extend the local reference/conditional fragment
+The canonical `!` constructor now uses the existing Boolean-negation primitive
+(ADR-0158). Source typing, raw evaluation correspondence, typed execution, and
+unused-name preservation include the new case. Non-Boolean operands are not
+coerced. Parsed negated conditions and double negation exercise the returned
+Core and exact execution bounds; `~` and binary operators remain unsupported.
+
+The next semantic work should extend the local reference/negation/conditional fragment
 to more canonical syntax and source scope construction, preserving binding identity and
 the established Core execution correspondence. It must not treat the resolved
 immutable expression binder as a decision about mutable source declarations.
