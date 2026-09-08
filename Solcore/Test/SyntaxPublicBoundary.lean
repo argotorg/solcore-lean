@@ -3301,4 +3301,34 @@ example := @Syntax.Parser.expressionAtom_trace_reject_state_iff
 example := @Syntax.Parser.expressionAtom_exists_trace_outcome
 example := @Syntax.Parser.expressionAtomTrace_outcome_exists
 
+example := @Syntax.DeclarativeGrammar.ExpressionAtomLayerTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionAtomLayerTraceRejects
+example := @Syntax.DeclarativeGrammar.expressionAtomLayerTraceExactOutcomeSpec
+example := @Syntax.Parser.expressionAtom_layer_trace_success_sound
+example := @Syntax.Parser.expressionAtom_layer_reject_trace_sound
+example := @Syntax.Parser.expressionAtom_layer_trace_success_complete
+example := @Syntax.Parser.expressionAtom_layer_trace_reject_complete
+example := @Syntax.Parser.expressionAtom_layer_success_context
+example := @Syntax.Parser.expressionAtomCore_exists_trace_outcome_of_unrestrictedElementFuel
+example := @Syntax.Parser.expressionAtom_layer_exists_trace_outcome_of_unrestrictedElementFuel
+example := @Syntax.Parser.expressionAtomLayerTrace_outcome_exists_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_ordinary_unrestricted
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_ne_invariant_unrestricted
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_production_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ne_invariant_of_unrestrictedElementFuel
+
 end Tests
