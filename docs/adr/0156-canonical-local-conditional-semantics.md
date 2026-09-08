@@ -68,3 +68,7 @@ Core fuel boundaries. Independent evaluation of a statically unsupported
 unselected branch protects the whole-resolution premise in correspondence.
 Public declarations receive kernel checks, axiom audits, and boundary consumers;
 focused and aggregate builds and the full test suite validate integration.
+Additional executable regressions begin with source strings, require complete
+diagnostic-free expression parsing, and execute the checker-returned Core.
+The older reference adapter is proved to embed with identical resolution,
+checked results (including missing-context failure), values, and stores.

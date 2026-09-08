@@ -715,13 +715,14 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | --- | --- | --- | --- |
 | Abstract resolved-name language | Local-expression foundation implemented (ADR-0154) | module/library-owned IDs, exact lookup, non-dangling references, and scope-relative fresh allocation; source declaration collection and global allocation remain open | Low |
 | Resolved local typing and evaluation | Implemented for monomorphic unit/Boolean/Word, references, selected primitives, immutable expression bindings, and conditionals | independent checker/elaborator correspondence, type preservation/reflection, exact value/store simulation, determinism and sufficient-fuel execution; no source spelling semantics | Low |
-| Source type checking | Planned after source-to-Resolved adapter | canonical source type/effect rules; local resolved typing alone is not source typing | Medium |
+| Source type checking | Explicit-table local reference/conditional fragment implemented | independent source typing iff checked elaboration; declarations, literals, overloaded operators, general source types/effects remain open | Medium |
 | Resolved scope and identity renaming | Complete for the local-expression fragment | scope iff elaboration existence; injective renaming preserves exact Core output, types, values, and store; non-injective capture counterexample; no source allocator claim | Low |
 | Fresh local binding insertion | Implemented for explicit scopes | owner-relative non-collision, exact free-index weakening, type/evaluation preservation under inner binders; evaluation reflection requires original scoping, freshness covers only the supplied scope | Low |
 | Parametric polymorphism | Planned | type application and preservation | Low |
 | Tabled class resolution | Planned | evidence language, finite search, inconclusive boundary | Low |
 | Comptime/runtime staging | Blocked | staging decision and effect rules | Low |
-| Canonical Syntax-to-Resolved adapter | Identifier/group reference slice implemented (ADR-0155) | explicit name/context tables give exact Core position/type and value/store correspondence under identity-order alignment; declaration collection, fresh IDs, and general expression resolution remain open | High |
+| Canonical Syntax-to-Resolved adapter | Identifier/group/conditional fragment implemented (ADR-0155/0156) | exact structure/type/value/store correspondence for explicit tables; source declaration collection, ID assignment, and general expression resolution remain open | High |
+| Canonical local conditional execution | Implemented for the explicit-table fragment | Boolean condition, same-type branches, selected-branch-only evaluation, typed open-environment totality and sufficient Core fuel; no source literal or operator policy | High |
 | Resolved-to-Core elaboration | Exact local-expression fragment implemented | full source coverage, effects beyond the store-preserving fragment, and stage preservation remain open | Medium |
 
 ## Contract and runtime semantics

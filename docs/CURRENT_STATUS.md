@@ -106,6 +106,34 @@ imports, and complete source typing are still open. `true`/`false` are ordinary
 caller-bound names, and unsupported AST forms do not become language rejections.
 The canonical parser and every Oracle/wire boundary remain unchanged.
 
+### Canonical local conditional semantics
+
+A separate adapter extends identifiers and grouping with canonical conditional
+expressions (ADR-0156). It preserves AST nesting and resolves all three children
+using the same explicit name table. Independent source typing requires a Boolean
+condition and the same type for both branches, without coercion or truthiness.
+Successful elaboration gives exactly the resolved expression, Core expression,
+and independently assigned type; unsupported or missing names receive no defaults.
+
+Independent source evaluation evaluates the condition and only its selected
+branch. It is deterministic and store-preserving even if a skipped branch cannot
+resolve or type-check. Whole-resolution and exact runtime identity alignment
+give value-and-store correspondence with Core in both directions. An aligned,
+typed local environment guarantees an evaluation of the assigned type, the same
+result at every sufficiently large Core fuel, and no machine fault at any fuel.
+
+Executable regressions now start with source text and use the existing canonical
+lexer and complete expression parse before checking and executing the actual
+returned Core. They cover conditional nesting, grouping, comments, caller-bound
+`true`/`false`, static failures, and exact four/seven-transition boundaries.
+The narrow reference adapter embeds with the same checked result, including
+missing-context failure, and the same value and store endpoints.
+
+This is a monomorphic explicit-table expression fragment, not complete source
+typing or a source-text execution service. The narrower reference adapter stays
+unchanged. Source declarations, literals, overloaded operations, calls, mutation,
+and staging remain separate; no parser or Oracle behavior changes.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.
@@ -1829,8 +1857,8 @@ malformed output remains separate so that recovery is not confused with
 language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
-Semantic Core remain separate later stages. Only canonical local references
-currently connect through the explicit-table adapter described above.
+Semantic Core remain separate later stages. Canonical local references and
+conditionals currently connect through the explicit-table adapters described above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 

@@ -60,8 +60,22 @@ to typed resolved references and Core variables (ADR-0155). The name table does
 not replace source scope construction. Execution correspondence retains exact
 identity-order alignment between the type context and runtime environment.
 
-The next semantic work should extend resolution beyond local references and
-connect more canonical parsed syntax to independently typed resolved inputs, preserving binding identity and
+An additive local-expression adapter now covers canonical conditional ASTs
+(ADR-0156). Independent source typing requires a Boolean condition and equally
+typed branches, and characterizes successful checked elaboration exactly.
+Independent source evaluation selects just one branch, is deterministic and
+store-preserving, and corresponds to resolved/Core evaluation under whole
+resolution and runtime identity alignment. Typed aligned environments ensure
+existence, type preservation, sufficient-fuel execution, and fault exclusion.
+Literal interpretation, source declaration resolution, and general source
+typing are not supplied by this explicit-table fragment.
+Source-text regressions exercise the existing lexer/parser and execute the
+returned checked Core, with exact branch selection, unchanged stores, and
+fuel boundaries. The previous reference adapter embeds without changing its
+checked results or value/store semantics.
+
+The next semantic work should extend the local reference/conditional fragment
+to more canonical syntax and source scope construction, preserving binding identity and
 the established Core execution correspondence. It must not treat the resolved
 immutable expression binder as a decision about mutable source declarations.
 
