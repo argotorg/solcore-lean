@@ -14,6 +14,14 @@ theorem resolveLocalExpression?_span (table : LocalNameTable) (source : Syntax.E
   cases source with
   | mk sourceSpan payload =>
       cases payload <;> try simp only [resolveLocalExpression?]
+      case tuple elements =>
+        rcases elements with ⟨tupleSpan, elements⟩
+        cases elements with
+        | nil => simp only [resolveLocalExpression?]
+        | cons left rest =>
+            cases rest with
+            | nil => simp only [resolveLocalExpression?]
+            | cons right rest => cases rest <;> simp only [resolveLocalExpression?]
       case unary operator operand =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> simp only [resolveLocalExpression?]

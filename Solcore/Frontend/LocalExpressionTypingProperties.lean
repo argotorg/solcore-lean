@@ -20,6 +20,10 @@ theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Reso
   | group _ ih =>
       obtain ⟨resolved, resolution, typed⟩ := ih
       exact ⟨resolved, .group resolution, typed⟩
+  | pair _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .pair leftResolved rightResolved, .pair leftTyped rightTyped⟩
   | logicalNot _ ih =>
       obtain ⟨resolved, resolution, typed⟩ := ih
       exact ⟨_, .logicalNot resolution, .unary typed⟩
@@ -110,6 +114,9 @@ theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context 
       cases typing with
       | word => exact .wordLiteral meaning
   | group _ ih => exact .group (ih typing)
+  | pair _ _ leftIH rightIH =>
+      cases typing with
+      | pair leftTyped rightTyped => exact .pair (leftIH leftTyped) (rightIH rightTyped)
   | logicalNot _ ih =>
       cases typing with
       | unary operandTyped => exact .logicalNot (ih operandTyped)

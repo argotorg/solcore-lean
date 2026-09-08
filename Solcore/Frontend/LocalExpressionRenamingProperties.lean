@@ -21,6 +21,7 @@ theorem ResolvesLocalExpression.mapIds {table : LocalNameTable}
       exact .identifier ((LocalNameTable.lookup_mapIds_iff_exists mapping).mpr ⟨_, found, rfl⟩)
   | wordLiteral meaning => exact .wordLiteral meaning
   | group _ ih => exact .group ih
+  | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
   | add _ _ leftIH rightIH => exact .add leftIH rightIH
@@ -59,6 +60,10 @@ theorem resolvesLocalExpression_mapIds_iff_exists (mapping : Resolved.LocalId �
     | group _ ih =>
         obtain ⟨original, child, rfl⟩ := ih
         exact ⟨original, .group child, rfl⟩
+    | pair _ _ leftIH rightIH =>
+        obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
+        obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
+        exact ⟨.pair originalLeft originalRight, .pair leftChild rightChild, rfl⟩
     | logicalNot _ ih =>
         obtain ⟨original, child, rfl⟩ := ih
         exact ⟨.unary .boolNot original, .logicalNot child, rfl⟩

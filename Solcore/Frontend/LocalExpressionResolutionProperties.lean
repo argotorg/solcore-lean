@@ -20,6 +20,7 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
   | wordLiteral meaning =>
       simp only [resolveLocalExpression?, interpretWordLiteral?_complete meaning, Option.map_some]
   | group _ ih => simpa only [resolveLocalExpression?] using ih
+  | pair _ _ leftIH rightIH => simp [resolveLocalExpression?, leftIH, rightIH]
   | logicalNot _ ih | bitNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
   | add _ _ leftIH rightIH | subtract _ _ leftIH rightIH | multiply _ _ leftIH rightIH
   | divide _ _ leftIH rightIH | modulo _ _ leftIH rightIH
@@ -53,6 +54,23 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
         cases same
         exact .wordLiteral (interpretWordLiteral?_sound interpreted)
       case group inner => exact .group (resolveLocalExpression?_sound result)
+      case tuple elements =>
+        cases elements with
+        | mk tupleSpan elements =>
+            cases elements with
+            | nil => simp only [resolveLocalExpression?, reduceCtorEq] at result
+            | cons left rest =>
+                cases rest with
+                | nil => simp only [resolveLocalExpression?, reduceCtorEq] at result
+                | cons right rest =>
+                    cases rest with
+                    | nil =>
+                        simp only [resolveLocalExpression?, bind, Option.bind_eq_some_iff, pure] at result
+                        obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+                        cases same
+                        exact .pair (resolveLocalExpression?_sound leftResult)
+                          (resolveLocalExpression?_sound rightResult)
+                    | cons third rest => simp only [resolveLocalExpression?, reduceCtorEq] at result
       case unary operator operand =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue with
