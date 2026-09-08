@@ -28,6 +28,7 @@ theorem LocalExpressionEvaluatesWithCost.erase {table : LocalNameTable}
   | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
   | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
   | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
+  | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
   | andTrue _ _ leftIH rightIH => exact .andTrue leftIH rightIH
   | andFalse _ ih => exact .andFalse ih
   | orTrue _ ih => exact .orTrue ih
@@ -85,6 +86,10 @@ theorem LocalExpressionEvaluates.exists_cost {table : LocalNameTable}
       obtain ⟨leftCost, left⟩ := leftIH
       obtain ⟨rightCost, right⟩ := rightIH
       exact ⟨_, .equal left right⟩
+  | notEqual _ _ leftIH rightIH =>
+      obtain ⟨leftCost, left⟩ := leftIH
+      obtain ⟨rightCost, right⟩ := rightIH
+      exact ⟨_, .notEqual left right⟩
   | andTrue _ _ leftIH rightIH =>
       obtain ⟨leftCost, left⟩ := leftIH
       obtain ⟨rightCost, right⟩ := rightIH

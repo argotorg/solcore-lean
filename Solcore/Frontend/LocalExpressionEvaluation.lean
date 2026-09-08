@@ -96,6 +96,13 @@ theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
           obtain ⟨sameRight, storeEq⟩ := rightIH rightChild
           cases sameLeft; cases sameRight
           exact ⟨rfl, storeEq⟩
+  | notEqual _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | notEqual leftChild rightChild =>
+          obtain ⟨sameLeft, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq⟩
   | andTrue _ _ leftIH rightIH =>
       cases rightEvaluation with
       | andTrue leftChild rightChild =>
