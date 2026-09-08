@@ -25,6 +25,14 @@ theorem evaluateLocalExpressionWithCost?_congr_lookup
       case group inner =>
         exact evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
           leftEnvironment rightEnvironment sameLookup inner
+      case tuple elements =>
+        rcases elements with ⟨tupleSpan, _ | ⟨left, _ | ⟨right, _ | ⟨third, rest⟩⟩⟩⟩ <;>
+          simp only [evaluateLocalExpressionWithCost?]
+        have first := evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
+          leftEnvironment rightEnvironment sameLookup left
+        have second := evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
+          leftEnvironment rightEnvironment sameLookup right
+        simp only [first, second]
       case unary operator operand =>
         have child := evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
           leftEnvironment rightEnvironment sameLookup operand

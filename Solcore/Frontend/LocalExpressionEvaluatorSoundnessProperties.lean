@@ -26,6 +26,23 @@ theorem evaluateLocalExpressionWithCost?_sound {table : LocalNameTable}
         obtain ⟨word, meaning, rfl, rfl⟩ := accepted
         exact .wordLiteral (interpretWordLiteral?_sound meaning)
       case group inner => exact .group (evaluateLocalExpressionWithCost?_sound accepted store)
+      case tuple elements =>
+        cases elements with
+        | mk tupleSpan children =>
+          cases children with
+          | nil => simp [evaluateLocalExpressionWithCost?] at accepted
+          | cons left remaining =>
+            cases remaining with
+            | nil => simp [evaluateLocalExpressionWithCost?] at accepted
+            | cons right tail =>
+              cases tail with
+              | cons _ _ => simp [evaluateLocalExpressionWithCost?] at accepted
+              | nil =>
+                simp only [evaluateLocalExpressionWithCost?, bind, Option.bind_eq_some_iff,
+                  pure, Option.some.injEq, Prod.mk.injEq] at accepted
+                obtain ⟨⟨leftValue, leftCost⟩, leftResult, ⟨rightValue, rightCost⟩, rightResult, rfl, rfl⟩ := accepted
+                exact .pair (evaluateLocalExpressionWithCost?_sound leftResult store)
+                  (evaluateLocalExpressionWithCost?_sound rightResult store)
       case unary operator operand =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;>

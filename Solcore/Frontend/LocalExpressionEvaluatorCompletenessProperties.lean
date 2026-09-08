@@ -24,6 +24,7 @@ theorem evaluateLocalExpressionWithCost?_complete {table : LocalNameTable}
   | group _ ih => simpa only [evaluateLocalExpressionWithCost?] using ih
   | logicalNot _ ih | bitNot _ ih | andFalse _ ih | orTrue _ ih =>
       simp [evaluateLocalExpressionWithCost?, ih]
+  | pair _ _ leftIH rightIH
   | add _ _ leftIH rightIH | subtract _ _ leftIH rightIH | multiply _ _ leftIH rightIH
   | divide _ _ leftIH rightIH | modulo _ _ leftIH rightIH
   | bitAnd _ _ leftIH rightIH | bitOr _ _ leftIH rightIH | bitXor _ _ leftIH rightIH
