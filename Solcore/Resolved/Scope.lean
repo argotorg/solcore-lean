@@ -11,6 +11,9 @@ inductive WellScoped : List LocalId → Expr → Prop where
   | bool {scope value} : WellScoped scope (.bool value)
   | word {scope value} : WellScoped scope (.word value)
   | var {scope id} : id ∈ scope → WellScoped scope (.var id)
+  | pair {scope left right} :
+      WellScoped scope left → WellScoped scope right →
+      WellScoped scope (.pair left right)
   | unary {scope op operand} :
       WellScoped scope operand → WellScoped scope (.unary op operand)
   | binary {scope op left right} :

@@ -20,6 +20,10 @@ inductive Evaluates : Environment → Core.Store → Expr → Core.Value → Cor
   | var {environment store id value} :
       LocalScope.Lookup environment id value →
       Evaluates environment store (.var id) value store
+  | pair {environment initialStore middleStore finalStore left right leftValue rightValue} :
+      Evaluates environment initialStore left leftValue middleStore →
+      Evaluates environment middleStore right rightValue finalStore →
+      Evaluates environment initialStore (.pair left right) (.pair leftValue rightValue) finalStore
   | unary {environment initialStore finalStore op operand operandValue result} :
       Evaluates environment initialStore operand operandValue finalStore →
       op.apply operandValue = some result →

@@ -14,6 +14,9 @@ inductive HasType : Context → Expr → Core.Ty → Prop where
   | word {context value} : HasType context (.word value) .word
   | var {context id type} :
       LocalScope.Lookup context id type → HasType context (.var id) type
+  | pair {context left right leftType rightType} :
+      HasType context left leftType → HasType context right rightType →
+      HasType context (.pair left right) (.product leftType rightType)
   | unary {context op operand} :
       HasType context operand op.operandType →
       HasType context (.unary op operand) op.resultType

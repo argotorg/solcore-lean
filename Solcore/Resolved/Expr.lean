@@ -15,6 +15,7 @@ inductive Expr where
   | bool (value : Bool)
   | word (value : Core.Word)
   | var (id : LocalId)
+  | pair (left right : Expr)
   | unary (op : Core.UnaryOp) (operand : Expr)
   | binary (op : Core.BinaryOp) (left right : Expr)
   | wordLt (left right : Expr)
@@ -28,6 +29,8 @@ def Expr.lower? (scope : List LocalId) : Expr → Option Core.Expr
   | .bool value => some (.bool value)
   | .word value => some (.word value)
   | .var id => (LocalScope.index? scope id).map Core.Expr.var
+  | .pair left right => do
+      return .pair (← left.lower? scope) (← right.lower? scope)
   | .unary op operand => do
       return .unary op (← operand.lower? scope)
   | .binary op left right => do
@@ -47,6 +50,9 @@ inductive Lowers : List LocalId → Expr → Core.Expr → Prop where
   | word {scope value} : Lowers scope (.word value) (.word value)
   | var {scope id index} :
       LocalScope.IndexOf scope id index → Lowers scope (.var id) (.var index)
+  | pair {scope left right coreLeft coreRight} :
+      Lowers scope left coreLeft → Lowers scope right coreRight →
+      Lowers scope (.pair left right) (.pair coreLeft coreRight)
   | unary {scope op operand coreOperand} :
       Lowers scope operand coreOperand →
       Lowers scope (.unary op operand) (.unary op coreOperand)

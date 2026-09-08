@@ -17,6 +17,7 @@ def Expr.renameIds (mapping : LocalId → LocalId) : Expr → Expr
   | .bool value => .bool value
   | .word value => .word value
   | .var id => .var (mapping id)
+  | .pair left right => .pair (left.renameIds mapping) (right.renameIds mapping)
   | .unary op operand => .unary op (operand.renameIds mapping)
   | .binary op left right => .binary op (left.renameIds mapping) (right.renameIds mapping)
   | .wordLt left right => .wordLt (left.renameIds mapping) (right.renameIds mapping)
