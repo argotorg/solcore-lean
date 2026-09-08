@@ -1,4 +1,4 @@
-import Solcore.Frontend.TypedLetReturnBodyOwnerProperties
+import Solcore.Frontend.TypedLetReturnTreeOwnerProperties
 import Solcore.Frontend.LocalInputsTypeErasureRenamingProperties
 import Solcore.Frontend.RuntimeParametersOwnerProperties
 import Solcore.Frontend.RuntimeFunctionEntryProperties

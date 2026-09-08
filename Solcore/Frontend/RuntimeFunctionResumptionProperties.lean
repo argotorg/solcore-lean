@@ -1,4 +1,4 @@
-import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
+import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.RuntimeFunctionCompiledExecutionProperties
 
 /-! Complete entry checkpoints resume their actual Core state. Exact source

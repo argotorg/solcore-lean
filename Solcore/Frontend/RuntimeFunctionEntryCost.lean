@@ -1,5 +1,5 @@
 import Solcore.Frontend.RuntimeFunctionEntryProperties
-import Solcore.Frontend.TypedLetReturnBodyRunnerProperties
+import Solcore.Frontend.TypedLetReturnTreeRunnerProperties
 
 /-! Independent cost for a complete restricted entry contract. Preparation
 provenance is mandatory; a prepared record alone supplies no such meaning.
@@ -15,7 +15,7 @@ inductive RuntimeFunctionEvaluatesWithCost (types : TypeNameTable) (owner : Reso
   | intro {prepared : PreparedRuntimeFunction} {initialStore finalStore : Core.Store}
       {value : Core.Value} {cost : Nat}
       (preparation : RuntimeFunctionPrepares types owner declaration arguments prepared)
-      (bodyCost : TypedLetReturnBodyEvaluatesWithCost owner prepared.inputs.names prepared.inputs.environment
+      (bodyCost : TypedLetReturnTreeEvaluatesWithCost owner prepared.inputs.names prepared.inputs.environment
         initialStore declaration.value.body value finalStore cost) :
       RuntimeFunctionEvaluatesWithCost types owner declaration arguments
         initialStore prepared.returnType value finalStore cost

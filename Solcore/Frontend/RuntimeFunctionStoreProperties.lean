@@ -1,7 +1,7 @@
-import Solcore.Frontend.TypedLetReturnBodyStoreProperties
+import Solcore.Frontend.TypedLetReturnTreeStoreProperties
 import Solcore.Frontend.RuntimeFunctionCompiledExecutionProperties
 
-/-! Store-independent values and exact costs lift through typed-prefix and
+/-! Store-independent values and exact costs lift through recursive-body and
 whole-entry contracts. Full results are not equated: each retains its own store. -/
 
 set_option autoImplicit false
