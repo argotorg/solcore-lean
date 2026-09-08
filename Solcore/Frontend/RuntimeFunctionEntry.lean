@@ -1,7 +1,7 @@
 import Solcore.Frontend.RuntimeFunctionHeader
 import Solcore.Frontend.RuntimeParametersProperties
 import Solcore.Frontend.LocalInputsTypeErasure
-import Solcore.Frontend.TypedLetReturnBodyProperties
+import Solcore.Frontend.TypedLetReturnTreeProperties
 
 /-! An explicitly supplied declaration, owner, type table, and typed arguments
 form one restricted external entry. This does not resolve or invoke source calls. -/
@@ -24,7 +24,7 @@ structure RuntimeFunctionPrepares (types : TypeNameTable) (owner : Resolved.Decl
   header : RuntimeFunctionHeader types declaration.value.signature prepared.returnType
   parameters : RuntimeParametersBind types owner declaration.value.signature.parameters.elements
     arguments prepared.inputs
-  body : TypedLetReturnBodyElaborates types owner prepared.inputs.toTypeInputs
+  body : TypedLetReturnTreeElaborates types owner prepared.inputs.toTypeInputs
     declaration.value.body prepared.core prepared.returnType
 
 /-- The whole entry contract, distinct from checking the body by itself. -/
@@ -33,7 +33,7 @@ def RuntimeFunctionHasType (types : TypeNameTable) (owner : Resolved.Declaration
     (returnType : Core.Ty) : Prop :=
   ∃ inputs, RuntimeFunctionHeader types declaration.value.signature returnType ∧
     RuntimeParametersBind types owner declaration.value.signature.parameters.elements arguments inputs ∧
-    TypedLetReturnBodyHasType types owner inputs.toTypeInputs declaration.value.body returnType
+    TypedLetReturnTreeHasType types owner inputs.toTypeInputs declaration.value.body returnType
 
 /-- Retain the body checker's returned Core only when it matches the explicit
 return contract. Unknown or unsupported components have no fallback meaning. -/
@@ -42,7 +42,7 @@ def prepareRuntimeFunction? (types : TypeNameTable) (owner : Resolved.Declaratio
     Option PreparedRuntimeFunction := do
   let returnType ← interpretRuntimeFunctionHeader? types declaration.value.signature
   let inputs ← bindRuntimeParameters? types owner declaration.value.signature.parameters.elements arguments
-  let (core, inferredType) ← elaborateTypedLetReturnBody? types owner inputs.toTypeInputs declaration.value.body
+  let (core, inferredType) ← elaborateTypedLetReturnTree? types owner inputs.toTypeInputs declaration.value.body
   if inferredType = returnType then
     return { inputs, core, returnType }
   else none
