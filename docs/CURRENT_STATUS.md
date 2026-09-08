@@ -1621,8 +1621,20 @@ Nested joint exactness supplies result uniqueness and disjointness, not existenc
 Both runtime soundness directions hold at every tail fuel under nested trace
 soundness and successful source/full-window context. They add no child progress,
 validity, ordinary-execution, or rejected-state frame premise. Index traces do
-not inherit the call-argument list's strict-progress check. Completeness and
-production-budget existence remain separate work at this boundary.
+not inherit the call-argument list's strict-progress check.
+
+Each finite postfix derivation now executes at every fuel above its own threshold
+under child completeness and successful context; rewinding index children remain
+allowed, so that threshold is not identified with remainingCount. Separately,
+the minimal child endIndex/progress/bounded-ordinary contract and explicit loop
+and child budgets establish unrestricted ordinary execution, including the
+production tail budget. Soundness then supplies actual and independent trace
+existence without joint-exactness premises. Joint exactness plus this invariant
+exclusion supplies fixed-fuel completeness. Pointwise success and rejection
+equivalences reconstruct every State/Failure field; only rejection reconstruction
+needs the explicit weak child file/endByte frame. All-fuel context laws preserve
+full successful windows or a caller-selected rejected window observation. These
+remain tail-layer results, not complete recursive expression traces.
 
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.

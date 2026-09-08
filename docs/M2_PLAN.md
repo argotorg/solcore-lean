@@ -1194,8 +1194,13 @@ Postfix-tail independent traces and runtime soundness now cover prioritized
 index/call/field suffixes, exact ASTs, ordered events, and all seven failure
 positions. Independent nested joint laws give uniqueness/disjointness only;
 all-fuel soundness assumes nested success/rejection traces and success context,
-without silently imposing index progress or totality. Completeness and actual
-production-budget existence are separate obligations.
+without silently imposing index progress or totality. Finite derivations now
+execute above derivation-specific thresholds. Separately, explicit child and loop
+budgets plus the minimal child progress contract establish ordinary execution
+and non-vacuous trace existence, including the production tail budget. Independent
+joint exactness then gives fixed-fuel completeness. Whole-State/Failure equivalences
+retain explicit invariant exclusion and, for rejection, weak child source/end-byte
+frames. This is not yet recursive expression closure.
 
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a

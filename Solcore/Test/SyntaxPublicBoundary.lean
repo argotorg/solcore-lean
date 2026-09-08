@@ -3344,4 +3344,27 @@ example := @Syntax.DeclarativeGrammar.postfixTailTraceExactOutcomeSpec
 example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_sound
 example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_reject_trace_sound
 
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_production_ordinary_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_production_ne_invariant_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_success_context
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_reject_context_of_windowProjection
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_reject_context
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_reject_source_endByte
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_complete_eventually
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_complete_eventually
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_complete_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_complete_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_failure_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_complete_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_complete_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_exists_trace_outcome_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTailTrace_outcome_exists_of_unrestrictedElementFuel
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_state_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_failure_state_iff_of_ne_invariant
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_state_iff_of_ne_invariant
+
 end Tests
