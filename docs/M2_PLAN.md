@@ -130,6 +130,16 @@ Invalid or overflowing literals still block whole checking, even when skipped;
 Word operands do not satisfy Boolean requirements. The narrower reference-only
 adapter and general source inference/overload policy remain unchanged.
 
+Canonical `&`, `|`, and `^` also use fixed Word-only source semantics (ADR-0164).
+Independent rules retain both operands and left-to-right evaluation through the
+existing Core operations; raw value/store correspondence and all typing, safety,
+input-extension, and ID-renaming guarantees are preserved. Unlike Boolean
+short-circuit forms, masks never skip an invalid right operand. Parsed examples
+check exact Core precedence/association, mask values, complement/conditional
+composition, nonempty stores, and the four/five-transition exhaustion/completion
+boundary. Arithmetic, comparison, assignment, and general overload policy remain
+separate; no parser or Core-machine changes are needed.
+
 The next semantic work should extend the supported local-expression fragment
 to more canonical syntax and source scope construction, preserving binding identity and
 the established Core execution correspondence. It must not treat the resolved

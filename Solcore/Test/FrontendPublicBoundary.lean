@@ -237,5 +237,20 @@ example := @Solcore.Frontend.LocalExpressionHasType.wordLiteral
 example := @Solcore.Frontend.LocalExpressionEvaluates.wordLiteral
 example := @Solcore.Frontend.AvoidsLocalName.literal
 example := @Solcore.Frontend.resolveLocalExpression?_literal_spans
+example := @Solcore.Frontend.ResolvesLocalExpression.bitAnd
+example := @Solcore.Frontend.ResolvesLocalExpression.bitOr
+example := @Solcore.Frontend.ResolvesLocalExpression.bitXor
+example := @Solcore.Frontend.LocalExpressionHasType.bitAnd
+example := @Solcore.Frontend.LocalExpressionHasType.bitOr
+example := @Solcore.Frontend.LocalExpressionHasType.bitXor
+example := @Solcore.Frontend.LocalExpressionEvaluates.bitAnd
+example := @Solcore.Frontend.LocalExpressionEvaluates.bitOr
+example := @Solcore.Frontend.LocalExpressionEvaluates.bitXor
+example := @Solcore.Frontend.AvoidsLocalName.bitAnd
+example := @Solcore.Frontend.AvoidsLocalName.bitOr
+example := @Solcore.Frontend.AvoidsLocalName.bitXor
+example := @Solcore.Frontend.resolveLocalExpression?_bitAnd_spans
+example := @Solcore.Frontend.resolveLocalExpression?_bitOr_spans
+example := @Solcore.Frontend.resolveLocalExpression?_bitXor_spans
 
 end Tests

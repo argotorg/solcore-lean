@@ -155,8 +155,8 @@ just as the conditional expansion does. This does not admit such an expression
 to checked execution. Tests distinguish this boundary from raw evaluation that
 skips a missing or unsupported operand, which still prevents whole checking.
 Parsed precedence, grouping, and nested right operands exercise exact fuel
-differences between selected and skipped paths. Other binary operators remain
-unsupported by this adapter.
+differences between selected and skipped paths. Arithmetic and comparison
+operators remain unsupported by this adapter.
 
 Word complement `~` is also supported as a fixed Word-only operation
 (ADR-0161), using the existing direct Core `wordNot`. Independent typing,
@@ -167,6 +167,24 @@ and numeric interpretation uses the separate layer below. Tests include arbitrar
 Words, double-complement involution, raw selected Word operands that cannot
 type-check as Boolean, parsed conditions, and exact fuel boundaries. The
 unused-name and identity-relabeling laws also cover this constructor.
+
+Word-only binary `&`, `|`, and `^` now extend the same adapter (ADR-0164),
+mapping directly to the existing Core bitwise operations. Independent source
+typing requires Word operands and result. Evaluation visits each operand once,
+left before right, and passes the intermediate store to the right operand.
+These are not short-circuit forms: even a zero mask cannot hide a missing,
+invalid, or wrongly typed right operand. Raw Word evaluation inside an operand
+may still skip an invalid conditional branch, but whole checking rejects it.
+Exact resolution, type/value/store correspondence, typed execution, unused-name
+insertion, and ID-relabeling proofs include all three forms.
+
+Parsed tests retain canonical precedence (`&`, then `^`, then `|`) and left
+association in the exact checked Core. Mask examples produce `0x88`, `0xEE`,
+and `0x66` from `0xAA` and `0xCC`; literal pairs take five transitions and
+preserve nonempty stores. Grouping, complement, conditional branches, wrong
+Boolean uses, whole-check failure, and unchanged results under input extension
+or ID relabeling are tested. Value commutativity does not reorder source operands.
+No general overload, assignment, parser, or Core-machine policy changes.
 
 ### Numeric spelling and strict Word interpretation
 
@@ -1982,7 +2000,7 @@ language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
 Semantic Core remain separate later stages. Canonical local references, Boolean
-operators, Word complement, strict Word literals, and conditionals connect through the explicit-table adapters described above.
+operators, Word bitwise operations, strict Word literals, and conditionals connect through the explicit-table adapters described above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 
