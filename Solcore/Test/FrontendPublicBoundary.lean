@@ -1092,6 +1092,15 @@ example := @Solcore.Frontend.elaborateTypedLetReturnBody?_mapOwner
 example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnBody?_mapOwner
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_mapOwner
 
+example := @Solcore.Frontend.TypedLetReturnBodyElaborates.extend_types
+example := @Solcore.Frontend.TypedLetReturnBodyHasType.extend_types
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_some_of_extends
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_eq_of_mutual_extends
+example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnBody?_some_of_extends
+example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnBody?_eq_of_mutual_extends
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_some_of_extends
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_eq_of_mutual_extends
+
 section RecursiveEntryContracts
 
 open Solcore Solcore.Frontend

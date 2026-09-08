@@ -166,6 +166,8 @@ import Solcore.Frontend.TypedLetReturnBodyStoreProperties
 import Solcore.Frontend.LocalTypeInputsOwnerProperties
 import Solcore.Frontend.TypedLetReturnBodyOwnerProperties
 import Solcore.Frontend.TypedLetReturnBodyRunnerOwnerProperties
+import Solcore.Frontend.TypedLetReturnBodyTypeExtensionProperties
+import Solcore.Frontend.TypedLetReturnBodyRunnerTypeExtensionProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -189,6 +191,7 @@ A separate checked body runner adds exact fuel thresholds, a source-only bound
 and genuine-state resumption. Store replay preserves values and costs, with
 each completed or suspended observation retaining its own store. Injective
 owner-only relabeling commutes with fresh binding and preserves exact Core,
-whole optional results and checkpoints at a fixed store. No runtime-entry
-integration, type inference or broader binding policy is added for this profile.
+whole optional results and checkpoints at a fixed store. First-match type-meaning
+extension preserves success, and mutual extension also preserves rejection.
+No runtime-entry integration, inference or broader binding policy is added.
 -/

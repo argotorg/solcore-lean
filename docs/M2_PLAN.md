@@ -389,6 +389,17 @@ at fixed fuel/store. This does not equate the owner-bearing inputs, generalize
 allocation to arbitrary index-changing/owner-collapsing maps, introduce raw/cost
 owner transport or change existing parameter and runtime-entry profiles.
 
+Typed-prefix type-name extension (ADR-0214) now transports annotation meanings
+while keeping original inputs, initializer scope, fresh tails and exact Core/type
+fixed. One-way semantic extension preserves successful checking and full runner
+pairs, including actual checkpoints; mutual extension preserves complete Options.
+Static nominal inputs require no values, and runtime values/fuel/stores are never
+reconstructed or changed. Unknown annotation meanings can be added to enable a
+previously rejected body, so one-way None preservation is not claimed. Keeping
+old rows beneath an overriding head is not semantic extension, whereas differing
+hidden duplicates can preserve all visible meanings. No redundant raw/cost/bound
+transport or runtime-entry/inference/binding-policy extension is introduced.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while

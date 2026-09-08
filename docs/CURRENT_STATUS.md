@@ -902,6 +902,27 @@ or owner-collapsing maps. Existing runtime-parameter owner laws and runtime-entr
 profiles are unchanged; body proofs have no reverse dependency on them. No
 raw/cost owner-transport API, inference, parser, Core or binding policy is added.
 
+### Typed local-declaration prefixes: type-name extension
+
+Preserving existing first-match type meanings now preserves exact prefix
+elaboration and whole typing (ADR-0214). The body, owner and input bundle stay
+fixed. Only written annotation meanings are transported; old-scope initializer
+evidence, declared types, fresh tail inputs, positional Core and result type
+are unchanged. Static nominal inputs still require no runtime inhabitants.
+
+One-way semantic extension preserves successful checker results and complete
+successful runner pairs, including genuine checkpoints at insufficient fuel.
+Mutual extension preserves the whole optional result, including rejection,
+without requiring equal tables or unique keys. Actual ordered values, fuel and
+store remain fixed. Adding a formerly unknown annotation can change `none` to
+`some`, so one-way extension does not preserve rejection. A changed first-match
+meaning is not extension merely because all old rows remain present; hidden
+duplicates may differ harmlessly when visible meanings are preserved.
+
+Raw paths, exact costs and source bounds do not depend on the caller type table
+and acquire no new checking evidence from these laws. No runtime-entry, parser,
+Core, inference, default-initializer or binding-policy extension is made.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime
