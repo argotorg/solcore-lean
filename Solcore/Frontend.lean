@@ -13,6 +13,11 @@ import Solcore.Frontend.LocalExpressionEvaluationProperties
 import Solcore.Frontend.LocalExpressionSafetyProperties
 import Solcore.Frontend.LocalExpressionExecutionProperties
 import Solcore.Frontend.LocalReferenceEmbeddingProperties
+import Solcore.Frontend.LocalInputs
+import Solcore.Frontend.LocalInputsProperties
+import Solcore.Frontend.LocalInputsLookupProperties
+import Solcore.Frontend.LocalInputsExecution
+import Solcore.Frontend.LocalInputsExecutionProperties
 
 /-!
 Canonical local-reference and conditional-expression semantic adapters with

@@ -723,6 +723,7 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Comptime/runtime staging | Blocked | staging decision and effect rules | Low |
 | Canonical Syntax-to-Resolved adapter | Identifier/group/conditional fragment implemented (ADR-0155/0156) | exact structure/type/value/store correspondence for explicit tables; source declaration collection, ID assignment, and general expression resolution remain open | High |
 | Canonical local conditional execution | Implemented for the explicit-table fragment | Boolean condition, same-type branches, selected-branch-only evaluation, typed open-environment totality and sufficient Core fuel; no source literal or operator policy | High |
+| Typed local input construction and execution | Implemented (ADR-0157) | unique IDs, fresh insertion, exact row lookup and automatically aligned typed tables; checked runner preserves type/value/store and separates check failure from fuel exhaustion; not source declaration collection | Low |
 | Resolved-to-Core elaboration | Exact local-expression fragment implemented | full source coverage, effects beyond the store-preserving fragment, and stage preservation remain open | Medium |
 
 ## Contract and runtime semantics

@@ -134,6 +134,29 @@ typing or a source-text execution service. The narrower reference adapter stays
 unchanged. Source declarations, literals, overloaded operations, calls, mutation,
 and staging remain separate; no parser or Oracle behavior changes.
 
+### Typed local input execution
+
+`LocalInputs` now bundles each spelling, unique ID, type, value, and structural
+value-typing evidence (ADR-0157). Name, type, and runtime tables are ordered
+projections, so callers do not separately prove matching ID order or environment
+typing. Unique IDs ensure that a selected name retrieves its own row's type and
+value. Repeated names still select the first row. Empty inputs and fresh binding
+insertion preserve ID uniqueness within the supplied inputs, not globally.
+
+The convenience checker and runner reuse the existing conditional fragment and
+execute the actual returned Core. The runner retains the checked type and full
+Core result: check failure is absent, while fuel exhaustion is present and keeps
+the suspended state. Completed runs correspond exactly to independently typed
+source evaluations; they preserve value type and store. Typed inputs give
+sufficient-fuel execution, and the endpoint never returns a machine fault.
+Source-text regressions now also build these inputs through fresh insertion
+and exercise their checker and runner for both conditional branch choices.
+
+These are proof-carrying Lean inputs, not validation of arbitrary external
+values or source declaration collection. Structural typing of a cell reference
+does not assert that its location is allocated. A repeated-name insertion may
+change existing source meaning; fresh IDs do not prevent name shadowing.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

@@ -11,6 +11,7 @@ import Solcore.Test.FrontendLocalReferenceExecutionProperties
 import Solcore.Test.FrontendLocalExpressionProperties
 import Solcore.Test.FrontendLocalExpressionExecutionProperties
 import Solcore.Test.FrontendParsedLocalExpressions
+import Solcore.Test.FrontendLocalInputsProperties
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
