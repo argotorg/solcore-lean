@@ -11,6 +11,10 @@ namespace Solcore.Frontend.LocalTypeInputs
     Resolved.LocalScope.ids inputs.context = inputs.ids := by
   simp [context, ids, Resolved.LocalScope.ids, List.map_map]
 
+@[simp] theorem names_ids (inputs : LocalTypeInputs) :
+    inputs.names.map Prod.snd = inputs.ids := by
+  simp only [names, ids, List.map_map, Function.comp_def]
+
 @[simp] theorem empty_ids : empty.ids = [] := rfl
 
 @[simp] theorem empty_names : empty.names = [] := rfl
