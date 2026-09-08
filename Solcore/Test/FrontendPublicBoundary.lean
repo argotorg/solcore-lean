@@ -545,5 +545,19 @@ example := @Solcore.Frontend.AvoidsLocalName.add
 example := @Solcore.Frontend.LocalExpressionEvaluates.add
 example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.add
 example := @Solcore.Frontend.resolveLocalExpression?_add_spans
+example := @Solcore.Frontend.ResolvesLocalExpression.subtract
+example := @Solcore.Frontend.ResolvesLocalExpression.multiply
+example := @Solcore.Frontend.LocalExpressionHasType.subtract
+example := @Solcore.Frontend.LocalExpressionHasType.multiply
+example := @Solcore.Frontend.AvoidsLocalName.subtract
+example := @Solcore.Frontend.AvoidsLocalName.multiply
+example := @Solcore.Frontend.LocalExpressionEvaluates.subtract
+example := @Solcore.Frontend.LocalExpressionEvaluates.multiply
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.subtract
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.multiply
+example := @Solcore.Frontend.resolveLocalExpression?_subtract_spans
+example := @Solcore.Frontend.resolveLocalExpression?_multiply_spans
+example := @Solcore.Frontend.LocalInputExtensionSupport.fresh_ne_of_named
+example := @Solcore.Frontend.LocalInputExtensionSupport.identity_lookup_cons_iff
 
 end Tests

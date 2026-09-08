@@ -20,6 +20,8 @@ import Solcore.Frontend.LocalInputsExecution
 import Solcore.Frontend.LocalInputsExecutionProperties
 import Solcore.Frontend.LocalNameAvoidance
 import Solcore.Frontend.LocalNameAvoidanceProperties
+import Solcore.Frontend.LocalInputsExtensionLookupSupport
+import Solcore.Frontend.LocalInputsExtensionTyping
 import Solcore.Frontend.LocalInputsExtensionSemantics
 import Solcore.Frontend.LocalInputsExtensionProperties
 import Solcore.Frontend.LocalExpressionRenamingProperties

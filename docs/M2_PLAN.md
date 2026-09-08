@@ -244,7 +244,16 @@ and cost is both child costs plus three. Literal range checking, whole-branch
 checking, identity transport, and unused-input invariance remain intact.
 Parsed regressions distinguish wrapping arithmetic from overflowing literal
 rejection and preserve canonical grouping/precedence and exact fuel boundaries.
-Other arithmetic, comparison, assignment, and overload policy remain separate.
+Word subtraction and multiplication (ADR-0177) extend the same monomorphic
+rules and generic bridges with existing modular Core operations. Ordered source
+trees, two strict Word operands, intermediate stores, and child costs plus three
+are retained; all typing, safety, exact-fuel, renaming, and unused-input proofs
+cover both forms. Independent consumers and fully parsed position-pair tests
+distinguish noncommutative subtraction, grouping and multiplication precedence,
+operation wrap from literal rejection, and pending frames from terminal values.
+The fresh-input typing/evaluation proof split preserves existing public APIs.
+Division, remainder, comparison, unary signs, assignment, and general overload
+policy remain separate.
 
 Further frontend semantics should preserve exact identity, binding, and Core
 execution correspondence while extending supported expressions and declarations.

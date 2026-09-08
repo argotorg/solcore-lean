@@ -44,6 +44,8 @@ import Solcore.Test.FrontendRuntimeFunctionCompilation
 import Solcore.Test.FrontendParsedFunctionCompilation
 import Solcore.Test.FrontendWordAdditionProperties
 import Solcore.Test.FrontendParsedWordAddition
+import Solcore.Test.FrontendWordArithmeticProperties
+import Solcore.Test.FrontendParsedWordArithmetic
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5573,6 +5575,7 @@ def run : IO Unit := do
   frontendParsedParameterDeclarationTests
   frontendParsedFunctionCompilationTests
   frontendParsedWordAdditionTests
+  frontendParsedWordArithmeticTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
