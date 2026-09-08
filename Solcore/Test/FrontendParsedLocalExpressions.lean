@@ -98,6 +98,11 @@ private def checkBundledRun : IO Unit := do
       "bundled source fuel exhaustion was lost or confused with failed checking"
     assertTrue (decide (inputs.run? 4 unsupported store = none))
       "bundled source execution skipped whole-expression checking"
+    let extended := inputs.bindFresh (localId 0).owner "extra" .unit .unit .unit
+    assertTrue (decide (extended.check? source = some (expectedCore.weakenAt 0, .word)))
+      "adding an unused source name did not preserve the checked type and shift free positions"
+    assertTrue (decide (extended.run? 4 source store = inputs.run? 4 source store))
+      "adding an unused source name changed the completed conditional result"
 
 def frontendParsedLocalExpressionTests : IO Unit := do
   let simple : Core.Expr := .ifE (.var 1) (.var 2) (.var 3)
