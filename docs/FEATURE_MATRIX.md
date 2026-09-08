@@ -717,7 +717,7 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Resolved local typing and evaluation | Implemented for monomorphic unit/Boolean/Word, references, selected primitives, immutable expression bindings, and conditionals | independent checker/elaborator correspondence, type preservation/reflection, exact value/store simulation, determinism and sufficient-fuel execution; no source spelling semantics | Low |
 | Source type checking | Planned after source-to-Resolved adapter | canonical source type/effect rules; local resolved typing alone is not source typing | Medium |
 | Resolved scope and identity renaming | Complete for the local-expression fragment | scope iff elaboration existence; injective renaming preserves exact Core output, types, values, and store; non-injective capture counterexample; no source allocator claim | Low |
-| Fresh local binding insertion | Implemented for explicit scopes | owner-relative non-collision, order independence, exact free-index weakening, type/evaluation preservation under inner binders; no freshness outside the supplied scope | Low |
+| Fresh local binding insertion | Implemented for explicit scopes | owner-relative non-collision, exact free-index weakening, type/evaluation preservation under inner binders; evaluation reflection requires original scoping, freshness covers only the supplied scope | Low |
 | Parametric polymorphism | Planned | type application and preservation | Low |
 | Tabled class resolution | Planned | evidence language, finite search, inconclusive boundary | Low |
 | Comptime/runtime staging | Blocked | staging decision and effect rules | Low |

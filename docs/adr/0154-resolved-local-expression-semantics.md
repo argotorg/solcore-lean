@@ -67,6 +67,9 @@ evaluation judgments are not abbreviations for their Core counterparts.
   binder positions, even when an inner binder uses the newly inserted ID.
   Independent evaluation preservation needs neither typing nor whole-expression
   elaboration; no inverse for ill-scoped expressions is claimed by that law.
+- For originally well-scoped expressions, fresh insertion also reflects
+  evaluation, with exactly the same result and both stores. Original scoping
+  is essential: insertion can enable a previously absent reference.
 
 The store-preservation result is the effect boundary of this fragment. No
 staging judgment is claimed. Fuel is a Core evaluator resource, not source

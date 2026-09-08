@@ -51,6 +51,8 @@ and named evaluation; a non-injective capture example fixes the limit of this
 guarantee. A pure scope-relative allocator now supplies the premise for fresh
 binding insertion. Lookup, typing, exact free-index weakening, and independent
 evaluation are preserved, including under inner binders with the inserted ID.
+For originally scoped expressions, insertion gives an exact evaluation equivalence;
+the regression for a newly enabled reference protects the original-scoping premise.
 These proofs do not implement a source declaration traversal or global allocator.
 
 Canonical identifiers and grouping now have an exact explicit-table adapter

@@ -69,6 +69,9 @@ corresponding free Core indices, and retains existing evaluation values and
 stores. Inner binders may reuse the inserted ID: their own bindings remain
 nearest. The evaluation-preservation law also covers a skipped ill-scoped
 branch, without mistaking newly enabled elaboration for unchanged scope validity.
+For originally well-scoped expressions, fresh insertion also reflects evaluation:
+the exact value and both stores agree in both directions. Freshness alone does
+not justify this inverse; an absent reference can become evaluable after insertion.
 
 The resolved fragment alone is not a canonical source adapter. It does not interpret literal
 spelling, resolve `true`/`false` or overloaded operators, allocate source-wide IDs,

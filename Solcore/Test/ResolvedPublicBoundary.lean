@@ -104,5 +104,10 @@ example := @Solcore.Resolved.LocalScope.Lookup.insert_fresh
 example := @Solcore.Resolved.Evaluates.insert_fresh
 example := @Solcore.Resolved.Evaluates.weaken_fresh
 example := @Solcore.Resolved.Evaluates.weaken_allocated
+example := @Solcore.Resolved.LocalScope.lookup_insert_fresh_iff
+example := @Solcore.Resolved.Evaluates.reflect_insert_fresh
+example := @Solcore.Resolved.WellScoped.evaluates_insert_fresh_iff
+example := @Solcore.Resolved.WellScoped.evaluates_weaken_fresh_iff
+example := @Solcore.Resolved.WellScoped.evaluates_weaken_allocated_iff
 
 end Tests
