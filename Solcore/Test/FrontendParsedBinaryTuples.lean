@@ -66,6 +66,11 @@ private def certify (ctx : Resolved.Context) (environment : Resolved.Environment
       return { child with resolution := by rw [sourceAt]; exact .group child.resolution
                           typing := by rw [sourceAt]; exact .group child.typing
                           raw := by rw [sourceAt]; exact .group child.raw }
+  | ⟨_, .tuple ⟨_, []⟩⟩ =>
+      return ⟨.unit, .unit, .unit, .unit, 1,
+        by rw [sourceAt]; exact .unit, .unit,
+        by rw [sourceAt]; exact .unit, by rw [sourceAt]; exact .unit,
+        fun _ => .cons .unit .refl⟩
   | ⟨_, .tuple ⟨_, [left, right]⟩⟩ =>
       let a ← certify ctx environment aligned store left
       let b ← certify ctx environment aligned store right
@@ -216,6 +221,7 @@ def frontendParsedBinaryTupleTests : IO Unit := do
   checked "(l,c)" (w 9) (w 2) false .word .word (.pair (.var 0) (.var 2)) (.product .word .bool) (.pair (w 9) (.bool false)) 5
   checked "(c,r)" (w 9) (w 2) true .word .word (.pair (.var 2) (.var 1)) (.product .bool .word) (.pair (.bool true) (w 2)) 5
   for text in ["(l)", "(l,)"] do checked text (w 9) (w 2) true .word .word (.var 0) .word (w 9) 1
+  checked "()" (w 9) (w 2) true .word .word .unit .unit .unit 1
   checked "(l,r)" (.cellRef .word 999) (.closure .word .word (.var 0) []) true (.cell .word) (.function .word .word)
     pair (.product (.cell .word) (.function .word .word)) (.pair (.cellRef .word 999) (.closure .word .word (.var 0) [])) 5
   let source ← parsed "(l,r,)"
@@ -247,7 +253,7 @@ def frontendParsedBinaryTupleTests : IO Unit := do
         some (value, if forwarded then 8 else 4)) && (elaborateLocalExpression? table (context .word .word) expression).isNone)
         "raw pair forwarding became a whole Bool rule"
       for store in stores do rawLogical expression c store
-  for text in ["()", "(l,r,c)", "(l,r,c,l)", "[l,r]", "(l,r).x", "(l,r)[0]", "(missing,r)", "(l,missing)", "(l,f(r))", "(l,~c)"] do
+  for text in ["(l,r,c)", "(l,r,c,l)", "[l,r]", "(l,r).x", "(l,r)[0]", "(missing,r)", "(l,missing)", "(l,f(r))", "(l,~c)"] do
     rejected text
   rejected "c ? (l,r) : (l,missing)" (some (.pair (w 9) (w 2), 8))
   rejected "c ? (l,r) : l" (some (.pair (w 9) (w 2), 8))
