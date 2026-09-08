@@ -150,7 +150,7 @@ def frontendParsedWordBitwiseTests : IO Unit := do
   checkRun supplied "a + b" (.binary .wordAdd (.var 2) (.var 1)) (word 374) 5
   checkRun supplied "a - b" (.binary .wordSub (.var 2) (.var 1)) ((word 170).sub (word 204)) 5
   checkRun supplied "a * b" (.binary .wordMul (.var 2) (.var 1)) (word 34680) 5
-  checkRejected supplied "a / b" false
+  checkRejected supplied "a(b)" false
   let rejectsTrailing ← try
     let _ ← parsedExpression "a & b 7"
     pure false

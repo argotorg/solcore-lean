@@ -171,7 +171,7 @@ def frontendParsedTerminalBodyInvarianceTests : IO Unit := do
         "{ if(t){return t;}else{return f;} }", "{ if(c){return t;} }",
         "{ return t; return f; }", "{ if(c){return t;}else{return f;} return t; }",
         "{ if(c){if(c){return t;}else{return f;}}else{return f;} }"] do checkRejected inputs content
-    for invalid in [s!"{Core.wordModulus}", "t / f", "t(c)"] do
+    for invalid in [s!"{Core.wordModulus}", "t + c", "t(c)"] do
       checkRejected inputs ("{ if(c){return t;}else{return " ++ invalid ++ ";} }")
       checkRejected inputs ("{ if(c){return " ++ invalid ++ ";}else{return f;} }")
   let unit : TypedRuntimeArgument := ⟨.unit, .unit, .unit⟩

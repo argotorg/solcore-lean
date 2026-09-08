@@ -100,7 +100,8 @@ private def rejectedArguments (declaration : Syntax.FunctionDecl) (compiled : Co
 private def strictOperations :
     List (String × Core.BinaryOp × (Core.Word → Core.Word → Core.Word)) :=
   [("+", .wordAdd, Core.Word.add), ("-", .wordSub, Core.Word.sub),
-    ("*", .wordMul, Core.Word.mul), ("&", .wordAnd, Core.Word.bitAnd),
+    ("*", .wordMul, Core.Word.mul), ("/", .wordDiv, Core.Word.udiv), ("%", .wordMod, Core.Word.umod),
+    ("&", .wordAnd, Core.Word.bitAnd),
     ("|", .wordOr, Core.Word.bitOr), ("^", .wordXor, Core.Word.bitXor)]
 
 def frontendParsedFuelBoundTests : IO Unit := do
@@ -182,15 +183,28 @@ def frontendParsedFuelBoundTests : IO Unit := do
     [.namedData ⟨91⟩] (.var 0) (.namedData ⟨91⟩) 1
   for arguments in [[], [boolArg false], [wordArg 0], [cell], [identity]] do
     rejectedArguments nominal nominalCompiled arguments
+  let (division, divisionCompiled) ← accepted
+    "function division(x: Word) returns (Word) { return x / x; }"
+    [.word] (.binary .wordDiv (.var 0) (.var 0)) .word 5
+  let (selectedDivision, selectedDivisionCompiled) ← accepted
+    "function selected(c: Bool, x: Word) returns (Word) { return c ? x : x / x; }"
+    [.bool, .word] (.ifE (.var 1) (.var 0) (.binary .wordDiv (.var 0) (.var 0))) .word 8
+  for input in [0, 1, 7, Core.Word.maximum.val] do
+    let quotient := word (if input == 0 then 0 else 1)
+    completed division divisionCompiled [wordArg input] (.word quotient) 5
+    for choice in [false, true] do
+      completed selectedDivision selectedDivisionCompiled [boolArg choice, wordArg input]
+        (.word (if choice then word input else quotient)) (if choice then 4 else 8)
+  -- Bool || Word remains rejected even though its division now has bound five.
   for (content, expectedBound) in [
       ("function empty() {}", 0), ("function multiple() { return; return; }", 0),
-      ("function division(x: Word) returns (Word) { return x / x; }", 0),
+      ("function call(x: Word) returns (Word) { return x(x); }", 0),
       ("function missing() returns (Word) { return missing; }", 1),
       ("function string() returns (Word) { return \"7\"; }", 1),
       (s!"function overflow() returns (Word)" ++ " { return " ++ s!"{Core.wordModulus};" ++ " }", 1),
       ("function skipped(c: Bool) returns (Bool) { return c && missing; }", 4),
-      ("function skipped(c: Bool, x: Word) returns (Bool) { return c || x / x; }", 4),
-      ("function skipped(c: Bool, x: Word) returns (Word) { return c ? x : x / x; }", 4),
+      ("function skipped(c: Bool, x: Word) returns (Bool) { return c || x / x; }", 8),
+      ("function skipped(c: Bool, x: Word) returns (Word) { return c ? x : x(c); }", 4),
       ("function wrong(c: Bool, x: Word) returns (Word) { return c ? x : c; }", 4),
       ("function wrong(x: Word) returns (Word) { return x > 0; }", 5)] do
     let some declaration ← parsed? content | throw (IO.userError "whole-rejection fixture failed parsing")

@@ -212,13 +212,13 @@ def frontendParsedTerminalReturnBodiesTests : IO Unit := do
       (.ifE (.var 2) (.ifE (.var 2) (.binary .wordSub (.var 1) (.var 0)) (.var 0))
         (.ifE (.var 2) (.var 1) (.var 0))) .word
       (.word (if choice then (word 7).sub (word 9) else word 9)) (if choice then 11 else 7) 11
-    for invalid in ["missing", "c", "t / f", "t(c)", s!"{Core.wordModulus}"] do
+    for invalid in ["missing", "c", "t + c", "t(c)", s!"{Core.wordModulus}"] do
       checkSkipped inputs choice invalid
     for content in ["{}", "{ return t; return f; }", "{ t; return f; }", "{ return t; missing; }", "{ if(c){return t;} }",
         "{ t; if(c){return t;}else{return f;} }", "{ if(c){return t;}else{return f;} return t; }",
         "{ if(c){return t;}else{return f;} if(c){return f;}else{return t;} }",
         "{ { if(c){return t;}else{return f;} } }"] do checkRejected inputs content true
-    for content in ["{ return missing; }", "{ return t / f; }", "{ return c ? t : missing; }",
+    for content in ["{ return missing; }", "{ return t(c); }", "{ return c ? t : missing; }",
         "{ return c ? t : c; }", "{ if(t){return t;}else{return f;} }", "{ if(missing){return t;}else{return f;} }",
         "{ if(c){return t;}else{return c;} }", "{ if(c){return;}else{return t;} }",
         "{ if(c){}else{return f;} }", "{ if(c){return t;}else{} }",

@@ -205,7 +205,7 @@ def frontendParsedTerminalRuntimeEntriesTests : IO Unit := do
       "{if(c){if(c){return t;}else{return f;}}else{return f;}}", "{if(t){return t;}else{return f;}}",
       "{if(c){return t;}else{return c;}}", "{if(c){return;}else{return f;}}"] do
     reject ("function invalid(c: Bool,t: Word,f: Word) returns (Word)" ++ body)
-  for invalid in ["missing", "c", "t / f", "t(c)", s!"{Core.wordModulus}"] do
+  for invalid in ["missing", "c", "t + c", "t(c)", s!"{Core.wordModulus}"] do
     reject ("function skipped(c: Bool,t: Word,f: Word) returns (Word){if(c){return t;}else{return " ++ invalid ++ ";}}")
     reject ("function skipped(c: Bool,t: Word,f: Word) returns (Word){if(c){return " ++ invalid ++ ";}else{return f;}}")
   for header in ["function wrong(c: Bool)", "function wrong(c: Bool) returns (Bool)",

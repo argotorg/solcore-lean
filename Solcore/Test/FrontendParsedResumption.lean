@@ -187,7 +187,7 @@ def frontendParsedResumptionTests : IO Unit := do
       "function missing() returns (Word) { return missing; }",
       "function skipped(c: Bool) returns (Bool) { return c && missing; }",
       "function skipped(c: Bool, x: Word) returns (Bool) { return c || x / x; }",
-      "function skipped(c: Bool, x: Word) returns (Word) { return c ? x : x / x; }",
+      "function skipped(c: Bool, x: Word) returns (Word) { return c ? x : x(c); }",
       "function wrong(c: Bool, x: Word) returns (Word) { return c ? x : c; }"] do
     let some declaration ← parsed? content | throw (IO.userError "whole-rejection fixture failed parsing")
     assertTrue (compileRuntimeFunction? types owner declaration).isNone "invalid whole declaration compiled"

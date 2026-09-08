@@ -179,7 +179,7 @@ def frontendParsedConditionalReturnBodiesTests : IO Unit := do
       (.ifE (.var 2) (.ifE (.var 2) (.binary .wordSub (.var 1) (.var 0)) (.var 0))
         (.ifE (.var 2) (.var 1) (.var 0))) .word
       (.word (if choice then (word 7).sub (word 9) else word 9)) (if choice then 11 else 7) 11
-    for invalid in ["missing", "c", "t / f", "t(c)", s!"{Core.wordModulus}"] do
+    for invalid in ["missing", "c", "t + c", "t(c)", s!"{Core.wordModulus}"] do
       checkSkipped inputs choice invalid
     for content in ["{}", "{ return; }", "{ return t; }", "{ if(c){return t;} }",
         "{ t; if(c){return t;}else{return f;} }", "{ if(c){return t;}else{return f;} return t; }",

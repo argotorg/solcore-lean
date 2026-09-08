@@ -255,7 +255,7 @@ def frontendParsedLocalExpressionTests : IO Unit := do
   checkRun "t - e" (.binary .wordSub (.var 2) (.var 3)) false false
     (.word ((Core.Word.ofNatModulo 11).sub (Core.Word.ofNatModulo 22))) 5
   checkRun "t * e" (.binary .wordMul (.var 2) (.var 3)) false false (word 242) 5
-  checkUnsupported "t / e"
+  checkUnsupported "t(e)"
   checkIllTyped "~c"
   checkIllTyped "n ? t : e"
   checkIllTyped "c ? t : d"

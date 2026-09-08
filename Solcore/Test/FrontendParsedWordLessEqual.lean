@@ -248,7 +248,7 @@ def frontendParsedWordLessEqualTests : IO Unit := do
     for fuel in [0, 7, 30] do
       assertTrue (runRuntimeFunction? types owner declaration [argument, argument] fuel store).isNone
         "rejected actual non-Word lessEqual entered execution"
-  for content in ["l / r", "l % r"] do
+  for content in ["l(c)", "r(c)"] do
     checkRejected supplied content false
   checkParameterPositions
   checkReturnContract

@@ -171,7 +171,7 @@ def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
       "function repeated() { return; return; }", "function tail() returns (Word) { 7 }",
       "function discarded() { return; missing; }", "function before() { 7; return; }",
       "function local() returns (Word) { let x = 7; return x; }",
-      "function arithmetic() returns (Word) { return 7 / 9; }"] do
+      "function call() returns (Word) { return missing(); }"] do
     checkRejected content
   for content in ["function publicOnly() public { return; }",
       "function payableOnly() payable { return; }", "function both() public payable { return; }"] do

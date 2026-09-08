@@ -250,7 +250,7 @@ def frontendParsedWordLessTests : IO Unit := do
       assertTrue (prepareRuntimeFunction? types owner declaration arguments).isNone "actual non-Word operand prepared"
       for fuel in [0, 11, 50] do
         assertTrue (runRuntimeFunction? types owner declaration arguments fuel store).isNone "actual non-Word operand ran"
-  for content in ["l / r", "l % r"] do checkRejected supplied content false
+  for content in ["l(c)", "r(c)"] do checkRejected supplied content false
   checkParameterPositions
   checkReturnContract
   checkArithmeticEntry

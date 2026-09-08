@@ -174,7 +174,7 @@ def frontendParsedWordAdditionTests : IO Unit := do
     for content in ["0 + missing", "missing + 0", s!"0 + {Core.wordModulus}",
         s!"{Core.wordModulus} + 0", "c ? l : 0 + missing", "c ? missing + 0 : r",
         s!"c ? l : 0 + {Core.wordModulus}", s!"c ? {Core.wordModulus} + 0 : r",
-        "0 + \"1\"", "l / r", "l % r"] do
+        "0 + \"1\"", "l(c)", "r(c)"] do
       checkRejected selected content false
   checkShapes
   checkParameterPositions
