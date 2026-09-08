@@ -834,6 +834,19 @@ example := @Solcore.Frontend.terminalReturnBodyEvaluatesWithCost_store_iff
 example := @Solcore.Frontend.LocalInputs.runTerminalReturnBody?_done_store_iff
 example := @Solcore.Frontend.LocalInputs.runTerminalReturnBody?_outOfFuel_store_iff
 
+example := @Solcore.Frontend.ResolvesLocalExpression.divide
+example := @Solcore.Frontend.ResolvesLocalExpression.modulo
+example := @Solcore.Frontend.LocalExpressionHasType.divide
+example := @Solcore.Frontend.LocalExpressionHasType.modulo
+example := @Solcore.Frontend.AvoidsLocalName.divide
+example := @Solcore.Frontend.AvoidsLocalName.modulo
+example := @Solcore.Frontend.LocalExpressionEvaluates.divide
+example := @Solcore.Frontend.LocalExpressionEvaluates.modulo
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.divide
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.modulo
+example := @Solcore.Frontend.resolveLocalExpression?_divide_spans
+example := @Solcore.Frontend.resolveLocalExpression?_modulo_spans
+
 section TerminalEntryContracts
 
 open Solcore Solcore.Frontend

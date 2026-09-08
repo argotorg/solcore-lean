@@ -88,6 +88,8 @@ import Solcore.Test.FrontendTerminalBodyInvarianceProperties
 import Solcore.Test.FrontendParsedTerminalBodyInvariance
 import Solcore.Test.FrontendTerminalRuntimeEntryProperties
 import Solcore.Test.FrontendParsedTerminalRuntimeEntries
+import Solcore.Test.FrontendWordDivisionProperties
+import Solcore.Test.FrontendParsedWordDivision
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5633,6 +5635,7 @@ def run : IO Unit := do
   frontendParsedTerminalReturnBodiesTests
   frontendParsedTerminalBodyInvarianceTests
   frontendParsedTerminalRuntimeEntriesTests
+  frontendParsedWordDivisionTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

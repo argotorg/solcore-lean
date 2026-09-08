@@ -450,10 +450,22 @@ add eleven, giving thirteen-step leaves. Actual checkpoints at three/six/eleven/
 twelve have ten/seven/two/one transitions left; the last retains the less-than
 Boolean and pending negation. Independent and parsed consumers cover actual
 arguments, exact resumption, short-circuit/arithmetic composition and own entry
-provenance. Seven obsolete `>=` rejections are removed, leaving division/remainder
-and all chained-comparison parser rejections unchanged.
-Division, remainder, unary signs, assignment, and general
-overload policy remain separate.
+provenance. Seven obsolete `>=` rejections are removed without changing
+chained-comparison parser rejection.
+
+Unsigned Word division and remainder (ADR-0199) now map canonical `/` and `%`
+directly to the ordered existing `wordDiv` and `wordMod` nodes. Two Word operands
+and a Word result use `Word.udiv`/`Word.umod`, including zero for both zero-divisor
+cases. Evaluation always visits both operands once, left before right; exact
+cost and source bound are the child costs/bounds plus three, or five for leaves.
+Every existing static/dynamic and identity/input/store/fuel/resumption theorem
+extends without new premises. Integrated terminal entries retain exact compiled
+Core, actual ordered arguments and independent provenance. Tests distinguish
+quotient/remainder and operand order, cover zero/high-bit/max values and actual
+checkpoints, and migrate obsolete unsupported-operator negatives while retaining
+non-Word, call and invalid-arm rejection. Structural bounds also change for some
+still-ill-typed expressions. Unary signs, assignment and general overload policy
+remain separate; Core/Resolved definitions, parsing and frozen interfaces do not change.
 
 Further frontend semantics should preserve exact identity, binding, and Core
 execution correspondence while extending supported expressions and declarations.

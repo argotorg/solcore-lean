@@ -236,8 +236,9 @@ to checked execution. Tests distinguish this boundary from raw evaluation that
 skips a missing or unsupported operand, which still prevents whole checking.
 Parsed precedence, grouping, and nested right operands exercise exact fuel
 differences between selected and skipped paths. Comparisons other than unsigned
-Word `>`/`<`/`<=`/`>=`/`==`/`!=` and arithmetic other than the separately specified Word addition,
-subtraction, and multiplication remain unsupported.
+Word `>`/`<`/`<=`/`>=`/`==`/`!=` and arithmetic beyond the separately specified
+Word addition, subtraction, multiplication, unsigned division and remainder
+remain unsupported.
 
 Word complement `~` is also supported as a fixed Word-only operation
 (ADR-0161), using the existing direct Core `wordNot`. Independent typing,
@@ -299,8 +300,26 @@ names or the old import path. Independent arbitrary-Word consumers and complete
 parsed declarations check noncommutative subtraction, multiplication precedence,
 grouping, all 58 tested ordered parameter pairs across the two operations, and
 the exact pending binary frame at four transitions before completion at five.
-Division, remainder, other comparisons, unary signs, and assignments remain outside
-the restricted expression adapter.
+Unsigned division and remainder are specified separately below; unary signs and
+assignments remain outside the restricted expression adapter.
+
+Word-only `/` and `%` now lower to the original ordered `wordDiv` and `wordMod`
+nodes (ADR-0199). Their values use the established unsigned `Word.udiv` and
+`Word.umod`: a zero divisor gives zero for both, including remainder. Neither
+zero dividend nor zero divisor skips an operand. Both Word children evaluate
+once, left before right, and exact cost/source bounds add three to the child
+costs. Two leaves require five transitions even when the result is zero.
+
+All independent resolution, typing, raw/cost evaluation, Core correspondence,
+safety, ID/insertion/store invariance, bounds and genuine-state resumption laws
+cover both forms with unchanged premises. Return bodies and integrated terminal
+entries retain their actual arguments, exact checked Core and provenance without
+extra transitions. Independent and parsed consumers cover unsigned boundary
+values, quotient/remainder distinctions, zeros, noncommutative operands, actual
+pending binary frames and exact completion thresholds. Obsolete unsupported `/`
+and `%` negatives are migrated without discarding call, non-Word, or unselected-arm
+rejection. A structural bound may increase even when a Bool/Word mismatch still
+rejects checking. No parser, primitive, wire, profile or overload policy changes.
 
 Unsigned Word `>` now produces a Bool through the direct ordered `wordGt`
 node (ADR-0178). Both operands must be Words even though the result is Boolean.
@@ -387,7 +406,8 @@ All generic static/dynamic and exact-store/fuel/resumption/provenance contracts
 cover the form without stronger premises. Parsed tests cover actual ordered
 arguments, unsigned boundaries, short-circuit and arithmetic/conditional
 composition, and whole return-type rejection. Seven obsolete `>=` rejection
-fixtures were removed while division/remainder and parser chain rejection remain.
+fixtures were removed. Parser chain rejection remains; unsigned division and
+remainder are now supported separately by ADR-0199.
 
 ### Numeric spelling and strict Word interpretation
 
@@ -2601,7 +2621,9 @@ language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
 Semantic Core remain separate later stages. Canonical local references, Boolean
-operators, Word addition/subtraction/multiplication, bitwise operations, unsigned `>`/`<`/`<=`/`>=` and Word equality/inequality, strict Word literals, and conditionals connect through the explicit-table adapters described above.
+operators, Word addition/subtraction/multiplication/unsigned division/remainder,
+bitwise operations, unsigned `>`/`<`/`<=`/`>=` and Word equality/inequality, strict
+Word literals, and conditionals connect through the explicit-table adapters above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 
