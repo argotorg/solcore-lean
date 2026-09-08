@@ -112,6 +112,7 @@ published through Oracle v4.
 | Changed-carrier atom trace consumer | Exact core/public Failure and State reconstruction when a child replaces tokens/endIndex and cursor-only rewind changes boundary observation | Demonstrates why rejected carrier preservation cannot be silently assumed | High |
 | Maximal postfix-tail diagnostic traces | Independent prioritized index/call/field ASTs, seven failures, joint exactness, all-fuel soundness, derivation-threshold completeness, and pointwise whole-State/Failure equivalences | Child-conditional; threshold is not remainingCount; invariant exclusion and rejected source/end-byte frames stay explicit | High |
 | Unrestricted postfix-tail totality | Minimal child endIndex/progress/bounded-ordinary contract gives explicit-budget and production ordinary execution, separate actual/independent trace existence, and fixed-fuel completeness with joint exactness | No source/token-storage validity; tail layer only, not recursive expression closure | High |
+| Postfix progress/fuel boundary consumers | Stationary index succeeds while call reaches noProgress; a rewinding child has finite independent traces and five contracts but production fuel two fails where fuel three succeeds | Full-window frames, ordinary children, and trace exactness do not imply production adequacy | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are

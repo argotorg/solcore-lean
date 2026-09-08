@@ -1202,6 +1202,13 @@ joint exactness then gives fixed-fuel completeness. Whole-State/Failure equivale
 retain explicit invariant exclusion and, for rejection, weak child source/end-byte
 frames. This is not yet recursive expression closure.
 
+Concrete counter-consumers separate stationary index success from call noProgress.
+A full-window-preserving rewinding child has five trace contracts and ordinary
+execution, but its two-index independent trace needs fuel three where the initial
+production budget is two. Reverse derivation checks and exact Reply checks retain
+arbitrary prior events. Child framing and trace exactness therefore do not imply
+the strict progress needed by production totality.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

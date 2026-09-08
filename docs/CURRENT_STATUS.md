@@ -1636,6 +1636,15 @@ needs the explicit weak child file/endByte frame. All-fuel context laws preserve
 full successful windows or a caller-selected rejected window observation. These
 remain tail-layer results, not complete recursive expression traces.
 
+Concrete progress-boundary consumers now show why these distinctions matter.
+A stationary child has an independent successful index trace, while a call
+with the same child reaches noProgress and has no independent success. A child
+that rewinds and replaces tokens still satisfies all five trace contracts,
+full-window context, and ordinary execution. Its finite two-index derivation
+executes at fuel three, yet the initial production budget of two is exhausted.
+Both independent derivations feed reverse completeness; arbitrary incoming
+diagnostic multiplicity and the exact final carrier are retained.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
