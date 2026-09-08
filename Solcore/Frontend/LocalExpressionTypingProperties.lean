@@ -30,6 +30,14 @@ theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Reso
       obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
       obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
       exact ⟨_, .add leftResolved rightResolved, .binary leftTyped rightTyped⟩
+  | subtract _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .subtract leftResolved rightResolved, .binary leftTyped rightTyped⟩
+  | multiply _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .multiply leftResolved rightResolved, .binary leftTyped rightTyped⟩
   | bitAnd _ _ leftIH rightIH =>
       obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
       obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
@@ -79,6 +87,12 @@ theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context 
   | add _ _ leftIH rightIH =>
       cases typing with
       | binary leftTyped rightTyped => exact .add (leftIH leftTyped) (rightIH rightTyped)
+  | subtract _ _ leftIH rightIH =>
+      cases typing with
+      | binary leftTyped rightTyped => exact .subtract (leftIH leftTyped) (rightIH rightTyped)
+  | multiply _ _ leftIH rightIH =>
+      cases typing with
+      | binary leftTyped rightTyped => exact .multiply (leftIH leftTyped) (rightIH rightTyped)
   | bitAnd _ _ leftIH rightIH =>
       cases typing with
       | binary leftTyped rightTyped => exact .bitAnd (leftIH leftTyped) (rightIH rightTyped)
