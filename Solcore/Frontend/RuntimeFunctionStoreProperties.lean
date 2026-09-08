@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalExpressionStoreProperties
+import Solcore.Frontend.ReturnBodyStoreProperties
 import Solcore.Frontend.RuntimeFunctionCompiledExecutionProperties
 
 /-! Store-independent values and exact costs lift through unchanged return and
@@ -7,24 +7,6 @@ entry contracts. Full results are not equated: each retains its own store. -/
 set_option autoImplicit false
 
 namespace Solcore.Frontend
-
-theorem ReturnBodyEvaluates.change_store
-    {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {body : Syntax.Block} {value : Core.Value}
-    (evaluation : ReturnBodyEvaluates table environment initialStore body value finalStore)
-    (replacement : Core.Store) : ReturnBodyEvaluates table environment replacement body value replacement := by
-  cases evaluation with
-  | bare => exact .bare
-  | expression child => exact .expression (child.change_store replacement)
-
-theorem ReturnBodyEvaluatesWithCost.change_store
-    {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {body : Syntax.Block} {value : Core.Value} {cost : Nat}
-    (evaluation : ReturnBodyEvaluatesWithCost table environment initialStore body value finalStore cost)
-    (replacement : Core.Store) : ReturnBodyEvaluatesWithCost table environment replacement body value replacement cost := by
-  cases evaluation with
-  | bare => exact .bare
-  | expression child => exact .expression (child.change_store replacement)
 
 theorem RuntimeFunctionEvaluatesWithCost.change_store
     {types : TypeNameTable} {owner : Resolved.DeclarationId} {declaration : Syntax.FunctionDecl}
