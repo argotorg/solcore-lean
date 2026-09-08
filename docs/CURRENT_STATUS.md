@@ -214,6 +214,26 @@ Manual singleton and larger tuples, tuple type syntax, explicit empty/multiple
 return annotations and projections remain outside this change. Core/resolved
 semantics, parser ranges, diagnostics and frozen wire formats are unchanged.
 
+A separate opt-in structural type adapter now interprets original canonical
+type syntax (ADR-0232). Independent named, Unit, singleton and ordered binary
+product meanings correspond exactly to total interpretation. Type singletons
+remain original tuple nodes, unlike expression grouping. All children use the
+same caller table, exact qualified components and duplicate first matches;
+arbitrary nominal types require no runtime inhabitants. Structural results need
+not be table entries. The old named-only API and its whole-result membership
+contract are unchanged.
+
+Soundness/completeness, unique meaning, exact success/failure, outer-range and
+lookup extensionality, successful semantic extension and full mutual-extension
+equality are proved. Independent source and complete parsed-type consumers
+cover explicit nesting/order, hidden duplicates, missing written leaves,
+arbitrary raw ranges and unchanged unsupported forms. One-way extension may
+enable a formerly missing leaf. This prerequisite is not yet connected to
+parameter/header/let annotation gates: those existing entry APIs retain every
+tuple-type rejection, checked with correct-arity actual arguments and original
+parsed annotations. Larger tuple lists, other type constructors, expressions,
+Core/resolved semantics, diagnostics and frozen wire formats are unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

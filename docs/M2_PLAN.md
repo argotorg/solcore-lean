@@ -162,6 +162,24 @@ negative and old unsupported-arity consumer migrate explicitly; tuple types,
 manual singleton/larger tuples, projections and empty/multiple return headers
 remain unsupported. No Core/resolved, diagnostic or frozen wire change is made.
 
+An opt-in structural type interpretation prerequisite (ADR-0232) now handles
+named leaves and canonical zero/one/two-element tuple types. Independent meanings
+give exact soundness/completeness, uniqueness and rejection; every recursive
+child retains the same caller table and explicit product association. Type
+singletons are interpreted from their original tuple nodes without rewriting.
+The old named-only API and whole-type table membership contract stay intact.
+
+Lookup-extensional equality, successful semantic extension and full equality
+under mutual extension are proved without row uniqueness or inhabitation.
+Independent source/parsed consumers cover ordering, aliases, hidden duplicates,
+nominal types, invalid ranges, strict missing leaves and unsupported forms.
+One-way extension may turn rejection into success, so no full-result invariant is claimed
+for it. Parameter/header/let gates remain named-only, and correct-arity parsed
+entry rejection tests keep this separation explicit. Connecting the new type
+adapter to those gates requires a subsequent scoped integration. Larger tuples,
+other type forms, expressions, Core/resolved semantics, diagnostics and frozen
+wire formats do not change.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

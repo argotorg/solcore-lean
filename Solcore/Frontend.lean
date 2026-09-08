@@ -52,6 +52,9 @@ import Solcore.Frontend.LocalExpressionEvaluatorExecutionProperties
 import Solcore.Frontend.TypeName
 import Solcore.Frontend.TypeNameProperties
 import Solcore.Frontend.TypeNameTableExtensionProperties
+import Solcore.Frontend.StructuralType
+import Solcore.Frontend.StructuralTypeProperties
+import Solcore.Frontend.StructuralTypeTableProperties
 import Solcore.Frontend.RuntimeFunctionHeaderTypeExtensionProperties
 import Solcore.Frontend.RuntimeParameterDeclarationsTypeExtensionProperties
 import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
@@ -206,7 +209,10 @@ import Solcore.Frontend.TypedLetReturnTreeLookupProperties
 Canonical explicit-table frontend adapters for local expressions, type names,
 type-only and runtime parameter inputs, singleton and terminal-conditional return bodies,
 and restricted explicit
-function entries with value-free compilation. Independent source rules
+function entries with value-free compilation. A separate opt-in structural type
+adapter interprets named leaves and zero/one/two-element tuple types with independent
+meaning and table-extension proofs; existing parameter/header/let gates stay named-only.
+Independent source rules
 connect to checked Core execution. A direct original-expression evaluator
 accepts empty canonical tuples as Unit and two-element tuples as ordered binary products, using
 both original child scopes and actual values. Explicit nesting and existing
