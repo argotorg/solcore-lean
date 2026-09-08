@@ -135,14 +135,25 @@ theorem word_and_opaque_operands_have_no_truthiness (location : Nat) (store : Co
 
 private def bitNeg : Syntax.Expr := ⟨span, .unary ⟨span, .bitNot⟩ (ref "x")⟩
 
-theorem bitwise_negation_remains_outside_this_adapter (choice : Bool) (store : Core.Store) :
-    resolveLocalExpression? (inputs choice).names bitNeg = none ∧ (inputs choice).check? bitNeg = none ∧
+theorem bitwise_negation_is_not_boolean_negation (choice : Bool) (store : Core.Store) :
+    resolveLocalExpression? (inputs choice).names bitNeg =
+      some (.unary .wordNot (.var ⟨owner, 0⟩)) ∧ (inputs choice).check? bitNeg = none ∧
     ∀ value finalStore, ¬ LocalExpressionEvaluates (inputs choice).names (inputs choice).environment
       store bitNeg value finalStore := by
   refine ⟨?_, ?_, ?_⟩
-  · simp [resolveLocalExpression?, bitNeg]
-  · simp [LocalInputs.check?, elaborateLocalExpression?, resolveLocalExpression?, bitNeg]
-  · intro value finalStore evaluation; cases evaluation
+  · apply ResolvesLocalExpression.complete
+    exact .bitNot (.identifier .head)
+  · apply elaborateLocalExpression?_eq_none_iff.mpr
+    rintro ⟨type, typing⟩
+    have original : LocalExpressionHasType (inputs choice).names (inputs choice).context (ref "x") .bool :=
+      .identifier .head .head
+    cases typing with
+    | bitNot operand => cases original.type_unique operand
+  · intro value finalStore evaluation
+    have original : LocalExpressionEvaluates (inputs choice).names (inputs choice).environment
+        store (ref "x") (.bool choice) store := .identifier .head .head
+    cases evaluation with
+    | bitNot operand => cases (original.deterministic operand).1
 
 private def extended (choice : Bool) : LocalInputs := (inputs choice).bindFresh owner "extra" .unit .unit .unit
 
