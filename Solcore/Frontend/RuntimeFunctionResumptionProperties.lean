@@ -1,4 +1,4 @@
-import Solcore.Frontend.TerminalReturnTreeResumptionProperties
+import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
 import Solcore.Frontend.RuntimeFunctionCompiledExecutionProperties
 
 /-! Complete entry checkpoints resume their actual Core state. Exact source
@@ -35,7 +35,9 @@ theorem RuntimeFunctionEvaluatesWithCost.residual_of_outOfFuel
           (Resolved.LocalScope.values prepared.inputs.environment) initialStore) = .outOfFuel checkpoint := by
         simpa only [runRuntimeFunction?, preparation.complete, bind, Option.bind_some, pure,
           Option.some.injEq, Prod.mk.injEq, true_and] using exhausted
-      exact bodyCost.checked_residual_of_outOfFuel preparation.body.complete prepared.inputs.sameIds execution
+      rw [← LocalInputs.toTypeInputs_names prepared.inputs] at bodyCost
+      exact bodyCost.checked_residual_of_outOfFuel preparation.body.complete
+        (by simpa only [LocalInputs.toTypeInputs_context] using prepared.inputs.sameIds) execution
 
 theorem RuntimeFunctionEvaluatesWithCost.compiled_residual_of_outOfFuel
     {types : TypeNameTable} {owner : Resolved.DeclarationId} {declaration : Syntax.FunctionDecl}

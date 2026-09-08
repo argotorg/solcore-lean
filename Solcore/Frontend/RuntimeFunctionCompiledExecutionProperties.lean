@@ -47,8 +47,10 @@ theorem compiled_toSteps
           arguments.reverse.map (·.value) := by
         simpa only [LocalInputs.environment, Resolved.LocalScope.values, List.map_map,
           Function.comp_def] using preparation.parameters.argument_values
+      rw [← LocalInputs.toTypeInputs_names prepared.inputs] at bodyCost
       simpa only [coreEq, valuesEq] using
-        bodyCost.checked_toSteps preparation.body.complete prepared.inputs.sameIds
+        bodyCost.checked_toSteps preparation.body.complete
+          (by simpa only [LocalInputs.toTypeInputs_context] using prepared.inputs.sameIds)
 
 theorem compiled_run_done_iff
     (evaluation : RuntimeFunctionEvaluatesWithCost types owner declaration arguments

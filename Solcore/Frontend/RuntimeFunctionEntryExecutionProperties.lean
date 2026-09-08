@@ -8,6 +8,13 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
+private theorem aligned (inputs : LocalInputs) : inputs.environment.ids = inputs.toTypeInputs.context.ids := by
+  simpa only [LocalInputs.toTypeInputs_context] using inputs.sameIds
+
+private theorem actualTypes (inputs : LocalInputs) :
+    Core.EnvironmentHasTypes inputs.environment.values inputs.toTypeInputs.context.values := by
+  simpa only [LocalInputs.toTypeInputs_context] using inputs.environmentTyped
+
 theorem runRuntimeFunction?_eq_some_iff
     {types : TypeNameTable} {owner : Resolved.DeclarationId} {declaration : Syntax.FunctionDecl}
     {arguments : List TypedRuntimeArgument} {fuel : Nat} {store : Core.Store}
@@ -34,8 +41,9 @@ theorem RuntimeFunctionEvaluatesWithCost.run_done_iff
       some (type, .done value finalStore) ↔ cost ≤ fuel := by
   cases evaluation with
   | @intro prepared _ _ _ _ preparation bodyCost =>
+      rw [← LocalInputs.toTypeInputs_names prepared.inputs] at bodyCost
       have boundary := bodyCost.checked_runStateful_done_iff preparation.body.complete
-        prepared.inputs.sameIds (fuel := fuel)
+        (aligned prepared.inputs) (fuel := fuel)
       simpa only [runRuntimeFunction?, preparation.complete, bind, Option.bind_some, pure,
         Option.some.injEq, Prod.mk.injEq, true_and] using boundary
 
@@ -49,8 +57,9 @@ theorem RuntimeFunctionEvaluatesWithCost.run_outOfFuel_iff
       some (type, .outOfFuel suspended)) ↔ fuel < cost := by
   cases evaluation with
   | @intro prepared _ _ _ _ preparation bodyCost =>
+      rw [← LocalInputs.toTypeInputs_names prepared.inputs] at bodyCost
       have boundary := bodyCost.checked_runStateful_outOfFuel_iff preparation.body.complete
-        prepared.inputs.sameIds (fuel := fuel)
+        (aligned prepared.inputs) (fuel := fuel)
       simpa only [runRuntimeFunction?, preparation.complete, bind, Option.bind_some, pure,
         Option.some.injEq, Prod.mk.injEq, true_and] using boundary
 
@@ -69,8 +78,8 @@ theorem runRuntimeFunction?_done_iff_cost
     obtain ⟨prepared, preparation, sameType, execution⟩ := runRuntimeFunction?_eq_some_iff.mp completed
     cases sameType
     obtain ⟨cost, bodyCost, enough⟩ :=
-      (elaborateTerminalReturnTree?_run_done_iff_cost preparation.body.complete prepared.inputs.sameIds).mp execution
-    exact ⟨cost, .intro preparation bodyCost, enough⟩
+      (elaborateTypedLetReturnBody?_run_done_iff_cost preparation.body.complete (aligned prepared.inputs)).mp execution
+    exact ⟨cost, .intro preparation (by simpa only [LocalInputs.toTypeInputs_names] using bodyCost), enough⟩
   · rintro ⟨cost, evaluation, enough⟩
     exact evaluation.run_done_iff.mpr enough
 
@@ -86,11 +95,11 @@ theorem runRuntimeFunction?_outOfFuel_iff_cost
     obtain ⟨prepared, preparation, sameType, execution⟩ := runRuntimeFunction?_eq_some_iff.mp exhausted
     cases sameType
     obtain ⟨value, evaluated, _⟩ := preparation.body.hasType.evaluates
-      prepared.inputs.sameIds prepared.inputs.environmentTyped store
+      (aligned prepared.inputs) (actualTypes prepared.inputs) store
     obtain ⟨cost, bodyCost⟩ := evaluated.exists_cost
-    exact ⟨value, cost, .intro preparation bodyCost,
+    exact ⟨value, cost, .intro preparation (by simpa only [LocalInputs.toTypeInputs_names] using bodyCost),
       (bodyCost.checked_runStateful_outOfFuel_iff preparation.body.complete
-        prepared.inputs.sameIds).mp ⟨suspended, execution⟩⟩
+        (aligned prepared.inputs)).mp ⟨suspended, execution⟩⟩
   · rintro ⟨value, cost, evaluation, short⟩
     exact evaluation.run_outOfFuel_iff.mpr short
 
@@ -109,9 +118,10 @@ theorem RuntimeFunctionHasType.typed_cost_execution
   obtain ⟨prepared, preparation, sameType⟩ := runtimeFunctionHasType_iff_prepares.mp typing
   cases sameType
   obtain ⟨value, evaluated, valueTyped⟩ := preparation.body.hasType.evaluates
-    prepared.inputs.sameIds prepared.inputs.environmentTyped store
+    (aligned prepared.inputs) (actualTypes prepared.inputs) store
   obtain ⟨cost, bodyCost⟩ := evaluated.exists_cost
-  have evaluation := RuntimeFunctionEvaluatesWithCost.intro preparation bodyCost
+  have evaluation := RuntimeFunctionEvaluatesWithCost.intro preparation
+    (by simpa only [LocalInputs.toTypeInputs_names] using bodyCost)
   exact ⟨value, cost, evaluation, valueTyped, fun _ =>
     ⟨evaluation.run_done_iff, evaluation.run_outOfFuel_iff⟩⟩
 

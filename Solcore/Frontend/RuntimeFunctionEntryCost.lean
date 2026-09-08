@@ -1,5 +1,5 @@
 import Solcore.Frontend.RuntimeFunctionEntryProperties
-import Solcore.Frontend.TerminalReturnTreeRunnerProperties
+import Solcore.Frontend.TypedLetReturnBodyRunnerProperties
 
 /-! Independent cost for a complete restricted entry contract. Preparation
 provenance is mandatory; a prepared record alone supplies no such meaning.
@@ -15,7 +15,7 @@ inductive RuntimeFunctionEvaluatesWithCost (types : TypeNameTable) (owner : Reso
   | intro {prepared : PreparedRuntimeFunction} {initialStore finalStore : Core.Store}
       {value : Core.Value} {cost : Nat}
       (preparation : RuntimeFunctionPrepares types owner declaration arguments prepared)
-      (bodyCost : TerminalReturnTreeEvaluatesWithCost prepared.inputs.names prepared.inputs.environment
+      (bodyCost : TypedLetReturnBodyEvaluatesWithCost owner prepared.inputs.names prepared.inputs.environment
         initialStore declaration.value.body value finalStore cost) :
       RuntimeFunctionEvaluatesWithCost types owner declaration arguments
         initialStore prepared.returnType value finalStore cost
@@ -36,8 +36,10 @@ theorem preserves_type (evaluation : RuntimeFunctionEvaluatesWithCost types owne
     initialStore type value finalStore cost) : Core.ValueHasType value type := by
   cases evaluation with
   | @intro prepared _ _ _ _ preparation bodyCost =>
+      rw [← LocalInputs.toTypeInputs_names prepared.inputs] at bodyCost
       exact (bodyCost.erase.preserves_type preparation.body.hasType
-        prepared.inputs.sameIds prepared.inputs.environmentTyped).1
+        (by simpa only [LocalInputs.toTypeInputs_context] using prepared.inputs.sameIds)
+        (by simpa only [LocalInputs.toTypeInputs_context] using prepared.inputs.environmentTyped)).1
 
 theorem store_eq (evaluation : RuntimeFunctionEvaluatesWithCost types owner declaration arguments
     initialStore type value finalStore cost) : finalStore = initialStore := by

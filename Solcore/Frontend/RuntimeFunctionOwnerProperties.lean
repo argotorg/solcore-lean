@@ -1,4 +1,5 @@
-import Solcore.Frontend.TerminalReturnTreeRenamingProperties
+import Solcore.Frontend.TypedLetReturnBodyOwnerProperties
+import Solcore.Frontend.LocalInputsTypeErasureRenamingProperties
 import Solcore.Frontend.RuntimeParametersOwnerProperties
 import Solcore.Frontend.RuntimeFunctionEntryProperties
 
@@ -22,8 +23,7 @@ theorem RuntimeFunctionPrepares.mapOwner {types : TypeNameTable} {owner : Resolv
       { prepared with inputs := (prepared.inputs.mapIds (ownerLocalIdMap mapping)
           (ownerLocalIdMap_injective mapping injective)) } := by
   refine ⟨preparation.header, preparation.parameters.map_owner mapping injective, ?_⟩
-  simp only [LocalInputs.mapIds_names, LocalInputs.mapIds_context]
-  exact preparation.body.mapIds (ownerLocalIdMap mapping) (ownerLocalIdMap_injective mapping injective)
+  simpa only [LocalInputs.toTypeInputs_mapIds] using preparation.body.mapOwner mapping injective
 
 private def swapOwner (left right owner : Resolved.DeclarationId) : Resolved.DeclarationId :=
   if owner = left then right else if owner = right then left else owner

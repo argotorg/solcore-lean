@@ -27,7 +27,10 @@ theorem runtimeFunction_parameter_prepares
       { inputs, core := .var (arguments.length - 1 - index), returnType := argument.type } := by
   refine ⟨header, bound, ?_⟩
   rw [bodyShape]
-  exact .single (bound.reference_return_elaborates_at parameterAt argumentAt blockSpan returnSpan span nameSpan)
+  apply TypedLetReturnBodyElaborates.terminal
+  simpa only [LocalInputs.toTypeInputs_names, LocalInputs.toTypeInputs_context] using
+    (TerminalReturnTreeElaborates.single
+      (bound.reference_return_elaborates_at parameterAt argumentAt blockSpan returnSpan span nameSpan))
 
 theorem runtimeFunction_parameter_cost
     (bound : RuntimeParametersBind types owner declaration.value.signature.parameters.elements arguments inputs)
@@ -43,7 +46,7 @@ theorem runtimeFunction_parameter_cost
   apply RuntimeFunctionEvaluatesWithCost.intro
     (runtimeFunction_parameter_prepares bound parameterAt argumentAt header bodyShape)
   rw [bodyShape]
-  exact .single (.expression (bound.reference_cost_at parameterAt argumentAt span nameSpan store))
+  exact .terminal (.single (.expression (bound.reference_cost_at parameterAt argumentAt span nameSpan store)))
 
 /-- Fuel zero retains the actual Core variable and full prepared environment;
 every positive fuel returns this exact argument without changing the store. -/
