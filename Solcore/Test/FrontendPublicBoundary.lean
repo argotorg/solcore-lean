@@ -539,5 +539,11 @@ example := @Solcore.Frontend.RuntimeFunctionCompiles.mk
 example := @Solcore.Frontend.RuntimeFunctionCompiles.header
 example := @Solcore.Frontend.RuntimeFunctionCompiles.parameters
 example := @Solcore.Frontend.RuntimeFunctionCompiles.body
+example := @Solcore.Frontend.ResolvesLocalExpression.add
+example := @Solcore.Frontend.LocalExpressionHasType.add
+example := @Solcore.Frontend.AvoidsLocalName.add
+example := @Solcore.Frontend.LocalExpressionEvaluates.add
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.add
+example := @Solcore.Frontend.resolveLocalExpression?_add_spans
 
 end Tests

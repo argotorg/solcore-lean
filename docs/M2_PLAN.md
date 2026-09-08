@@ -236,6 +236,16 @@ typed arguments. Parsed declarations and independent consumers preserve the
 distinction between static success, argument availability, and runtime outcomes.
 This is not closure generation, a source-call machine, or whole-program lookup.
 
+Binary Word addition (ADR-0176) now extends the expression fragment through
+existing body, entry, and value-free compilation bridges. Its independent
+rules require two Word operands, preserve strict left-to-right evaluation,
+and use the existing modulo-`2^256` sum. Exact Core retains the addition node,
+and cost is both child costs plus three. Literal range checking, whole-branch
+checking, identity transport, and unused-input invariance remain intact.
+Parsed regressions distinguish wrapping arithmetic from overflowing literal
+rejection and preserve canonical grouping/precedence and exact fuel boundaries.
+Other arithmetic, comparison, assignment, and overload policy remain separate.
+
 Further frontend semantics should preserve exact identity, binding, and Core
 execution correspondence while extending supported expressions and declarations.
 General calls and control flow remain separate. The resolved immutable expression

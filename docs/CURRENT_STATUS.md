@@ -155,8 +155,8 @@ just as the conditional expansion does. This does not admit such an expression
 to checked execution. Tests distinguish this boundary from raw evaluation that
 skips a missing or unsupported operand, which still prevents whole checking.
 Parsed precedence, grouping, and nested right operands exercise exact fuel
-differences between selected and skipped paths. Arithmetic and comparison
-operators remain unsupported by this adapter.
+differences between selected and skipped paths. Comparison operators and
+arithmetic other than the separately specified Word addition remain unsupported.
 
 Word complement `~` is also supported as a fixed Word-only operation
 (ADR-0161), using the existing direct Core `wordNot`. Independent typing,
@@ -185,6 +185,24 @@ preserve nonempty stores. Grouping, complement, conditional branches, wrong
 Boolean uses, whole-check failure, and unchanged results under input extension
 or ID relabeling are tested. Value commutativity does not reorder source operands.
 No general overload, assignment, parser, or Core-machine policy changes.
+
+Word-only binary addition now extends the same explicit adapter (ADR-0176).
+Both operands must be Words, and the exact resolved/Core tree retains a
+`wordAdd` node without constant folding. Independent evaluation visits the
+left operand before the right and uses the existing modulo-`2^256` Word sum.
+An accepted maximum Word plus one wraps to zero; an out-of-range literal is
+still rejected by strict literal conversion. Zero does not bypass an unresolved
+or wrongly typed operand, and whole checking still inspects skipped branches.
+
+The independent cost is both child costs plus three transitions. Two leaves
+take five, and the exact four-step suspended state retains the right value and
+the pending addition of the left value. Resolution, typing, evaluation,
+continuation-aware Core correspondence, identity relabeling, and unused-input
+cost laws all cover addition. Independent compiled-function evidence and fully
+parsed expressions/declarations retain actual Core, source order, canonical
+precedence, wrapping results, stores, and exact fuel boundaries. Subtraction,
+multiplication, unary plus, and assignment remain outside this adapter; no
+parser, evaluator, or general arithmetic-overload policy is changed.
 
 ### Numeric spelling and strict Word interpretation
 
@@ -286,7 +304,7 @@ jointly unique even for raw evaluations with unresolved skipped branches.
 No checking or executable-run premise is built into the cost relation.
 
 Identifiers and Word literals cost one; grouping adds nothing; unary operators
-add two. Strict bitwise binaries cost both operands plus three. A conditional
+add two. Strict Word addition and bitwise binaries cost both operands plus three. A conditional
 costs its condition and selected branch plus two. Short-circuit selection costs
 both visited operands plus two; skipping the right costs the left plus three,
 including the generated Boolean constant. Both initial and final stores and
@@ -2251,7 +2269,7 @@ language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
 Semantic Core remain separate later stages. Canonical local references, Boolean
-operators, Word bitwise operations, strict Word literals, and conditionals connect through the explicit-table adapters described above.
+operators, Word addition and bitwise operations, strict Word literals, and conditionals connect through the explicit-table adapters described above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 
