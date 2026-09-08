@@ -66,6 +66,8 @@ import Solcore.Frontend.RuntimeFunctionEntry
 import Solcore.Frontend.RuntimeFunctionEntryProperties
 import Solcore.Frontend.RuntimeFunctionEntryCost
 import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
+import Solcore.Frontend.RuntimeFunctionEvaluator
+import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
 import Solcore.Frontend.RuntimeParametersPositionProperties
 import Solcore.Frontend.RuntimeParameterReferenceProperties
 import Solcore.Frontend.RuntimeFunctionParameterReturnProperties
@@ -209,7 +211,11 @@ is not whole acceptance. A direct recursive-body evaluator composes these raw
 expression results with strict old-scope initialization, actual fresh tails and
 selected arms. Its exact raw correspondence and checked bridges preserve the
 same acceptance, identity and continuation boundaries. General source-program resolution, parser
-changes, and wire publication are not implied. Function entries support finite
+changes, and wire publication are not implied. A direct checked entry retains
+the existing preparation gate and original actual parameter bundle; its result
+exactly matches independent entry cost, and absence is exactly preparation
+failure. Static preparation still lowers; result computation does not run Core.
+Function entries support finite
 alternation of typed lets and terminal if/else trees inside either arm; compilation owner
 invariance requires no runtime argument inhabitants.
 Recursive terminal return trees additionally have independent static and

@@ -586,6 +586,20 @@ do not guarantee pending-frame completion. Independent and parsed depth, scope,
 strict-unused, opaque-value and actual-checkpoint consumers preserve these boundaries.
 Existing entry/checker/raw/bound/parser/Core/Wire policies are not changed.
 
+Direct checked entry evaluation (ADR-0225) now gates on unchanged runtime
+preparation, then evaluates the original body with its actual parameter-only
+names and values. The result is the declared type, value and exact transition
+cost. Static preparation still lowers; the result is not obtained by running
+Core, rebinding arguments or adding entry transitions. Two contracts suffice:
+exact independent entry-cost correspondence with explicit final-store equality,
+and absence iff preparation failure. Actual typed prepared inputs prove there
+is no post-acceptance evaluation failure. Whole header/argument/return/body
+checks remain mandatory even when raw selected body evaluation succeeds.
+Independent and parsed consumers reuse established fuel, compiled-path,
+store and checkpoint contracts through the new correspondence, preserving exact
+source/Core/argument provenance and nominal/opaque boundaries. Existing entry
+definitions, records and source policies are unchanged.
+
 Arbitrary-position parameter semantics (ADR-0171) now connect source index `k`
 to identity `(owner, k)`, exact Core position `n - 1 - k`, and the original
 argument's type/value. Independent row layout, index bounds, and unique-name/ID

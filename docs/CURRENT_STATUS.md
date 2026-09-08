@@ -1224,6 +1224,33 @@ contracts, actual Core/input order, every fuel boundary, and typed closure or
 unallocated cell-reference returns. This external entry is not general function
 calling, mutable statement/control-flow semantics, or a new wire interface.
 
+### Direct checked runtime-entry evaluation
+
+An additive entry evaluator now returns the declared type, actual result and
+exact Core-transition cost directly from the original declaration and supplied
+typed arguments (ADR-0225). Existing preparation remains the whole-entry gate:
+headers, ordered argument types and arity, every body child, local annotations
+and names, and the declared return contract are unchanged. The gate performs
+static lowering; only result computation is independent of Core execution.
+The original parameter-only names and actual values feed the direct body
+evaluator without rebinding, a second reversal or extra entry transitions.
+
+The computed triple corresponds exactly to existing independent entry-cost
+evidence. General store correspondence explicitly retains final-store equality.
+Absence is exactly preparation failure: actual typed prepared inputs guarantee
+that direct evaluation cannot introduce a further failure after acceptance.
+Raw body success alone still cannot bypass invalid headers, unused wrong-typed
+arguments, mismatched returns or unknown unselected annotations. Static nominal
+types do not manufacture arguments, and arbitrary hand-built records gain no
+provenance or safety.
+
+Independent source proofs and complete parsed declarations use this correspondence
+to consume existing fuel, compiled-execution, store and real resumption
+contracts, rather than duplicating them as new APIs. Exact original Core, actual
+parameter rows, strict asymmetric costs and opaque values remain explicit.
+Existing preparation/compilation/runners, raw judgments, bounds, records and
+parser/Core/Resolved/Wire are unchanged; this adds no source calls or allocation.
+
 ### Arbitrary runtime parameter positions
 
 The ordered parameter layout now connects to semantic lookup and execution at

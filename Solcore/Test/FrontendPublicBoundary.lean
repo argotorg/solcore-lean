@@ -1281,4 +1281,8 @@ example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_done_iff_evaluat
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_outOfFuel_iff_evaluator
 example := @Solcore.Frontend.LocalInputs.typedLetReturnTree_evaluator_execution
 
+example := @Solcore.Frontend.evaluateRuntimeFunctionWithCost?
+example := @Solcore.Frontend.runtimeFunctionEvaluatesWithCost_iff_evaluate
+example := @Solcore.Frontend.evaluateRuntimeFunctionWithCost?_eq_none_iff
+
 end Tests
