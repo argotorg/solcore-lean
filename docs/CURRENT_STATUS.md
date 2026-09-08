@@ -1645,6 +1645,13 @@ executes at fuel three, yet the initial production budget of two is exhausted.
 Both independent derivations feed reverse completeness; arbitrary incoming
 diagnostic multiplicity and the exact final carrier are retained.
 
+Literal-child reverse consumers additionally derive `.a-b[1](2)` from independent
+name/index/argument judgments and reconstruct the fully located nested AST and
+entire output State. A later dot followed by semicolon or `true` retains the prior
+name event but does not commit the terminal identifier report: field names use
+checked identifiers, not Boolean expression names. Duplicate prior events, unread
+boundary tokens, hidden dots, and missing backing slots are checked separately.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

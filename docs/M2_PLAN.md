@@ -1209,6 +1209,12 @@ production budget is two. Reverse derivation checks and exact Reply checks retai
 arbitrary prior events. Child framing and trace exactness therefore do not imply
 the strict progress needed by production totality.
 
+Real literal-child reverse consumers now cover mixed `.a-b[1](2)` maximal tails,
+exact nested spans and States, later field failure with only earlier name events,
+Boolean-keyword rejection as a field, duplicate prior events, and hidden/missing
+suffix termination. These consumers instantiate production adequacy rather than
+assuming it from trace correspondence.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

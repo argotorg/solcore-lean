@@ -207,6 +207,8 @@ import Solcore.Test.SyntaxExpressionAtomTraceProperties
 import Solcore.Test.SyntaxExpressionAtomTotalityProperties
 import Solcore.Test.SyntaxPostfixTailProgressSupport
 import Solcore.Test.SyntaxPostfixTailProgressProperties
+import Solcore.Test.SyntaxPostfixTailTraceSupport
+import Solcore.Test.SyntaxPostfixTailTraceProperties
 import Solcore.Test.SyntaxCanonicalMappingTypeTraceExamples
 import Solcore.Test.SyntaxParserPublicPragmaNameRejectionExamples
 import Solcore.Test.SyntaxParserPublicPragmaNameCascadeExamples
