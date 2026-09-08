@@ -150,6 +150,9 @@ import Solcore.Test.FrontendTypedLetReturnTreeRawOwnerProperties
 import Solcore.Test.FrontendParsedTypedLetReturnTreeRawOwner
 import Solcore.Test.FrontendRawLookupProperties
 import Solcore.Test.FrontendParsedRawLookup
+import Solcore.Test.FrontendBinaryTupleProperties
+import Solcore.Test.FrontendParsedBinaryTuples
+import Solcore.Test.FrontendParsedBinaryTupleEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5726,6 +5729,8 @@ def run : IO Unit := do
   frontendParsedRuntimeFunctionEvaluatorTests
   frontendParsedTypedLetReturnTreeRawOwnerTests
   frontendParsedRawLookupTests
+  frontendParsedBinaryTupleTests
+  frontendParsedBinaryTupleEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

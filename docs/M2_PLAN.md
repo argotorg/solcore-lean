@@ -105,8 +105,8 @@ Independent proof and executable consumers cover nesting, retained prefixes,
 opaque values, nominal static types without inhabitants, missing/wrong children
 and real checkpoint resumption. Core semantics, projections, closure/cell
 exclusions and wire policies do not change. Resolved pair representation follows
-in ADR-0229; canonical two-element source tuples remain a separate next step;
-larger tuples, tuple type syntax and projection spelling remain undecided here.
+in ADR-0229, followed by canonical binary tuples in ADR-0230. Larger tuples,
+tuple type syntax and projection spelling are not enabled by these steps.
 
 Resolved binary products (ADR-0229) now lower both original children in the same
 scope to ordered Core pairs, with independent product typing, whole-child scope
@@ -119,8 +119,29 @@ Pairs introduce no binder or allocation condition, and a left-local let cannot
 alter the right operand's scope. Nominal static/opaque raw and duplicate-ID
 consumers retain the old raw/whole, suffix-fresh and original-scoping boundaries.
 Independent ordered Core paths and checkpoints test cost and execution without
-changing any runner. Canonical tuples and their arity/type/projection policies
-remain a separate adapter change, and source/wire rejections are preserved.
+changing any runner. This prerequisite leaves source policy to the separate
+adapter below and preserves frozen wire rejection.
+
+Canonical two-element tuple expressions (ADR-0230) now resolve to ordered
+binary products using the original children and spans, with both children in
+the same caller scope/environment. Independent product typing, whole-name
+avoidance, raw evaluation and exact costs extend the existing generic laws.
+The direct evaluator returns the actual ordered pair and child costs plus three;
+the source fuel bound uses the same additive composition. All 80 affected
+public proof contracts keep their names/premises, including direct lookup
+extensionality, store replay, safety, renaming and fresh insertion. The cost
+renaming split retains the historical import path.
+
+Independent source, fully parsed expression and complete-entry consumers cover
+ordered/nested products, opaque actual values, nominal static types, exact
+checkpoints/resumption and whole-versus-selected boundaries. True-and/false-or
+still forward a raw pair while whole Boolean checking fails. Named product
+aliases let existing recursive entries return pairs without tuple type syntax,
+new argument layouts or broader header gates. Existing grouping/trailing commas
+need no parser change, and the old binary-tuple negative becomes an independent
+positive. Empty/manual-singleton/larger tuple expressions, tuple types,
+projections and multiple returns remain outside the adapter; Core/resolved
+semantics, diagnostics and frozen wire formats are unchanged.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

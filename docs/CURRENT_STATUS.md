@@ -138,9 +138,9 @@ prefixes, opaque values, nominal static types, missing/wrong children and actual
 pair checkpoints/resumption. Neither state equality nor typed inhabitants are
 assumed. Core semantics and frozen wire rejection are unchanged; projections,
 closures/calls and cell access remain excluded from this predicate. Resolved
-pair representation is added in ADR-0229 below; canonical two-element tuple
-acceptance remains a separate next step, with no decision here about larger
-tuples or tuple type syntax.
+pair representation is added in ADR-0229 below, followed by the separate
+canonical two-element adapter in ADR-0230. Larger tuples and tuple type syntax
+are not enabled by these changes.
 
 Resolved immutable expressions now include ordered binary pairs (ADR-0229).
 Their independent lowering, typing, whole-scope and raw evaluation constructors
@@ -159,9 +159,37 @@ ordered Core and values, duplicate first matches, nominal open types without
 inhabitants, opaque values, raw skipped-child success versus whole rejection,
 and the existing renaming/freshness boundaries. Separate Core paths and actual
 checkpoints preserve exact cost and both stores; same-typed wrong output is not
-treated as correct lowering. Existing Core semantics, source tuple rejection,
-runtime entry gates and wire formats are unchanged. No new evaluator, cost
-judgment or source tuple arity/type/projection policy is introduced.
+treated as correct lowering. This resolved prerequisite changes no Core
+semantics, runtime entry gates or wire formats and introduces no source tuple
+policy; its source adapter follows separately below.
+
+Canonical two-element tuple expressions now use ordered binary products
+(ADR-0230). The original delimited list must contain exactly two children, in
+written order; both children retain the same caller tables, context and actual
+environment. Independent resolution, product typing, whole-name avoidance,
+raw evaluation and exact-cost constructors correspond to the existing resolved
+and Core pairs. Both child costs plus three is the exact Core cost and the
+source-only bound composition. The direct evaluator follows original syntax,
+returning actual ordered values without consulting a checker or running Core.
+
+All 80 affected public proof contracts retain their names and premises across
+static checking, raw/Core correspondence, safety, renaming, fresh insertion,
+store replay, costs, bounds and lookup-extensional direct execution. One cost
+renaming module is split with the old import path retained. Explicit binary
+nesting, grouping and existing trailing commas are supported without parser
+changes. Empty, manually constructed singleton and larger tuple expressions,
+tuple type syntax, projections and multiple return annotations remain unsupported.
+The old two-element tuple negative is migrated to an independent positive.
+
+Independent source, parsed-expression and complete-function consumers fix exact
+Core, ordered values, types and costs separately from the tested evaluators.
+They cover opaque raw values, nominal static types without inhabitants, actual
+pair checkpoints and residual fuel, strict children and raw/whole contrasts.
+True-and and false-or still forward any selected raw value, including a pair,
+while whole Boolean typing rejects those ill-typed expressions. Existing
+recursive function entries accept pair results through caller-provided named
+product aliases, preserving original parameter-only records and all old gates.
+No Core/resolved semantics, diagnostic, source type or frozen wire policy changes.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
