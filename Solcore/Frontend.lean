@@ -67,6 +67,9 @@ import Solcore.Frontend.RuntimeFunctionOwnerProperties
 import Solcore.Frontend.LocalTypeInputs
 import Solcore.Frontend.LocalTypeInputsProperties
 import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeParameterDeclarationsLayout
+import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties
+import Solcore.Frontend.RuntimeParameterDeclarationReferenceProperties
 import Solcore.Frontend.LocalInputsTypeErasure
 import Solcore.Frontend.LocalOwnerRenaming
 import Solcore.Frontend.LocalTypeInputsRenaming

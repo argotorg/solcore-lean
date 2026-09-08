@@ -793,6 +793,28 @@ rejection. Unsupported annotation forms and repeated names remain outside the
 adapter profile. This is annotation-only preparation, not whole-function
 compilation, source calls, or a new runtime evaluator.
 
+Static parameter layout and source positions are now proved without actual
+arguments (ADR-0201). Independent row judgments pair each original annotation,
+spelling and type with the exact source-ordered row. General declaration evidence
+retains arbitrary initial rows as a suffix, with newly allocated rows in reverse
+source order. Generated indices start at the actual owner-relative fresh index,
+including sparse/mixed-owner input tables. Distinct-name preservation retains its
+initial distinctness premise; static bundles themselves require only unique IDs.
+
+For empty-start declaration, a real parameter lookup at source position `k`
+proves `k < n`, exact identity `(owner, k)`, the row at `n - 1 - k`, first-match
+name/type lookups and positional Core lowering. References and singleton returns
+therefore elaborate to exactly `Core.var (n - 1 - k)` with the annotation's type,
+for arbitrary spans and types, including nominal types without runtime values.
+Same-type parameters are not interchangeable. A truncated out-of-range index,
+row membership or typing alone cannot establish this source-position evidence.
+
+Independent and parsed consumers exercise all tested positions, retained source
+order, nominal and repeated types, owner transport, sparse initial identities,
+repeated initial spellings and range boundaries. Valid static parameters do not
+license an invalid whole body or return contract. No allocation, declaration,
+compilation, parser or runtime policy changes.
+
 ### Value-free restricted function compilation
 
 The restricted explicit function profile now compiles before runtime arguments

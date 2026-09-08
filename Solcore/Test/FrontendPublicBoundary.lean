@@ -862,6 +862,26 @@ example := @Solcore.Frontend.RuntimeParametersDeclare.map_owner
 example := @Solcore.Frontend.RuntimeFunctionCompiles.mapOwner
 example := @Solcore.Frontend.compileRuntimeFunction?_owner_projection_eq
 
+example := @Solcore.Frontend.RuntimeParameterDeclarationRow
+example := @Solcore.Frontend.RuntimeParameterDeclarationRows
+example := @Solcore.Frontend.RuntimeParameterDeclarationRows.arity
+example := @Solcore.Frontend.RuntimeParameterDeclarationRows.row_at
+example := @Solcore.Frontend.RuntimeParametersDeclareFrom.rows
+example := @Solcore.Frontend.RuntimeParametersDeclareFrom.bindings_length
+example := @Solcore.Frontend.RuntimeParametersDeclareFrom.names_nodup
+example := @Solcore.Frontend.RuntimeParametersDeclareFrom.generated_ids
+example := @Solcore.Frontend.RuntimeParametersDeclare.rows
+example := @Solcore.Frontend.RuntimeParametersDeclare.bindings_length
+example := @Solcore.Frontend.RuntimeParametersDeclare.names_nodup
+example := @Solcore.Frontend.RuntimeParametersDeclare.generated_ids
+example := @Solcore.Frontend.RuntimeParameterDeclarationRow.typed
+example := @Solcore.Frontend.RuntimeParameterDeclarationRows.nil
+example := @Solcore.Frontend.RuntimeParameterDeclarationRows.cons
+example := @Solcore.Frontend.RuntimeParametersDeclare.position
+example := @Solcore.Frontend.RuntimeParametersDeclare.reference_resolves_at
+example := @Solcore.Frontend.RuntimeParametersDeclare.reference_elaborates_at
+example := @Solcore.Frontend.RuntimeParametersDeclare.reference_return_elaborates_at
+
 section TerminalEntryContracts
 
 open Solcore Solcore.Frontend

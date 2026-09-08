@@ -330,6 +330,17 @@ and an actual typed argument list reconstructs binding precisely when its
 ordered types agree with the declared parameter context. No type-inhabitation
 assumption, argument decoder, or new source policy is introduced.
 
+Value-free layout and position laws (ADR-0201) now pair original parameters with
+exact type-only rows and retain arbitrary initial rows under reverse-order
+extension. Generated IDs start at the owner-relative fresh index, not initial
+length; preservation of distinct names requires initial distinctness. Empty-start
+source lookup at `k` proves its bound, identity `(owner, k)`, reversed row, name
+and type lookup, and Core index `n - 1 - k`. Exact reference and singleton-return
+elaboration use annotation meaning alone, including nominal types with no values.
+Tests distinguish equal types from equal source positions, combine owner transport,
+and retain sparse/mixed-owner, duplicate-initial-name and out-of-range boundaries.
+Static parameter success is not whole-function acceptance; executable policies stay fixed.
+
 Value-free restricted function compilation (ADR-0175) now combines these
 static inputs with the existing header and exact return-body semantics. The
 independent compilation relation characterizes the executable compiler and
