@@ -3331,4 +3331,17 @@ example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_ne_invarian
 example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ordinary_of_unrestrictedElementFuel
 example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ne_invariant_of_unrestrictedElementFuel
 
+example := @Syntax.DeclarativeGrammar.postfixIndexTraceValue
+example := @Syntax.DeclarativeGrammar.postfixCallTraceValue
+example := @Syntax.DeclarativeGrammar.postfixFieldTraceValue
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceParses
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceRejects
+example := @Syntax.DeclarativeGrammar.NoTrailingDelimitedListTraceParses.opening_present
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.PostfixTailTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.postfixTailTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_sound
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_reject_trace_sound
+
 end Tests

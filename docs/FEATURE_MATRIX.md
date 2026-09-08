@@ -110,6 +110,7 @@ published through Oracle v4.
 | Composed public atom-layer traces | Actual selected core plus recovery with nested/body contracts, weak rejected frames, and separate bounded actual/independent trace existence | One layer only; nested expression and body relations remain supplied | High |
 | Unrestricted atom-layer totality | Raw tuple/group/dot/array and core/public ordinary execution from minimal child progress/budget contracts, with literal-child consumers for overshot/hidden/missing carriers and independent invalid-window group/tuple successes | Explicit loop/child bounds; no child validity/token/source/rejection frames; recursive expression totality remains separate | High |
 | Changed-carrier atom trace consumer | Exact core/public Failure and State reconstruction when a child replaces tokens/endIndex and cursor-only rewind changes boundary observation | Demonstrates why rejected carrier preservation cannot be silently assumed | High |
+| Maximal postfix-tail diagnostic traces | Independent prioritized index/call/field ASTs, seven failures, nested-conditional joint exactness, and all-fuel runtime success/rejection soundness | Child-conditional; no index progress implied; completeness and production-budget existence remain separate | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are

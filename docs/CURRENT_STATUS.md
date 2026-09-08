@@ -1614,6 +1614,16 @@ numerical gap. Independent group/tuple derivations reconstruct full successful
 States even when source/window validity fails. These are one-layer consumers;
 the displayed loop and child bounds remain explicit.
 
+Maximal postfix tails now have independent success/rejection traces for index,
+call, and checked-identifier field suffixes, retaining branch priority, exact
+AST spans, ordered child/name events, and all seven first-failure positions.
+Nested joint exactness supplies result uniqueness and disjointness, not existence.
+Both runtime soundness directions hold at every tail fuel under nested trace
+soundness and successful source/full-window context. They add no child progress,
+validity, ordinary-execution, or rejected-state frame premise. Index traces do
+not inherit the call-argument list's strict-progress check. Completeness and
+production-budget existence remain separate work at this boundary.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

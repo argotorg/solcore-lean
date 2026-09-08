@@ -1190,6 +1190,13 @@ and independent group/tuple traces reconstruct successes with arbitrary prior
 events. This keeps one-layer execution and its explicit budgets separate from
 recursive expression closure.
 
+Postfix-tail independent traces and runtime soundness now cover prioritized
+index/call/field suffixes, exact ASTs, ordered events, and all seven failure
+positions. Independent nested joint laws give uniqueness/disjointness only;
+all-fuel soundness assumes nested success/rejection traces and success context,
+without silently imposing index progress or totality. Completeness and actual
+production-budget existence are separate obligations.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

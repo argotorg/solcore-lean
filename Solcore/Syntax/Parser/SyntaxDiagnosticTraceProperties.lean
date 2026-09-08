@@ -196,6 +196,12 @@ import Solcore.Syntax.Parser.ExpressionAtomLayerTraceExistenceProperties
 import Solcore.Syntax.Parser.ExpressionAtomTupleUnrestrictedFuelTotalityProperties
 import Solcore.Syntax.Parser.ExpressionAtomCollectionUnrestrictedFuelTotalityProperties
 import Solcore.Syntax.Parser.ExpressionAtomUnrestrictedFuelTotalityProperties
+import Solcore.Syntax.DeclarativePostfixTailTraceGrammar
+import Solcore.Syntax.DeclarativePostfixTailRejectionTraceGrammar
+import Solcore.Syntax.DeclarativePostfixTailTraceProperties
+import Solcore.Syntax.DeclarativePostfixTailRejectionTraceProperties
+import Solcore.Syntax.Parser.PostfixTailSuccessTraceSoundnessProperties
+import Solcore.Syntax.Parser.PostfixTailRejectionTraceSoundnessProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -254,4 +260,5 @@ one selected atom-core layer has exact raw trace correspondence under explicit n
 separate rejection frames preserve a chosen window observation, including end-byte-only frames that allow end-index changes;
 public atoms compose abstract core traces with exact cursor-only rewind and recovery under explicit source/end-byte frames;
 the concrete selected-core/public layer composes recursive child contracts, with separate bounded totality and trace existence;
+maximal postfix tails have independent exact prioritized traces and all-fuel ordinary-outcome soundness under child contracts;
 general expressions and remaining statement traces remain open. -/
