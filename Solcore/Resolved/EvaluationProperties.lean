@@ -1,5 +1,7 @@
 import Solcore.Resolved.Eval
 import Solcore.Resolved.LocalScopeProperties
+import Solcore.Resolved.LocalFragmentProperties
+import Solcore.Core.LocalRightWordLessEvaluationProperties
 
 /-! Exact named-to-positional evaluation correspondence for the resolved local
 fragment. The independent relation preserves the store and is deterministic
@@ -29,6 +31,10 @@ theorem Evaluates.toCore
   | binary _ _ applied leftIH rightIH =>
       cases lowered with
       | binary left right => exact .binary (leftIH left) (rightIH right) applied
+  | wordLt _ _ leftIH rightIH =>
+      cases lowered with
+      | wordLt left right =>
+          exact (leftIH left).wordLt_local_right (rightIH right) right.localFragment
   | letE _ _ valueIH bodyIH =>
       cases lowered with
       | letE value body => exact .letE (valueIH value) (bodyIH body)
@@ -63,6 +69,11 @@ private theorem evaluation_of_core_scope
       cases evaluation with
       | binary leftEvaluation rightEvaluation applied =>
           exact .binary (leftIH scopeEq leftEvaluation) (rightIH scopeEq rightEvaluation) applied
+  | wordLt left right leftIH rightIH =>
+      intro environment initialStore finalStore value scopeEq evaluation
+      obtain ⟨leftWord, rightWord, middleStore, leftEvaluation, rightEvaluation, rfl⟩ :=
+        evaluation.wordLt_inv_local_right right.localFragment
+      exact .wordLt (leftIH scopeEq leftEvaluation) (rightIH scopeEq rightEvaluation)
   | letE lowerValue lowerBody valueIH bodyIH =>
       intro environment initialStore finalStore value scopeEq evaluation
       cases evaluation with
@@ -104,6 +115,7 @@ theorem Evaluates.store_eq
   | unit | bool | word | var => rfl
   | unary _ _ ih => exact ih
   | binary _ _ _ leftIH rightIH => exact rightIH.trans leftIH
+  | wordLt _ _ leftIH rightIH => exact rightIH.trans leftIH
   | letE _ _ valueIH bodyIH => exact bodyIH.trans valueIH
   | ifTrue _ _ conditionIH branchIH | ifFalse _ _ conditionIH branchIH =>
       exact branchIH.trans conditionIH
@@ -143,6 +155,14 @@ theorem evaluation_deterministic
       | letE rightValue rightBody =>
           obtain ⟨rfl, rfl⟩ := valueIH rightValue
           exact bodyIH rightBody
+  | wordLt _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | wordLt otherLeft otherRight =>
+          obtain ⟨sameLeft, rfl⟩ := leftIH otherLeft
+          cases Core.Value.word.inj sameLeft
+          obtain ⟨sameRight, sameStore⟩ := rightIH otherRight
+          cases Core.Value.word.inj sameRight
+          exact ⟨rfl, sameStore⟩
   | ifTrue _ _ conditionIH branchIH =>
       cases rightEvaluation with
       | ifTrue rightCondition rightBranch =>

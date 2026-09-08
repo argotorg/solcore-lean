@@ -59,6 +59,12 @@ theorem Evaluates.reflect_insert_fresh {leading suffix : Environment}
           cases evaluation with
           | binary leftEvaluation rightEvaluation applied =>
               exact .binary (leftIH leftEvaluation leftScoped) (rightIH rightEvaluation rightScoped) applied
+  | wordLt left right leftIH rightIH =>
+      cases scopeValid with
+      | wordLt leftScoped rightScoped =>
+          cases evaluation with
+          | wordLt leftEvaluation rightEvaluation =>
+              exact .wordLt (leftIH leftEvaluation leftScoped) (rightIH rightEvaluation rightScoped)
   | letE binder expr body valueIH bodyIH =>
       cases scopeValid with
       | letE valueScoped bodyScoped =>

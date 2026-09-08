@@ -16,6 +16,8 @@ inductive WellScoped : List LocalId → Expr → Prop where
   | binary {scope op left right} :
       WellScoped scope left → WellScoped scope right →
       WellScoped scope (.binary op left right)
+  | wordLt {scope left right} :
+      WellScoped scope left → WellScoped scope right → WellScoped scope (.wordLt left right)
   | letE {scope binder value body} :
       WellScoped scope value → WellScoped (binder :: scope) body →
       WellScoped scope (.letE binder value body)

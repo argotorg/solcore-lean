@@ -48,6 +48,10 @@ private theorem evaluation_insert_aux
       intro leading suffix split newId newValue fresh
       exact .binary (leftIH leading suffix split newId newValue fresh)
         (rightIH leading suffix split newId newValue fresh) applied
+  | wordLt _ _ leftIH rightIH =>
+      intro leading suffix split newId newValue fresh
+      exact .wordLt (leftIH leading suffix split newId newValue fresh)
+        (rightIH leading suffix split newId newValue fresh)
   | @letE environment initialStore middleStore finalStore binder value body boundValue result
       _ _ valueIH bodyIH =>
       intro leading suffix split newId newValue fresh

@@ -22,6 +22,7 @@ theorem Lowers.wellScoped {scope : List LocalId} {expr : Expr} {core : Core.Expr
       | tail _ _ ih => exact List.mem_cons_of_mem _ ih
   | unary _ ih => exact .unary ih
   | binary _ _ leftIH rightIH => exact .binary leftIH rightIH
+  | wordLt _ _ leftIH rightIH => exact .wordLt leftIH rightIH
   | letE _ _ valueIH bodyIH => exact .letE valueIH bodyIH
   | ifE _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
 
@@ -43,6 +44,10 @@ theorem WellScoped.lowers {scope : List LocalId} {expr : Expr}
       obtain ⟨left, leftLowered⟩ := leftIH
       obtain ⟨right, rightLowered⟩ := rightIH
       exact ⟨_, .binary leftLowered rightLowered⟩
+  | wordLt _ _ leftIH rightIH =>
+      obtain ⟨left, leftLowered⟩ := leftIH
+      obtain ⟨right, rightLowered⟩ := rightIH
+      exact ⟨_, .wordLt leftLowered rightLowered⟩
   | letE _ _ valueIH bodyIH =>
       obtain ⟨value, valueLowered⟩ := valueIH
       obtain ⟨body, bodyLowered⟩ := bodyIH
@@ -82,6 +87,7 @@ theorem HasType.wellScoped {context : Context} {expr : Expr} {type : Core.Ty}
   | var found => exact .var (List.mem_map.mpr ⟨_, found.mem, rfl⟩)
   | unary _ ih => exact .unary ih
   | binary _ _ leftIH rightIH => exact .binary leftIH rightIH
+  | wordLt _ _ leftIH rightIH => exact .wordLt leftIH rightIH
   | letE _ _ valueIH bodyIH => exact .letE valueIH bodyIH
   | ifE _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
 

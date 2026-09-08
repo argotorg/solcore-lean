@@ -30,6 +30,11 @@ inductive Evaluates : Environment → Core.Store → Expr → Core.Value → Cor
       Evaluates environment middleStore right rightValue finalStore →
       op.apply leftValue rightValue = some result →
       Evaluates environment initialStore (.binary op left right) result finalStore
+  | wordLt {environment initialStore middleStore finalStore left right leftWord rightWord} :
+      Evaluates environment initialStore left (.word leftWord) middleStore →
+      Evaluates environment middleStore right (.word rightWord) finalStore →
+      Evaluates environment initialStore (.wordLt left right)
+        (.bool (decide (leftWord < rightWord))) finalStore
   | letE {environment initialStore middleStore finalStore binder value body boundValue result} :
       Evaluates environment initialStore value boundValue middleStore →
       Evaluates ((binder, boundValue) :: environment) middleStore body result finalStore →

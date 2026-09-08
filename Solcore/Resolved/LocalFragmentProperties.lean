@@ -1,4 +1,4 @@
-import Solcore.Core.LocalFragment
+import Solcore.Core.LocalRightWordLessTypingProperties
 import Solcore.Resolved.Expr
 
 /-! Existing resolved lowering produces only the independent local Core
@@ -18,6 +18,7 @@ theorem Lowers.localFragment {scope : List LocalId} {expr : Expr} {core : Core.E
   | var => exact .var
   | unary _ ih => exact .unary ih
   | binary _ _ leftIH rightIH => exact .binary leftIH rightIH
+  | wordLt _ _ leftIH rightIH => exact leftIH.wordLt rightIH
   | letE _ _ valueIH bodyIH => exact .letE valueIH bodyIH
   | ifE _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
 

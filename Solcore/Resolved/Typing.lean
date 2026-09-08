@@ -20,6 +20,9 @@ inductive HasType : Context → Expr → Core.Ty → Prop where
   | binary {context op left right} :
       HasType context left op.leftType → HasType context right op.rightType →
       HasType context (.binary op left right) op.resultType
+  | wordLt {context left right} :
+      HasType context left .word → HasType context right .word →
+      HasType context (.wordLt left right) .bool
   | letE {context binder value body valueType bodyType} :
       HasType context value valueType →
       HasType ((binder, valueType) :: context) body bodyType →

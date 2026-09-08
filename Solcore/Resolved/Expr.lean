@@ -17,6 +17,7 @@ inductive Expr where
   | var (id : LocalId)
   | unary (op : Core.UnaryOp) (operand : Expr)
   | binary (op : Core.BinaryOp) (left right : Expr)
+  | wordLt (left right : Expr)
   | letE (binder : LocalId) (value body : Expr)
   | ifE (condition thenBranch elseBranch : Expr)
   deriving Repr, DecidableEq
@@ -31,6 +32,8 @@ def Expr.lower? (scope : List LocalId) : Expr → Option Core.Expr
       return .unary op (← operand.lower? scope)
   | .binary op left right => do
       return .binary op (← left.lower? scope) (← right.lower? scope)
+  | .wordLt left right => do
+      return .wordLt (← left.lower? scope) (← right.lower? scope)
   | .letE binder value body => do
       return .letE (← value.lower? scope) (← body.lower? (binder :: scope))
   | .ifE condition thenBranch elseBranch => do
@@ -50,6 +53,9 @@ inductive Lowers : List LocalId → Expr → Core.Expr → Prop where
   | binary {scope op left right coreLeft coreRight} :
       Lowers scope left coreLeft → Lowers scope right coreRight →
       Lowers scope (.binary op left right) (.binary op coreLeft coreRight)
+  | wordLt {scope left right coreLeft coreRight} :
+      Lowers scope left coreLeft → Lowers scope right coreRight →
+      Lowers scope (.wordLt left right) (coreLeft.wordLt coreRight)
   | letE {scope binder value body coreValue coreBody} :
       Lowers scope value coreValue → Lowers (binder :: scope) body coreBody →
       Lowers scope (.letE binder value body) (.letE coreValue coreBody)

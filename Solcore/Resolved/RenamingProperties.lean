@@ -72,6 +72,7 @@ theorem Expr.lower?_renameIds (mapping : LocalId → LocalId)
   | var id => simp only [renameIds, lower?, LocalScope.index?_map mapping injective]
   | unary op operand ih => simp only [renameIds, lower?, ih]
   | binary op left right leftIH rightIH => simp only [renameIds, lower?, leftIH, rightIH]
+  | wordLt left right leftIH rightIH => simp only [renameIds, lower?, leftIH, rightIH]
   | letE binder value body valueIH bodyIH =>
       simpa only [renameIds, lower?, List.map_cons, valueIH] using
         congrArg (fun loweredBody => do
@@ -140,6 +141,14 @@ theorem evaluates_renameIds_iff (mapping : LocalId → LocalId)
       · intro evaluation
         cases evaluation with
         | letE bound rest => exact .letE (valueIH.mpr bound) (bodyIH.mpr rest)
+  | wordLt left right leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | wordLt first second => exact .wordLt (leftIH.mp first) (rightIH.mp second)
+      · intro evaluation
+        cases evaluation with
+        | wordLt first second => exact .wordLt (leftIH.mpr first) (rightIH.mpr second)
   | ifE condition thenBranch elseBranch conditionIH thenIH elseIH =>
       constructor
       · intro evaluation

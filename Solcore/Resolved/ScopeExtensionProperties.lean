@@ -1,6 +1,6 @@
 import Solcore.Resolved.ScopeProperties
 import Solcore.Resolved.TypingProperties
-import Solcore.Core.Renaming
+import Solcore.Core.DerivedComparisons
 
 /-! Inserting a fresh outer identity preserves every existing local reference.
 The prefix formulation passes under arbitrary let binders, including binders
@@ -61,6 +61,11 @@ theorem Lowers.insert_fresh
       | binary leftLowered rightLowered =>
           simp only [Core.Expr.weakenAt]
           exact .binary (leftIH leftLowered) (rightIH rightLowered)
+  | wordLt left right leftIH rightIH =>
+      cases lowered with
+      | wordLt leftLowered rightLowered =>
+          rw [Core.Expr.weakenAt_wordLt]
+          exact .wordLt (leftIH leftLowered) (rightIH rightLowered)
   | letE binder value body valueIH bodyIH =>
       cases lowered with
       | letE valueLowered bodyLowered =>

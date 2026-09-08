@@ -1,6 +1,7 @@
 import Solcore.Resolved.Typing
 import Solcore.Resolved.LocalScopeProperties
 import Solcore.Resolved.LoweringProperties
+import Solcore.Resolved.LocalFragmentProperties
 
 /-! Independent resolved-local typing agrees with elaboration to the existing
 Core checker. These laws do not resolve source names or assign source syntax
@@ -29,6 +30,10 @@ theorem HasType.lowers {context : Context} {expr : Expr} {type : Core.Ty}
       obtain ⟨left, leftLowered, leftTyped⟩ := leftIH
       obtain ⟨right, rightLowered, rightTyped⟩ := rightIH
       exact ⟨_, .binary leftLowered rightLowered, .binary leftTyped rightTyped⟩
+  | wordLt _ _ leftIH rightIH =>
+      obtain ⟨left, leftLowered, leftTyped⟩ := leftIH
+      obtain ⟨right, rightLowered, rightTyped⟩ := rightIH
+      exact ⟨_, .wordLt leftLowered rightLowered, leftTyped.wordLt rightTyped⟩
   | letE _ _ valueIH bodyIH =>
       obtain ⟨value, valueLowered, valueTyped⟩ := valueIH
       obtain ⟨body, bodyLowered, bodyTyped⟩ := bodyIH
@@ -60,6 +65,9 @@ private theorem reflects_type_aux {scope : List LocalId} {expr : Expr} {core : C
       cases typing with
       | binary leftTyped rightTyped =>
           exact .binary (leftIH scopeEq leftTyped) (rightIH scopeEq rightTyped)
+  | wordLt _ rightLowered leftIH rightIH =>
+      obtain ⟨rfl, leftTyped, rightTyped⟩ := typing.wordLt_inv_local_right rightLowered.localFragment
+      exact .wordLt (leftIH scopeEq leftTyped) (rightIH scopeEq rightTyped)
   | @letE scope binder value body coreValue coreBody _ _ valueIH bodyIH =>
       cases typing with
       | @letE _ _ _ _ valueType _ valueTyped bodyTyped =>

@@ -19,6 +19,7 @@ def Expr.renameIds (mapping : LocalId → LocalId) : Expr → Expr
   | .var id => .var (mapping id)
   | .unary op operand => .unary op (operand.renameIds mapping)
   | .binary op left right => .binary op (left.renameIds mapping) (right.renameIds mapping)
+  | .wordLt left right => .wordLt (left.renameIds mapping) (right.renameIds mapping)
   | .letE binder value body =>
       .letE (mapping binder) (value.renameIds mapping) (body.renameIds mapping)
   | .ifE condition thenBranch elseBranch =>
