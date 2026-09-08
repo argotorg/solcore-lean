@@ -461,7 +461,20 @@ Each actual state resumes separately via ADR-0218. Source and parsed consumers
 cover depth, asymmetric costs, opaque values, whole rejection, distinct stores
 and genuine captured states. Pending loads provide an explicit boundary: retained
 continuation endpoints do not imply store-independent continuation execution.
-No owner, new bound/resumption, old entry, parser/Core/Wire or policy extension.
+No new bound/resumption, old entry, parser/Core/Wire or policy extension;
+owner covariance is treated separately in ADR-0220.
+
+Recursive owner covariance (ADR-0220) preserves independent exact elaboration
+and whole typing with unchanged source, type-name table, Core and type. A global
+injective owner-only map keeps all indices, transports each fresh tail and starts
+both sibling arms from the same mapped original inputs. Sparse mixed-owner
+scopes and local sibling ID reuse follow the existing allocator. Full checker
+Options, including rejection, are preserved without a surjective map or inverse.
+For actual inputs, unchanged positional values give identical whole runner
+results and genuine checkpoints at fixed fuel/store. Static nominal proofs need
+no inhabitants; opaque actual values need no access or calls. Arbitrary index
+changes and collapsing owners do not meet this contract. Existing raw/cost,
+bound/resumption, owner helpers and outer-prefix function entries are unchanged.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent

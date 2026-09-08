@@ -182,6 +182,8 @@ import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.TypedLetReturnTreeRunnerEmbeddingProperties
 import Solcore.Frontend.TypedLetReturnTreeStoreProperties
+import Solcore.Frontend.TypedLetReturnTreeOwnerProperties
+import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -223,6 +225,9 @@ runner successes retain their full results; singleton shapes retain rejection
 as well. Arbitrary-store raw replay preserves values and exact costs; completed
 observations and exhaustion presence keep their own stores, not identical full
 results or checkpoints. Pending Core frames receive no store-independence law.
+Globally injective owner-only relabeling preserves independent static provenance,
+full checker rejection and same-store complete runner results, without changing
+indices, source, positional values or scope-local sibling allocation.
 Existing function entries are unchanged. No inference, default
 initialization or broader binding policy is added.
 -/

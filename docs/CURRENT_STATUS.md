@@ -1042,7 +1042,33 @@ Rejected annotations and unselected failures still admit some raw paths. A
 pending Core cell-load can instead observe different contents or fault on an
 empty store at zero fuel; returning a cell reference is not executing that
 pending load. No arbitrary-Core or arbitrary-continuation runner independence,
-owner transport, old entry change or broader source policy is introduced.
+old entry change or broader source policy is introduced by store replay;
+independent owner transport follows in ADR-0220.
+
+### Recursive typed let/return trees: owner covariance
+
+A globally injective declaration-owner map preserves independent exact
+elaboration and whole source typing for the same original recursive body,
+type-name table, Core and return type (ADR-0220). All supplied input owners and
+the current fresh allocator owner are mapped, but indices stay fixed. Existing
+freshness laws handle sparse, mixed-owner scopes; allocation is not row count.
+Each initializer keeps its old scope, each tail gets its mapped fresh binding,
+and both sibling arms start from the same original scope. Sibling IDs may still
+coincide locally. No global input-name uniqueness or runtime inhabitants are
+required for value-free nominal typing.
+
+Recursion on original syntax proves full optional checker equality, including
+rejected shapes and invalid unselected children. Injectivity is required but
+surjectivity or an inverse is not. Erased actual inputs and unchanged positional
+values lift this to full same-fuel, same-store runner equality, including genuine
+conditional/initializer/tail checkpoints. This is distinct from ADR-0219's
+own-store observations across different stores. Opaque values remain supplied
+values, not new allocations or calls.
+
+Arbitrary local-ID index shifts need not commute with fresh allocation, and
+owner-collapsing maps are not admissible. Old function entries, owner helpers,
+raw/cost judgments, source bounds and resumption stay unchanged. No type-name
+extension, parser/Core/Wire change or broader source policy is introduced here.
 
 ### Explicit restricted runtime function entry
 

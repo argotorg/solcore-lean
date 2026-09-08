@@ -1231,4 +1231,10 @@ example := @Solcore.Frontend.typedLetReturnTreeEvaluatesWithCost_store_iff
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_done_store_iff
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_outOfFuel_store_iff
 
+example := @Solcore.Frontend.TypedLetReturnTreeElaborates.mapOwner
+example := @Solcore.Frontend.TypedLetReturnTreeHasType.mapOwner
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_mapOwner
+example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnTree?_mapOwner
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_mapOwner
+
 end Tests
