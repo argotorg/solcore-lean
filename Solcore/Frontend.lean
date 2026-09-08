@@ -168,6 +168,10 @@ import Solcore.Frontend.TypedLetReturnBodyOwnerProperties
 import Solcore.Frontend.TypedLetReturnBodyRunnerOwnerProperties
 import Solcore.Frontend.TypedLetReturnBodyTypeExtensionProperties
 import Solcore.Frontend.TypedLetReturnBodyRunnerTypeExtensionProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.TypedLetReturnTreeElaboration
+import Solcore.Frontend.TypedLetReturnTreeProperties
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -195,5 +199,10 @@ whole optional results and checkpoints at a fixed store. First-match type-meanin
 extension preserves success, and mutual extension also preserves rejection.
 Existing function entries reuse the typed-prefix judgments and additive bound,
 retaining original parameter records, argument guards and direct Core execution.
-No inference, arm-local let or broader binding policy is added.
+No arm-local let is added to those runtime entries. A separate recursive static
+adapter admits annotated, initialized, nonshadowing lets inside either arm,
+with exact ordered Core, independent typing and success-only old embeddings.
+Sibling scopes start from the same inputs and may reuse the same fresh ID.
+This new adapter adds no evaluation, fuel bound, runner or entry integration;
+no inference, default initialization or broader binding policy is added.
 -/

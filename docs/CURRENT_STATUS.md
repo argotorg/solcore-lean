@@ -923,6 +923,34 @@ Raw paths, exact costs and source bounds do not depend on the caller type table
 and acquire no new checking evidence from these laws. This body-level unit adds
 no entry, parser, Core, inference, default-initializer or binding-policy extension.
 
+### Recursive typed let/return trees: static semantics
+
+A separate total `TypedLetReturnTree` adapter now admits finite alternating
+typed-let prefixes and terminal explicit if/else nodes inside either arm
+(ADR-0216). Independent typing and exact elaboration retain the original syntax,
+old-scope initializers, fresh tail inputs and ordered Core `letE`/`ifE` structure.
+Both arms start in the same original scope: sibling binders can reuse a fresh
+identity, even with different declared types, without becoming visible across
+branches. Descendants can use ancestor locals but cannot shadow them. Recursion
+decreases full syntax size, not merely the outer statement count.
+
+Whole checking covers every initializer and both arms, including unselected
+deep failures. Exact provenance characterizes success, fixes Core and type,
+and implies Core typing; absence of any independent whole typing characterizes
+rejection. Value-free nominal types need no runtime inhabitants or extra input
+name-uniqueness premise. Old terminal-tree and outer-prefix successes embed
+with exactly the same Core/type; only singleton-return shapes have full Option
+equality. Old failures may become new successes and are not preserved generally.
+
+Independent arbitrary-length proofs and complete parsed declarations cover
+alternating depth, noncommutative initialization, sibling isolation, original
+parameter positions, first-match annotation meanings and qualified keys.
+This unit adds no evaluation/cost, runner, bound, resumption or runtime-entry
+integration. The existing entries below still reject arm-local lets. Missing
+annotations/initializers, shadowing, extra statements after a conditional,
+separate block wrappers and general calls remain outside this new adapter;
+no parser/Core/Wire change, inference or global binding policy is implied.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime

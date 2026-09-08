@@ -400,6 +400,23 @@ old rows beneath an overriding head is not semantic extension, whereas differing
 hidden duplicates can preserve all visible meanings. No redundant raw/cost/bound
 transport or runtime-entry/inference/binding-policy extension is introduced.
 
+Recursive typed-let tree static semantics (ADR-0216) now separately admits
+arbitrary finite alternation of typed prefixes and terminal explicit if/else
+inside either arm. Initializers use old inputs, tails use exact fresh extensions,
+and both siblings restart from the same original scope, allowing independent
+reuse of a fresh identity without name leakage. Whole syntax size justifies
+total recursion even when a singleton conditional contains a long child body.
+Independent typing/exact elaboration give success and rejection equivalences,
+Core type preservation and uniqueness, without runtime inhabitants or a new
+name-uniqueness premise. Old tree/prefix successes embed unchanged; singleton
+return has full Option equality, but old branch-let failures may become successes.
+Arbitrary-depth source proofs and complete parsed declarations exercise exact
+Core, original parameter positions, same-ID siblings, ancestor visibility,
+noncommutative initialization, qualified/first-match meanings and deep rejection.
+Existing body adapters and ADR-0215 entries remain unchanged. Evaluation/cost,
+runner/fuel/resumption and eventual entry integration are separate subsequent
+proof boundaries; no general calls, inference, defaults or broader scope policy.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while

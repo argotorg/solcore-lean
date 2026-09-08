@@ -1143,4 +1143,36 @@ example (compilation : RuntimeFunctionCompiles types owner declaration compiled)
 
 end TypedLetEntryContracts
 
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?
+example := @Solcore.Frontend.TypedLetReturnTreeHasType
+example := @Solcore.Frontend.TypedLetReturnTreeElaborates
+example := @Solcore.Frontend.TypedLetReturnTreeHasType.single
+example := @Solcore.Frontend.TypedLetReturnTreeHasType.binding
+example := @Solcore.Frontend.TypedLetReturnTreeHasType.conditional
+example := @Solcore.Frontend.TypedLetReturnTreeElaborates.single
+example := @Solcore.Frontend.TypedLetReturnTreeElaborates.binding
+example := @Solcore.Frontend.TypedLetReturnTreeElaborates.conditional
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_single
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_binding_children
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_conditional_children
+example := @Solcore.Frontend.TypedLetReturnTreeElaborates.complete
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_elaborates
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_iff
+example := @Solcore.Frontend.TypedLetReturnTreeElaborates.hasType
+example := @Solcore.Frontend.TypedLetReturnTreeHasType.elaborates_exact
+example := @Solcore.Frontend.typedLetReturnTreeHasType_iff_elaborates_exact
+example := @Solcore.Frontend.TypedLetReturnTreeHasType.elaborates
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_sound
+example := @Solcore.Frontend.typedLetReturnTreeHasType_iff_elaborates
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_core_hasType
+example := @Solcore.Frontend.TypedLetReturnTreeElaborates.result_unique
+example := @Solcore.Frontend.TypedLetReturnTreeHasType.type_unique
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_eq_none_iff
+example := @Solcore.Frontend.TerminalReturnTreeHasType.typedLetReturnTree
+example := @Solcore.Frontend.TerminalReturnTreeElaborates.typedLetReturnTree
+example := @Solcore.Frontend.TypedLetReturnBodyHasType.returnTree
+example := @Solcore.Frontend.TypedLetReturnBodyElaborates.returnTree
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_some_of_terminalReturnTree
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_some_of_typedLetReturnBody
+
 end Tests
