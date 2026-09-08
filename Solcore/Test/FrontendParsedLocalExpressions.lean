@@ -83,6 +83,7 @@ private def bundledInputs (choice : Bool) : LocalInputs :=
 
 private def checkBundledRun : IO Unit := do
   let source ← parsedExpression "c ? t : e"
+  let negatedSource ← parsedExpression "!c ? t : e"
   let unsupported ← parsedExpression "c ? t : missing"
   for choice in [false, true] do
     let inputs := bundledInputs choice
@@ -103,6 +104,11 @@ private def checkBundledRun : IO Unit := do
       "adding an unused source name did not preserve the checked type and shift free positions"
     assertTrue (decide (extended.run? 4 source store = inputs.run? 4 source store))
       "adding an unused source name changed the completed conditional result"
+    assertTrue (decide (inputs.run? 6 negatedSource store =
+      some (.word, .done (if choice then word 22 else word 11) store)))
+      "bundled source negation did not select the opposite branch"
+    assertTrue (decide (extended.run? 6 negatedSource store = inputs.run? 6 negatedSource store))
+      "unused input insertion changed a parsed negated condition"
 
 def frontendParsedLocalExpressionTests : IO Unit := do
   let simple : Core.Expr := .ifE (.var 1) (.var 2) (.var 3)
@@ -120,12 +126,26 @@ def frontendParsedLocalExpressionTests : IO Unit := do
     (.ifE (.ifE (.var 1) (.var 4) (.var 7)) (.var 2) (.var 3)) false false (word 11) 7
   checkRun "true ? t : e" (.ifE (.var 6) (.var 2) (.var 3)) true true (word 22) 4
   checkRun "false ? t : e" (.ifE (.var 7) (.var 2) (.var 3)) false false (word 11) 4
+  let negatedCondition : Core.Expr := .ifE (.unary .boolNot (.var 1)) (.var 2) (.var 3)
+  checkRun "!c ? t : e" negatedCondition false false (word 11) 6
+  checkRun "(!c) ? t : e" negatedCondition true true (word 22) 6
+  checkRun "!!c ? t : e"
+    (.ifE (.unary .boolNot (.unary .boolNot (.var 1))) (.var 2) (.var 3)) true false (word 11) 8
+  checkRun "c ? t : (!d ? e : n)"
+    (.ifE (.var 1) (.var 2) (.ifE (.unary .boolNot (.var 4)) (.var 3) (.var 5)))
+    false false (word 22) 9
+  checkRun "!true ? t : e"
+    (.ifE (.unary .boolNot (.var 6)) (.var 2) (.var 3)) true true (word 11) 6
+  checkRun "!false ? t : e"
+    (.ifE (.unary .boolNot (.var 7)) (.var 2) (.var 3)) false false (word 22) 6
   checkUnsupported "c ? t : missing"
   checkUnsupported "c ? t : 7"
   checkUnsupported "t + e"
+  checkUnsupported "~c"
   checkIllTyped "n ? t : e"
   checkIllTyped "c ? t : d"
   checkIllTyped "c ? t : (d ? e : c)"
+  checkIllTyped "(!n) ? t : e"
   let rejectsTrailingTokens ← try
     let _ ← parsedExpression "t e"
     pure false
