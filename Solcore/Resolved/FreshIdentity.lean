@@ -80,4 +80,19 @@ theorem freshLocalId_eq_of_perm (owner : DeclarationId) {left right : List Local
         simp [freshBinderIndex, firstOwner, secondOwner, Nat.max_left_comm]
   | trans _ _ firstIH secondIH => exact firstIH.trans secondIH
 
+/-- Relabeling owners injectively preserves the exact allocated index for any
+scope. Indices are unchanged; the owner map need not be surjective. -/
+theorem freshLocalId_map_owner (mapping : DeclarationId → DeclarationId)
+    (injective : Function.Injective mapping) (owner : DeclarationId) (scope : List LocalId) :
+    freshLocalId (mapping owner)
+        (scope.map (fun id => ⟨mapping id.owner, id.binderIndex⟩)) =
+      ⟨mapping owner, (freshLocalId owner scope).binderIndex⟩ := by
+  suffices indices : freshBinderIndex (mapping owner)
+      (scope.map (fun id => ⟨mapping id.owner, id.binderIndex⟩)) = freshBinderIndex owner scope by
+    exact congrArg (LocalId.mk (mapping owner)) indices
+  induction scope with
+  | nil => rfl
+  | cons id rest ih =>
+      simp only [List.map_cons, freshBinderIndex, injective.eq_iff, ih]
+
 end Solcore.Resolved
