@@ -67,6 +67,9 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | lessEqual _ _ leftIH rightIH =>
       cases evaluation with
       | lessEqual leftChild rightChild => exact .unary (.binary (leftIH leftChild) (rightIH rightChild) rfl) rfl
+  | greaterEqual _ _ leftIH rightIH =>
+      cases evaluation with
+      | greaterEqual leftChild rightChild => exact .unary (.wordLt (leftIH leftChild) (rightIH rightChild)) rfl
   | logicalAnd _ _ leftIH rightIH =>
       cases evaluation with
       | andTrue leftChild rightChild => exact .ifTrue (leftIH leftChild) (rightIH rightChild)
@@ -198,6 +201,13 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
                 cases applied
                 cases negated
                 exact .lessEqual (leftIH leftChild) (rightIH rightChild)
+  | greaterEqual _ _ leftIH rightIH =>
+      cases evaluation with
+      | unary comparison negated =>
+          cases comparison with
+          | wordLt leftChild rightChild =>
+              cases negated
+              exact .greaterEqual (leftIH leftChild) (rightIH rightChild)
   | logicalAnd _ _ leftIH rightIH =>
       cases evaluation with
       | ifTrue leftChild rightChild => exact .andTrue (leftIH leftChild) (rightIH rightChild)

@@ -135,6 +135,17 @@ theorem LocalExpressionEvaluatesWithCost.toStepsWithContinuation
                   simpa only [Nat.add_assoc] using CostStepComposition.unary
                     (CostStepComposition.binary
                       (leftIH leftChild lowerLeft _) (rightIH rightChild lowerRight _) rfl) rfl
+  | greaterEqual _ _ leftIH rightIH =>
+      cases resolution with
+      | greaterEqual leftChild rightChild =>
+          cases lowered with
+          | unary lowerComparison =>
+              cases lowerComparison with
+              | wordLt lowerLeft lowerRight =>
+                  simpa only [Nat.add_assoc] using CostStepComposition.unary
+                    (CostStepComposition.wordLt_of_local_right
+                      (leftIH leftChild lowerLeft) (rightIH rightChild lowerRight)
+                      lowerRight.localFragment (.unaryApply .boolNot :: continuation)) rfl
   | andTrue _ _ leftIH rightIH =>
       cases resolution with
       | logicalAnd leftChild rightChild =>

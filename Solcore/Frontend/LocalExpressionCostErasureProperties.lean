@@ -31,6 +31,7 @@ theorem LocalExpressionEvaluatesWithCost.erase {table : LocalNameTable}
   | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
   | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
   | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
+  | greaterEqual _ _ leftIH rightIH => exact .greaterEqual leftIH rightIH
   | andTrue _ _ leftIH rightIH => exact .andTrue leftIH rightIH
   | andFalse _ ih => exact .andFalse ih
   | orTrue _ ih => exact .orTrue ih
@@ -100,6 +101,10 @@ theorem LocalExpressionEvaluates.exists_cost {table : LocalNameTable}
       obtain ⟨leftCost, left⟩ := leftIH
       obtain ⟨rightCost, right⟩ := rightIH
       exact ⟨_, .lessEqual left right⟩
+  | greaterEqual _ _ leftIH rightIH =>
+      obtain ⟨leftCost, left⟩ := leftIH
+      obtain ⟨rightCost, right⟩ := rightIH
+      exact ⟨_, .greaterEqual left right⟩
   | andTrue _ _ leftIH rightIH =>
       obtain ⟨leftCost, left⟩ := leftIH
       obtain ⟨rightCost, right⟩ := rightIH

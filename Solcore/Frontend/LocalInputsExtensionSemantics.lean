@@ -132,6 +132,14 @@ theorem AvoidsLocalName.bindFresh_evaluates_iff {name : String} {source : Syntax
       · intro evaluation
         cases evaluation with
         | lessEqual left right => exact .lessEqual (leftIH.mpr left) (rightIH.mpr right)
+  | greaterEqual _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | greaterEqual left right => exact .greaterEqual (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | greaterEqual left right => exact .greaterEqual (leftIH.mpr left) (rightIH.mpr right)
   | bitAnd _ _ leftIH rightIH =>
       constructor
       · intro evaluation

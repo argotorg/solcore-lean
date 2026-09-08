@@ -131,6 +131,14 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       LocalExpressionEvaluates table environment initialStore
         { span, value := .binary left ⟨operatorSpan, .lessEqual⟩ right }
         (.bool (!(decide (leftValue > rightValue)))) finalStore
+  | greaterEqual {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.word leftValue) middleStore)
+      (rightEvaluation : LocalExpressionEvaluates table environment middleStore right (.word rightValue) finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .greaterEqual⟩ right }
+        (.bool (!(decide (leftValue < rightValue)))) finalStore
   | andTrue {initialStore middleStore finalStore : Core.Store}
       {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr} {value : Core.Value}
       (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.bool true) middleStore)
@@ -189,6 +197,7 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
   | equal _ _ leftIH rightIH
   | notEqual _ _ leftIH rightIH
   | lessEqual _ _ leftIH rightIH
+  | greaterEqual _ _ leftIH rightIH
   | andTrue _ _ leftIH rightIH | orFalse _ _ leftIH rightIH =>
       exact rightIH.trans leftIH
 
