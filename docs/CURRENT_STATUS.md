@@ -478,6 +478,29 @@ parsed entries cover distinct/equal owners, changed real ID tables, identical
 Core and values, exact fuel boundaries, opaque typed values, and rejected whole
 declarations. No global allocator, function lookup, or runtime adapter is added.
 
+### Type-only runtime parameter declarations
+
+Canonical runtime parameter annotations now prepare an ordered static input
+bundle without any supplied values (ADR-0174). Each row contains a spelling,
+fresh identity, and explicit Core type; unique identities align the name table
+and typing context. The independent declaration relation exactly characterizes
+the executable empty-start adapter. Parameters retain their written allocation
+order and reverse storage order, and duplicate spellings are rejected.
+
+Existing typed runtime inputs erase to these exact static rows. Independent
+runtime binding implies static declaration; conversely, a static declaration
+and an actual typed argument list with the exact source-order types reconstruct
+runtime binding with identical erasure. Type-list equality preserves arity and
+order as well as each type. No arbitrary type is assumed inhabited, and no
+dummy value is manufactured.
+
+Independent consumers and fully parsed parameters cover arbitrary explicit
+types, nominal data references with no supplied values, fresh IDs, erasure,
+ordered argument reconstruction, and static success with runtime arity/type
+rejection. Unsupported annotation forms and repeated names remain outside the
+adapter profile. This is annotation-only preparation, not whole-function
+compilation, source calls, or a new runtime evaluator.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

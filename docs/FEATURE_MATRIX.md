@@ -741,6 +741,7 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Arbitrary runtime parameter positions | Proved (ADR-0171) | source-index bounds and exact name/ID/Core-position/type/value correspondence, reference and matched entry return in one transition, mixed types and every parsed position across several arities; no new evaluator, call semantics, or out-of-range subtraction policy | High |
 | Static runtime argument invariance | Proved (ADR-0172) | equal structural argument type lists preserve independent binding/preparation and optional names/context/IDs/exact Core/return type, including rejection; values, suspended states, outcomes, and costs may differ | High |
 | Runtime entry owner invariance | Proved (ADR-0173) | injective owner-only binding/preparation transport, identical optional Core/type/runtime values and full same-fuel results for arbitrary owners; ID tables are relabeled, no general allocator covariance for binder-index changes | High |
+| Type-only runtime parameter declarations | Implemented with exact independent semantics (ADR-0174) | value-free static rows, exact annotation declaration, runtime erasure and reconstruction from matching ordered typed arguments; no type-inhabitation assumption or whole-function compiler | High |
 | Resolved-to-Core elaboration | Exact local-expression fragment implemented | full source coverage, effects beyond the store-preserving fragment, and stage preservation remain open | Medium |
 
 ## Contract and runtime semantics

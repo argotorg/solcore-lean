@@ -59,10 +59,15 @@ import Solcore.Frontend.RuntimeParametersStaticProperties
 import Solcore.Frontend.RuntimeFunctionStaticProperties
 import Solcore.Frontend.RuntimeParametersOwnerProperties
 import Solcore.Frontend.RuntimeFunctionOwnerProperties
+import Solcore.Frontend.LocalTypeInputs
+import Solcore.Frontend.LocalTypeInputsProperties
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.LocalInputsTypeErasure
+import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
-runtime parameter inputs, singleton return bodies, and restricted explicit
+type-only and runtime parameter inputs, singleton return bodies, and restricted explicit
 function entries. Independent source rules
 connect to checked Core execution. General source-program resolution, parser
 changes, and wire publication are not implied.

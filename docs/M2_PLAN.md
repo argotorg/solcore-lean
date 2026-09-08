@@ -218,6 +218,17 @@ along the existing allocation chain, not for arbitrary injective index changes.
 The source declaration and typed argument values stay fixed; name/context/ID
 tables are related by relabeling rather than directly equated.
 
+Type-only parameter declarations (ADR-0174) now separate annotation meaning
+from runtime argument supply. Static rows retain spelling, identity, and type
+without value evidence; the independent declaration relation exactly matches
+the executable adapter. Existing runtime binding erases to static declaration,
+and an actual typed argument list reconstructs binding precisely when its
+ordered types agree with the declared parameter context. No type-inhabitation
+assumption, argument decoder, or new source policy is introduced. A following
+unit should combine these inputs with the existing exact body elaboration and
+return contract, retaining the explicit argument-type guard when relating
+value-free compilation to runtime preparation.
+
 Further frontend semantics should preserve exact identity, binding, and Core
 execution correspondence while extending supported expressions and declarations.
 General calls and control flow remain separate. The resolved immutable expression
