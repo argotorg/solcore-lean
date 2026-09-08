@@ -16,6 +16,7 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
   | identifier found =>
       simp only [resolveLocalExpression?, LocalNameTable.lookup?_iff.mpr found, Option.map_some]
   | group _ ih => simpa only [resolveLocalExpression?] using ih
+  | logicalNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
   | conditional _ _ _ conditionIH thenIH elseIH =>
       simp [resolveLocalExpression?, conditionIH, thenIH, elseIH]
 
@@ -25,7 +26,7 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
     ResolvesLocalExpression table source resolved := by
   cases source with
   | mk span payload =>
-      cases payload <;> simp only [resolveLocalExpression?, reduceCtorEq] at result
+      cases payload <;> try simp only [resolveLocalExpression?, reduceCtorEq] at result
       case identifier name =>
         cases found : table.lookup? name.value with
         | none => simp only [found, Option.map_none, reduceCtorEq] at result
@@ -34,6 +35,15 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
             cases result
             exact .identifier (LocalNameTable.lookup?_iff.mp found)
       case group inner => exact .group (resolveLocalExpression?_sound result)
+      case unary operator operand =>
+        rcases operator with ⟨operatorSpan, operatorValue⟩
+        cases operatorValue with
+        | logicalNot =>
+            simp only [resolveLocalExpression?, Option.map_eq_some_iff] at result
+            obtain ⟨resolvedOperand, operandResult, same⟩ := result
+            cases same
+            exact .logicalNot (resolveLocalExpression?_sound operandResult)
+        | bitNot => simp only [resolveLocalExpression?, reduceCtorEq] at result
       case conditional condition question thenBranch colon elseBranch =>
         simp only [bind, Option.bind_eq_some_iff, pure] at result
         obtain ⟨resolvedCondition, conditionResult, resolvedThen, thenResult,
@@ -73,7 +83,11 @@ theorem resolveLocalExpression?_span (table : LocalNameTable) (source : Syntax.E
     (span : Syntax.SourceSpan) :
     resolveLocalExpression? table { source with span } = resolveLocalExpression? table source := by
   cases source with
-  | mk sourceSpan payload => cases payload <;> simp only [resolveLocalExpression?]
+  | mk sourceSpan payload =>
+      cases payload <;> try simp only [resolveLocalExpression?]
+      case unary operator operand =>
+        rcases operator with ⟨operatorSpan, operatorValue⟩
+        cases operatorValue <;> simp only [resolveLocalExpression?]
 
 /-- Conditional punctuation and the outer range carry no resolution meaning. -/
 theorem resolveLocalExpression?_conditional_spans (table : LocalNameTable)
@@ -84,6 +98,14 @@ theorem resolveLocalExpression?_conditional_spans (table : LocalNameTable)
       resolveLocalExpression? table
         { span := otherSpan,
           value := .conditional condition otherQuestion thenBranch otherColon elseBranch } := by
+  simp only [resolveLocalExpression?]
+
+/-- Boolean negation ignores its operator range and the enclosing expression range. -/
+theorem resolveLocalExpression?_logicalNot_spans (table : LocalNameTable) (operand : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .unary ⟨otherOperatorSpan, .logicalNot⟩ operand } := by
   simp only [resolveLocalExpression?]
 
 /-- Identifier spelling, not either occurrence range, selects the local ID. -/

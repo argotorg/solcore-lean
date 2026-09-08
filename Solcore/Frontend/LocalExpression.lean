@@ -1,8 +1,8 @@
 import Solcore.Frontend.LocalReference
 
-/-! An additive canonical identifier/group/conditional adapter. Its explicit
+/-! An additive canonical identifier/group/logical-negation/conditional adapter. Its explicit
 name table supplies all identities, including any bindings for `true` or `false`.
-Literal interpretation, operators, source bindings, and global resolution remain
+Literal interpretation, other operators, source bindings, and global resolution remain
 outside this fragment. Unsupported syntax is not a source-language rejection. -/
 
 set_option autoImplicit false
@@ -17,6 +17,8 @@ def resolveLocalExpression? (table : LocalNameTable) (source : Syntax.Expr) :
   match source with
   | ⟨_, .identifier name⟩ => (table.lookup? name.value).map Resolved.Expr.var
   | ⟨_, .group inner⟩ => resolveLocalExpression? table inner
+  | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ =>
+      (resolveLocalExpression? table operand).map (Resolved.Expr.unary .boolNot)
   | ⟨_, .conditional condition _ thenBranch _ elseBranch⟩ => do
       return .ifE (← resolveLocalExpression? table condition)
         (← resolveLocalExpression? table thenBranch) (← resolveLocalExpression? table elseBranch)
@@ -33,6 +35,12 @@ inductive ResolvesLocalExpression (table : LocalNameTable) :
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr} {resolved : Resolved.Expr}
       (child : ResolvesLocalExpression table inner resolved) :
       ResolvesLocalExpression table { span, value := .group inner } resolved
+  | logicalNot {span operatorSpan : Syntax.SourceSpan}
+      {operand : Syntax.Expr} {resolvedOperand : Resolved.Expr}
+      (operandChild : ResolvesLocalExpression table operand resolvedOperand) :
+      ResolvesLocalExpression table
+        { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand }
+        (.unary .boolNot resolvedOperand)
   | conditional {span question colon : Syntax.SourceSpan}
       {condition thenBranch elseBranch : Syntax.Expr}
       {resolvedCondition resolvedThen resolvedElse : Resolved.Expr}

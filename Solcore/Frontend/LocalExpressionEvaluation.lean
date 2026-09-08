@@ -2,7 +2,7 @@ import Solcore.Frontend.LocalExpression
 import Solcore.Frontend.LocalReferenceProperties
 import Solcore.Resolved.EvaluationProperties
 
-/-! Independent canonical evaluation for the local conditional fragment.
+/-! Independent canonical evaluation for the local conditional/negation fragment.
 Evaluation requires only the selected branch, not whole-expression resolution.
 Both stores are explicit even though every constructor is store-preserving. -/
 
@@ -23,6 +23,11 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       (child : LocalExpressionEvaluates table environment initialStore inner value finalStore) :
       LocalExpressionEvaluates table environment initialStore
         { span, value := .group inner } value finalStore
+  | logicalNot {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+      {operand : Syntax.Expr} {value : Bool}
+      (child : LocalExpressionEvaluates table environment initialStore operand (.bool value) finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand } (.bool (!value)) finalStore
   | ifTrue {initialStore middleStore finalStore : Core.Store}
       {span question colon : Syntax.SourceSpan} {condition thenBranch elseBranch : Syntax.Expr}
       {value : Core.Value}
@@ -49,7 +54,7 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
     finalStore = initialStore := by
   induction evaluation with
   | identifier => rfl
-  | group _ ih => exact ih
+  | group _ ih | logicalNot _ ih => exact ih
   | ifTrue _ _ conditionIH branchIH | ifFalse _ _ conditionIH branchIH =>
       exact branchIH.trans conditionIH
 
@@ -69,6 +74,12 @@ theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
   | group _ ih =>
       cases rightEvaluation with
       | group child => exact ih child
+  | logicalNot _ ih =>
+      cases rightEvaluation with
+      | logicalNot child =>
+          obtain ⟨same, storeEq⟩ := ih child
+          cases same
+          exact ⟨rfl, storeEq⟩
   | ifTrue _ _ conditionIH branchIH =>
       cases rightEvaluation with
       | ifTrue condition branch =>

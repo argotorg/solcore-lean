@@ -19,6 +19,9 @@ theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Reso
   | group _ ih =>
       obtain ⟨resolved, resolution, typed⟩ := ih
       exact ⟨resolved, .group resolution, typed⟩
+  | logicalNot _ ih =>
+      obtain ⟨resolved, resolution, typed⟩ := ih
+      exact ⟨_, .logicalNot resolution, .unary typed⟩
   | conditional _ _ _ conditionIH thenIH elseIH =>
       obtain ⟨condition, conditionResolved, conditionTyped⟩ := conditionIH
       obtain ⟨thenBranch, thenResolved, thenTyped⟩ := thenIH
@@ -36,6 +39,9 @@ theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context 
       cases typing with
       | var found => exact .identifier named found
   | group _ ih => exact .group (ih typing)
+  | logicalNot _ ih =>
+      cases typing with
+      | unary operandTyped => exact .logicalNot (ih operandTyped)
   | conditional _ _ _ conditionIH thenIH elseIH =>
       cases typing with
       | ifE conditionTyped thenTyped elseTyped =>
@@ -130,7 +136,7 @@ theorem elaborateLocalExpression?_type_unique {table : LocalNameTable} {context 
     (localExpressionHasType_iff_elaborates.mpr ⟨rightCore, second⟩)
 
 /-- Failure includes unsupported/unmapped syntax, missing local IDs, and
-ill-typed conditionals; none is silently promoted to whole-language rejection. -/
+ill-typed negations or conditionals; none is promoted to whole-language rejection. -/
 theorem elaborateLocalExpression?_eq_none_iff {table : LocalNameTable} {context : Resolved.Context}
     {source : Syntax.Expr} : elaborateLocalExpression? table context source = none ↔
       ¬ ∃ type, LocalExpressionHasType table context source type := by

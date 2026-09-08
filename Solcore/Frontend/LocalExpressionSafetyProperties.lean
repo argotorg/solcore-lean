@@ -3,8 +3,8 @@ import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Core.Safety
 
 /-! Direct source-level existence and type/store preservation for the local
-conditional fragment. Identity order and positional environment typing remain
-explicit; no closedness or general resolved-evaluation existence theorem is used. -/
+negation/conditional fragment. Identity order and positional environment typing
+remain explicit; no closedness or general resolved-evaluation existence theorem is used. -/
 
 set_option autoImplicit false
 
@@ -32,6 +32,10 @@ theorem LocalExpressionHasType.evaluates
   | group _ ih =>
       obtain ⟨value, evaluation, valueTyped⟩ := ih
       exact ⟨value, .group evaluation, valueTyped⟩
+  | logicalNot _ ih =>
+      obtain ⟨value, evaluation, valueTyped⟩ := ih
+      obtain ⟨decision, rfl⟩ := valueTyped.bool_shape
+      exact ⟨.bool (!decision), .logicalNot evaluation, .bool⟩
   | conditional _ _ _ conditionIH thenIH elseIH =>
       obtain ⟨conditionValue, conditionEvaluation, conditionTyped⟩ := conditionIH
       obtain ⟨decision, rfl⟩ := conditionTyped.bool_shape

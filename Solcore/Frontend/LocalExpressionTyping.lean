@@ -2,8 +2,9 @@ import Solcore.Frontend.LocalExpression
 import Solcore.Resolved.Typing
 
 /-! Independent typing for the supported canonical local-expression fragment.
-Conditionals require a Boolean condition and equally typed branches. Names and
-local identities come from explicit caller tables; no literal meaning,
+Logical negation requires a Boolean operand; conditionals require a Boolean
+condition and equally typed branches. Names and local identities come from
+explicit caller tables; no literal meaning,
 coercion, or typing rule for other canonical constructors is introduced. -/
 
 set_option autoImplicit false
@@ -20,6 +21,10 @@ inductive LocalExpressionHasType (table : LocalNameTable) (context : Resolved.Co
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr} {type : Core.Ty}
       (typing : LocalExpressionHasType table context inner type) :
       LocalExpressionHasType table context { span, value := .group inner } type
+  | logicalNot {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr}
+      (operandTyped : LocalExpressionHasType table context operand .bool) :
+      LocalExpressionHasType table context
+        { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand } .bool
   | conditional {span question colon : Syntax.SourceSpan}
       {condition thenBranch elseBranch : Syntax.Expr} {type : Core.Ty}
       (conditionTyped : LocalExpressionHasType table context condition .bool)

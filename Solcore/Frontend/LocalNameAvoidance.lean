@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
-/-- No identifier in this identifier/group/conditional expression has the
+/-- No identifier in this identifier/group/logical-negation/conditional expression has the
 specified spelling. All conditional children are checked, not just a branch
 that a particular runtime environment might select. -/
 inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
@@ -17,6 +17,9 @@ inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr}
       (child : AvoidsLocalName name inner) :
       AvoidsLocalName name { span, value := .group inner }
+  | logicalNot {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr}
+      (child : AvoidsLocalName name operand) :
+      AvoidsLocalName name { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand }
   | conditional {span question colon : Syntax.SourceSpan}
       {condition thenBranch elseBranch : Syntax.Expr}
       (conditionAvoids : AvoidsLocalName name condition)

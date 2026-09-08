@@ -23,6 +23,9 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | group _ ih =>
       cases evaluation with
       | group child => exact ih child
+  | logicalNot _ ih =>
+      cases evaluation with
+      | logicalNot child => exact .unary (ih child) rfl
   | conditional _ _ _ conditionIH thenIH elseIH =>
       cases evaluation with
       | ifTrue condition branch => exact .ifTrue (conditionIH condition) (thenIH branch)
@@ -40,6 +43,13 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
       cases evaluation with
       | var found => exact .identifier named found
   | group _ ih => exact .group (ih evaluation)
+  | logicalNot _ ih =>
+      cases evaluation with
+      | @unary _ _ _ _ _ operandValue _ child applied =>
+          cases operandValue <;> simp only [Core.UnaryOp.apply, reduceCtorEq] at applied
+          case bool decision =>
+            cases applied
+            exact .logicalNot (ih child)
   | conditional _ _ _ conditionIH thenIH elseIH =>
       cases evaluation with
       | ifTrue condition branch => exact .ifTrue (conditionIH condition) (thenIH branch)

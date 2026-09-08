@@ -44,6 +44,14 @@ theorem AvoidsLocalName.resolves_cons_iff {name : String} {source : Syntax.Expr}
       · intro resolution
         cases resolution with
         | group child => exact .group (ih.mpr child)
+  | logicalNot _ ih =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | logicalNot child => exact .logicalNot (ih.mp child)
+      · intro resolution
+        cases resolution with
+        | logicalNot child => exact .logicalNot (ih.mpr child)
   | conditional _ _ _ conditionIH thenIH elseIH =>
       constructor
       · intro resolution
