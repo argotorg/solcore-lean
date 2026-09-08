@@ -761,6 +761,36 @@ Function entries now reuse the recursive tree contracts below (ADR-0208). Old
 body-only adapters stay unchanged; no general early return, extra statements,
 missing else, local declarations, calls or fallthrough are added.
 
+### Typed local-declaration prefixes: static semantics
+
+A separate `TypedLetReturnBody` adapter now checks a finite outer sequence of
+annotated, initialized, non-shadowing local declarations followed by an existing
+terminal return tree (ADR-0209). It consumes original statements without a fuel
+or length limit. An annotation uses the caller's first matching type meaning;
+its initializer is checked in the old inputs with that exact type. Only the
+remaining statements see the new name, fresh owner-relative ID and prepended
+type. The exact output is nested Core `letE`, with no second reversal or extra
+weakening of the already elaborated tail.
+
+Independent source typing and exact elaboration retain annotation meaning,
+initializer resolution/lowering/typing and the entire remaining source.
+Checker success is equivalent to that provenance; typing, exact uniqueness and
+failure characterization require no runtime values or nominal inhabitants.
+Every initializer and every terminal branch is checked, including unused or
+unselected source. Same-typed wrong Core cannot replace the actual output.
+Old terminal-tree successes embed unchanged, and full optional equality holds
+on singleton return/if shapes, including rejection, not on arbitrary prefixes.
+
+This is a deliberately restricted static adapter, not a language-wide rejection
+of omitted annotations, omitted initializers or repeated names. Inference,
+default initialization, shadowing, let prefixes inside conditional arms,
+mutation, separate block wrappers and calls are not added. Freshness is relative
+to current inputs; no arbitrary-renaming allocator covariance or traversal-global
+uniqueness is claimed. Independent and parsed consumers retain exact source
+order, old-scope/forward-reference boundaries, nominal inputs and whole failures.
+There is no source evaluation/cost/runner for this profile yet. Existing tree
+and function-entry adapters remain unchanged and still reject let prefixes.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime

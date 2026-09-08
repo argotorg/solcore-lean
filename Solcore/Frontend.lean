@@ -149,6 +149,10 @@ import Solcore.Frontend.TerminalReturnTreeResumptionProperties
 import Solcore.Frontend.TerminalReturnTreeRunnerEmbeddingProperties
 import Solcore.Frontend.TerminalReturnTreeRenamingProperties
 import Solcore.Frontend.TerminalReturnTreeStoreProperties
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.TypedLetReturnBodyElaboration
+import Solcore.Frontend.TypedLetReturnBodyProperties
+import Solcore.Frontend.TypedLetReturnBodyEmbeddingProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -165,4 +169,7 @@ a checked body runner, recursive fuel bounds and genuine-state resumption.
 Injective identity relabeling retains full results; store replay retains value,
 cost and observation thresholds with each result's own store. Existing function
 entries reuse these recursive contracts with unchanged headers and parameters.
+Typed, initialized, non-shadowing local-declaration prefixes have a separate
+value-free static adapter with exact nested Core letE. It adds no runtime-entry
+integration, source evaluation or general binding/inference policy.
 -/

@@ -1005,6 +1005,35 @@ example := @Solcore.Frontend.terminalReturnTreeEvaluatesWithCost_store_iff
 example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_done_store_iff
 example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_outOfFuel_store_iff
 
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?
+example := @Solcore.Frontend.TypedLetReturnBodyHasType
+example := @Solcore.Frontend.TypedLetReturnBodyElaborates
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_binding_children
+example := @Solcore.Frontend.TypedLetReturnBodyElaborates.complete
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_elaborates
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_iff
+example := @Solcore.Frontend.TypedLetReturnBodyHasType.terminal
+example := @Solcore.Frontend.TypedLetReturnBodyHasType.binding
+example := @Solcore.Frontend.TypedLetReturnBodyElaborates.terminal
+example := @Solcore.Frontend.TypedLetReturnBodyElaborates.binding
+
+example := @Solcore.Frontend.TypedLetReturnBodyElaborates.hasType
+example := @Solcore.Frontend.TypedLetReturnBodyHasType.elaborates_exact
+example := @Solcore.Frontend.typedLetReturnBodyHasType_iff_elaborates_exact
+example := @Solcore.Frontend.TypedLetReturnBodyHasType.elaborates
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_sound
+example := @Solcore.Frontend.typedLetReturnBodyHasType_iff_elaborates
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_core_hasType
+example := @Solcore.Frontend.TypedLetReturnBodyElaborates.result_unique
+example := @Solcore.Frontend.TypedLetReturnBodyHasType.type_unique
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_eq_none_iff
+example := @Solcore.Frontend.TerminalReturnTreeHasType.typedLetReturnBody
+example := @Solcore.Frontend.TerminalReturnTreeElaborates.typedLetReturnBody
+example := @Solcore.Frontend.TerminalReturnTreeElaborates.typedLetReturnBody_complete
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_single
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_conditional
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_conditional_singletons
+
 section RecursiveEntryContracts
 
 open Solcore Solcore.Frontend

@@ -320,6 +320,20 @@ first-match collisions are outside the ID law. The body modules remain acyclic
 and runtime-entry-independent. Existing function entries reuse these contracts
 in ADR-0208 below; the old body-only adapters remain unchanged.
 
+The separate typed-let-prefix static adapter (ADR-0209) adds finite outer
+sequences of annotated, initialized, non-shadowing declarations before an
+existing terminal tree. Initializers use the old scope and the exact annotated
+type; only the tail sees the freshly prepended static binding. Independent
+typing and exact provenance characterize total checking, exact nested Core
+`letE`, Core typing, uniqueness and rejection without runtime inhabitants.
+All written initializers and terminal branches are checked. Old tree successes
+embed; whole Option equality only applies to old singleton return/if shapes.
+The restrictions do not imply that omitted annotations/initializers or shadowing
+are invalid source. No inference/default values, arm-local prefix, execution,
+cost, runner or entry integration is added. Actual parsed static declarations
+and arbitrary-length/type source proofs retain original order, binder positions,
+whole failure and same-typed wrong-Core boundaries.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while
