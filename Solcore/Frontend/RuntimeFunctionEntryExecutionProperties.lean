@@ -69,7 +69,7 @@ theorem runRuntimeFunction?_done_iff_cost
     obtain ⟨prepared, preparation, sameType, execution⟩ := runRuntimeFunction?_eq_some_iff.mp completed
     cases sameType
     obtain ⟨cost, bodyCost, enough⟩ :=
-      (elaborateTerminalReturnBody?_run_done_iff_cost preparation.body.complete prepared.inputs.sameIds).mp execution
+      (elaborateTerminalReturnTree?_run_done_iff_cost preparation.body.complete prepared.inputs.sameIds).mp execution
     exact ⟨cost, .intro preparation bodyCost, enough⟩
   · rintro ⟨cost, evaluation, enough⟩
     exact evaluation.run_done_iff.mpr enough

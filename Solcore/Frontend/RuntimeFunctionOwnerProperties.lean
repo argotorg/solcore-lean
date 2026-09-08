@@ -1,4 +1,4 @@
-import Solcore.Frontend.TerminalReturnBodyRenamingProperties
+import Solcore.Frontend.TerminalReturnTreeRenamingProperties
 import Solcore.Frontend.RuntimeParametersOwnerProperties
 import Solcore.Frontend.RuntimeFunctionEntryProperties
 
