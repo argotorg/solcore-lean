@@ -30,6 +30,12 @@ inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | add {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
       AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .add⟩ right }
+  | subtract {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
+      AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .subtract⟩ right }
+  | multiply {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
+      AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .multiply⟩ right }
   | bitAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
       AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .bitAnd⟩ right }

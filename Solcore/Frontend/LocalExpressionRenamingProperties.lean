@@ -24,6 +24,8 @@ theorem ResolvesLocalExpression.mapIds {table : LocalNameTable}
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
   | add _ _ leftIH rightIH => exact .add leftIH rightIH
+  | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
+  | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
   | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
   | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
   | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
@@ -59,6 +61,14 @@ theorem resolvesLocalExpression_mapIds_iff_exists (mapping : Resolved.LocalId �
         obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
         obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
         exact ⟨.binary .wordAdd originalLeft originalRight, .add leftChild rightChild, rfl⟩
+    | subtract _ _ leftIH rightIH =>
+        obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
+        obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
+        exact ⟨.binary .wordSub originalLeft originalRight, .subtract leftChild rightChild, rfl⟩
+    | multiply _ _ leftIH rightIH =>
+        obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
+        obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
+        exact ⟨.binary .wordMul originalLeft originalRight, .multiply leftChild rightChild, rfl⟩
     | bitAnd _ _ leftIH rightIH =>
         obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
         obtain ⟨originalRight, rightChild, rfl⟩ := rightIH

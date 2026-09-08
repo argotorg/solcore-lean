@@ -56,6 +56,8 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
     | add _ _ leftIH rightIH => exact .add leftIH rightIH
+    | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
+    | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
     | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
     | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
     | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
@@ -75,6 +77,8 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
     | add _ _ leftIH rightIH => exact .add leftIH rightIH
+    | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
+    | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
     | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
     | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
     | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
