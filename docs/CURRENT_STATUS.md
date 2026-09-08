@@ -44,7 +44,8 @@ Structured declaration/local identities retain module and library ownership.
 Independent first-match lookup and positional judgments prove exact binding
 selection, uniqueness, and non-dangling references. The monomorphic expression
 fragment includes semantic unit/Boolean/Word values, local references, selected
-Core unary/binary primitives, immutable expression binding, and conditionals.
+Core unary/binary primitives, ordered unsigned Word less-than, immutable
+expression binding, and conditionals.
 Its total elaborator preserves lexical scope and rejects unresolved references.
 
 Independent typing and named-environment evaluation are connected to Core in
@@ -137,6 +138,20 @@ cannot be dropped: allocating a captured closure may change the literal store
 under insertion even when the right operand returns the same Word. This proof
 bridge preserves existing Core APIs and does not yet change the Resolved or
 canonical source expression representation.
+
+Resolved expressions now have a dedicated identity-free `wordLt` form
+(ADR-0192). Both original children lower in the original scope, producing the
+existing two-let Core expansion without choosing temporary LocalIds. Independent
+Word/Word-to-Bool typing, ordered raw evaluation, and whole-child scope validity
+extend through this form. All generic lowering/checker, type/evaluation
+correspondence, determinism, store preservation, renaming and fresh insertion/
+reflection contracts remain unchanged. Arbitrary structural ID maps introduce no
+allocation problem; semantic map preservation keeps its existing injectivity
+premise, and duplicate IDs keep first-match lookup. The expansion still belongs
+to the eight-form Core predicate. Raw evaluation may skip an unresolved or
+ill-typed child, while whole lowering/typing still checks it. The explicit-ID
+builder remains available with its original hygiene contract. Canonical source
+`<` and its negative fixtures remain unchanged pending adapter integration.
 
 The resolved fragment alone is not a canonical source adapter. It does not interpret literal
 spelling, resolve `true`/`false` or overloaded operators, allocate source-wide IDs,

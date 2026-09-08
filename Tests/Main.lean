@@ -74,6 +74,8 @@ import Solcore.Test.CoreLocalFragmentExactInsertionProperties
 import Solcore.Test.CoreLocalFragmentExactInsertionBoundary
 import Solcore.Test.CoreLocalRightWordLessProperties
 import Solcore.Test.CoreLocalRightWordLessBoundary
+import Solcore.Test.ResolvedWordLessProperties
+import Solcore.Test.ResolvedWordLessBoundary
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler

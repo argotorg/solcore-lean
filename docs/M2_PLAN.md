@@ -105,6 +105,17 @@ retains the necessary right-side boundary. Existing Core comparison APIs remain
 unchanged; dedicated resolved representation and the canonical source adapter
 are the next distinct integration steps, without a hidden LocalId allocator.
 
+The dedicated resolved representation is now implemented (ADR-0192): `wordLt`
+lowers both original children in the same original scope and expands only into
+positional Core lets. All existing independent typing, scope, evaluation,
+lowering, checker, store, determinism, renaming and fresh-insertion/reflection
+theorems include this form without stronger premises. Arbitrary structural maps
+need no fresh allocation; semantic invariance still requires injectivity and
+duplicate IDs retain first-match behavior. The Core expansion remains in the
+eight-form local predicate. Raw skipped-child success does not excuse whole
+scope/type rejection. Explicit-ID builders remain unchanged. Canonical source
+`<` support and its negative-fixture migration are still the next adapter step.
+
 Canonical identifiers and grouping now have an exact explicit-table adapter
 to typed resolved references and Core variables (ADR-0155). The name table does
 not replace source scope construction. Execution correspondence retains exact

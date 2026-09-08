@@ -119,5 +119,10 @@ example := @Solcore.Resolved.Evaluates.wordLtWithIds
 example := @Solcore.Resolved.Evaluates.wordLtWithIds_inv
 example := @Solcore.Resolved.wordLtWithIds_evaluates_iff
 example := @Solcore.Resolved.Lowers.localFragment
+example := @Solcore.Resolved.Expr.wordLt
+example := @Solcore.Resolved.Lowers.wordLt
+example := @Solcore.Resolved.HasType.wordLt
+example := @Solcore.Resolved.Evaluates.wordLt
+example := @Solcore.Resolved.WellScoped.wordLt
 
 end Tests

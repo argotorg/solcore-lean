@@ -674,5 +674,10 @@ example := @Solcore.Core.Evaluates.wordLt_local_right
 example := @Solcore.Core.Evaluates.wordLt_inv_local_right
 example := @Solcore.Core.wordLt_evaluates_iff_local_right
 example := @Solcore.Frontend.CostStepComposition.wordLt_of_local_right
+example := @Solcore.Resolved.Expr.wordLt
+example := @Solcore.Resolved.Lowers.wordLt
+example := @Solcore.Resolved.HasType.wordLt
+example := @Solcore.Resolved.Evaluates.wordLt
+example := @Solcore.Resolved.WellScoped.wordLt
 
 end Tests
