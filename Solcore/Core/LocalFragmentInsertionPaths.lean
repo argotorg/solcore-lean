@@ -21,6 +21,22 @@ private theorem lookup_insert (leading suffix : Environment) (inserted : Value) 
           by_cases shifted : leading.length ≤ index <;>
             simpa [shifted, Nat.succ_le_succ_iff] using ih index
 
+private theorem pair_path {environment : Environment} {initialStore middleStore finalStore : Store}
+    {left right : Expr} {leftValue rightValue : Value}
+    {continuation : List Frame} {leftCost rightCost : Nat}
+    (leftPath : Steps leftCost
+      ⟨.eval left environment, .pairRight right environment :: continuation, initialStore⟩
+      ⟨.ret leftValue, .pairRight right environment :: continuation, middleStore⟩)
+    (rightPath : Steps rightCost
+      ⟨.eval right environment, .pairApply leftValue :: continuation, middleStore⟩
+      ⟨.ret rightValue, .pairApply leftValue :: continuation, finalStore⟩) :
+    Steps (leftCost + rightCost + 3)
+      ⟨.eval (.pair left right) environment, continuation, initialStore⟩
+      ⟨.ret (.pair leftValue rightValue), continuation, finalStore⟩ := by
+  have path := Steps.cons .enterPair
+    (leftPath.trans (.cons .enterPairRight (rightPath.trans (.cons .applyPair .refl))))
+  simpa only [Nat.add_assoc] using path
+
 private theorem unary_path {environment : Environment} {initialStore finalStore : Store}
     {op : UnaryOp} {operand : Expr} {operandValue result : Value}
     {continuation : List Frame} {childCost : Nat}
@@ -134,6 +150,16 @@ theorem Expr.LocalFragment.insertion_paths
           by_cases shifted : leading.length ≤ index <;>
             simp only [shifted, ↓reduceIte] at positions ⊢
           all_goals exact .cons (.var (positions.trans found)) .refl
+  | pair _ _ leftIH rightIH =>
+      cases evaluation with
+      | pair left right =>
+          obtain ⟨leftCost, leftPaths⟩ := leftIH leading left
+          obtain ⟨rightCost, rightPaths⟩ := rightIH leading right
+          refine ⟨leftCost + rightCost + 3, fun continuation => ?_⟩
+          constructor
+          · exact pair_path (leftPaths _).1 (rightPaths _).1
+          · simp only [Expr.weakenAt]
+            exact pair_path (leftPaths _).2 (rightPaths _).2
   | unary _ ih =>
       cases evaluation with
       | unary child applied =>

@@ -53,6 +53,15 @@ theorem Expr.LocalFragment.hasType_insert_iff
         · intro typing
           cases typing with
           | var found => exact .var (positions.trans found)
+  | pair _ _ leftIH rightIH =>
+      simp only [Expr.weakenAt]
+      constructor
+      · intro typing
+        cases typing with
+        | pair left right => exact .pair ((leftIH leading).mp left) ((rightIH leading).mp right)
+      · intro typing
+        cases typing with
+        | pair left right => exact .pair ((leftIH leading).mpr left) ((rightIH leading).mpr right)
   | unary _ ih =>
       simp only [Expr.weakenAt]
       constructor

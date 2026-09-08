@@ -53,6 +53,15 @@ theorem Expr.LocalFragment.evaluates_insert_iff
         · intro evaluation
           cases evaluation with
           | var found => exact .var (positions.trans found)
+  | pair _ _ leftIH rightIH =>
+      simp only [Expr.weakenAt]
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | pair left right => exact .pair ((leftIH leading).mp left) ((rightIH leading).mp right)
+      · intro evaluation
+        cases evaluation with
+        | pair left right => exact .pair ((leftIH leading).mpr left) ((rightIH leading).mpr right)
   | unary _ ih =>
       simp only [Expr.weakenAt]
       constructor
