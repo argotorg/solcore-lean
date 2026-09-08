@@ -202,7 +202,7 @@ def frontendParsedWordArithmeticTests : IO Unit := do
     "equality completed below its five-transition cost"
   assertTrue (decide (supplied.run? 5 equality store = some (.bool, .done (.bool false) store)))
     "equality lost its Bool result or exact five-transition cost"
-  for content in ["l / r", "l % r", "l < r"] do
+  for content in ["l / r", "l % r", "l >= r"] do
     checkRejected supplied content false
   checkShapes
   for content in ["-1", "+1", "8 -", "2 *", "8 - 3 2", "2 * 3 trailing", "l -= r", "l *= r"] do

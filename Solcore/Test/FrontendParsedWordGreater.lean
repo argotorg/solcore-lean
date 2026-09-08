@@ -196,7 +196,7 @@ def frontendParsedWordGreaterTests : IO Unit := do
   checkRun supplied "l == r" (.binary .wordEq (.var 2) (.var 1)) .bool (.bool false) 5
   checkRun supplied "l != r" (.unary .boolNot (.binary .wordEq (.var 2) (.var 1))) .bool (.bool true) 7
   checkRun supplied "l <= r" (.unary .boolNot (.binary .wordGt (.var 2) (.var 1))) .bool (.bool true) 7
-  for content in ["l < r", "l >= r", "l / r", "l % r"] do
+  for content in ["l >= r", "l / r", "l % r"] do
     checkRejected supplied content false
   checkParameterPositions
   checkReturnContract
