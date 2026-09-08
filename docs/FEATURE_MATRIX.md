@@ -119,6 +119,7 @@ published through Oracle v4.
 | Atom totality with bounded bodies | Raw lambda, selected-core, and public atom ordinary/no-invariant laws consume bounded expression/body contracts and two explicit input budgets | No global body totality; rejected window replacement remains allowed, so atom success-window contract is separate | High |
 | Numeric-window atom contract composition | Numeric-only endIndex frames lift through raw/core/recovery; bounded child contracts and rejected endpoint preservation construct actual atom contracts up to both child successor budgets | No source/token/endByte/validity frame; conditional layer step, not recursive closure | High |
 | Rejected-endpoint recovery consumer | Always-rejecting children have every fuel contract, yet a changed rejected endIndex becomes public success; independent reverse traces retain full State and ordered diagnostics | Demonstrates why child success-only endpoint laws cannot frame public recovery | High |
+| Constructed postfix child contracts | Actual atom contract is built internally; numeric suffix frames and bounded children give ordinary execution, successor contracts, and separate child-only layer trace existence | Numeric totality and stronger trace context frames remain separate; recursive closure still open | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are

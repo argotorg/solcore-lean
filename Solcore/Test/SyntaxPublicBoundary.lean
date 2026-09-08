@@ -3430,4 +3430,13 @@ example := @Syntax.Parser.expressionAtom_endIndex_onReject
 example := @Syntax.Parser.expressionAtom_unrestrictedChildContract
 example := @Syntax.Parser.expressionAtom_unrestrictedChildContract_succ
 
+example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_preservesEndIndex
+example := @Syntax.Parser.expressionPostfix_preservesEndIndex
+example := @Syntax.Parser.expressionPostfix_ordinary_of_unrestrictedChildFuels
+example := @Syntax.Parser.expressionPostfix_ne_invariant_of_unrestrictedChildFuels
+example := @Syntax.Parser.expressionPostfix_unrestrictedChildContract
+example := @Syntax.Parser.expressionPostfix_unrestrictedChildContract_succ
+example := @Syntax.Parser.expressionPostfix_layer_exists_trace_outcome_of_unrestrictedChildFuels
+example := @Syntax.Parser.expressionPostfixLayerTrace_outcome_exists_of_unrestrictedChildFuels
+
 end Tests

@@ -224,6 +224,9 @@ import Solcore.Syntax.Parser.DelimitedNumericWindowProperties
 import Solcore.Syntax.Parser.ExpressionCollectionNumericWindowProperties
 import Solcore.Syntax.Parser.ExpressionAtomNumericWindowProperties
 import Solcore.Syntax.Parser.ExpressionAtomUnrestrictedChildContractProperties
+import Solcore.Syntax.Parser.PostfixNumericWindowProperties
+import Solcore.Syntax.Parser.ExpressionPostfixUnrestrictedChildContractProperties
+import Solcore.Syntax.Parser.ExpressionPostfixLayerTraceExistenceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -289,4 +292,5 @@ actual atom-plus-postfix composition preserves ordered traces and pointwise comp
 separate bounded composition totality and trace existence still require an atom endpoint budget or a supplied atom contract;
 atom ordinary execution also accepts bounded body contracts, and one concrete atom/postfix layer retains explicit child frames;
 numeric-only success/rejection frames compose through recovery, constructing an atom fuel contract from two bounded children;
+actual postfix contracts now construct the intermediate atom internally, and child-only bounded soundness supplies layer trace existence;
 general expressions and remaining statement traces remain open. -/

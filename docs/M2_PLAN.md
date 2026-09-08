@@ -1237,6 +1237,12 @@ source/token/endByte/validity frames. An independent reverse recovery consumer
 shows that child fuel contracts alone do not suffice: a rejected endpoint change
 survives as public success. Recursive expression/block closure remains separate.
 
+Actual postfix contracts now construct their atom contract internally and lift
+numeric endpoint frames through the tail. Explicit child budgets/rejected endpoint
+frames suffice for ordinary execution and the successor contract step. Concrete
+layer soundness additionally supplies child-only actual/independent trace existence
+under its source/window frames, without joint-exactness or completeness assumptions.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

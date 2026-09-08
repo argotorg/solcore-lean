@@ -1689,6 +1689,16 @@ changed endpoint. Independent core/recovery traces reconstruct the exact State
 and ordered report/recovery events for arbitrary content and prior diagnostics.
 This supplies a conditional atom-layer contract, not recursive expression closure.
 
+The actual postfix contract now constructs that intermediate atom contract
+internally. Numeric-only frames lift through every suffix and both ordinary
+outcomes; nested/body fuel contracts and rejected endpoint preservation give
+ordinary execution and the next postfix-layer contract without an abstract atom
+premise. Success endpoint/progress laws hold on all States, while ordinary
+execution retains the explicit two-budget bound. Combining this result with
+the concrete layer soundness and explicit full-window child contexts supplies
+actual and independent postfix-layer trace existence using only child premises.
+No independent joint law or completeness assumption replaces totality.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
