@@ -88,6 +88,14 @@ theorem resolveLocalExpression?_greater_spans (table : LocalNameTable) (left rig
         { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .greater⟩ right } := by
   simp only [resolveLocalExpression?]
 
+/-- Word equality retains operand order and ignores only the operator/outer ranges. -/
+theorem resolveLocalExpression?_equal_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .equal⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .equal⟩ right } := by
+  simp only [resolveLocalExpression?]
+
 /-- Word conjunction keeps both operand trees and ignores only the operator/outer ranges. -/
 theorem resolveLocalExpression?_bitAnd_spans (table : LocalNameTable) (left right : Syntax.Expr)
     (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :

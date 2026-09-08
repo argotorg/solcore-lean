@@ -95,6 +95,14 @@ theorem AvoidsLocalName.resolves_cons_iff {name : String} {source : Syntax.Expr}
       · intro resolution
         cases resolution with
         | greater left right => exact .greater (leftIH.mpr left) (rightIH.mpr right)
+  | equal _ _ leftIH rightIH =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | equal left right => exact .equal (leftIH.mp left) (rightIH.mp right)
+      · intro resolution
+        cases resolution with
+        | equal left right => exact .equal (leftIH.mpr left) (rightIH.mpr right)
   | bitAnd _ _ leftIH rightIH =>
       constructor
       · intro resolution
