@@ -2,8 +2,8 @@ import Solcore.Frontend.LocalReference
 import Solcore.Frontend.WordLiteral
 
 /-! An additive canonical adapter for identifiers, strict Word literals, grouping,
-conditionals, Boolean operators, Word addition/subtraction/multiplication, and
-Word bitwise operators. Its explicit name table
+conditionals, Boolean operators, Word arithmetic/bitwise operators, and unsigned
+Word greater-than. Its explicit name table
 supplies identities, including any bindings for `true` or `false`; literals do
 not consult that table. This fixed literal interpretation is local to the adapter,
 not a general source conversion or overload policy. Other operators, source
@@ -35,6 +35,9 @@ def resolveLocalExpression? (table : LocalNameTable) (source : Syntax.Expr) :
         (← resolveLocalExpression? table right)
   | ⟨_, .binary left ⟨_, .multiply⟩ right⟩ => do
       return .binary .wordMul (← resolveLocalExpression? table left)
+        (← resolveLocalExpression? table right)
+  | ⟨_, .binary left ⟨_, .greater⟩ right⟩ => do
+      return .binary .wordGt (← resolveLocalExpression? table left)
         (← resolveLocalExpression? table right)
   | ⟨_, .binary left ⟨_, .bitAnd⟩ right⟩ => do
       return .binary .wordAnd (← resolveLocalExpression? table left)
@@ -103,6 +106,13 @@ inductive ResolvesLocalExpression (table : LocalNameTable) :
       ResolvesLocalExpression table
         { span, value := .binary left ⟨operatorSpan, .multiply⟩ right }
         (.binary .wordMul resolvedLeft resolvedRight)
+  | greater {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {resolvedLeft resolvedRight : Resolved.Expr}
+      (leftChild : ResolvesLocalExpression table left resolvedLeft)
+      (rightChild : ResolvesLocalExpression table right resolvedRight) :
+      ResolvesLocalExpression table
+        { span, value := .binary left ⟨operatorSpan, .greater⟩ right }
+        (.binary .wordGt resolvedLeft resolvedRight)
   | bitAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {resolvedLeft resolvedRight : Resolved.Expr}
       (leftChild : ResolvesLocalExpression table left resolvedLeft)
