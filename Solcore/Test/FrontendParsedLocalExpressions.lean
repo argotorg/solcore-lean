@@ -47,10 +47,11 @@ private def parsedExpression (content : String) : IO Syntax.Expr := do
   | .invariant error => throw (IO.userError s!"{content}: parser invariant {reprStr error}")
 
 private def checkRun (content : String) (expectedCore : Core.Expr)
-    (condition nestedCondition : Bool) (expectedValue : Core.Value) (required : Nat) : IO Unit := do
+    (condition nestedCondition : Bool) (expectedValue : Core.Value) (required : Nat)
+    (expectedType : Core.Ty := .word) : IO Unit := do
   let source ← parsedExpression content
   let checked := elaborateLocalExpression? names context source
-  assertTrue (decide (checked = some (expectedCore, .word))) s!"{content}: wrong checked Core expression"
+  assertTrue (decide (checked = some (expectedCore, expectedType))) s!"{content}: wrong checked Core expression"
   let some (actualCore, _) := checked
     | throw (IO.userError s!"{content}: no checked expression")
   let initial := Core.State.initial actualCore
@@ -74,7 +75,7 @@ private def checkIllTyped (content : String) : IO Unit := do
   let source ← parsedExpression content
   assertTrue (resolveLocalExpression? names source).isSome s!"{content}: expected name resolution"
   assertTrue (decide (elaborateLocalExpression? names context source = none))
-    s!"{content}: ill-typed conditional unexpectedly checked"
+    s!"{content}: ill-typed expression unexpectedly checked"
 
 private def bundledInputs (choice : Bool) : LocalInputs :=
   ((LocalInputs.empty.bindFresh (localId 0).owner "e" .word (word 22) .word).bindFresh
@@ -84,6 +85,8 @@ private def bundledInputs (choice : Bool) : LocalInputs :=
 private def checkBundledRun : IO Unit := do
   let source ← parsedExpression "c ? t : e"
   let negatedSource ← parsedExpression "!c ? t : e"
+  let conjunction ← parsedExpression "c && !c"
+  let disjunction ← parsedExpression "c || !c"
   let unsupported ← parsedExpression "c ? t : missing"
   for choice in [false, true] do
     let inputs := bundledInputs choice
@@ -109,6 +112,50 @@ private def checkBundledRun : IO Unit := do
       "bundled source negation did not select the opposite branch"
     assertTrue (decide (extended.run? 6 negatedSource store = inputs.run? 6 negatedSource store))
       "unused input insertion changed a parsed negated condition"
+    assertTrue (decide (inputs.run? (if choice then 6 else 4) conjunction store =
+      some (.bool, .done (.bool false) store))) "bundled conjunction did not short-circuit correctly"
+    assertTrue (decide (inputs.run? (if choice then 4 else 6) disjunction store =
+      some (.bool, .done (.bool true) store))) "bundled disjunction did not short-circuit correctly"
+    assertTrue (decide (extended.run? 6 conjunction store = inputs.run? 6 conjunction store ∧
+      extended.run? 6 disjunction store = inputs.run? 6 disjunction store))
+      "unused input insertion changed parsed short-circuit execution"
+
+private def checkShortCircuitRuns : IO Unit := do
+  let conjunction : Core.Expr := .ifE (.var 1) (.var 4) (.bool false)
+  let disjunction : Core.Expr := .ifE (.var 1) (.bool true) (.var 4)
+  for choice in [false, true] do
+    for rightChoice in [false, true] do
+      checkRun "c && d" conjunction choice rightChoice (.bool (choice && rightChoice)) 4 .bool
+      checkRun "c || d" disjunction choice rightChoice (.bool (choice || rightChoice)) 4 .bool
+      checkRun "c && !d ? t : e"
+        (.ifE (.ifE (.var 1) (.unary .boolNot (.var 4)) (.bool false)) (.var 2) (.var 3))
+        choice rightChoice (if choice && !rightChoice then word 11 else word 22)
+        (if choice then 9 else 7)
+      checkRun "c || !d ? t : e"
+        (.ifE (.ifE (.var 1) (.bool true) (.unary .boolNot (.var 4))) (.var 2) (.var 3))
+        choice rightChoice (if choice || !rightChoice then word 11 else word 22)
+        (if choice then 7 else 9)
+  let precedence : Core.Expr := .ifE
+    (.ifE (.var 1) (.bool true) (.ifE (.var 4) (.unary .boolNot (.var 6)) (.bool false)))
+    (.var 2) (.var 3)
+  checkRun "c || d && !true ? t : e" precedence true false (word 11) 7
+  checkRun "c || d && !true ? t : e" precedence false true (word 11) 12
+  checkRun "c || d && !true ? t : e" precedence false false (word 22) 10
+  checkRun "(c || d) && !false ? t : e"
+    (.ifE (.ifE disjunction (.unary .boolNot (.var 7)) (.bool false)) (.var 2) (.var 3))
+    true false (word 22) 12
+  let nested : Core.Expr := .ifE
+    (.ifE (.var 1) (.ifE (.var 4) (.unary .boolNot (.var 1)) (.var 1)) (.bool false))
+    (.var 2) (.var 3)
+  checkRun "c && (d ? !c : c) ? t : e" nested false true (word 22) 7
+  checkRun "c && (d ? !c : c) ? t : e" nested true true (word 22) 12
+  checkRun "c && (d ? !c : c) ? t : e" nested true false (word 11) 10
+  checkUnsupported "c && missing"
+  checkUnsupported "c || 7"
+  checkUnsupported "c & d"
+  checkUnsupported "c | d"
+  checkIllTyped "c && n"
+  checkIllTyped "n || c"
 
 def frontendParsedLocalExpressionTests : IO Unit := do
   let simple : Core.Expr := .ifE (.var 1) (.var 2) (.var 3)
@@ -152,5 +199,6 @@ def frontendParsedLocalExpressionTests : IO Unit := do
   catch error => pure (error.toString == "t e: unconsumed source tokens")
   assertTrue rejectsTrailingTokens "source-text test helper accepted an incomplete expression parse"
   checkBundledRun
+  checkShortCircuitRuns
 
 end Tests
