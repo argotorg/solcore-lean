@@ -459,6 +459,25 @@ declarations remain rejected for both value choices. Typed closures and
 unallocated references may be replaced as opaque arguments without implying
 application or allocation safety.
 
+### Owner-independent runtime entries
+
+Changing only the caller-supplied declaration owner now preserves entry
+acceptance, exact Core, return type, runtime value sequence, and the complete
+same-fuel execution result (ADR-0173). Independent parameter and preparation
+relations are transported by an injective owner map that fixes binder indices.
+For arbitrary old and new owners, an owner swap supplies the required global
+injectivity. Input IDs, name tables, and typed contexts are relabeled rather
+than asserted equal; their runtime value projections are unchanged.
+
+The allocation argument follows the existing empty-start fresh-ID chain and
+does not claim commutation with arbitrary injective ID maps. A binder-index
+shift is an explicit counterexample to that stronger claim. In contrast to
+changing argument values, changing only the owner preserves entire suspended
+states, not merely exhaustion presence. Independent consumers and completely
+parsed entries cover distinct/equal owners, changed real ID tables, identical
+Core and values, exact fuel boundaries, opaque typed values, and rejected whole
+declarations. No global allocator, function lookup, or runtime adapter is added.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

@@ -467,5 +467,12 @@ example := @Solcore.Frontend.runRuntimeFunction?_parameter
 example := @Solcore.Frontend.RuntimeParametersBindFrom.transport_types
 example := @Solcore.Frontend.RuntimeFunctionPrepares.transport_argument_types
 example := @Solcore.Frontend.prepareRuntimeFunction?_static_projection_eq
+example := @Solcore.Frontend.ownerLocalIdMap
+example := @Solcore.Frontend.ownerLocalIdMap_injective
+example := @Solcore.Frontend.RuntimeParametersBind.map_owner
+example := @Solcore.Frontend.ReturnBodyElaborates.mapIds
+example := @Solcore.Frontend.RuntimeFunctionPrepares.mapOwner
+example := @Solcore.Frontend.prepareRuntimeFunction?_owner_projection_eq
+example := @Solcore.Frontend.runRuntimeFunction?_owner_eq
 
 end Tests

@@ -210,6 +210,14 @@ context, identities, Core, and return type. Actual runtime values and costs may
 differ; consumers and parsed declarations demonstrate that distinction. No
 runtime argument decoder, unchecked-value shortcut, or new evaluator is added.
 
+Owner invariance (ADR-0173) now transports independent parameter binding and
+exact preparation while fixing binder indices. Swapping two declaration owners
+gives optional Core/type/runtime-value equality and unconditional full same-fuel
+runner equality, including suspended states. Fresh-ID correspondence is proved
+along the existing allocation chain, not for arbitrary injective index changes.
+The source declaration and typed argument values stay fixed; name/context/ID
+tables are related by relabeling rather than directly equated.
+
 Further frontend semantics should preserve exact identity, binding, and Core
 execution correspondence while extending supported expressions and declarations.
 General calls and control flow remain separate. The resolved immutable expression
