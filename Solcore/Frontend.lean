@@ -153,6 +153,10 @@ import Solcore.Frontend.TypedLetReturnBody
 import Solcore.Frontend.TypedLetReturnBodyElaboration
 import Solcore.Frontend.TypedLetReturnBodyProperties
 import Solcore.Frontend.TypedLetReturnBodyEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnBodyEvaluation
+import Solcore.Frontend.TypedLetReturnBodyEvaluationProperties
+import Solcore.Frontend.TypedLetReturnBodyExecutionProperties
+import Solcore.Frontend.TypedLetReturnBodyEvaluationEmbeddingProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -170,6 +174,8 @@ Injective identity relabeling retains full results; store replay retains value,
 cost and observation thresholds with each result's own store. Existing function
 entries reuse these recursive contracts with unchanged headers and parameters.
 Typed, initialized, non-shadowing local-declaration prefixes have a separate
-value-free static adapter with exact nested Core letE. It adds no runtime-entry
-integration, source evaluation or general binding/inference policy.
+value-free static adapter with exact nested Core letE. Independent raw evaluation
+and cost correspond to the actual checked Core and exact continuation paths.
+No body runner, runtime-entry integration or general binding/inference policy
+is added for this prefix profile.
 -/

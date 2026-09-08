@@ -788,8 +788,43 @@ mutation, separate block wrappers and calls are not added. Freshness is relative
 to current inputs; no arbitrary-renaming allocator covariance or traversal-global
 uniqueness is claimed. Independent and parsed consumers retain exact source
 order, old-scope/forward-reference boundaries, nominal inputs and whole failures.
-There is no source evaluation/cost/runner for this profile yet. Existing tree
-and function-entry adapters remain unchanged and still reject let prefixes.
+The independent evaluation/cost layer below now complements this static unit.
+Existing tree and function-entry adapters remain unchanged and still reject
+let prefixes; there is no checked prefix runner or entry integration yet.
+
+### Typed local-declaration prefixes: evaluation and cost
+
+Independent raw and costed judgments now evaluate each original initializer
+once in the old name table/environment, then prepend its actual value and the
+same fresh ID for the remaining statements (ADR-0210). Terminal paths reuse the
+existing tree semantics. Both stores are retained around each child, and each
+let costs initializer plus tail plus two existing Core transitions. Unused
+initializers still evaluate and contribute their full cost.
+
+Raw rules do not require annotation meaning, an unused name, whole checking or
+runtime typing. They may describe paths for a rejected annotation, repeated
+name or invalid unselected subtree; this is not a general acceptance/shadowing
+policy. Missing values in an evaluated initializer cannot be bypassed. Raw
+determinism, unchanged stores, cost erasure/existence, positivity and unique
+costs follow independently of the checker. Actual aligned, typed environments
+separately give evaluation existence and value typing, extending the tail only
+with the value obtained from the initializer.
+
+Whole acceptance and matching environment IDs suffice for evaluation iff with
+the actual checked Core and exact-cost transition paths under any original
+continuation. The names/ID projection law identifies raw table-relative fresh
+IDs with static input allocation; arbitrary inconsistent environments get no
+freshness guarantee. Runtime typing is not inferred from alignment. Initializers
+retain their pending let frame and old values; tails receive the obtained value
+once and the original continuation, without weakening or reversal. An arbitrary
+continuation is only retained at the endpoint: a bad pending frame may fault at
+zero remaining fuel, so no unconditional exhaustion claim follows.
+
+Independent and parsed consumers retain arbitrary-length paths, noncommutative
+old-scope arithmetic, unused initializer costs, asymmetric terminal choices,
+actual opaque cell/closure values, distinct stores and whole-rejection contrasts.
+Existing tree raw/cost paths embed without checking. This unit adds no parser,
+Core or entry changes, body runner, source fuel bound, resumption or call semantics.
 
 ### Explicit restricted runtime function entry
 

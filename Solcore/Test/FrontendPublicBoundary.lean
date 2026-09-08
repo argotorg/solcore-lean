@@ -1034,6 +1034,29 @@ example := @Solcore.Frontend.elaborateTypedLetReturnBody?_single
 example := @Solcore.Frontend.elaborateTypedLetReturnBody?_conditional
 example := @Solcore.Frontend.elaborateTypedLetReturnBody?_conditional_singletons
 
+example := @Solcore.Frontend.LocalTypeInputs.names_ids
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluates
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.store_eq
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.deterministic
+example := @Solcore.Frontend.TypedLetReturnBodyHasType.evaluates
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.preserves_type
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.erase
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.exists_cost
+example := @Solcore.Frontend.typedLetReturnBodyEvaluates_iff_exists_cost
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.store_eq
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.cost_pos
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.deterministic
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_evaluates_iff
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.checked_toStepsWithContinuation
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.checked_toSteps
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.typedLetReturnBody
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.typedLetReturnBody
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.terminal
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.binding
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.terminal
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.binding
+
 section RecursiveEntryContracts
 
 open Solcore Solcore.Frontend

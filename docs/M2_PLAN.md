@@ -329,10 +329,25 @@ typing and exact provenance characterize total checking, exact nested Core
 All written initializers and terminal branches are checked. Old tree successes
 embed; whole Option equality only applies to old singleton return/if shapes.
 The restrictions do not imply that omitted annotations/initializers or shadowing
-are invalid source. No inference/default values, arm-local prefix, execution,
-cost, runner or entry integration is added. Actual parsed static declarations
+are invalid source. This static unit adds no inference/default values, arm-local
+prefix, execution, cost, runner or entry integration. Actual parsed static declarations
 and arbitrary-length/type source proofs retain original order, binder positions,
 whole failure and same-typed wrong-Core boundaries.
+
+Independent typed-prefix evaluation/cost (ADR-0210) now complements that static
+unit. Each initializer evaluates once in the old inputs, even when unused, and
+the actual resulting value/fresh ID extends only the tail. Raw rules retain
+stores and require neither whole acceptance nor annotation/name/type policy;
+determinism, unchanged stores, cost erasure/existence/positivity/uniqueness are
+independent of checking. Typed existence and preservation separately require
+actual aligned, typed values. Accepted exact Core and aligned IDs alone give
+evaluation iff and exact arbitrary-continuation paths using child costs plus two
+per let. Names/ID projection identifies raw and static allocation without claiming
+freshness in arbitrary inconsistent environments. Pending frames are retained,
+not executed; bad frames can fault with zero fuel at the endpoint. Source and
+parsed consumers retain strict unused initialization, old-scope positions,
+opaque values, asymmetric terminal paths and raw-success/whole-rejection cases.
+No prefix runner, bound, resumption or runtime-entry extension is added yet.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent

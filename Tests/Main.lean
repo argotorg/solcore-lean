@@ -110,6 +110,8 @@ import Solcore.Test.FrontendRecursiveRuntimeEntryProperties
 import Solcore.Test.FrontendParsedRecursiveRuntimeEntries
 import Solcore.Test.FrontendTypedLetReturnBodyProperties
 import Solcore.Test.FrontendParsedTypedLetReturnBodies
+import Solcore.Test.FrontendTypedLetReturnBodyEvaluationProperties
+import Solcore.Test.FrontendParsedTypedLetReturnBodyEvaluation
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5666,6 +5668,7 @@ def run : IO Unit := do
   frontendParsedTerminalReturnTreeInvarianceTests
   frontendParsedRecursiveRuntimeEntryTests
   frontendParsedTypedLetReturnBodyTests
+  frontendParsedTypedLetReturnBodyEvaluationTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
