@@ -61,4 +61,28 @@ example := @Solcore.Resolved.HasType.closed_evaluates
 example := @Solcore.Resolved.HasType.closed_run_has_sufficient_fuel
 example := @Solcore.Resolved.Lowers.closed_run_never_faults
 
+example := @Solcore.Resolved.WellScoped
+example := @Solcore.Resolved.Lowers.wellScoped
+example := @Solcore.Resolved.WellScoped.lowers
+example := @Solcore.Resolved.wellScoped_iff_lowers
+example := @Solcore.Resolved.Expr.lower?_eq_none_iff_not_wellScoped
+example := @Solcore.Resolved.Expr.lower?_isSome_iff_wellScoped
+example := @Solcore.Resolved.HasType.wellScoped
+example := @Solcore.Resolved.Expr.lower?_var_eq_none_iff
+example := @Solcore.Resolved.LocalScope.mapIds
+example := @Solcore.Resolved.Expr.renameIds
+example := @Solcore.Resolved.LocalScope.ids_mapIds
+example := @Solcore.Resolved.LocalScope.values_mapIds
+example := @Solcore.Resolved.LocalScope.index?_map
+example := @Solcore.Resolved.LocalScope.lookup?_mapIds
+example := @Solcore.Resolved.LocalScope.lookup_mapIds_iff
+example := @Solcore.Resolved.LocalScope.indexOf_map_iff
+example := @Solcore.Resolved.Expr.renameIds_id
+example := @Solcore.Resolved.Expr.renameIds_comp
+example := @Solcore.Resolved.Expr.lower?_renameIds
+example := @Solcore.Resolved.lowers_renameIds_iff
+example := @Solcore.Resolved.infer?_renameIds
+example := @Solcore.Resolved.typing_renameIds_iff
+example := @Solcore.Resolved.evaluates_renameIds_iff
+
 end Tests

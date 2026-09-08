@@ -55,6 +55,13 @@ deterministic and store-preserving even when an unselected branch prevents
 whole-expression elaboration. Closed typed expressions have an evaluation,
 return the same result at all sufficient Core fuel, and never machine-fault.
 
+Independent, type-free scope validity now characterizes successful elaboration
+exactly, checking both conditional branches and excluding a new binder from its
+own initializer. Injective identity renaming preserves the exact Core expression
+(including elaboration failure), typing, and evaluation. Concrete counterexamples
+show that merging two distinct IDs can instead capture an outer reference and
+change its result; the injectivity premise is essential.
+
 This is not yet a canonical source adapter. It does not interpret literal
 spelling, resolve `true`/`false` or overloaded operators, allocate fresh IDs,
 decide source shadowing or mutable-declaration semantics, or cover imports,

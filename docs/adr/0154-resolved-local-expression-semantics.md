@@ -51,6 +51,10 @@ evaluation judgments are not abbreviations for their Core counterparts.
   expressions whose unselected branch cannot elaborate.
 - Closed typed expressions evaluate, elaborate to executable Core, return the
   same value at every sufficiently large fuel, and cannot fault at any fuel.
+- Independent scope validity exactly characterizes elaboration existence,
+  without assuming operand types or fresh identities.
+- Uniform injective identity renaming preserves exact Core output, types,
+  and named evaluation; identity merging is deliberately not covered.
 
 The store-preservation result is the effect boundary of this fragment. No
 staging judgment is claimed. Fuel is a Core evaluator resource, not source

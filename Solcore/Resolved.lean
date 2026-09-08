@@ -8,6 +8,10 @@ import Solcore.Resolved.TypingProperties
 import Solcore.Resolved.Eval
 import Solcore.Resolved.EvaluationProperties
 import Solcore.Resolved.ExecutionProperties
+import Solcore.Resolved.Scope
+import Solcore.Resolved.ScopeProperties
+import Solcore.Resolved.Renaming
+import Solcore.Resolved.RenamingProperties
 
 /-!
 Semantic frontend foundation for already-resolved local expressions. Exact

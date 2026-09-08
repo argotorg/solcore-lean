@@ -45,6 +45,11 @@ Closed typed expressions execute with sufficient fuel, preserve the store, and
 cannot fault. Source spelling, fresh-ID allocation, name resolution, source
 mutation, overloading, and staging remain outside this slice.
 
+Type-independent scope validity is now equivalent to elaboration existence.
+Injective resolved-ID renaming preserves exact Core output, checker results,
+and named evaluation; a non-injective capture example fixes the limit of this
+guarantee. These proofs do not presume a source fresh-ID allocator.
+
 The next semantic work should extend resolution and connect canonical parsed
 syntax to independently typed resolved inputs, preserving binding identity and
 the established Core execution correspondence. It must not treat the resolved
