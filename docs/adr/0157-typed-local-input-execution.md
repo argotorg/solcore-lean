@@ -8,6 +8,9 @@ ADR-0158 extends the underlying local-expression adapter with Boolean
 negation and extends the unused-name laws to its operand; the bundle and
 checked runner keep their existing input/result representations.
 
+ADR-0160 subsequently adds injective identity relabeling of this bundle,
+preserving the whole checked execution result at identical fuel.
+
 ## Decision
 
 Provide a single explicit input bundle for ADR-0156's local-expression adapter.

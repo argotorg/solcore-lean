@@ -100,6 +100,13 @@ the checker rejects that case. Correspondence, safety, and unused-name laws
 cover both operators. Tests protect generated constants from caller-name
 capture and exercise parsed precedence and selected/skipped fuel bounds.
 
+Frontend identity relabeling (ADR-0160) now lifts the resolved laws to unchanged
+canonical source trees and typed input bundles. Resolution commutes with any
+ID map; injective maps preserve exact checked Core/type and raw evaluation in
+both directions. The bundled runner retains the whole result at identical
+fuel, including failed checking and suspended states. This is not source-name
+renaming, global allocation, or a claim about subsequent fresh-ID choices.
+
 The next semantic work should extend the local reference/Boolean/conditional fragment
 to more canonical syntax and source scope construction, preserving binding identity and
 the established Core execution correspondence. It must not treat the resolved

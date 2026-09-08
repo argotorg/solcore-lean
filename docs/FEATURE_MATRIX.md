@@ -727,6 +727,7 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Unused-name local input extension | Proved for identifiers/groups/Boolean operators/conditionals | source typing/evaluation equivalence, exact checked Core weakening and failure preservation, identical completed observations; spelling avoidance covers all branches and operands and is essential | High |
 | Canonical Boolean negation | Implemented (ADR-0158) | fixed Bool-only `!`, independent typing/evaluation, exact direct-Core lowering and three-transition named operand; no truthiness or general overload resolution | High |
 | Canonical Boolean short-circuit operators | Implemented (ADR-0159) | both operands checked as Bool; selected-right-only execution, exact conditional expansion/value/store/fuel correspondence, and generated constants independent of source-name bindings | High |
+| Frontend local identity relabeling | Implemented (ADR-0160) | unchanged source AST; arbitrary-map resolution and injective-map exact checker/raw evaluation invariance; typed inputs preserve same-fuel results including suspended states; no allocator commutation | High |
 | Resolved-to-Core elaboration | Exact local-expression fragment implemented | full source coverage, effects beyond the store-preserving fragment, and stage preservation remain open | Medium |
 
 ## Contract and runtime semantics

@@ -22,6 +22,11 @@ import Solcore.Frontend.LocalNameAvoidance
 import Solcore.Frontend.LocalNameAvoidanceProperties
 import Solcore.Frontend.LocalInputsExtensionSemantics
 import Solcore.Frontend.LocalInputsExtensionProperties
+import Solcore.Frontend.LocalExpressionRenamingProperties
+import Solcore.Frontend.LocalExpressionRenamingSemantics
+import Solcore.Frontend.LocalInputsRenaming
+import Solcore.Frontend.LocalInputsRenamingProperties
+import Solcore.Frontend.LocalNameRenaming
 
 /-!
 Canonical local-reference, Boolean-operator, and conditional-expression semantic adapters with

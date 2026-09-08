@@ -190,6 +190,27 @@ fuel witnesses may be separate; suspended states are not claimed identical.
 Avoidance includes both short-circuit operands, even a skipped one. This
 condition is not a free-name analysis of unsupported syntax.
 
+### Local identity relabeling
+
+The explicit frontend tables and typed input bundle now support simultaneous
+local-ID relabeling (ADR-0160). Source ASTs, spellings, ranges, row order, types,
+values, and stores are unchanged. Name lookup and whole expression resolution
+commute with arbitrary ID maps, including failed resolution.
+
+An injective map also preserves the exact checked Core and type, source typing,
+and raw source evaluation in both directions. Evaluation preservation does not
+require whole resolution or typing, so skipped missing/unsupported syntax stays
+within the raw judgment's original boundary. Existing repeated names and raw
+ID aliases retain their first-match meaning; the typed bundle retains unique IDs.
+
+The bundle's runner has exact result equality at identical fuel, including
+failed checking and the entire suspended machine state. This is stronger than
+fresh input insertion because neither Core indices nor runtime values move.
+Identity/composition laws and same-fuel parsed regressions cover the operation.
+Noninjective merging can change which row a reference selects and is excluded.
+No global ownership/allocator guarantee or commutation with subsequent fresh
+allocation is claimed.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.
