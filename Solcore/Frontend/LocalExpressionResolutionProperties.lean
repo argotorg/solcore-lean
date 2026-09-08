@@ -1,0 +1,111 @@
+import Solcore.Frontend.LocalExpression
+import Solcore.Frontend.LocalReferenceProperties
+
+/-! Exact structural resolution for the supported canonical expression fragment.
+All conditional children must resolve; branch selection belongs to evaluation. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend
+
+theorem ResolvesLocalExpression.complete {table : LocalNameTable}
+    {source : Syntax.Expr} {resolved : Resolved.Expr}
+    (resolution : ResolvesLocalExpression table source resolved) :
+    resolveLocalExpression? table source = some resolved := by
+  induction resolution with
+  | identifier found =>
+      simp only [resolveLocalExpression?, LocalNameTable.lookup?_iff.mpr found, Option.map_some]
+  | group _ ih => simpa only [resolveLocalExpression?] using ih
+  | conditional _ _ _ conditionIH thenIH elseIH =>
+      simp [resolveLocalExpression?, conditionIH, thenIH, elseIH]
+
+theorem resolveLocalExpression?_sound {table : LocalNameTable}
+    {source : Syntax.Expr} {resolved : Resolved.Expr}
+    (result : resolveLocalExpression? table source = some resolved) :
+    ResolvesLocalExpression table source resolved := by
+  cases source with
+  | mk span payload =>
+      cases payload <;> simp only [resolveLocalExpression?, reduceCtorEq] at result
+      case identifier name =>
+        cases found : table.lookup? name.value with
+        | none => simp only [found, Option.map_none, reduceCtorEq] at result
+        | some id =>
+            simp only [found, Option.map_some, Option.some.injEq] at result
+            cases result
+            exact .identifier (LocalNameTable.lookup?_iff.mp found)
+      case group inner => exact .group (resolveLocalExpression?_sound result)
+      case conditional condition question thenBranch colon elseBranch =>
+        simp only [bind, Option.bind_eq_some_iff, pure] at result
+        obtain ⟨resolvedCondition, conditionResult, resolvedThen, thenResult,
+          resolvedElse, elseResult, same⟩ := result
+        cases same
+        exact .conditional (resolveLocalExpression?_sound conditionResult)
+          (resolveLocalExpression?_sound thenResult) (resolveLocalExpression?_sound elseResult)
+termination_by sizeOf source
+
+theorem resolveLocalExpression?_iff {table : LocalNameTable}
+    {source : Syntax.Expr} {resolved : Resolved.Expr} :
+    resolveLocalExpression? table source = some resolved ↔
+      ResolvesLocalExpression table source resolved :=
+  ⟨resolveLocalExpression?_sound, ResolvesLocalExpression.complete⟩
+
+theorem resolveLocalExpression?_eq_none_iff {table : LocalNameTable} {source : Syntax.Expr} :
+    resolveLocalExpression? table source = none ↔
+      ¬ ∃ resolved, ResolvesLocalExpression table source resolved := by
+  constructor
+  · intro result ⟨resolved, resolution⟩
+    have accepted := resolution.complete
+    rw [result] at accepted
+    cases accepted
+  · intro absent
+    cases result : resolveLocalExpression? table source with
+    | none => rfl
+    | some resolved => exact False.elim (absent ⟨resolved, resolveLocalExpression?_sound result⟩)
+
+theorem ResolvesLocalExpression.deterministic {table : LocalNameTable}
+    {source : Syntax.Expr} {left right : Resolved.Expr}
+    (leftResolution : ResolvesLocalExpression table source left)
+    (rightResolution : ResolvesLocalExpression table source right) : left = right :=
+  Option.some.inj (leftResolution.complete.symm.trans rightResolution.complete)
+
+/-- Changing the outer source range does not change structural resolution. -/
+theorem resolveLocalExpression?_span (table : LocalNameTable) (source : Syntax.Expr)
+    (span : Syntax.SourceSpan) :
+    resolveLocalExpression? table { source with span } = resolveLocalExpression? table source := by
+  cases source with
+  | mk sourceSpan payload => cases payload <;> simp only [resolveLocalExpression?]
+
+/-- Conditional punctuation and the outer range carry no resolution meaning. -/
+theorem resolveLocalExpression?_conditional_spans (table : LocalNameTable)
+    (condition thenBranch elseBranch : Syntax.Expr)
+    (span question colon otherSpan otherQuestion otherColon : Syntax.SourceSpan) :
+    resolveLocalExpression? table
+        { span, value := .conditional condition question thenBranch colon elseBranch } =
+      resolveLocalExpression? table
+        { span := otherSpan,
+          value := .conditional condition otherQuestion thenBranch otherColon elseBranch } := by
+  simp only [resolveLocalExpression?]
+
+/-- Identifier spelling, not either occurrence range, selects the local ID. -/
+theorem resolveLocalExpression?_identifier_value_eq (table : LocalNameTable)
+    {left right : Syntax.Identifier} (same : left.value = right.value)
+    (leftSpan rightSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span := leftSpan, value := .identifier left } =
+      resolveLocalExpression? table { span := rightSpan, value := .identifier right } := by
+  simp only [resolveLocalExpression?, same]
+
+theorem resolveLocalExpression?_group (table : LocalNameTable) (span : Syntax.SourceSpan)
+    (inner : Syntax.Expr) :
+    resolveLocalExpression? table { span, value := .group inner } = resolveLocalExpression? table inner := by
+  simp only [resolveLocalExpression?]
+
+/-- The established reference fragment embeds without changing its selected identity. -/
+theorem ResolvesLocalReference.toLocalExpression {table : LocalNameTable}
+    {source : Syntax.Expr} {id : Resolved.LocalId}
+    (reference : ResolvesLocalReference table source id) :
+    ResolvesLocalExpression table source (.var id) := by
+  induction reference with
+  | identifier found => exact .identifier found
+  | group _ ih => exact .group ih
+
+end Solcore.Frontend
