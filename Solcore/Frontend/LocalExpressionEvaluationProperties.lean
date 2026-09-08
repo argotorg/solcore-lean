@@ -28,6 +28,9 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | group _ ih =>
       cases evaluation with
       | group child => exact ih child
+  | pair _ _ leftIH rightIH =>
+      cases evaluation with
+      | pair leftChild rightChild => exact .pair (leftIH leftChild) (rightIH rightChild)
   | logicalNot _ ih =>
       cases evaluation with
       | logicalNot child => exact .unary (ih child) rfl
@@ -104,6 +107,9 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
       cases evaluation with
       | word => exact .wordLiteral meaning
   | group _ ih => exact .group (ih evaluation)
+  | pair _ _ leftIH rightIH =>
+      cases evaluation with
+      | pair leftChild rightChild => exact .pair (leftIH leftChild) (rightIH rightChild)
   | logicalNot _ ih =>
       cases evaluation with
       | @unary _ _ _ _ _ operandValue _ child applied =>

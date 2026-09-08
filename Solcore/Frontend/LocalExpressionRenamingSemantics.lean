@@ -53,6 +53,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
         exact .identifier oldNamed ((Resolved.LocalScope.lookup_mapIds_iff mapping injective).mp found)
     | wordLiteral meaning => exact .wordLiteral meaning
     | group _ ih => exact .group ih
+    | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
     | add _ _ leftIH rightIH => exact .add leftIH rightIH
@@ -82,6 +83,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
           ((Resolved.LocalScope.lookup_mapIds_iff mapping injective).mpr found)
     | wordLiteral meaning => exact .wordLiteral meaning
     | group _ ih => exact .group ih
+    | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
     | add _ _ leftIH rightIH => exact .add leftIH rightIH

@@ -28,6 +28,12 @@ theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
   | group _ ih =>
       cases rightEvaluation with
       | group child => exact ih child
+  | pair _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | pair leftChild rightChild =>
+          obtain ⟨rfl, rfl⟩ := leftIH leftChild
+          obtain ⟨rfl, storeEq⟩ := rightIH rightChild
+          exact ⟨rfl, storeEq⟩
   | logicalNot _ ih =>
       cases rightEvaluation with
       | logicalNot child =>

@@ -18,6 +18,7 @@ theorem LocalExpressionEvaluatesWithCost.change_store
   | identifier named found => exact .identifier named found
   | wordLiteral meaning => exact .wordLiteral meaning
   | group _ ih => exact .group ih
+  | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
   | add _ _ leftIH rightIH => exact .add leftIH rightIH

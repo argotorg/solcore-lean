@@ -52,6 +52,14 @@ theorem AvoidsLocalName.bindFresh_evaluates_iff {name : String} {source : Syntax
       · intro evaluation
         cases evaluation with
         | group child => exact .group (ih.mpr child)
+  | pair _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | pair left right => exact .pair (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | pair left right => exact .pair (leftIH.mpr left) (rightIH.mpr right)
   | logicalNot _ ih =>
       constructor
       · intro evaluation
