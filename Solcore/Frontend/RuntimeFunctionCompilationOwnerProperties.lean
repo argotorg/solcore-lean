@@ -1,6 +1,6 @@
 import Solcore.Frontend.RuntimeParameterDeclarationsOwnerProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.TerminalReturnBodyRenamingProperties
+import Solcore.Frontend.TerminalReturnTreeRenamingProperties
 
 /-! Value-free compilation retains its exact Core, declared type and ordered
 parameter types across owners. Identity-bearing inputs are relabeled, not equated. -/
@@ -9,7 +9,7 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
-/-- Static declaration and whole terminal-body evidence transport directly.
+/-- Static declaration and whole recursive-body evidence transport directly.
 No actual arguments or inhabitants of the parameter types are required. -/
 theorem RuntimeFunctionCompiles.mapOwner {types : TypeNameTable} {owner : Resolved.DeclarationId}
     {declaration : Syntax.FunctionDecl} {compiled : CompiledRuntimeFunction}

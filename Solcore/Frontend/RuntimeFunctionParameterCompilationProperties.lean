@@ -20,7 +20,7 @@ private theorem parameter_body_elaboration
     (meaning : TypeNameDenotes types annotation type)
     (bodyShape : declaration.value.body =
       ⟨blockSpan, [⟨returnSpan, .returnStmt (some ⟨span, .identifier ⟨nameSpan, name.value⟩⟩)⟩]⟩) :
-    TerminalReturnBodyElaborates inputs.names inputs.context declaration.value.body
+    TerminalReturnTreeElaborates inputs.names inputs.context declaration.value.body
       (.var (declaration.value.signature.parameters.elements.length - 1 - index)) type := by
   rw [bodyShape]
   exact .single (declared.reference_return_elaborates_at parameterAt meaning blockSpan returnSpan span nameSpan)

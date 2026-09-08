@@ -1,6 +1,6 @@
 import Solcore.Frontend.RuntimeFunctionHeader
 import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.TerminalReturnBodyProperties
+import Solcore.Frontend.TerminalReturnTreeProperties
 
 /-! Compile one restricted explicit entry without supplying argument values.
 The retained Core is open in the parameter context, not a source function value. -/
@@ -22,16 +22,16 @@ structure RuntimeFunctionCompiles (types : TypeNameTable) (owner : Resolved.Decl
   header : RuntimeFunctionHeader types declaration.value.signature compiled.returnType
   parameters : RuntimeParametersDeclare types owner declaration.value.signature.parameters.elements
     compiled.inputs
-  body : TerminalReturnBodyElaborates compiled.inputs.names compiled.inputs.context
+  body : TerminalReturnTreeElaborates compiled.inputs.names compiled.inputs.context
     declaration.value.body compiled.core compiled.returnType
 
-/-- Keep the existing header policy and check either terminal-body shape. Retain
+/-- Keep the existing header policy and check the whole recursive tree. Retain
 the actual Core only when its inferred type agrees with the return contract. -/
 def compileRuntimeFunction? (types : TypeNameTable) (owner : Resolved.DeclarationId)
     (declaration : Syntax.FunctionDecl) : Option CompiledRuntimeFunction := do
   let returnType ← interpretRuntimeFunctionHeader? types declaration.value.signature
   let inputs ← declareRuntimeParameters? types owner declaration.value.signature.parameters.elements
-  let (core, inferredType) ← elaborateTerminalReturnBody? inputs.names inputs.context declaration.value.body
+  let (core, inferredType) ← elaborateTerminalReturnTree? inputs.names inputs.context declaration.value.body
   if inferredType = returnType then
     return { inputs, core, returnType }
   else none

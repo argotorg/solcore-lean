@@ -37,17 +37,17 @@ private theorem conditional_parameter_body_elaborates
           .returnStmt (some ⟨thenSpan, .identifier ⟨thenNameSpan, thenName.value⟩⟩)⟩]⟩
         (some ⟨elseBlockSpan, [⟨elseReturnSpan,
           .returnStmt (some ⟨elseSpan, .identifier ⟨elseNameSpan, elseName.value⟩⟩)⟩]⟩)⟩]⟩) :
-    TerminalReturnBodyElaborates inputs.names inputs.context declaration.value.body
+    TerminalReturnTreeElaborates inputs.names inputs.context declaration.value.body
       (.ifE (.var (declaration.value.signature.parameters.elements.length - 1 - conditionIndex))
         (.var (declaration.value.signature.parameters.elements.length - 1 - thenIndex))
         (.var (declaration.value.signature.parameters.elements.length - 1 - elseIndex))) type := by
   rw [bodyShape]
   obtain ⟨_, _, actualMeaning, _, named, found, indexed⟩ := declared.position conditionAt
   cases actualMeaning.type_unique conditionMeaning
-  exact .conditional (.intro (.identifier named) (.var indexed) (.var found)
-    (declared.reference_return_elaborates_at thenAt thenMeaning
-      thenBlockSpan thenReturnSpan thenSpan thenNameSpan)
-    (declared.reference_return_elaborates_at elseAt elseMeaning
+  exact .conditional (.identifier named) (.var indexed) (.var found)
+    (.single (declared.reference_return_elaborates_at thenAt thenMeaning
+      thenBlockSpan thenReturnSpan thenSpan thenNameSpan))
+    (.single (declared.reference_return_elaborates_at elseAt elseMeaning
       elseBlockSpan elseReturnSpan elseSpan elseNameSpan))
 
 /-- All parameters and the whole header remain prerequisites, even when both
