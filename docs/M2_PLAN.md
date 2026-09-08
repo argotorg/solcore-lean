@@ -1250,6 +1250,13 @@ The unary layer independently lifts corresponding postfix soundness/completeness
 contracts; whole-State iff adds only a matching weak file/endByte frame. No
 child progress or joint law is mistaken for recursive expression totality.
 
+The actual unary contract now inherits the postfix budget unchanged, since an
+empty prefix pays nothing. Separate numeric frames, bounded ordinary execution,
+and actual/independent trace existence retain their distinct assumptions.
+Reverse literal-child consumers fix `!~a-b(1).c` operator order, complete postfix
+operand/spans/State, one name event and prior multiplicity, later uncommitted
+field reports, and minus/hidden/missing scanner boundaries.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

@@ -1711,6 +1711,22 @@ laws need only the corresponding postfix file/endByte frame. Independent unary
 joint exactness remains conditional on postfix joint exactness and does not give
 complete-expression outcome existence.
 
+Unary numeric endpoint and strict-progress laws now lift the actual postfix
+contract at the same fuel: an empty unary prefix cannot pay an extra unit.
+Bounded ordinary execution and no-invariant laws need no source/token/endByte
+or validity frame; constructed nested/body postfix contracts also lift to unary.
+Combining ordinary execution with the two corresponding postfix soundness laws
+separately gives actual and independent bounded unary trace existence, without
+joint exactness or completeness premises.
+
+Concrete reverse consumers use a real literal child and an explicit rejecting
+body. Independent traces for `!~a-b(1).c` fix bang outside tilde outside the complete
+postfix AST, all spans, the full State, a single name event, and arbitrary prior
+duplicates. Later field rejection preserves the earlier name event but does not
+commit its terminal report. Independent scanner-absence judgments also verify
+that minus is not a canonical unary operator and hidden/missing prefixes remain
+silent. These are one-layer consumers, not recursive block/expression closure.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

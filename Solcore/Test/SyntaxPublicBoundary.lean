@@ -3466,4 +3466,14 @@ example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_stat
 example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_failure_state_iff
 example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_state_iff
 
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_endIndex_onSuccess
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_preservesEndIndex
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_ordinary_of_unrestrictedPostfixFuel
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_ne_invariant_of_unrestrictedPostfixFuel
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_unrestrictedPostfixContract
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_unrestrictedChildContract
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_unrestrictedChildContract_succ
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_exists_trace_outcome_of_unrestrictedPostfixFuel
+example := @Syntax.Parser.ExpressionInternals.expressionUnaryTrace_outcome_exists_of_unrestrictedPostfixFuel
+
 end Tests

@@ -122,6 +122,8 @@ published through Oracle v4.
 | Constructed postfix child contracts | Actual atom contract is built internally; numeric suffix frames and bounded children give ordinary execution, successor contracts, and separate child-only layer trace existence | Numeric totality and stronger trace context frames remain separate; recursive closure still open | High |
 | Prefix unary scanning | Exact maximal operators and complete silent States, no rejection, unconditional production success, and separate independent existence on arbitrary carriers | Scanning only; postfix execution remains separate | High |
 | Unary diagnostic traces | Independent exact wrapped ASTs and postfix event/report forwarding, four independently lifted contracts, separate success context, and weak-frame whole-State iff | Postfix-conditional; joint exactness does not establish complete-expression existence | High |
+| Unary numeric contracts and existence | Actual postfix contracts lift at the same fuel, including constructed child contracts; bounded ordinary execution and soundness give separate actual/independent trace existence | Empty prefixes do not justify successor fuel; source/token/byte validity is not required | High |
+| Concrete unary trace consumers | Reverse literal-child derivations fix prefix order around maximal postfix ASTs, complete States, ordered name events/duplicates, later reports, and minus/hidden/missing boundaries | Explicit rejecting body and one expression layer; not general recursive execution | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are

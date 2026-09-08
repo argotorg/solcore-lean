@@ -233,6 +233,8 @@ import Solcore.Syntax.Parser.UnaryOperatorsTraceProperties
 import Solcore.Syntax.Parser.ExpressionUnaryTraceProperties
 import Solcore.Syntax.Parser.ExpressionUnaryTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.ExpressionUnaryTraceStateProperties
+import Solcore.Syntax.Parser.ExpressionUnaryUnrestrictedFuelContractProperties
+import Solcore.Syntax.Parser.ExpressionUnaryTraceExistenceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -300,4 +302,5 @@ atom ordinary execution also accepts bounded body contracts, and one concrete at
 numeric-only success/rejection frames compose through recovery, constructing an atom fuel contract from two bounded children;
 actual postfix contracts now construct the intermediate atom internally, and child-only bounded soundness supplies layer trace existence;
 unary prefixes have unconditional silent full-State scanning and existence; corresponding postfix contracts lift independently through unary traces;
+unary layers inherit postfix numeric fuel contracts without adding fuel, with separately proved bounded trace existence;
 general expressions and remaining statement traces remain open. -/
