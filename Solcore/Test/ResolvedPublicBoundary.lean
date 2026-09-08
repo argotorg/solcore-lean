@@ -109,5 +109,14 @@ example := @Solcore.Resolved.Evaluates.reflect_insert_fresh
 example := @Solcore.Resolved.WellScoped.evaluates_insert_fresh_iff
 example := @Solcore.Resolved.WellScoped.evaluates_weaken_fresh_iff
 example := @Solcore.Resolved.WellScoped.evaluates_weaken_allocated_iff
+example := @Solcore.Resolved.Expr.wordLtWithIds
+example := @Solcore.Resolved.Expr.renameIds_wordLtWithIds
+example := @Solcore.Resolved.Lowers.wordLtWithIds
+example := @Solcore.Resolved.HasType.wordLtWithIds
+example := @Solcore.Resolved.Expr.lower?_wordLtWithIds
+example := @Solcore.Resolved.infer_wordLtWithIds
+example := @Solcore.Resolved.Evaluates.wordLtWithIds
+example := @Solcore.Resolved.Evaluates.wordLtWithIds_inv
+example := @Solcore.Resolved.wordLtWithIds_evaluates_iff
 
 end Tests

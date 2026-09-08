@@ -73,6 +73,21 @@ For originally well-scoped expressions, fresh insertion also reflects evaluation
 the exact value and both stores agree in both directions. Freshness alone does
 not justify this inverse; an absent reference can become evaluable after insertion.
 
+An explicit-ID derived Word less-than builder now composes two existing resolved
+lets (ADR-0187). It evaluates left then right once and lowers exactly to the
+Core `wordLt` expansion, including right-operand weakening and comparison of
+the retained values at indices zero/one. The first temporary must be absent
+from the original scope and the two temporaries must differ; the second may
+reuse an outer ID, and inner source binders may shadow either ID. Word typing,
+explicit-ID structural renaming and forward evaluation are proved. Evaluation
+reflection additionally retains original right scoping. Counterexamples protect
+the distinctness, non-capture and original-scoping boundaries. Continuation-aware
+let/less-than path composition counts both child costs plus nine (eleven for two
+leaves), with the weakened right path under the retained left value supplied
+explicitly. No unrestricted Core weakening theorem is assumed. This is a resolved
+foundation, not canonical `<` support or a hidden source temporary allocator;
+existing resolver and arbitrary identity-map guarantees are unchanged.
+
 The resolved fragment alone is not a canonical source adapter. It does not interpret literal
 spelling, resolve `true`/`false` or overloaded operators, allocate source-wide IDs,
 decide source shadowing or mutable-declaration semantics, or cover imports,

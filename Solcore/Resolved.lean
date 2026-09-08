@@ -16,6 +16,8 @@ import Solcore.Resolved.FreshIdentity
 import Solcore.Resolved.ScopeExtensionProperties
 import Solcore.Resolved.ScopeExtensionEvaluationProperties
 import Solcore.Resolved.ScopeExtensionReflectionProperties
+import Solcore.Resolved.WordLessWithIds
+import Solcore.Resolved.WordLessWithIdsEvaluationProperties
 
 /-!
 Semantic frontend foundation for already-resolved local expressions. Exact

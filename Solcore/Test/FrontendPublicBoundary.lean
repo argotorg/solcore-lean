@@ -630,5 +630,16 @@ example := @Solcore.Frontend.AvoidsLocalName.lessEqual
 example := @Solcore.Frontend.LocalExpressionEvaluates.lessEqual
 example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.lessEqual
 example := @Solcore.Frontend.resolveLocalExpression?_lessEqual_spans
+example := @Solcore.Resolved.Expr.wordLtWithIds
+example := @Solcore.Resolved.Expr.renameIds_wordLtWithIds
+example := @Solcore.Resolved.Lowers.wordLtWithIds
+example := @Solcore.Resolved.HasType.wordLtWithIds
+example := @Solcore.Resolved.Expr.lower?_wordLtWithIds
+example := @Solcore.Resolved.infer_wordLtWithIds
+example := @Solcore.Resolved.Evaluates.wordLtWithIds
+example := @Solcore.Resolved.Evaluates.wordLtWithIds_inv
+example := @Solcore.Resolved.wordLtWithIds_evaluates_iff
+example := @Solcore.Frontend.CostStepComposition.letE
+example := @Solcore.Frontend.CostStepComposition.wordLt
 
 end Tests

@@ -55,6 +55,16 @@ For originally scoped expressions, insertion gives an exact evaluation equivalen
 the regression for a newly enabled reference protects the original-scoping premise.
 These proofs do not implement a source declaration traversal or global allocator.
 
+The explicit-ID ordered Word less-than foundation (ADR-0187) now builds two
+existing resolved lets, proves exact Core expansion/Word typing and forward
+evaluation, and reflects evaluation under original right scoping. The first
+temporary is fresh for the outer scope and the two temporary IDs differ; the
+second may reuse an outer binding and source inner shadowing is retained.
+Exact continuation paths cost both children plus nine, with the weakened right
+path explicitly supplied. Canonical `<` integration and a restricted-Core exact
+insertion theorem remain separate; no hidden allocation changes the existing
+resolver's identity-map contract.
+
 Canonical identifiers and grouping now have an exact explicit-table adapter
 to typed resolved references and Core variables (ADR-0155). The name table does
 not replace source scope construction. Execution correspondence retains exact
