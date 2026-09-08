@@ -80,6 +80,8 @@ import Solcore.Test.FrontendWordLessProperties
 import Solcore.Test.FrontendParsedWordLess
 import Solcore.Test.FrontendWordGreaterEqualProperties
 import Solcore.Test.FrontendParsedWordGreaterEqual
+import Solcore.Test.FrontendConditionalReturnBodyProperties
+import Solcore.Test.FrontendParsedConditionalReturnBodies
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5621,6 +5623,7 @@ def run : IO Unit := do
   frontendParsedWordLessEqualTests
   frontendParsedWordLessTests
   frontendParsedWordGreaterEqualTests
+  frontendParsedConditionalReturnBodiesTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

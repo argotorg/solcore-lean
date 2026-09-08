@@ -247,6 +247,18 @@ parameters and actual declaration bodies exercise the composition; the body
 endpoint deliberately does not check a declared return type or other signature
 contracts.
 
+A separate terminal-conditional body adapter (ADR-0195) accepts one explicit
+`if/else` whose arms are existing singleton return bodies. The original Bool
+condition and same-typed arms elaborate independently to exact Core `ifE`.
+Raw selected-arm evaluation is separate from mandatory whole-arm checking.
+Typing, exact simulation, store and cost determinism, safe checked execution,
+all fuel thresholds, max-arm bounds and genuine-state resumption are proved.
+No binding/identity allocation or extra return operation is introduced. Parsed
+and independent consumers preserve actual typed arguments and test invalid
+unselected arms, extra/nested statements and absent else. Existing singleton
+body and function entry contracts remain unchanged; integrating this new body
+form into a broader explicitly specified entry profile is a subsequent step.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while

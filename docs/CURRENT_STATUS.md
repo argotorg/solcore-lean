@@ -599,6 +599,28 @@ signature checking at this body-only endpoint, general early returns,
 continuation unwinding, mutable locals, and loops remain separate, as do all
 wire interfaces.
 
+### Terminal conditional return bodies
+
+A separate nonrecursive body adapter accepts exactly one `if` with an explicit
+`else`, each arm containing exactly one bare or expression return (ADR-0195).
+The condition must be Bool and both arms must have the same type, under the
+original inputs. Independent exact elaboration retains all three checked Core
+children and lowers directly to `ifE`; no identities or source bindings are added.
+Raw evaluation visits the condition and selected arm only, but whole checking
+still rejects an invalid unselected arm. Source typing/checking equivalence,
+exact Core simulation, value/store/cost determinism and type safety are proved.
+
+Exact cost adds two to condition plus selected-arm costs. The source bound uses
+the larger arm, so a four-step selected path may have a conservative bound of
+six. Checked runs have exact completion/exhaustion boundaries and cannot fault;
+genuine suspended states retain their pending condition/arm frames on resumption.
+Independent and parsed tests cover actual typed values including existing cells
+and closures, bare Unit returns, unequal arm costs and invalid skipped arms.
+Absent else, extra statements, nested statement conditionals and return-type
+mismatch are rejected. Existing singleton body and runtime-function entry APIs
+remain unchanged; this is not yet conditional-function compilation, general
+early-return unwinding, source mutation or sequential statement semantics.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime

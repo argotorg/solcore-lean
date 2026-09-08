@@ -97,11 +97,22 @@ import Solcore.Resolved.LocalFragmentProperties
 import Solcore.Core.LocalRightWordLessTypingProperties
 import Solcore.Core.LocalRightWordLessEvaluationProperties
 import Solcore.Frontend.WordLessLocalRightCostProperties
+import Solcore.Frontend.ConditionalReturnBody
+import Solcore.Frontend.ConditionalReturnBodyProperties
+import Solcore.Frontend.ConditionalReturnBodyEvaluation
+import Solcore.Frontend.ConditionalReturnBodyEvaluationProperties
+import Solcore.Frontend.ReturnBodyContinuationProperties
+import Solcore.Frontend.ConditionalReturnBodyExecutionProperties
+import Solcore.Frontend.ConditionalReturnBodyRunnerProperties
+import Solcore.Frontend.ConditionalReturnBodyFuelBoundProperties
+import Solcore.Frontend.ConditionalReturnBodyResumptionProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
-type-only and runtime parameter inputs, singleton return bodies, and restricted explicit
+type-only and runtime parameter inputs, singleton and terminal-conditional return bodies,
+and restricted explicit
 function entries with value-free compilation. Independent source rules
 connect to checked Core execution. General source-program resolution, parser
-changes, and wire publication are not implied.
+changes, and wire publication are not implied. The separate conditional-body adapter
+does not yet extend the singleton-body function entry profile.
 -/
