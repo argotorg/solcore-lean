@@ -1,6 +1,7 @@
 import Solcore.Frontend.RuntimeParameters
 import Solcore.Frontend.LocalInputsProperties
 import Solcore.Frontend.LocalInputsRenaming
+import Solcore.Frontend.LocalOwnerRenaming
 
 /-! Empty-start runtime parameter binding commutes with injective owner
 relabeling that leaves binder indices fixed. The proof follows the existing
@@ -9,23 +10,6 @@ fresh-allocation chain, not arbitrary local-ID allocator covariance. -/
 set_option autoImplicit false
 
 namespace Solcore.Frontend
-
-def ownerLocalIdMap (mapping : Resolved.DeclarationId → Resolved.DeclarationId)
-    (id : Resolved.LocalId) : Resolved.LocalId :=
-  ⟨mapping id.owner, id.binderIndex⟩
-
-theorem ownerLocalIdMap_injective
-    (mapping : Resolved.DeclarationId → Resolved.DeclarationId)
-    (injective : Function.Injective mapping) :
-    Function.Injective (ownerLocalIdMap mapping) := by
-  intro left right same
-  have owners := injective (congrArg Resolved.LocalId.owner same)
-  have indices := congrArg Resolved.LocalId.binderIndex same
-  cases left
-  cases right
-  cases owners
-  cases indices
-  rfl
 
 private theorem map_bindFresh (inputs : LocalInputs) (owner : Resolved.DeclarationId)
     (mapping : Resolved.DeclarationId → Resolved.DeclarationId)
