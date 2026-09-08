@@ -3,8 +3,8 @@ import Solcore.Frontend.TypedLetReturnBodyEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
 
 /-! Parsed typed prefixes retain original initializer scopes and exact ordered
-Core without argument values. This separate static adapter does not extend the
-old tree or runtime entry, including for nominal types without inhabitants. -/
+Core without argument values. Runtime entries now use this static adapter;
+the old tree boundary remains narrower, including for nominal inputs. -/
 
 set_option autoImplicit false
 
@@ -158,8 +158,11 @@ private def accepted (content : String) (parameters : List (String × Core.Ty))
             (compileRuntimeFunction? types owner source).map (fun compiled => (compiled.core, compiled.returnType)) = some (core, type)))
             "zero-prefix compatibility changed the old whole result"
         else
-          assertTrue ((elaborateTerminalReturnTree? inputs.names inputs.context source.value.body).isNone &&
-            (compileRuntimeFunction? types owner source).isNone) "separate typed-let adapter expanded an existing entry"
+          assertTrue ((elaborateTerminalReturnTree? inputs.names inputs.context source.value.body).isNone)
+            "typed-prefix entry integration expanded the old tree adapter"
+        assertTrue (decide ((compileRuntimeFunction? types owner source).map (fun compiled =>
+          (compiled.core, compiled.returnType, compiled.inputs.names, compiled.inputs.context.values)) =
+            some (expected, type, inputs.names, inputs.context.values))) "entry changed exact Core or original parameter-only rows"
     compatibility owner inputs source.value.body
 
 private def repeated (count : Nat) (annotation : String) (type : Core.Ty) : IO Unit := do

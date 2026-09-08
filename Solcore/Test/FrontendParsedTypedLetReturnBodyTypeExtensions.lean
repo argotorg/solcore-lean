@@ -4,6 +4,7 @@ import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.RuntimeFunctionEntry
 
 /-! Type dictionaries change, but parsed bodies and their originally declared
 input rows do not. First-match preservation is stronger than retaining rows. -/
@@ -149,7 +150,13 @@ private def fixture (content : String) (arguments : List TypedRuntimeArgument) (
   assertTrue (decide (interpretRuntimeFunctionHeader? base source.value.signature = some type)) "body used a wrong header contrast"
   runChecked inputs source.value.body core type value cost bound
   for names in [base, alternate, extended] do
-    assertTrue (compileRuntimeFunction? names owner source).isNone "dictionary law expanded the existing runtime entry"
+    assertTrue (decide ((compileRuntimeFunction? names owner source).map (fun compiled =>
+      (compiled.core, compiled.returnType, compiled.inputs.names, compiled.inputs.context.values)) =
+        some (core, type, inputs.names, inputs.context.values))) "entry dictionary extension changed exact Core or original parameter-only rows"
+    for store in stores do
+      for fuel in List.range (bound + 3) do
+        assertTrue (decide (runRuntimeFunction? names owner source arguments fuel store =
+          inputs.runTypedLetReturnBody? base owner fuel source.value.body store)) "entry dictionary extension changed complete body execution"
 
 def frontendParsedTypedLetReturnBodyTypeExtensionTests : IO Unit := do
   assertTrue (decide (base ≠ alternate ∧ base.length ≠ alternate.length)) "different hidden rows or dictionary ordering became trivial"

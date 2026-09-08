@@ -4,6 +4,7 @@ import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
 import Solcore.Frontend.TypedLetReturnBodyRunnerEmbeddingProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.RuntimeFunctionEntry
 
 /-! Independent parsed source certificates meet the actual checked runner.
 Every checkpoint is obtained by running its predecessor; no state, actual
@@ -136,6 +137,7 @@ private def oldShapes (inputs : LocalInputs) (source : Syntax.Block) (fuel : Nat
 
 private def checked (inputs : LocalInputs) (source : Syntax.FunctionDecl) (choices : List Bool)
     (expected : Core.Expr) (type : Core.Ty) (value : Core.Value) (cost bound : Nat) : IO Unit := do
+  let arguments := inputs.bindings.reverse.map (fun row => (⟨row.type, row.value, row.valueTyped⟩ : TypedRuntimeArgument))
   have aligned : inputs.environment.ids = inputs.toTypeInputs.context.ids := by
     simpa only [LocalInputs.toTypeInputs_context] using inputs.sameIds
   have typed : Core.EnvironmentHasTypes inputs.environment.values inputs.toTypeInputs.context.values := by
@@ -149,6 +151,9 @@ private def checked (inputs : LocalInputs) (source : Syntax.FunctionDecl) (choic
     | some (core, actualType) =>
         assertTrue (decide (core = expected ∧ actualType = type ∧ interpretRuntimeFunctionHeader? types source.value.signature = some type))
           "actual checked Core, type or original header changed"
+        assertTrue (decide ((compileRuntimeFunction? types owner source).map (fun compiled =>
+          (compiled.core, compiled.returnType, compiled.inputs.names, compiled.inputs.context.values)) =
+            some (expected, type, inputs.names, inputs.context.values))) "entry changed exact Core or original parameter-only rows"
         have _ := certificate.costed.cost_le_fuelBound
         let typing := elaborateTypedLetReturnBody?_sound accepted
         have _ := certificate.costed.checked_runStateful_done_iff (fuel := cost) accepted aligned
@@ -165,7 +170,8 @@ private def checked (inputs : LocalInputs) (source : Syntax.FunctionDecl) (choic
         for fuel in List.range (bound + 3) do
           oldShapes inputs source.value.body fuel store
           have _ := LocalInputs.runTypedLetReturnBody?_never_faults inputs types owner source.value.body fuel store type
-          assertTrue (decide (run fuel = some (type, Core.runStateful fuel initial))) "runner replaced Core or reordered actual values"
+          assertTrue (decide (run fuel = some (type, Core.runStateful fuel initial) ∧
+            runRuntimeFunction? types owner source arguments fuel store = run fuel)) "body or entry replaced Core, reordered actual values or added steps"
           match outcome : run fuel with
           | some (resultType, .done result finalStore) =>
               have _ := LocalInputs.runTypedLetReturnBody?_done_iff_typed_cost.mp outcome
@@ -206,8 +212,7 @@ private def checked (inputs : LocalInputs) (source : Syntax.FunctionDecl) (choic
             assertTrue (decide (Core.runStateful 0 { checkpoint with continuation := [] } = .done child.value store ∧
               Core.runStateful 0 checkpoint = .outOfFuel checkpoint ∧
               run (cost - (child.cost + 1)) ≠ some (type, Core.runStateful (cost - (child.cost + 1)) checkpoint))) "dropping frames or restarting was mistaken for resumption"
-            assertTrue ((inputs.runTerminalReturnTree? bound source.value.body store).isNone &&
-              (compileRuntimeFunction? types owner source).isNone) "separate body runner extended old tree or entry policy"
+            assertTrue ((inputs.runTerminalReturnTree? bound source.value.body store).isNone) "entry integration expanded the old tree adapter"
         | _, _ => pure ()
 
 def frontendParsedTypedLetReturnBodyRunnerTests : IO Unit := do

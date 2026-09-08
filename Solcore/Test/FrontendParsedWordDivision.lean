@@ -118,7 +118,7 @@ private def checkEntry (content : String) (core : Core.Expr) (type : Core.Ty) (p
             "preparation or injective relabeling changed actual arguments/Core/body"
           for store in stores do
             have _ := provenance.run_done_of_fuelBound arguments matching store
-              (terminalReturnTreeFuelBound source.value.body) (Nat.le_refl _)
+              (typedLetReturnBodyFuelBound source.value.body) (Nat.le_refl _)
             let run := fun fuel => runRuntimeFunction? types owner source arguments fuel store
             checkMachine run core (arguments.reverse.map (·.value)) store type value cost bound
             for fuel in List.range (bound + 3) do

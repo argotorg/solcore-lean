@@ -5,6 +5,7 @@ import Solcore.Frontend.TypedLetReturnBodyEvaluationEmbeddingProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.LocalInputsProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.RuntimeFunctionEntry
 
 /-! Actual parsed initializers certify their old-scope values before adding
 bindings. Fixture scripts construct source paths, never derive expectations
@@ -143,6 +144,7 @@ private theorem arbitraryContinuation {inputs : LocalTypeInputs} {environment : 
 
 private def checked (source : Syntax.FunctionDecl) (inputs : LocalInputs) (choices : List Bool)
     (expected : Core.Expr) (value : Core.Value) (cost : Nat) : IO Unit := do
+  let arguments := inputs.bindings.reverse.map (fun row => (⟨row.type, row.value, row.valueTyped⟩ : TypedRuntimeArgument))
   have sameIds : inputs.environment.ids = inputs.toTypeInputs.context.ids := by
     simpa only [LocalInputs.toTypeInputs_context] using inputs.sameIds
   have typedEnvironment : Core.EnvironmentHasTypes inputs.environment.values inputs.toTypeInputs.context.values := by
@@ -155,7 +157,7 @@ private def checked (source : Syntax.FunctionDecl) (inputs : LocalInputs) (choic
     | none => throw (IO.userError "whole prefix checking failed")
     | some (core, type) =>
         let typing := elaborateTypedLetReturnBody?_sound accepted
-        assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some type)) "old entry rejection was caused by a different header contract"
+        assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some type)) "entry header disagreed with the checked return type"
         have _ := typing.evaluates sameIds typedEnvironment store
         have _ := certificate.raw.preserves_type typing sameIds typedEnvironment
         have _ := certificate.raw.store_eq
@@ -171,6 +173,9 @@ private def checked (source : Syntax.FunctionDecl) (inputs : LocalInputs) (choic
         have _ := arbitraryContinuation certificate accepted sameIds
         assertTrue (decide (core = expected ∧ Core.infer? inputs.context.values core = some type ∧
           Core.runStateful cost (.initial core inputs.environment.values store) = .done value store)) "actual accepted Core lost the certified endpoint"
+        assertTrue (decide ((compileRuntimeFunction? types owner source).map (fun compiled =>
+          (compiled.core, compiled.returnType, compiled.inputs.names, compiled.inputs.context.values)) = some (expected, type, inputs.names, inputs.context.values) ∧
+          runRuntimeFunction? types owner source arguments cost store = some (type, .done value store))) "integrated entry changed original parameters, Core or certified execution"
         let safe : List Core.Frame := [.letBody (.var 0) [.word (word 17)], .unaryApply .wordNot]
         have _ := arbitraryContinuation certificate accepted sameIds safe
         assertTrue (decide (Core.runStateful cost ⟨.eval core inputs.environment.values, safe, store⟩ =
@@ -180,7 +185,6 @@ private def checked (source : Syntax.FunctionDecl) (inputs : LocalInputs) (choic
           have _ := arbitraryContinuation certificate accepted sameIds bad
           assertTrue (decide (Core.runStateful cost ⟨.eval core inputs.environment.values, bad, store⟩ =
             .fault (.invalidUnaryOperand .wordNot value) ⟨.ret value, bad, store⟩)) "zero remaining fuel concealed an incompatible continuation"
-    assertTrue (compileRuntimeFunction? types owner source).isNone "body correspondence expanded the old runtime entry"
 
 private theorem initializerRequired {table : LocalNameTable} {environment : Resolved.Environment}
     {store : Core.Store} {blockSpan letSpan : Syntax.SourceSpan} {name : Syntax.Identifier}

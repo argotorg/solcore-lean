@@ -140,11 +140,11 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument) (c
         "preparation changed source positions, Core or actual values"
       for store in stores do
         let certificate ← certify prepared.inputs.names prepared.inputs.environment store entry.source.value.body choices
-        let costed := RuntimeFunctionEvaluatesWithCost.intro preparation certificate.costed
+        let costed := RuntimeFunctionEvaluatesWithCost.intro preparation (.terminal certificate.costed)
         have _ := costed.compiled_toSteps entry.provenance
         have _ := costed.cost_le_fuelBound
         have _ := costed.hasType.run_done_of_fuelBound store
-        let bound := terminalReturnTreeFuelBound entry.source.value.body
+        let bound := typedLetReturnBodyFuelBound entry.source.value.body
         have _ := entry.provenance.run_done_of_fuelBound arguments matching store bound (Nat.le_refl _)
         assertTrue (decide (certificate.cost = cost ∧ certificate.value = value)) "independent recursive source cost/value changed"
         let initial := Core.State.initial entry.compiled.core (arguments.reverse.map (·.value)) store

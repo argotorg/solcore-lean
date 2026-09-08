@@ -4,6 +4,7 @@ import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.RuntimeFunctionEntry
 
 /-! Actual parsed prefixes replay at distinct stores without replacing their
 values, identities or source paths. Same control and frames do not identify
@@ -148,6 +149,7 @@ private def replay (table : LocalNameTable) (environment : Resolved.Environment)
 
 private def checked (inputs : LocalInputs) (source : Syntax.FunctionDecl) (choices : List Bool)
     (expected : Core.Expr) (type : Core.Ty) (value : Core.Value) (cost bound : Nat) : IO Unit := do
+  let arguments := inputs.bindings.reverse.map (fun row => (⟨row.type, row.value, row.valueTyped⟩ : TypedRuntimeArgument))
   let certificate ← replay inputs.toTypeInputs.names inputs.environment source.value.body choices value cost
   match accepted : inputs.checkTypedLetReturnBody? types owner source.value.body with
   | none => throw (IO.userError "whole prefix failed to check")
@@ -161,6 +163,8 @@ private def checked (inputs : LocalInputs) (source : Syntax.FunctionDecl) (choic
         let outLaw := inputs.runTypedLetReturnBody?_outOfFuel_store_iff types owner fuel source.value.body leftStore rightStore type
         assertTrue (decide (run leftStore fuel = some (type, Core.runStateful fuel (.initial core inputs.environment.values leftStore)) ∧
           run rightStore fuel = some (type, Core.runStateful fuel (.initial core inputs.environment.values rightStore)) ∧
+          runRuntimeFunction? types owner source arguments fuel leftStore = run leftStore fuel ∧
+          runRuntimeFunction? types owner source arguments fuel rightStore = run rightStore fuel ∧
           run leftStore fuel ≠ run rightStore fuel)) "store replacement changed execution or erased the result's own store"
         if doneLeft : run leftStore fuel = some (type, .done value leftStore) then
           have rightDone := doneLaw.mp doneLeft
@@ -196,7 +200,9 @@ private def checked (inputs : LocalInputs) (source : Syntax.FunctionDecl) (choic
             assertTrue (decide (run store 1 = some (type, .outOfFuel ⟨.eval initializerCore environment, [.letBody tailCore environment], store⟩) ∧
               run store (child.cost + 1) = some (type, .outOfFuel ⟨.ret child.value, [.letBody tailCore environment], store⟩) ∧
               run store (child.cost + 2) = some (type, .outOfFuel ⟨.eval tailCore (child.value :: environment), [], store⟩))) "initializer or post-binding checkpoint lost original arguments or its own store"
-          assertTrue (compileRuntimeFunction? types owner source).isNone "store replay extended the existing runtime entry"
+          assertTrue (decide ((compileRuntimeFunction? types owner source).map (fun compiled =>
+            (compiled.core, compiled.returnType, compiled.inputs.names, compiled.inputs.context.values)) =
+              some (expected, type, inputs.names, inputs.context.values))) "entry changed original parameter rows or independently checked Core"
       | _, _ =>
           for store in [leftStore, rightStore] do
             for fuel in List.range (bound + 3) do

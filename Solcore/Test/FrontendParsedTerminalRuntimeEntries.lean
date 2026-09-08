@@ -80,7 +80,7 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument)
     (value : Core.Value) (cost : Nat) : IO Unit := do
   let source := entry.declaration
   let compiled := entry.compiled
-  let bound := terminalReturnTreeFuelBound source.value.body
+  let bound := typedLetReturnBodyFuelBound source.value.body
   assertTrue (decide (0 < cost ∧ cost ≤ bound)) "actual selected cost exceeded source budget"
   if matching : arguments.map (·.type) = compiled.inputs.context.values.reverse then
     let some prepared := prepareRuntimeFunction? types owner source arguments

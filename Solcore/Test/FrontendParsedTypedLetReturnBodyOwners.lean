@@ -4,6 +4,7 @@ import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.RuntimeFunctionEntry
 
 /-! Owner-only allocation changes actual IDs, not the parsed source, original
 scope positions or full fixed-store checkpoints. Nominal cases remain value-free. -/
@@ -158,8 +159,14 @@ private def fixture (content : String) (arguments : List TypedRuntimeArgument) (
   let inputs ← actual source arguments
   assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some type)) "body contrast used an invalid header"
   runChecked inputs source.value.body core type value cost bound arguments.length
-  assertTrue ((compileRuntimeFunction? types owner source).isNone &&
-    (compileRuntimeFunction? types (shift owner) source).isNone) "body owner covariance expanded the unchanged runtime entry"
+  for (selectedOwner, expectedIds) in [(owner, inputs.ids), (shift owner, inputs.ids.map mapping)] do
+    assertTrue (decide ((compileRuntimeFunction? types selectedOwner source).map (fun compiled =>
+      (compiled.core, compiled.returnType, compiled.inputs.ids, compiled.inputs.context.values, compiled.inputs.names.map Prod.fst)) =
+        some (core, type, expectedIds, inputs.context.values, inputs.names.map Prod.fst))) "entry owner change altered Core or parameter-only rows"
+    for store in stores do
+      for fuel in List.range (bound + 3) do
+        assertTrue (decide (runRuntimeFunction? types selectedOwner source arguments fuel store =
+          inputs.runTypedLetReturnBody? types owner fuel source.value.body store)) "entry owner change altered complete body execution"
 
 def frontendParsedTypedLetReturnBodyOwnerTests : IO Unit := do
   have _ := shiftNotSurjective
@@ -179,7 +186,9 @@ def frontendParsedTypedLetReturnBodyOwnerTests : IO Unit := do
       let core := indices.foldr (fun index tail => Core.Expr.letE (.var (if index = 0 then 2 else 0)) tail) terminal
       checkedStatic inputs source.value.body core type (3 * count + 7) 3
       assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some type)) "nominal header meaning changed"
-      if count > 0 then assertTrue ((compileRuntimeFunction? types owner source).isNone) "static-only prefix expanded runtime compilation"
+      assertTrue (decide ((compileRuntimeFunction? types owner source).map (fun compiled =>
+        (compiled.core, compiled.returnType, compiled.inputs.names, compiled.inputs.context.values)) =
+          some (core, type, inputs.names, inputs.context.values))) "nominal compilation needed values or changed its original parameter rows"
   for (x, r) in [(word 9, word 2), (Core.Word.zero, Core.Word.maximum), (word (2 ^ 255), word 7)] do
     let args : List TypedRuntimeArgument := [⟨.word, .word x, .word⟩, ⟨.word, .word r, .word⟩]
     fixture "function ordered(x: Word,r: Word) returns (Word){let y: Word=x;let z: Word=y - r;return z;}" args
