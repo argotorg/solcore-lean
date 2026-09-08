@@ -397,9 +397,19 @@ nine, with eleven-step leaves and genuine two/five/ten checkpoints retaining
 nine/six/one remaining steps. All generic static, dynamic, store, extension,
 resumption and compiled-entry contracts include the new form. Parsed arithmetic,
 conditional and Bool-returning entry tests retain actual arguments and provenance.
-Six obsolete `<` rejection fixtures migrate to unsupported `>=`, without changing
-precedence or parser rejection of chained comparisons.
-Division, remainder, `>=`, unary signs, assignment, and general
+Six obsolete `<` rejection fixtures were migrated without changing precedence
+or parser rejection of chained comparisons.
+Unsigned Word `>=` (ADR-0194) resolves to `boolNot(wordLt(left, right))` under
+the original table, retaining the ordered two-let lowering and all generic
+contracts. Independent source semantics returns `!(decide (leftWord < rightWord))`;
+Word operands and Bool result are mandatory, with equality true. Costs/bounds
+add eleven, giving thirteen-step leaves. Actual checkpoints at three/six/eleven/
+twelve have ten/seven/two/one transitions left; the last retains the less-than
+Boolean and pending negation. Independent and parsed consumers cover actual
+arguments, exact resumption, short-circuit/arithmetic composition and own entry
+provenance. Seven obsolete `>=` rejections are removed, leaving division/remainder
+and all chained-comparison parser rejections unchanged.
+Division, remainder, unary signs, assignment, and general
 overload policy remain separate.
 
 Further frontend semantics should preserve exact identity, binding, and Core

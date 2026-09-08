@@ -236,7 +236,7 @@ to checked execution. Tests distinguish this boundary from raw evaluation that
 skips a missing or unsupported operand, which still prevents whole checking.
 Parsed precedence, grouping, and nested right operands exercise exact fuel
 differences between selected and skipped paths. Comparisons other than unsigned
-Word `>`/`<`/`<=`/`==`/`!=` and arithmetic other than the separately specified Word addition,
+Word `>`/`<`/`<=`/`>=`/`==`/`!=` and arithmetic other than the separately specified Word addition,
 subtraction, and multiplication remain unsupported.
 
 Word complement `~` is also supported as a fixed Word-only operation
@@ -372,8 +372,22 @@ value, right value and pending comparison, with nine/six/one steps remaining.
 All generic type/evaluation, arbitrary structural ID-map, input-extension,
 store, bound, resumption and compilation-provenance contracts are unchanged.
 Parsed arithmetic/conditional compositions and Bool-returning entries consume
-actual arguments. Six obsolete `<` rejection fixtures now use still-unsupported
-`>=`; parser precedence and chained-comparison rejection remain unchanged.
+actual arguments. Six obsolete `<` rejection fixtures were migrated in that
+unit; parser precedence and chained-comparison rejection remain unchanged.
+
+Unsigned Word `>=` resolves to `boolNot(wordLt(left, right))` (ADR-0194), with
+both children under the original table. The two ordered Core lets evaluate each
+operand once, and the final negation yields `!(decide (leftWord < rightWord))`.
+Independent typing still requires two Words and returns Bool, with equal values
+true and high-bit/max values unsigned. Cost and the structural bound add eleven
+to child costs; two leaves take thirteen transitions. Genuine checkpoints at
+three/six/eleven/twelve retain both binding environments, the comparison frame
+and then the pending negation, with ten/seven/two/one transitions remaining.
+All generic static/dynamic and exact-store/fuel/resumption/provenance contracts
+cover the form without stronger premises. Parsed tests cover actual ordered
+arguments, unsigned boundaries, short-circuit and arithmetic/conditional
+composition, and whole return-type rejection. Seven obsolete `>=` rejection
+fixtures were removed while division/remainder and parser chain rejection remain.
 
 ### Numeric spelling and strict Word interpretation
 
@@ -477,7 +491,7 @@ No checking or executable-run premise is built into the cost relation.
 Identifiers and Word literals cost one; grouping adds nothing; unary operators
 add two. Strict Word arithmetic, bitwise, greater-than, and equality binaries
 cost both operands plus three; derived Word inequality and `<=` add five,
-and ordered Word `<` adds nine. A conditional
+ordered Word `<` adds nine, and `>=` adds eleven. A conditional
 costs its condition and selected branch plus two. Short-circuit selection costs
 both visited operands plus two; skipping the right costs the left plus three,
 including the generated Boolean constant. Both initial and final stores and
@@ -2520,7 +2534,7 @@ language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
 Semantic Core remain separate later stages. Canonical local references, Boolean
-operators, Word addition/subtraction/multiplication, bitwise operations, unsigned `>`/`<`/`<=` and Word equality/inequality, strict Word literals, and conditionals connect through the explicit-table adapters described above.
+operators, Word addition/subtraction/multiplication, bitwise operations, unsigned `>`/`<`/`<=`/`>=` and Word equality/inequality, strict Word literals, and conditionals connect through the explicit-table adapters described above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 

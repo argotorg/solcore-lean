@@ -685,5 +685,11 @@ example := @Solcore.Frontend.AvoidsLocalName.less
 example := @Solcore.Frontend.LocalExpressionEvaluates.less
 example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.less
 example := @Solcore.Frontend.resolveLocalExpression?_less_spans
+example := @Solcore.Frontend.ResolvesLocalExpression.greaterEqual
+example := @Solcore.Frontend.LocalExpressionHasType.greaterEqual
+example := @Solcore.Frontend.AvoidsLocalName.greaterEqual
+example := @Solcore.Frontend.LocalExpressionEvaluates.greaterEqual
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.greaterEqual
+example := @Solcore.Frontend.resolveLocalExpression?_greaterEqual_spans
 
 end Tests
