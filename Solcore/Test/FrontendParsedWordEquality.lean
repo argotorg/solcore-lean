@@ -248,7 +248,8 @@ def frontendParsedWordEqualityTests : IO Unit := do
       assertTrue (runRuntimeFunction? types owner declaration [argument, argument] fuel store).isNone
         "rejected actual non-Word equality entered execution"
   checkRun supplied "l != r" (.unary .boolNot (.binary .wordEq (.var 2) (.var 1))) .bool (.bool true) 7
-  for content in ["l < r", "l <= r", "l >= r", "l / r", "l % r"] do
+  checkRun supplied "l <= r" (.unary .boolNot (.binary .wordGt (.var 2) (.var 1))) .bool (.bool true) 7
+  for content in ["l < r", "l >= r", "l / r", "l % r"] do
     checkRejected supplied content false
   checkParameterPositions
   checkReturnContract
