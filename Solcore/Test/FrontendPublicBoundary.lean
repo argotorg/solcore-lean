@@ -908,6 +908,42 @@ example := @Solcore.Frontend.RuntimeFunctionCompiles.extend_types
 example := @Solcore.Frontend.compileRuntimeFunction?_some_of_extends
 example := @Solcore.Frontend.compileRuntimeFunction?_eq_of_mutual_extends
 
+example := @Solcore.Frontend.elaborateTerminalReturnTree?
+example := @Solcore.Frontend.TerminalReturnTreeHasType
+example := @Solcore.Frontend.TerminalReturnTreeElaborates
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_single
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_children
+example := @Solcore.Frontend.TerminalReturnTreeElaborates.complete
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_elaborates
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_iff
+example := @Solcore.Frontend.TerminalReturnTreeElaborates.hasType
+example := @Solcore.Frontend.TerminalReturnTreeHasType.elaborates_exact
+example := @Solcore.Frontend.terminalReturnTreeHasType_iff_elaborates_exact
+example := @Solcore.Frontend.TerminalReturnTreeHasType.elaborates
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_sound
+example := @Solcore.Frontend.terminalReturnTreeHasType_iff_elaborates
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_core_hasType
+example := @Solcore.Frontend.TerminalReturnTreeElaborates.result_unique
+example := @Solcore.Frontend.TerminalReturnTreeHasType.type_unique
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_eq_none_iff
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_spans
+example := @Solcore.Frontend.ReturnBodyHasType.returnTree
+example := @Solcore.Frontend.ReturnBodyElaborates.returnTree
+example := @Solcore.Frontend.ReturnBodyElaborates.returnTree_complete
+example := @Solcore.Frontend.ConditionalReturnBodyHasType.returnTree
+example := @Solcore.Frontend.ConditionalReturnBodyElaborates.returnTree
+example := @Solcore.Frontend.ConditionalReturnBodyElaborates.returnTree_complete
+example := @Solcore.Frontend.TerminalReturnBodyHasType.returnTree
+example := @Solcore.Frontend.TerminalReturnBodyElaborates.returnTree
+example := @Solcore.Frontend.TerminalReturnBodyElaborates.returnTree_complete
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_single_terminal
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_conditional_singletons
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_conditional_singletons_terminal
+example := @Solcore.Frontend.TerminalReturnTreeHasType.single
+example := @Solcore.Frontend.TerminalReturnTreeHasType.conditional
+example := @Solcore.Frontend.TerminalReturnTreeElaborates.single
+example := @Solcore.Frontend.TerminalReturnTreeElaborates.conditional
+
 section TerminalEntryContracts
 
 open Solcore Solcore.Frontend

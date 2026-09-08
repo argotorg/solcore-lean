@@ -279,6 +279,18 @@ with old-import availability retained. Noninjective lookup counterexamples remai
 explicit. This layer itself does not change entries, input-shadowing policy or
 accepted syntax; its acyclic imports allow the entry integration below.
 
+The separate recursive `TerminalReturnTree` static adapter (ADR-0204) accepts
+finite nested explicit if/else trees with singleton-return leaves. Structural
+source-size recursion needs no fuel/depth limit. Independent source typing and
+exact elaboration characterize all successful results, retain both whole arms
+and ordered Core `ifE` nodes, and prove Core typing, exact uniqueness and failure
+characterization without runtime values. Old successes embed exactly; complete
+Option equality only applies to old singleton/one-level shapes. Deep positive
+and negative parsed trees retain valid static parameters/header while contrasting
+unchanged old body/entry rejection. Recursive evaluation/cost, continuation,
+fuel/resumption and invariance proofs follow separately before entry integration;
+this static unit changes no existing acceptance or execution policy.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while

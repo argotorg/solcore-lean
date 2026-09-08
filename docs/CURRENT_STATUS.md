@@ -673,6 +673,35 @@ changing their statements or proofs and remain available through the old runtime
 imports. Body-level modules have no runtime-function dependency or cycle, allowing
 entry integration to reuse these laws without reversing the dependency direction.
 
+### Recursive terminal return-tree static semantics
+
+A separate `TerminalReturnTree` adapter now checks finite, arbitrarily nested
+explicit if/else bodies whose leaves are singleton returns (ADR-0204). Structural
+recursion on the original block establishes totality without fuel or a depth
+limit. Bare returns retain Unit; every condition must be Bool and every written
+arm must independently have the same result type. Exact elaboration preserves
+the original ordered condition and both recursive arms as a nested Core `ifE`.
+
+Independent recursive source typing and exact elaboration characterize success
+in both directions. Successful checking yields typed Core, exact Core/type
+uniqueness and failure iff there is no source typing. Condition resolution,
+positional lowering and typing remain separate premises; another same-typed Core
+is not an alternative elaboration. Static inputs may include nominal types with
+no runtime inhabitants. Deep invalid unselected branches remain rejected.
+
+Old singleton, one-level conditional and terminal-union successes embed with the
+same Core and type. Full optional-result equality is restricted to old body
+shapes, including failed expression checks. It is false for arbitrary bodies:
+a valid deeper tree is accepted here but rejected by the old nonrecursive body
+and function-entry adapters. Independent and parsed consumers retain that
+contrast with valid parameter and header evidence.
+
+This is static body semantics only. Recursive raw/cost correspondence, safe
+execution, recursive fuel bounds, identity/store invariance and checkpoint
+resumption remain subsequent work before entry integration. Existing checkers,
+compilation and runtime policies are unchanged; no general early return, extra
+statements, missing else, local declarations, calls or fallthrough are added.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime
