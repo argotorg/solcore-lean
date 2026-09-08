@@ -789,9 +789,9 @@ to current inputs; no arbitrary-renaming allocator covariance or traversal-globa
 uniqueness is claimed. Independent and parsed consumers retain exact source
 order, old-scope/forward-reference boundaries, nominal inputs and whole failures.
 The independent evaluation/cost layer below now complements this static unit.
-Existing tree and function-entry adapters remain unchanged and still reject
-let prefixes. A separate checked prefix runner follows below; runtime-entry
-integration remains separate.
+Existing tree adapters still reject let prefixes. A separate checked prefix
+runner follows below, and ADR-0215 now integrates this adapter into the existing
+function-entry APIs while preserving their complete header/parameter contract.
 
 ### Typed local-declaration prefixes: evaluation and cost
 
@@ -856,9 +856,9 @@ retain actual multi-chunk states and distinguish resumption from restarting or
 dropping a continuation. Old singleton/if shapes retain whole optional result
 equality, including checking failure and same-fuel complete checkpoints.
 
-This does not extend runtime-function entries or let prefixes inside branches,
-and adds no parser, Core, Wire, call, mutation, inference, default initialization
-or general source shadowing policy.
+The body-runner unit itself adds no entry integration; ADR-0215 now supplies that
+connection below. Let prefixes inside branches, parser/Core/Wire changes, calls,
+mutation, inference, default initialization and general shadowing remain outside it.
 
 ### Typed local-declaration prefixes: store replay
 
@@ -877,7 +877,7 @@ rejected bodies. They do not equate complete results or suspended states across
 distinct stores. Genuine initializer/tail checkpoints must be resumed separately,
 retaining their own stores and captured values. Opaque cell/closure returns do
 not imply that reading cells or running arbitrary pending continuations is
-store-independent. No Core, entry, mutation or binding-policy extension is made.
+store-independent. This body-level unit adds no Core, entry, mutation or binding-policy extension.
 
 ### Typed local-declaration prefixes: owner covariance
 
@@ -898,8 +898,8 @@ input IDs themselves are relabeled, not equated. This differs from store replay,
 where complete states retain different stores.
 
 This is not allocator covariance under arbitrary index-changing local-ID maps
-or owner-collapsing maps. Existing runtime-parameter owner laws and runtime-entry
-profiles are unchanged; body proofs have no reverse dependency on them. No
+or owner-collapsing maps. Runtime-parameter owner laws are unchanged; ADR-0215 now
+uses this body transport at entries without a reverse body dependency. No
 raw/cost owner-transport API, inference, parser, Core or binding policy is added.
 
 ### Typed local-declaration prefixes: type-name extension
@@ -920,13 +920,14 @@ meaning is not extension merely because all old rows remain present; hidden
 duplicates may differ harmlessly when visible meanings are preserved.
 
 Raw paths, exact costs and source bounds do not depend on the caller type table
-and acquire no new checking evidence from these laws. No runtime-entry, parser,
-Core, inference, default-initializer or binding-policy extension is made.
+and acquire no new checking evidence from these laws. This body-level unit adds
+no entry, parser, Core, inference, default-initializer or binding-policy extension.
 
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime
-parameters, and terminal return tree in one entry (ADR-0170, ADR-0198, ADR-0208). Independent exact
+parameters, typed let prefix and terminal return tree in one entry
+(ADR-0170, ADR-0198, ADR-0208, ADR-0215). Independent exact
 preparation retains both the actual lowered Core and its declared return type,
 not merely some Core of that type. Success and failure correspond to this
 independent relation, and a whole-entry typing contract is distinct from
@@ -934,28 +935,36 @@ body-only typing. A Bool-return declaration with a Word body is rejected here
 while remaining a Word body at the existing body-only endpoint.
 
 The compiler, preparer, whole-entry typing and independent entry cost now use
-the recursive terminal return-tree judgments. Finite nested explicit if/else
-trees with singleton-return leaves extend the earlier nonrecursive union. The
-original entry APIs and compiled/prepared record layouts are retained. Exact-Core,
-type-only/actual-argument factorization, type-table extension, source parameter
-positions, owner, store and checkpoint contracts lift through the recursive
-body evidence; the entry adds no transitions or second value reversal.
+the typed let-prefix judgments. Finite outer annotated, initialized, unused-name
+declarations precede a recursively checked terminal tree. Each initializer uses
+the old scope and its exact annotation type; the freshly extended tail becomes
+the actual nested Core `letE`. The original entry APIs and three-field data
+record layouts remain unchanged. Records retain only original parameter inputs:
+prefix locals do not alter argument count, ordered type guards or value reversal.
+Exact-Core factorization, parameter positions, owner/type-name transport, stores
+and checkpoints lift through the new provenance. The runner still executes the
+prepared Core directly and adds no transitions or second value reversal.
 
-The three entry fuel-bound theorems now use `terminalReturnTreeFuelBound`, taking
-the maximum recursively at every node. A depth-two long path can cost seven while
-the old terminal-body bound is four, so that old bound is no longer an entry
-guarantee. Other generic entry theorem statements retain their premises and
+The three entry fuel-bound theorems now use `typedLetReturnBodyFuelBound`, adding
+each initializer bound and two before the terminal tree's recursive maximum.
+One initialized variable and return cost four while the old tree bound is zero,
+so the old tree formula cannot remain the general entry guarantee. Other generic
+entry theorem statements retain their premises and
 conclusions over the broadened judgments. Value-free compilation still requires
 no actual inhabitants, while safe execution requires real matching typed arguments
 and provenance. Same-typed wrong Core cannot replace the source's actual Core.
 
 Old singleton and one-level values, costs and complete same-fuel results remain
-unchanged. Valid deep entry rejection fixtures migrate to exact success; genuine
-invalid headers, parameters and unselected deep arms remain rejected. Extra
-statements, missing else and a block containing a separate nested block are
-still unsupported. Old nonrecursive body-only checking and bounds are unchanged.
-Independent and parsed regressions retain actual argument values, asymmetric
-selected costs, nonempty stores and genuine multi-chunk checkpoint states.
+unchanged. Valid annotated-prefix entry rejection fixtures now become exact
+successes while old tree-adapter rejection remains. Invalid headers, parameters,
+declared return mismatches and unselected deep arms still reject. Missing
+annotations/initializers, shadowing, self/forward references, arm-local lets,
+extra returns, missing else and separate nested-block wrappers remain unsupported;
+this is not a global binding policy. All old body-only adapters and bounds are
+unchanged. Independent arbitrary-length source proofs retain static nominal
+types without values, exact `3n + 1` costs, original parameter rows and actual
+multi-chunk let checkpoints. Parsed whole declarations additionally retain
+noncommutative/unused initialization, asymmetric paths and complete rejections.
 
 The restricted header excludes generics, where clauses, and contract modifiers.
 No return clause means Unit; an explicit clause has exactly one supported

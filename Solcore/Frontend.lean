@@ -175,8 +175,8 @@ type-only and runtime parameter inputs, singleton and terminal-conditional retur
 and restricted explicit
 function entries with value-free compilation. Independent source rules
 connect to checked Core execution. General source-program resolution, parser
-changes, and wire publication are not implied. Function entries support finite
-recursive terminal if/else trees with singleton-return leaves; compilation owner
+changes, and wire publication are not implied. Function entries support typed
+outer let prefixes before finite terminal if/else trees with singleton-return leaves; compilation owner
 invariance requires no runtime argument inhabitants.
 Recursive terminal return trees additionally have independent static and
 selected-path evaluation/cost semantics with exact Core continuation paths,
@@ -193,5 +193,7 @@ each completed or suspended observation retaining its own store. Injective
 owner-only relabeling commutes with fresh binding and preserves exact Core,
 whole optional results and checkpoints at a fixed store. First-match type-meaning
 extension preserves success, and mutual extension also preserves rejection.
-No runtime-entry integration, inference or broader binding policy is added.
+Existing function entries reuse the typed-prefix judgments and additive bound,
+retaining original parameter records, argument guards and direct Core execution.
+No inference, arm-local let or broader binding policy is added.
 -/

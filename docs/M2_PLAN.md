@@ -347,8 +347,8 @@ freshness in arbitrary inconsistent environments. Pending frames are retained,
 not executed; bad frames can fault with zero fuel at the endpoint. Source and
 parsed consumers retain strict unused initialization, old-scope positions,
 opaque values, asymmetric terminal paths and raw-success/whole-rejection cases.
-The checked prefix runner, bound and genuine resumption now follow in ADR-0211;
-runtime-entry integration remains separate.
+The checked prefix runner, bound and genuine resumption follow in ADR-0211;
+ADR-0215 now integrates these contracts into the existing runtime entries.
 
 The separate typed-prefix runner (ADR-0211) checks `toTypeInputs` with the caller's
 type meanings/owner and executes the actual Core with original ordered values.
@@ -365,7 +365,7 @@ resumption preserves full results across multiple chunks, not restarted or
 reconstructed states. Old singleton/if shapes preserve full optional results at
 every fuel. Source and parsed consumers retain asymmetric path/bound differences,
 unsupported zero/nonzero budgets and incorrect-checkpoint counterexamples.
-No existing tree/entry, parser, Core, call or broader binding policy is changed.
+This body-runner unit changes no tree/entry, parser, Core, call or broader binding policy.
 
 Typed-prefix store replay (ADR-0212) now transports independent raw paths and
 exact costs to arbitrary replacement stores, preserving each initializer's
@@ -387,7 +387,7 @@ transport; recursive checker equality preserves failures without surjectivity.
 The checked wrapper keeps full optional results and genuine checkpoints equal
 at fixed fuel/store. This does not equate the owner-bearing inputs, generalize
 allocation to arbitrary index-changing/owner-collapsing maps, introduce raw/cost
-owner transport or change existing parameter and runtime-entry profiles.
+owner transport or change parameter policies. ADR-0215 reuses it at runtime entries.
 
 Typed-prefix type-name extension (ADR-0214) now transports annotation meanings
 while keeping original inputs, initializer scope, fresh tails and exact Core/type
@@ -410,20 +410,38 @@ profile. Actual complete declarations exercise this boundary. Neither hand-built
 prepared records nor arbitrary source functions receive unconditional safety.
 
 Terminal entry integration (ADR-0198) initially connected the existing entry API
-to the nonrecursive union. ADR-0208 extends that same compiler/preparer to the
+to the nonrecursive union. ADR-0208 extended that same compiler/preparer to the
 recursive tree checker and exact provenance, typing and independent cost. Old
 accepted Core/value/store/cost and complete same-fuel observations are retained.
 The compiled/prepared layouts, header and complete parameter policies, actual
 value order, factorization, owner/store invariance and genuine resumption remain
 intact. Value-free compilation, parameter positions and type-table extension
-need no runtime inhabitants. Only the three entry fuel-bound statements migrate
+need no runtime inhabitants. In that unit, only the three entry fuel-bound statements migrated
 to `terminalReturnTreeFuelBound`; the old nonrecursive bound can be too small for
 a deep selected path. Whole checking still covers unselected deep children.
-Valid deep entry failures become exact successes; missing else, extra statements,
-nested-block wrappers, bad headers/arguments and mismatched arms remain rejected.
+Valid deep entry failures became exact successes; that profile still rejected missing else,
+extra statements, nested-block wrappers, bad headers/arguments and mismatched arms.
 Old body-only adapters and the absence of general source calls/early returns are
 unchanged. Independent and parsed entry consumers retain exact source Core,
 real arguments, asymmetric bounds and actual multi-chunk checkpoints.
+
+Typed-prefix entry integration (ADR-0215) now connects the same APIs to the
+annotated, initialized, nonshadowing outer prefix followed by a terminal tree.
+Compilation uses complete value-free inputs; preparation uses their exact actual
+projection. Parameter-declaration uniqueness preserves that entire bundle across
+same-typed arguments. Compiled/prepared records retain only original parameters,
+not prefix locals, and direct Core execution retains the one reversed value list.
+Whole provenance, declared returns, exact cost/typing/factorization, owner and
+type-name transport, own-store replay and genuine resumption remain mandatory.
+Only three generic theorem formulas change, to `typedLetReturnBodyFuelBound`:
+the old tree bound is zero on a one-let body costing four. Body fields and the
+cost constructor broaden explicitly. Independent arbitrary-length entry proofs
+and parsed whole declarations cover exact positional Core, nominal types without
+inhabitants, actual opaque values, strict unused work and real multi-chunk states.
+Valid prefix entry failures migrate to exact success without changing old tree
+rejection. Missing annotation/initializer, shadowing, self/forward references,
+arm-local lets and all invalid whole contracts remain outside this adapter.
+No parser/Core/Wire change, inference, defaults, general calls or binding policy.
 
 Arbitrary-position parameter semantics (ADR-0171) now connect source index `k`
 to identity `(owner, k)`, exact Core position `n - 1 - k`, and the original

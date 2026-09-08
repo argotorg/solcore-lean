@@ -1101,7 +1101,7 @@ example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnBody?_eq_of_mutual_e
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_some_of_extends
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_eq_of_mutual_extends
 
-section RecursiveEntryContracts
+section TypedLetEntryContracts
 
 open Solcore Solcore.Frontend
 
@@ -1111,36 +1111,36 @@ variable {types : TypeNameTable} {owner : Resolved.DeclarationId}
   {initialStore finalStore : Core.Store} {type : Core.Ty} {value : Core.Value} {cost : Nat}
 
 example (compilation : RuntimeFunctionCompiles types owner declaration compiled) :
-    TerminalReturnTreeElaborates compiled.inputs.names compiled.inputs.context
+    TypedLetReturnBodyElaborates types owner compiled.inputs
       declaration.value.body compiled.core compiled.returnType := compilation.body
 
 example (preparation : RuntimeFunctionPrepares types owner declaration arguments prepared) :
-    TerminalReturnTreeElaborates prepared.inputs.names prepared.inputs.context
+    TypedLetReturnBodyElaborates types owner prepared.inputs.toTypeInputs
       declaration.value.body prepared.core prepared.returnType := preparation.body
 
 example (preparation : RuntimeFunctionPrepares types owner declaration arguments prepared)
-    (bodyCost : TerminalReturnTreeEvaluatesWithCost prepared.inputs.names prepared.inputs.environment
+    (bodyCost : TypedLetReturnBodyEvaluatesWithCost owner prepared.inputs.names prepared.inputs.environment
       initialStore declaration.value.body value finalStore cost) :
     RuntimeFunctionEvaluatesWithCost types owner declaration arguments
       initialStore prepared.returnType value finalStore cost := .intro preparation bodyCost
 
 example (evaluation : RuntimeFunctionEvaluatesWithCost types owner declaration arguments
     initialStore type value finalStore cost) :
-    cost ≤ terminalReturnTreeFuelBound declaration.value.body := evaluation.cost_le_fuelBound
+    cost ≤ typedLetReturnBodyFuelBound declaration.value.body := evaluation.cost_le_fuelBound
 
 example (typing : RuntimeFunctionHasType types owner declaration arguments type)
-    (store : Core.Store) (fuel : Nat) (enough : terminalReturnTreeFuelBound declaration.value.body ≤ fuel) :
+    (store : Core.Store) (fuel : Nat) (enough : typedLetReturnBodyFuelBound declaration.value.body ≤ fuel) :
     ∃ value, Core.ValueHasType value type ∧ runRuntimeFunction? types owner declaration arguments fuel store =
       some (type, .done value store) := typing.run_done_of_fuelBound store fuel enough
 
 example (compilation : RuntimeFunctionCompiles types owner declaration compiled)
     (matchingTypes : arguments.map (·.type) = compiled.inputs.context.values.reverse)
-    (store : Core.Store) (fuel : Nat) (enough : terminalReturnTreeFuelBound declaration.value.body ≤ fuel) :
+    (store : Core.Store) (fuel : Nat) (enough : typedLetReturnBodyFuelBound declaration.value.body ≤ fuel) :
     ∃ value, Core.ValueHasType value compiled.returnType ∧
       runRuntimeFunction? types owner declaration arguments fuel store = some (compiled.returnType, .done value store) ∧
       Core.runStateful fuel (Core.State.initial compiled.core (arguments.reverse.map (·.value)) store) =
         .done value store := compilation.run_done_of_fuelBound arguments matchingTypes store fuel enough
 
-end RecursiveEntryContracts
+end TypedLetEntryContracts
 
 end Tests
