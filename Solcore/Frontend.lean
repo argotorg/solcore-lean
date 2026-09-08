@@ -5,6 +5,7 @@ import Solcore.Frontend.LocalReferenceElaborationProperties
 import Solcore.Frontend.LocalReferenceEvaluation
 import Solcore.Frontend.LocalReferenceExecutionProperties
 import Solcore.Frontend.LocalExpression
+import Solcore.Frontend.LocalExpressionShapeProperties
 import Solcore.Frontend.LocalExpressionResolutionProperties
 import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Frontend.LocalExpressionTypingProperties

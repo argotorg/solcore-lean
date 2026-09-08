@@ -252,8 +252,16 @@ cover both forms. Independent consumers and fully parsed position-pair tests
 distinguish noncommutative subtraction, grouping and multiplication precedence,
 operation wrap from literal rejection, and pending frames from terminal values.
 The fresh-input typing/evaluation proof split preserves existing public APIs.
-Division, remainder, comparison, unary signs, assignment, and general overload
-policy remain separate.
+Unsigned Word greater-than (ADR-0178) now connects computed Words to Boolean
+conditions through the direct ordered `wordGt` node. Independent typing requires
+Word operands and a Bool result; evaluation and cost retain strict store order
+and both child costs plus three. Generic safety, correspondence, invariance,
+value-free compilation, and runtime entry proofs include the form. Consumers
+verify unsigned boundaries, equality, exact pending frames, declared Bool results,
+wrong Word returns, computed-guard branch costs, and all tested parameter pairs.
+Source shape laws are split without changing their public contracts/import path.
+Division, remainder, other comparisons, unary signs, assignment, and general
+overload policy remain separate.
 
 Further frontend semantics should preserve exact identity, binding, and Core
 execution correspondence while extending supported expressions and declarations.

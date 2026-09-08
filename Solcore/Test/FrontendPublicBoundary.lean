@@ -559,5 +559,11 @@ example := @Solcore.Frontend.resolveLocalExpression?_subtract_spans
 example := @Solcore.Frontend.resolveLocalExpression?_multiply_spans
 example := @Solcore.Frontend.LocalInputExtensionSupport.fresh_ne_of_named
 example := @Solcore.Frontend.LocalInputExtensionSupport.identity_lookup_cons_iff
+example := @Solcore.Frontend.ResolvesLocalExpression.greater
+example := @Solcore.Frontend.LocalExpressionHasType.greater
+example := @Solcore.Frontend.AvoidsLocalName.greater
+example := @Solcore.Frontend.LocalExpressionEvaluates.greater
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.greater
+example := @Solcore.Frontend.resolveLocalExpression?_greater_spans
 
 end Tests
