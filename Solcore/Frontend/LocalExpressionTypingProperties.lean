@@ -1,0 +1,148 @@
+import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.LocalExpressionResolutionProperties
+import Solcore.Resolved.TypingProperties
+
+/-! Independent canonical-fragment typing agrees exactly with resolved typing
+and the executable Core checker. All conditional branches are checked, even
+when dynamic evaluation would leave a branch unselected. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend
+
+theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {type : Core.Ty}
+    (typing : LocalExpressionHasType table context source type) :
+    ∃ resolved, ResolvesLocalExpression table source resolved ∧ Resolved.HasType context resolved type := by
+  induction typing with
+  | identifier named found => exact ⟨_, .identifier named, .var found⟩
+  | group _ ih =>
+      obtain ⟨resolved, resolution, typed⟩ := ih
+      exact ⟨resolved, .group resolution, typed⟩
+  | conditional _ _ _ conditionIH thenIH elseIH =>
+      obtain ⟨condition, conditionResolved, conditionTyped⟩ := conditionIH
+      obtain ⟨thenBranch, thenResolved, thenTyped⟩ := thenIH
+      obtain ⟨elseBranch, elseResolved, elseTyped⟩ := elseIH
+      exact ⟨_, .conditional conditionResolved thenResolved elseResolved,
+        .ifE conditionTyped thenTyped elseTyped⟩
+
+theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {resolved : Resolved.Expr} {type : Core.Ty}
+    (resolution : ResolvesLocalExpression table source resolved)
+    (typing : Resolved.HasType context resolved type) :
+    LocalExpressionHasType table context source type := by
+  induction resolution generalizing type with
+  | identifier named =>
+      cases typing with
+      | var found => exact .identifier named found
+  | group _ ih => exact .group (ih typing)
+  | conditional _ _ _ conditionIH thenIH elseIH =>
+      cases typing with
+      | ifE conditionTyped thenTyped elseTyped =>
+          exact .conditional (conditionIH conditionTyped) (thenIH thenTyped) (elseIH elseTyped)
+
+theorem ResolvesLocalExpression.preserves_type {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {resolved : Resolved.Expr} {type : Core.Ty}
+    (resolution : ResolvesLocalExpression table source resolved)
+    (typing : LocalExpressionHasType table context source type) :
+    Resolved.HasType context resolved type := by
+  obtain ⟨other, otherResolution, otherTyped⟩ := typing.resolves
+  cases otherResolution.deterministic resolution
+  exact otherTyped
+
+theorem ResolvesLocalExpression.typing_iff {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {resolved : Resolved.Expr} {type : Core.Ty}
+    (resolution : ResolvesLocalExpression table source resolved) :
+    LocalExpressionHasType table context source type ↔ Resolved.HasType context resolved type :=
+  ⟨resolution.preserves_type, resolution.reflects_type⟩
+
+theorem localExpressionHasType_iff_resolves {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {type : Core.Ty} :
+    LocalExpressionHasType table context source type ↔
+      ∃ resolved, ResolvesLocalExpression table source resolved ∧ Resolved.HasType context resolved type :=
+  ⟨LocalExpressionHasType.resolves, fun ⟨_, resolution, typing⟩ => resolution.reflects_type typing⟩
+
+/-- Every successful result retains its exact resolved expression, positional
+Core expression, and independently assigned type. -/
+theorem elaborateLocalExpression?_sound {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
+    (accepted : elaborateLocalExpression? table context source = some (core, type)) :
+    ∃ resolved, ResolvesLocalExpression table source resolved ∧
+      Resolved.Lowers (Resolved.LocalScope.ids context) resolved core ∧
+      Resolved.HasType context resolved type := by
+  simp only [elaborateLocalExpression?, bind, Option.bind_eq_some_iff, pure] at accepted
+  obtain ⟨resolved, resolution, actualCore, lowering, actualType, inferred, result⟩ := accepted
+  cases result
+  have lowered := Resolved.Expr.lower?_sound lowering
+  exact ⟨resolved, resolveLocalExpression?_sound resolution, lowered,
+    lowered.reflects_type (Core.infer_sound inferred)⟩
+
+theorem elaborateLocalExpression?_complete {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {resolved : Resolved.Expr} {core : Core.Expr} {type : Core.Ty}
+    (resolution : ResolvesLocalExpression table source resolved)
+    (lowered : Resolved.Lowers (Resolved.LocalScope.ids context) resolved core)
+    (typing : Resolved.HasType context resolved type) :
+    elaborateLocalExpression? table context source = some (core, type) := by
+  simp [elaborateLocalExpression?, resolution.complete, lowered.complete,
+    Core.infer_complete (lowered.preserves_type typing)]
+
+theorem elaborateLocalExpression?_iff {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty} :
+    elaborateLocalExpression? table context source = some (core, type) ↔
+      ∃ resolved, ResolvesLocalExpression table source resolved ∧
+        Resolved.Lowers (Resolved.LocalScope.ids context) resolved core ∧
+        Resolved.HasType context resolved type :=
+  ⟨elaborateLocalExpression?_sound,
+    fun ⟨_, resolution, lowered, typing⟩ => elaborateLocalExpression?_complete resolution lowered typing⟩
+
+theorem localExpressionHasType_iff_elaborates {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {type : Core.Ty} :
+    LocalExpressionHasType table context source type ↔
+      ∃ core, elaborateLocalExpression? table context source = some (core, type) := by
+  constructor
+  · intro typing
+    obtain ⟨resolved, resolution, resolvedTyped⟩ := typing.resolves
+    obtain ⟨core, lowered, _⟩ := resolvedTyped.lowers
+    exact ⟨core, elaborateLocalExpression?_complete resolution lowered resolvedTyped⟩
+  · rintro ⟨core, accepted⟩
+    obtain ⟨resolved, resolution, _, typing⟩ := elaborateLocalExpression?_sound accepted
+    exact resolution.reflects_type typing
+
+theorem elaborateLocalExpression?_core_hasType {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
+    (accepted : elaborateLocalExpression? table context source = some (core, type)) :
+    Core.HasType (Resolved.LocalScope.values context) core type := by
+  obtain ⟨resolved, _, lowered, typing⟩ := elaborateLocalExpression?_sound accepted
+  exact lowered.preserves_type typing
+
+theorem LocalExpressionHasType.type_unique {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {left right : Core.Ty}
+    (first : LocalExpressionHasType table context source left)
+    (second : LocalExpressionHasType table context source right) : left = right := by
+  obtain ⟨resolved, resolution, typed⟩ := first.resolves
+  exact Resolved.typing_deterministic typed (resolution.preserves_type second)
+
+theorem elaborateLocalExpression?_type_unique {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} {leftCore rightCore : Core.Expr} {left right : Core.Ty}
+    (first : elaborateLocalExpression? table context source = some (leftCore, left))
+    (second : elaborateLocalExpression? table context source = some (rightCore, right)) : left = right :=
+  (localExpressionHasType_iff_elaborates.mpr ⟨leftCore, first⟩).type_unique
+    (localExpressionHasType_iff_elaborates.mpr ⟨rightCore, second⟩)
+
+/-- Failure includes unsupported/unmapped syntax, missing local IDs, and
+ill-typed conditionals; none is silently promoted to whole-language rejection. -/
+theorem elaborateLocalExpression?_eq_none_iff {table : LocalNameTable} {context : Resolved.Context}
+    {source : Syntax.Expr} : elaborateLocalExpression? table context source = none ↔
+      ¬ ∃ type, LocalExpressionHasType table context source type := by
+  constructor
+  · intro rejected ⟨type, typing⟩
+    obtain ⟨core, accepted⟩ := localExpressionHasType_iff_elaborates.mp typing
+    rw [rejected] at accepted
+    cases accepted
+  · intro missing
+    cases result : elaborateLocalExpression? table context source with
+    | none => rfl
+    | some pair =>
+        exact False.elim (missing ⟨pair.2, localExpressionHasType_iff_elaborates.mpr ⟨pair.1, result⟩⟩)
+
+end Solcore.Frontend
