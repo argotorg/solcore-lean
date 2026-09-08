@@ -156,13 +156,13 @@ type-only and runtime parameter inputs, singleton and terminal-conditional retur
 and restricted explicit
 function entries with value-free compilation. Independent source rules
 connect to checked Core execution. General source-program resolution, parser
-changes, and wire publication are not implied. Function entries support the
-nonrecursive singleton/terminal-conditional body union; compilation owner
+changes, and wire publication are not implied. Function entries support finite
+recursive terminal if/else trees with singleton-return leaves; compilation owner
 invariance requires no runtime argument inhabitants.
 Recursive terminal return trees additionally have independent static and
 selected-path evaluation/cost semantics with exact Core continuation paths,
 a checked body runner, recursive fuel bounds and genuine-state resumption.
 Injective identity relabeling retains full results; store replay retains value,
-cost and observation thresholds with each result's own store. Function-entry
-integration remains separate.
+cost and observation thresholds with each result's own store. Existing function
+entries reuse these recursive contracts with unchanged headers and parameters.
 -/

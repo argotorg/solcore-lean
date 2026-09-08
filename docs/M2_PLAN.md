@@ -267,7 +267,8 @@ thresholds, source bounds and genuine-state resumption lift from the original
 profiles. Full optional runner results are equal to the selected old runner,
 including failure and suspended states. Parsed tests retain actual values and
 original singleton behavior. The two conditional arms remain singleton bodies,
-not recursive unions; both shapes now connect to whole entries through ADR-0198.
+not recursive unions. ADR-0198 connected both shapes to whole entries; ADR-0208
+extends those entries to recursive trees without changing this body-only union.
 
 The body identity/store layer (ADR-0197) now gives injective exact-elaboration
 transport and unconditional optional checker/full same-fuel runner equality for
@@ -286,9 +287,10 @@ exact elaboration characterize all successful results, retain both whole arms
 and ordered Core `ifE` nodes, and prove Core typing, exact uniqueness and failure
 characterization without runtime values. Old successes embed exactly; complete
 Option equality only applies to old singleton/one-level shapes. Deep positive
-and negative parsed trees retain valid static parameters/header while contrasting
-unchanged old body/entry rejection. This static unit changes no existing
-acceptance or execution policy.
+and negative parsed trees retain valid static parameters/header. The unchanged
+old body-only checker still rejects deep trees, while ADR-0208 migrates valid
+deep entry rejection to exact compilation success. The static unit itself
+changed no existing acceptance or execution policy.
 
 Recursive selected-path evaluation/cost semantics (ADR-0205) now retain each
 condition and only its selected arm, exact stores and child costs plus two per
@@ -315,8 +317,8 @@ Raw value/cost replay needs no whole typing, while typed runner observations
 retain each run's own store and relate exhaustion presence, not checkpoint
 equality across stores. Deep skipped invalid subtrees still reject; noninjective
 first-match collisions are outside the ID law. The body modules remain acyclic
-and runtime-entry-independent. Entry integration remains separate, and existing
-executable adapters are unchanged.
+and runtime-entry-independent. Existing function entries reuse these contracts
+in ADR-0208 below; the old body-only adapters remain unchanged.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
@@ -327,16 +329,21 @@ multiple return lists, generics, where clauses, and modifiers stay outside this
 profile. Actual complete declarations exercise this boundary. Neither hand-built
 prepared records nor arbitrary source functions receive unconditional safety.
 
-Terminal entry integration (ADR-0198) connects the existing compiler/preparer to
-the common body checker and their independent provenance, typing and cost to
-the terminal judgments. Original singleton Core/value/store/cost behavior is
-retained. Valid explicit terminal if/else entries now compile and run using
-actual ordered arguments, with the same factorization, owner/store invariance,
-safe compiled execution and genuine-state resumption. The three entry-bound
-theorems explicitly migrate to `terminalReturnBodyFuelBound`; the unchanged old
-singleton bound cannot justify execution of conditionals. Both written arms are
-checked. Headers, parameter policy, nested/extra-statement rejection and the
-absence of general source-call/early-return semantics remain unchanged.
+Terminal entry integration (ADR-0198) initially connected the existing entry API
+to the nonrecursive union. ADR-0208 extends that same compiler/preparer to the
+recursive tree checker and exact provenance, typing and independent cost. Old
+accepted Core/value/store/cost and complete same-fuel observations are retained.
+The compiled/prepared layouts, header and complete parameter policies, actual
+value order, factorization, owner/store invariance and genuine resumption remain
+intact. Value-free compilation, parameter positions and type-table extension
+need no runtime inhabitants. Only the three entry fuel-bound statements migrate
+to `terminalReturnTreeFuelBound`; the old nonrecursive bound can be too small for
+a deep selected path. Whole checking still covers unselected deep children.
+Valid deep entry failures become exact successes; missing else, extra statements,
+nested-block wrappers, bad headers/arguments and mismatched arms remain rejected.
+Old body-only adapters and the absence of general source calls/early returns are
+unchanged. Independent and parsed entry consumers retain exact source Core,
+real arguments, asymmetric bounds and actual multi-chunk checkpoints.
 
 Arbitrary-position parameter semantics (ADR-0171) now connect source index `k`
 to identity `(owner, k)`, exact Core position `n - 1 - k`, and the original

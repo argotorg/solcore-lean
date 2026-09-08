@@ -658,8 +658,9 @@ Its full optional result equals the original runner at every fuel and store,
 including failed checks and complete suspended states. Independent and parsed
 consumers retain actual Unit/Word/Bool/cell/closure values, unequal arm costs,
 pending frames and invalid-unselected-arm rejection. Singleton execution keeps
-its original meaning; the entry integration below now uses this same interface
-for both body shapes while retaining its own header and parameter requirements.
+its original meaning. Entry integration initially used this union (ADR-0198)
+and now extends to recursive trees (ADR-0208), retaining its own header and
+parameter requirements.
 
 Body-level identity and store invariance now cover all three return profiles
 (ADR-0197). Injective ID relabeling preserves independent exact elaboration,
@@ -692,9 +693,10 @@ no runtime inhabitants. Deep invalid unselected branches remain rejected.
 Old singleton, one-level conditional and terminal-union successes embed with the
 same Core and type. Full optional-result equality is restricted to old body
 shapes, including failed expression checks. It is false for arbitrary bodies:
-a valid deeper tree is accepted here but rejected by the old nonrecursive body
-and function-entry adapters. Independent and parsed consumers retain that
-contrast with valid parameter and header evidence.
+a valid deeper tree is accepted here but rejected by the old nonrecursive
+body-only adapters. Entry consumers with valid parameter and header evidence
+now establish exact deep compilation success under ADR-0208; the old body-only
+rejection contrast is retained.
 
 The static layer is now complemented by independent recursive evaluation and
 cost semantics (ADR-0205). Only the selected arm is evaluated; a node costs its
@@ -755,14 +757,14 @@ deep invalid skipped branches alongside whole rejection, and distinguish full
 same-store ID invariance from cross-store observation laws. The new body modules
 have no runtime-function dependency or cycle.
 
-Function-entry integration remains separate. Existing checkers, compilation and
-runtime-entry policies are unchanged; no general early return, extra statements,
+Function entries now reuse the recursive tree contracts below (ADR-0208). Old
+body-only adapters stay unchanged; no general early return, extra statements,
 missing else, local declarations, calls or fallthrough are added.
 
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime
-parameters, and terminal return body in one entry (ADR-0170, ADR-0198). Independent exact
+parameters, and terminal return tree in one entry (ADR-0170, ADR-0198, ADR-0208). Independent exact
 preparation retains both the actual lowered Core and its declared return type,
 not merely some Core of that type. Success and failure correspond to this
 independent relation, and a whole-entry typing contract is distinct from
@@ -770,17 +772,28 @@ body-only typing. A Bool-return declaration with a Word body is rejected here
 while remaining a Word body at the existing body-only endpoint.
 
 The compiler, preparer, whole-entry typing and independent entry cost now use
-the common terminal-body judgments. Both singleton returns and explicit terminal
-if/else bodies are supported, with singleton returns in each arm. The original
-entry APIs and compiled/prepared record layouts are retained. Their exact-Core,
-type-only/actual-argument factorization, owner, store and checkpoint contracts
-extend to both shapes; the entry adds no transitions. Entry fuel-bound theorems
-now use `terminalReturnBodyFuelBound`, including the maximum arm for conditionals.
-The old singleton body's bound is still zero for a conditional and supplies no
-entry completion guarantee. Genuine invalid headers, parameters and unselected
-arms remain rejected; nested statement conditionals and extra statements remain
-outside this profile. Independent and parsed regressions retain actual argument
-values, unequal branch costs, nonempty stores and every checkpoint's own state.
+the recursive terminal return-tree judgments. Finite nested explicit if/else
+trees with singleton-return leaves extend the earlier nonrecursive union. The
+original entry APIs and compiled/prepared record layouts are retained. Exact-Core,
+type-only/actual-argument factorization, type-table extension, source parameter
+positions, owner, store and checkpoint contracts lift through the recursive
+body evidence; the entry adds no transitions or second value reversal.
+
+The three entry fuel-bound theorems now use `terminalReturnTreeFuelBound`, taking
+the maximum recursively at every node. A depth-two long path can cost seven while
+the old terminal-body bound is four, so that old bound is no longer an entry
+guarantee. Other generic entry theorem statements retain their premises and
+conclusions over the broadened judgments. Value-free compilation still requires
+no actual inhabitants, while safe execution requires real matching typed arguments
+and provenance. Same-typed wrong Core cannot replace the source's actual Core.
+
+Old singleton and one-level values, costs and complete same-fuel results remain
+unchanged. Valid deep entry rejection fixtures migrate to exact success; genuine
+invalid headers, parameters and unselected deep arms remain rejected. Extra
+statements, missing else and a block containing a separate nested block are
+still unsupported. Old nonrecursive body-only checking and bounds are unchanged.
+Independent and parsed regressions retain actual argument values, asymmetric
+selected costs, nonempty stores and genuine multi-chunk checkpoint states.
 
 The restricted header excludes generics, where clauses, and contract modifiers.
 No return clause means Unit; an explicit clause has exactly one supported
