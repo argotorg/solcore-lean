@@ -1167,6 +1167,16 @@ exactness but reaches the actual parenthesized noProgress invariant; completenes
 proves that neither independent atom outcome exists there. Recursive progress
 and totality remain distinct obligations.
 
+The actual selected core plus recovery now form a child-conditional public atom
+layer. Separate unrestricted collection/core/public ordinary laws require only
+successful child endIndex preservation, strict progress, bounded ordinary
+execution, body ordinary execution, and an explicit remaining-count bound.
+No validity or rejected carrier/source frame is needed for these totality laws.
+Soundness plus this totality gives bounded non-vacuous core/public trace existence,
+including an independent public remainder outcome. General recursive closure is
+still open. A changed-carrier consumer verifies that public boundary testing uses
+the failed tokens/endIndex after cursor-only rewind, not the original carrier.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

@@ -1578,6 +1578,26 @@ invariant. Completeness together with that exact execution rules out both
 independent trace outcomes for this input. Neither child ordinary execution nor
 joint uniqueness substitutes for the strict progress needed by collections.
 
+The selected core and public wrapper are now instantiated as one independent
+atom-layer trace relation over only nested-expression and block relations. Four
+trace laws use the corresponding child contracts and weak rejected file/end-byte
+frames; the separate full-window success context states stronger rejected-child
+frames explicitly. Raw groups/tuples, dot arguments/constructors, arrays, selected
+core, and public recovery additionally have ordinary execution on arbitrary States
+under an explicit remaining-count bound and a three-field nested contract:
+successful endIndex preservation, strict cursor progress, and bounded ordinary
+execution. The body needs only ordinary execution for this totality result.
+It does not require child validity, token/source/end-byte preservation, or any
+rejected-state frame. Combining totality with soundness separately establishes
+actual core/public traced outcomes and independent public outcomes under the
+same bound; this is not a completed general recursive expression parser.
+
+A changed-carrier reverse consumer now exercises a rejected child that replaces
+both the tokens and endIndex. The original opening parenthesis is not a boundary,
+but the failed carrier's leading semicolon is a boundary after cursor-only rewind.
+Exact core and public State/Failure equivalences retain that carrier, the child
+event, and arbitrary duplicate prior events without committing the terminal report.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it
