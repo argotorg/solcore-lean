@@ -1,7 +1,7 @@
 import Solcore.Frontend.RuntimeFunctionHeaderTypeExtensionProperties
 import Solcore.Frontend.RuntimeParameterDeclarationsTypeExtensionProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.TypedLetReturnBodyTypeExtensionProperties
+import Solcore.Frontend.TypedLetReturnTreeTypeExtensionProperties
 
 /-! Extending caller meanings preserves the complete compiled record. Exact
 body provenance is retained without introducing or supplying runtime values. -/

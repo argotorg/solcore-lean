@@ -24,7 +24,7 @@ theorem RuntimeFunctionPrepares.transport_argument_types {types : TypeNameTable}
     rw [← LocalInputs.context_ids, ← LocalInputs.context_ids, contextEq]
   have erased : rightInputs.toTypeInputs = left.inputs.toTypeInputs :=
     parameters.erase_values.result_unique preparation.parameters.erase_values
-  have body : TypedLetReturnBodyElaborates types owner rightInputs.toTypeInputs declaration.value.body
+  have body : TypedLetReturnTreeElaborates types owner rightInputs.toTypeInputs declaration.value.body
       left.core left.returnType := by
     rw [erased]
     exact preparation.body

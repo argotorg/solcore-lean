@@ -37,18 +37,19 @@ private theorem conditional_parameter_body_elaborates
           .returnStmt (some ⟨thenSpan, .identifier ⟨thenNameSpan, thenName.value⟩⟩)⟩]⟩
         (some ⟨elseBlockSpan, [⟨elseReturnSpan,
           .returnStmt (some ⟨elseSpan, .identifier ⟨elseNameSpan, elseName.value⟩⟩)⟩]⟩)⟩]⟩) :
-    TypedLetReturnBodyElaborates types owner inputs declaration.value.body
+    TypedLetReturnTreeElaborates types owner inputs declaration.value.body
       (.ifE (.var (declaration.value.signature.parameters.elements.length - 1 - conditionIndex))
         (.var (declaration.value.signature.parameters.elements.length - 1 - thenIndex))
         (.var (declaration.value.signature.parameters.elements.length - 1 - elseIndex))) type := by
   rw [bodyShape]
   obtain ⟨_, _, actualMeaning, _, named, found, indexed⟩ := declared.position conditionAt
   cases actualMeaning.type_unique conditionMeaning
-  exact .terminal (.conditional (.identifier named) (.var indexed) (.var found)
+  refine .conditional (.identifier named) ?_ (.var found)
     (.single (declared.reference_return_elaborates_at thenAt thenMeaning
       thenBlockSpan thenReturnSpan thenSpan thenNameSpan))
     (.single (declared.reference_return_elaborates_at elseAt elseMeaning
-      elseBlockSpan elseReturnSpan elseSpan elseNameSpan)))
+      elseBlockSpan elseReturnSpan elseSpan elseNameSpan))
+  exact .var (by simpa only [LocalTypeInputs.context_ids] using indexed)
 
 /-- All parameters and the whole header remain prerequisites, even when both
 arms select the same parameter or the Bool condition is also returned. -/
