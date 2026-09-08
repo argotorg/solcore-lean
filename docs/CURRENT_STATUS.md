@@ -390,8 +390,37 @@ returns and compare actual returned Core, full same-fuel expression results,
 nonempty stores, and bare-return zero/one boundaries. The body's inferred type
 is deliberately not a signature contract: a parsed Bool-return annotation with
 a Word-return body still gives Word at this body-only endpoint. Function calls,
-signature checking, general early returns, continuation unwinding, mutable
-locals, and loops remain separate, as do all wire interfaces.
+signature checking at this body-only endpoint, general early returns,
+continuation unwinding, mutable locals, and loops remain separate, as do all
+wire interfaces.
+
+### Explicit restricted runtime function entry
+
+An explicitly supplied canonical declaration now connects its header, runtime
+parameters, and single-return body in one entry (ADR-0170). Independent exact
+preparation retains both the actual lowered Core and its declared return type,
+not merely some Core of that type. Success and failure correspond to this
+independent relation, and a whole-entry typing contract is distinct from
+body-only typing. A Bool-return declaration with a Word body is rejected here
+while remaining a Word body at the existing body-only endpoint.
+
+The restricted header excludes generics, where clauses, and contract modifiers.
+No return clause means Unit; an explicit clause has exactly one supported
+named type with caller-provided meaning. Empty and multiple return lists are
+outside this entry, not classified as invalid source. Parameter arity, exact
+argument rows, types, names, and owner-relative identities retain the existing
+binding contract. No declaration lookup or global identity allocation is added.
+
+Checked-entry cost combines the independent preparation and existing raw body
+cost. The exact Core runner adds no transitions to that cost. Completion and
+exhaustion correspond to the same fixed-fuel thresholds; typed entry contracts
+supply a typed result, a preserved store, sufficient fuel, and fault exclusion.
+These guarantees require valid preparation, not a hand-built data record.
+Raw body evaluation remains unchanged, including its skipped-branch distinction
+from whole checking. Fully parsed declarations test accepted and rejected
+contracts, actual Core/input order, every fuel boundary, and typed closure or
+unallocated cell-reference returns. This external entry is not general function
+calling, mutable statement/control-flow semantics, or a new wire interface.
 
 ### Semantic Core
 

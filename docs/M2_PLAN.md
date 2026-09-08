@@ -183,12 +183,22 @@ in one Core transition; expression returns retain the exact child Core and fuel
 behavior. Whole body checking, runtime correspondence, typed execution, and
 fault exclusion are proved without inventing general return control. Parsed
 parameters and actual declaration bodies exercise the composition; the body
-endpoint does not yet check a declared return type or other signature contracts.
+endpoint deliberately does not check a declared return type or other signature
+contracts.
 
-The next semantic work should connect explicit signature return contracts to
-the parameter/body adapters, preserving the established execution correspondence
-and keeping general calls and control flow separate. It must not treat the resolved
-immutable expression binder as a decision about mutable source declarations.
+The explicit runtime entry (ADR-0170) now connects a restricted header's return
+contract, typed parameter binding, and exact body elaboration. Independent
+preparation characterizes success/failure and fixes the actual Core, while
+whole-entry typing and source cost characterize checked execution at each fuel.
+Absent returns mean Unit; one explicit named type is supported, but empty or
+multiple return lists, generics, where clauses, and modifiers stay outside this
+profile. Actual complete declarations exercise this boundary. Neither hand-built
+prepared records nor arbitrary source functions receive unconditional safety.
+
+Further frontend semantics should preserve exact identity, binding, and Core
+execution correspondence while extending supported expressions and declarations.
+General calls and control flow remain separate. The resolved immutable expression
+binder must not be treated as a decision about mutable source declarations.
 
 ### Source-to-AST coverage
 
