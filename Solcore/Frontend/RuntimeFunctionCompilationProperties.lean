@@ -27,7 +27,7 @@ theorem compileRuntimeFunction?_sound {types : TypeNameTable} {owner : Resolved.
     subst inferredType
     cases result
     exact ⟨interpretRuntimeFunctionHeader?_iff.mp header,
-      declareRuntimeParameters?_sound parameters, elaborateReturnBody?_elaborates body⟩
+      declareRuntimeParameters?_sound parameters, elaborateTerminalReturnBody?_elaborates body⟩
   next => cases result
 
 theorem compileRuntimeFunction?_iff {types : TypeNameTable} {owner : Resolved.DeclarationId}
@@ -71,6 +71,6 @@ theorem RuntimeFunctionCompiles.core_hasType {types : TypeNameTable} {owner : Re
     {declaration : Syntax.FunctionDecl} {compiled : CompiledRuntimeFunction}
     (compilation : RuntimeFunctionCompiles types owner declaration compiled) :
     Core.HasType (Resolved.LocalScope.values compiled.inputs.context) compiled.core compiled.returnType :=
-  elaborateReturnBody?_core_hasType compilation.body.complete
+  elaborateTerminalReturnBody?_core_hasType compilation.body.complete
 
 end Solcore.Frontend

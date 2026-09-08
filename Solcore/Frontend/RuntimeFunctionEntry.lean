@@ -1,6 +1,6 @@
 import Solcore.Frontend.RuntimeFunctionHeader
 import Solcore.Frontend.RuntimeParametersProperties
-import Solcore.Frontend.ReturnBodyElaboration
+import Solcore.Frontend.TerminalReturnBodyProperties
 
 /-! An explicitly supplied declaration, owner, type table, and typed arguments
 form one restricted external entry. This does not resolve or invoke source calls. -/
@@ -23,7 +23,7 @@ structure RuntimeFunctionPrepares (types : TypeNameTable) (owner : Resolved.Decl
   header : RuntimeFunctionHeader types declaration.value.signature prepared.returnType
   parameters : RuntimeParametersBind types owner declaration.value.signature.parameters.elements
     arguments prepared.inputs
-  body : ReturnBodyElaborates prepared.inputs.names prepared.inputs.context
+  body : TerminalReturnBodyElaborates prepared.inputs.names prepared.inputs.context
     declaration.value.body prepared.core prepared.returnType
 
 /-- The whole entry contract, distinct from checking the body by itself. -/
@@ -32,7 +32,7 @@ def RuntimeFunctionHasType (types : TypeNameTable) (owner : Resolved.Declaration
     (returnType : Core.Ty) : Prop :=
   ∃ inputs, RuntimeFunctionHeader types declaration.value.signature returnType ∧
     RuntimeParametersBind types owner declaration.value.signature.parameters.elements arguments inputs ∧
-    ReturnBodyHasType inputs.names inputs.context declaration.value.body returnType
+    TerminalReturnBodyHasType inputs.names inputs.context declaration.value.body returnType
 
 /-- Retain the body checker's returned Core only when it matches the explicit
 return contract. Unknown or unsupported components have no fallback meaning. -/
@@ -41,7 +41,7 @@ def prepareRuntimeFunction? (types : TypeNameTable) (owner : Resolved.Declaratio
     Option PreparedRuntimeFunction := do
   let returnType ← interpretRuntimeFunctionHeader? types declaration.value.signature
   let inputs ← bindRuntimeParameters? types owner declaration.value.signature.parameters.elements arguments
-  let (core, inferredType) ← elaborateReturnBody? inputs.names inputs.context declaration.value.body
+  let (core, inferredType) ← elaborateTerminalReturnBody? inputs.names inputs.context declaration.value.body
   if inferredType = returnType then
     return { inputs, core, returnType }
   else none

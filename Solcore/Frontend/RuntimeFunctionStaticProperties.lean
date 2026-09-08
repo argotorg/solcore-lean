@@ -21,7 +21,7 @@ theorem RuntimeFunctionPrepares.transport_argument_types {types : TypeNameTable}
     preparation.parameters.transport_types (rightInitial := .empty) rfl rfl sameArgumentTypes
   have idsEq : rightInputs.ids = left.inputs.ids := by
     rw [← LocalInputs.context_ids, ← LocalInputs.context_ids, contextEq]
-  have body : ReturnBodyElaborates rightInputs.names rightInputs.context declaration.value.body
+  have body : TerminalReturnBodyElaborates rightInputs.names rightInputs.context declaration.value.body
       left.core left.returnType := by
     rw [namesEq, contextEq]
     exact preparation.body
