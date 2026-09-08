@@ -50,8 +50,13 @@ Injective resolved-ID renaming preserves exact Core output, checker results,
 and named evaluation; a non-injective capture example fixes the limit of this
 guarantee. These proofs do not presume a source fresh-ID allocator.
 
-The next semantic work should extend resolution and connect canonical parsed
-syntax to independently typed resolved inputs, preserving binding identity and
+Canonical identifiers and grouping now have an exact explicit-table adapter
+to typed resolved references and Core variables (ADR-0155). The name table does
+not replace source scope construction. Execution correspondence retains exact
+identity-order alignment between the type context and runtime environment.
+
+The next semantic work should extend resolution beyond local references and
+connect more canonical parsed syntax to independently typed resolved inputs, preserving binding identity and
 the established Core execution correspondence. It must not treat the resolved
 immutable expression binder as a decision about mutable source declarations.
 

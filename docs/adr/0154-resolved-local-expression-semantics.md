@@ -66,7 +66,8 @@ This slice does not interpret numeric or string spelling, bind source `true`
 or `false`, resolve source operators or type classes, or assign mutable source
 `let` declarations the semantics of immutable expression binding. It has no
 imports, declaration collection, closures, mutable cells, data declarations,
-source type annotations, polymorphism, staging, or source-to-Resolved adapter.
+source type annotations, polymorphism, staging, or general source-to-Resolved adapter.
+ADR-0155 separately adds an explicit-table adapter for canonical local references.
 The literal constructors contain semantic values after a future frontend
 has performed the required interpretation and resolution.
 Open local tables may carry any existing Core type or value; an opaque cell
