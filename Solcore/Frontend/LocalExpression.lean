@@ -1,7 +1,8 @@
 import Solcore.Frontend.LocalReference
 
-/-! An additive canonical identifier/group/logical-negation/conditional adapter. Its explicit
-name table supplies all identities, including any bindings for `true` or `false`.
+/-! An additive canonical adapter for identifiers, grouping, conditionals, and
+the Boolean operators `!`, `&&`, and `||`. Its explicit name table supplies all
+identities, including any bindings for `true` or `false`.
 Literal interpretation, other operators, source bindings, and global resolution remain
 outside this fragment. Unsupported syntax is not a source-language rejection. -/
 
@@ -19,14 +20,20 @@ def resolveLocalExpression? (table : LocalNameTable) (source : Syntax.Expr) :
   | ⟨_, .group inner⟩ => resolveLocalExpression? table inner
   | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ =>
       (resolveLocalExpression? table operand).map (Resolved.Expr.unary .boolNot)
+  | ⟨_, .binary left ⟨_, .logicalAnd⟩ right⟩ => do
+      return .ifE (← resolveLocalExpression? table left)
+        (← resolveLocalExpression? table right) (.bool false)
+  | ⟨_, .binary left ⟨_, .logicalOr⟩ right⟩ => do
+      return .ifE (← resolveLocalExpression? table left) (.bool true)
+        (← resolveLocalExpression? table right)
   | ⟨_, .conditional condition _ thenBranch _ elseBranch⟩ => do
       return .ifE (← resolveLocalExpression? table condition)
         (← resolveLocalExpression? table thenBranch) (← resolveLocalExpression? table elseBranch)
   | _ => none
 termination_by sizeOf source
 
-/-- Independent structural resolution: all three conditional children must
-resolve, even though subsequent evaluation can select just one branch. -/
+/-- Independent structural resolution requires every written child, including
+both short-circuit operands. Inserted Boolean values are not source-name lookups. -/
 inductive ResolvesLocalExpression (table : LocalNameTable) :
     Syntax.Expr → Resolved.Expr → Prop where
   | identifier {span : Syntax.SourceSpan} {name : Syntax.Identifier} {id : Resolved.LocalId}
@@ -41,6 +48,20 @@ inductive ResolvesLocalExpression (table : LocalNameTable) :
       ResolvesLocalExpression table
         { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand }
         (.unary .boolNot resolvedOperand)
+  | logicalAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {resolvedLeft resolvedRight : Resolved.Expr}
+      (leftChild : ResolvesLocalExpression table left resolvedLeft)
+      (rightChild : ResolvesLocalExpression table right resolvedRight) :
+      ResolvesLocalExpression table
+        { span, value := .binary left ⟨operatorSpan, .logicalAnd⟩ right }
+        (.ifE resolvedLeft resolvedRight (.bool false))
+  | logicalOr {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {resolvedLeft resolvedRight : Resolved.Expr}
+      (leftChild : ResolvesLocalExpression table left resolvedLeft)
+      (rightChild : ResolvesLocalExpression table right resolvedRight) :
+      ResolvesLocalExpression table
+        { span, value := .binary left ⟨operatorSpan, .logicalOr⟩ right }
+        (.ifE resolvedLeft (.bool true) resolvedRight)
   | conditional {span question colon : Syntax.SourceSpan}
       {condition thenBranch elseBranch : Syntax.Expr}
       {resolvedCondition resolvedThen resolvedElse : Resolved.Expr}

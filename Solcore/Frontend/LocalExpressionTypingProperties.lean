@@ -3,8 +3,8 @@ import Solcore.Frontend.LocalExpressionResolutionProperties
 import Solcore.Resolved.TypingProperties
 
 /-! Independent canonical-fragment typing agrees exactly with resolved typing
-and the executable Core checker. All conditional branches are checked, even
-when dynamic evaluation would leave a branch unselected. -/
+and the executable Core checker. All conditional branches and short-circuit
+operands are checked, even when dynamic evaluation would skip them. -/
 
 set_option autoImplicit false
 
@@ -22,6 +22,14 @@ theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Reso
   | logicalNot _ ih =>
       obtain ⟨resolved, resolution, typed⟩ := ih
       exact ⟨_, .logicalNot resolution, .unary typed⟩
+  | logicalAnd _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .logicalAnd leftResolved rightResolved, .ifE leftTyped rightTyped .bool⟩
+  | logicalOr _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .logicalOr leftResolved rightResolved, .ifE leftTyped .bool rightTyped⟩
   | conditional _ _ _ conditionIH thenIH elseIH =>
       obtain ⟨condition, conditionResolved, conditionTyped⟩ := conditionIH
       obtain ⟨thenBranch, thenResolved, thenTyped⟩ := thenIH
@@ -42,6 +50,16 @@ theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context 
   | logicalNot _ ih =>
       cases typing with
       | unary operandTyped => exact .logicalNot (ih operandTyped)
+  | logicalAnd _ _ leftIH rightIH =>
+      cases typing with
+      | ifE leftTyped rightTyped falseTyped =>
+          cases falseTyped
+          exact .logicalAnd (leftIH leftTyped) (rightIH rightTyped)
+  | logicalOr _ _ leftIH rightIH =>
+      cases typing with
+      | ifE leftTyped trueTyped rightTyped =>
+          cases trueTyped
+          exact .logicalOr (leftIH leftTyped) (rightIH rightTyped)
   | conditional _ _ _ conditionIH thenIH elseIH =>
       cases typing with
       | ifE conditionTyped thenTyped elseTyped =>
@@ -136,7 +154,7 @@ theorem elaborateLocalExpression?_type_unique {table : LocalNameTable} {context 
     (localExpressionHasType_iff_elaborates.mpr ⟨rightCore, second⟩)
 
 /-- Failure includes unsupported/unmapped syntax, missing local IDs, and
-ill-typed negations or conditionals; none is promoted to whole-language rejection. -/
+ill-typed operands or conditionals; none is promoted to whole-language rejection. -/
 theorem elaborateLocalExpression?_eq_none_iff {table : LocalNameTable} {context : Resolved.Context}
     {source : Syntax.Expr} : elaborateLocalExpression? table context source = none ↔
       ¬ ∃ type, LocalExpressionHasType table context source type := by

@@ -2,7 +2,8 @@ import Solcore.Frontend.LocalExpression
 import Solcore.Frontend.LocalReferenceProperties
 
 /-! Exact structural resolution for the supported canonical expression fragment.
-All conditional children must resolve; branch selection belongs to evaluation. -/
+All written children must resolve, including short-circuit operands; branch
+selection belongs to evaluation. -/
 
 set_option autoImplicit false
 
@@ -17,6 +18,8 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
       simp only [resolveLocalExpression?, LocalNameTable.lookup?_iff.mpr found, Option.map_some]
   | group _ ih => simpa only [resolveLocalExpression?] using ih
   | logicalNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
+  | logicalAnd _ _ leftIH rightIH | logicalOr _ _ leftIH rightIH =>
+      simp [resolveLocalExpression?, leftIH, rightIH]
   | conditional _ _ _ conditionIH thenIH elseIH =>
       simp [resolveLocalExpression?, conditionIH, thenIH, elseIH]
 
@@ -44,6 +47,21 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
             cases same
             exact .logicalNot (resolveLocalExpression?_sound operandResult)
         | bitNot => simp only [resolveLocalExpression?, reduceCtorEq] at result
+      case binary left operator right =>
+        rcases operator with ⟨operatorSpan, operatorValue⟩
+        cases operatorValue <;> try simp only [resolveLocalExpression?, reduceCtorEq] at result
+        case logicalAnd =>
+          simp only [bind, Option.bind_eq_some_iff, pure] at result
+          obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+          cases same
+          exact .logicalAnd (resolveLocalExpression?_sound leftResult)
+            (resolveLocalExpression?_sound rightResult)
+        case logicalOr =>
+          simp only [bind, Option.bind_eq_some_iff, pure] at result
+          obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+          cases same
+          exact .logicalOr (resolveLocalExpression?_sound leftResult)
+            (resolveLocalExpression?_sound rightResult)
       case conditional condition question thenBranch colon elseBranch =>
         simp only [bind, Option.bind_eq_some_iff, pure] at result
         obtain ⟨resolvedCondition, conditionResult, resolvedThen, thenResult,
@@ -88,6 +106,9 @@ theorem resolveLocalExpression?_span (table : LocalNameTable) (source : Syntax.E
       case unary operator operand =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> simp only [resolveLocalExpression?]
+      case binary left operator right =>
+        rcases operator with ⟨operatorSpan, operatorValue⟩
+        cases operatorValue <;> simp only [resolveLocalExpression?]
 
 /-- Conditional punctuation and the outer range carry no resolution meaning. -/
 theorem resolveLocalExpression?_conditional_spans (table : LocalNameTable)
@@ -106,6 +127,22 @@ theorem resolveLocalExpression?_logicalNot_spans (table : LocalNameTable) (opera
     resolveLocalExpression? table { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand } =
       resolveLocalExpression? table
         { span := otherSpan, value := .unary ⟨otherOperatorSpan, .logicalNot⟩ operand } := by
+  simp only [resolveLocalExpression?]
+
+/-- Conjunction's generated false constant is independent of its source ranges. -/
+theorem resolveLocalExpression?_logicalAnd_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .logicalAnd⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .logicalAnd⟩ right } := by
+  simp only [resolveLocalExpression?]
+
+/-- Disjunction's generated true constant is independent of its source ranges. -/
+theorem resolveLocalExpression?_logicalOr_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .logicalOr⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .logicalOr⟩ right } := by
   simp only [resolveLocalExpression?]
 
 /-- Identifier spelling, not either occurrence range, selects the local ID. -/

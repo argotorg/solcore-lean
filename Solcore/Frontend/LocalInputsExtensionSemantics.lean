@@ -70,6 +70,22 @@ theorem AvoidsLocalName.bindFresh_hasType_iff {name : String} {source : Syntax.E
       · intro typing
         cases typing with
         | logicalNot child => exact .logicalNot (ih.mpr child)
+  | logicalAnd _ _ leftIH rightIH =>
+      constructor
+      · intro typing
+        cases typing with
+        | logicalAnd left right => exact .logicalAnd (leftIH.mp left) (rightIH.mp right)
+      · intro typing
+        cases typing with
+        | logicalAnd left right => exact .logicalAnd (leftIH.mpr left) (rightIH.mpr right)
+  | logicalOr _ _ leftIH rightIH =>
+      constructor
+      · intro typing
+        cases typing with
+        | logicalOr left right => exact .logicalOr (leftIH.mp left) (rightIH.mp right)
+      · intro typing
+        cases typing with
+        | logicalOr left right => exact .logicalOr (leftIH.mpr left) (rightIH.mpr right)
   | conditional _ _ _ conditionIH thenIH elseIH =>
       constructor
       · intro typing
@@ -122,6 +138,26 @@ theorem AvoidsLocalName.bindFresh_evaluates_iff {name : String} {source : Syntax
       · intro evaluation
         cases evaluation with
         | logicalNot child => exact .logicalNot (ih.mpr child)
+  | logicalAnd _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | andTrue left right => exact .andTrue (leftIH.mp left) (rightIH.mp right)
+        | andFalse left => exact .andFalse (leftIH.mp left)
+      · intro evaluation
+        cases evaluation with
+        | andTrue left right => exact .andTrue (leftIH.mpr left) (rightIH.mpr right)
+        | andFalse left => exact .andFalse (leftIH.mpr left)
+  | logicalOr _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | orTrue left => exact .orTrue (leftIH.mp left)
+        | orFalse left right => exact .orFalse (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | orTrue left => exact .orTrue (leftIH.mpr left)
+        | orFalse left right => exact .orFalse (leftIH.mpr left) (rightIH.mpr right)
   | conditional _ _ _ conditionIH thenIH elseIH =>
       constructor
       · intro evaluation

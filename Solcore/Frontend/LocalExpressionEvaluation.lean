@@ -2,9 +2,11 @@ import Solcore.Frontend.LocalExpression
 import Solcore.Frontend.LocalReferenceProperties
 import Solcore.Resolved.EvaluationProperties
 
-/-! Independent canonical evaluation for the local conditional/negation fragment.
+/-! Independent canonical evaluation for the local conditional/Boolean fragment.
 Evaluation requires only the selected branch, not whole-expression resolution.
-Both stores are explicit even though every constructor is store-preserving. -/
+Short-circuit forms forward any selected right value at this raw boundary;
+source typing separately requires both operands to be Boolean. Both stores are
+explicit even though every constructor is store-preserving. -/
 
 set_option autoImplicit false
 
@@ -28,6 +30,28 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       (child : LocalExpressionEvaluates table environment initialStore operand (.bool value) finalStore) :
       LocalExpressionEvaluates table environment initialStore
         { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand } (.bool (!value)) finalStore
+  | andTrue {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr} {value : Core.Value}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.bool true) middleStore)
+      (rightEvaluation : LocalExpressionEvaluates table environment middleStore right value finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .logicalAnd⟩ right } value finalStore
+  | andFalse {initialStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.bool false) finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .logicalAnd⟩ right } (.bool false) finalStore
+  | orTrue {initialStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.bool true) finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .logicalOr⟩ right } (.bool true) finalStore
+  | orFalse {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr} {value : Core.Value}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.bool false) middleStore)
+      (rightEvaluation : LocalExpressionEvaluates table environment middleStore right value finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .logicalOr⟩ right } value finalStore
   | ifTrue {initialStore middleStore finalStore : Core.Store}
       {span question colon : Syntax.SourceSpan} {condition thenBranch elseBranch : Syntax.Expr}
       {value : Core.Value}
@@ -54,9 +78,11 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
     finalStore = initialStore := by
   induction evaluation with
   | identifier => rfl
-  | group _ ih | logicalNot _ ih => exact ih
+  | group _ ih | logicalNot _ ih | andFalse _ ih | orTrue _ ih => exact ih
   | ifTrue _ _ conditionIH branchIH | ifFalse _ _ conditionIH branchIH =>
       exact branchIH.trans conditionIH
+  | andTrue _ _ leftIH rightIH | orFalse _ _ leftIH rightIH =>
+      exact rightIH.trans leftIH
 
 /-- No whole-resolution or typing premise is needed for source determinism. -/
 theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
@@ -80,6 +106,34 @@ theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
           obtain ⟨same, storeEq⟩ := ih child
           cases same
           exact ⟨rfl, storeEq⟩
+  | andTrue _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | andTrue leftChild rightChild =>
+          obtain ⟨_, rfl⟩ := leftIH leftChild
+          exact rightIH rightChild
+      | andFalse leftChild =>
+          obtain ⟨impossible, _⟩ := leftIH leftChild
+          cases impossible
+  | andFalse _ leftIH =>
+      cases rightEvaluation with
+      | andFalse leftChild => exact leftIH leftChild
+      | andTrue leftChild _ =>
+          obtain ⟨impossible, _⟩ := leftIH leftChild
+          cases impossible
+  | orTrue _ leftIH =>
+      cases rightEvaluation with
+      | orTrue leftChild => exact leftIH leftChild
+      | orFalse leftChild _ =>
+          obtain ⟨impossible, _⟩ := leftIH leftChild
+          cases impossible
+  | orFalse _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | orFalse leftChild rightChild =>
+          obtain ⟨_, rfl⟩ := leftIH leftChild
+          exact rightIH rightChild
+      | orTrue leftChild =>
+          obtain ⟨impossible, _⟩ := leftIH leftChild
+          cases impossible
   | ifTrue _ _ conditionIH branchIH =>
       cases rightEvaluation with
       | ifTrue condition branch =>

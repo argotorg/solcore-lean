@@ -26,6 +26,14 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | logicalNot _ ih =>
       cases evaluation with
       | logicalNot child => exact .unary (ih child) rfl
+  | logicalAnd _ _ leftIH rightIH =>
+      cases evaluation with
+      | andTrue leftChild rightChild => exact .ifTrue (leftIH leftChild) (rightIH rightChild)
+      | andFalse leftChild => exact .ifFalse (leftIH leftChild) .bool
+  | logicalOr _ _ leftIH rightIH =>
+      cases evaluation with
+      | orTrue leftChild => exact .ifTrue (leftIH leftChild) .bool
+      | orFalse leftChild rightChild => exact .ifFalse (leftIH leftChild) (rightIH rightChild)
   | conditional _ _ _ conditionIH thenIH elseIH =>
       cases evaluation with
       | ifTrue condition branch => exact .ifTrue (conditionIH condition) (thenIH branch)
@@ -50,6 +58,18 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
           case bool decision =>
             cases applied
             exact .logicalNot (ih child)
+  | logicalAnd _ _ leftIH rightIH =>
+      cases evaluation with
+      | ifTrue leftChild rightChild => exact .andTrue (leftIH leftChild) (rightIH rightChild)
+      | ifFalse leftChild constant =>
+          cases constant
+          exact .andFalse (leftIH leftChild)
+  | logicalOr _ _ leftIH rightIH =>
+      cases evaluation with
+      | ifTrue leftChild constant =>
+          cases constant
+          exact .orTrue (leftIH leftChild)
+      | ifFalse leftChild rightChild => exact .orFalse (leftIH leftChild) (rightIH rightChild)
   | conditional _ _ _ conditionIH thenIH elseIH =>
       cases evaluation with
       | ifTrue condition branch => exact .ifTrue (conditionIH condition) (thenIH branch)

@@ -3,7 +3,7 @@ import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Core.Safety
 
 /-! Direct source-level existence and type/store preservation for the local
-negation/conditional fragment. Identity order and positional environment typing
+Boolean/conditional fragment. Identity order and positional environment typing
 remain explicit; no closedness or general resolved-evaluation existence theorem is used. -/
 
 set_option autoImplicit false
@@ -36,6 +36,22 @@ theorem LocalExpressionHasType.evaluates
       obtain ⟨value, evaluation, valueTyped⟩ := ih
       obtain ⟨decision, rfl⟩ := valueTyped.bool_shape
       exact ⟨.bool (!decision), .logicalNot evaluation, .bool⟩
+  | logicalAnd _ _ leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
+      obtain ⟨decision, rfl⟩ := leftTyped.bool_shape
+      cases decision with
+      | false => exact ⟨.bool false, .andFalse leftEvaluation, .bool⟩
+      | true =>
+          obtain ⟨rightValue, rightEvaluation, rightTyped⟩ := rightIH
+          exact ⟨rightValue, .andTrue leftEvaluation rightEvaluation, rightTyped⟩
+  | logicalOr _ _ leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
+      obtain ⟨decision, rfl⟩ := leftTyped.bool_shape
+      cases decision with
+      | false =>
+          obtain ⟨rightValue, rightEvaluation, rightTyped⟩ := rightIH
+          exact ⟨rightValue, .orFalse leftEvaluation rightEvaluation, rightTyped⟩
+      | true => exact ⟨.bool true, .orTrue leftEvaluation, .bool⟩
   | conditional _ _ _ conditionIH thenIH elseIH =>
       obtain ⟨conditionValue, conditionEvaluation, conditionTyped⟩ := conditionIH
       obtain ⟨decision, rfl⟩ := conditionTyped.bool_shape

@@ -52,6 +52,22 @@ theorem AvoidsLocalName.resolves_cons_iff {name : String} {source : Syntax.Expr}
       · intro resolution
         cases resolution with
         | logicalNot child => exact .logicalNot (ih.mpr child)
+  | logicalAnd _ _ leftIH rightIH =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | logicalAnd left right => exact .logicalAnd (leftIH.mp left) (rightIH.mp right)
+      · intro resolution
+        cases resolution with
+        | logicalAnd left right => exact .logicalAnd (leftIH.mpr left) (rightIH.mpr right)
+  | logicalOr _ _ leftIH rightIH =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | logicalOr left right => exact .logicalOr (leftIH.mp left) (rightIH.mp right)
+      · intro resolution
+        cases resolution with
+        | logicalOr left right => exact .logicalOr (leftIH.mpr left) (rightIH.mpr right)
   | conditional _ _ _ conditionIH thenIH elseIH =>
       constructor
       · intro resolution
