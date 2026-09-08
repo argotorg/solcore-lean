@@ -14,6 +14,7 @@ import Solcore.Test.FrontendParsedLocalExpressions
 import Solcore.Test.FrontendLocalInputsProperties
 import Solcore.Test.FrontendLocalInputsExtensionProperties
 import Solcore.Test.FrontendLocalNegationProperties
+import Solcore.Test.FrontendLocalShortCircuitProperties
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler

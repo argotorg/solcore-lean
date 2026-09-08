@@ -139,5 +139,17 @@ example := @Solcore.Frontend.LocalExpressionHasType.logicalNot
 example := @Solcore.Frontend.LocalExpressionEvaluates.logicalNot
 example := @Solcore.Frontend.AvoidsLocalName.logicalNot
 example := @Solcore.Frontend.resolveLocalExpression?_logicalNot_spans
+example := @Solcore.Frontend.ResolvesLocalExpression.logicalAnd
+example := @Solcore.Frontend.ResolvesLocalExpression.logicalOr
+example := @Solcore.Frontend.LocalExpressionHasType.logicalAnd
+example := @Solcore.Frontend.LocalExpressionHasType.logicalOr
+example := @Solcore.Frontend.LocalExpressionEvaluates.andTrue
+example := @Solcore.Frontend.LocalExpressionEvaluates.andFalse
+example := @Solcore.Frontend.LocalExpressionEvaluates.orTrue
+example := @Solcore.Frontend.LocalExpressionEvaluates.orFalse
+example := @Solcore.Frontend.AvoidsLocalName.logicalAnd
+example := @Solcore.Frontend.AvoidsLocalName.logicalOr
+example := @Solcore.Frontend.resolveLocalExpression?_logicalAnd_spans
+example := @Solcore.Frontend.resolveLocalExpression?_logicalOr_spans
 
 end Tests

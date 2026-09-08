@@ -4,6 +4,9 @@
 - Decision date: 2026-09-08
 - Scope: additive Boolean negation in the internal local-expression adapter
 
+ADR-0159 subsequently extends this internal adapter with Boolean `&&` and `||`
+without changing the accepted negation semantics described here.
+
 ## Decision
 
 Extend ADR-0156's internal canonical local-expression adapter with the
