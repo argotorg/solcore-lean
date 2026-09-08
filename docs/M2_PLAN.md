@@ -148,7 +148,16 @@ have exactly that cost; checked and bundled execution complete iff fuel is at
 least that threshold and exhaust below it. Raw costs do not bypass whole
 checking. Terminal detection is free; nonterminal path lengths do not supply
 completion bounds. This is not a gas or frontend-time model and does not change
-any executable behavior or strengthen the input-invariance APIs.
+any executable behavior.
+
+Cost derivations now preserve their exact index under injective ID relabeling
+and unused-name fresh insertion (ADR-0166), including raw unresolved skipped
+branches. A typed-cost characterization of exhaustion yields same-fuel
+completion and exhaustion-presence invariance for input insertion. Old/new
+suspended states are separate; fuel-zero environments can differ. Same-spelling
+shadowing can retain the result but change the cost, protecting the avoidance
+premise. Parsed observations exercise the stronger fuel boundary without
+changing evaluation or source-name allocation.
 
 The next semantic work should extend the supported local-expression fragment
 to more canonical syntax and source scope construction, preserving binding identity and

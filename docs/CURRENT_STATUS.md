@@ -250,8 +250,9 @@ For a supported local expression that avoids the newly added
 spelling in every child, fresh insertion preserves and reflects source typing
 and evaluation, including the exact value and both stores. Checking changes
 only the free Core positions by one; the assigned type and failure boundary
-are unchanged. Completed runs therefore have the same observations. Their
-fuel witnesses may be separate; suspended states are not claimed identical.
+are unchanged. Completed runs have the same observations even at the same fuel;
+the exact-cost strengthening below also preserves exhaustion presence.
+Suspended states themselves are not claimed identical.
 Avoidance includes both short-circuit operands, even a skipped one. This
 condition is not a free-name analysis of unsupported syntax.
 
@@ -305,8 +306,25 @@ A return control with pending frames is not final, and recognizing an already
 final state needs zero transitions. Consumers protect those boundaries and all
 source cost formulas. These counts are not gas, elapsed time, frontend lookup
 or numeric-decoding complexity, nor the work performed by failing executions.
-The parser, evaluator, wire interfaces, and existing input-invariance APIs are
-unchanged.
+The parser, evaluator, and wire interfaces are unchanged.
+
+Source costs are also invariant under injective local-ID relabeling and fresh
+insertion of an avoided source spelling (ADR-0166). These proofs preserve raw
+cost derivations, including skipped unresolved branches, without adding a
+whole-resolution or typing requirement. The bundled runner now has a reusable
+exhaustion characterization: whole source typing plus a successful independent
+cost strictly above the supplied fuel is equivalent to a present exhausted
+result of that type.
+
+Combining those laws preserves completed type/value/store observations and
+exhaustion presence at identical fuel after unused input insertion. Old and new
+suspended states are quantified separately: their environments and free Core
+positions can differ, as a fuel-zero literal test demonstrates. Parsed tests
+compare these observations across multiple exact thresholds while keeping the
+existing stronger same-fuel full-state equality for ID relabeling. Fresh
+same-spelling shadowing can preserve a final Boolean value yet change cost
+from four to ten, so the unused-name premise cannot be dropped. This strengthens
+proof interfaces only, not executable behavior or allocation policy.
 
 ### Semantic Core
 

@@ -292,5 +292,10 @@ example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.orTrue
 example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.orFalse
 example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.ifTrue
 example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.ifFalse
+example := @Solcore.Frontend.localExpressionEvaluatesWithCost_mapIds_iff
+example := @Solcore.Frontend.AvoidsLocalName.bindFresh_cost_iff
+example := @Solcore.Frontend.LocalInputs.run?_outOfFuel_iff_typed_cost
+example := @Solcore.Frontend.AvoidsLocalName.bindFresh_run_done_at_fuel_iff
+example := @Solcore.Frontend.AvoidsLocalName.bindFresh_run_outOfFuel_iff
 
 end Tests

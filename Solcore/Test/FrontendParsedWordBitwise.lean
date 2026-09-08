@@ -77,13 +77,21 @@ private def operations : List (String × Core.BinaryOp × (Core.Word → Core.Wo
   [("&", .wordAnd, Core.Word.bitAnd, 136), ("|", .wordOr, Core.Word.bitOr, 238),
     ("^", .wordXor, Core.Word.bitXor, 102)]
 
+/-- Input insertion preserves completed observations and exhaustion presence,
+not the suspended states themselves. All other result fields remain exact. -/
+private def sameObservation (left right : Option (Core.Ty × Core.StatefulRunResult)) : Bool :=
+  match left, right with
+  | some (leftType, .outOfFuel _), some (rightType, .outOfFuel _) => decide (leftType = rightType)
+  | _, _ => decide (left = right)
+
 private def checkInputInvariance : IO Unit := do
   for choice in [false, true] do
     let supplied := inputs choice
     let extended := supplied.bindFresh owner "extra" .unit .unit .unit
     let renamed := extended.mapIds relabel relabel_injective
-    for content in ["a & b", "a | b", "a ^ b", "~a & (b | 0x0F)",
-        "c ? a & b : a ^ b", "0 & missing", "c | b", "0 ^ \"7\""] do
+    for content in ["7", "a & b", "a | b", "a ^ b", "~a & (b | 0x0F)",
+        "c ? a & b : a ^ b", "c && !c", "c || !c", "c ? 7 : missing",
+        "0 & missing", "c | b", "0 ^ \"7\""] do
       let source ← parsedExpression content
       assertTrue (decide (extended.check? source =
         (supplied.check? source).map (fun result => (result.1.weakenAt 0, result.2))))
@@ -92,9 +100,16 @@ private def checkInputInvariance : IO Unit := do
         s!"{content}: unused input changed a completed result or failed checking"
       assertTrue (decide (renamed.check? source = extended.check? source))
         s!"{content}: ID relabeling changed checked Core or type"
-      for fuel in [0, 4, 5, 7, 8, 13] do
+      for fuel in [0, 1, 3, 4, 5, 6, 7, 8, 13] do
+        assertTrue (sameObservation (extended.run? fuel source store) (supplied.run? fuel source store))
+          s!"{content}: unused input changed a same-fuel completion or exhaustion observation"
         assertTrue (decide (renamed.run? fuel source store = extended.run? fuel source store))
           s!"{content}: ID relabeling changed the result or exact suspended state"
+    let constant ← parsedExpression "7"
+    assertTrue (decide (extended.run? 0 constant store ≠ supplied.run? 0 constant store))
+      "input insertion should retain distinct initial environments when exhausted"
+    assertTrue (sameObservation (extended.run? 0 constant store) (supplied.run? 0 constant store))
+      "distinct suspended states must still have equal exhaustion observations"
 
 def frontendParsedWordBitwiseTests : IO Unit := do
   let supplied := inputs true
