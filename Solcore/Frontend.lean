@@ -79,6 +79,9 @@ import Solcore.Frontend.LocalExpressionFuelBound
 import Solcore.Frontend.LocalExpressionFuelBoundProperties
 import Solcore.Frontend.ReturnBodyFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
+import Solcore.Frontend.LocalExpressionResumptionProperties
+import Solcore.Frontend.ReturnBodyResumptionProperties
+import Solcore.Frontend.RuntimeFunctionResumptionProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,

@@ -645,6 +645,20 @@ argument values but can overestimate a selected path. It is neither a checker,
 an exact/minimal cost, nor a gas/time estimate; zero for unsupported syntax/body
 shapes does not bypass whole rejection or create an inhabitant of a declared type.
 
+Actual fuel-exhaustion checkpoints now support exact resumption (ADR-0183).
+The unchanged Core runner on a genuine checkpoint with additional fuel returns
+the same full result as the original state with the combined budget, without
+assuming typing or termination. A known final path of cost `cost` additionally
+proves `spent < cost` and exactly `cost - spent` remaining transitions, with
+both exact completion/exhaustion thresholds. Source cost correspondence lifts
+this residual path through resolved/checked expressions, singleton return
+bodies, complete runtime entries, and independently compiled functions.
+The original local/body/entry endpoints also agree with resumed actual Core
+results. This retains the actual control, frames, values, and store; it does
+not recreate an initial state, edit a checkpoint, recover faults, or resume host
+requests. Parsed tests cover every checkpoint on known paths, two/three-chunk
+full-result equality, exact residual thresholds, and a dropped-frame counterexample.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

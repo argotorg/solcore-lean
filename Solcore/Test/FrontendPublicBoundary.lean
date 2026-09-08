@@ -600,5 +600,17 @@ example := @Solcore.Frontend.LocalInputs.runReturnBody?_done_of_fuelBound
 example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.cost_le_fuelBound
 example := @Solcore.Frontend.RuntimeFunctionHasType.run_done_of_fuelBound
 example := @Solcore.Frontend.RuntimeFunctionCompiles.run_done_of_fuelBound
+example := @Solcore.Core.runStateful_resume
+example := @Solcore.Core.Steps.residual_of_outOfFuel
+example := @Solcore.Core.Steps.resumed_done_iff
+example := @Solcore.Core.Steps.resumed_outOfFuel_iff
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.residual_of_outOfFuel
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.checked_residual_of_outOfFuel
+example := @Solcore.Frontend.LocalInputs.run?_resume
+example := @Solcore.Frontend.ReturnBodyEvaluatesWithCost.checked_residual_of_outOfFuel
+example := @Solcore.Frontend.LocalInputs.runReturnBody?_resume
+example := @Solcore.Frontend.runRuntimeFunction?_resume
+example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.residual_of_outOfFuel
+example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.compiled_residual_of_outOfFuel
 
 end Tests

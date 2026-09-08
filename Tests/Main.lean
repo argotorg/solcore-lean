@@ -56,6 +56,8 @@ import Solcore.Test.FrontendStoreIndependenceProperties
 import Solcore.Test.FrontendParsedStoreIndependence
 import Solcore.Test.FrontendFuelBoundProperties
 import Solcore.Test.FrontendParsedFuelBounds
+import Solcore.Test.FrontendResumptionProperties
+import Solcore.Test.FrontendParsedResumption
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5591,6 +5593,7 @@ def run : IO Unit := do
   frontendParsedCompiledObservationTests
   frontendParsedStoreIndependenceTests
   frontendParsedFuelBoundTests
+  frontendParsedResumptionTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

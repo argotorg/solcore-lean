@@ -273,6 +273,14 @@ completion at every budget at least the bound, including proven compiled Core.
 The bound may exceed the selected path's exact cost and does not grant acceptance
 to unsupported syntax, invalid branches, or mismatched/uninhabited argument types.
 
+Exact checkpoint resumption (ADR-0183) joins genuine Core fuel exhaustion with
+source cost correspondence. Continuing the actual state agrees with one larger
+run in its full result; a known terminal cost yields the exact residual path
+and completion/exhaustion thresholds at `cost - spent`. Checked local/body/entry
+endpoints and proven compiled paths retain their original contracts, actual
+frames, values, and stores. No new runner or host-response protocol is added.
+Parsed multi-chunk tests distinguish resumption from discarding a pending frame.
+
 Binary Word addition (ADR-0176) now extends the expression fragment through
 existing body, entry, and value-free compilation bridges. Its independent
 rules require two Word operands, preserve strict left-to-right evaluation,
