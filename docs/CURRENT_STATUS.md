@@ -344,6 +344,31 @@ that boundary from malformed or partially consumed text. This prepares explicit
 parameter scope construction without yet adding function calls, source type
 declaration collection, general inference, or staging semantics.
 
+### Canonical runtime parameter inputs
+
+Canonical runtime parameters now construct the shared typed input tables
+(ADR-0168). The caller supplies the owner, explicit type-name meanings, and
+arguments carrying structural value-typing evidence. Exact arity, annotation
+meaning, and unused parameter spelling are required; comptime/recovery forms
+and unsupported or mismatched annotations remain outside this profile.
+
+An independent paired-list judgment characterizes executable success and
+failure. Its ordered row relation keeps each parameter with its exact argument
+type and value, even when several arguments share a type. Generated IDs run
+from zero in source order; prepending makes the final tables reverse that
+order. Lengths, argument projections, per-index row correspondence, generated
+IDs, unique names, and initial-row preservation are proved. Existing lookup,
+checker, typed-environment, and runner guarantees apply to the resulting bundle.
+
+Actual parsed parameter lists and signature parameters now feed local-expression
+execution with exact Core positions, selected values, preserved nonempty stores,
+and completion/exhaustion thresholds. Consumers cover arity and duplicate-name
+failures, aliases, arbitrary ranges, typed captured closures, and unallocated
+cell references. A closure's declared type alone does not supply the structural
+evidence; structural reference typing does not imply store allocation. No new
+function-call, body/return, signature-constraint, argument-decoding, global
+allocation, or wire semantics are claimed.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

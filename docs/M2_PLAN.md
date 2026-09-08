@@ -167,10 +167,19 @@ normalization, implicit primitive names, type-argument interpretation, or
 global type collection is added. Parsed known, unknown, and unsupported types
 exercise this boundary independently of syntactic acceptance.
 
-The next semantic work should use this bridge for runtime parameter scope
-construction with explicitly typed supplied arguments, then extend the local
-expression and scope coverage while preserving binding identity and the
-established Core execution correspondence. It must not treat the resolved
+Runtime parameter input preparation (ADR-0168) now uses that bridge to construct
+`LocalInputs` from canonical runtime parameters and explicitly typed arguments.
+Independent paired binding specifies exact arity, annotation meaning, unused
+spellings, and matching value/type rows; it is equivalent to executable success.
+Source-order IDs, reversed table storage, per-position pairing, projections,
+and unique names are proved. Actual parsed parameter lists and signatures feed
+existing local-expression checking and execution without a new evaluator.
+Comptime, generic/signature constraints, function calls and returns, external
+argument validation, and global allocation are not inferred from this adapter.
+
+The next semantic work should extend canonical body and local-expression
+coverage while preserving binding identity and the established Core execution
+correspondence. It must not treat the resolved
 immutable expression binder as a decision about mutable source declarations.
 
 ### Source-to-AST coverage
