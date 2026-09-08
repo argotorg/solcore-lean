@@ -1,5 +1,6 @@
 import Solcore.Frontend.RuntimeParametersStaticProperties
 import Solcore.Frontend.RuntimeFunctionEntryProperties
+import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 
 /-! Equal ordered argument types preserve exact static preparation, including
 failure. Runtime environments, results, suspended states, and costs may differ. -/
@@ -21,9 +22,11 @@ theorem RuntimeFunctionPrepares.transport_argument_types {types : TypeNameTable}
     preparation.parameters.transport_types (rightInitial := .empty) rfl rfl sameArgumentTypes
   have idsEq : rightInputs.ids = left.inputs.ids := by
     rw [← LocalInputs.context_ids, ← LocalInputs.context_ids, contextEq]
-  have body : TerminalReturnTreeElaborates rightInputs.names rightInputs.context declaration.value.body
+  have erased : rightInputs.toTypeInputs = left.inputs.toTypeInputs :=
+    parameters.erase_values.result_unique preparation.parameters.erase_values
+  have body : TypedLetReturnBodyElaborates types owner rightInputs.toTypeInputs declaration.value.body
       left.core left.returnType := by
-    rw [namesEq, contextEq]
+    rw [erased]
     exact preparation.body
   exact ⟨⟨rightInputs, left.core, left.returnType⟩, ⟨preparation.header, parameters, body⟩,
     idsEq, namesEq, contextEq, rfl, rfl⟩

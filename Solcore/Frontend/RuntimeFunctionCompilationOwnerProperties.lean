@@ -1,6 +1,6 @@
 import Solcore.Frontend.RuntimeParameterDeclarationsOwnerProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.TerminalReturnTreeRenamingProperties
+import Solcore.Frontend.TypedLetReturnBodyOwnerProperties
 
 /-! Value-free compilation retains its exact Core, declared type and ordered
 parameter types across owners. Identity-bearing inputs are relabeled, not equated. -/
@@ -9,7 +9,7 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
-/-- Static declaration and whole recursive-body evidence transport directly.
+/-- Static declaration and whole typed let-prefix evidence transport directly.
 No actual arguments or inhabitants of the parameter types are required. -/
 theorem RuntimeFunctionCompiles.mapOwner {types : TypeNameTable} {owner : Resolved.DeclarationId}
     {declaration : Syntax.FunctionDecl} {compiled : CompiledRuntimeFunction}
@@ -20,8 +20,7 @@ theorem RuntimeFunctionCompiles.mapOwner {types : TypeNameTable} {owner : Resolv
       { compiled with inputs := (compiled.inputs.mapIds (ownerLocalIdMap mapping)
           (ownerLocalIdMap_injective mapping injective)) } := by
   refine ⟨compilation.header, compilation.parameters.map_owner mapping injective, ?_⟩
-  simp only [LocalTypeInputs.mapIds_names, LocalTypeInputs.mapIds_context]
-  exact compilation.body.mapIds (ownerLocalIdMap mapping) (ownerLocalIdMap_injective mapping injective)
+  exact compilation.body.mapOwner mapping injective
 
 private def swapOwner (left right owner : Resolved.DeclarationId) : Resolved.DeclarationId :=
   if owner = left then right else if owner = right then left else owner

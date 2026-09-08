@@ -1,6 +1,7 @@
 import Solcore.Frontend.RuntimeFunctionHeaderTypeExtensionProperties
 import Solcore.Frontend.RuntimeParameterDeclarationsTypeExtensionProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnBodyTypeExtensionProperties
 
 /-! Extending caller meanings preserves the complete compiled record. Exact
 body provenance is retained without introducing or supplying runtime values. -/
@@ -16,7 +17,8 @@ theorem RuntimeFunctionCompiles.extend_types {old new : TypeNameTable}
     (extension : TypeNameTable.Extends old new) :
     RuntimeFunctionCompiles new owner declaration compiled :=
   ⟨compilation.header.extend_types extension,
-    RuntimeParametersDeclare.extend_types compilation.parameters extension, compilation.body⟩
+    RuntimeParametersDeclare.extend_types compilation.parameters extension,
+    compilation.body.extend_types extension⟩
 
 theorem compileRuntimeFunction?_some_of_extends {old new : TypeNameTable}
     {owner : Resolved.DeclarationId} {declaration : Syntax.FunctionDecl}

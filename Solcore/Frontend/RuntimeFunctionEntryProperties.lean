@@ -29,7 +29,7 @@ theorem prepareRuntimeFunction?_sound {types : TypeNameTable} {owner : Resolved.
     subst inferredType
     cases result
     exact ⟨interpretRuntimeFunctionHeader?_iff.mp header,
-      bindRuntimeParameters?_sound parameters, elaborateTerminalReturnTree?_elaborates body⟩
+      bindRuntimeParameters?_sound parameters, elaborateTypedLetReturnBody?_elaborates body⟩
   next => cases result
 
 theorem prepareRuntimeFunction?_iff {types : TypeNameTable} {owner : Resolved.DeclarationId}
@@ -92,7 +92,8 @@ theorem RuntimeFunctionPrepares.core_hasType {types : TypeNameTable} {owner : Re
     {declaration : Syntax.FunctionDecl} {arguments : List TypedRuntimeArgument}
     {prepared : PreparedRuntimeFunction}
     (preparation : RuntimeFunctionPrepares types owner declaration arguments prepared) :
-    Core.HasType (Resolved.LocalScope.values prepared.inputs.context) prepared.core prepared.returnType :=
-  elaborateTerminalReturnTree?_core_hasType preparation.body.complete
+    Core.HasType (Resolved.LocalScope.values prepared.inputs.context) prepared.core prepared.returnType := by
+  simpa only [LocalInputs.toTypeInputs_context] using
+    elaborateTypedLetReturnBody?_core_hasType preparation.body.complete
 
 end Solcore.Frontend

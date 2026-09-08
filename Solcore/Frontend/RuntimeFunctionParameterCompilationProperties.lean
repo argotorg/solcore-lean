@@ -20,10 +20,11 @@ private theorem parameter_body_elaboration
     (meaning : TypeNameDenotes types annotation type)
     (bodyShape : declaration.value.body =
       ⟨blockSpan, [⟨returnSpan, .returnStmt (some ⟨span, .identifier ⟨nameSpan, name.value⟩⟩)⟩]⟩) :
-    TerminalReturnTreeElaborates inputs.names inputs.context declaration.value.body
+    TypedLetReturnBodyElaborates types owner inputs declaration.value.body
       (.var (declaration.value.signature.parameters.elements.length - 1 - index)) type := by
   rw [bodyShape]
-  exact .single (declared.reference_return_elaborates_at parameterAt meaning blockSpan returnSpan span nameSpan)
+  exact .terminal (.single
+    (declared.reference_return_elaborates_at parameterAt meaning blockSpan returnSpan span nameSpan))
 
 /-- Header and complete parameter declaration remain necessary even when the
 body returns only one parameter. Its source lookup supplies the positional bound. -/

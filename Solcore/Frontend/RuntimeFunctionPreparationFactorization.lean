@@ -19,9 +19,7 @@ theorem RuntimeFunctionPrepares.compiles {types : TypeNameTable} {owner : Resolv
     {prepared : PreparedRuntimeFunction}
     (preparation : RuntimeFunctionPrepares types owner declaration arguments prepared) :
     RuntimeFunctionCompiles types owner declaration prepared.toCompiled := by
-  refine ⟨preparation.header, preparation.parameters.erase_values, ?_⟩
-  simpa only [PreparedRuntimeFunction.toCompiled, LocalInputs.toTypeInputs_names,
-    LocalInputs.toTypeInputs_context] using preparation.body
+  exact ⟨preparation.header, preparation.parameters.erase_values, preparation.body⟩
 
 theorem RuntimeFunctionCompiles.prepare_arguments {types : TypeNameTable} {owner : Resolved.DeclarationId}
     {declaration : Syntax.FunctionDecl} {compiled : CompiledRuntimeFunction}
@@ -31,13 +29,9 @@ theorem RuntimeFunctionCompiles.prepare_arguments {types : TypeNameTable} {owner
     ∃ prepared, RuntimeFunctionPrepares types owner declaration arguments prepared ∧
       prepared.toCompiled = compiled := by
   obtain ⟨inputs, bound, erased⟩ := compilation.parameters.bind_typed_arguments arguments matchingTypes
-  have namesEq : inputs.names = compiled.inputs.names := by
-    rw [← LocalInputs.toTypeInputs_names, erased]
-  have contextEq : inputs.context = compiled.inputs.context := by
-    rw [← LocalInputs.toTypeInputs_context, erased]
   refine ⟨⟨inputs, compiled.core, compiled.returnType⟩,
     ⟨compilation.header, bound, ?_⟩, ?_⟩
-  · simpa only [namesEq, contextEq] using compilation.body
+  · simpa only [erased] using compilation.body
   · simp only [PreparedRuntimeFunction.toCompiled, erased]
 
 /-- A compiled record needs independent compilation evidence as well as the
