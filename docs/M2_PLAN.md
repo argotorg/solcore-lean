@@ -114,7 +114,7 @@ need no fresh allocation; semantic invariance still requires injectivity and
 duplicate IDs retain first-match behavior. The Core expansion remains in the
 eight-form local predicate. Raw skipped-child success does not excuse whole
 scope/type rejection. Explicit-ID builders remain unchanged. Canonical source
-`<` support and its negative-fixture migration are still the next adapter step.
+`<` support and its negative-fixture migration are completed below in ADR-0193.
 
 Canonical identifiers and grouping now have an exact explicit-table adapter
 to typed resolved references and Core variables (ADR-0155). The name table does
@@ -388,7 +388,18 @@ argument positions remain explicit. Independent typing/evaluation reflection
 peels both nodes and generic cost, store, fuel-bound, resumption and entry proofs
 cover the form. Relational precedence stays above equality and non-associative;
 mixed parsed forms still obey Word-only comparison/equality operand types.
-Division, remainder, other comparisons, unary signs, assignment, and general
+Unsigned Word `<` (ADR-0193) now uses the dedicated identity-free resolved form
+and the existing ordered two-let Core expansion. No temporary LocalIds are
+allocated; original operand order and arbitrary structural-map laws are retained.
+Independent source typing requires two Words and returns Bool; raw evaluation
+returns unsigned `decide (leftWord < rightWord)`. Cost and structural bounds add
+nine, with eleven-step leaves and genuine two/five/ten checkpoints retaining
+nine/six/one remaining steps. All generic static, dynamic, store, extension,
+resumption and compiled-entry contracts include the new form. Parsed arithmetic,
+conditional and Bool-returning entry tests retain actual arguments and provenance.
+Six obsolete `<` rejection fixtures migrate to unsupported `>=`, without changing
+precedence or parser rejection of chained comparisons.
+Division, remainder, `>=`, unary signs, assignment, and general
 overload policy remain separate.
 
 Further frontend semantics should preserve exact identity, binding, and Core

@@ -150,8 +150,8 @@ allocation problem; semantic map preservation keeps its existing injectivity
 premise, and duplicate IDs keep first-match lookup. The expansion still belongs
 to the eight-form Core predicate. Raw evaluation may skip an unresolved or
 ill-typed child, while whole lowering/typing still checks it. The explicit-ID
-builder remains available with its original hygiene contract. Canonical source
-`<` and its negative fixtures remain unchanged pending adapter integration.
+builder remains available with its original hygiene contract. That representation
+unit did not enable canonical source `<`; its adapter integration is described below.
 
 The resolved fragment alone is not a canonical source adapter. It does not interpret literal
 spelling, resolve `true`/`false` or overloaded operators, allocate source-wide IDs,
@@ -236,7 +236,7 @@ to checked execution. Tests distinguish this boundary from raw evaluation that
 skips a missing or unsupported operand, which still prevents whole checking.
 Parsed precedence, grouping, and nested right operands exercise exact fuel
 differences between selected and skipped paths. Comparisons other than unsigned
-Word `>`/`<=`/`==`/`!=` and arithmetic other than the separately specified Word addition,
+Word `>`/`<`/`<=`/`==`/`!=` and arithmetic other than the separately specified Word addition,
 subtraction, and multiplication remain unsupported.
 
 Word complement `~` is also supported as a fixed Word-only operation
@@ -360,6 +360,21 @@ cases and entry contracts retain actual arguments. Relational precedence remains
 non-associative and stronger than Word equality; a parsed comparison Bool cannot
 serve as a Word operand for another comparison or equality.
 
+Unsigned Word `<` now resolves to the dedicated identity-free resolved form
+(ADR-0193). Both original operands resolve under the same table and evaluate
+left to right exactly once. The Core expansion uses two positional lets, shifts
+the original right references and compares the retained right/left values with
+`wordGt`, yielding `decide (leftWord < rightWord)`. Both operands must be Words;
+equal values produce false and high-bit/max values retain unsigned order.
+Source cost and the structural fuel bound add nine to the child costs, so two
+leaves finish at eleven. Genuine checkpoints at two/five/ten retain the left
+value, right value and pending comparison, with nine/six/one steps remaining.
+All generic type/evaluation, arbitrary structural ID-map, input-extension,
+store, bound, resumption and compilation-provenance contracts are unchanged.
+Parsed arithmetic/conditional compositions and Bool-returning entries consume
+actual arguments. Six obsolete `<` rejection fixtures now use still-unsupported
+`>=`; parser precedence and chained-comparison rejection remain unchanged.
+
 ### Numeric spelling and strict Word interpretation
 
 An independent numeric-literal layer now gives whole canonical decimal and
@@ -461,7 +476,8 @@ No checking or executable-run premise is built into the cost relation.
 
 Identifiers and Word literals cost one; grouping adds nothing; unary operators
 add two. Strict Word arithmetic, bitwise, greater-than, and equality binaries
-cost both operands plus three; derived Word inequality and `<=` add five. A conditional
+cost both operands plus three; derived Word inequality and `<=` add five,
+and ordered Word `<` adds nine. A conditional
 costs its condition and selected branch plus two. Short-circuit selection costs
 both visited operands plus two; skipping the right costs the left plus three,
 including the generated Boolean constant. Both initial and final stores and
@@ -2504,7 +2520,7 @@ language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
 Semantic Core remain separate later stages. Canonical local references, Boolean
-operators, Word addition/subtraction/multiplication, bitwise operations, unsigned `>`/`<=` and Word equality/inequality, strict Word literals, and conditionals connect through the explicit-table adapters described above.
+operators, Word addition/subtraction/multiplication, bitwise operations, unsigned `>`/`<`/`<=` and Word equality/inequality, strict Word literals, and conditionals connect through the explicit-table adapters described above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 

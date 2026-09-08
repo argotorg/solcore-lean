@@ -679,5 +679,11 @@ example := @Solcore.Resolved.Lowers.wordLt
 example := @Solcore.Resolved.HasType.wordLt
 example := @Solcore.Resolved.Evaluates.wordLt
 example := @Solcore.Resolved.WellScoped.wordLt
+example := @Solcore.Frontend.ResolvesLocalExpression.less
+example := @Solcore.Frontend.LocalExpressionHasType.less
+example := @Solcore.Frontend.AvoidsLocalName.less
+example := @Solcore.Frontend.LocalExpressionEvaluates.less
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.less
+example := @Solcore.Frontend.resolveLocalExpression?_less_spans
 
 end Tests
