@@ -3,8 +3,8 @@ import Solcore.Frontend.TerminalReturnTreeEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
 
 /-! Recursive bodies are checked statically using actual parsed parameters.
-No values, tree execution, costs or recursive entry integration are assumed.
-Source depth, unlike the depth of its lowered Core, controls the old profile. -/
+No values, tree execution or costs are assumed by recursive entry compilation.
+Source depth, unlike the depth of its lowered Core, controls the old body profile. -/
 
 set_option autoImplicit false
 
@@ -184,10 +184,11 @@ private def checkFixture (fixture : TreeFixture) (type : Core.Ty) (annotation : 
     have _ := interpretRuntimeFunctionHeader?_iff.mp headerAt
     checkTree inputs block fixture.core type
     checkTree inputs source.value.body fixture.core type
+    assertTrue (decide ((compileRuntimeFunction? types owner source).map (fun result => (result.core, result.returnType)) =
+      some (fixture.core, type))) "value-free recursive entry compilation lost its exact body"
     if 1 < fixture.depth then
       assertTrue ((elaborateTerminalReturnBody? inputs.names inputs.context block).isNone &&
-        (elaborateTerminalReturnBody? inputs.names inputs.context source.value.body).isNone &&
-        (compileRuntimeFunction? types owner source).isNone) "new body-only tree support expanded an old adapter or entry"
+        (elaborateTerminalReturnBody? inputs.names inputs.context source.value.body).isNone) "recursive entry support expanded the old body adapter"
     else
       assertTrue (decide (elaborateTerminalReturnBody? inputs.names inputs.context block = some (fixture.core, type) ∧
         (compileRuntimeFunction? types owner source).map (fun result => (result.core, result.returnType)) =

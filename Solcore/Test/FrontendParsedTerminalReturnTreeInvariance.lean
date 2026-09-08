@@ -3,6 +3,7 @@ import Solcore.Frontend.TerminalReturnTreeRenamingProperties
 import Solcore.Frontend.TerminalReturnTreeStoreProperties
 import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
 import Solcore.Frontend.TerminalReturnTreeResumptionProperties
+import Solcore.Frontend.TerminalReturnBody
 import Solcore.Frontend.RuntimeFunctionCompilation
 import Solcore.Frontend.RuntimeFunctionEntry
 import Solcore.Frontend.LocalOwnerRenaming
@@ -194,12 +195,16 @@ private def fixture (content annotation : String) (left right : TypedRuntimeArgu
   assertTrue (decide (owned.ids = actual.ids.map (ownerLocalIdMap ownerShift) ∧
     owned.checkTerminalReturnTree? source.value.body = some (core, left.type))) "owner rebinding changed the actual body"
   if deep then
+    assertTrue (actual.checkTerminalReturnBody? source.value.body).isNone "recursive entry support changed the old body adapter"
     for selectedOwner in [owner, ownerShift owner] do
-      assertTrue ((compileRuntimeFunction? types selectedOwner source).isNone &&
-        (prepareRuntimeFunction? types selectedOwner source arguments).isNone) "identity replay broadened old deep entry policy"
+      assertTrue (decide ((compileRuntimeFunction? types selectedOwner source).map (fun result => (result.core, result.returnType)) =
+        some (core, left.type) ∧ (prepareRuntimeFunction? types selectedOwner source arguments).map (fun result =>
+          (result.core, result.returnType, result.inputs.environment.values)) = some (core, left.type, arguments.reverse.map (·.value))))
+        "recursive entry changed the exact owner-independent projection or actual values"
       for store in [firstStore, secondStore] do
         for fuel in [0, cost, bound, bound + 2] do
-          assertTrue (runRuntimeFunction? types selectedOwner source arguments fuel store).isNone "existing entry became recursive"
+          assertTrue (decide (runRuntimeFunction? types selectedOwner source arguments fuel store =
+            actual.runTerminalReturnTree? fuel source.value.body store)) "entry changed its same-fuel recursive body result"
 
 def frontendParsedTerminalReturnTreeInvarianceTests : IO Unit := do
   let content := "{if(c){if(d){return x;}else{return y;}}else{return x;}}"

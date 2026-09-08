@@ -64,7 +64,7 @@ private def compile (content : String) (core : Core.Expr) (type : Core.Ty)
       assertTrue (decide (compiled.core = core ∧ compiled.returnType = type ∧
         compiled.inputs.context.values = parameterTypes.reverse ∧ compiled.inputs.names = expectedNames ∧
         Core.infer? parameterTypes.reverse core = some type)) "wrong open Core, source IDs, or declared return type"
-      assertTrue (terminalReturnBodyFuelBound declaration.value.body == bound) "wrong integrated entry bound"
+      assertTrue (terminalReturnTreeFuelBound declaration.value.body == bound) "wrong integrated entry bound"
       match declaration.value.body.value with
       | [⟨_, .returnStmt _⟩] =>
           assertTrue (returnBodyFuelBound declaration.value.body == bound) "singleton source bound changed"
@@ -80,7 +80,7 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument)
     (value : Core.Value) (cost : Nat) : IO Unit := do
   let source := entry.declaration
   let compiled := entry.compiled
-  let bound := terminalReturnBodyFuelBound source.value.body
+  let bound := terminalReturnTreeFuelBound source.value.body
   assertTrue (decide (0 < cost ∧ cost ≤ bound)) "actual selected cost exceeded source budget"
   if matching : arguments.map (·.type) = compiled.inputs.context.values.reverse then
     let some prepared := prepareRuntimeFunction? types owner source arguments
@@ -89,7 +89,7 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument)
     assertTrue (decide (prepared.core = compiled.core ∧ prepared.returnType = compiled.returnType ∧
       prepared.inputs.names = compiled.inputs.names ∧ prepared.inputs.context.values = compiled.inputs.context.values ∧
       prepared.inputs.environment.values = arguments.reverse.map (·.value) ∧
-      prepared.inputs.checkTerminalReturnBody? source.value.body = some (compiled.core, compiled.returnType)))
+      prepared.inputs.checkTerminalReturnTree? source.value.body = some (compiled.core, compiled.returnType)))
       "preparation changed static projection, ordered actual values, or the original checked body"
     let expectedRows := (compiled.inputs.names.reverse.zip arguments).map fun (name, argument) =>
       (name.1, name.2, argument.type, argument.value)
@@ -103,7 +103,7 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument)
         have _ := entry.provenance.run_eq arguments matching fuel initialStore
         have _ := runRuntimeFunction?_owner_eq types owner otherOwner source arguments fuel initialStore
         assertTrue (decide (run fuel = some (compiled.returnType, Core.runStateful fuel initial) ∧
-          run fuel = prepared.inputs.runTerminalReturnBody? fuel source.value.body initialStore ∧
+          run fuel = prepared.inputs.runTerminalReturnTree? fuel source.value.body initialStore ∧
           run fuel = runRuntimeFunction? types otherOwner source arguments fuel initialStore))
           "entry wrapper or owner change altered the full same-fuel machine result"
         assertTrue (match run fuel with
@@ -147,7 +147,7 @@ private def rejectArguments (entry : Entry) (arguments : List TypedRuntimeArgume
     "negative actual arguments accidentally matched"
   assertTrue (prepareRuntimeFunction? types owner entry.declaration arguments).isNone "ordered argument guard bypassed"
   for store in stores do
-    for fuel in [0, terminalReturnBodyFuelBound entry.declaration.value.body, 60] do
+    for fuel in [0, terminalReturnTreeFuelBound entry.declaration.value.body, 60] do
       assertTrue (runRuntimeFunction? types otherOwner entry.declaration arguments fuel store).isNone
         "ample fuel or owner change bypassed actual argument guard"
 
@@ -158,7 +158,7 @@ private def reject (content : String) (location : Syntax.Parser.FunctionLocation
       [boolArg false, wordArg 7, wordArg 9], [boolArg true, wordArg 7, wordArg 9]] do
     assertTrue (prepareRuntimeFunction? types owner source arguments).isNone "rejected entry prepared actual arguments"
     for store in stores do
-      for fuel in [0, terminalReturnBodyFuelBound source.value.body, 60] do
+      for fuel in [0, terminalReturnTreeFuelBound source.value.body, 60] do
         assertTrue (runRuntimeFunction? types owner source arguments fuel store).isNone
           "whole header/parameter/arm rejection depended on fuel or selected value"
 
@@ -168,6 +168,10 @@ def frontendParsedTerminalRuntimeEntriesTests : IO Unit := do
   let units ← compile "function units(c: Bool){if(c){return;}else{return;}}"
     (.ifE (.var 0) .unit .unit) .unit [.bool] 4
   for choice in [false, true] do checkCase units [boolArg choice] .unit 4
+  let nested ← compile "function nested(c: Bool,t: Word,f: Word) returns (Word){if(c){if(c){return t;}else{return f;}}else{return f;}}"
+    (.ifE (.var 2) (.ifE (.var 2) (.var 1) (.var 0)) (.var 0)) .word [.bool, .word, .word] 7
+  for choice in [false, true] do
+    checkCase nested [boolArg choice, wordArg 7, wordArg 9] (.word (word (if choice then 7 else 9))) (if choice then 7 else 4)
   let short ← compile "function short(c: Bool,t: Word,f: Word) returns (Word){if(c){return ~t;}else{return f;}}"
     (.ifE (.var 2) (.unary .wordNot (.var 1)) (.var 0)) .word [.bool, .word, .word] 6
   let compare ← compile "function compare(c: Bool,t: Word,f: Word) returns (Bool){if(c){return t < f;}else{return t >= f;}}"
@@ -202,7 +206,7 @@ def frontendParsedTerminalRuntimeEntriesTests : IO Unit := do
     rejectArguments nominal [boolArg true, argument]
   for body in ["{}", "{if(c){return t;}}", "{if(c){return t;}else{return f;}return t;}",
       "{t; if(c){return t;}else{return f;}}", "{if(c){return t;return f;}else{return f;}}",
-      "{if(c){if(c){return t;}else{return f;}}else{return f;}}", "{if(t){return t;}else{return f;}}",
+      "{if(t){return t;}else{return f;}}",
       "{if(c){return t;}else{return c;}}", "{if(c){return;}else{return f;}}"] do
     reject ("function invalid(c: Bool,t: Word,f: Word) returns (Word)" ++ body)
   for invalid in ["missing", "c", "t + c", "t(c)", s!"{Core.wordModulus}"] do

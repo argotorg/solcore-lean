@@ -10,7 +10,7 @@ import Solcore.Resolved.LocalScopeProperties
 
 /-! Actual checked recursive bodies retain their full machine states. Small
 fixture-supplied branch scripts independently certify the selected source cost;
-the runtime-entry profile remains deliberately nonrecursive. -/
+the recursive entry retains these exact body runs while old adapters stay separate. -/
 
 set_option autoImplicit false
 
@@ -229,12 +229,15 @@ def frontendParsedTerminalReturnTreeRunnerTests : IO Unit := do
   assertTrue (decide (boundInputs.checkTerminalReturnTree? declaration.value.body = some (core, .word) ∧
     boundInputs.environment.values = arguments.reverse.map (·.value) ∧
     interpretRuntimeFunctionHeader? types declaration.value.signature = some .word) &&
-    (compileRuntimeFunction? types owner declaration).isNone && (prepareRuntimeFunction? types owner declaration arguments).isNone)
-    "recursive body runner silently broadened existing entry compilation/preparation"
+    decide ((compileRuntimeFunction? types owner declaration).map (fun result => (result.core, result.returnType)) = some (core, .word) ∧
+      (prepareRuntimeFunction? types owner declaration arguments).map (fun result =>
+        (result.core, result.returnType, result.inputs.environment.values)) = some (core, .word, arguments.reverse.map (·.value))))
+    "recursive entry compilation/preparation lost its exact body or actual ordered arguments"
   for store in stores do
     checked boundInputs declaration.value.body [true, false] core .word (.word (word 2)) 7 7 store
     for fuel in [0, 4, 7, 20] do
-      assertTrue (runRuntimeFunction? types owner declaration arguments fuel store).isNone "existing entry became recursive"
+      assertTrue (decide (runRuntimeFunction? types owner declaration arguments fuel store =
+        boundInputs.runTerminalReturnTree? fuel declaration.value.body store)) "entry added transitions or changed a genuine body state"
     let untyped : Resolved.Environment := actual.environment.map fun entry => (entry.1, .word (word 23))
     assertTrue (decide (untyped.ids = actual.context.ids)) "untyped boundary fixture lost identity alignment"
     let badState : Core.State := ⟨.ret (.word (word 23)), [.ifBranches (.ifE (.var 2) (.var 1) (.var 0)) (.var 1) untyped.values], store⟩

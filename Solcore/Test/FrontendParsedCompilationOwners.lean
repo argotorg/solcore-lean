@@ -96,7 +96,7 @@ private def accepted (content : String) (parameterTypes : List Core.Ty)
         assertTrue (decide (rows compiled.inputs = expectedRows ∧
           compiled.inputs.context.values = parameterTypes.reverse ∧
           Core.infer? parameterTypes.reverse core = some returnType ∧
-          elaborateTerminalReturnBody? compiled.inputs.names compiled.inputs.context source.value.body =
+          elaborateTerminalReturnTree? compiled.inputs.names compiled.inputs.context source.value.body =
             some (core, returnType))) "static rows, open Core typing, or original whole body changed"
         let mapping := ownerLocalIdMap shiftOwner
         let injective := ownerLocalIdMap_injective shiftOwner shiftOwnerInjective
@@ -142,6 +142,8 @@ def frontendParsedCompilationOwnersTests : IO Unit := do
     accepted ("function nominal(c: Bool,x: Opaque,y: Opaque) returns (Opaque)" ++ body)
       [.bool, .namedData ⟨91⟩, .namedData ⟨91⟩] (.ifE (.var 2) (.var 1) (.var 0)) (.namedData ⟨91⟩)
   accepted "function units(c: Bool){if(c){return;}else{return;}}" [.bool] (.ifE (.var 0) .unit .unit) .unit
+  accepted "function nested(c: Bool){if(c){if(c){return;}else{return;}}else{return;}}"
+    [.bool] (.ifE (.var 0) (.ifE (.var 0) .unit .unit) .unit) .unit
   accepted "function alias(c: Pkg /* same spelling */ . Flag,x: Word,y: Word,) returns (Word){if(c){return x / y;}else{return x % y;}}"
     [.bool, .word, .word] (.ifE (.var 2) (.binary .wordDiv (.var 1) (.var 0))
       (.binary .wordMod (.var 1) (.var 0))) .word
@@ -167,8 +169,7 @@ def frontendParsedCompilationOwnersTests : IO Unit := do
       "function missing(c: Bool,x: Opaque) returns (Opaque){if(c){return x;}else{return missing;}}",
       "function wrong(c: Bool,x: Opaque) returns (Opaque){if(c){return x;}else{return 0;}}",
       "function wrong(c: Word,x: Opaque) returns (Opaque){if(c){return x;}else{return x;}}",
-      "function noElse(c: Bool){if(c){return;}}", "function extra(c: Bool){if(c){return;}else{return;}return;}",
-      "function nested(c: Bool){if(c){if(c){return;}else{return;}}else{return;}}"] do
+      "function noElse(c: Bool){if(c){return;}}", "function extra(c: Bool){if(c){return;}else{return;}return;}"] do
     rejected content
   for content in ["function publicOnly() public {return;}", "function payableOnly() payable {return;}"] do
     rejected content .contract

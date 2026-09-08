@@ -208,6 +208,12 @@ def frontendParsedParameterCompilationTests : IO Unit := do
       | throw (IO.userError "exact theorem body shape became an unintended compiler restriction")
     assertTrue (decide (compiled.core = .ifE (.var 2) (.var 1) (.var 0) ∧
       compiled.returnType = .namedData ⟨91⟩)) "valid ternary-return compilation changed"
+  let some nested ← parsed? "function nested(c: Bool,x: Opaque) returns (Opaque){if(c){if(c){return x;}else{return x;}}else{return x;}}"
+    | throw (IO.userError "valid recursive body did not parse")
+  for owner in owners do
+    assertTrue (decide ((compileRuntimeFunction? types owner nested).map (fun result => (result.core, result.returnType)) =
+      some (.ifE (.var 1) (.ifE (.var 1) (.var 0) (.var 0)) (.var 0), .namedData ⟨91⟩)))
+      "exact one-level theorem premise became a recursive compiler restriction"
   for content in ["function generic<T>(x: Opaque) returns (Opaque){return x;}",
       "function mismatch(x: Opaque) returns (Word){return x;}", "function absent(x: Opaque){return x;}",
       "function empty(x: Opaque) returns (){return x;}", "function many(x: Opaque) returns (Opaque,Opaque){return x;}",
@@ -221,7 +227,6 @@ def frontendParsedParameterCompilationTests : IO Unit := do
       "function noElse(c: Bool,x: Opaque) returns (Opaque){if(c){return x;}}",
       "function extra(x: Opaque) returns (Opaque){return x;return x;}",
       "function extra(c: Bool,x: Opaque) returns (Opaque){if(c){return x;}else{return x;}return x;}",
-      "function nested(c: Bool,x: Opaque) returns (Opaque){if(c){if(c){return x;}else{return x;}}else{return x;}}",
       "function armExtra(c: Bool,x: Opaque) returns (Opaque){if(c){return x;}else{return x;return x;}}"] do
     rejected content
   rejected "function publicOnly(x: Opaque) public returns (Opaque){return x;}" .contract

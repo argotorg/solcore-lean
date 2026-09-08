@@ -104,7 +104,7 @@ private def checkEntry (content : String) (core : Core.Expr) (type : Core.Ty) (p
         compiled.inputs.context.values = parameterTypes.reverse ∧ Core.infer? parameterTypes.reverse core = some type ∧
         compiled.inputs.names = (names.zipIdx.map (fun (name, index) => (name, (⟨owner, index⟩ : Resolved.LocalId)))).reverse))
         "exact open Core, original source identities, or declared type changed"
-      assertTrue (terminalReturnBodyFuelBound source.value.body == bound) "entry's source bound changed"
+      assertTrue (terminalReturnTreeFuelBound source.value.body == bound) "entry's source bound changed"
       for (arguments, value, cost) in cases do
         if matching : arguments.map (·.type) = compiled.inputs.context.values.reverse then
           let some prepared := prepareRuntimeFunction? types owner source arguments
@@ -118,7 +118,7 @@ private def checkEntry (content : String) (core : Core.Expr) (type : Core.Ty) (p
             "preparation or injective relabeling changed actual arguments/Core/body"
           for store in stores do
             have _ := provenance.run_done_of_fuelBound arguments matching store
-              (terminalReturnBodyFuelBound source.value.body) (Nat.le_refl _)
+              (terminalReturnTreeFuelBound source.value.body) (Nat.le_refl _)
             let run := fun fuel => runRuntimeFunction? types owner source arguments fuel store
             checkMachine run core (arguments.reverse.map (·.value)) store type value cost bound
             for fuel in List.range (bound + 3) do
@@ -139,7 +139,7 @@ private def reject (content : String) (arguments : List TypedRuntimeArgument) : 
   assertTrue ((compileRuntimeFunction? types owner source).isNone &&
     (prepareRuntimeFunction? types owner source arguments).isNone) s!"{content}: invalid whole entry checked"
   for store in stores do
-    for fuel in [0, terminalReturnBodyFuelBound source.value.body, 50] do
+    for fuel in [0, terminalReturnTreeFuelBound source.value.body, 50] do
       assertTrue (runRuntimeFunction? types owner source arguments fuel store).isNone "rejection exposed an actual checkpoint"
 
 private def positions (symbol : String) (sourceOperator : Syntax.BinaryOp) (operator : Core.BinaryOp)
