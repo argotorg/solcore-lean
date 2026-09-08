@@ -860,6 +860,25 @@ This does not extend runtime-function entries or let prefixes inside branches,
 and adds no parser, Core, Wire, call, mutation, inference, default initialization
 or general source shadowing policy.
 
+### Typed local-declaration prefixes: store replay
+
+Independent prefix paths now replay from any replacement store with identical
+returned values and exact costs (ADR-0212). Each initializer is replayed in its
+original scope, and its actual value is retained in the tail's extended
+environment. Owner, names, IDs and value order stay fixed. Raw replay requires
+neither checking, usable annotation meanings, fresh spellings, aligned IDs nor
+typed values. Whole-source rejection therefore remains distinct from raw replay.
+
+Bidirectional raw/cost laws retain the necessary final-store-equals-initial-store
+condition. At the actual typed-input boundary, completed observations agree on
+returned type/value at the same fuel and carry their own initial stores; fuel
+exhaustion presence is equivalent. These laws keep whole checking and also cover
+rejected bodies. They do not equate complete results or suspended states across
+distinct stores. Genuine initializer/tail checkpoints must be resumed separately,
+retaining their own stores and captured values. Opaque cell/closure returns do
+not imply that reading cells or running arbitrary pending continuations is
+store-independent. No Core, entry, mutation or binding-policy extension is made.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime

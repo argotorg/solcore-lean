@@ -1078,6 +1078,13 @@ example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_single
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_conditional
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_conditional_singletons
 
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.change_store
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.change_store
+example := @Solcore.Frontend.typedLetReturnBodyEvaluates_store_iff
+example := @Solcore.Frontend.typedLetReturnBodyEvaluatesWithCost_store_iff
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_done_store_iff
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_outOfFuel_store_iff
+
 section RecursiveEntryContracts
 
 open Solcore Solcore.Frontend

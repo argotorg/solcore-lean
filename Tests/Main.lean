@@ -114,6 +114,8 @@ import Solcore.Test.FrontendTypedLetReturnBodyEvaluationProperties
 import Solcore.Test.FrontendParsedTypedLetReturnBodyEvaluation
 import Solcore.Test.FrontendTypedLetReturnBodyRunnerProperties
 import Solcore.Test.FrontendParsedTypedLetReturnBodyRunner
+import Solcore.Test.FrontendTypedLetReturnBodyStoreProperties
+import Solcore.Test.FrontendParsedTypedLetReturnBodyStore
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5672,6 +5674,7 @@ def run : IO Unit := do
   frontendParsedTypedLetReturnBodyTests
   frontendParsedTypedLetReturnBodyEvaluationTests
   frontendParsedTypedLetReturnBodyRunnerTests
+  frontendParsedTypedLetReturnBodyStoreTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

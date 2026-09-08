@@ -162,6 +162,7 @@ import Solcore.Frontend.TypedLetReturnBodyRunnerProperties
 import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
 import Solcore.Frontend.TypedLetReturnBodyRunnerEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnBodyStoreProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -182,6 +183,7 @@ Typed, initialized, non-shadowing local-declaration prefixes have a separate
 value-free static adapter with exact nested Core letE. Independent raw evaluation
 and cost correspond to the actual checked Core and exact continuation paths.
 A separate checked body runner adds exact fuel thresholds, a source-only bound
-and genuine-state resumption. No runtime-entry integration, type inference or
-broader source binding policy is added for this prefix profile.
+and genuine-state resumption. Store replay preserves values and costs, with
+each completed or suspended observation retaining its own store. No runtime-entry
+integration, type inference or broader binding policy is added for this profile.
 -/

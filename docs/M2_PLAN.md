@@ -367,6 +367,17 @@ every fuel. Source and parsed consumers retain asymmetric path/bound differences
 unsupported zero/nonzero budgets and incorrect-checkpoint counterexamples.
 No existing tree/entry, parser, Core, call or broader binding policy is changed.
 
+Typed-prefix store replay (ADR-0212) now transports independent raw paths and
+exact costs to arbitrary replacement stores, preserving each initializer's
+actual value in the extended environment. The body, owner, names and original
+runtime values stay fixed. No annotation meaning, checking, freshness or runtime
+typing is needed for raw replay. Bidirectional laws retain final-store equality.
+Typed body runners relate same-fuel done values with their own stores and
+exhaustion presence, keeping whole checking. Complete results/checkpoints at
+distinct stores are not equated; each genuine state is resumed separately.
+This is not general Core or arbitrary-continuation store independence, and does
+not extend source mutation, calls, inference, binding policy or runtime entries.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while
