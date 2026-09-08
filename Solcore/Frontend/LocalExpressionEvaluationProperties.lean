@@ -43,6 +43,12 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | multiply _ _ leftIH rightIH =>
       cases evaluation with
       | multiply leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
+  | divide _ _ leftIH rightIH =>
+      cases evaluation with
+      | divide leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
+  | modulo _ _ leftIH rightIH =>
+      cases evaluation with
+      | modulo leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
   | bitAnd _ _ leftIH rightIH =>
       cases evaluation with
       | bitAnd leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
@@ -136,6 +142,22 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
           case word.word leftWord rightWord =>
             cases applied
             exact .multiply (leftIH leftChild) (rightIH rightChild)
+  | divide _ _ leftIH rightIH =>
+      cases evaluation with
+      | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>
+          cases leftValue <;> cases rightValue <;>
+            simp only [Core.BinaryOp.apply, reduceCtorEq] at applied
+          case word.word leftWord rightWord =>
+            cases applied
+            exact .divide (leftIH leftChild) (rightIH rightChild)
+  | modulo _ _ leftIH rightIH =>
+      cases evaluation with
+      | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>
+          cases leftValue <;> cases rightValue <;>
+            simp only [Core.BinaryOp.apply, reduceCtorEq] at applied
+          case word.word leftWord rightWord =>
+            cases applied
+            exact .modulo (leftIH leftChild) (rightIH rightChild)
   | bitAnd _ _ leftIH rightIH =>
       cases evaluation with
       | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>

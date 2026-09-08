@@ -61,6 +61,20 @@ theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
           obtain ⟨sameRight, storeEq⟩ := rightIH rightChild
           cases sameLeft; cases sameRight
           exact ⟨rfl, storeEq⟩
+  | divide _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | divide leftChild rightChild =>
+          obtain ⟨sameLeft, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq⟩
+  | modulo _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | modulo leftChild rightChild =>
+          obtain ⟨sameLeft, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq⟩
   | bitAnd _ _ leftIH rightIH =>
       cases rightEvaluation with
       | bitAnd leftChild rightChild =>

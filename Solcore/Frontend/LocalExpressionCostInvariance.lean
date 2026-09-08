@@ -34,6 +34,8 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
     | add _ _ leftIH rightIH => exact .add leftIH rightIH
     | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
     | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
+    | divide _ _ leftIH rightIH => exact .divide leftIH rightIH
+    | modulo _ _ leftIH rightIH => exact .modulo leftIH rightIH
     | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
     | less _ _ leftIH rightIH => exact .less leftIH rightIH
     | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
@@ -63,6 +65,8 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
     | add _ _ leftIH rightIH => exact .add leftIH rightIH
     | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
     | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
+    | divide _ _ leftIH rightIH => exact .divide leftIH rightIH
+    | modulo _ _ leftIH rightIH => exact .modulo leftIH rightIH
     | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
     | less _ _ leftIH rightIH => exact .less leftIH rightIH
     | equal _ _ leftIH rightIH => exact .equal leftIH rightIH
@@ -165,6 +169,22 @@ theorem AvoidsLocalName.bindFresh_cost_iff {name : String} {source : Syntax.Expr
       · intro evaluation
         cases evaluation with
         | multiply left right => exact .multiply (leftIH.mpr left) (rightIH.mpr right)
+  | divide _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | divide left right => exact .divide (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | divide left right => exact .divide (leftIH.mpr left) (rightIH.mpr right)
+  | modulo _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | modulo left right => exact .modulo (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | modulo left right => exact .modulo (leftIH.mpr left) (rightIH.mpr right)
   | greater _ _ leftIH rightIH =>
       constructor
       · intro evaluation

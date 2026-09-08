@@ -62,6 +62,20 @@ theorem LocalExpressionHasType.evaluates
       | word =>
           cases rightTyped with
           | word => exact ⟨_, .multiply leftEvaluation rightEvaluation, .word⟩
+  | divide _ _ leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
+      obtain ⟨rightValue, rightEvaluation, rightTyped⟩ := rightIH
+      cases leftTyped with
+      | word =>
+          cases rightTyped with
+          | word => exact ⟨_, .divide leftEvaluation rightEvaluation, .word⟩
+  | modulo _ _ leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
+      obtain ⟨rightValue, rightEvaluation, rightTyped⟩ := rightIH
+      cases leftTyped with
+      | word =>
+          cases rightTyped with
+          | word => exact ⟨_, .modulo leftEvaluation rightEvaluation, .word⟩
   | bitAnd _ _ leftIH rightIH =>
       obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
       obtain ⟨rightValue, rightEvaluation, rightTyped⟩ := rightIH
