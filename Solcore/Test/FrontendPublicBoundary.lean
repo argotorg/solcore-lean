@@ -574,5 +574,8 @@ example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.compiled_run_done_
 example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.compiled_run_outOfFuel_iff
 example := @Solcore.Frontend.RuntimeFunctionCompiles.typed_compiled_execution
 example := @Solcore.Frontend.RuntimeFunctionCompiles.compiled_never_faults
+example := @Solcore.Frontend.RuntimeFunctionCompiles.returnType_eq_of_same_core
+example := @Solcore.Frontend.RuntimeFunctionCompiles.run_eq_of_same_core
+example := @Solcore.Frontend.RuntimeFunctionCompiles.cost_iff_of_same_core
 
 end Tests

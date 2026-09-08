@@ -600,6 +600,23 @@ same-type distinct values and source positions, zero/intermediate states,
 different-cost short-circuit paths, wrong arity/type order, whole rejection,
 and supplied closure/reference values without assuming type inhabitation.
 
+Independent compilations can now be compared across different declarations,
+type-name tables, and owners (ADR-0180). Equal ordered parameter types and exact
+compiled Core imply equal return types by Core typing uniqueness, and equal
+full runtime results for every shared actual argument list, fuel, and initial
+store. Mismatched argument lists are rejected on both sides. Names, generated
+identities, and complete static input records need not be equal. The same
+conditions transport independent function cost evidence in both directions,
+retaining the exact value, type, initial/final stores, and cost.
+
+This is conditional on proven compilation and exact Core/context equality;
+it does not infer those equalities from renamed source text. Independent and
+fully parsed pairs exercise renamed/aliased/grouped declarations, while
+counterexamples retain the necessary boundaries: unused parameters can change
+argument acceptance, adding zero preserves a final value but changes the Core
+and cost, and matching argument types cannot replace the actual supplied values.
+No optimizer, source transformation, runner, or evaluation relation is added.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

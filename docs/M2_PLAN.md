@@ -247,6 +247,15 @@ provenance and matching actual typed arguments. Cached-compilation regressions
 cover different values at equal types, argument order/arity, unequal short-circuit
 costs, and supplied closure/reference values without inventing inhabitants.
 
+Compiled observation invariance (ADR-0180) compares independently compiled
+declarations across source/type-table/owner differences. The same ordered type
+context and exact Core imply the same return type, full runtime results for
+all common actual arguments, and bidirectional independent cost evidence.
+The proof preserves both-sided guard rejection and exact suspended states;
+it does not infer Core equality from surface renaming or final-value agreement.
+Counterexamples distinguish context/arity changes, adding zero, and substituting
+different values with the same argument types. No new runner or relation is used.
+
 Binary Word addition (ADR-0176) now extends the expression fragment through
 existing body, entry, and value-free compilation bridges. Its independent
 rules require two Word operands, preserve strict left-to-right evaluation,
