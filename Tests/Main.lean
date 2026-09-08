@@ -96,6 +96,8 @@ import Solcore.Test.FrontendParameterDeclarationPositionProperties
 import Solcore.Test.FrontendParsedParameterPositions
 import Solcore.Test.FrontendParameterCompilationProperties
 import Solcore.Test.FrontendParsedParameterCompilation
+import Solcore.Test.FrontendTypeTableExtensionProperties
+import Solcore.Test.FrontendParsedTypeTableExtensions
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5645,6 +5647,7 @@ def run : IO Unit := do
   frontendParsedCompilationOwnersTests
   frontendParsedParameterPositionTests
   frontendParsedParameterCompilationTests
+  frontendParsedTypeTableExtensionTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

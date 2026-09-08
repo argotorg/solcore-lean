@@ -817,6 +817,29 @@ compilation, parser or runtime policy changes.
 
 ### Value-free restricted function compilation
 
+Type-name table extension now preserves already established annotation meanings
+and exact static compilation (ADR-0203). `TypeNameTable.Extends` preserves every
+first-match lookup, not merely entry membership. Arbitrary right append is safe,
+even with duplicate keys; fresh-key prepend is also safe. Same-meaning duplicate
+prepend can be safe without freshness, while meaning-changing shadowing is not
+an extension. Qualified component lists are never flattened into dotted strings.
+
+Independent annotation, return-clause, complete header and parameter-declaration
+evidence transports directly, including arbitrary initial static inputs. The same
+types retain the same allocated identities and row order. Compilation reuses its
+original exact body evidence and preserves the entire compiled record. Successful
+interpretation, declaration and compilation therefore preserve their exact results.
+One-way extension does not preserve failure: adding an unknown nominal type can
+enable static compilation without supplying any runtime value.
+
+Mutual extension gives full optional-result equality, including absence, for
+lookup, interpretation, parameter declaration and compilation. Nonidentical tables
+may satisfy this relation, including reordered distinct keys and pruned shadowed
+duplicates. Existing same-Core execution and cost contracts consume transported
+compilation evidence on common actual arguments, preserving rejection and genuine
+checkpoints without asserting prepared-record equality from a projection. No
+lookup, compiler, header/body or runtime policy changes.
+
 The restricted explicit function profile now compiles before runtime arguments
 are supplied (ADR-0175). Independent compilation combines the existing header
 meaning, type-only parameter declaration, and exact return-body elaboration.

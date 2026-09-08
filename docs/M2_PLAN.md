@@ -341,6 +341,17 @@ Tests distinguish equal types from equal source positions, combine owner transpo
 and retain sparse/mixed-owner, duplicate-initial-name and out-of-range boundaries.
 Static parameter success is not whole-function acceptance; executable policies stay fixed.
 
+Meaning-preserving type table extension (ADR-0203) now transports independent
+annotation, return/header, general static declaration and compilation evidence.
+The extension relation preserves first-match meanings, so right-appended duplicate
+entries are safe while meaning-changing prefix shadowing is not. Fresh prepend
+is sufficient but same-meaning duplicate prepend can also be safe. Exact successful
+results and complete compiled records remain unchanged, including nominal types
+without runtime inhabitants. Only mutual extension guarantees full Option equality;
+one-way extension may turn unknown-type rejection into success. Qualified keys,
+initial rows and generated IDs remain exact. Existing same-Core observation laws
+connect already compiled entries without changing lookup or execution policy.
+
 Value-free restricted function compilation (ADR-0175) now combines these
 static inputs with the existing header and exact return-body semantics. The
 independent compilation relation characterizes the executable compiler and

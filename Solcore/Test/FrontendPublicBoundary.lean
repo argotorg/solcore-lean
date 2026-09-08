@@ -889,6 +889,25 @@ example := @Solcore.Frontend.runtimeFunction_conditional_parameters_compiles
 example := @Solcore.Frontend.compileRuntimeFunction?_conditional_parameters
 example := @Solcore.Frontend.RuntimeFunctionCompiles.conditional_parameters_core
 
+example := @Solcore.Frontend.TypeNameTable.Extends
+example := @Solcore.Frontend.TypeNameTable.Extends.refl
+example := @Solcore.Frontend.TypeNameTable.Extends.trans
+example := @Solcore.Frontend.TypeNameTable.Extends.append_right
+example := @Solcore.Frontend.TypeNameTable.Extends.cons_fresh
+example := @Solcore.Frontend.TypeNameTable.lookup?_eq_of_mutual_extends
+example := @Solcore.Frontend.TypeNameDenotes.extend_types
+example := @Solcore.Frontend.interpretTypeName?_some_of_extends
+example := @Solcore.Frontend.interpretTypeName?_eq_of_mutual_extends
+example := @Solcore.Frontend.RuntimeReturnTypeDenotes.extend_types
+example := @Solcore.Frontend.RuntimeFunctionHeader.extend_types
+example := @Solcore.Frontend.RuntimeParametersDeclareFrom.extend_types
+example := @Solcore.Frontend.RuntimeParametersDeclare.extend_types
+example := @Solcore.Frontend.declareRuntimeParameters?_some_of_extends
+example := @Solcore.Frontend.declareRuntimeParameters?_eq_of_mutual_extends
+example := @Solcore.Frontend.RuntimeFunctionCompiles.extend_types
+example := @Solcore.Frontend.compileRuntimeFunction?_some_of_extends
+example := @Solcore.Frontend.compileRuntimeFunction?_eq_of_mutual_extends
+
 section TerminalEntryContracts
 
 open Solcore Solcore.Frontend
