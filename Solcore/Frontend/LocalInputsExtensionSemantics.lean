@@ -86,6 +86,30 @@ theorem AvoidsLocalName.bindFresh_hasType_iff {name : String} {source : Syntax.E
       · intro typing
         cases typing with
         | bitNot child => exact .bitNot (ih.mpr child)
+  | bitAnd _ _ leftIH rightIH =>
+      constructor
+      · intro typing
+        cases typing with
+        | bitAnd left right => exact .bitAnd (leftIH.mp left) (rightIH.mp right)
+      · intro typing
+        cases typing with
+        | bitAnd left right => exact .bitAnd (leftIH.mpr left) (rightIH.mpr right)
+  | bitOr _ _ leftIH rightIH =>
+      constructor
+      · intro typing
+        cases typing with
+        | bitOr left right => exact .bitOr (leftIH.mp left) (rightIH.mp right)
+      · intro typing
+        cases typing with
+        | bitOr left right => exact .bitOr (leftIH.mpr left) (rightIH.mpr right)
+  | bitXor _ _ leftIH rightIH =>
+      constructor
+      · intro typing
+        cases typing with
+        | bitXor left right => exact .bitXor (leftIH.mp left) (rightIH.mp right)
+      · intro typing
+        cases typing with
+        | bitXor left right => exact .bitXor (leftIH.mpr left) (rightIH.mpr right)
   | logicalAnd _ _ leftIH rightIH =>
       constructor
       · intro typing
@@ -170,6 +194,30 @@ theorem AvoidsLocalName.bindFresh_evaluates_iff {name : String} {source : Syntax
       · intro evaluation
         cases evaluation with
         | bitNot child => exact .bitNot (ih.mpr child)
+  | bitAnd _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | bitAnd left right => exact .bitAnd (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | bitAnd left right => exact .bitAnd (leftIH.mpr left) (rightIH.mpr right)
+  | bitOr _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | bitOr left right => exact .bitOr (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | bitOr left right => exact .bitOr (leftIH.mpr left) (rightIH.mpr right)
+  | bitXor _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | bitXor left right => exact .bitXor (leftIH.mp left) (rightIH.mp right)
+      · intro evaluation
+        cases evaluation with
+        | bitXor left right => exact .bitXor (leftIH.mpr left) (rightIH.mpr right)
   | logicalAnd _ _ leftIH rightIH =>
       constructor
       · intro evaluation

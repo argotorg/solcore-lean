@@ -34,6 +34,15 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | bitNot _ ih =>
       cases evaluation with
       | bitNot child => exact .unary (ih child) rfl
+  | bitAnd _ _ leftIH rightIH =>
+      cases evaluation with
+      | bitAnd leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
+  | bitOr _ _ leftIH rightIH =>
+      cases evaluation with
+      | bitOr leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
+  | bitXor _ _ leftIH rightIH =>
+      cases evaluation with
+      | bitXor leftChild rightChild => exact .binary (leftIH leftChild) (rightIH rightChild) rfl
   | logicalAnd _ _ leftIH rightIH =>
       cases evaluation with
       | andTrue leftChild rightChild => exact .ifTrue (leftIH leftChild) (rightIH rightChild)
@@ -76,6 +85,30 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
           case word value =>
             cases applied
             exact .bitNot (ih child)
+  | bitAnd _ _ leftIH rightIH =>
+      cases evaluation with
+      | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>
+          cases leftValue <;> cases rightValue <;>
+            simp only [Core.BinaryOp.apply, reduceCtorEq] at applied
+          case word.word leftWord rightWord =>
+            cases applied
+            exact .bitAnd (leftIH leftChild) (rightIH rightChild)
+  | bitOr _ _ leftIH rightIH =>
+      cases evaluation with
+      | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>
+          cases leftValue <;> cases rightValue <;>
+            simp only [Core.BinaryOp.apply, reduceCtorEq] at applied
+          case word.word leftWord rightWord =>
+            cases applied
+            exact .bitOr (leftIH leftChild) (rightIH rightChild)
+  | bitXor _ _ leftIH rightIH =>
+      cases evaluation with
+      | @binary _ _ _ _ _ _ _ leftValue rightValue _ leftChild rightChild applied =>
+          cases leftValue <;> cases rightValue <;>
+            simp only [Core.BinaryOp.apply, reduceCtorEq] at applied
+          case word.word leftWord rightWord =>
+            cases applied
+            exact .bitXor (leftIH leftChild) (rightIH rightChild)
   | logicalAnd _ _ leftIH rightIH =>
       cases evaluation with
       | ifTrue leftChild rightChild => exact .andTrue (leftIH leftChild) (rightIH rightChild)

@@ -41,6 +41,27 @@ theorem LocalExpressionHasType.evaluates
       obtain ⟨value, evaluation, valueTyped⟩ := ih
       cases valueTyped with
       | word => exact ⟨_, .bitNot evaluation, .word⟩
+  | bitAnd _ _ leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
+      obtain ⟨rightValue, rightEvaluation, rightTyped⟩ := rightIH
+      cases leftTyped with
+      | word =>
+          cases rightTyped with
+          | word => exact ⟨_, .bitAnd leftEvaluation rightEvaluation, .word⟩
+  | bitOr _ _ leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
+      obtain ⟨rightValue, rightEvaluation, rightTyped⟩ := rightIH
+      cases leftTyped with
+      | word =>
+          cases rightTyped with
+          | word => exact ⟨_, .bitOr leftEvaluation rightEvaluation, .word⟩
+  | bitXor _ _ leftIH rightIH =>
+      obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
+      obtain ⟨rightValue, rightEvaluation, rightTyped⟩ := rightIH
+      cases leftTyped with
+      | word =>
+          cases rightTyped with
+          | word => exact ⟨_, .bitXor leftEvaluation rightEvaluation, .word⟩
   | logicalAnd _ _ leftIH rightIH =>
       obtain ⟨leftValue, leftEvaluation, leftTyped⟩ := leftIH
       obtain ⟨decision, rfl⟩ := leftTyped.bool_shape

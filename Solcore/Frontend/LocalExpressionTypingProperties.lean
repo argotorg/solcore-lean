@@ -26,6 +26,18 @@ theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Reso
   | bitNot _ ih =>
       obtain ⟨resolved, resolution, typed⟩ := ih
       exact ⟨_, .bitNot resolution, .unary typed⟩
+  | bitAnd _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .bitAnd leftResolved rightResolved, .binary leftTyped rightTyped⟩
+  | bitOr _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .bitOr leftResolved rightResolved, .binary leftTyped rightTyped⟩
+  | bitXor _ _ leftIH rightIH =>
+      obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
+      obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
+      exact ⟨_, .bitXor leftResolved rightResolved, .binary leftTyped rightTyped⟩
   | logicalAnd _ _ leftIH rightIH =>
       obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
       obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
@@ -60,6 +72,15 @@ theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context 
   | bitNot _ ih =>
       cases typing with
       | unary operandTyped => exact .bitNot (ih operandTyped)
+  | bitAnd _ _ leftIH rightIH =>
+      cases typing with
+      | binary leftTyped rightTyped => exact .bitAnd (leftIH leftTyped) (rightIH rightTyped)
+  | bitOr _ _ leftIH rightIH =>
+      cases typing with
+      | binary leftTyped rightTyped => exact .bitOr (leftIH leftTyped) (rightIH rightTyped)
+  | bitXor _ _ leftIH rightIH =>
+      cases typing with
+      | binary leftTyped rightTyped => exact .bitXor (leftIH leftTyped) (rightIH rightTyped)
   | logicalAnd _ _ leftIH rightIH =>
       cases typing with
       | ifE leftTyped rightTyped falseTyped =>

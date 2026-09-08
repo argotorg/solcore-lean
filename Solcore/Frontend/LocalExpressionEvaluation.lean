@@ -6,8 +6,9 @@ import Solcore.Resolved.EvaluationProperties
 /-! Independent canonical evaluation for the local conditional/operator fragment.
 Evaluation requires only the selected branch, not whole-expression resolution.
 Short-circuit forms forward any selected right value at this raw boundary;
-source typing separately requires both operands to be Boolean. Both stores are
-explicit even though every constructor is store-preserving. Strict Word literals
+source typing separately requires both operands to be Boolean. Binary bitwise
+operations instead evaluate both Word operands once, in left-to-right order.
+Both stores are explicit even though every constructor is store-preserving. Strict Word literals
 return their independently denoted value without consulting caller tables. -/
 
 set_option autoImplicit false
@@ -42,6 +43,30 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       (child : LocalExpressionEvaluates table environment initialStore operand (.word value) finalStore) :
       LocalExpressionEvaluates table environment initialStore
         { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand } (.word value.bitNot) finalStore
+  | bitAnd {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.word leftValue) middleStore)
+      (rightEvaluation : LocalExpressionEvaluates table environment middleStore right (.word rightValue) finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .bitAnd⟩ right }
+        (.word (leftValue.bitAnd rightValue)) finalStore
+  | bitOr {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.word leftValue) middleStore)
+      (rightEvaluation : LocalExpressionEvaluates table environment middleStore right (.word rightValue) finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .bitOr⟩ right }
+        (.word (leftValue.bitOr rightValue)) finalStore
+  | bitXor {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.word leftValue) middleStore)
+      (rightEvaluation : LocalExpressionEvaluates table environment middleStore right (.word rightValue) finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .bitXor⟩ right }
+        (.word (leftValue.bitXor rightValue)) finalStore
   | andTrue {initialStore middleStore finalStore : Core.Store}
       {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr} {value : Core.Value}
       (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.bool true) middleStore)
@@ -94,6 +119,7 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
   | group _ ih | logicalNot _ ih | bitNot _ ih | andFalse _ ih | orTrue _ ih => exact ih
   | ifTrue _ _ conditionIH branchIH | ifFalse _ _ conditionIH branchIH =>
       exact branchIH.trans conditionIH
+  | bitAnd _ _ leftIH rightIH | bitOr _ _ leftIH rightIH | bitXor _ _ leftIH rightIH
   | andTrue _ _ leftIH rightIH | orFalse _ _ leftIH rightIH =>
       exact rightIH.trans leftIH
 
@@ -129,6 +155,27 @@ theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
       | bitNot child =>
           obtain ⟨same, storeEq⟩ := ih child
           cases same
+          exact ⟨rfl, storeEq⟩
+  | bitAnd _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | bitAnd leftChild rightChild =>
+          obtain ⟨sameLeft, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq⟩
+  | bitOr _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | bitOr leftChild rightChild =>
+          obtain ⟨sameLeft, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq⟩
+  | bitXor _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | bitXor leftChild rightChild =>
+          obtain ⟨sameLeft, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
           exact ⟨rfl, storeEq⟩
   | andTrue _ _ leftIH rightIH =>
       cases rightEvaluation with
