@@ -26,6 +26,9 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | logicalNot _ ih =>
       cases evaluation with
       | logicalNot child => exact .unary (ih child) rfl
+  | bitNot _ ih =>
+      cases evaluation with
+      | bitNot child => exact .unary (ih child) rfl
   | logicalAnd _ _ leftIH rightIH =>
       cases evaluation with
       | andTrue leftChild rightChild => exact .ifTrue (leftIH leftChild) (rightIH rightChild)
@@ -58,6 +61,13 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
           case bool decision =>
             cases applied
             exact .logicalNot (ih child)
+  | bitNot _ ih =>
+      cases evaluation with
+      | @unary _ _ _ _ _ operandValue _ child applied =>
+          cases operandValue <;> simp only [Core.UnaryOp.apply, reduceCtorEq] at applied
+          case word value =>
+            cases applied
+            exact .bitNot (ih child)
   | logicalAnd _ _ leftIH rightIH =>
       cases evaluation with
       | ifTrue leftChild rightChild => exact .andTrue (leftIH leftChild) (rightIH rightChild)

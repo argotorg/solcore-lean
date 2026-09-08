@@ -22,6 +22,9 @@ theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Reso
   | logicalNot _ ih =>
       obtain ⟨resolved, resolution, typed⟩ := ih
       exact ⟨_, .logicalNot resolution, .unary typed⟩
+  | bitNot _ ih =>
+      obtain ⟨resolved, resolution, typed⟩ := ih
+      exact ⟨_, .bitNot resolution, .unary typed⟩
   | logicalAnd _ _ leftIH rightIH =>
       obtain ⟨left, leftResolved, leftTyped⟩ := leftIH
       obtain ⟨right, rightResolved, rightTyped⟩ := rightIH
@@ -50,6 +53,9 @@ theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context 
   | logicalNot _ ih =>
       cases typing with
       | unary operandTyped => exact .logicalNot (ih operandTyped)
+  | bitNot _ ih =>
+      cases typing with
+      | unary operandTyped => exact .bitNot (ih operandTyped)
   | logicalAnd _ _ leftIH rightIH =>
       cases typing with
       | ifE leftTyped rightTyped falseTyped =>

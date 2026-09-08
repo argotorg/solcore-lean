@@ -17,7 +17,7 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
   | identifier found =>
       simp only [resolveLocalExpression?, LocalNameTable.lookup?_iff.mpr found, Option.map_some]
   | group _ ih => simpa only [resolveLocalExpression?] using ih
-  | logicalNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
+  | logicalNot _ ih | bitNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
   | logicalAnd _ _ leftIH rightIH | logicalOr _ _ leftIH rightIH =>
       simp [resolveLocalExpression?, leftIH, rightIH]
   | conditional _ _ _ conditionIH thenIH elseIH =>
@@ -46,7 +46,11 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
             obtain ⟨resolvedOperand, operandResult, same⟩ := result
             cases same
             exact .logicalNot (resolveLocalExpression?_sound operandResult)
-        | bitNot => simp only [resolveLocalExpression?, reduceCtorEq] at result
+        | bitNot =>
+            simp only [resolveLocalExpression?, Option.map_eq_some_iff] at result
+            obtain ⟨resolvedOperand, operandResult, same⟩ := result
+            cases same
+            exact .bitNot (resolveLocalExpression?_sound operandResult)
       case binary left operator right =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> try simp only [resolveLocalExpression?, reduceCtorEq] at result
@@ -127,6 +131,14 @@ theorem resolveLocalExpression?_logicalNot_spans (table : LocalNameTable) (opera
     resolveLocalExpression? table { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand } =
       resolveLocalExpression? table
         { span := otherSpan, value := .unary ⟨otherOperatorSpan, .logicalNot⟩ operand } := by
+  simp only [resolveLocalExpression?]
+
+/-- Word complement ignores its operator range and the enclosing expression range. -/
+theorem resolveLocalExpression?_bitNot_spans (table : LocalNameTable) (operand : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .unary ⟨otherOperatorSpan, .bitNot⟩ operand } := by
   simp only [resolveLocalExpression?]
 
 /-- Conjunction's generated false constant is independent of its source ranges. -/

@@ -1,8 +1,8 @@
 import Solcore.Frontend.LocalReference
 
 /-! An additive canonical adapter for identifiers, grouping, conditionals, and
-the Boolean operators `!`, `&&`, and `||`. Its explicit name table supplies all
-identities, including any bindings for `true` or `false`.
+the Boolean operators `!`, `&&`, and `||`, and Word complement `~`. Its explicit
+name table supplies all identities, including any bindings for `true` or `false`.
 Literal interpretation, other operators, source bindings, and global resolution remain
 outside this fragment. Unsupported syntax is not a source-language rejection. -/
 
@@ -20,6 +20,8 @@ def resolveLocalExpression? (table : LocalNameTable) (source : Syntax.Expr) :
   | ⟨_, .group inner⟩ => resolveLocalExpression? table inner
   | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ =>
       (resolveLocalExpression? table operand).map (Resolved.Expr.unary .boolNot)
+  | ⟨_, .unary ⟨_, .bitNot⟩ operand⟩ =>
+      (resolveLocalExpression? table operand).map (Resolved.Expr.unary .wordNot)
   | ⟨_, .binary left ⟨_, .logicalAnd⟩ right⟩ => do
       return .ifE (← resolveLocalExpression? table left)
         (← resolveLocalExpression? table right) (.bool false)
@@ -48,6 +50,12 @@ inductive ResolvesLocalExpression (table : LocalNameTable) :
       ResolvesLocalExpression table
         { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand }
         (.unary .boolNot resolvedOperand)
+  | bitNot {span operatorSpan : Syntax.SourceSpan}
+      {operand : Syntax.Expr} {resolvedOperand : Resolved.Expr}
+      (operandChild : ResolvesLocalExpression table operand resolvedOperand) :
+      ResolvesLocalExpression table
+        { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand }
+        (.unary .wordNot resolvedOperand)
   | logicalAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {resolvedLeft resolvedRight : Resolved.Expr}
       (leftChild : ResolvesLocalExpression table left resolvedLeft)

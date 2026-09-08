@@ -2,7 +2,7 @@ import Solcore.Frontend.LocalExpression
 import Solcore.Frontend.LocalReferenceProperties
 import Solcore.Resolved.EvaluationProperties
 
-/-! Independent canonical evaluation for the local conditional/Boolean fragment.
+/-! Independent canonical evaluation for the local conditional/operator fragment.
 Evaluation requires only the selected branch, not whole-expression resolution.
 Short-circuit forms forward any selected right value at this raw boundary;
 source typing separately requires both operands to be Boolean. Both stores are
@@ -30,6 +30,11 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       (child : LocalExpressionEvaluates table environment initialStore operand (.bool value) finalStore) :
       LocalExpressionEvaluates table environment initialStore
         { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand } (.bool (!value)) finalStore
+  | bitNot {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+      {operand : Syntax.Expr} {value : Core.Word}
+      (child : LocalExpressionEvaluates table environment initialStore operand (.word value) finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand } (.word value.bitNot) finalStore
   | andTrue {initialStore middleStore finalStore : Core.Store}
       {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr} {value : Core.Value}
       (leftEvaluation : LocalExpressionEvaluates table environment initialStore left (.bool true) middleStore)
@@ -78,7 +83,7 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
     finalStore = initialStore := by
   induction evaluation with
   | identifier => rfl
-  | group _ ih | logicalNot _ ih | andFalse _ ih | orTrue _ ih => exact ih
+  | group _ ih | logicalNot _ ih | bitNot _ ih | andFalse _ ih | orTrue _ ih => exact ih
   | ifTrue _ _ conditionIH branchIH | ifFalse _ _ conditionIH branchIH =>
       exact branchIH.trans conditionIH
   | andTrue _ _ leftIH rightIH | orFalse _ _ leftIH rightIH =>
@@ -103,6 +108,12 @@ theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
   | logicalNot _ ih =>
       cases rightEvaluation with
       | logicalNot child =>
+          obtain ⟨same, storeEq⟩ := ih child
+          cases same
+          exact ⟨rfl, storeEq⟩
+  | bitNot _ ih =>
+      cases rightEvaluation with
+      | bitNot child =>
           obtain ⟨same, storeEq⟩ := ih child
           cases same
           exact ⟨rfl, storeEq⟩
