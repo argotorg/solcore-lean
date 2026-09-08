@@ -1,6 +1,7 @@
 import Solcore.Syntax.Parser.Term
 import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Frontend.LocalInputsExecution
+import Solcore.Frontend.LocalInputsRenaming
 import Solcore.Resolved.Eval
 import Solcore.Core.Machine
 
@@ -31,6 +32,18 @@ private def environment (condition nestedCondition : Bool) : Resolved.Environmen
     (localId 3, .bool nestedCondition), (localId 4, word 0),
     (localId 5, .bool false), (localId 6, .bool true)]
 private def store : Core.Store := [word 91, .bool false]
+
+private def relabel (id : Resolved.LocalId) : Resolved.LocalId :=
+  { id with binderIndex := id.binderIndex + 10 }
+private theorem relabel_injective : Function.Injective relabel := by
+  intro left right same
+  cases left with
+  | mk leftOwner leftIndex =>
+      cases right with
+      | mk rightOwner rightIndex =>
+          have owners := congrArg Resolved.LocalId.owner same
+          have indices := Nat.add_right_cancel (congrArg Resolved.LocalId.binderIndex same)
+          cases owners; cases indices; rfl
 
 private def parsedExpression (content : String) : IO Syntax.Expr := do
   let file : Syntax.SourceFile := { id := ⟨.main, "parsed-local.sol"⟩, content }
@@ -119,6 +132,13 @@ private def checkBundledRun : IO Unit := do
     assertTrue (decide (extended.run? 6 conjunction store = inputs.run? 6 conjunction store ∧
       extended.run? 6 disjunction store = inputs.run? 6 disjunction store))
       "unused input insertion changed parsed short-circuit execution"
+    let renamed := extended.mapIds relabel relabel_injective
+    for checkedSource in [source, negatedSource, conjunction, disjunction, unsupported] do
+      assertTrue (decide (renamed.check? checkedSource = extended.check? checkedSource))
+        "identity relabeling changed parsed checked Core or type"
+      for fuel in [0, 2, 4, 6] do
+        assertTrue (decide (renamed.run? fuel checkedSource store = extended.run? fuel checkedSource store))
+          "identity relabeling changed a parsed result or exact suspended state"
 
 private def checkShortCircuitRuns : IO Unit := do
   let conjunction : Core.Expr := .ifE (.var 1) (.var 4) (.bool false)
