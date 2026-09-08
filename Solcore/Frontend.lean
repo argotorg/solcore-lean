@@ -89,6 +89,8 @@ import Solcore.Resolved.WordLessWithIdsEvaluationProperties
 import Solcore.Frontend.WordLessCostStepComposition
 import Solcore.Core.LocalFragment
 import Solcore.Core.LocalFragmentInsertionProperties
+import Solcore.Core.LocalFragmentTypingInsertionProperties
+import Solcore.Core.LocalFragmentInferenceInsertionProperties
 import Solcore.Resolved.LocalFragmentProperties
 
 /-!

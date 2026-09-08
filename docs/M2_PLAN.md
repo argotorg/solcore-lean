@@ -61,9 +61,9 @@ evaluation, and reflects evaluation under original right scoping. The first
 temporary is fresh for the outer scope and the two temporary IDs differ; the
 second may reuse an outer binding and source inner shadowing is retained.
 Exact continuation paths cost both children plus nine, with the weakened right
-path explicitly supplied. Canonical `<` integration and a restricted-Core exact
-insertion theorem remain separate; no hidden allocation changes the existing
-resolver's identity-map contract.
+path explicitly supplied. Canonical `<` integration remains separate; the
+restricted-Core insertion foundations below do not introduce hidden allocation
+or change the existing resolver's identity-map contract.
 
 The next prerequisite, exact untyped insertion for the local Core fragment
 (ADR-0188), is proved independently of Resolved correspondence. A structural
@@ -73,8 +73,17 @@ retained prefix while shifting free indices preserves and reflects exact
 evaluation values/stores, including under nested lets and for missing variables.
 Typing, scope, freshness and runtime-world premises are unnecessary. Closure
 creation/calls and cell access remain excluded even when a broader CellFree
-judgment holds; returned existing values remain arbitrary. Exact-cost transport,
-typing reflection and canonical `<` integration are still separate steps.
+judgment holds; returned existing values remain arbitrary. Exact-cost transport
+and canonical `<` integration are still separate steps.
+
+The static insertion counterpart (ADR-0189) now preserves and reflects exact
+typing and proves equal executable inference results, including rejection.
+Retained context prefixes extend with each actual let-bound type; arbitrary
+data definitions and inserted/context types require no runtime inhabitants or
+extra well-formedness premises. Explicit prefixes avoid the false unrestricted
+reflection claim for a clamped, out-of-range `Context.insertAt`. Every written
+conditional child still needs typing even if execution skips it. This is an
+independent Core prerequisite, not exact-cost insertion or source `<` support.
 
 Canonical identifiers and grouping now have an exact explicit-table adapter
 to typed resolved references and Core variables (ADR-0155). The name table does

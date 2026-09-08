@@ -101,6 +101,17 @@ and cell operations are outside the predicate. CellFree alone would be too broad
 a created lambda captures a different environment after insertion. No equality
 of suspended states, exact-cost transport or canonical `<` support is claimed.
 
+The same independent fragment now has exact retained-prefix typing reflection
+and inference-result equality (ADR-0189). Shifting free indices past an inserted
+type preserves and reflects the identical result type under arbitrary data
+definitions, including through nested lets. Executable inference retains both
+success and rejection. Neither inserted/context types nor runtime inhabitants
+need extra well-formedness assumptions. The position is fixed by the retained
+prefix: unrestricted out-of-range `Context.insertAt` reflection would be false
+because insertion clamps while weakening does not. All conditional children
+still require typing, even when execution skips a branch. This static result
+does not claim exact-cost transport or extend canonical operator support.
+
 The resolved fragment alone is not a canonical source adapter. It does not interpret literal
 spelling, resolve `true`/`false` or overloaded operators, allocate source-wide IDs,
 decide source shadowing or mutable-declaration semantics, or cover imports,

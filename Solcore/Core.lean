@@ -5,6 +5,8 @@ import Solcore.Core.ExactFuelProperties
 import Solcore.Core.FuelResumptionProperties
 import Solcore.Core.LocalFragment
 import Solcore.Core.LocalFragmentInsertionProperties
+import Solcore.Core.LocalFragmentTypingInsertionProperties
+import Solcore.Core.LocalFragmentInferenceInsertionProperties
 import Solcore.Core.Host
 import Solcore.Core.HostSafety
 import Solcore.Core.HostMachine

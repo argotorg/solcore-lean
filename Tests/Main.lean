@@ -68,6 +68,8 @@ import Solcore.Test.ResolvedWordLessWithIdsProperties
 import Solcore.Test.FrontendWordLessCostProperties
 import Solcore.Test.CoreLocalFragmentInsertionProperties
 import Solcore.Test.CoreLocalFragmentInsertionBoundary
+import Solcore.Test.CoreLocalFragmentTypingInsertionProperties
+import Solcore.Test.CoreLocalFragmentTypingInsertionBoundary
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
