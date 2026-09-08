@@ -1607,6 +1607,13 @@ core and recovery reports have equal payloads but only the original is committed
 Mixed lexical filtering drops the committed report/recovery event while retaining
 the protected name warning and arbitrary prior duplicates remain intact.
 
+Literal-child totality consumers now instantiate the three-field contract at
+every child budget. They cover overshot cursors, stored-but-hidden tokens, missing
+backing storage, exact end-byte failures, and the single report commitment at a
+numerical gap. Independent group/tuple derivations reconstruct full successful
+States even when source/window validity fails. These are one-layer consumers;
+the displayed loop and child bounds remain explicit.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

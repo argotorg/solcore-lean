@@ -1183,6 +1183,13 @@ unread right parentheses, name-success bypass, uncommitted boundary failures,
 and initial missing backing with exactly one committed original report. Lexical
 filtering explicitly distinguishes protected name events from recovery/report events.
 
+Real literal-child consumers discharge the minimal totality contract and exercise
+invalid numerical carriers without assuming ValidFor. Overshot/hidden ends retain
+the complete State, initial missing backing commits exactly one original report,
+and independent group/tuple traces reconstruct successes with arbitrary prior
+events. This keeps one-layer execution and its explicit budgets separate from
+recursive expression closure.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.
