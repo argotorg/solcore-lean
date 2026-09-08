@@ -190,7 +190,8 @@ def frontendParsedLocalExpressionEvaluatorTests : IO Unit := do
     contrast s!"0 {symbol} missing" actual none
     contrast s!"0 {symbol} c" actual none
     contrast s!"l {symbol} (c ? 0 : missing)" actual (some (w 0, 8))
-  for content in ["!l", "~c", "l + c", "c - r", "l && missing", "missing", "f(l)", "l.x", "l[0]", "[l]", "(l,r)", "\"7\""] do
+  checked "(l,r)" actual (.pair (.var 3) (.var 2)) (.product .word .word) (.pair (w 7) (w 3)) 5
+  for content in ["!l", "~c", "l + c", "c - r", "l && missing", "missing", "f(l)", "l.x", "l[0]", "[l]", "\"7\""] do
     contrast content actual none
   for op in [Syntax.BinaryOp.logicalAnd, .logicalOr] do
     assertTrue (evaluateLocalWordBinaryWithCost? op (word 1) (word 0)).isNone "short circuit acquired strict Word meaning"
