@@ -347,7 +347,25 @@ freshness in arbitrary inconsistent environments. Pending frames are retained,
 not executed; bad frames can fault with zero fuel at the endpoint. Source and
 parsed consumers retain strict unused initialization, old-scope positions,
 opaque values, asymmetric terminal paths and raw-success/whole-rejection cases.
-No prefix runner, bound, resumption or runtime-entry extension is added yet.
+The checked prefix runner, bound and genuine resumption now follow in ADR-0211;
+runtime-entry integration remains separate.
+
+The separate typed-prefix runner (ADR-0211) checks `toTypeInputs` with the caller's
+type meanings/owner and executes the actual Core with original ordered values.
+Full Option/Core-result laws distinguish check failure from fuel exhaustion.
+Whole typing and independent costs characterize observations; real typed inputs
+give exact thresholds and fault exclusion. A source-only additive prefix bound
+delegates terminal trees to the recursive max-arm bound. It bounds raw costs
+without checking, but neither positive nor zero budgets imply acceptance, and
+rejected annotations or duplicate names may still have nonzero bounds. Actual
+typing and whole checking remain necessary for sufficient-fuel safety.
+Genuine checkpoints retain initializer frames, captured environments, actual
+bound values and stores. Their exact residual costs are for closed body paths;
+resumption preserves full results across multiple chunks, not restarted or
+reconstructed states. Old singleton/if shapes preserve full optional results at
+every fuel. Source and parsed consumers retain asymmetric path/bound differences,
+unsupported zero/nonzero budgets and incorrect-checkpoint counterexamples.
+No existing tree/entry, parser, Core, call or broader binding policy is changed.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent

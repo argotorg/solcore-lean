@@ -1057,6 +1057,27 @@ example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.binding
 example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.terminal
 example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.binding
 
+example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnBody?
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.checked_runStateful_done_iff
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.checked_runStateful_outOfFuel_iff
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_run_done_iff_cost
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_eq_none_iff
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_eq_some_iff
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_done_iff_typed_cost
+example := @Solcore.Frontend.LocalInputs.typedLetReturnBody_typed_cost_execution
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_outOfFuel_iff_typed_cost
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_never_faults
+example := @Solcore.Frontend.typedLetReturnBodyFuelBound
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.cost_le_fuelBound
+example := @Solcore.Frontend.elaborateTypedLetReturnBody?_run_done_of_fuelBound
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_done_of_fuelBound
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.checked_residual_of_outOfFuel
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_resume
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_single
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_conditional
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnBody?_conditional_singletons
+
 section RecursiveEntryContracts
 
 open Solcore Solcore.Frontend

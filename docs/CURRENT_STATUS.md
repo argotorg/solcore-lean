@@ -790,7 +790,8 @@ uniqueness is claimed. Independent and parsed consumers retain exact source
 order, old-scope/forward-reference boundaries, nominal inputs and whole failures.
 The independent evaluation/cost layer below now complements this static unit.
 Existing tree and function-entry adapters remain unchanged and still reject
-let prefixes; there is no checked prefix runner or entry integration yet.
+let prefixes. A separate checked prefix runner follows below; runtime-entry
+integration remains separate.
 
 ### Typed local-declaration prefixes: evaluation and cost
 
@@ -823,8 +824,41 @@ zero remaining fuel, so no unconditional exhaustion claim follows.
 Independent and parsed consumers retain arbitrary-length paths, noncommutative
 old-scope arithmetic, unused initializer costs, asymmetric terminal choices,
 actual opaque cell/closure values, distinct stores and whole-rejection contrasts.
-Existing tree raw/cost paths embed without checking. This unit adds no parser,
-Core or entry changes, body runner, source fuel bound, resumption or call semantics.
+Existing tree raw/cost paths embed without checking. ADR-0210 itself added no
+parser, Core or entry changes, body runner, source bound, resumption or calls.
+
+### Typed local-declaration prefixes: checked execution and resumption
+
+A separate checked body runner now uses the actual static projection and
+original ordered values (ADR-0211). Caller type meanings and owner remain
+explicit. Check failure is `none`; successful checking retains the complete
+Core machine result, including genuine suspended states. Values are neither
+reversed again nor reconstructed from static types. Whole typing and independent
+costs characterize completed and exhausted observations. Actual typed inputs
+give a typed returned value, exact fuel thresholds and fault exclusion for any
+store, while generic known-cost laws require only checking and aligned IDs.
+
+The total source-only bound adds each written initializer's expression bound,
+the remaining prefix's bound and two. Its terminal suffix uses the recursive
+max-arm tree bound. Raw selected-path costs are bounded without annotation
+meaning, unused-name or whole-typing premises. It is an upper bound, not a
+minimum: paths costing seven or twelve can share bound fourteen. Rejected
+annotations and repeated names may have nonzero budgets and raw paths; neither
+zero nor positive bounds supply checking evidence or missing runtime values.
+Sufficient-fuel safety additionally requires whole acceptance and actual typing.
+
+Genuine exhausted states retain exact remaining paths of length `cost - spent`.
+Resuming them equals a larger original run, preserving pending initializer let
+frames, captured old values, the actual value prepended after binding and each
+store. These residual costs concern closed empty-continuation body paths, not
+the cost of executing arbitrary pending frames. Independent and parsed tests
+retain actual multi-chunk states and distinguish resumption from restarting or
+dropping a continuation. Old singleton/if shapes retain whole optional result
+equality, including checking failure and same-fuel complete checkpoints.
+
+This does not extend runtime-function entries or let prefixes inside branches,
+and adds no parser, Core, Wire, call, mutation, inference, default initialization
+or general source shadowing policy.
 
 ### Explicit restricted runtime function entry
 

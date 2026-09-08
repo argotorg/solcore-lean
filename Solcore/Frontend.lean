@@ -157,6 +157,11 @@ import Solcore.Frontend.TypedLetReturnBodyEvaluation
 import Solcore.Frontend.TypedLetReturnBodyEvaluationProperties
 import Solcore.Frontend.TypedLetReturnBodyExecutionProperties
 import Solcore.Frontend.TypedLetReturnBodyEvaluationEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnBodyRunner
+import Solcore.Frontend.TypedLetReturnBodyRunnerProperties
+import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
+import Solcore.Frontend.TypedLetReturnBodyRunnerEmbeddingProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -176,6 +181,7 @@ entries reuse these recursive contracts with unchanged headers and parameters.
 Typed, initialized, non-shadowing local-declaration prefixes have a separate
 value-free static adapter with exact nested Core letE. Independent raw evaluation
 and cost correspond to the actual checked Core and exact continuation paths.
-No body runner, runtime-entry integration or general binding/inference policy
-is added for this prefix profile.
+A separate checked body runner adds exact fuel thresholds, a source-only bound
+and genuine-state resumption. No runtime-entry integration, type inference or
+broader source binding policy is added for this prefix profile.
 -/
