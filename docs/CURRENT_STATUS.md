@@ -157,6 +157,14 @@ values or source declaration collection. Structural typing of a cell reference
 does not assert that its location is allocated. A repeated-name insertion may
 change existing source meaning; fresh IDs do not prevent name shadowing.
 
+For an identifier/group/conditional expression that avoids the newly added
+spelling in every child, fresh insertion preserves and reflects source typing
+and evaluation, including the exact value and both stores. Checking changes
+only the free Core positions by one; the assigned type and failure boundary
+are unchanged. Completed runs therefore have the same observations. Their
+fuel witnesses may be separate; suspended states are not claimed identical.
+This name-avoidance condition is not a free-name analysis of unsupported syntax.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

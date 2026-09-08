@@ -18,6 +18,10 @@ import Solcore.Frontend.LocalInputsProperties
 import Solcore.Frontend.LocalInputsLookupProperties
 import Solcore.Frontend.LocalInputsExecution
 import Solcore.Frontend.LocalInputsExecutionProperties
+import Solcore.Frontend.LocalNameAvoidance
+import Solcore.Frontend.LocalNameAvoidanceProperties
+import Solcore.Frontend.LocalInputsExtensionSemantics
+import Solcore.Frontend.LocalInputsExtensionProperties
 
 /-!
 Canonical local-reference and conditional-expression semantic adapters with

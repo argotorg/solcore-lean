@@ -80,6 +80,11 @@ exact row lookup proofs support a checked runner without separate caller
 alignment premises. The runner distinguishes failed checking from present fuel
 exhaustion and has exact typed source-evaluation correspondence. This constructs
 explicit inputs only, not source declarations or globally allocated identities.
+Fresh insertion under a spelling unused by the entire supported expression now
+preserves source type/evaluation in both directions, the exact checked type and
+free-index shift (including check failures), and completed value/store results.
+The premise covers both conditional branches and deliberately excludes
+same-name shadowing; it does not assert equality of suspended machine states.
 
 The next semantic work should extend the local reference/conditional fragment
 to more canonical syntax and source scope construction, preserving binding identity and

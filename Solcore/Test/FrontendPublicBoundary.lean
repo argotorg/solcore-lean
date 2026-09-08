@@ -125,4 +125,14 @@ example := @Solcore.Frontend.LocalInputs.bindFresh_context
 example := @Solcore.Frontend.LocalInputs.bindFresh_environment
 example := @Solcore.Frontend.LocalInputs.bindFresh_id_fresh
 
+example := @Solcore.Frontend.AvoidsLocalName
+example := @Solcore.Frontend.LocalNameTable.lookup_cons_iff_of_ne
+example := @Solcore.Frontend.AvoidsLocalName.resolves_cons_iff
+example := @Solcore.Frontend.AvoidsLocalName.resolve_cons_eq
+example := @Solcore.Frontend.AvoidsLocalName.bindFresh_hasType_iff
+example := @Solcore.Frontend.AvoidsLocalName.bindFresh_evaluates_iff
+example := @Solcore.Frontend.AvoidsLocalName.check_bindFresh_complete
+example := @Solcore.Frontend.AvoidsLocalName.check_bindFresh_eq
+example := @Solcore.Frontend.AvoidsLocalName.bindFresh_run_done_iff
+
 end Tests

@@ -26,6 +26,14 @@ to these inputs, not to an unexamined source program. A newly prepended binding
 with an existing name hides the previous name entry; fresh identity alone does
 not promise preservation of source expressions mentioning that spelling.
 
+For the supported identifier/group/conditional fragment, an independent
+avoidance judgment requires that no child use the newly added spelling.
+Under this condition, fresh insertion preserves and reflects source typing
+and evaluation. Checked Core free positions shift by one, while the type and
+check-failure result are unchanged. Completed executions agree on type, value,
+and both stores. This does not identify their fuel witnesses or suspended
+states, and does not analyze free names in unsupported canonical constructors.
+
 ## Checked execution
 
 Checking uses the existing canonical local-expression adapter and the derived
