@@ -185,8 +185,9 @@ private def checkShortCircuitRuns : IO Unit := do
   checkUnsupported "c && missing"
   checkIllTyped "c || 7"
   checkUnsupported "c || \"7\""
-  checkUnsupported "c & d"
-  checkUnsupported "c | d"
+  checkIllTyped "c & d"
+  checkIllTyped "c | d"
+  checkIllTyped "c ^ d"
   checkIllTyped "c && n"
   checkIllTyped "n || c"
 
