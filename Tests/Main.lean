@@ -16,6 +16,7 @@ import Solcore.Test.FrontendLocalInputsExtensionProperties
 import Solcore.Test.FrontendLocalNegationProperties
 import Solcore.Test.FrontendLocalShortCircuitProperties
 import Solcore.Test.FrontendLocalIdentityRenamingProperties
+import Solcore.Test.FrontendLocalWordComplementProperties
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler

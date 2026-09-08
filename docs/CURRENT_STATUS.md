@@ -141,8 +141,8 @@ The full resolution/typing/evaluation correspondence, typed execution, and
 unused-name insertion laws include this case. A named operand completes in
 three Core transitions. Parsed negated conditions, double negation, and nested
 conditionals are tested; operator source ranges have no semantic effect.
-`true`/`false` still use caller bindings. There is no truthiness, overload
-search, or bitwise `~` support.
+`true`/`false` still use caller bindings. There is no truthiness or overload
+search.
 
 Short-circuit `&&` and `||` also have canonical source semantics (ADR-0159).
 They resolve to the established conditional expansions with generated Boolean
@@ -158,6 +158,16 @@ Parsed precedence, grouping, and nested right operands exercise exact fuel
 differences between selected and skipped paths. Other binary operators remain
 unsupported by this adapter.
 
+Word complement `~` is also supported as a fixed Word-only operation
+(ADR-0161), using the existing direct Core `wordNot`. Independent typing,
+raw evaluation, and checked execution preserve its exact 256-bit result and
+store. The operand is evaluated once; named and double-complemented operands
+take three and five Core transitions. Bool/reference inputs are not coerced,
+and numeric literal interpretation remains separate. Tests include arbitrary
+Words, double-complement involution, raw selected Word operands that cannot
+type-check as Boolean, parsed conditions, and exact fuel boundaries. The
+unused-name and identity-relabeling laws also cover this constructor.
+
 ### Typed local input execution
 
 `LocalInputs` now bundles each spelling, unique ID, type, value, and structural
@@ -167,7 +177,7 @@ typing. Unique IDs ensure that a selected name retrieves its own row's type and
 value. Repeated names still select the first row. Empty inputs and fresh binding
 insertion preserve ID uniqueness within the supplied inputs, not globally.
 
-The convenience checker and runner reuse the Boolean/conditional fragment and
+The convenience checker and runner reuse the supported local-expression fragment and
 execute the actual returned Core. The runner retains the checked type and full
 Core result: check failure is absent, while fuel exhaustion is present and keeps
 the suspended state. Completed runs correspond exactly to independently typed
@@ -1935,7 +1945,7 @@ language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
 Semantic Core remain separate later stages. Canonical local references, Boolean
-operators, and conditionals connect through the explicit-table adapters described above.
+operators, Word complement, and conditionals connect through the explicit-table adapters described above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 

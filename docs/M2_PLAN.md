@@ -90,7 +90,7 @@ The canonical `!` constructor now uses the existing Boolean-negation primitive
 (ADR-0158). Source typing, raw evaluation correspondence, typed execution, and
 unused-name preservation include the new case. Non-Boolean operands are not
 coerced. Parsed negated conditions and double negation exercise the returned
-Core and exact execution bounds; `~` remains unsupported.
+Core and exact execution bounds.
 
 Canonical `&&` and `||` now expand to the existing short-circuit conditionals
 (ADR-0159). Both operands must resolve and type-check as Boolean, but only a
@@ -107,7 +107,14 @@ both directions. The bundled runner retains the whole result at identical
 fuel, including failed checking and suspended states. This is not source-name
 renaming, global allocation, or a claim about subsequent fresh-ID choices.
 
-The next semantic work should extend the local reference/Boolean/conditional fragment
+Canonical `~` now has fixed Word-only typing and direct Core complement
+semantics (ADR-0161), reusing the existing 256-bit operation. Its source/Core
+correspondence, typed execution, unused-name preservation, and ID-relabeling
+laws are proved. Arbitrary Word/double-complement and exact fuel tests include
+parsed source execution; Bool/reference coercion and numeric literal policy
+are not introduced.
+
+The next semantic work should extend the supported local-expression fragment
 to more canonical syntax and source scope construction, preserving binding identity and
 the established Core execution correspondence. It must not treat the resolved
 immutable expression binder as a decision about mutable source declarations.

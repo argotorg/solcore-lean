@@ -6,6 +6,7 @@
 
 ADR-0159 subsequently extends this internal adapter with Boolean `&&` and `||`
 without changing the accepted negation semantics described here.
+ADR-0161 later adds the distinct Word-only `~` operation; `!` remains Bool-only.
 
 ## Decision
 

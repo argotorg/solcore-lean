@@ -178,5 +178,10 @@ example := @Solcore.Frontend.LocalNameTable.mapIds_comp
 example := @Solcore.Frontend.LocalNameTable.lookup?_mapIds
 example := @Solcore.Frontend.LocalNameTable.lookup_mapIds_iff_exists
 example := @Solcore.Frontend.LocalNameTable.lookup_mapIds_iff
+example := @Solcore.Frontend.ResolvesLocalExpression.bitNot
+example := @Solcore.Frontend.LocalExpressionHasType.bitNot
+example := @Solcore.Frontend.LocalExpressionEvaluates.bitNot
+example := @Solcore.Frontend.AvoidsLocalName.bitNot
+example := @Solcore.Frontend.resolveLocalExpression?_bitNot_spans
 
 end Tests

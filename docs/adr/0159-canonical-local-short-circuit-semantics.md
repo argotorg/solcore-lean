@@ -4,6 +4,9 @@
 - Decision date: 2026-09-08
 - Scope: additive `&&` and `||` in the internal local-expression adapter
 
+ADR-0161 later adds Word-only `~`; the short-circuit semantics and Boolean
+typing requirements here remain unchanged.
+
 ## Decision
 
 Extend ADR-0156/0158's internal adapter with canonical binary
