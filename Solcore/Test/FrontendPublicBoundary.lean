@@ -297,5 +297,26 @@ example := @Solcore.Frontend.AvoidsLocalName.bindFresh_cost_iff
 example := @Solcore.Frontend.LocalInputs.run?_outOfFuel_iff_typed_cost
 example := @Solcore.Frontend.AvoidsLocalName.bindFresh_run_done_at_fuel_iff
 example := @Solcore.Frontend.AvoidsLocalName.bindFresh_run_outOfFuel_iff
+example := @Solcore.Frontend.TypeNameTable
+example := @Solcore.Frontend.TypeNameTable.lookup?
+example := @Solcore.Frontend.TypeNameTable.Lookup
+example := @Solcore.Frontend.qualifiedTypeNameKey
+example := @Solcore.Frontend.interpretTypeName?
+example := @Solcore.Frontend.TypeNameDenotes
+example := @Solcore.Frontend.TypeNameTable.lookup?_iff
+example := @Solcore.Frontend.TypeNameTable.Lookup.type_unique
+example := @Solcore.Frontend.TypeNameTable.Lookup.mem
+example := @Solcore.Frontend.TypeNameTable.lookup?_eq_none_iff
+example := @Solcore.Frontend.TypeNameDenotes.complete
+example := @Solcore.Frontend.interpretTypeName?_sound
+example := @Solcore.Frontend.interpretTypeName?_iff
+example := @Solcore.Frontend.TypeNameDenotes.type_unique
+example := @Solcore.Frontend.TypeNameDenotes.mem
+example := @Solcore.Frontend.interpretTypeName?_eq_none_iff
+example := @Solcore.Frontend.interpretTypeName?_span
+example := @Solcore.Frontend.interpretTypeName?_key_eq
+example := @Solcore.Frontend.TypeNameTable.Lookup.head
+example := @Solcore.Frontend.TypeNameTable.Lookup.tail
+example := @Solcore.Frontend.TypeNameDenotes.named
 
 end Tests

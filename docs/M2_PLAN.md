@@ -159,9 +159,18 @@ shadowing can retain the result but change the cost, protecting the avoidance
 premise. Parsed observations exercise the stronger fuel boundary without
 changing evaluation or source-name allocation.
 
-The next semantic work should extend the supported local-expression fragment
-to more canonical syntax and source scope construction, preserving binding identity and
-the established Core execution correspondence. It must not treat the resolved
+Explicit monomorphic type-name interpretation (ADR-0167) now supplies a first
+bridge from canonical named/no-arguments types to caller-provided Core types.
+Independent first-match rules and exact qualified component keys characterize
+the executable adapter in both directions. Source ranges are irrelevant; no
+normalization, implicit primitive names, type-argument interpretation, or
+global type collection is added. Parsed known, unknown, and unsupported types
+exercise this boundary independently of syntactic acceptance.
+
+The next semantic work should use this bridge for runtime parameter scope
+construction with explicitly typed supplied arguments, then extend the local
+expression and scope coverage while preserving binding identity and the
+established Core execution correspondence. It must not treat the resolved
 immutable expression binder as a decision about mutable source declarations.
 
 ### Source-to-AST coverage

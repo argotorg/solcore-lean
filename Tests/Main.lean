@@ -25,6 +25,8 @@ import Solcore.Test.FrontendLocalWordBitwiseProperties
 import Solcore.Test.CoreExactFuelProperties
 import Solcore.Test.FrontendLocalExpressionCostProperties
 import Solcore.Test.FrontendLocalExpressionCostInvarianceProperties
+import Solcore.Test.FrontendTypeNameProperties
+import Solcore.Test.FrontendParsedTypeNames
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5545,6 +5547,7 @@ def run : IO Unit := do
   frontendParsedLocalExpressionTests
   frontendParsedWordLiteralTests
   frontendParsedWordBitwiseTests
+  frontendParsedTypeNameTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

@@ -38,6 +38,8 @@ import Solcore.Frontend.LocalExpressionCostCorrespondence
 import Solcore.Frontend.LocalExpressionCostExecutionProperties
 import Solcore.Frontend.LocalExpressionCostInvariance
 import Solcore.Frontend.LocalInputsCostInvariance
+import Solcore.Frontend.TypeName
+import Solcore.Frontend.TypeNameProperties
 
 /-!
 Canonical local-reference, Boolean/Word, and conditional-expression semantic adapters with

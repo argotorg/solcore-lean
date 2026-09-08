@@ -326,6 +326,24 @@ same-spelling shadowing can preserve a final Boolean value yet change cost
 from four to ten, so the unused-name premise cannot be dropped. This strengthens
 proof interfaces only, not executable behavior or allocation policy.
 
+### Explicit canonical type names
+
+An additive type-name adapter now interprets canonical named types without
+arguments through an explicit caller table (ADR-0167). Its independent
+first-occurrence lookup and source meaning have exact success/failure,
+uniqueness, and supplied-entry provenance proofs. Qualified component lists
+remain ordered and separate: raw `"A.B"` is not the path `["A", "B"]`.
+All source ranges are ignored, but spelling is not normalized or validated.
+
+Any Core type can be assigned by the table; `Word` and `Bool` do not acquire
+implicit meanings, and aliases or duplicate table entries retain exact
+caller-specified behavior. Applied names, mapping, proxy, function, comptime,
+tuple, and recovery forms remain outside this restricted adapter even when
+their source text parses successfully. Complete-source parser tests distinguish
+that boundary from malformed or partially consumed text. This prepares explicit
+parameter scope construction without yet adding function calls, source type
+declaration collection, general inference, or staging semantics.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.
