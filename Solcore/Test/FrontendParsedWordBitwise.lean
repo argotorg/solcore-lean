@@ -147,7 +147,8 @@ def frontendParsedWordBitwiseTests : IO Unit := do
         (.binary .wordOr (literalCore 170) (literalCore 204))) (word (if choice then 136 else 238)) 8
   checkRejected supplied "(a & b) ? 1 : 0" true
   checkRejected supplied "c && (a & b)" true
-  checkRejected supplied "a + b" false
+  checkRun supplied "a + b" (.binary .wordAdd (.var 2) (.var 1)) (word 374) 5
+  checkRejected supplied "a - b" false
   let rejectsTrailing ← try
     let _ ← parsedExpression "a & b 7"
     pure false

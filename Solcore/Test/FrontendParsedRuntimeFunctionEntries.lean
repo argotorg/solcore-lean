@@ -153,6 +153,8 @@ def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
   assertTrue (decide (LocalInputs.empty.checkReturnBody? mismatched.value.body =
     some (.word seven, .word))) "entry contract incorrectly changed the body-only endpoint"
   checkRejected mismatch
+  checkAccepted types "function addition() returns (Word) { return 7 + 9; }" []
+    (.binary .wordAdd (.word seven) (.word nine)) .word (.word (seven.add nine)) 5
   for content in [
       "function absent() { return 7; }", "function bare() returns (Word) { return; }",
       "function empty() returns () { return; }", "function many() returns (Word, Bool) { return 7; }",
@@ -165,7 +167,7 @@ def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
       "function repeated() { return; return; }", "function tail() returns (Word) { 7 }",
       "function discarded() { return; missing; }", "function before() { 7; return; }",
       "function local() returns (Word) { let x = 7; return x; }",
-      "function arithmetic() returns (Word) { return 7 + 9; }"] do
+      "function arithmetic() returns (Word) { return 7 - 9; }"] do
     checkRejected content
   for content in ["function publicOnly() public { return; }",
       "function payableOnly() payable { return; }", "function both() public payable { return; }"] do

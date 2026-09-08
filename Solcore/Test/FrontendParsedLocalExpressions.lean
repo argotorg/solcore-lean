@@ -251,7 +251,8 @@ def frontendParsedLocalExpressionTests : IO Unit := do
   checkUnsupported "c ? t : \"7\""
   checkIllTyped "7 ? t : e"
   checkIllTyped "c ? 7 : d"
-  checkUnsupported "t + e"
+  checkRun "t + e" (.binary .wordAdd (.var 2) (.var 3)) false false (word 33) 5
+  checkUnsupported "t - e"
   checkIllTyped "~c"
   checkIllTyped "n ? t : e"
   checkIllTyped "c ? t : d"

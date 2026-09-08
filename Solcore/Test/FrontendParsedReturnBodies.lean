@@ -107,9 +107,10 @@ def frontendParsedReturnBodyTests : IO Unit := do
       (.ifE (.var 2) (.unary .boolNot (.var 2)) (.bool false)) .bool (.bool false)
       (if choice then 6 else 4)
     checkText inputs "{ return t ^ f; }" (.binary .wordXor (.var 1) (.var 0)) .word (.word (seven.bitXor nine)) 5
+    checkText inputs "{ return t + f; }" (.binary .wordAdd (.var 1) (.var 0)) .word (.word (seven.add nine)) 5
     for content in ["{}", "{ t; }", "{ t }", "{ { return t; } }", "{ return t; return f; }",
         "{ t; return f; }", "{ return t; missing; }", "{ let x = t; return x; }",
-        "{ return c ? t : missing; }", "{ return c ? t : c; }", "{ return t + f; }",
+        "{ return c ? t : missing; }", "{ return c ? t : c; }", "{ return t - f; }",
         "{ return \"7\"; }"] do
       let some body ← parsed? (Syntax.Parser.block .allow) content
         | throw (IO.userError s!"{content}: unsupported body should still parse")
