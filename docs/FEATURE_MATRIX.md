@@ -729,6 +729,7 @@ Wire v1 and v2 remain frozen and reject their later forms.
 | Canonical Boolean short-circuit operators | Implemented (ADR-0159) | both operands checked as Bool; selected-right-only execution, exact conditional expansion/value/store/fuel correspondence, and generated constants independent of source-name bindings | High |
 | Frontend local identity relabeling | Implemented (ADR-0160) | unchanged source AST; arbitrary-map resolution and injective-map exact checker/raw evaluation invariance; typed inputs preserve same-fuel results including suspended states; no allocator commutation | High |
 | Canonical Word complement | Implemented (ADR-0161) | fixed Word-only `~`, exact 256-bit result, independent correspondence/safety and double-complement involution; no Bool coercion, literal policy, or general overload resolution | High |
+| Numeric spelling and strict Word interpretation | Implemented standalone (ADR-0162) | independent ASCII digit/positional natural meaning, exact decoder correspondence, strict non-wrapping Word range, arbitrary leading zeroes, raw-payload validation and span irrelevance; not yet local-expression literal typing | High |
 | Resolved-to-Core elaboration | Exact local-expression fragment implemented | full source coverage, effects beyond the store-preserving fragment, and stage preservation remain open | Medium |
 
 ## Contract and runtime semantics

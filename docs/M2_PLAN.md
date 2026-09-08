@@ -114,6 +114,14 @@ laws are proved. Arbitrary Word/double-complement and exact fuel tests include
 parsed source execution; Bool/reference coercion and numeric literal policy
 are not introduced.
 
+Numeric spelling now has independent digit/positional natural-number semantics
+and a sound/complete total decoder (ADR-0162). A separate strict Word projection
+rejects values at or above `2^256` without modulo reduction. Whole ASCII spelling,
+nonempty hexadecimal digits, both hex letter cases, arbitrary leading zeroes,
+raw-payload validation, and span irrelevance are proved and tested, including
+complete actual-source parsing. Local-expression acceptance remains unchanged;
+general source numeric typing and overload policy are not inferred from this layer.
+
 The next semantic work should extend the supported local-expression fragment
 to more canonical syntax and source scope construction, preserving binding identity and
 the established Core execution correspondence. It must not treat the resolved

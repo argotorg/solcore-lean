@@ -11,6 +11,8 @@ import Solcore.Test.FrontendLocalReferenceExecutionProperties
 import Solcore.Test.FrontendLocalExpressionProperties
 import Solcore.Test.FrontendLocalExpressionExecutionProperties
 import Solcore.Test.FrontendParsedLocalExpressions
+import Solcore.Test.FrontendParsedWordLiterals
+import Solcore.Test.FrontendWordLiteralProperties
 import Solcore.Test.FrontendLocalInputsProperties
 import Solcore.Test.FrontendLocalInputsExtensionProperties
 import Solcore.Test.FrontendLocalNegationProperties
@@ -5535,6 +5537,7 @@ def testCanonicalRawLexing : IO Unit := do
 def run : IO Unit := do
   resolvedLocalSemanticsTests
   frontendParsedLocalExpressionTests
+  frontendParsedWordLiteralTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

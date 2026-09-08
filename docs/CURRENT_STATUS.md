@@ -168,6 +168,27 @@ Words, double-complement involution, raw selected Word operands that cannot
 type-check as Boolean, parsed conditions, and exact fuel boundaries. The
 unused-name and identity-relabeling laws also cover this constructor.
 
+### Numeric spelling and strict Word interpretation
+
+An independent numeric-literal layer now gives whole canonical decimal and
+hexadecimal spellings their natural-number meaning (ADR-0162). Digit and
+positional-sequence relations characterize the total decoder exactly. Only
+ASCII digits are accepted; hexadecimal requires lowercase `0x`, allows both
+letter cases, and has no digit-length cap. Arbitrarily many leading zeroes
+preserve the value. Invalid prefixes, signs, separators, Unicode digits,
+fractions, trailing characters, and string payloads have no numeric meaning.
+
+A separate strict Word projection succeeds exactly for values below `2^256`.
+Larger values retain their natural meaning but have no Word result; they do
+not wrap. Located interpretation ignores spans, not raw payload validation.
+Public soundness, completeness, uniqueness, and exact failure/range laws are
+proved. Consumers cover both range boundaries and malformed manually built
+ASTs; actual-source tests require complete diagnostic-free parsing.
+
+This layer is not yet connected to local-expression resolution or typing.
+It does not settle general source literal types, `fromInteger`, or overload
+resolution, and does not change the parser, Core, or Oracle/wire interfaces.
+
 ### Typed local input execution
 
 `LocalInputs` now bundles each spelling, unique ID, type, value, and structural

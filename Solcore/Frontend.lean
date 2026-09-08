@@ -27,6 +27,10 @@ import Solcore.Frontend.LocalExpressionRenamingSemantics
 import Solcore.Frontend.LocalInputsRenaming
 import Solcore.Frontend.LocalInputsRenamingProperties
 import Solcore.Frontend.LocalNameRenaming
+import Solcore.Frontend.NumericDigits
+import Solcore.Frontend.NumericDigitsProperties
+import Solcore.Frontend.WordLiteral
+import Solcore.Frontend.WordLiteralProperties
 
 /-!
 Canonical local-reference, Boolean/Word-complement, and conditional-expression semantic adapters with
