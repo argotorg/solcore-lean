@@ -5,7 +5,7 @@ import Solcore.Frontend.RuntimeFunctionCompilationProperties
 
 /-! The nonrecursive union preserves each original profile's full observations.
 Independent fixtures retain actual inputs and do not turn conditional arms into
-recursive terminal bodies or broaden the existing function-entry adapter. -/
+recursive terminal bodies or accept function entries with ill-scoped bodies. -/
 
 set_option autoImplicit false
 
@@ -220,13 +220,18 @@ theorem nested_statement_conditionals_are_not_recursively_accepted
 private def declaration : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "unchanged"⟩, none, ⟨span, []⟩, ⟨none, none⟩, none, none⟩, conditional⟩⟩
 
-theorem original_singleton_and_function_entry_checkers_are_not_broadened
+theorem original_singleton_rejects_and_ill_scoped_function_entry_still_rejects
     (choice : Bool) (word : Core.Word) :
     (inputs choice word).checkReturnBody? conditional = none ∧
     compileRuntimeFunction? [] owner declaration = none := by
   refine ⟨rfl, ?_⟩
   apply compileRuntimeFunction?_eq_none_iff.mpr
   intro ⟨candidate, accepted⟩
-  cases accepted.body
+  have sameInputs : candidate.inputs = .empty := accepted.parameters.result_unique .nil
+  have checked := accepted.body.complete
+  rw [sameInputs] at checked
+  simp [elaborateTerminalReturnBody?, elaborateConditionalReturnBody?, declaration, conditional,
+    branch, ref, elaborateLocalExpression?, resolveLocalExpression?, LocalTypeInputs.empty,
+    LocalTypeInputs.names, LocalTypeInputs.context, LocalNameTable.lookup?] at checked
 
 end Tests.FrontendTerminalReturnBody

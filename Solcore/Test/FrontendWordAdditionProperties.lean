@@ -140,7 +140,7 @@ private theorem compilation : RuntimeFunctionCompiles types owner declaration co
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
     .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons (.named .head) (by change "r" ∉ ["l"]; simp) .nil),
-    .expression (.add (.identifier (.tail names_ne .head)) (.identifier .head))
+    .single <| .expression (.add (.identifier (.tail names_ne .head)) (.identifier .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))⟩
 private def arguments (left right : Core.Word) : List TypedRuntimeArgument :=
@@ -161,7 +161,7 @@ theorem independent_value_free_function_compilation_reaches_exact_runtime_cost
       some (.word, .done (.word (left.add right)) store) ↔ 5 ≤ fuel) := by
   have evaluation : RuntimeFunctionEvaluatesWithCost types owner declaration (arguments left right)
       store .word (.word (left.add right)) store 5 :=
-    .intro (preparation left right) (.expression (costed left right store))
+    .intro (preparation left right) (.single <| .expression (costed left right store))
   exact ⟨compilation, compilation.complete, evaluation, fun _ => evaluation.run_done_iff⟩
 
 end Tests.FrontendWordAddition

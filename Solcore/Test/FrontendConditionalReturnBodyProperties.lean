@@ -5,7 +5,7 @@ import Solcore.Frontend.RuntimeFunctionCompilationProperties
 
 /-! Independent terminal conditional bodies retain both checked return arms,
 but execute only the selected arm. Actual values and stores are not replaced
-by type representatives, and the older entry adapter remains separate. -/
+by type representatives; the existing runtime entry also accepts terminal bodies. -/
 
 set_option autoImplicit false
 
@@ -231,17 +231,19 @@ private def declaration : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "terminal"⟩, none,
     ⟨span, [⟨span, .typed none ⟨span, "c"⟩ boolAnnotation⟩]⟩, ⟨none, none⟩, none, none⟩, bareArms⟩⟩
 
-theorem old_singleton_and_runtime_entry_adapters_still_reject_conditional_statements
+theorem old_singleton_rejects_but_runtime_entry_compiles_conditional_statements
     (choice : Bool) (word : Core.Word) :
     (inputs choice word).checkReturnBody? body = none ∧
     RuntimeFunctionHeader [(["Bool"], .bool)] declaration.value.signature .unit ∧
     RuntimeParametersDeclare [(["Bool"], .bool)] owner declaration.value.signature.parameters.elements
       (LocalTypeInputs.empty.bindFresh owner "c" .bool) ∧
-    compileRuntimeFunction? [(["Bool"], .bool)] owner declaration = none := by
-  refine ⟨rfl, ⟨rfl, rfl, rfl, rfl, .absent⟩,
-    .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil, ?_⟩
-  apply compileRuntimeFunction?_eq_none_iff.mpr
-  intro ⟨candidate, accepted⟩
-  cases accepted.body
+    compileRuntimeFunction? [(["Bool"], .bool)] owner declaration =
+      some ⟨LocalTypeInputs.empty.bindFresh owner "c" .bool, .ifE (.var 0) .unit .unit, .unit⟩ := by
+  have compilation : RuntimeFunctionCompiles [(["Bool"], .bool)] owner declaration
+      ⟨LocalTypeInputs.empty.bindFresh owner "c" .bool, .ifE (.var 0) .unit .unit, .unit⟩ :=
+    ⟨⟨rfl, rfl, rfl, rfl, .absent⟩,
+      .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil,
+      .conditional <| .intro (.identifier .head) (.var .head) (.var .head) .bare .bare⟩
+  exact ⟨rfl, compilation.header, compilation.parameters, compilation.complete⟩
 
 end Tests.FrontendConditionalReturnBody

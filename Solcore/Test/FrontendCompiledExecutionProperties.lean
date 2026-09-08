@@ -38,7 +38,7 @@ private def identityCompiled (type : Core.Ty) : CompiledRuntimeFunction :=
 private theorem identityCompiles (type : Core.Ty) :
     RuntimeFunctionCompiles (table type type) owner identity (identityCompiled type) :=
   ⟨header type type _ _, .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil,
-    .expression (.identifier .head) (.var .head) (.var .head)⟩
+    .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
 
 theorem arbitrary_typed_identity_preserves_full_results_and_zero_state
     (type : Core.Ty) (value : Core.Value) (typed : Core.ValueHasType value type) (store : Core.Store) :
@@ -68,8 +68,8 @@ private theorem selectedCompiles (type : Core.Ty) (left : Bool) :
     RuntimeFunctionCompiles (table type type) owner (selected left) (selectedCompiled type left) := by
   refine ⟨header type type _ _, pairDeclares type type, ?_⟩
   cases left
-  · exact .expression (.identifier .head) (.var .head) (.var .head)
-  · exact .expression (.identifier (.tail names_ne .head))
+  · exact .single <| .expression (.identifier .head) (.var .head) (.var .head)
+  · exact .single <| .expression (.identifier (.tail names_ne .head))
       (.var (.tail ids_ne .head)) (.var (.tail ids_ne .head))
 
 theorem equally_typed_distinct_values_remain_in_their_source_positions
@@ -104,7 +104,7 @@ private def greaterCompiled : CompiledRuntimeFunction := ⟨pairInputs .word, .b
 private theorem greaterCompiles : RuntimeFunctionCompiles (table .word .bool) owner
     (declaration pairParameters greater) greaterCompiled :=
   ⟨header .word .bool _ _, pairDeclares .word .bool,
-    .expression (.greater (.identifier (.tail names_ne .head)) (.identifier .head))
+    .single <| .expression (.greater (.identifier (.tail names_ne .head)) (.identifier .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))⟩
 
@@ -130,7 +130,7 @@ private def mixedCompiled : CompiledRuntimeFunction :=
 private theorem mixedCompiles : RuntimeFunctionCompiles (table .word .bool) owner mixed mixedCompiled :=
   ⟨header .word .bool _ _, .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
     (.cons (.named (.tail (by decide) .head)) (by change "r" ∉ ["l"]; simp) .nil),
-    .expression (.identifier .head) (.var .head) (.var .head)⟩
+    .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
 private def wrongArguments : List (List TypedRuntimeArgument) :=
   [[], [wordArg .zero], [wordArg .zero, boolArg true, wordArg .zero], [boolArg true, wordArg .zero]]
 
@@ -167,7 +167,9 @@ theorem independent_body_failure_blocks_every_supplied_argument_list
     runRuntimeFunction? (table .bool .bool) owner emptyBody arguments fuel store = none := by
   have absent : ¬ ∃ compiled, RuntimeFunctionCompiles (table .bool .bool) owner emptyBody compiled := by
     rintro ⟨compiled, evidence⟩
-    cases evidence.body
+    cases evidence.body with
+    | single body => cases body
+    | conditional body => cases body
   refine ⟨absent, ?_⟩
   rw [runRuntimeFunction?_factorization, compileRuntimeFunction?_eq_none_iff.mpr absent]
   rfl
@@ -192,7 +194,7 @@ private def shortCompiled : CompiledRuntimeFunction :=
   { identityCompiled .bool with core := .ifE (.var 0) (.unary .boolNot (.unary .boolNot (.var 0))) (.bool false) }
 private theorem shortCompiles : RuntimeFunctionCompiles (table .bool .bool) owner shortDeclaration shortCompiled :=
   ⟨header .bool .bool _ _, (identityCompiles .bool).parameters,
-    .expression (.logicalAnd (.identifier .head) (.logicalNot (.logicalNot (.identifier .head))))
+    .single <| .expression (.logicalAnd (.identifier .head) (.logicalNot (.logicalNot (.identifier .head))))
       (.ifE (.var .head) (.unary (.unary (.var .head))) .bool)
       (.ifE (.var .head) (.unary (.unary (.var .head))) .bool)⟩
 private def shortPrepared (choice : Bool) : PreparedRuntimeFunction :=
@@ -205,10 +207,10 @@ private theorem shortCost (choice : Bool) (store : Core.Store) :
     RuntimeFunctionEvaluatesWithCost (table .bool .bool) owner shortDeclaration [boolArg choice]
       store .bool (.bool choice) store (if choice then 8 else 4) := by
   cases choice
-  · exact .intro (shortPrepares false) (.expression (.andFalse (.identifier .head .head)))
+  · exact .intro (shortPrepares false) (.single <| .expression (.andFalse (.identifier .head .head)))
   · have leaf : LocalExpressionEvaluatesWithCost (shortPrepared true).inputs.names
         (shortPrepared true).inputs.environment store (ref "x") (.bool true) store 1 := .identifier .head .head
-    exact .intro (shortPrepares true) (.expression (.andTrue leaf (.logicalNot (.logicalNot leaf))))
+    exact .intro (shortPrepares true) (.single <| .expression (.andTrue leaf (.logicalNot (.logicalNot leaf))))
 
 theorem equal_argument_types_do_not_equalize_costs_states_or_results (store : Core.Store) :
     [boolArg false].map (·.type) = [boolArg true].map (·.type) ∧

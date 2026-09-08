@@ -186,10 +186,10 @@ private theorem compilation (kind : Kind) : RuntimeFunctionCompiles types owner 
     .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons (.named .head) (by change "r" ∉ ["l"]; simp) .nil), ?_⟩
   cases kind
-  · exact .expression (.subtract (.identifier (.tail names_ne .head)) (.identifier .head))
+  · exact .single <| .expression (.subtract (.identifier (.tail names_ne .head)) (.identifier .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))
-  · exact .expression (.multiply (.identifier (.tail names_ne .head)) (.identifier .head))
+  · exact .single <| .expression (.multiply (.identifier (.tail names_ne .head)) (.identifier .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))
       (.binary (.var (.tail ids_ne .head)) (.var .head))
 private def arguments (left right : Core.Word) : List TypedRuntimeArgument :=
@@ -213,7 +213,7 @@ theorem independent_compilation_preparation_and_exact_entry_cost
       some (.word, .done (.word (result kind left right)) store) ↔ 5 ≤ fuel) := by
   have evaluation : RuntimeFunctionEvaluatesWithCost types owner (declaration kind) (arguments left right)
       store .word (.word (result kind left right)) store 5 :=
-    .intro (preparation kind left right) (.expression (costed kind left right store))
+    .intro (preparation kind left right) (.single <| .expression (costed kind left right store))
   exact ⟨compilation kind, (compilation kind).complete, preparation kind left right,
     evaluation, fun _ => evaluation.run_done_iff⟩
 

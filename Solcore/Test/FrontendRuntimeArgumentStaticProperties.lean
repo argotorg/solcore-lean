@@ -63,7 +63,7 @@ private def andCore : Core.Expr := .ifE (.var 0) (.unary .boolNot (.var 0)) (.bo
 private theorem falsePrepares : RuntimeFunctionPrepares (table .bool) owner (declaration andNot)
     [boolArg false] (prepared andCore (boolArg false)) :=
   ⟨header .bool andNot, binding (boolArg false),
-    .expression (.logicalAnd (.identifier .head) (.logicalNot (.identifier .head)))
+    .single <| .expression (.logicalAnd (.identifier .head) (.logicalNot (.identifier .head)))
       (.ifE (.var .head) (.unary (.var .head)) .bool)
       (.ifE (.var .head) (.unary (.var .head)) .bool)⟩
 private theorem truePrepares : RuntimeFunctionPrepares (table .bool) owner (declaration andNot)
@@ -72,14 +72,14 @@ private theorem truePrepares : RuntimeFunctionPrepares (table .bool) owner (decl
 private theorem falseCost (store : Core.Store) :
     RuntimeFunctionEvaluatesWithCost (table .bool) owner (declaration andNot)
       [boolArg false] store .bool (.bool false) store 4 :=
-  .intro falsePrepares (.expression (.andFalse (.identifier .head .head)))
+  .intro falsePrepares (.single <| .expression (.andFalse (.identifier .head .head)))
 private theorem trueCost (store : Core.Store) :
     RuntimeFunctionEvaluatesWithCost (table .bool) owner (declaration andNot)
       [boolArg true] store .bool (.bool false) store 6 := by
   have leaf : LocalExpressionEvaluatesWithCost (inputs (boolArg true)).names
       (inputs (boolArg true)).environment store (ref "c") (.bool true) store 1 :=
     .identifier .head .head
-  exact .intro truePrepares (.expression (.andTrue leaf (.logicalNot leaf)))
+  exact .intro truePrepares (.single <| .expression (.andTrue leaf (.logicalNot leaf)))
 
 theorem transported_preparation_preserves_static_but_changes_environment :
     RuntimeFunctionPrepares (table .bool) owner (declaration andNot)
@@ -131,14 +131,17 @@ private theorem missingRejected : prepareRuntimeFunction? (table .bool) owner (d
   have body := preparation.body
   rw [sameInputs] at body
   cases body with
-  | expression resolution _ _ =>
-      cases resolution with
-      | logicalAnd _ right =>
-          cases right with
-          | identifier found =>
-              have accepted := LocalNameTable.lookup?_iff.mpr found
-              change none = some _ at accepted
-              cases accepted
+  | single body =>
+      cases body with
+      | expression resolution _ _ =>
+          cases resolution with
+          | logicalAnd _ right =>
+              cases right with
+              | identifier found =>
+                  have accepted := LocalNameTable.lookup?_iff.mpr found
+                  change none = some _ at accepted
+                  cases accepted
+  | conditional body => cases body
 
 theorem skipped_missing_branch_rejects_for_both_argument_values (fuel : Nat) (store : Core.Store) :
     ReturnBodyEvaluatesWithCost (inputs (boolArg false)).names (inputs (boolArg false)).environment
@@ -164,7 +167,8 @@ private theorem mismatchRejected : prepareRuntimeFunction? (table .bool) owner (
     .expression (.identifier .head) (.var .head) (.var .head)
   have declared : RuntimeFunctionHeader (table .bool) (declaration (ref "c") "Word").value.signature .word :=
     ⟨rfl, rfl, rfl, rfl, .single (.named (.tail (by decide) (.tail (by decide) .head)))⟩
-  have impossible := (expectedBody.result_unique body).2.trans (declared.type_unique preparation.header).symm
+  have impossible := ((TerminalReturnBodyElaborates.single expectedBody).result_unique body).2.trans
+    (declared.type_unique preparation.header).symm
   cases impossible
 
 theorem return_contract_mismatch_rejects_for_both_argument_values (fuel : Nat) (store : Core.Store) :
@@ -186,7 +190,7 @@ private def cellArg (location : Core.Location) : TypedRuntimeArgument := ⟨.cel
 private theorem cellPrepares (location : Core.Location) : RuntimeFunctionPrepares (table (.cell .word)) owner
     (declaration (ref "c")) [cellArg location] (prepared (.var 0) (cellArg location)) :=
   ⟨header (.cell .word) (ref "c"), binding (cellArg location),
-    .expression (.identifier .head) (.var .head) (.var .head)⟩
+    .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
 
 theorem typed_cell_replacement_changes_runtime_value_not_static_output
     (left right : Core.Location) (different : left ≠ right) (store : Core.Store) :
@@ -201,10 +205,10 @@ theorem typed_cell_replacement_changes_runtime_value_not_static_output
     (cellPrepares left) rfl (binding (cellArg right))
   have leftCost : RuntimeFunctionEvaluatesWithCost (table (.cell .word)) owner (declaration (ref "c"))
       [cellArg left] store (.cell .word) (.cellRef .word left) store 1 :=
-    .intro (cellPrepares left) (.expression (.identifier .head .head))
+    .intro (cellPrepares left) (.single <| .expression (.identifier .head .head))
   have rightCost : RuntimeFunctionEvaluatesWithCost (table (.cell .word)) owner (declaration (ref "c"))
       [cellArg right] store (.cell .word) (.cellRef .word right) store 1 :=
-    .intro transported (.expression (.identifier .head .head))
+    .intro transported (.single <| .expression (.identifier .head .head))
   exact ⟨prepareRuntimeFunction?_static_projection_eq rfl, leftCost.run_done_iff.mpr (by decide),
     rightCost.run_done_iff.mpr (by decide), by intro same; exact different (Core.Value.cellRef.inj same).2⟩
 

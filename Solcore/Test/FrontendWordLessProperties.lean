@@ -3,6 +3,7 @@ import Solcore.Frontend.LocalInputsRenamingProperties
 import Solcore.Frontend.RuntimeFunctionStoreProperties
 import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
+import Solcore.Frontend.LocalExpressionResumptionProperties
 
 /-! Independent unsigned Word ordering returns Bool while preserving strict operand
 order, exact transition counts, and the complete checked entry contract. -/
@@ -244,7 +245,7 @@ private theorem compilation : RuntimeFunctionCompiles types owner (declaration "
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
     .cons wordAnnotation (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
       (.cons wordAnnotation (by change "r" ∉ ["l"]; simp) .nil),
-    .expression (.less (.identifier (.tail names_ne .head)) (.identifier .head))
+    .single <| .expression (.less (.identifier (.tail names_ne .head)) (.identifier .head))
       (.wordLt (.var (.tail ids_ne .head)) (.var .head))
       (.wordLt (.var (.tail ids_ne .head)) (.var .head))⟩
 private def arguments (left right : Core.Word) : List TypedRuntimeArgument :=
@@ -268,7 +269,7 @@ theorem independent_compilation_preparation_and_exact_bool_entry_cost
       some (.bool, .done (.bool (decide (left < right))) store) ↔ 11 ≤ fuel) := by
   have evaluation : RuntimeFunctionEvaluatesWithCost types owner (declaration "Bool") (arguments left right)
       store .bool (.bool (decide (left < right))) store 11 :=
-    .intro (preparation left right) (.expression (costed left right store))
+    .intro (preparation left right) (.single <| .expression (costed left right store))
   exact ⟨compilation, compilation.complete, preparation left right, evaluation, fun _ => evaluation.run_done_iff⟩
 
 theorem declared_word_return_rejects_a_bool_less_result :

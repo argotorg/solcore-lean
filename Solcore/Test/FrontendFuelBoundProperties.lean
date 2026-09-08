@@ -188,7 +188,7 @@ private def inputs (type : Core.Ty) (value : Core.Value) (typed : Core.ValueHasT
 private theorem compilation (type : Core.Ty) : RuntimeFunctionCompiles (types type) owner declaration (compiled type) :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
     .cons (.named .head) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names]) .nil,
-    .expression (.identifier .head) (.var .head) (.var .head)⟩
+    .single <| .expression (.identifier .head) (.var .head) (.var .head)⟩
 private theorem preparation (type : Core.Ty) (value : Core.Value) (typed : Core.ValueHasType value type) :
     RuntimeFunctionPrepares (types type) owner declaration [argument type value typed]
       ⟨inputs type value typed, .var 0, type⟩ :=
@@ -215,7 +215,10 @@ theorem checked_local_and_return_endpoints_finish_with_the_same_structural_budge
   have bodyEnough : returnBodyFuelBound (body (ref "x")) ≤ fuel := localEnough
   have localRun := elaborateLocalExpression?_run_done_of_fuelBound localChecked
     (inputs type value typed).sameIds (inputs type value typed).environmentTyped store fuel localEnough
-  have bodyRun := elaborateReturnBody?_run_done_of_fuelBound (preparation type value typed).body.complete
+  have bodyElaboration : ReturnBodyElaborates (inputs type value typed).names
+      (inputs type value typed).context (body (ref "x")) (.var 0) type :=
+    .expression (.identifier .head) (.var .head) (.var .head)
+  have bodyRun := elaborateReturnBody?_run_done_of_fuelBound bodyElaboration.complete
     (inputs type value typed).sameIds (inputs type value typed).environmentTyped store fuel bodyEnough
   obtain ⟨localResult, _, localDone⟩ := localRun
   obtain ⟨bodyResult, bodyResultTyped, bodyDone⟩ := bodyRun
@@ -231,16 +234,16 @@ theorem independently_compiled_identity_uses_only_its_actual_typed_argument
     (type : Core.Ty) (value : Core.Value) (typed : Core.ValueHasType value type)
     (store : Core.Store) (fuel : Nat) (enough : 1 ≤ fuel) :
     RuntimeFunctionEvaluatesWithCost (types type) owner declaration [argument type value typed]
-      store type value store 1 ∧ 1 ≤ returnBodyFuelBound declaration.value.body ∧
+      store type value store 1 ∧ 1 ≤ terminalReturnBodyFuelBound declaration.value.body ∧
     (∃ result, Core.ValueHasType result type ∧ runRuntimeFunction? (types type) owner declaration
       [argument type value typed] fuel store = some (type, .done result store)) ∧
     (∃ result, Core.ValueHasType result type ∧ runRuntimeFunction? (types type) owner declaration
       [argument type value typed] fuel store = some (type, .done result store) ∧
       Core.runStateful fuel (Core.State.initial (.var 0) [value] store) = .done result store) := by
   have evaluated : RuntimeFunctionEvaluatesWithCost (types type) owner declaration [argument type value typed]
-      store type value store 1 := .intro (preparation type value typed) (.expression (.identifier .head .head))
-  have bounded : returnBodyFuelBound declaration.value.body ≤ fuel := by
-    simpa [declaration, body, returnBodyFuelBound, ref, localExpressionFuelBound] using enough
+      store type value store 1 := .intro (preparation type value typed) (.single <| .expression (.identifier .head .head))
+  have bounded : terminalReturnBodyFuelBound declaration.value.body ≤ fuel := by
+    simpa [declaration, body, terminalReturnBodyFuelBound, returnBodyFuelBound, ref, localExpressionFuelBound] using enough
   exact ⟨evaluated, evaluated.cost_le_fuelBound,
     (preparation type value typed).hasType.run_done_of_fuelBound store fuel bounded,
     (compilation type).run_done_of_fuelBound [argument type value typed] rfl store fuel bounded⟩
