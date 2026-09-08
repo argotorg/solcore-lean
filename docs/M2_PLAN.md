@@ -111,16 +111,24 @@ Canonical `~` now has fixed Word-only typing and direct Core complement
 semantics (ADR-0161), reusing the existing 256-bit operation. Its source/Core
 correspondence, typed execution, unused-name preservation, and ID-relabeling
 laws are proved. Arbitrary Word/double-complement and exact fuel tests include
-parsed source execution; Bool/reference coercion and numeric literal policy
-are not introduced.
+parsed source execution; Bool/reference coercion is not introduced.
 
 Numeric spelling now has independent digit/positional natural-number semantics
 and a sound/complete total decoder (ADR-0162). A separate strict Word projection
 rejects values at or above `2^256` without modulo reduction. Whole ASCII spelling,
 nonempty hexadecimal digits, both hex letter cases, arbitrary leading zeroes,
 raw-payload validation, and span irrelevance are proved and tested, including
-complete actual-source parsing. Local-expression acceptance remains unchanged;
-general source numeric typing and overload policy are not inferred from this layer.
+complete actual-source parsing. General source numeric typing and overload
+policy are not inferred from this layer.
+
+The existing monomorphic local-expression adapter now explicitly uses the
+strict Word projection for literal leaves (ADR-0163). Independent resolution,
+typing, evaluation, exact Core correspondence, safety, input insertion, and ID
+relabeling proofs include constants. Actual parsed literal/complement/conditional
+runs cover one/three/five-transition boundaries and preserve nonempty stores.
+Invalid or overflowing literals still block whole checking, even when skipped;
+Word operands do not satisfy Boolean requirements. The narrower reference-only
+adapter and general source inference/overload policy remain unchanged.
 
 The next semantic work should extend the supported local-expression fragment
 to more canonical syntax and source scope construction, preserving binding identity and

@@ -232,5 +232,10 @@ example := @Solcore.Frontend.NumericLiteralDenotes.decimal
 example := @Solcore.Frontend.NumericLiteralDenotes.hexadecimal
 example := @Solcore.Frontend.instReprNumericRadix
 example := @Solcore.Frontend.instDecidableEqNumericRadix
+example := @Solcore.Frontend.ResolvesLocalExpression.wordLiteral
+example := @Solcore.Frontend.LocalExpressionHasType.wordLiteral
+example := @Solcore.Frontend.LocalExpressionEvaluates.wordLiteral
+example := @Solcore.Frontend.AvoidsLocalName.literal
+example := @Solcore.Frontend.resolveLocalExpression?_literal_spans
 
 end Tests

@@ -131,7 +131,7 @@ missing-context failure, and the same value and store endpoints.
 
 This is a monomorphic explicit-table expression fragment, not complete source
 typing or a source-text execution service. The narrower reference adapter stays
-unchanged. Source declarations, literals, overloaded operations, calls, mutation,
+unchanged. Source declarations, general literal typing, overloaded operations, calls, mutation,
 and staging remain separate; no parser or Oracle behavior changes.
 
 Boolean negation `!` now extends this internal adapter (ADR-0158), using the
@@ -163,7 +163,7 @@ Word complement `~` is also supported as a fixed Word-only operation
 raw evaluation, and checked execution preserve its exact 256-bit result and
 store. The operand is evaluated once; named and double-complemented operands
 take three and five Core transitions. Bool/reference inputs are not coerced,
-and numeric literal interpretation remains separate. Tests include arbitrary
+and numeric interpretation uses the separate layer below. Tests include arbitrary
 Words, double-complement involution, raw selected Word operands that cannot
 type-check as Boolean, parsed conditions, and exact fuel boundaries. The
 unused-name and identity-relabeling laws also cover this constructor.
@@ -185,9 +185,25 @@ Public soundness, completeness, uniqueness, and exact failure/range laws are
 proved. Consumers cover both range boundaries and malformed manually built
 ASTs; actual-source tests require complete diagnostic-free parsing.
 
-This layer is not yet connected to local-expression resolution or typing.
-It does not settle general source literal types, `fromInteger`, or overload
-resolution, and does not change the parser, Core, or Oracle/wire interfaces.
+The monomorphic local-expression adapter now adopts this strict Word projection
+for canonical literal leaves (ADR-0163). Independent resolution, typing, and
+evaluation require the mathematical Word meaning; the value is a constant,
+has Word type, and preserves the store. Their exact correspondence, typed
+execution, unused-input insertion, and ID-relabeling proofs include this case.
+Even invalid literal payloads contain no names, so unused-input insertion
+preserves their checking failure as well. Both literal and expression ranges
+are irrelevant. A literal takes one Core transition; `~7` takes three and
+`~~7` takes five, with grouping adding none.
+
+All written branches still check: a skipped invalid or overflowing literal
+blocks checked execution. A valid Word on the right of `&&`/`||` resolves but
+fails Boolean typing, even though raw selected-branch evaluation can return
+that Word. Parsed regressions exercise literals, complement, conditionals,
+exact fuel, nonempty stores, and unchanged results after adding unused inputs
+or relabeling IDs. The reference-only adapter continues to reject literals.
+This limited Word policy does not settle general source literal types,
+`fromInteger`, or overload resolution, and does not change the parser, Core,
+or Oracle/wire interfaces.
 
 ### Typed local input execution
 
@@ -1966,7 +1982,7 @@ language acceptance.
 
 Full source resolution, source type checking, and elaboration into checked
 Semantic Core remain separate later stages. Canonical local references, Boolean
-operators, Word complement, and conditionals connect through the explicit-table adapters described above.
+operators, Word complement, strict Word literals, and conditionals connect through the explicit-table adapters described above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 
