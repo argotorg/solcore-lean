@@ -362,6 +362,16 @@ owner helpers move unchanged into a shared module with old import availability.
 Nominal static success, whole rejection, exact source order, allocator and forged
 record counterexamples are covered without changing compilation or runtime policy.
 
+Whole-entry positional compilation (ADR-0202) now lifts value-free reference
+evidence to exact singleton parameter returns and terminal parameter selectors.
+Forward proofs keep whole static declarations, annotation meanings, header and
+body shape; executable corollaries retain exact records. Inverse contracts use
+existing compilation provenance to recover the positional Core and return type.
+Repeated arm indices and Bool guard/arm aliasing are valid, with no extra bounds
+or distinctness assumptions. Nominal and repeated-type consumers reject equally
+typed wrong Core trees and preserve whole-entry premises. These are proof profiles,
+not new acceptance restrictions; the compiler and runtime policies are unchanged.
+
 Exact execution factorization (ADR-0179) closes the next proof boundary without
 adding another runner. The existing runtime endpoint equals value-free
 compilation, the exact ordered argument-type guard, and Core execution with

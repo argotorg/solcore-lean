@@ -862,6 +862,25 @@ with fresh allocation, and a same-Core/type hand-built record need not satisfy
 compilation provenance. Executable compilation and header/body policies are
 unchanged; runtime argument availability and arity remain separate obligations.
 
+Positional parameter returns now have direct whole-compilation proof interfaces
+(ADR-0202). A singleton identifier return compiles to the exact source-selected
+`Core.var (n - 1 - k)`. A terminal parameter selector compiles to the ordered
+`Core.ifE` of its guard, then and else positions. Forward proofs retain the whole
+parameter declaration, annotation meanings, complete header and actual body shape;
+their executable corollaries retain the exact static input bundle and return type.
+Inverse proofs recover that exact Core and return type from existing compilation
+provenance, without requiring another header or parameter proof.
+
+Distinct parameter indices are not required. Both arms may select one position;
+a Bool-returning selector may also return its condition parameter. Arbitrary and
+nominal types need no runtime inhabitants. Independent and parsed consumers
+distinguish equally typed alternative variables or swapped branches from the
+source-selected Core and preserve whole-header/parameter/branch rejection.
+These proof profiles do not exhaust compiler acceptance: an expression conditional
+inside a singleton return remains independently supported. No compiler, runtime,
+parser, allocation or body policy is changed, and actual execution still requires
+matching supplied typed arguments.
+
 The execution bridge is now a generic proof contract, not only a parsed-test
 observation (ADR-0179). The unchanged runtime endpoint equals value-free
 compilation followed by the ordered argument guard and Core execution using

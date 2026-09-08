@@ -882,6 +882,13 @@ example := @Solcore.Frontend.RuntimeParametersDeclare.reference_resolves_at
 example := @Solcore.Frontend.RuntimeParametersDeclare.reference_elaborates_at
 example := @Solcore.Frontend.RuntimeParametersDeclare.reference_return_elaborates_at
 
+example := @Solcore.Frontend.runtimeFunction_parameter_compiles
+example := @Solcore.Frontend.compileRuntimeFunction?_parameter
+example := @Solcore.Frontend.RuntimeFunctionCompiles.parameter_return_core
+example := @Solcore.Frontend.runtimeFunction_conditional_parameters_compiles
+example := @Solcore.Frontend.compileRuntimeFunction?_conditional_parameters
+example := @Solcore.Frontend.RuntimeFunctionCompiles.conditional_parameters_core
+
 section TerminalEntryContracts
 
 open Solcore Solcore.Frontend
