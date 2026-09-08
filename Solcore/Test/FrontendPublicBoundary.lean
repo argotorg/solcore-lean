@@ -1289,4 +1289,9 @@ example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_mapOwner
 example := @Solcore.Frontend.typedLetReturnTreeEvaluatesWithCost_mapOwner_iff
 example := @Solcore.Frontend.typedLetReturnTreeEvaluates_mapOwner_iff
 
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_congr_lookup
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_congr_lookup
+example := @Solcore.Frontend.typedLetReturnTreeEvaluatesWithCost_congr_lookup_iff
+example := @Solcore.Frontend.typedLetReturnTreeEvaluates_congr_lookup_iff
+
 end Tests

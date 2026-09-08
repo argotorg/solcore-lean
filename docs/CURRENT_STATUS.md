@@ -1182,6 +1182,31 @@ can merge environment keys and change first-match values. A separate index-shift
 example only refutes exact fresh-allocation covariance, not raw result equality.
 No evaluator, checker, entry, Core-state or existing owner-runner policy changes.
 
+### Raw lookup-extensional semantics
+
+Equal composed optional actual-value lookup for every spelling now preserves
+complete direct expression and recursive-body results, including exact cost and
+absence (ADR-0227). The body owners may differ independently. Costed and uncosted
+raw iff laws preserve both the specified initial and final stores. This requires
+no identity map, injection, inverse, equal lengths/order, uniqueness, alignment,
+whole checking or runtime/store typing.
+
+The proof observes identifier values through both first-match lookups. Each let
+uses the actual old-scope initializer value; each side then allocates relative
+to its own name table. Fresh non-membership makes both extensions implement the
+same name update, even when their fresh IDs differ or collide with environment-
+only rows. Other names keep their previous optional values. Selected branches
+retain the original input scope, and expression/body recursion uses original
+syntax size without changing any evaluator or lookup definition.
+
+Independent and parsed consumers contrast different owners/layouts, duplicate
+rows, absent names versus names without values, opaque values, genuine absence,
+strict initialization and raw success versus whole rejection. Index-changing
+relabeling may preserve results without commuting with allocation; changed
+visible first matches need not preserve results. The new premise does not imply
+equal static tables, accepted provenance, compiled Core or checkpoint payloads.
+Checked execution still requires its own whole provenance and matching IDs.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime

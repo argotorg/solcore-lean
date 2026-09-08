@@ -198,6 +198,8 @@ import Solcore.Frontend.TypedLetReturnTreeEvaluatorCorrespondence
 import Solcore.Frontend.TypedLetReturnTreeEvaluatorProperties
 import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
 import Solcore.Frontend.TypedLetReturnTreeRawOwnerProperties
+import Solcore.Frontend.LocalExpressionLookupProperties
+import Solcore.Frontend.TypedLetReturnTreeLookupProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -214,6 +216,9 @@ selected arms. Its exact raw correspondence and checked bridges preserve the
 same acceptance, identity and continuation boundaries. Globally injective owner-only
 relabeling additionally preserves complete direct results and raw value/cost paths
 for arbitrary caller rows, without whole checking, alignment or runtime typing.
+More generally, equal composed actual-value lookups preserve full expression and
+recursive results and raw paths even with different owners and independently
+allocated fresh IDs; internal layouts and Core checkpoints need not be equal.
 General source-program resolution, parser
 changes, and wire publication are not implied. A direct checked entry retains
 the existing preparation gate and original actual parameter bundle; its result

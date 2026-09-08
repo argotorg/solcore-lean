@@ -144,6 +144,8 @@ import Solcore.Test.FrontendRuntimeFunctionEvaluatorProperties
 import Solcore.Test.FrontendParsedRuntimeFunctionEvaluator
 import Solcore.Test.FrontendTypedLetReturnTreeRawOwnerProperties
 import Solcore.Test.FrontendParsedTypedLetReturnTreeRawOwner
+import Solcore.Test.FrontendRawLookupProperties
+import Solcore.Test.FrontendParsedRawLookup
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5717,6 +5719,7 @@ def run : IO Unit := do
   frontendParsedTypedLetReturnTreeEvaluatorTests
   frontendParsedRuntimeFunctionEvaluatorTests
   frontendParsedTypedLetReturnTreeRawOwnerTests
+  frontendParsedRawLookupTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

@@ -601,6 +601,19 @@ values, while an index-shift allocator counterexample is not mislabeled as a
 raw-value counterexample. Existing evaluators, entry gates and typed owner-runner
 contracts are unchanged.
 
+Raw lookup-extensional semantics (ADR-0227) generalizes value/cost invariance to
+equality of composed optional actual-value lookup for every spelling. Full
+expression/body Options and costed/uncosted raw iff laws retain absence and both
+stores, with independently chosen owners and no map, alignment, uniqueness or
+typing premise. Each side's name-table-relative fresh ID implements the same
+name update with the actual strict initializer value, despite different IDs or
+environment-only collisions. Independent and parsed consumers retain missing-
+versus-unbound names, untyped opaque values, genuine absence and raw/whole
+distinctions. Allocation need not commute for raw results to agree. Changed
+visible values can change results, and the new laws do not identify static
+tables, compiled Core or store-bearing checkpoints. Existing definitions,
+checked execution premises, entry gates and source-language policies are unchanged.
+
 Direct checked entry evaluation (ADR-0225) now gates on unchanged runtime
 preparation, then evaluates the original body with its actual parameter-only
 names and values. The result is the declared type, value and exact transition
