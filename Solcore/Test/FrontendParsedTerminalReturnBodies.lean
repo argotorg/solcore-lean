@@ -4,7 +4,7 @@ import Solcore.Frontend.RuntimeFunctionExecutionFactorization
 
 /-! The common body interface preserves both original runners at every fuel.
 Singleton and terminal-conditional profiles retain their own Core, costs and
-actual values; current runtime entries still accept only singleton returns. -/
+actual values when accepted through the integrated runtime entry. -/
 
 set_option autoImplicit false
 
@@ -103,28 +103,23 @@ private def checkEntry (content : String) (supplied : List TypedRuntimeArgument)
   assertTrue (decide (inputs.environment.values = supplied.reverse.map (·.value))) "actual argument order changed"
   checkBody inputs declaration.value.body core type value cost bound
   match declaration.value.body.value with
-  | [⟨_, .returnStmt _⟩] =>
-      match accepted : compileRuntimeFunction? types owner declaration with
-      | none => throw (IO.userError "old singleton entry stopped compiling")
-      | some compiled =>
-          let provenance := compileRuntimeFunction?_sound accepted
-          let some prepared := prepareRuntimeFunction? types owner declaration supplied
-            | throw (IO.userError "actual singleton arguments stopped preparing")
-          assertTrue (decide (compiled.core = core ∧ compiled.returnType = type ∧ prepared.core = core ∧
-            prepared.inputs.environment.values = supplied.reverse.map (·.value))) "entry lost actual compilation projection"
-          if matching : supplied.map (·.type) = compiled.inputs.context.values.reverse then
-            have _ := provenance.run_eq supplied matching bound store
-            for fuel in List.range (bound + 3) do
-              assertTrue (decide (runRuntimeFunction? types owner declaration supplied fuel store =
-                inputs.runTerminalReturnBody? fuel declaration.value.body store)) "old singleton entry behavior changed"
-          else throw (IO.userError "actual singleton argument type order changed")
-  | _ =>
-      assertTrue (returnBodyFuelBound declaration.value.body == 0) "old entry bound silently broadened"
-      assertTrue ((compileRuntimeFunction? types owner declaration).isNone &&
-        (prepareRuntimeFunction? types owner declaration supplied).isNone) "union became runtime entry integration"
-      for fuel in [0, cost, bound, bound + 20] do
-        assertTrue (runRuntimeFunction? types owner declaration supplied fuel store).isNone
-          "old entry runner accepted a terminal statement conditional"
+  | [⟨_, .returnStmt _⟩] => pure ()
+  | _ => assertTrue (returnBodyFuelBound declaration.value.body == 0) "original singleton bound broadened"
+  match accepted : compileRuntimeFunction? types owner declaration with
+  | none => throw (IO.userError "terminal entry stopped compiling")
+  | some compiled =>
+      let provenance := compileRuntimeFunction?_sound accepted
+      let some prepared := prepareRuntimeFunction? types owner declaration supplied
+        | throw (IO.userError "actual terminal arguments did not prepare")
+      assertTrue (decide (compiled.core = core ∧ compiled.returnType = type ∧ prepared.core = core ∧
+        prepared.returnType = type ∧ prepared.inputs.environment.values = supplied.reverse.map (·.value)))
+        "entry lost actual compilation projection"
+      if matching : supplied.map (·.type) = compiled.inputs.context.values.reverse then
+        for fuel in List.range (bound + 3) do
+          have _ := provenance.run_eq supplied matching fuel store
+          assertTrue (decide (runRuntimeFunction? types owner declaration supplied fuel store =
+            inputs.runTerminalReturnBody? fuel declaration.value.body store)) "entry changed terminal body behavior"
+      else throw (IO.userError "actual terminal argument type order changed")
 
 private theorem selectedPiecesEvaluate (inputs : LocalInputs) (blockSpan statementSpan : Syntax.SourceSpan)
     (condition : Syntax.Expr) (thenBody elseBody : Syntax.Block) (choice : Bool) (type : Core.Ty) (value : Core.Value)

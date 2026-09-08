@@ -2,9 +2,9 @@ import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.ConditionalReturnBodyFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionExecutionFactorization
 
-/-! A fully parsed terminal statement conditional uses the separate body API.
-Actual typed parameters and returned cells/closures are retained; neither the
-old singleton adapter nor current runtime entries silently broaden their scope. -/
+/-! A fully parsed terminal statement conditional uses its separate body API
+and the integrated runtime entry. Actual typed parameters and returned
+cells/closures are retained; the original singleton adapter stays narrow. -/
 
 set_option autoImplicit false
 
@@ -88,11 +88,21 @@ private def checkEntry (content : String) (supplied : List TypedRuntimeArgument)
     | throw (IO.userError "actual declaration arguments did not bind")
   assertTrue (decide (inputs.environment.values = supplied.reverse.map (·.value))) "actual argument order changed"
   checkBody inputs declaration.value.body core type value cost bound
-  assertTrue ((compileRuntimeFunction? types owner declaration).isNone &&
-    (prepareRuntimeFunction? types owner declaration supplied).isNone) "entry integration happened outside this adapter"
-  for fuel in [0, cost, bound, bound + 20] do
-    assertTrue (runRuntimeFunction? types owner declaration supplied fuel store).isNone
-      "old runtime function API accepted a terminal statement conditional"
+  match accepted : compileRuntimeFunction? types owner declaration with
+  | none => throw (IO.userError "terminal statement entry did not compile")
+  | some compiled =>
+      let provenance := compileRuntimeFunction?_sound accepted
+      let some prepared := prepareRuntimeFunction? types owner declaration supplied
+        | throw (IO.userError "actual conditional arguments did not prepare")
+      assertTrue (decide (compiled.core = core ∧ compiled.returnType = type ∧ prepared.core = core ∧
+        prepared.returnType = type ∧ prepared.inputs.environment.values = supplied.reverse.map (·.value)))
+        "conditional entry changed the actual compilation or input projection"
+      if matching : supplied.map (·.type) = compiled.inputs.context.values.reverse then
+        for fuel in List.range (bound + 3) do
+          have _ := provenance.run_eq supplied matching fuel store
+          assertTrue (decide (runRuntimeFunction? types owner declaration supplied fuel store =
+            inputs.runConditionalReturnBody? fuel declaration.value.body store)) "entry charged extra body steps"
+      else throw (IO.userError "conditional entry changed ordered argument types")
 
 private theorem selectedPiecesEvaluate (inputs : LocalInputs) (blockSpan statementSpan : Syntax.SourceSpan)
     (condition : Syntax.Expr) (thenBody elseBody : Syntax.Block) (choice : Bool) (type : Core.Ty) (value : Core.Value)

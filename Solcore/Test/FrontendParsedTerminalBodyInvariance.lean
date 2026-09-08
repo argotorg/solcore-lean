@@ -7,7 +7,7 @@ import Solcore.Frontend.RuntimeFunctionStoreProperties
 
 /-! Parsed body identity changes preserve complete same-fuel machine results.
 Store replay preserves actual values and thresholds, not the store-bearing
-results or suspended states. Old entry owner/store contracts remain separate. -/
+results or suspended states. Existing entry owner/store contracts also apply. -/
 
 set_option autoImplicit false
 
@@ -113,26 +113,29 @@ private def checkEntry (content : String) (supplied : List TypedRuntimeArgument)
   checkBody inputs declaration.value.body core type value cost bound
   let singleton := match declaration.value.body.value with | [⟨_, .returnStmt _⟩] => true | _ => false
   if !singleton then
-    assertTrue ((compileRuntimeFunction? types owner declaration).isNone &&
-      (prepareRuntimeFunction? types otherOwner declaration supplied).isNone &&
-      returnBodyFuelBound declaration.value.body == 0) "body invariance broadened old entry acceptance/bound"
+    assertTrue (returnBodyFuelBound declaration.value.body == 0) "original singleton bound broadened"
+  let some compiled := compileRuntimeFunction? types owner declaration
+    | throw (IO.userError "invariant terminal entry did not compile")
+  let some prepared := prepareRuntimeFunction? types otherOwner declaration supplied
+    | throw (IO.userError "relabeled actual terminal arguments did not prepare")
+  assertTrue (decide (compiled.core = core ∧ compiled.returnType = type ∧ prepared.core = core ∧
+    prepared.returnType = type ∧ prepared.inputs.environment.values = supplied.reverse.map (·.value)))
+    "entry relabeling changed actual Core, return type, or argument values"
   for initialStore in stores do
     for fuel in List.range (bound + 3) do
       have _ := runRuntimeFunction?_owner_eq types owner otherOwner declaration supplied fuel initialStore
       let original := runRuntimeFunction? types owner declaration supplied fuel initialStore
       assertTrue (decide (original = runRuntimeFunction? types otherOwner declaration supplied fuel initialStore))
-        "old owner API stopped preserving complete same-fuel results"
-      if singleton then
-        assertTrue (decide (original = inputs.runTerminalReturnBody? fuel declaration.value.body initialStore))
-          "old singleton entry no longer agrees with its original body execution"
-      else assertTrue original.isNone "old entry accepted a conditional statement body"
+        "owner API stopped preserving complete same-fuel results"
+      assertTrue (decide (original = inputs.runTerminalReturnBody? fuel declaration.value.body initialStore))
+        "entry no longer agrees with its terminal body execution"
       for replacement in stores do
         have _ := runRuntimeFunction?_done_store_iff types owner declaration supplied fuel initialStore replacement type value
         have _ := runRuntimeFunction?_outOfFuel_store_iff types owner declaration supplied fuel initialStore replacement type
         let completed := decide (original = some (type, .done value initialStore))
         let replayed := decide (runRuntimeFunction? types owner declaration supplied fuel replacement =
           some (type, .done value replacement))
-        assertTrue (completed == replayed) "old store API lost its own-store completion observation"
+        assertTrue (completed == replayed) "store API lost its own-store completion observation"
 
 private def checkRejected (inputs : LocalInputs) (content : String) : IO Unit := do
   let source ← body content
