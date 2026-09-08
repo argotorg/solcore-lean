@@ -45,6 +45,9 @@ inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | notEqual {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
       AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .notEqual⟩ right }
+  | lessEqual {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
+      AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .lessEqual⟩ right }
   | bitAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
       AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .bitAnd⟩ right }

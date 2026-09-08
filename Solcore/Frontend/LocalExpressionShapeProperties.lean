@@ -104,6 +104,14 @@ theorem resolveLocalExpression?_notEqual_spans (table : LocalNameTable) (left ri
         { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .notEqual⟩ right } := by
   simp only [resolveLocalExpression?]
 
+/-- Unsigned less-or-equal retains the ordered comparison/negation tree and ignores ranges. -/
+theorem resolveLocalExpression?_lessEqual_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .lessEqual⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .lessEqual⟩ right } := by
+  simp only [resolveLocalExpression?]
+
 /-- Word conjunction keeps both operand trees and ignores only the operator/outer ranges. -/
 theorem resolveLocalExpression?_bitAnd_spans (table : LocalNameTable) (left right : Syntax.Expr)
     (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :

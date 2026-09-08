@@ -23,6 +23,7 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
   | logicalNot _ ih | bitNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
   | add _ _ leftIH rightIH | subtract _ _ leftIH rightIH | multiply _ _ leftIH rightIH
   | greater _ _ leftIH rightIH | equal _ _ leftIH rightIH | notEqual _ _ leftIH rightIH
+  | lessEqual _ _ leftIH rightIH
   | bitAnd _ _ leftIH rightIH
   | bitOr _ _ leftIH rightIH | bitXor _ _ leftIH rightIH
   | logicalAnd _ _ leftIH rightIH | logicalOr _ _ leftIH rightIH =>
@@ -101,6 +102,12 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
           obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
           cases same
           exact .notEqual (resolveLocalExpression?_sound leftResult)
+            (resolveLocalExpression?_sound rightResult)
+        case lessEqual =>
+          simp only [bind, Option.bind_eq_some_iff, pure] at result
+          obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+          cases same
+          exact .lessEqual (resolveLocalExpression?_sound leftResult)
             (resolveLocalExpression?_sound rightResult)
         case bitAnd =>
           simp only [bind, Option.bind_eq_some_iff, pure] at result
