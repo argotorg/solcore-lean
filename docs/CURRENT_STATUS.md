@@ -62,8 +62,16 @@ own initializer. Injective identity renaming preserves the exact Core expression
 show that merging two distinct IDs can instead capture an outer reference and
 change its result; the injectivity premise is essential.
 
+A local allocator now chooses an unused ID for an explicit owner and scope.
+Its freshness is relative to that supplied scope, not an unexamined source
+program. Fresh binding insertion preserves lookup and types, changes only the
+corresponding free Core indices, and retains existing evaluation values and
+stores. Inner binders may reuse the inserted ID: their own bindings remain
+nearest. The evaluation-preservation law also covers a skipped ill-scoped
+branch, without mistaking newly enabled elaboration for unchanged scope validity.
+
 The resolved fragment alone is not a canonical source adapter. It does not interpret literal
-spelling, resolve `true`/`false` or overloaded operators, allocate fresh IDs,
+spelling, resolve `true`/`false` or overloaded operators, allocate source-wide IDs,
 decide source shadowing or mutable-declaration semantics, or cover imports,
 polymorphism, functions, and staging. Repeated IDs have explicit first-match
 table behavior; that is not a proof that a source resolver allocates unique IDs.

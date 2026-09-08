@@ -14,8 +14,15 @@ A declaration identity contains an existing `Workspace.ModuleId` and a
 source-declaration index. A local identity adds a binder index within its
 owning declaration. Reusing the workspace module identity retains the library
 namespace: main, standard, and external modules do not become equal merely
-because they share a module path. These are caller-supplied identities; this
-slice does not allocate indices or prove an allocator fresh.
+because they share a module path. These are caller-supplied identities; no
+source declaration traversal or global allocation pipeline is prescribed.
+
+A pure local allocator is available for an explicit owner and supplied scope.
+It returns zero when that owner has no entries, otherwise one above its
+greatest existing binder index. The result is proved absent from the supplied
+scope, independent of its ordering and of other owners' entries. Adding the
+result before allocating again advances its index by one. This does not prove
+freshness relative to identities omitted from the caller's scope.
 
 Ordered local tables carry identities and semantic types or values. Lookup
 selects the first matching identity. This also specifies deterministic behavior
@@ -55,6 +62,11 @@ evaluation judgments are not abbreviations for their Core counterparts.
   without assuming operand types or fresh identities.
 - Uniform injective identity renaming preserves exact Core output, types,
   and named evaluation; identity merging is deliberately not covered.
+- Fresh scope insertion preserves existing lookup, typing, and evaluation.
+  Exact Core elaboration shifts free variable positions while retaining inner
+  binder positions, even when an inner binder uses the newly inserted ID.
+  Independent evaluation preservation needs neither typing nor whole-expression
+  elaboration; no inverse for ill-scoped expressions is claimed by that law.
 
 The store-preservation result is the effect boundary of this fragment. No
 staging judgment is claimed. Fuel is a Core evaluator resource, not source

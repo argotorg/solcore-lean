@@ -12,6 +12,9 @@ import Solcore.Resolved.Scope
 import Solcore.Resolved.ScopeProperties
 import Solcore.Resolved.Renaming
 import Solcore.Resolved.RenamingProperties
+import Solcore.Resolved.FreshIdentity
+import Solcore.Resolved.ScopeExtensionProperties
+import Solcore.Resolved.ScopeExtensionEvaluationProperties
 
 /-!
 Semantic frontend foundation for already-resolved local expressions. Exact

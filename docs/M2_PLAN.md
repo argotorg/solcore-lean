@@ -48,7 +48,10 @@ mutation, overloading, and staging remain outside this slice.
 Type-independent scope validity is now equivalent to elaboration existence.
 Injective resolved-ID renaming preserves exact Core output, checker results,
 and named evaluation; a non-injective capture example fixes the limit of this
-guarantee. These proofs do not presume a source fresh-ID allocator.
+guarantee. A pure scope-relative allocator now supplies the premise for fresh
+binding insertion. Lookup, typing, exact free-index weakening, and independent
+evaluation are preserved, including under inner binders with the inserted ID.
+These proofs do not implement a source declaration traversal or global allocator.
 
 Canonical identifiers and grouping now have an exact explicit-table adapter
 to typed resolved references and Core variables (ADR-0155). The name table does

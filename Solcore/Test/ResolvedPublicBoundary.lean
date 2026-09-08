@@ -85,4 +85,24 @@ example := @Solcore.Resolved.infer?_renameIds
 example := @Solcore.Resolved.typing_renameIds_iff
 example := @Solcore.Resolved.evaluates_renameIds_iff
 
+example := @Solcore.Resolved.freshLocalId
+example := @Solcore.Resolved.freshLocalId_owner
+example := @Solcore.Resolved.freshLocalId_empty
+example := @Solcore.Resolved.lt_freshLocalId_binderIndex
+example := @Solcore.Resolved.freshLocalId_not_mem
+example := @Solcore.Resolved.freshLocalId_cons_fresh_binderIndex
+example := @Solcore.Resolved.freshLocalId_cons_fresh_ne
+example := @Solcore.Resolved.freshLocalId_cons_of_ne_owner
+example := @Solcore.Resolved.freshLocalId_eq_of_perm
+example := @Solcore.Resolved.LocalScope.IndexOf.insert_fresh
+example := @Solcore.Resolved.Lowers.insert_fresh
+example := @Solcore.Resolved.Lowers.weaken_fresh
+example := @Solcore.Resolved.WellScoped.weaken_fresh
+example := @Solcore.Resolved.Expr.lower?_weaken_fresh
+example := @Solcore.Resolved.HasType.weaken_fresh
+example := @Solcore.Resolved.LocalScope.Lookup.insert_fresh
+example := @Solcore.Resolved.Evaluates.insert_fresh
+example := @Solcore.Resolved.Evaluates.weaken_fresh
+example := @Solcore.Resolved.Evaluates.weaken_allocated
+
 end Tests
