@@ -517,5 +517,27 @@ example := @Solcore.Frontend.LocalTypeInputs.bindings
 example := @Solcore.Frontend.LocalTypeInputs.ids_nodup
 example := @Solcore.Frontend.RuntimeParametersDeclareFrom.nil
 example := @Solcore.Frontend.RuntimeParametersDeclareFrom.cons
+example := @Solcore.Frontend.CompiledRuntimeFunction
+example := @Solcore.Frontend.RuntimeFunctionCompiles
+example := @Solcore.Frontend.compileRuntimeFunction?
+example := @Solcore.Frontend.RuntimeFunctionCompiles.complete
+example := @Solcore.Frontend.compileRuntimeFunction?_sound
+example := @Solcore.Frontend.compileRuntimeFunction?_iff
+example := @Solcore.Frontend.RuntimeFunctionCompiles.result_unique
+example := @Solcore.Frontend.compileRuntimeFunction?_eq_none_iff
+example := @Solcore.Frontend.RuntimeFunctionCompiles.core_hasType
+example := @Solcore.Frontend.PreparedRuntimeFunction.toCompiled
+example := @Solcore.Frontend.RuntimeFunctionPrepares.compiles
+example := @Solcore.Frontend.RuntimeFunctionCompiles.prepare_arguments
+example := @Solcore.Frontend.runtimeFunctionPrepares_toCompiled_iff
+example := @Solcore.Frontend.prepareRuntimeFunction?_factorization
+example := @Solcore.Frontend.CompiledRuntimeFunction.mk
+example := @Solcore.Frontend.CompiledRuntimeFunction.inputs
+example := @Solcore.Frontend.CompiledRuntimeFunction.core
+example := @Solcore.Frontend.CompiledRuntimeFunction.returnType
+example := @Solcore.Frontend.RuntimeFunctionCompiles.mk
+example := @Solcore.Frontend.RuntimeFunctionCompiles.header
+example := @Solcore.Frontend.RuntimeFunctionCompiles.parameters
+example := @Solcore.Frontend.RuntimeFunctionCompiles.body
 
 end Tests

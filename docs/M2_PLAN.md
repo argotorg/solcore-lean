@@ -224,10 +224,17 @@ without value evidence; the independent declaration relation exactly matches
 the executable adapter. Existing runtime binding erases to static declaration,
 and an actual typed argument list reconstructs binding precisely when its
 ordered types agree with the declared parameter context. No type-inhabitation
-assumption, argument decoder, or new source policy is introduced. A following
-unit should combine these inputs with the existing exact body elaboration and
-return contract, retaining the explicit argument-type guard when relating
-value-free compilation to runtime preparation.
+assumption, argument decoder, or new source policy is introduced.
+
+Value-free restricted function compilation (ADR-0175) now combines these
+static inputs with the existing header and exact return-body semantics. The
+independent compilation relation characterizes the executable compiler and
+proves typing for the actual open Core in its parameter context. Existing
+runtime preparation factors into this compilation and an exact ordered type
+guard, including arity and rejection; reconstruction uses only actual supplied
+typed arguments. Parsed declarations and independent consumers preserve the
+distinction between static success, argument availability, and runtime outcomes.
+This is not closure generation, a source-call machine, or whole-program lookup.
 
 Further frontend semantics should preserve exact identity, binding, and Core
 execution correspondence while extending supported expressions and declarations.

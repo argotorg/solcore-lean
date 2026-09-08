@@ -501,6 +501,32 @@ rejection. Unsupported annotation forms and repeated names remain outside the
 adapter profile. This is annotation-only preparation, not whole-function
 compilation, source calls, or a new runtime evaluator.
 
+### Value-free restricted function compilation
+
+The restricted explicit function profile now compiles before runtime arguments
+are supplied (ADR-0175). Independent compilation combines the existing header
+meaning, type-only parameter declaration, and exact return-body elaboration.
+The executable compiler agrees exactly with that relation, including rejection,
+and retains the actual Core and declared return type. The output is typed in
+the parameter context: it is open Core, not a closed function value or a source
+call implementation. A hand-built compiled record has no unconditional guarantee.
+
+Existing runtime preparation factors exactly into static compilation followed
+by an ordered argument-type guard. Erasing values from any successful runtime
+preparation gives the exact compiled record; independent compilation and a
+matching actual typed argument list reconstruct runtime preparation. The guard
+preserves individual types, arity, and order, and the optional-result equality
+also includes rejected compilations and mismatched arguments.
+
+Independent proofs and completely parsed declarations cover arbitrary type
+aliases, nominal types without a default typed runtime argument inhabitant,
+exact open-Core typing, equally typed but incorrect hand-built Core, header and
+body rejection, and different actual values sharing one compiled result.
+Existing checked execution retains its full initial/suspended states, returned
+values, stores, and exact fuel boundaries. Compilation alone does not supply
+arguments or assert completion. No parser, Core evaluator, or source-call
+policy is changed.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.
