@@ -15,6 +15,8 @@ inductive Expr.LocalFragment : Expr → Prop where
   | bool {value : Bool} : LocalFragment (.bool value)
   | word {value : Word} : LocalFragment (.word value)
   | var {index : Nat} : LocalFragment (.var index)
+  | pair {left right : Expr} :
+      LocalFragment left → LocalFragment right → LocalFragment (.pair left right)
   | unary {op : UnaryOp} {operand : Expr} :
       LocalFragment operand → LocalFragment (.unary op operand)
   | binary {op : BinaryOp} {left right : Expr} :
@@ -37,6 +39,9 @@ theorem Expr.LocalFragment.weakenAt {expr : Expr}
   | var =>
       simp only [Expr.weakenAt]
       split <;> exact .var
+  | pair _ _ leftIH rightIH =>
+      simp only [Expr.weakenAt]
+      exact .pair (leftIH cutoff) (rightIH cutoff)
   | unary _ ih => simp only [Expr.weakenAt]; exact .unary (ih cutoff)
   | binary _ _ leftIH rightIH =>
       simp only [Expr.weakenAt]
