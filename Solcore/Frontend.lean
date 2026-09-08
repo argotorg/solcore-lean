@@ -114,6 +114,12 @@ import Solcore.Frontend.TerminalReturnBodyExecutionProperties
 import Solcore.Frontend.TerminalReturnBodyRunnerProperties
 import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
 import Solcore.Frontend.TerminalReturnBodyResumptionProperties
+import Solcore.Frontend.ReturnBodyRenamingProperties
+import Solcore.Frontend.ConditionalReturnBodyRenamingProperties
+import Solcore.Frontend.TerminalReturnBodyRenamingProperties
+import Solcore.Frontend.ReturnBodyStoreProperties
+import Solcore.Frontend.ConditionalReturnBodyStoreProperties
+import Solcore.Frontend.TerminalReturnBodyStoreProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,

@@ -269,6 +269,15 @@ including failure and suspended states. Parsed tests retain actual values and
 confirm old singleton entries still work while conditional entries remain
 rejected. The two conditional arms remain singleton bodies, not recursive unions.
 
+The body identity/store layer (ADR-0197) now gives injective exact-elaboration
+transport and unconditional optional checker/full same-fuel runner equality for
+single, conditional and terminal profiles. Raw/cost replay keeps value and cost
+at arbitrary stores; completed observations and exhaustion presence retain each
+store rather than equating entire results. Existing singleton map/replay laws
+move unchanged out of runtime-owner/store modules into acyclic body-only modules,
+with old-import availability retained. Noninjective lookup counterexamples remain
+explicit. Runtime entries, input-shadowing policy and accepted syntax do not change.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while

@@ -640,6 +640,18 @@ pending frames and invalid-unselected-arm rejection. Existing singleton entry
 compilation still behaves as before and still rejects statement conditionals;
 entry integration and its owner/store/provenance contracts remain subsequent work.
 
+Body-level identity and store invariance now cover all three return profiles
+(ADR-0197). Injective ID relabeling preserves independent exact elaboration,
+the full optional checker result and the complete same-fuel runner result,
+including suspended states. Store replay preserves raw values and exact costs
+at any replacement store. Completed observations carry their respective stores;
+fuel exhaustion has equivalent presence, not identical checkpoints across stores.
+Noninjective ID merging still changes first-match lookup and may change results.
+The three existing singleton body renaming/replay proofs were relocated without
+changing their statements or proofs and remain available through the old runtime
+imports. Body-level modules now have no runtime-function dependency or cycle,
+preparing for later entry integration without changing current entry behavior.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime
