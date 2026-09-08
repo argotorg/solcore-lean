@@ -1285,4 +1285,8 @@ example := @Solcore.Frontend.evaluateRuntimeFunctionWithCost?
 example := @Solcore.Frontend.runtimeFunctionEvaluatesWithCost_iff_evaluate
 example := @Solcore.Frontend.evaluateRuntimeFunctionWithCost?_eq_none_iff
 
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_mapOwner
+example := @Solcore.Frontend.typedLetReturnTreeEvaluatesWithCost_mapOwner_iff
+example := @Solcore.Frontend.typedLetReturnTreeEvaluates_mapOwner_iff
+
 end Tests

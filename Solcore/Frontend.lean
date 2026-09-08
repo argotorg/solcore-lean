@@ -197,6 +197,7 @@ import Solcore.Frontend.TypedLetReturnTreeEvaluator
 import Solcore.Frontend.TypedLetReturnTreeEvaluatorCorrespondence
 import Solcore.Frontend.TypedLetReturnTreeEvaluatorProperties
 import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
+import Solcore.Frontend.TypedLetReturnTreeRawOwnerProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -210,7 +211,10 @@ successful output to checked Core paths and fuel thresholds. Raw selected succes
 is not whole acceptance. A direct recursive-body evaluator composes these raw
 expression results with strict old-scope initialization, actual fresh tails and
 selected arms. Its exact raw correspondence and checked bridges preserve the
-same acceptance, identity and continuation boundaries. General source-program resolution, parser
+same acceptance, identity and continuation boundaries. Globally injective owner-only
+relabeling additionally preserves complete direct results and raw value/cost paths
+for arbitrary caller rows, without whole checking, alignment or runtime typing.
+General source-program resolution, parser
 changes, and wire publication are not implied. A direct checked entry retains
 the existing preparation gate and original actual parameter bundle; its result
 exactly matches independent entry cost, and absence is exactly preparation

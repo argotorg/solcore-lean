@@ -586,6 +586,21 @@ do not guarantee pending-frame completion. Independent and parsed depth, scope,
 strict-unused, opaque-value and actual-checkpoint consumers preserve these boundaries.
 Existing entry/checker/raw/bound/parser/Core/Wire policies are not changed.
 
+Raw recursive-body owner covariance (ADR-0226) now preserves full optional direct
+results and independent costed/uncosted raw paths under globally injective
+owner-only maps, including non-surjective maps without inverses. Arbitrary
+duplicate, sparse, unaligned and untyped caller rows are allowed: no static
+input bundle, whole checking or runtime/store typing premise is inserted.
+Original syntax, actual values, row order and binder indices are unchanged.
+Syntax-size recursion composes expression-cost transport with name-table-relative
+fresh allocation and actual strict initializer values; selected branches retain
+their original scope. Both-store correspondence remains exact. Independent and
+parsed consumers preserve raw/whole and genuine-absence distinctions, fresh-ID
+environment collisions and opaque values. Owner collapse can change first-match
+values, while an index-shift allocator counterexample is not mislabeled as a
+raw-value counterexample. Existing evaluators, entry gates and typed owner-runner
+contracts are unchanged.
+
 Direct checked entry evaluation (ADR-0225) now gates on unchanged runtime
 preparation, then evaluates the original body with its actual parameter-only
 names and values. The result is the declared type, value and exact transition

@@ -1158,6 +1158,30 @@ values and genuine checkpoint resumption with each result's own store.
 Existing checkers, raw judgments, bounds, body/entry APIs and parser/Core/Wire
 remain unchanged; this adds no new source form or binding policy.
 
+### Raw recursive-body owner covariance
+
+Globally injective owner-only relabeling now preserves complete direct recursive
+body results and independent raw evaluation/cost in both directions (ADR-0226).
+Unlike the static and typed-runner laws, these contracts apply to arbitrary
+caller rows: duplicate names or IDs, sparse mixed owners, unaligned environments
+and untyped actual values. They require no whole checking, source-name uniqueness,
+ID alignment or runtime/store typing. Source syntax and spans, row order, actual values
+and binder indices remain fixed. Non-surjective maps need no inverse.
+
+The direct-result proof follows original syntax size, preserving the strict
+initializer's obtained value and exact name-table-relative fresh tail. An extra
+environment row may collide with the new identity without defeating the new
+head's first match. Selected arms keep the same input scope. General raw laws
+retain both stores and exact cost; the existing final-store equality is not
+discarded. Success through unknown annotations or invalid unselected children
+is still only raw success, not whole acceptance, and genuine absence is preserved.
+
+Independent and completely parsed consumers exercise depth, sparse scopes,
+opaque values, raw/whole contrasts and non-surjective maps. Collapsing owners
+can merge environment keys and change first-match values. A separate index-shift
+example only refutes exact fresh-allocation covariance, not raw result equality.
+No evaluator, checker, entry, Core-state or existing owner-runner policy changes.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime
