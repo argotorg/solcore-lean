@@ -847,6 +847,21 @@ example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.modulo
 example := @Solcore.Frontend.resolveLocalExpression?_divide_spans
 example := @Solcore.Frontend.resolveLocalExpression?_modulo_spans
 
+example := @Solcore.Frontend.LocalTypeBinding.mapIds
+example := @Solcore.Frontend.LocalTypeBinding.mapIds_id
+example := @Solcore.Frontend.LocalTypeBinding.mapIds_comp
+example := @Solcore.Frontend.LocalTypeInputs.mapIds
+example := @Solcore.Frontend.LocalTypeInputs.mapIds_bindings
+example := @Solcore.Frontend.LocalTypeInputs.mapIds_ids
+example := @Solcore.Frontend.LocalTypeInputs.mapIds_names
+example := @Solcore.Frontend.LocalTypeInputs.mapIds_context
+example := @Solcore.Frontend.LocalTypeInputs.mapIds_id
+example := @Solcore.Frontend.LocalTypeInputs.mapIds_comp
+example := @Solcore.Frontend.LocalInputs.toTypeInputs_mapIds
+example := @Solcore.Frontend.RuntimeParametersDeclare.map_owner
+example := @Solcore.Frontend.RuntimeFunctionCompiles.mapOwner
+example := @Solcore.Frontend.compileRuntimeFunction?_owner_projection_eq
+
 section TerminalEntryContracts
 
 open Solcore Solcore.Frontend

@@ -68,9 +68,14 @@ import Solcore.Frontend.LocalTypeInputs
 import Solcore.Frontend.LocalTypeInputsProperties
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.LocalInputsTypeErasure
+import Solcore.Frontend.LocalOwnerRenaming
+import Solcore.Frontend.LocalTypeInputsRenaming
+import Solcore.Frontend.LocalInputsTypeErasureRenamingProperties
+import Solcore.Frontend.RuntimeParameterDeclarationsOwnerProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.RuntimeFunctionCompilation
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.RuntimeFunctionCompilationOwnerProperties
 import Solcore.Frontend.RuntimeFunctionPreparationFactorization
 import Solcore.Frontend.RuntimeFunctionExecutionFactorization
 import Solcore.Frontend.RuntimeFunctionCompiledExecutionProperties
@@ -127,6 +132,7 @@ type-only and runtime parameter inputs, singleton and terminal-conditional retur
 and restricted explicit
 function entries with value-free compilation. Independent source rules
 connect to checked Core execution. General source-program resolution, parser
-changes, and wire publication are not implied. The separate conditional-body adapter
-does not yet extend the singleton-body function entry profile.
+changes, and wire publication are not implied. Function entries support the
+nonrecursive singleton/terminal-conditional body union; compilation owner
+invariance requires no runtime argument inhabitants.
 -/

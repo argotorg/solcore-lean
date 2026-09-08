@@ -819,6 +819,27 @@ values, stores, and exact fuel boundaries. Compilation alone does not supply
 arguments or assert completion. No parser, Core evaluator, or source-call
 policy is changed.
 
+Owner relabeling is now proved directly for value-free compilation (ADR-0200),
+including nominal types for which the current runtime argument representation
+has no inhabitant. Type-only input rows support injective ID maps with exact
+name/context projections and identity/composition laws. Erasing already supplied
+runtime values commutes with this map; no inverse value construction is added.
+
+Independent empty-start parameter declarations follow their own fresh-ID chain
+under an injective owner map that retains binder indices. Independent compilation
+then retains the exact Core and return type through both terminal body shapes.
+An injective swap connects arbitrary owners and preserves the complete optional
+`(core, returnType, context.values)` projection, including rejection. IDs and
+whole compiled records are relabeled, not asserted equal. The old owner helpers
+and runtime import path remain available with unchanged definitions and proofs.
+
+Independent and parsed consumers cover arbitrary types, uninhabited nominal
+inputs, changed owners with retained source spelling/order/index, full failure
+results and erasure compatibility. Binder-index shifts still do not commute
+with fresh allocation, and a same-Core/type hand-built record need not satisfy
+compilation provenance. Executable compilation and header/body policies are
+unchanged; runtime argument availability and arity remain separate obligations.
+
 The execution bridge is now a generic proof contract, not only a parsed-test
 observation (ADR-0179). The unchanged runtime endpoint equals value-free
 compilation followed by the ordered argument guard and Core execution using

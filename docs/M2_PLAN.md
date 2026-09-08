@@ -340,6 +340,17 @@ typed arguments. Parsed declarations and independent consumers preserve the
 distinction between static success, argument availability, and runtime outcomes.
 This is not closure generation, a source-call machine, or whole-program lookup.
 
+Value-free owner invariance (ADR-0200) now transports static parameter declarations
+and independent compilation directly, without runtime argument inhabitants.
+Type-only rows support injective ID maps and exact projection/identity/composition
+laws; relabeling commutes with erasure of actual supplied inputs. Owner transport
+follows the empty-start fresh-ID chain and retains binder indices. Arbitrary owner
+pairs have equal complete optional Core/return-type/context-type projections,
+including failure, while their identity-bearing records may differ. Existing
+owner helpers move unchanged into a shared module with old import availability.
+Nominal static success, whole rejection, exact source order, allocator and forged
+record counterexamples are covered without changing compilation or runtime policy.
+
 Exact execution factorization (ADR-0179) closes the next proof boundary without
 adding another runner. The existing runtime endpoint equals value-free
 compilation, the exact ordered argument-type guard, and Core execution with

@@ -90,6 +90,8 @@ import Solcore.Test.FrontendTerminalRuntimeEntryProperties
 import Solcore.Test.FrontendParsedTerminalRuntimeEntries
 import Solcore.Test.FrontendWordDivisionProperties
 import Solcore.Test.FrontendParsedWordDivision
+import Solcore.Test.FrontendCompilationOwnerProperties
+import Solcore.Test.FrontendParsedCompilationOwners
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5636,6 +5638,7 @@ def run : IO Unit := do
   frontendParsedTerminalBodyInvarianceTests
   frontendParsedTerminalRuntimeEntriesTests
   frontendParsedWordDivisionTests
+  frontendParsedCompilationOwnersTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
