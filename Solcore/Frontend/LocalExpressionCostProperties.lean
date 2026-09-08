@@ -26,6 +26,7 @@ theorem LocalExpressionEvaluatesWithCost.erase {table : LocalNameTable}
   | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
   | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
   | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
+  | greater _ _ leftIH rightIH => exact .greater leftIH rightIH
   | andTrue _ _ leftIH rightIH => exact .andTrue leftIH rightIH
   | andFalse _ ih => exact .andFalse ih
   | orTrue _ ih => exact .orTrue ih
@@ -75,6 +76,10 @@ theorem LocalExpressionEvaluates.exists_cost {table : LocalNameTable}
       obtain ⟨leftCost, left⟩ := leftIH
       obtain ⟨rightCost, right⟩ := rightIH
       exact ⟨_, .bitXor left right⟩
+  | greater _ _ leftIH rightIH =>
+      obtain ⟨leftCost, left⟩ := leftIH
+      obtain ⟨rightCost, right⟩ := rightIH
+      exact ⟨_, .greater left right⟩
   | andTrue _ _ leftIH rightIH =>
       obtain ⟨leftCost, left⟩ := leftIH
       obtain ⟨rightCost, right⟩ := rightIH
@@ -194,6 +199,13 @@ theorem LocalExpressionEvaluatesWithCost.deterministic {table : LocalNameTable}
   | bitXor _ _ leftIH rightIH =>
       cases rightEvaluation with
       | bitXor leftChild rightChild =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq, rfl⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq, rfl⟩
+  | greater _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | greater leftChild rightChild =>
           obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
           obtain ⟨sameRight, storeEq, rfl⟩ := rightIH rightChild
           cases sameLeft; cases sameRight

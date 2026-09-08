@@ -91,6 +91,13 @@ theorem LocalExpressionEvaluatesWithCost.toStepsWithContinuation
           | binary lowerLeft lowerRight =>
               exact CostStepComposition.binary
                 (leftIH leftChild lowerLeft _) (rightIH rightChild lowerRight _) rfl
+  | greater _ _ leftIH rightIH =>
+      cases resolution with
+      | greater leftChild rightChild =>
+          cases lowered with
+          | binary lowerLeft lowerRight =>
+              exact CostStepComposition.binary
+                (leftIH leftChild lowerLeft _) (rightIH rightChild lowerRight _) rfl
   | andTrue _ _ leftIH rightIH =>
       cases resolution with
       | logicalAnd leftChild rightChild =>
