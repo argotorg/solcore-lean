@@ -43,10 +43,13 @@ import Solcore.Frontend.TypeNameProperties
 import Solcore.Frontend.RuntimeParameters
 import Solcore.Frontend.RuntimeParametersProperties
 import Solcore.Frontend.RuntimeParametersLayout
+import Solcore.Frontend.ReturnBody
+import Solcore.Frontend.ReturnBodyProperties
+import Solcore.Frontend.ReturnBodyExecutionProperties
 
 /-!
-Canonical local-reference, Boolean/Word, and conditional-expression semantic adapters with
-explicit caller-supplied name, type, and runtime tables. Independent source
-typing and evaluation correspond exactly to checked Core execution. No source
-program resolution, parser change, or wire publication is implied.
+Canonical explicit-table frontend adapters for local expressions, type names,
+runtime parameter inputs, and singleton return bodies. Independent source rules
+connect to checked Core execution. General source-program resolution, parser
+changes, and wire publication are not implied.
 -/

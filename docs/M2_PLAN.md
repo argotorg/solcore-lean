@@ -177,9 +177,17 @@ existing local-expression checking and execution without a new evaluator.
 Comptime, generic/signature constraints, function calls and returns, external
 argument validation, and global allocation are not inferred from this adapter.
 
-The next semantic work should extend canonical body and local-expression
-coverage while preserving binding identity and the established Core execution
-correspondence. It must not treat the resolved
+Single-return body semantics (ADR-0169) now wrap bare or expression returns in
+independent type/value/store/cost judgments. Checked bare returns produce Unit
+in one Core transition; expression returns retain the exact child Core and fuel
+behavior. Whole body checking, runtime correspondence, typed execution, and
+fault exclusion are proved without inventing general return control. Parsed
+parameters and actual declaration bodies exercise the composition; the body
+endpoint does not yet check a declared return type or other signature contracts.
+
+The next semantic work should connect explicit signature return contracts to
+the parameter/body adapters, preserving the established execution correspondence
+and keeping general calls and control flow separate. It must not treat the resolved
 immutable expression binder as a decision about mutable source declarations.
 
 ### Source-to-AST coverage

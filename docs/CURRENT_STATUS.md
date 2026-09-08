@@ -369,6 +369,30 @@ evidence; structural reference typing does not imply store allocation. No new
 function-call, body/return, signature-constraint, argument-decoding, global
 allocation, or wire semantics are claimed.
 
+### Single-return canonical bodies
+
+A body containing exactly one canonical return now has independent typing,
+evaluation, and transition-cost semantics (ADR-0169). Bare return elaborates
+to Unit with cost one; an expression return preserves its actual checked Core,
+type, value, both stores, and exact cost. The surrounding block and return do
+not add machine operations. Empty, nested, multi-statement, expression-tail,
+and return-followed-by-statement bodies are not silently reduced to this shape.
+
+The checked body runner uses the existing typed input bundle. Whole body typing
+characterizes checking, checked source evaluation corresponds to Core under
+runtime identity alignment, and typed inputs give a correctly typed result and
+fault exclusion. Raw store/value/cost properties remain independent of whole
+checking. Fixed-fuel completion and exhaustion retain the same exact thresholds;
+a skipped unresolved expression branch still prevents checked execution.
+
+Complete-source body and declaration tests connect parsed parameters to parsed
+returns and compare actual returned Core, full same-fuel expression results,
+nonempty stores, and bare-return zero/one boundaries. The body's inferred type
+is deliberately not a signature contract: a parsed Bool-return annotation with
+a Word-return body still gives Word at this body-only endpoint. Function calls,
+signature checking, general early returns, continuation unwinding, mutable
+locals, and loops remain separate, as do all wire interfaces.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

@@ -29,6 +29,8 @@ import Solcore.Test.FrontendTypeNameProperties
 import Solcore.Test.FrontendParsedTypeNames
 import Solcore.Test.FrontendRuntimeParametersProperties
 import Solcore.Test.FrontendParsedRuntimeParameters
+import Solcore.Test.FrontendReturnBodyProperties
+import Solcore.Test.FrontendParsedReturnBodies
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5551,6 +5553,7 @@ def run : IO Unit := do
   frontendParsedWordBitwiseTests
   frontendParsedTypeNameTests
   frontendParsedRuntimeParameterTests
+  frontendParsedReturnBodyTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
