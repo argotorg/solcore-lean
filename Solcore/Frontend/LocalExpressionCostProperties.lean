@@ -21,6 +21,8 @@ theorem LocalExpressionEvaluatesWithCost.erase {table : LocalNameTable}
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
   | add _ _ leftIH rightIH => exact .add leftIH rightIH
+  | subtract _ _ leftIH rightIH => exact .subtract leftIH rightIH
+  | multiply _ _ leftIH rightIH => exact .multiply leftIH rightIH
   | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
   | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
   | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
@@ -53,6 +55,14 @@ theorem LocalExpressionEvaluates.exists_cost {table : LocalNameTable}
       obtain ⟨leftCost, left⟩ := leftIH
       obtain ⟨rightCost, right⟩ := rightIH
       exact ⟨_, .add left right⟩
+  | subtract _ _ leftIH rightIH =>
+      obtain ⟨leftCost, left⟩ := leftIH
+      obtain ⟨rightCost, right⟩ := rightIH
+      exact ⟨_, .subtract left right⟩
+  | multiply _ _ leftIH rightIH =>
+      obtain ⟨leftCost, left⟩ := leftIH
+      obtain ⟨rightCost, right⟩ := rightIH
+      exact ⟨_, .multiply left right⟩
   | bitAnd _ _ leftIH rightIH =>
       obtain ⟨leftCost, left⟩ := leftIH
       obtain ⟨rightCost, right⟩ := rightIH
@@ -149,6 +159,20 @@ theorem LocalExpressionEvaluatesWithCost.deterministic {table : LocalNameTable}
   | add _ _ leftIH rightIH =>
       cases rightEvaluation with
       | add leftChild rightChild =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq, rfl⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq, rfl⟩
+  | subtract _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | subtract leftChild rightChild =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
+          obtain ⟨sameRight, storeEq, rfl⟩ := rightIH rightChild
+          cases sameLeft; cases sameRight
+          exact ⟨rfl, storeEq, rfl⟩
+  | multiply _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | multiply leftChild rightChild =>
           obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
           obtain ⟨sameRight, storeEq, rfl⟩ := rightIH rightChild
           cases sameLeft; cases sameRight

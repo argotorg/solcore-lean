@@ -53,6 +53,26 @@ inductive LocalExpressionEvaluatesWithCost
       LocalExpressionEvaluatesWithCost table environment initialStore
         { span, value := .binary left ⟨operatorSpan, .add⟩ right }
         (.word (leftValue.add rightValue)) finalStore (leftCost + rightCost + 3)
+  | subtract {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word} {leftCost rightCost : Nat}
+      (leftEvaluation : LocalExpressionEvaluatesWithCost table environment
+        initialStore left (.word leftValue) middleStore leftCost)
+      (rightEvaluation : LocalExpressionEvaluatesWithCost table environment
+        middleStore right (.word rightValue) finalStore rightCost) :
+      LocalExpressionEvaluatesWithCost table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .subtract⟩ right }
+        (.word (leftValue.sub rightValue)) finalStore (leftCost + rightCost + 3)
+  | multiply {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word} {leftCost rightCost : Nat}
+      (leftEvaluation : LocalExpressionEvaluatesWithCost table environment
+        initialStore left (.word leftValue) middleStore leftCost)
+      (rightEvaluation : LocalExpressionEvaluatesWithCost table environment
+        middleStore right (.word rightValue) finalStore rightCost) :
+      LocalExpressionEvaluatesWithCost table environment initialStore
+        { span, value := .binary left ⟨operatorSpan, .multiply⟩ right }
+        (.word (leftValue.mul rightValue)) finalStore (leftCost + rightCost + 3)
   | bitAnd {initialStore middleStore finalStore : Core.Store}
       {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {leftValue rightValue : Core.Word} {leftCost rightCost : Nat}
