@@ -208,7 +208,7 @@ type-only and runtime parameter inputs, singleton and terminal-conditional retur
 and restricted explicit
 function entries with value-free compilation. Independent source rules
 connect to checked Core execution. A direct original-expression evaluator
-accepts exactly two-element canonical tuples as ordered binary products, using
+accepts empty canonical tuples as Unit and two-element tuples as ordered binary products, using
 both original child scopes and actual values. Explicit nesting and existing
 grouping/trailing commas need no parser change; other tuple arities, tuple types
 and projections remain outside this adapter. The evaluator

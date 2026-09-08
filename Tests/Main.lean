@@ -153,6 +153,9 @@ import Solcore.Test.FrontendParsedRawLookup
 import Solcore.Test.FrontendBinaryTupleProperties
 import Solcore.Test.FrontendParsedBinaryTuples
 import Solcore.Test.FrontendParsedBinaryTupleEntries
+import Solcore.Test.FrontendUnitProperties
+import Solcore.Test.FrontendParsedUnits
+import Solcore.Test.FrontendParsedUnitEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5731,6 +5734,8 @@ def run : IO Unit := do
   frontendParsedRawLookupTests
   frontendParsedBinaryTupleTests
   frontendParsedBinaryTupleEntryTests
+  frontendParsedUnitTests
+  frontendParsedUnitEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

@@ -139,9 +139,28 @@ still forward a raw pair while whole Boolean checking fails. Named product
 aliases let existing recursive entries return pairs without tuple type syntax,
 new argument layouts or broader header gates. Existing grouping/trailing commas
 need no parser change, and the old binary-tuple negative becomes an independent
-positive. Empty/manual-singleton/larger tuple expressions, tuple types,
+positive. Empty tuples follow separately in ADR-0231; manual-singleton/larger tuple expressions, tuple types,
 projections and multiple returns remain outside the adapter; Core/resolved
 semantics, diagnostics and frozen wire formats are unchanged.
+
+Canonical empty tuple expressions (ADR-0231) now map to the existing Unit
+constant through independent source resolution, typing, name avoidance and
+raw/exact-cost rules. They require no name/context/environment lookup and keep
+their original ranges and own store. Direct evaluation and the source bound
+are exactly one, matching the existing Core transition. The expression proof
+suite's 80 generic contracts retain their names and premises (56 contracts in
+the 25 changed production modules).
+
+Independent source, complete parsed expressions and function entries cover
+nested Unit/products, arbitrary caller rows, same-typed wrong Core, all fuel
+thresholds and genuine continuation resumption. Nullary Unit and ordered binary
+pairs stay distinct; grouping adds no steps, and strict lets retain binding
+costs. Selected raw short circuits need not be whole-typed. Omitted return
+annotations and caller aliases admit Unit results, without reserving `Unit`
+spelling or bypassing original header/unused-argument gates. The empty-expression
+negative and old unsupported-arity consumer migrate explicitly; tuple types,
+manual singleton/larger tuples, projections and empty/multiple return headers
+remain unsupported. No Core/resolved, diagnostic or frozen wire change is made.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

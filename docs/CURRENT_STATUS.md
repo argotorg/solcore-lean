@@ -177,7 +177,7 @@ static checking, raw/Core correspondence, safety, renaming, fresh insertion,
 store replay, costs, bounds and lookup-extensional direct execution. One cost
 renaming module is split with the old import path retained. Explicit binary
 nesting, grouping and existing trailing commas are supported without parser
-changes. Empty, manually constructed singleton and larger tuple expressions,
+changes. Empty tuples receive a separate meaning in ADR-0231 below; manually constructed singleton and larger tuple expressions,
 tuple type syntax, projections and multiple return annotations remain unsupported.
 The old two-element tuple negative is migrated to an independent positive.
 
@@ -190,6 +190,29 @@ while whole Boolean typing rejects those ill-typed expressions. Existing
 recursive function entries accept pair results through caller-provided named
 product aliases, preserving original parameter-only records and all old gates.
 No Core/resolved semantics, diagnostic, source type or frozen wire policy changes.
+
+Canonical empty tuple expressions now denote the existing Unit constant
+(ADR-0231). The original empty delimited list independently resolves, types,
+avoids names and evaluates to Unit with the same store and exact cost one.
+This leaf requires no caller lookup, actual-value typing, row alignment or
+source-span validity. The direct evaluator and source fuel bound agree with
+the single existing Core unit transition. All 80 existing generic proof
+contracts in the expression proof suite retain their names and premises;
+56 of those contracts occur in the 25 changed production modules.
+
+Independent source, parsed-expression and complete-entry consumers distinguish
+the nullary unit from binary pairs of units, preserve grouping at zero extra
+cost, and retain actual continuations, stores and residual fuel. Raw short
+circuits can forward Unit while whole Boolean checking still fails. Complete
+Unit-return entries support omitted annotations and caller-provided named aliases;
+strict Unit lets retain their two binding transitions and original parameter-only
+records, and unused arguments retain every type/arity gate. The identifier and
+type-name spelling `Unit` are not reserved. The former empty-expression negative
+becomes an independent positive; the old arity rejection adds an explicit
+nonempty premise. Wrong product-return/Unit-body entries remain rejected.
+Manual singleton and larger tuples, tuple type syntax, explicit empty/multiple
+return annotations and projections remain outside this change. Core/resolved
+semantics, parser ranges, diagnostics and frozen wire formats are unchanged.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
