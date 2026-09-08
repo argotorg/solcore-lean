@@ -3439,4 +3439,31 @@ example := @Syntax.Parser.expressionPostfix_unrestrictedChildContract_succ
 example := @Syntax.Parser.expressionPostfix_layer_exists_trace_outcome_of_unrestrictedChildFuels
 example := @Syntax.Parser.expressionPostfixLayerTrace_outcome_exists_of_unrestrictedChildFuels
 
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionUnaryTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.expressionUnaryTraceExactOutcomeSpec
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_success_state_shape
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_success_context
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_diagnostics_eq_onSuccess
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_ne_reject
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_trace_success_sound
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_trace_success_complete
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_trace_success_state_iff
+example := @Syntax.Parser.ExpressionInternals.unaryOperators_exists_exact_trace_outcome
+example := @Syntax.Parser.ExpressionInternals.unaryOperatorsTrace_outcome_exists
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_sound
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_reject_trace_sound
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_complete
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_complete
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_context
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_failure_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_success_state_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_failure_state_iff
+example := @Syntax.Parser.ExpressionInternals.expressionUnary_trace_reject_state_iff
+
 end Tests

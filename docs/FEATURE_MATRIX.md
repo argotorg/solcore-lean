@@ -120,6 +120,8 @@ published through Oracle v4.
 | Numeric-window atom contract composition | Numeric-only endIndex frames lift through raw/core/recovery; bounded child contracts and rejected endpoint preservation construct actual atom contracts up to both child successor budgets | No source/token/endByte/validity frame; conditional layer step, not recursive closure | High |
 | Rejected-endpoint recovery consumer | Always-rejecting children have every fuel contract, yet a changed rejected endIndex becomes public success; independent reverse traces retain full State and ordered diagnostics | Demonstrates why child success-only endpoint laws cannot frame public recovery | High |
 | Constructed postfix child contracts | Actual atom contract is built internally; numeric suffix frames and bounded children give ordinary execution, successor contracts, and separate child-only layer trace existence | Numeric totality and stronger trace context frames remain separate; recursive closure still open | High |
+| Prefix unary scanning | Exact maximal operators and complete silent States, no rejection, unconditional production success, and separate independent existence on arbitrary carriers | Scanning only; postfix execution remains separate | High |
+| Unary diagnostic traces | Independent exact wrapped ASTs and postfix event/report forwarding, four independently lifted contracts, separate success context, and weak-frame whole-State iff | Postfix-conditional; joint exactness does not establish complete-expression existence | High |
 | Public source wire interface | Planned | New additive protocol after the frontend semantic stages are coherent | High |
 
 Recursive type, type-alias, shared generic-parameter, and enum soundness are

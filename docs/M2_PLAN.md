@@ -1243,6 +1243,13 @@ frames suffice for ordinary execution and the successor contract step. Concrete
 layer soundness additionally supplies child-only actual/independent trace existence
 under its source/window frames, without joint-exactness or completeness assumptions.
 
+Unary traces now preserve maximal source-order operators, exact wrapped ASTs,
+postfix events, and the terminal report. Scanner production is unconditionally
+successful with complete silent-State correspondence and separate existence.
+The unary layer independently lifts corresponding postfix soundness/completeness
+contracts; whole-State iff adds only a matching weak file/endByte frame. No
+child progress or joint law is mistaken for recursive expression totality.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

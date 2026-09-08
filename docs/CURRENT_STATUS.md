@@ -1699,6 +1699,18 @@ the concrete layer soundness and explicit full-window child contexts supplies
 actual and independent postfix-layer trace existence using only child premises.
 No independent joint law or completeness assumption replaces totality.
 
+Prefix unary diagnostic traces now reuse the exact maximal source-order operator
+grammar and preserve the entire postfix event suffix and terminal report. The
+scanner is silent at every successful fuel/accumulator and never rejects; its
+production scan has unconditional full-State correspondence and separate actual
+and independent successful existence on arbitrary numerical carriers. Each of
+the four postfix trace directions lifts independently through the unary layer,
+without child framing, progress, joint exactness, or totality assumptions.
+Successful full-window context is separate; complete success/rejection State iff
+laws need only the corresponding postfix file/endByte frame. Independent unary
+joint exactness remains conditional on postfix joint exactness and does not give
+complete-expression outcome existence.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

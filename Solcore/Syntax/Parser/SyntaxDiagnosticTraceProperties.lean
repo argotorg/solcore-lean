@@ -227,6 +227,12 @@ import Solcore.Syntax.Parser.ExpressionAtomUnrestrictedChildContractProperties
 import Solcore.Syntax.Parser.PostfixNumericWindowProperties
 import Solcore.Syntax.Parser.ExpressionPostfixUnrestrictedChildContractProperties
 import Solcore.Syntax.Parser.ExpressionPostfixLayerTraceExistenceProperties
+import Solcore.Syntax.DeclarativeExpressionUnaryTraceGrammar
+import Solcore.Syntax.DeclarativeExpressionUnaryTraceProperties
+import Solcore.Syntax.Parser.UnaryOperatorsTraceProperties
+import Solcore.Syntax.Parser.ExpressionUnaryTraceProperties
+import Solcore.Syntax.Parser.ExpressionUnaryTraceCorrespondenceProperties
+import Solcore.Syntax.Parser.ExpressionUnaryTraceStateProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -293,4 +299,5 @@ separate bounded composition totality and trace existence still require an atom 
 atom ordinary execution also accepts bounded body contracts, and one concrete atom/postfix layer retains explicit child frames;
 numeric-only success/rejection frames compose through recovery, constructing an atom fuel contract from two bounded children;
 actual postfix contracts now construct the intermediate atom internally, and child-only bounded soundness supplies layer trace existence;
+unary prefixes have unconditional silent full-State scanning and existence; corresponding postfix contracts lift independently through unary traces;
 general expressions and remaining statement traces remain open. -/
