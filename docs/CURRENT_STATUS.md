@@ -90,7 +90,7 @@ foundation, not canonical `<` support or a hidden source temporary allocator;
 existing resolver and arbitrary identity-map guarantees are unchanged.
 
 An independent Core local-fragment predicate and exact environment-insertion
-equivalence are now available (ADR-0188). Its eight structural forms match the
+equivalence are now available (ADR-0188). Its structural forms include the
 current resolved lowering; a separate `Lowers.localFragment` proof connects
 them without Core depending on Resolved evaluation. With free indices shifted
 past an arbitrary inserted value behind any retained prefix, successful
@@ -125,6 +125,22 @@ equating distinct suspended states or executing an outer continuation early.
 This adds no typing or runtime-world premise and does not yet enable canonical
 `<` or `>=`.
 
+Binary pair construction now belongs to this independent local fragment
+(ADR-0228), extending the original eight forms to nine. Both children must
+belong, including syntactically present children that a conditional skips.
+Existing evaluation, typing, inference and exact-cost insertion contracts keep
+their original names and premises. Each pair evaluates left then right in the
+original environment, retains actual component values and ordered stores, and
+costs both child costs plus three. Shared-cost proofs build each side's own
+pair frames and saved environment under the same unexecuted outer continuation.
+Independent proof and executable consumers cover nested pairs/lets, retained
+prefixes, opaque values, nominal static types, missing/wrong children and actual
+pair checkpoints/resumption. Neither state equality nor typed inhabitants are
+assumed. Core semantics and frozen wire rejection are unchanged; projections,
+closures/calls and cell access remain excluded from this predicate. Resolved
+pair representation and canonical two-element tuple acceptance remain separate
+next steps, with no decision here about larger tuples or tuple type syntax.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
@@ -148,7 +164,7 @@ correspondence, determinism, store preservation, renaming and fresh insertion/
 reflection contracts remain unchanged. Arbitrary structural ID maps introduce no
 allocation problem; semantic map preservation keeps its existing injectivity
 premise, and duplicate IDs keep first-match lookup. The expansion still belongs
-to the eight-form Core predicate. Raw evaluation may skip an unresolved or
+to the local Core predicate. Raw evaluation may skip an unresolved or
 ill-typed child, while whole lowering/typing still checks it. The explicit-ID
 builder remains available with its original hygiene contract. That representation
 unit did not enable canonical source `<`; its adapter integration is described below.

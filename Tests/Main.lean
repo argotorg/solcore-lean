@@ -72,6 +72,8 @@ import Solcore.Test.CoreLocalFragmentTypingInsertionProperties
 import Solcore.Test.CoreLocalFragmentTypingInsertionBoundary
 import Solcore.Test.CoreLocalFragmentExactInsertionProperties
 import Solcore.Test.CoreLocalFragmentExactInsertionBoundary
+import Solcore.Test.CoreLocalFragmentPairProperties
+import Solcore.Test.CoreLocalFragmentPairBoundary
 import Solcore.Test.CoreLocalRightWordLessProperties
 import Solcore.Test.CoreLocalRightWordLessBoundary
 import Solcore.Test.ResolvedWordLessProperties
@@ -5662,6 +5664,7 @@ def testCanonicalRawLexing : IO Unit := do
       s!"canonical source {reprStr raw.id} exceeded the lexer bound"
 
 def run : IO Unit := do
+  coreLocalFragmentPairBoundaryTests
   resolvedLocalSemanticsTests
   frontendParsedLocalExpressionTests
   frontendParsedWordLiteralTests

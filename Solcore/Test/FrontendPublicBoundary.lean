@@ -647,6 +647,7 @@ example := @Solcore.Core.Expr.LocalFragment.unit
 example := @Solcore.Core.Expr.LocalFragment.bool
 example := @Solcore.Core.Expr.LocalFragment.word
 example := @Solcore.Core.Expr.LocalFragment.var
+example := @Solcore.Core.Expr.LocalFragment.pair
 example := @Solcore.Core.Expr.LocalFragment.unary
 example := @Solcore.Core.Expr.LocalFragment.binary
 example := @Solcore.Core.Expr.LocalFragment.letE

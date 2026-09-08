@@ -67,7 +67,7 @@ or change the existing resolver's identity-map contract.
 
 The next prerequisite, exact untyped insertion for the local Core fragment
 (ADR-0188), is proved independently of Resolved correspondence. A structural
-eight-form predicate is closed under weakening and includes every currently
+predicate is closed under weakening and includes every currently
 lowered resolved expression. Inserting an arbitrary runtime value behind any
 retained prefix while shifting free indices preserves and reflects exact
 evaluation values/stores, including under nested lets and for missing variables.
@@ -95,6 +95,19 @@ at empty-continuation final endpoints. Existing fuel and resumption laws can
 be reused while genuine suspended states remain distinct. Canonical ordered
 `<` integration remains a separate representation-and-adapter change.
 
+Binary pairs now extend the initial eight-form local predicate to nine forms
+(ADR-0228). Existing evaluation/typing insertion iff, complete inference equality
+and exact path transport/reflection keep their names and premises. Left and
+right children use the same original environment and ordered actual stores;
+pair costs are their costs plus three. Shared child costs precede arbitrary
+continuations, and each side retains its own pair frames and captured environment.
+Independent proof and executable consumers cover nesting, retained prefixes,
+opaque values, nominal static types without inhabitants, missing/wrong children
+and real checkpoint resumption. Core semantics, projections, closure/cell
+exclusions and wire policies do not change. Resolved pair representation and
+canonical two-element source tuples are separate next integration steps;
+larger tuples, tuple type syntax and projection spelling remain undecided here.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
@@ -112,7 +125,7 @@ lowering, checker, store, determinism, renaming and fresh-insertion/reflection
 theorems include this form without stronger premises. Arbitrary structural maps
 need no fresh allocation; semantic invariance still requires injectivity and
 duplicate IDs retain first-match behavior. The Core expansion remains in the
-eight-form local predicate. Raw skipped-child success does not excuse whole
+local predicate. Raw skipped-child success does not excuse whole
 scope/type rejection. Explicit-ID builders remain unchanged. Canonical source
 `<` support and its negative-fixture migration are completed below in ADR-0193.
 
