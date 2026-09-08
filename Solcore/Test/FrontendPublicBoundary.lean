@@ -589,5 +589,16 @@ example := @Solcore.Frontend.runRuntimeFunction?_done_store_iff
 example := @Solcore.Frontend.runRuntimeFunction?_outOfFuel_store_iff
 example := @Solcore.Frontend.RuntimeFunctionCompiles.compiled_done_store_iff
 example := @Solcore.Frontend.RuntimeFunctionCompiles.compiled_outOfFuel_store_iff
+example := @Solcore.Frontend.localExpressionFuelBound
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.cost_le_fuelBound
+example := @Solcore.Frontend.elaborateLocalExpression?_run_done_of_fuelBound
+example := @Solcore.Frontend.LocalInputs.run?_done_of_fuelBound
+example := @Solcore.Frontend.returnBodyFuelBound
+example := @Solcore.Frontend.ReturnBodyEvaluatesWithCost.cost_le_fuelBound
+example := @Solcore.Frontend.elaborateReturnBody?_run_done_of_fuelBound
+example := @Solcore.Frontend.LocalInputs.runReturnBody?_done_of_fuelBound
+example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.cost_le_fuelBound
+example := @Solcore.Frontend.RuntimeFunctionHasType.run_done_of_fuelBound
+example := @Solcore.Frontend.RuntimeFunctionCompiles.run_done_of_fuelBound
 
 end Tests

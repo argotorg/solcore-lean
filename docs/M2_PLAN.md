@@ -265,6 +265,14 @@ nor apply to arbitrary Core reads/effects or execution of supplied closures.
 Raw skipped-invalid-branch examples remain distinct from whole checked rejection;
 parsed tests retain each empty/nonempty store and exact selected-path costs.
 
+Source-derived fuel bounds (ADR-0182) supply computable sufficient Core budgets
+for the current fragment and singleton return bodies, uniformly over actual
+argument values. Independent costs are bounded by structural arithmetic and
+branch maxima; complete typing/preparation then guarantees typed store-preserving
+completion at every budget at least the bound, including proven compiled Core.
+The bound may exceed the selected path's exact cost and does not grant acceptance
+to unsupported syntax, invalid branches, or mismatched/uninhabited argument types.
+
 Binary Word addition (ADR-0176) now extends the expression fragment through
 existing body, entry, and value-free compilation bridges. Its independent
 rules require two Word operands, preserve strict left-to-right evaluation,

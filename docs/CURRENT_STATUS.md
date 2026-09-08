@@ -632,6 +632,19 @@ consumers include a store-preserving Core read with store-dependent results;
 fully parsed entries cover distinct empty/nonempty stores, selected arithmetic
 and short-circuit costs, supplied references/closures, and whole guard rejection.
 
+Source-computable sufficient fuel bounds now strengthen existential termination
+(ADR-0182). Structural expression bounds follow the existing transition costs,
+using a maximum of branches instead of inspecting actual values; short-circuit
+forms also budget for their inserted Boolean constant. Every independent raw
+cost is below this bound, including raw evaluation that skips an invalid branch.
+Singleton return bodies inherit the bound without extra wrapper steps. Checked
+expressions, typed bodies/entries, and proven compiled functions with matching
+actual typed arguments finish with a typed value and unchanged store at every
+fuel at least the source bound. The same numerical budget applies across actual
+argument values but can overestimate a selected path. It is neither a checker,
+an exact/minimal cost, nor a gas/time estimate; zero for unsupported syntax/body
+shapes does not bypass whole rejection or create an inhabitant of a declared type.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.
