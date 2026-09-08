@@ -134,6 +134,19 @@ def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
     [⟨.cell .word, .cellRef .word 40, .cellRef⟩] (.var 0) (.cell .word) (.cellRef .word 40) 1 []
   checkAccepted types "function closure(x: Fn) returns (Fn) { return x; }"
     [⟨.function .bool .bool, closure, closureTyped⟩] (.var 0) (.function .bool .bool) closure 1
+  -- Every source position is checked across several arities, not only endpoints.
+  let pool : List (String × TypedRuntimeArgument) :=
+    [("Bool", boolArg false), ("Word", wordArg seven), ("Bool", boolArg true), ("Word", wordArg nine),
+     ("U", ⟨.unit, .unit, .unit⟩), ("Cell", ⟨.cell .word, .cellRef .word 40, .cellRef⟩),
+     ("Fn", ⟨.function .bool .bool, closure, closureTyped⟩), ("Word", wordArg seven.bitNot)]
+  for arity in [1, 2, 3, 4, 5, 6, 7, 8] do
+    let rows := pool.take arity
+    let parameters := String.intercalate ", " (rows.zipIdx.map fun (row, index) => s!"p{index}: {row.1}")
+    for (selected, index) in rows.zipIdx do
+      let content := s!"function projection_{arity}_{index}({parameters}) returns ({selected.1})"
+        ++ " { return " ++ s!"p{index};" ++ " }"
+      checkAccepted types content (rows.map Prod.snd) (.var (arity - 1 - index))
+        selected.2.type selected.2.value 1 []
   let mismatch := "function mismatch() returns (Bool) { return 7; }"
   let some mismatched ← parsed? mismatch
     | throw (IO.userError "return mismatch example did not parse")
