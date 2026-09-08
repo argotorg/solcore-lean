@@ -1230,6 +1230,13 @@ lambda/core/public atom totality laws; expression and body bounds stay separate.
 These ordinary laws do not imply successful numeric-window preservation through
 recovery or construct the atom progress contract.
 
+Separate numeric endIndex frames now lift through both ordinary outcomes of
+raw/core/public atoms. Child bounded contracts plus rejected-child endpoint
+preservation construct the actual atom contract for A ≤ N+1 and A ≤ B+1, without
+source/token/endByte/validity frames. An independent reverse recovery consumer
+shows that child fuel contracts alone do not suffice: a rejected endpoint change
+survives as public success. Recursive expression/block closure remains separate.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

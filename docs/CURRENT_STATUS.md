@@ -1675,6 +1675,20 @@ bounds. The real lam marker pays one body-budget unit before concrete parameters
 and return annotations. This ordinary law still permits replacement rejected
 windows and does not establish the atom's success endIndex/progress contract.
 
+Numeric-only frames now compose through delimiter loops, raw collections,
+selected atoms, and public recovery. They preserve only endIndex on both ordinary
+outcomes and leave invariant replies unconstrained; source, tokens, endByte,
+diagnostics, progress, and validity are not part of this frame. Combined with
+the bounded child contracts and existing cursor-progress laws, rejected-child
+endIndex preservation constructs an actual public-atom contract at any budget
+A with A ≤ N+1 and A ≤ B+1, including the equal-budget successor step.
+A reverse consumer demonstrates why the rejected endpoint premises are needed:
+two always-rejecting children satisfy every three-field fuel contract, but one
+changes endIndex from three to four and public recovery succeeds with that
+changed endpoint. Independent core/recovery traces reconstruct the exact State
+and ordered report/recovery events for arbitrary content and prior diagnostics.
+This supplies a conditional atom-layer contract, not recursive expression closure.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

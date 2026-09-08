@@ -3404,4 +3404,30 @@ example := @Syntax.DeclarativeGrammar.expressionPostfixLayerTraceExactOutcomeSpe
 example := @Syntax.Parser.expressionPostfix_layer_trace_success_sound
 example := @Syntax.Parser.expressionPostfix_layer_reject_trace_sound
 
+example := @Syntax.Parser.Reply.PreservesEndIndex
+example := @Syntax.Parser.Parser.PreservesEndIndex
+example := @Syntax.Parser.Reply.PreservesEndIndex.trans
+example := @Syntax.Parser.Parser.PreservesEndIndex.of_success_reject
+example := @Syntax.Parser.Parser.PreservesEndIndex.endIndex_eq_of_ok
+example := @Syntax.Parser.Parser.PreservesEndIndex.endIndex_eq_of_reject
+example := @Syntax.Parser.Parser.PreservesTokenWindow.preservesEndIndex
+example := @Syntax.Parser.pure_preservesEndIndex
+example := @Syntax.Parser.bind_preservesEndIndex
+example := @Syntax.Parser.closeDelimited_preservesEndIndex
+example := @Syntax.Parser.afterDelimitedElement_preservesEndIndex
+example := @Syntax.Parser.delimitedWithPolicy_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.closeTuple_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.tupleTail_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.parenthesized_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.optionalDotConstructorArguments_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.dotConstructor_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.arrayLiteral_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_preservesEndIndex
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_preservesEndIndex
+example := @Syntax.Parser.expressionAtom_preservesEndIndex
+example := @Syntax.Parser.expressionAtom_endIndex_onSuccess
+example := @Syntax.Parser.expressionAtom_endIndex_onReject
+example := @Syntax.Parser.expressionAtom_unrestrictedChildContract
+example := @Syntax.Parser.expressionAtom_unrestrictedChildContract_succ
+
 end Tests

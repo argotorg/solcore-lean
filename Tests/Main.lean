@@ -205,6 +205,7 @@ import Solcore.Test.SyntaxExpressionAtomRejectionContextProperties
 import Solcore.Test.SyntaxExpressionAtomTraceSupport
 import Solcore.Test.SyntaxExpressionAtomTraceProperties
 import Solcore.Test.SyntaxExpressionAtomTotalityProperties
+import Solcore.Test.SyntaxExpressionAtomNumericWindowProperties
 import Solcore.Test.SyntaxPostfixTailProgressSupport
 import Solcore.Test.SyntaxPostfixTailProgressProperties
 import Solcore.Test.SyntaxPostfixTailTraceSupport
