@@ -1264,4 +1264,21 @@ example := @Solcore.Frontend.LocalInputs.run?_done_iff_evaluator
 example := @Solcore.Frontend.LocalInputs.run?_outOfFuel_iff_evaluator
 example := @Solcore.Frontend.LocalInputs.typed_evaluator_execution
 
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_sound
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_complete
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_iff
+example := @Solcore.Frontend.typedLetReturnTreeEvaluatesWithCost_iff_evaluate
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_eq_none_iff
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_exists_cost_iff
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_value_iff
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_checked_toStepsWithContinuation
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_checked_runStateful_done_iff
+example := @Solcore.Frontend.evaluateTypedLetReturnTreeWithCost?_checked_runStateful_outOfFuel_iff
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_run_done_iff_evaluator
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_typed_evaluator_exists
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_done_iff_evaluator
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_outOfFuel_iff_evaluator
+example := @Solcore.Frontend.LocalInputs.typedLetReturnTree_evaluator_execution
+
 end Tests

@@ -579,7 +579,8 @@ ends before its pending frames execute; no whole-run guarantee follows there.
 Independent and parsed consumers exercise exact operator values/costs, literal
 boundaries, first-match rows, raw/whole rejection and real machine checkpoints.
 No existing checker, evaluator, body/entry, parser/Core/Wire or binding policy
-changes; direct recursive-body evaluation remains a separate later composition.
+changes within this unit; recursive-body evaluation composes it separately in
+ADR-0224.
 
 ### Explicit canonical type names
 
@@ -1125,6 +1126,37 @@ are exercised by independent depth proofs and complete parsed declarations,
 alongside asymmetric costs, unused initializers, opaque actual values and real
 checkpoints. No old body/entry, owner, raw/cost, bound/resumption, parser/Core/Wire
 or broader binding policy is changed by this unit.
+
+### Recursive typed let/return trees: direct evaluation
+
+A total original-block evaluator composes the direct expression evaluator with
+the existing independent recursive raw grammar (ADR-0224). It returns the exact
+value and Core-transition cost without checking, lowering or running Core.
+Singleton bare returns cost one; expression returns keep the child result.
+Annotated, initialized head lets evaluate strictly in the old scope, then place
+the actual value under the name-table-relative fresh ID in the extended tail.
+Let and selected if/else paths add two to their child costs. Unused initializers
+still execute; only the selected conditional arm is visited.
+
+Independent soundness/completeness and exact absence/value-projection laws
+preserve the old raw rules. General store correspondence explicitly requires
+the final store to equal the initial store. Annotation presence is required,
+but its meaning, type agreement and unused-name checks remain whole-checker
+obligations. Duplicate spellings, sparse mixed owners, untyped values and
+unaligned environments are legitimate raw inputs. Even an extra environment
+row colliding with the fresh ID cannot replace the newly prepended actual value.
+Missing annotation/initializer/else, empty bodies or trailing statements are
+not silently ignored. Opaque values are forwarded, not allocated or invoked.
+
+Whole checking and actual ID alignment separately yield exact Core paths and
+fuel thresholds. Checked completion reflects the computed value and cost;
+typed aligned actual inputs supply successful typed results. Bundled runner
+equivalences retain whole typing, and retained-continuation paths stop before
+pending frames run. Independent depth proofs and complete parsed consumers
+exercise actual scopes, raw/whole contrasts, strict asymmetric costs, opaque
+values and genuine checkpoint resumption with each result's own store.
+Existing checkers, raw judgments, bounds, body/entry APIs and parser/Core/Wire
+remain unchanged; this adds no new source form or binding policy.
 
 ### Explicit restricted runtime function entry
 

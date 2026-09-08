@@ -236,7 +236,7 @@ actual environments supply successful output; bundled runner equivalences retain
 whole source typing. Retained-continuation endpoints do not guarantee completion.
 Independent and complete parsed consumers retain raw/checked, literal, row-order,
 opaque-value and actual-checkpoint boundaries. Existing APIs and language policies
-stay fixed; direct recursive-body evaluation is a later composition.
+stay fixed; direct recursive-body evaluation composes it separately in ADR-0224.
 
 Explicit monomorphic type-name interpretation (ADR-0167) now supplies a first
 bridge from canonical named/no-arguments types to caller-provided Core types.
@@ -568,6 +568,23 @@ multi-chunk checkpoints. Valid arm-local rejections become exact successes;
 missing annotations/initializers, shadowing, sibling leakage, mismatched returns,
 bad headers/arguments and invalid unselected children still reject. No inference,
 defaults, general calls, separate block wrappers or broader binding policy is added.
+
+Direct recursive-body evaluation (ADR-0224) now executes the existing raw typed
+let/return-tree grammar on original blocks and actual explicit tables, composing
+the direct expression evaluator. Strict old-scope initializers supply real values
+to name-table-relative fresh tails; selected conditions retain the original scope.
+Child costs add two per let/if, with bare return one and expression return unchanged.
+Independent soundness/completeness, absence and uncosted projection laws retain
+the necessary final-store equality. Annotation presence is a raw shape requirement,
+not meaning/type/unused-name checking. Duplicate names and environment-only fresh
+ID collisions preserve exact first-match behavior; omitted shapes or trailing
+statements remain absent. Raw selected success can still fail whole checking.
+Whole acceptance and ID alignment separately supply exact Core paths and fuel
+thresholds; actual typed inputs provide existence, and completed runs reflect the
+computed value/cost. Bundled laws retain whole typing and continuation endpoints
+do not guarantee pending-frame completion. Independent and parsed depth, scope,
+strict-unused, opaque-value and actual-checkpoint consumers preserve these boundaries.
+Existing entry/checker/raw/bound/parser/Core/Wire policies are not changed.
 
 Arbitrary-position parameter semantics (ADR-0171) now connect source index `k`
 to identity `(owner, k)`, exact Core position `n - 1 - k`, and the original

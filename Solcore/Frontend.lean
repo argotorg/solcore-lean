@@ -191,6 +191,10 @@ import Solcore.Frontend.TypedLetReturnTreeOwnerProperties
 import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
 import Solcore.Frontend.TypedLetReturnTreeTypeExtensionProperties
 import Solcore.Frontend.TypedLetReturnTreeRunnerTypeExtensionProperties
+import Solcore.Frontend.TypedLetReturnTreeEvaluator
+import Solcore.Frontend.TypedLetReturnTreeEvaluatorCorrespondence
+import Solcore.Frontend.TypedLetReturnTreeEvaluatorProperties
+import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -201,7 +205,10 @@ connect to checked Core execution. A direct original-expression evaluator
 returns exactly the independent raw value and transition cost without checking
 or Core execution; whole checking and actual ID alignment separately connect
 successful output to checked Core paths and fuel thresholds. Raw selected success
-is not whole acceptance. General source-program resolution, parser
+is not whole acceptance. A direct recursive-body evaluator composes these raw
+expression results with strict old-scope initialization, actual fresh tails and
+selected arms. Its exact raw correspondence and checked bridges preserve the
+same acceptance, identity and continuation boundaries. General source-program resolution, parser
 changes, and wire publication are not implied. Function entries support finite
 alternation of typed lets and terminal if/else trees inside either arm; compilation owner
 invariance requires no runtime argument inhabitants.
