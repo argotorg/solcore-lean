@@ -112,6 +112,18 @@ because insertion clamps while weakening does not. All conditional children
 still require typing, even when execution skips a branch. This static result
 does not claim exact-cost transport or extend canonical operator support.
 
+Exact-cost insertion is now proved for the same independent fragment (ADR-0190).
+Each successful evaluation yields original and shifted paths with one common
+cost, chosen before their arbitrary outer continuations. A supplied closed final
+path can be transported and reflected at its exact length, retaining the literal
+value, stores and outer continuation. Only empty-continuation final paths are
+used for length uniqueness. Nested lets extend the retained prefix with the
+actual bound value; skipped branches do not execute or add to the cost. Existing
+fuel-threshold and checkpoint-resumption theorems apply to these paths, without
+equating distinct suspended states or executing an outer continuation early.
+This adds no typing or runtime-world premise and does not yet enable canonical
+`<` or `>=`.
+
 The resolved fragment alone is not a canonical source adapter. It does not interpret literal
 spelling, resolve `true`/`false` or overloaded operators, allocate source-wide IDs,
 decide source shadowing or mutable-declaration semantics, or cover imports,

@@ -85,6 +85,16 @@ reflection claim for a clamped, out-of-range `Context.insertAt`. Every written
 conditional child still needs typing even if execution skips it. This is an
 independent Core prerequisite, not exact-cost insertion or source `<` support.
 
+Exact-cost insertion for the local Core fragment is now available (ADR-0190).
+A common cost is selected before arbitrary continuations for the original and
+shifted evaluation paths. Closed final paths transport and reflect at that
+exact cost, with identical values/stores and unconsumed outer continuations.
+The proof is Core-only and introduces neither a new cost relation nor extra
+type, scope or runtime-world assumptions. Final-path uniqueness is used only
+at empty-continuation final endpoints. Existing fuel and resumption laws can
+be reused while genuine suspended states remain distinct. Canonical ordered
+`<` integration remains a separate representation-and-adapter change.
+
 Canonical identifiers and grouping now have an exact explicit-table adapter
 to typed resolved references and Core variables (ADR-0155). The name table does
 not replace source scope construction. Execution correspondence retains exact

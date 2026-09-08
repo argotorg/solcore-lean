@@ -91,6 +91,8 @@ import Solcore.Core.LocalFragment
 import Solcore.Core.LocalFragmentInsertionProperties
 import Solcore.Core.LocalFragmentTypingInsertionProperties
 import Solcore.Core.LocalFragmentInferenceInsertionProperties
+import Solcore.Core.LocalFragmentInsertionPaths
+import Solcore.Core.LocalFragmentExactInsertionProperties
 import Solcore.Resolved.LocalFragmentProperties
 
 /-!

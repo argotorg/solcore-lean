@@ -662,5 +662,11 @@ example := @Solcore.Core.HasType.weakenAt_zero_localFragment
 example := @Solcore.Core.HasType.reflect_weakenAt_zero_localFragment
 example := @Solcore.Core.Expr.LocalFragment.infer_insert
 example := @Solcore.Core.Expr.LocalFragment.infer_weaken_zero
+example := @Solcore.Core.Expr.LocalFragment.insertion_paths
+example := @Solcore.Core.Expr.LocalFragment.steps_insert
+example := @Solcore.Core.Expr.LocalFragment.steps_reflect_insert
+example := @Solcore.Core.Expr.LocalFragment.steps_insert_iff
+example := @Solcore.Core.Steps.weakenAt_zero_localFragment
+example := @Solcore.Core.Steps.reflect_weakenAt_zero_localFragment
 
 end Tests

@@ -7,6 +7,8 @@ import Solcore.Core.LocalFragment
 import Solcore.Core.LocalFragmentInsertionProperties
 import Solcore.Core.LocalFragmentTypingInsertionProperties
 import Solcore.Core.LocalFragmentInferenceInsertionProperties
+import Solcore.Core.LocalFragmentInsertionPaths
+import Solcore.Core.LocalFragmentExactInsertionProperties
 import Solcore.Core.Host
 import Solcore.Core.HostSafety
 import Solcore.Core.HostMachine
