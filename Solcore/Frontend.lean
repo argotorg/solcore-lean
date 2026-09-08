@@ -9,6 +9,7 @@ import Solcore.Frontend.LocalExpressionShapeProperties
 import Solcore.Frontend.LocalExpressionResolutionProperties
 import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Frontend.LocalExpressionTypingProperties
+import Solcore.Frontend.LocalExpressionEvaluationRules
 import Solcore.Frontend.LocalExpressionEvaluation
 import Solcore.Frontend.LocalExpressionEvaluationProperties
 import Solcore.Frontend.LocalExpressionSafetyProperties

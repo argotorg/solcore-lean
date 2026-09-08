@@ -305,6 +305,14 @@ value-free compilation, and runtime entry proofs include the form. Consumers
 verify unsigned boundaries, equality, exact pending frames, declared Bool results,
 wrong Word returns, computed-guard branch costs, and all tested parameter pairs.
 Source shape laws are split without changing their public contracts/import path.
+Word equality `==` (ADR-0184) extends the same strict ordered Word-to-Bool rules
+using direct `wordEq`, not polymorphic equality or Word-valued flags. All generic
+proofs now cover equality, including store replay, structural fuel bounds, and
+genuine-checkpoint residual paths. Independent and parsed consumers retain
+actual argument/operand order despite symmetric final values, exact fuel-four
+frames and five-step results, declaration return contracts, and whole rejection
+of non-Word operands or invalid unselected branches. Evaluation rules are split
+from determinism while preserving old names and the historical import boundary.
 Division, remainder, other comparisons, unary signs, assignment, and general
 overload policy remain separate.
 

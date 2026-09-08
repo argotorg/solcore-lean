@@ -612,5 +612,11 @@ example := @Solcore.Frontend.LocalInputs.runReturnBody?_resume
 example := @Solcore.Frontend.runRuntimeFunction?_resume
 example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.residual_of_outOfFuel
 example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.compiled_residual_of_outOfFuel
+example := @Solcore.Frontend.ResolvesLocalExpression.equal
+example := @Solcore.Frontend.LocalExpressionHasType.equal
+example := @Solcore.Frontend.AvoidsLocalName.equal
+example := @Solcore.Frontend.LocalExpressionEvaluates.equal
+example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.equal
+example := @Solcore.Frontend.resolveLocalExpression?_equal_spans
 
 end Tests

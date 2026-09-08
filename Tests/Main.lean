@@ -58,6 +58,8 @@ import Solcore.Test.FrontendFuelBoundProperties
 import Solcore.Test.FrontendParsedFuelBounds
 import Solcore.Test.FrontendResumptionProperties
 import Solcore.Test.FrontendParsedResumption
+import Solcore.Test.FrontendWordEqualityProperties
+import Solcore.Test.FrontendParsedWordEquality
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5594,6 +5596,7 @@ def run : IO Unit := do
   frontendParsedStoreIndependenceTests
   frontendParsedFuelBoundTests
   frontendParsedResumptionTests
+  frontendParsedWordEqualityTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
