@@ -176,6 +176,11 @@ import Solcore.Frontend.TypedLetReturnTreeEvaluation
 import Solcore.Frontend.TypedLetReturnTreeEvaluationProperties
 import Solcore.Frontend.TypedLetReturnTreeExecutionProperties
 import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnTreeRunner
+import Solcore.Frontend.TypedLetReturnTreeRunnerProperties
+import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
+import Solcore.Frontend.TypedLetReturnTreeRunnerEmbeddingProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -211,6 +216,9 @@ Independent recursive evaluation and cost now retain strict old-scope
 initialization and only selected arms, with exact checked Core paths under
 arbitrary retained continuations. Raw paths do not imply whole checking;
 typed existence separately requires actual aligned, typed environments.
-This recursive adapter adds no fuel bound, runner or entry integration;
-no inference, default initialization or broader binding policy is added.
+A separate recursive body runner supplies exact fuel thresholds, a source-only
+additive/max-arm upper bound and complete genuine-checkpoint resumption. Old
+runner successes retain their full results; singleton shapes retain rejection
+as well. Existing function entries are unchanged. No inference, default
+initialization or broader binding policy is added.
 -/

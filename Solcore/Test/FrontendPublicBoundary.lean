@@ -1203,4 +1203,25 @@ example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.typedLetReturnT
 example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.returnTree
 example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.returnTree
 
+example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnTree?
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.checked_runStateful_done_iff
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.checked_runStateful_outOfFuel_iff
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_run_done_iff_cost
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_eq_none_iff
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_eq_some_iff
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_done_iff_typed_cost
+example := @Solcore.Frontend.LocalInputs.typedLetReturnTree_typed_cost_execution
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_outOfFuel_iff_typed_cost
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_never_faults
+example := @Solcore.Frontend.typedLetReturnTreeFuelBound
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.cost_le_fuelBound
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_run_done_of_fuelBound
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_done_of_fuelBound
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.checked_residual_of_outOfFuel
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_resume
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_single
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_some_of_terminalReturnTree
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_some_of_typedLetReturnBody
+
 end Tests

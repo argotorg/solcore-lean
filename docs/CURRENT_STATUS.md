@@ -945,9 +945,9 @@ equality. Old failures may become new successes and are not preserved generally.
 Independent arbitrary-length proofs and complete parsed declarations cover
 alternating depth, noncommutative initialization, sibling isolation, original
 parameter positions, first-match annotation meanings and qualified keys.
-This static unit adds no runner, bound, resumption or runtime-entry integration;
-independent evaluation/cost is supplied below by ADR-0217. The existing entries
-below still reject arm-local lets. Missing
+This static unit itself adds no runtime-entry integration. Independent
+evaluation/cost and a separate body runner follow in ADR-0217/0218; the existing
+function entries still reject arm-local lets. Missing
 annotations/initializers, shadowing, extra statements after a conditional,
 separate block wrappers and general calls remain outside this new adapter;
 no parser/Core/Wire change, inference or global binding policy is implied.
@@ -978,8 +978,45 @@ the path endpoint; incompatible frames can fault at zero remaining fuel. Old raw
 terminal-tree and outer-prefix paths/costs embed unchanged without new premises.
 Independent source proofs and complete parsed argument execution cover depth,
 strict/noncommutative initialization, asymmetric selected costs, actual stores
-and the raw/checked/continuation boundaries. No new body runner, source bound,
-resumption or entry integration is added, and all old profiles remain unchanged.
+and the raw/checked/continuation boundaries. This evaluation unit itself adds no
+entry integration; the separate body runner follows in ADR-0218 below.
+
+### Recursive typed let/return trees: fuel and resumption
+
+The separate recursive body runner now checks the actual `LocalInputs` static
+projection and executes its exact Core with the original ordered values and
+empty continuation (ADR-0218). Whole checker rejection gives `none`; successful
+results retain the complete type and machine result. Independent known cost,
+whole acceptance and aligned IDs give exact done/out-of-fuel thresholds without
+assuming runtime typing. Whole typing at actual typed inputs separately supplies
+cost existence, wrapper threshold characterizations and fault exclusion.
+
+The total syntax-size-recursive bound adds each initializer bound and two,
+and each condition bound plus the maximum arm bound and two. Singleton returns
+reuse their old bound and other shapes contribute zero. Every independent raw
+cost is bounded, without annotation meaning or name freshness assumptions.
+Typed sufficient-fuel completion still needs whole acceptance and real typed
+values. Positive bounds do not establish acceptance, and are not minimum costs:
+an invalid annotation can have a raw path, while a short selected arm can finish
+below the maximum. A branch-local let can cost seven where both old bounds are
+four, so the old budget cannot serve this new adapter.
+
+Actual exhausted checkpoints retain control, pending conditional/let frames,
+captured environments, obtained values and stores. Their exact residual path
+has length `cost - spent`, with `spent < cost`. Any additional fuel gives the
+same complete result as the original run at the sum, including further genuine
+checkpoints across multiple chunks. Restarting the body or dropping frames is
+not equivalent. These laws use empty-continuation complete paths, not arbitrary
+retained-continuation endpoints.
+
+Old tree and outer-prefix runner successes keep the entire optional payload at
+the same inputs, fuel and store. Singleton shapes additionally preserve `none`;
+general old conditional/prefix failures may become new successes. Independent
+depth proofs and fully parsed actual-argument tests cover bounds, asymmetric
+costs, unused work, opaque values, rejection and genuine multi-stage checkpoints.
+Existing body adapters, bounds and function entries stay unchanged. No owner
+covariance, arbitrary-store replay, parser/Core/Wire extension, inferred values
+or broader binding/call policy is added by this runner unit.
 
 ### Explicit restricted runtime function entry
 

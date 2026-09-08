@@ -414,8 +414,8 @@ Arbitrary-depth source proofs and complete parsed declarations exercise exact
 Core, original parameter positions, same-ID siblings, ancestor visibility,
 noncommutative initialization, qualified/first-match meanings and deep rejection.
 Existing body adapters and ADR-0215 entries remain unchanged. Evaluation/cost
-is supplied by ADR-0217; runner/fuel/resumption and eventual entry integration
-remain separate proof boundaries, without calls, inference or broader policy.
+is supplied by ADR-0217 and separate body runner/fuel/resumption by ADR-0218.
+Eventual entry integration remains separate, without calls or broader policy.
 
 Recursive typed-let evaluation/cost (ADR-0217) now evaluates strict initializers
 in their old scope, extends tails with actual obtained values and follows only
@@ -429,8 +429,25 @@ Those frames are neither executed nor unwound; a bad frame may fault at zero
 remaining fuel. Old tree/prefix raw paths and costs embed unchanged. Source and
 parsed consumers retain arbitrary depth, noncommutative/unused work, asymmetric
 choices, opaque values, actual stores and raw rejection/ID/continuation contrasts.
-No checker policy, body runner, bound, resumption, entry, parser/Core/Wire change
-or fabricated runtime inhabitants are added in this unit.
+No checker policy, entry, parser/Core/Wire change or fabricated inhabitants are
+added in this evaluation unit; the separate body runner follows in ADR-0218.
+
+Recursive body fuel/resumption (ADR-0218) now runs the exact checked Core with
+actual ordered values and empty continuation. Known independent cost gives
+exact Core fuel thresholds with only acceptance and aligned IDs; actual typed
+inputs separately yield wrapper typing/cost thresholds and fault exclusion.
+A syntax-size-recursive source bound adds initialized lets and uses maximum
+recursive arms. It bounds raw costs without whole checking, but does not replace
+acceptance or actual typed values for sufficient-fuel safety. New branch-local
+work can exceed old tree/prefix bounds; rejected bodies can have positive bounds.
+Genuine exhausted states give exact residual costs and full sum-fuel results,
+retaining every captured value, environment, store and pending frame across
+multiple chunks. Restarting or dropping frames is not resumption. Old runner
+successes embed with complete same-fuel payloads; only singleton shapes preserve
+the full Option without a success premise. Independent and parsed consumers
+exercise depth, asymmetry, opaque values, rejected positive bounds and actual
+initializer/conditional/tail checkpoints. No entry integration, old bound change,
+owner/store replay or broader source policy is introduced.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
