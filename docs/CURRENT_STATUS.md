@@ -1015,8 +1015,34 @@ general old conditional/prefix failures may become new successes. Independent
 depth proofs and fully parsed actual-argument tests cover bounds, asymmetric
 costs, unused work, opaque values, rejection and genuine multi-stage checkpoints.
 Existing body adapters, bounds and function entries stay unchanged. No owner
-covariance, arbitrary-store replay, parser/Core/Wire extension, inferred values
-or broader binding/call policy is added by this runner unit.
+covariance, parser/Core/Wire extension, inferred values or broader binding/call
+policy is added by this runner unit; independent store replay follows in ADR-0219.
+
+### Recursive typed let/return trees: store replay
+
+Every independent raw path and cost now replays at any replacement store with
+the same source, owner, name table, actual environment, result value and cost
+(ADR-0219). Initializers retain their old scope and obtained values, extended
+tails retain those same values and fresh identities, and conditions follow the
+same selected arm. These raw laws need no annotation meanings, unused names,
+whole acceptance, aligned IDs, runtime typing or store validity. Both raw and
+cost equivalences explicitly retain `finalStore = initialStore`; that conjunct
+cannot be dropped when relating arbitrary final stores.
+
+The existing typed-cost runner contracts give same-fuel completed values at
+each run's own store and equivalent exhaustion presence. They do not equate
+complete results or checkpoints across distinct stores. Each genuine checkpoint
+is resumed separately with its own store and captured frames. Whole rejection
+still comes from the unchanged store-independent checker, not raw replay.
+
+Independent depth proofs and complete parsed actual-argument tests cover
+asymmetric selected costs, strict unused initialization, opaque values, distinct
+stores, unequal complete results and actual conditional/let checkpoints.
+Rejected annotations and unselected failures still admit some raw paths. A
+pending Core cell-load can instead observe different contents or fault on an
+empty store at zero fuel; returning a cell reference is not executing that
+pending load. No arbitrary-Core or arbitrary-continuation runner independence,
+owner transport, old entry change or broader source policy is introduced.
 
 ### Explicit restricted runtime function entry
 

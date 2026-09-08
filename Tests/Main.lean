@@ -128,6 +128,8 @@ import Solcore.Test.FrontendTypedLetReturnTreeEvaluationProperties
 import Solcore.Test.FrontendParsedTypedLetReturnTreeEvaluation
 import Solcore.Test.FrontendTypedLetReturnTreeRunnerProperties
 import Solcore.Test.FrontendParsedTypedLetReturnTreeRunner
+import Solcore.Test.FrontendTypedLetReturnTreeStoreProperties
+import Solcore.Test.FrontendParsedTypedLetReturnTreeStore
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5693,6 +5695,7 @@ def run : IO Unit := do
   frontendParsedTypedLetReturnTreeTests
   frontendParsedTypedLetReturnTreeEvaluationTests
   frontendParsedTypedLetReturnTreeRunnerTests
+  frontendParsedTypedLetReturnTreeStoreTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

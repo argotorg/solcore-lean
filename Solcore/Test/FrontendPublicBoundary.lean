@@ -1224,4 +1224,11 @@ example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_single
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_some_of_terminalReturnTree
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_some_of_typedLetReturnBody
 
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates.change_store
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.change_store
+example := @Solcore.Frontend.typedLetReturnTreeEvaluates_store_iff
+example := @Solcore.Frontend.typedLetReturnTreeEvaluatesWithCost_store_iff
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_done_store_iff
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_outOfFuel_store_iff
+
 end Tests

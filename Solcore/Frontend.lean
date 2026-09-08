@@ -181,6 +181,7 @@ import Solcore.Frontend.TypedLetReturnTreeRunnerProperties
 import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.TypedLetReturnTreeRunnerEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnTreeStoreProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -219,6 +220,9 @@ typed existence separately requires actual aligned, typed environments.
 A separate recursive body runner supplies exact fuel thresholds, a source-only
 additive/max-arm upper bound and complete genuine-checkpoint resumption. Old
 runner successes retain their full results; singleton shapes retain rejection
-as well. Existing function entries are unchanged. No inference, default
+as well. Arbitrary-store raw replay preserves values and exact costs; completed
+observations and exhaustion presence keep their own stores, not identical full
+results or checkpoints. Pending Core frames receive no store-independence law.
+Existing function entries are unchanged. No inference, default
 initialization or broader binding policy is added.
 -/

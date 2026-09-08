@@ -447,7 +447,21 @@ successes embed with complete same-fuel payloads; only singleton shapes preserve
 the full Option without a success premise. Independent and parsed consumers
 exercise depth, asymmetry, opaque values, rejected positive bounds and actual
 initializer/conditional/tail checkpoints. No entry integration, old bound change,
-owner/store replay or broader source policy is introduced.
+owner transport or broader source policy is introduced; store replay follows
+separately in ADR-0219.
+
+Recursive body store replay (ADR-0219) preserves raw values and exact costs at
+any replacement store without adding typing, checking, alignment, freshness or
+store-validity premises. Strict initializers retain their obtained values and
+fresh tail identities; only the selected original-scope arm replays. Bidirectional
+raw/cost contracts retain the necessary original final-store equality. Checked
+same-fuel done observations have the same type/value with each own store, while
+out-of-fuel presence agrees without identifying complete results or checkpoints.
+Each actual state resumes separately via ADR-0218. Source and parsed consumers
+cover depth, asymmetric costs, opaque values, whole rejection, distinct stores
+and genuine captured states. Pending loads provide an explicit boundary: retained
+continuation endpoints do not imply store-independent continuation execution.
+No owner, new bound/resumption, old entry, parser/Core/Wire or policy extension.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
