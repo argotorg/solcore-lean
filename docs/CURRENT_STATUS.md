@@ -581,6 +581,25 @@ values, stores, and exact fuel boundaries. Compilation alone does not supply
 arguments or assert completion. No parser, Core evaluator, or source-call
 policy is changed.
 
+The execution bridge is now a generic proof contract, not only a parsed-test
+observation (ADR-0179). The unchanged runtime endpoint equals value-free
+compilation followed by the ordered argument guard and Core execution using
+the actual compiled expression and reversed supplied argument values. This
+unconditional Option equality includes compile failure, guard rejection, and
+all full stateful results at every fuel and initial store. An independent
+existential characterization recovers compilation evidence, matching types,
+the return type, and exact Core execution from a present runtime result.
+
+Independent function cost evidence fixes a path of that exact length from the
+compiled initial state, and gives both completion and exhaustion thresholds.
+Matching actual typed arguments and independent compilation produce a typed
+result, unchanged store, and a no-fault guarantee. Neither matching types alone
+nor a forged compiled record supplies this provenance. No second runner or
+evaluation relation is introduced. Cached-compilation regressions exercise
+same-type distinct values and source positions, zero/intermediate states,
+different-cost short-circuit paths, wrong arity/type order, whole rejection,
+and supplied closure/reference values without assuming type inhabitation.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

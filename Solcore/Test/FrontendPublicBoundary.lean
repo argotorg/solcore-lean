@@ -565,5 +565,14 @@ example := @Solcore.Frontend.AvoidsLocalName.greater
 example := @Solcore.Frontend.LocalExpressionEvaluates.greater
 example := @Solcore.Frontend.LocalExpressionEvaluatesWithCost.greater
 example := @Solcore.Frontend.resolveLocalExpression?_greater_spans
+example := @Solcore.Frontend.RuntimeFunctionCompiles.run_eq
+example := @Solcore.Frontend.runRuntimeFunction?_factorization
+example := @Solcore.Frontend.runRuntimeFunction?_eq_some_compiled_iff
+example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.compiled_contract
+example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.compiled_toSteps
+example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.compiled_run_done_iff
+example := @Solcore.Frontend.RuntimeFunctionEvaluatesWithCost.compiled_run_outOfFuel_iff
+example := @Solcore.Frontend.RuntimeFunctionCompiles.typed_compiled_execution
+example := @Solcore.Frontend.RuntimeFunctionCompiles.compiled_never_faults
 
 end Tests

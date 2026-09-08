@@ -70,6 +70,8 @@ import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.RuntimeFunctionCompilation
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
 import Solcore.Frontend.RuntimeFunctionPreparationFactorization
+import Solcore.Frontend.RuntimeFunctionExecutionFactorization
+import Solcore.Frontend.RuntimeFunctionCompiledExecutionProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,

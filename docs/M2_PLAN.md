@@ -236,6 +236,17 @@ typed arguments. Parsed declarations and independent consumers preserve the
 distinction between static success, argument availability, and runtime outcomes.
 This is not closure generation, a source-call machine, or whole-program lookup.
 
+Exact execution factorization (ADR-0179) closes the next proof boundary without
+adding another runner. The existing runtime endpoint equals value-free
+compilation, the exact ordered argument-type guard, and Core execution with
+the actual compiled tree and reversed supplied values. Equality includes
+rejection and every full stateful result at every fuel, not just final values.
+Independent entry costs produce exact paths and completion/exhaustion thresholds
+for that same initial state; typed execution and no-fault require compilation
+provenance and matching actual typed arguments. Cached-compilation regressions
+cover different values at equal types, argument order/arity, unequal short-circuit
+costs, and supplied closure/reference values without inventing inhabitants.
+
 Binary Word addition (ADR-0176) now extends the expression fragment through
 existing body, entry, and value-free compilation bridges. Its independent
 rules require two Word operands, preserve strict left-to-right evaluation,
