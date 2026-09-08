@@ -16,6 +16,7 @@ theorem Lowers.localFragment {scope : List LocalId} {expr : Expr} {core : Core.E
   | bool => exact .bool
   | word => exact .word
   | var => exact .var
+  | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
   | unary _ ih => exact .unary ih
   | binary _ _ leftIH rightIH => exact .binary leftIH rightIH
   | wordLt _ _ leftIH rightIH => exact leftIH.wordLt rightIH

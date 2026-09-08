@@ -12,6 +12,7 @@ theorem Lowers.complete {scope : List LocalId} {expr : Expr} {core : Core.Expr}
   | bool => rfl
   | word => rfl
   | var found => simp [Expr.lower?, LocalScope.index?_iff.mpr found]
+  | pair _ _ leftIH rightIH => simp [Expr.lower?, leftIH, rightIH]
   | unary _ ih => simp [Expr.lower?, ih]
   | binary _ _ leftIH rightIH => simp [Expr.lower?, leftIH, rightIH]
   | wordLt _ _ leftIH rightIH => simp [Expr.lower?, leftIH, rightIH]
@@ -29,6 +30,11 @@ theorem Expr.lower?_sound {scope : List LocalId} {expr : Expr} {core : Core.Expr
       simp only [Expr.lower?, Option.map_eq_some_iff] at lowered
       obtain ⟨index, found, rfl⟩ := lowered
       exact .var (LocalScope.index?_iff.mp found)
+  | pair left right leftIH rightIH =>
+      simp only [Expr.lower?, bind, Option.bind_eq_some_iff, pure] at lowered
+      obtain ⟨coreLeft, leftLowered, coreRight, rightLowered, result⟩ := lowered
+      cases result
+      exact .pair (leftIH leftLowered) (rightIH rightLowered)
   | unary op operand ih =>
       simp only [Expr.lower?, bind, Option.bind_eq_some_iff, pure] at lowered
       obtain ⟨coreOperand, operandLowered, result⟩ := lowered

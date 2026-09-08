@@ -37,6 +37,10 @@ private theorem evaluation_insert_aux
   | unit => intros; exact .unit
   | bool => intros; exact .bool
   | word => intros; exact .word
+  | pair _ _ leftIH rightIH =>
+      intro leading suffix split newId newValue fresh
+      exact .pair (leftIH leading suffix split newId newValue fresh)
+        (rightIH leading suffix split newId newValue fresh)
   | var found =>
       intro leading suffix split newId newValue fresh
       rw [split] at found

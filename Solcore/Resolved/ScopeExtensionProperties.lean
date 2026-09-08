@@ -53,6 +53,11 @@ theorem Lowers.insert_fresh
       | var indexed =>
           simpa only [← Core.Expr.rename_insertion, Core.Expr.rename] using
             Lowers.var (indexed.insert_fresh fresh)
+  | pair left right leftIH rightIH =>
+      cases lowered with
+      | pair leftLowered rightLowered =>
+          simp only [Core.Expr.weakenAt]
+          exact .pair (leftIH leftLowered) (rightIH rightLowered)
   | unary op operand ih =>
       cases lowered with
       | unary child => simp only [Core.Expr.weakenAt]; exact .unary (ih child)

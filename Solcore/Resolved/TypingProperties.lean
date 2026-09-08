@@ -23,6 +23,10 @@ theorem HasType.lowers {context : Context} {expr : Expr} {type : Core.Ty}
   | var found =>
       obtain ⟨index, indexed, atType⟩ := found.indexed
       exact ⟨.var index, .var indexed, .var atType⟩
+  | pair _ _ leftIH rightIH =>
+      obtain ⟨left, leftLowered, leftTyped⟩ := leftIH
+      obtain ⟨right, rightLowered, rightTyped⟩ := rightIH
+      exact ⟨_, .pair leftLowered rightLowered, .pair leftTyped rightTyped⟩
   | unary _ ih =>
       obtain ⟨core, lowered, typed⟩ := ih
       exact ⟨_, .unary lowered, .unary typed⟩
@@ -58,6 +62,10 @@ private theorem reflects_type_aux {scope : List LocalId} {expr : Expr} {core : C
       cases typing with
       | var atType =>
           exact .var (LocalScope.lookup_of_indexed (scopeEq ▸ indexed) atType)
+  | pair _ _ leftIH rightIH =>
+      cases typing with
+      | pair leftTyped rightTyped =>
+          exact .pair (leftIH scopeEq leftTyped) (rightIH scopeEq rightTyped)
   | unary _ ih =>
       cases typing with
       | unary operandTyped => exact .unary (ih scopeEq operandTyped)

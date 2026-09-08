@@ -43,6 +43,12 @@ theorem Evaluates.reflect_insert_fresh {leading suffix : Environment}
   | unit => cases evaluation; exact .unit
   | bool actual => cases evaluation; exact .bool
   | word actual => cases evaluation; exact .word
+  | pair left right leftIH rightIH =>
+      cases scopeValid with
+      | pair leftScoped rightScoped =>
+          cases evaluation with
+          | pair leftEvaluation rightEvaluation =>
+              exact .pair (leftIH leftEvaluation leftScoped) (rightIH rightEvaluation rightScoped)
   | var id =>
       cases scopeValid with
       | var member =>

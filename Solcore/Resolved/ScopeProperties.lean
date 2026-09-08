@@ -20,6 +20,7 @@ theorem Lowers.wellScoped {scope : List LocalId} {expr : Expr} {core : Core.Expr
       induction indexed with
       | head => exact List.mem_cons_self
       | tail _ _ ih => exact List.mem_cons_of_mem _ ih
+  | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
   | unary _ ih => exact .unary ih
   | binary _ _ leftIH rightIH => exact .binary leftIH rightIH
   | wordLt _ _ leftIH rightIH => exact .wordLt leftIH rightIH
@@ -37,6 +38,10 @@ theorem WellScoped.lowers {scope : List LocalId} {expr : Expr}
       cases result : LocalScope.index? scope id with
       | none => exact False.elim ((LocalScope.index?_eq_none_iff.mp result) member)
       | some index => exact ⟨_, .var (LocalScope.index?_iff.mp result)⟩
+  | pair _ _ leftIH rightIH =>
+      obtain ⟨left, leftLowered⟩ := leftIH
+      obtain ⟨right, rightLowered⟩ := rightIH
+      exact ⟨_, .pair leftLowered rightLowered⟩
   | unary _ ih =>
       obtain ⟨core, lowered⟩ := ih
       exact ⟨_, .unary lowered⟩
@@ -85,6 +90,7 @@ theorem HasType.wellScoped {context : Context} {expr : Expr} {type : Core.Ty}
   | bool => exact .bool
   | word => exact .word
   | var found => exact .var (List.mem_map.mpr ⟨_, found.mem, rfl⟩)
+  | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
   | unary _ ih => exact .unary ih
   | binary _ _ leftIH rightIH => exact .binary leftIH rightIH
   | wordLt _ _ leftIH rightIH => exact .wordLt leftIH rightIH

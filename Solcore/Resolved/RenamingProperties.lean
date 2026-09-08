@@ -70,6 +70,7 @@ theorem Expr.lower?_renameIds (mapping : LocalId → LocalId)
   induction expr generalizing scope with
   | unit | bool | word => rfl
   | var id => simp only [renameIds, lower?, LocalScope.index?_map mapping injective]
+  | pair left right leftIH rightIH => simp only [renameIds, lower?, leftIH, rightIH]
   | unary op operand ih => simp only [renameIds, lower?, ih]
   | binary op left right leftIH rightIH => simp only [renameIds, lower?, leftIH, rightIH]
   | wordLt left right leftIH rightIH => simp only [renameIds, lower?, leftIH, rightIH]
@@ -117,6 +118,14 @@ theorem evaluates_renameIds_iff (mapping : LocalId → LocalId)
       · intro evaluation
         cases evaluation with
         | var found => exact .var ((LocalScope.lookup_mapIds_iff mapping injective).mpr found)
+  | pair left right leftIH rightIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | pair first second => exact .pair (leftIH.mp first) (rightIH.mp second)
+      · intro evaluation
+        cases evaluation with
+        | pair first second => exact .pair (leftIH.mpr first) (rightIH.mpr second)
   | unary op operand ih =>
       constructor
       · intro evaluation

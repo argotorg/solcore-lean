@@ -21,6 +21,9 @@ theorem Evaluates.toCore
   | unit => cases lowered; exact .unit
   | bool => cases lowered; exact .bool
   | word => cases lowered; exact .word
+  | pair _ _ leftIH rightIH =>
+      cases lowered with
+      | pair left right => exact .pair (leftIH left) (rightIH right)
   | var found =>
       cases lowered with
       | var indexed =>
@@ -56,6 +59,11 @@ private theorem evaluation_of_core_scope
   | unit => intro environment initialStore finalStore value scopeEq evaluation; cases evaluation; exact .unit
   | bool => intro environment initialStore finalStore value scopeEq evaluation; cases evaluation; exact .bool
   | word => intro environment initialStore finalStore value scopeEq evaluation; cases evaluation; exact .word
+  | pair left right leftIH rightIH =>
+      intro environment initialStore finalStore value scopeEq evaluation
+      cases evaluation with
+      | pair leftEvaluation rightEvaluation =>
+          exact .pair (leftIH scopeEq leftEvaluation) (rightIH scopeEq rightEvaluation)
   | var indexed =>
       intro environment initialStore finalStore value scopeEq evaluation
       cases evaluation with
@@ -114,6 +122,7 @@ theorem Evaluates.store_eq
   induction evaluation with
   | unit | bool | word | var => rfl
   | unary _ _ ih => exact ih
+  | pair _ _ leftIH rightIH => exact rightIH.trans leftIH
   | binary _ _ _ leftIH rightIH => exact rightIH.trans leftIH
   | wordLt _ _ leftIH rightIH => exact rightIH.trans leftIH
   | letE _ _ valueIH bodyIH => exact bodyIH.trans valueIH
@@ -132,6 +141,12 @@ theorem evaluation_deterministic
   | unit => cases rightEvaluation; exact ⟨rfl, rfl⟩
   | bool => cases rightEvaluation; exact ⟨rfl, rfl⟩
   | word => cases rightEvaluation; exact ⟨rfl, rfl⟩
+  | pair _ _ leftIH rightIH =>
+      cases rightEvaluation with
+      | pair otherLeft otherRight =>
+          obtain ⟨rfl, rfl⟩ := leftIH otherLeft
+          obtain ⟨rfl, storeEquality⟩ := rightIH otherRight
+          exact ⟨rfl, storeEquality⟩
   | var leftLookup =>
       cases rightEvaluation with
       | var rightLookup => exact ⟨leftLookup.value_unique rightLookup, rfl⟩
