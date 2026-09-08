@@ -299,8 +299,17 @@ exact Core evaluation, even without runtime typing. Exact cost paths retain any
 pending continuation unexecuted; no arbitrary-continuation inverse is asserted.
 Old raw/cost profiles embed exactly without checking premises. Deep selected-path,
 untyped-aligned and misaligned-ID consumers retain those distinct boundaries.
-Checked runners, recursive bounds, resumption and replay invariance still precede
-any later entry integration; existing executable adapters remain unchanged.
+The separate tree runner, recursive bounds and genuine resumption now follow in
+ADR-0206. The runner retains actual checked Core and existing ordered values;
+exact result/failure and typed-cost fuel contracts preserve complete suspended
+states. The recursive max-arm bound is only an upper bound: long/short paths may
+cost seven/four with bound seven, while the old nonrecursive bound can be four.
+Raw cost upper bounds require no whole typing; sufficient-fuel safety requires
+actual runtime typing in addition to checking and ID alignment. Genuine states
+retain exact residual paths and multi-chunk execution without resetting frames
+or values. Old-shape full optional runtime equalities include failure and real
+checkpoints. Identity/store replay and entry integration remain separate;
+existing executable adapters are unchanged.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent

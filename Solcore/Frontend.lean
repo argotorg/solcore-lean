@@ -142,6 +142,11 @@ import Solcore.Frontend.TerminalReturnTreeEvaluation
 import Solcore.Frontend.TerminalReturnTreeEvaluationProperties
 import Solcore.Frontend.TerminalReturnTreeExecutionProperties
 import Solcore.Frontend.TerminalReturnTreeEvaluationEmbeddingProperties
+import Solcore.Frontend.TerminalReturnTreeRunner
+import Solcore.Frontend.TerminalReturnTreeRunnerProperties
+import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
+import Solcore.Frontend.TerminalReturnTreeResumptionProperties
+import Solcore.Frontend.TerminalReturnTreeRunnerEmbeddingProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -153,6 +158,7 @@ changes, and wire publication are not implied. Function entries support the
 nonrecursive singleton/terminal-conditional body union; compilation owner
 invariance requires no runtime argument inhabitants.
 Recursive terminal return trees additionally have independent static and
-selected-path evaluation/cost semantics with exact Core continuation paths;
-their checked runner, fuel bounds and entry integration are separate.
+selected-path evaluation/cost semantics with exact Core continuation paths,
+a checked body runner, recursive fuel bounds and genuine-state resumption.
+Identity/store replay invariance and function-entry integration remain separate.
 -/

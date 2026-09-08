@@ -673,7 +673,7 @@ changing their statements or proofs and remain available through the old runtime
 imports. Body-level modules have no runtime-function dependency or cycle, allowing
 entry integration to reuse these laws without reversing the dependency direction.
 
-### Recursive terminal return-tree static semantics
+### Recursive terminal return-tree semantics
 
 A separate `TerminalReturnTree` adapter now checks finite, arbitrarily nested
 explicit if/else bodies whose leaves are singleton returns (ADR-0204). Structural
@@ -715,10 +715,30 @@ endpoint is not an unconditional claim of fuel exhaustion under arbitrary frames
 Old raw/cost evidence embeds with identical value, stores and cost, even without
 whole checking. Deep skipped invalid subtrees retain raw success/whole rejection.
 
-Checked runners, recursive fuel bounds, identity/store replay invariance and
-checkpoint resumption remain subsequent work before entry integration. Existing
-checkers, compilation and runtime policies are unchanged; no general early return,
-extra statements, missing else, local declarations, calls or fallthrough are added.
+The separate checked tree runner now uses the actual accepted Core, original
+ordered runtime values and supplied store (ADR-0206). Exact optional-result and
+failure laws preserve complete machine states. Known independent costs give
+fixed-fuel completion/exhaustion thresholds; actual typed inputs connect whole
+source typing with typed-cost execution and exclude machine faults. Static
+acceptance plus aligned IDs alone is not a generic safety guarantee.
+
+A total recursive source bound adds the condition bound, the maximum of both
+recursive arm bounds and two. Raw costs obey it without whole-typing premises;
+sufficient-fuel completion additionally requires whole acceptance and actual
+runtime typing. The bound is conservative, not a minimum. A depth-two variable
+tree can cost seven or four with bound seven; its old nonrecursive bound can be
+four and is not sufficient for the new long path. Unsupported whole shapes have
+zero bounds without acquiring acceptance or an execution guarantee.
+
+Genuine exhausted states retain exact remaining paths of length `cost - spent`.
+Resuming the actual checkpoint equals a larger original run, including all
+pending frames, environment and store. Old singleton and one-level shapes retain
+full optional runner equality at every fuel; arbitrary deeper bodies do not.
+Independent and parsed tests distinguish exact threshold, upper bound, preserved
+checkpoints and unsafe replacement states. Identity/store replay invariance and
+function-entry integration remain separate. Existing checkers, compilation and
+runtime-entry policies are unchanged; no general early return, extra statements,
+missing else, local declarations, calls or fallthrough are added.
 
 ### Explicit restricted runtime function entry
 

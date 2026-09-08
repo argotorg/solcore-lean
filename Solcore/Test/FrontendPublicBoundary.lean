@@ -972,6 +972,28 @@ example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.single
 example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.ifTrue
 example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.ifFalse
 
+example := @Solcore.Frontend.LocalInputs.checkTerminalReturnTree?
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.checked_runStateful_done_iff
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.checked_runStateful_outOfFuel_iff
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_run_done_iff_cost
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_eq_none_iff
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_eq_some_iff
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_done_iff_typed_cost
+example := @Solcore.Frontend.LocalInputs.terminalReturnTree_typed_cost_execution
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_outOfFuel_iff_typed_cost
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_never_faults
+example := @Solcore.Frontend.terminalReturnTreeFuelBound
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.cost_le_fuelBound
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_run_done_of_fuelBound
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_done_of_fuelBound
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.checked_residual_of_outOfFuel
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_resume
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_single
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_single_terminal
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_conditional_singletons
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_conditional_singletons_terminal
+
 section TerminalEntryContracts
 
 open Solcore Solcore.Frontend
