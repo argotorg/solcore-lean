@@ -10,7 +10,7 @@ namespace Solcore.Frontend
 
 /-- No identifier in this expression has the specified spelling. Literal validity
 is not required, since literal payloads do not perform name lookup.
-All conditional children and both short-circuit operands are checked, including
+All conditional children and both operands of each binary form are checked, including
 children that a particular runtime environment might skip. -/
 inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | identifier {span : Syntax.SourceSpan} {identifier : Syntax.Identifier}
@@ -27,6 +27,15 @@ inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | bitNot {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr}
       (child : AvoidsLocalName name operand) :
       AvoidsLocalName name { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand }
+  | bitAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
+      AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .bitAnd⟩ right }
+  | bitOr {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
+      AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .bitOr⟩ right }
+  | bitXor {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
+      AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .bitXor⟩ right }
   | logicalAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
       AvoidsLocalName name { span, value := .binary left ⟨operatorSpan, .logicalAnd⟩ right }

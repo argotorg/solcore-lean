@@ -63,6 +63,30 @@ theorem AvoidsLocalName.resolves_cons_iff {name : String} {source : Syntax.Expr}
       · intro resolution
         cases resolution with
         | bitNot child => exact .bitNot (ih.mpr child)
+  | bitAnd _ _ leftIH rightIH =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | bitAnd left right => exact .bitAnd (leftIH.mp left) (rightIH.mp right)
+      · intro resolution
+        cases resolution with
+        | bitAnd left right => exact .bitAnd (leftIH.mpr left) (rightIH.mpr right)
+  | bitOr _ _ leftIH rightIH =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | bitOr left right => exact .bitOr (leftIH.mp left) (rightIH.mp right)
+      · intro resolution
+        cases resolution with
+        | bitOr left right => exact .bitOr (leftIH.mpr left) (rightIH.mpr right)
+  | bitXor _ _ leftIH rightIH =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | bitXor left right => exact .bitXor (leftIH.mp left) (rightIH.mp right)
+      · intro resolution
+        cases resolution with
+        | bitXor left right => exact .bitXor (leftIH.mpr left) (rightIH.mpr right)
   | logicalAnd _ _ leftIH rightIH =>
       constructor
       · intro resolution

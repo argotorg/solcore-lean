@@ -23,6 +23,9 @@ theorem ResolvesLocalExpression.mapIds {table : LocalNameTable}
   | group _ ih => exact .group ih
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
+  | bitAnd _ _ leftIH rightIH => exact .bitAnd leftIH rightIH
+  | bitOr _ _ leftIH rightIH => exact .bitOr leftIH rightIH
+  | bitXor _ _ leftIH rightIH => exact .bitXor leftIH rightIH
   | logicalAnd _ _ leftIH rightIH => exact .logicalAnd leftIH rightIH
   | logicalOr _ _ leftIH rightIH => exact .logicalOr leftIH rightIH
   | conditional _ _ _ conditionIH thenIH elseIH => exact .conditional conditionIH thenIH elseIH
@@ -51,6 +54,18 @@ theorem resolvesLocalExpression_mapIds_iff_exists (mapping : Resolved.LocalId �
     | bitNot _ ih =>
         obtain ⟨original, child, rfl⟩ := ih
         exact ⟨.unary .wordNot original, .bitNot child, rfl⟩
+    | bitAnd _ _ leftIH rightIH =>
+        obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
+        obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
+        exact ⟨.binary .wordAnd originalLeft originalRight, .bitAnd leftChild rightChild, rfl⟩
+    | bitOr _ _ leftIH rightIH =>
+        obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
+        obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
+        exact ⟨.binary .wordOr originalLeft originalRight, .bitOr leftChild rightChild, rfl⟩
+    | bitXor _ _ leftIH rightIH =>
+        obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
+        obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
+        exact ⟨.binary .wordXor originalLeft originalRight, .bitXor leftChild rightChild, rfl⟩
     | logicalAnd _ _ leftIH rightIH =>
         obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
         obtain ⟨originalRight, rightChild, rfl⟩ := rightIH

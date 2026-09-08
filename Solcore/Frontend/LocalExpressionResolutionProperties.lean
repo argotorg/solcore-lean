@@ -21,6 +21,7 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
       simp only [resolveLocalExpression?, interpretWordLiteral?_complete meaning, Option.map_some]
   | group _ ih => simpa only [resolveLocalExpression?] using ih
   | logicalNot _ ih | bitNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
+  | bitAnd _ _ leftIH rightIH | bitOr _ _ leftIH rightIH | bitXor _ _ leftIH rightIH
   | logicalAnd _ _ leftIH rightIH | logicalOr _ _ leftIH rightIH =>
       simp [resolveLocalExpression?, leftIH, rightIH]
   | conditional _ _ _ conditionIH thenIH elseIH =>
@@ -62,6 +63,24 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
       case binary left operator right =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> try simp only [resolveLocalExpression?, reduceCtorEq] at result
+        case bitAnd =>
+          simp only [bind, Option.bind_eq_some_iff, pure] at result
+          obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+          cases same
+          exact .bitAnd (resolveLocalExpression?_sound leftResult)
+            (resolveLocalExpression?_sound rightResult)
+        case bitOr =>
+          simp only [bind, Option.bind_eq_some_iff, pure] at result
+          obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+          cases same
+          exact .bitOr (resolveLocalExpression?_sound leftResult)
+            (resolveLocalExpression?_sound rightResult)
+        case bitXor =>
+          simp only [bind, Option.bind_eq_some_iff, pure] at result
+          obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
+          cases same
+          exact .bitXor (resolveLocalExpression?_sound leftResult)
+            (resolveLocalExpression?_sound rightResult)
         case logicalAnd =>
           simp only [bind, Option.bind_eq_some_iff, pure] at result
           obtain ⟨resolvedLeft, leftResult, resolvedRight, rightResult, same⟩ := result
@@ -155,6 +174,30 @@ theorem resolveLocalExpression?_bitNot_spans (table : LocalNameTable) (operand :
     resolveLocalExpression? table { span, value := .unary ⟨operatorSpan, .bitNot⟩ operand } =
       resolveLocalExpression? table
         { span := otherSpan, value := .unary ⟨otherOperatorSpan, .bitNot⟩ operand } := by
+  simp only [resolveLocalExpression?]
+
+/-- Word conjunction keeps both operand trees and ignores only the operator/outer ranges. -/
+theorem resolveLocalExpression?_bitAnd_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .bitAnd⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .bitAnd⟩ right } := by
+  simp only [resolveLocalExpression?]
+
+/-- Word disjunction keeps both operand trees and ignores only the operator/outer ranges. -/
+theorem resolveLocalExpression?_bitOr_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .bitOr⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .bitOr⟩ right } := by
+  simp only [resolveLocalExpression?]
+
+/-- Word exclusive-or keeps both operand trees and ignores only the operator/outer ranges. -/
+theorem resolveLocalExpression?_bitXor_spans (table : LocalNameTable) (left right : Syntax.Expr)
+    (span operatorSpan otherSpan otherOperatorSpan : Syntax.SourceSpan) :
+    resolveLocalExpression? table { span, value := .binary left ⟨operatorSpan, .bitXor⟩ right } =
+      resolveLocalExpression? table
+        { span := otherSpan, value := .binary left ⟨otherOperatorSpan, .bitXor⟩ right } := by
   simp only [resolveLocalExpression?]
 
 /-- Conjunction's generated false constant is independent of its source ranges. -/
