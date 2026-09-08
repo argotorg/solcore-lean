@@ -308,8 +308,15 @@ Raw cost upper bounds require no whole typing; sufficient-fuel safety requires
 actual runtime typing in addition to checking and ID alignment. Genuine states
 retain exact residual paths and multi-chunk execution without resetting frames
 or values. Old-shape full optional runtime equalities include failure and real
-checkpoints. Identity/store replay and entry integration remain separate;
-existing executable adapters are unchanged.
+checkpoints. ADR-0207 adds body-level injective ID and arbitrary-store replay
+invariance for recursive trees. Exact Core, type, whole optional checking and
+same-store runner states survive injective relabeling without reordered values.
+Raw value/cost replay needs no whole typing, while typed runner observations
+retain each run's own store and relate exhaustion presence, not checkpoint
+equality across stores. Deep skipped invalid subtrees still reject; noninjective
+first-match collisions are outside the ID law. The body modules remain acyclic
+and runtime-entry-independent. Entry integration remains separate, and existing
+executable adapters are unchanged.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent

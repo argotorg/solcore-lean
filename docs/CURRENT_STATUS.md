@@ -735,8 +735,27 @@ Resuming the actual checkpoint equals a larger original run, including all
 pending frames, environment and store. Old singleton and one-level shapes retain
 full optional runner equality at every fuel; arbitrary deeper bodies do not.
 Independent and parsed tests distinguish exact threshold, upper bound, preserved
-checkpoints and unsafe replacement states. Identity/store replay invariance and
-function-entry integration remain separate. Existing checkers, compilation and
+checkpoints and unsafe replacement states.
+
+Body-level identity and store invariance now extends to arbitrary-depth trees
+(ADR-0207). Globally injective ID maps retain exact independent elaboration and
+the whole optional checker result, including deep rejection. The proof-carrying
+input checker and same-fuel runner preserve full results, including genuine
+checkpoints, because positional runtime values are unchanged. Source spellings,
+row order and allocator policy are not rewritten. Noninjective raw-table maps
+can change first-match lookup, checked Core, selected values and costs.
+
+Independent raw and costed paths replay from any replacement store to itself,
+with identical value and cost and no checking or typing premise. The store iff
+laws retain the original final-equals-initial constraint. Typed-input runners
+preserve same-fuel completed value/type observations with each result's own store,
+and relate only exhaustion presence between stores. Distinct store-bearing
+checkpoints and full results are not identified. Consumers retain raw replay for
+deep invalid skipped branches alongside whole rejection, and distinguish full
+same-store ID invariance from cross-store observation laws. The new body modules
+have no runtime-function dependency or cycle.
+
+Function-entry integration remains separate. Existing checkers, compilation and
 runtime-entry policies are unchanged; no general early return, extra statements,
 missing else, local declarations, calls or fallthrough are added.
 

@@ -994,6 +994,17 @@ example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_single_terminal
 example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_conditional_singletons
 example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_conditional_singletons_terminal
 
+example := @Solcore.Frontend.TerminalReturnTreeElaborates.mapIds
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_mapIds
+example := @Solcore.Frontend.LocalInputs.checkTerminalReturnTree?_mapIds
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_mapIds
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.change_store
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.change_store
+example := @Solcore.Frontend.terminalReturnTreeEvaluates_store_iff
+example := @Solcore.Frontend.terminalReturnTreeEvaluatesWithCost_store_iff
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_done_store_iff
+example := @Solcore.Frontend.LocalInputs.runTerminalReturnTree?_outOfFuel_store_iff
+
 section TerminalEntryContracts
 
 open Solcore Solcore.Frontend

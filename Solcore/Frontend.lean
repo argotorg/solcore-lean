@@ -147,6 +147,8 @@ import Solcore.Frontend.TerminalReturnTreeRunnerProperties
 import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
 import Solcore.Frontend.TerminalReturnTreeResumptionProperties
 import Solcore.Frontend.TerminalReturnTreeRunnerEmbeddingProperties
+import Solcore.Frontend.TerminalReturnTreeRenamingProperties
+import Solcore.Frontend.TerminalReturnTreeStoreProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -160,5 +162,7 @@ invariance requires no runtime argument inhabitants.
 Recursive terminal return trees additionally have independent static and
 selected-path evaluation/cost semantics with exact Core continuation paths,
 a checked body runner, recursive fuel bounds and genuine-state resumption.
-Identity/store replay invariance and function-entry integration remain separate.
+Injective identity relabeling retains full results; store replay retains value,
+cost and observation thresholds with each result's own store. Function-entry
+integration remains separate.
 -/
