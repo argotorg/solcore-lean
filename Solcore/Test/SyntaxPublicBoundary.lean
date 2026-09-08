@@ -3392,4 +3392,16 @@ example := @Syntax.Parser.expressionPostfix_trace_success_state_iff_of_ne_invari
 example := @Syntax.Parser.expressionPostfix_trace_reject_failure_state_iff_of_ne_invariant
 example := @Syntax.Parser.expressionPostfix_trace_reject_state_iff_of_ne_invariant
 
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_ordinary_of_unrestrictedBodyFuel
+example := @Syntax.Parser.ExpressionAtomInternals.lambdaExpression_ne_invariant_of_unrestrictedBodyFuel
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_ordinary_of_unrestrictedChildFuels
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtomCore_ne_invariant_of_unrestrictedChildFuels
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ordinary_of_unrestrictedChildFuels
+example := @Syntax.Parser.ExpressionAtomInternals.expressionAtom_ne_invariant_of_unrestrictedChildFuels
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixLayerTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixLayerTraceRejects
+example := @Syntax.DeclarativeGrammar.expressionPostfixLayerTraceExactOutcomeSpec
+example := @Syntax.Parser.expressionPostfix_layer_trace_success_sound
+example := @Syntax.Parser.expressionPostfix_layer_reject_trace_sound
+
 end Tests

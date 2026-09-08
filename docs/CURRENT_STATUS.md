@@ -1665,6 +1665,16 @@ gives actual and independent traced outcome existence without joint assumptions.
 The atom progress contract is still a premise here, not a result of child trace
 contracts or a claim of recursive expression closure.
 
+One concrete selected-core/recovery/postfix trace layer now leaves only nested
+expression and body relations supplied. Its soundness uses explicit successful
+and rejected full-window contexts to frame recovered atom successes; the layer
+joint bundle remains uniqueness/disjointness only. Separately, raw lambda,
+selected-core, and public-atom ordinary execution now accept bounded body
+contracts instead of global body totality, under two explicit remaining-count
+bounds. The real lam marker pays one body-budget unit before concrete parameters
+and return annotations. This ordinary law still permits replacement rejected
+windows and does not establish the atom's success endIndex/progress contract.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

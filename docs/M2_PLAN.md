@@ -1223,6 +1223,13 @@ progress contracts with two input bounds. Separate actual/independent existence
 follows totality and soundness, not uniqueness. Atom contract construction and
 recursive expression closure remain separate obligations.
 
+The selected-core/recovery/postfix layer now specializes both soundness laws
+to nested-expression/body trace contracts, with explicit full-window frames.
+Bounded body contracts also replace global body ordinary execution in the raw
+lambda/core/public atom totality laws; expression and body bounds stay separate.
+These ordinary laws do not imply successful numeric-window preservation through
+recovery or construct the atom progress contract.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

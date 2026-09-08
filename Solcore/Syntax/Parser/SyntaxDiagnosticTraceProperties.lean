@@ -217,6 +217,9 @@ import Solcore.Syntax.Parser.ExpressionPostfixUnrestrictedFuelTotalityProperties
 import Solcore.Syntax.Parser.ExpressionPostfixTraceExistenceProperties
 import Solcore.Syntax.Parser.ExpressionPostfixTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.ExpressionPostfixTraceStateProperties
+import Solcore.Syntax.Parser.ExpressionAtomBoundedBodyFuelTotalityProperties
+import Solcore.Syntax.DeclarativeExpressionPostfixLayerTraceProperties
+import Solcore.Syntax.Parser.ExpressionPostfixLayerTraceProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -280,4 +283,5 @@ postfix derivations execute above their own thresholds, while explicit progress/
 pointwise postfix correspondences reconstruct complete States with explicit rejected source/end-byte frames;
 actual atom-plus-postfix composition preserves ordered traces and pointwise complete States under explicit atom/nested contracts;
 separate bounded composition totality and trace existence still require an atom endpoint budget or a supplied atom contract;
+atom ordinary execution also accepts bounded body contracts, and one concrete atom/postfix layer retains explicit child frames;
 general expressions and remaining statement traces remain open. -/
