@@ -1068,7 +1068,33 @@ values, not new allocations or calls.
 Arbitrary local-ID index shifts need not commute with fresh allocation, and
 owner-collapsing maps are not admissible. Old function entries, owner helpers,
 raw/cost judgments, source bounds and resumption stay unchanged. No type-name
-extension, parser/Core/Wire change or broader source policy is introduced here.
+extension, parser/Core/Wire change or broader source policy is introduced here;
+type-name extension follows independently in ADR-0221.
+
+### Recursive typed let/return trees: type-name extension
+
+First-match semantic type-name extension preserves independent exact elaboration
+and whole typing throughout both recursive arms and every annotated binding
+(ADR-0221). Only annotation meaning evidence changes. The original source,
+owner, supplied input bundle, Core, result type, old-scope initializers, unused
+names and freshly extended tails remain fixed. Static nominal types still need
+no runtime inhabitants, and neither parameters nor actual values are rebound.
+
+One-way extension preserves successful complete checker and runner pairs,
+including suspended results at insufficient fuel. Mutual extension preserves
+full Options, including rejection, without requiring equal tables or unique
+keys. At fixed fuel/store, actual positional values give identical full results
+and genuine checkpoints. Their usual residual resumption remains applicable.
+
+One-way extension can resolve an unknown annotation in an unselected branch and
+repair whole rejection even when the selected raw path was already valid.
+Later duplicate entries can preserve meanings, but prepending a conflicting
+first match is not semantic extension merely because all old rows remain.
+Qualified component keys stay distinct from flattened strings. These boundaries
+are exercised by independent depth proofs and complete parsed declarations,
+alongside asymmetric costs, unused initializers, opaque actual values and real
+checkpoints. No old body/entry, owner, raw/cost, bound/resumption, parser/Core/Wire
+or broader binding policy is changed by this unit.
 
 ### Explicit restricted runtime function entry
 

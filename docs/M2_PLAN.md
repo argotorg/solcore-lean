@@ -476,6 +476,19 @@ no inhabitants; opaque actual values need no access or calls. Arbitrary index
 changes and collapsing owners do not meet this contract. Existing raw/cost,
 bound/resumption, owner helpers and outer-prefix function entries are unchanged.
 
+Recursive type-name extension (ADR-0221) transports independent exact elaboration
+and whole typing through every annotation and both original-scope arms. Fixed
+source, owner, input bundles, Core/type and actual values preserve successful
+complete checker/runner pairs under one-way first-match semantic extension.
+Mutual extension retains full Options, including rejection and genuine suspended
+states at the same fuel/store, without equal tables or unique keys. Unknown
+annotations in unselected arms may instead be repaired by one-way extension.
+Retained rows do not justify conflicting prepended meanings; qualified component
+keys keep their existing interpretation. Independent and parsed consumers cover
+depth, mixed annotations, nominal/opaque values, asymmetric unused work and real
+checkpoint resumption. Old entries, body adapters, owner/allocator, raw/cost,
+bound/resumption and parser/Core/Wire policies remain unchanged.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while

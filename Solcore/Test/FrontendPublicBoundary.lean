@@ -1237,4 +1237,13 @@ example := @Solcore.Frontend.elaborateTypedLetReturnTree?_mapOwner
 example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnTree?_mapOwner
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_mapOwner
 
+example := @Solcore.Frontend.TypedLetReturnTreeElaborates.extend_types
+example := @Solcore.Frontend.TypedLetReturnTreeHasType.extend_types
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_some_of_extends
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_eq_of_mutual_extends
+example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnTree?_some_of_extends
+example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnTree?_eq_of_mutual_extends
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_some_of_extends
+example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_eq_of_mutual_extends
+
 end Tests
