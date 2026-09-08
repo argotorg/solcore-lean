@@ -3,6 +3,7 @@ import Solcore.Frontend.TypedLetReturnTreeStoreProperties
 import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
+import Solcore.Frontend.RuntimeFunctionEntry
 import Solcore.Frontend.RuntimeFunctionCompilation
 
 /-! Store replay on actual parsed recursive bodies keeps inputs and source paths
@@ -22,7 +23,7 @@ private def types : TypeNameTable := [(["Word"], .word), (["Bool"], .bool), (["U
   (["Cell"], .cell .word), (["Fn"], .function .bool .bool)]
 private def leftStore : Core.Store := [.word (word 101), .cellRef .word 31]
 private def rightStore : Core.Store := [.word (word 202), .bool false, .closure .bool .bool (.var 0) []]
-private def actual (content : String) (arguments : List TypedRuntimeArgument) : IO (Syntax.FunctionDecl × LocalInputs) := do
+private def actual (content : String) (arguments : List TypedRuntimeArgument) : IO (Syntax.FunctionDecl × LocalInputs × List TypedRuntimeArgument) := do
   let file : Syntax.SourceFile := { id := ⟨.main, "parsed-let-tree-stores.sol"⟩, content }
   let .ok lexed ← pure (Syntax.Lexer.lex file) | throw (IO.userError "lexer invariant")
   let .ok source next := Syntax.Parser.functionDecl .module (Syntax.Parser.State.initial file lexed)
@@ -38,7 +39,7 @@ private def actual (content : String) (arguments : List TypedRuntimeArgument) : 
         inputs.names = (names.zipIdx.map (fun (name, index) => (name, (⟨owner, index⟩ : Resolved.LocalId)))).reverse ∧
         (declareRuntimeParameters? types owner source.value.signature.parameters.elements).map (fun i => (i.names, i.context.values)) =
           some (inputs.names, inputs.context.values))) "original names, IDs, ordered values or static factorization changed"
-      return (source, inputs)
+      return (source, inputs, arguments)
 private structure Expression (table : LocalNameTable) (environment : Resolved.Environment) (store : Core.Store) (source : Syntax.Expr) where
   value : Core.Value
   cost : Nat
@@ -135,20 +136,25 @@ private def replay (table : LocalNameTable) (environment : Resolved.Environment)
   have _ : ¬ TypedLetReturnTreeEvaluatesWithCost owner table environment leftStore source value rightStore cost := by
     intro wrong
     exact distinct ((typedLetReturnTreeEvaluatesWithCost_store_iff (replacement := leftStore)).mp wrong).1.symm
-private def checked (source : Syntax.FunctionDecl) (inputs : LocalInputs) (choices : List Bool)
+private def checked (source : Syntax.FunctionDecl) (inputs : LocalInputs) (arguments : List TypedRuntimeArgument) (choices : List Bool)
     (core : Core.Expr) (expected : TypedRuntimeArgument) (cost bound : Nat) : IO Unit := do
   replay inputs.names inputs.environment source.value.body choices expected.value cost
   assertTrue (decide (inputs.checkTypedLetReturnTree? types owner source.value.body = some (core, expected.type) ∧
     Core.infer? inputs.context.values core = some expected.type ∧ typedLetReturnTreeFuelBound source.value.body = bound ∧
-    interpretRuntimeFunctionHeader? types source.value.signature = some expected.type) &&
-    (compileRuntimeFunction? types owner source).isNone) "actual ordered Core, type, maximum bound or unchanged entry boundary failed"
+    interpretRuntimeFunctionHeader? types source.value.signature = some expected.type)) "actual ordered Core, type or maximum bound changed"
+  assertTrue (decide ((compileRuntimeFunction? types owner source).map (fun c => (c.core, c.returnType, c.inputs.names, c.inputs.context.values)) =
+    some (core, expected.type, inputs.names, inputs.context.values)) && (prepareRuntimeFunction? types owner source arguments).any (fun p =>
+      decide (p.core = core ∧ p.returnType = expected.type ∧ p.inputs.names = inputs.names ∧ p.inputs.context.values = inputs.context.values ∧
+        p.inputs.environment.values = arguments.reverse.map (·.value)))) "entry changed Core or original actual parameter rows"
   let run := fun store fuel => inputs.runTypedLetReturnTree? types owner fuel source.value.body store
   for fuel in List.range (bound + 3) do
     let doneLaw := inputs.runTypedLetReturnTree?_done_store_iff types owner fuel source.value.body leftStore rightStore expected.type expected.value
     let outLaw := inputs.runTypedLetReturnTree?_outOfFuel_store_iff types owner fuel source.value.body leftStore rightStore expected.type
     assertTrue (decide (run leftStore fuel = some (expected.type, Core.runStateful fuel (.initial core inputs.environment.values leftStore)) ∧
       run rightStore fuel = some (expected.type, Core.runStateful fuel (.initial core inputs.environment.values rightStore)) ∧
-      run leftStore fuel ≠ run rightStore fuel)) "complete results erased their own store or differed from actual checked Core"
+      run leftStore fuel ≠ run rightStore fuel ∧
+      runRuntimeFunction? types owner source arguments fuel leftStore = run leftStore fuel ∧
+      runRuntimeFunction? types owner source arguments fuel rightStore = run rightStore fuel)) "entry/body results erased their own store or differed from actual checked Core"
     if doneLeft : run leftStore fuel = some (expected.type, .done expected.value leftStore) then
       have rightDone := doneLaw.mp doneLeft
       have _ := doneLaw.mpr rightDone
@@ -202,18 +208,18 @@ def frontendParsedTypedLetReturnTreeStoreTests : IO Unit := do
     let (body, core) := alternating depth 0
     for c in [false, true] do
       for d in [false, true] do
-        let (source, inputs) ← actual ("function alternating(c: Bool,d: Bool,x: Word,y: Word) returns (Word){" ++ body ++ "}")
+        let (source, inputs, arguments) ← actual ("function alternating(c: Bool,d: Bool,x: Word,y: Word) returns (Word){" ++ body ++ "}")
           [boolArg c, boolArg d, wordArg 9, wordArg 2]
         let choices := if !c then [false] else if depth = 1 then [true] else if d then [true, true]
           else (List.range depth).map fun level => level % 2 == 0
-        checked source inputs choices core (if c && (depth == 1 || !d) then wordArg 9 else wordArg 2)
+        checked source inputs arguments choices core (if c && (depth == 1 || !d) then wordArg 9 else wordArg 2)
           (if !c || depth == 1 then 7 else if d then 13 else 6 * depth + 1) (6 * depth + 1)
   for (x, y) in [(9, 2), (2, 9), (0, Core.Word.maximum.val), (2 ^ 255, 7)] do
     for c in [false, true] do
       for d in [false, true] do
-        let (source, inputs) ← actual "function asymmetric(c: Bool,d: Bool,x: Word,y: Word) returns (Word){if(c){let z: Word=x - y;if(d){let w: Word=z;return ~w;}else{let w: Word=y - z;return w;}}else{let z: Word=y - x;return y;}}"
+        let (source, inputs, arguments) ← actual "function asymmetric(c: Bool,d: Bool,x: Word,y: Word) returns (Word){if(c){let z: Word=x - y;if(d){let w: Word=z;return ~w;}else{let w: Word=y - z;return w;}}else{let z: Word=y - x;return y;}}"
           [boolArg c, boolArg d, wordArg x, wordArg y]
-        checked source inputs (if c then [true, d] else [false]) (.ifE (.var 3)
+        checked source inputs arguments (if c then [true, d] else [false]) (.ifE (.var 3)
           (.letE (.binary .wordSub (.var 1) (.var 0)) (.ifE (.var 3) (.letE (.var 0) (.unary .wordNot (.var 0)))
             (.letE (.binary .wordSub (.var 1) (.var 0)) (.var 0)))) (.letE (.binary .wordSub (.var 0) (.var 1)) (.var 1)))
           ⟨.word, .word (if c then if d then ((word x).sub (word y)).bitNot else (word y).sub ((word x).sub (word y)) else word y), .word⟩
@@ -223,14 +229,14 @@ def frontendParsedTypedLetReturnTreeStoreTests : IO Unit := do
   for (name, x, y) in [("Fn", left, right), ("Cell", ⟨.cell .word, .cellRef .word 0, .cellRef⟩, ⟨.cell .word, .cellRef .word 9, .cellRef⟩),
       ("Unit", ⟨.unit, .unit, .unit⟩, ⟨.unit, .unit, .unit⟩)] do
     for c in [false, true] do
-      let (source, inputs) ← actual (s!"function opaque(c: Bool,x: {name},y: {name}) returns ({name})" ++ "{if(c){let z: " ++ name ++
+      let (source, inputs, arguments) ← actual (s!"function opaque(c: Bool,x: {name},y: {name}) returns ({name})" ++ "{if(c){let z: " ++ name ++
         "=x;if(c){let w: " ++ name ++ "=y;return z;}else{return z;}}else{let z: " ++ name ++ "=y;return z;}}") [boolArg c, x, y]
-      checked source inputs (if c then [true, true] else [false]) (.ifE (.var 2)
+      checked source inputs arguments (if c then [true, true] else [false]) (.ifE (.var 2)
         (.letE (.var 1) (.ifE (.var 3) (.letE (.var 1) (.var 1)) (.var 0))) (.letE (.var 0) (.var 0))) (if c then x else y) (if c then 13 else 7) 13
   for c in [false, true] do
-    let (source, inputs) ← actual "function simple(c: Bool,x: Word,y: Word) returns (Word){if(c){let z: Word=x;return z;}else{return y;}}" [boolArg c, wordArg 9, wordArg 2]
+    let (source, inputs, arguments) ← actual "function simple(c: Bool,x: Word,y: Word) returns (Word){if(c){let z: Word=x;return z;}else{return y;}}" [boolArg c, wordArg 9, wordArg 2]
     let selected := Core.Expr.letE (.var 1) (.var 0)
-    checked source inputs [c] (.ifE (.var 2) selected (.var 0)) (if c then wordArg 9 else wordArg 2) (if c then 7 else 4) 7
+    checked source inputs arguments [c] (.ifE (.var 2) selected (.var 0)) (if c then wordArg 9 else wordArg 2) (if c then 7 else 4) 7
     if c then
       for store in [leftStore, rightStore] do
         let environment := inputs.environment.values
@@ -243,7 +249,7 @@ def frontendParsedTypedLetReturnTreeStoreTests : IO Unit := do
   for (body, expected) in [("{if(c){let z: Unknown=x;return z;}else{return y;}}", 9), ("{if(c){let z: Bool=x;return z;}else{return y;}}", 9),
       ("{if(c){let x: Word=y;return x;}else{return y;}}", 2), ("{if(c){let z: Word=x;return z;}else{let z: Word=missing;return y;}}", 9),
       ("{if(c){let z: Word=x;return z;}else{return c;}}", 9), ("{if(c){let z: Word=x;return z;}else{if(c){return y;}else{return missing;}}}", 9)] do
-    let (source, inputs) ← actual ("function rejected(c: Bool,x: Word,y: Word) returns (Word)" ++ body) [boolArg true, wordArg 9, wordArg 2]
+    let (source, inputs, _) ← actual ("function rejected(c: Bool,x: Word,y: Word) returns (Word)" ++ body) [boolArg true, wordArg 9, wordArg 2]
     replay inputs.names inputs.environment source.value.body [true] (.word (word expected)) 7
     assertTrue (decide (typedLetReturnTreeFuelBound source.value.body = 7) && (inputs.checkTypedLetReturnTree? types owner source.value.body).isNone)
       "raw replay or positive bound licensed whole acceptance"
@@ -252,7 +258,7 @@ def frontendParsedTypedLetReturnTreeStoreTests : IO Unit := do
       have _ := inputs.runTypedLetReturnTree?_outOfFuel_store_iff types owner fuel source.value.body leftStore rightStore .word
       assertTrue ((inputs.runTypedLetReturnTree? types owner fuel source.value.body leftStore).isNone &&
         (inputs.runTypedLetReturnTree? types owner fuel source.value.body rightStore).isNone) "store replacement repaired rejected source"
-  let (source, inputs) ← actual "function misaligned(x: Word,y: Word) returns (Word){let z: Word=x;return y;}" [wordArg 9, wordArg 2]
+  let (source, inputs, _) ← actual "function misaligned(x: Word,y: Word) returns (Word){let z: Word=x;return y;}" [wordArg 9, wordArg 2]
   let reordered : Resolved.Environment := inputs.environment.reverse
   replay inputs.names reordered source.value.body [] (.word (word 2)) 4
   assertTrue (decide (reordered.ids ≠ inputs.context.ids ∧ inputs.checkTypedLetReturnTree? types owner source.value.body =
@@ -265,7 +271,7 @@ def frontendParsedTypedLetReturnTreeStoreTests : IO Unit := do
     Core.runStateful 1 (pending rightStore) = .done (.word (word 202)) rightStore ∧
     Core.runStateful 0 (pending leftStore) = .outOfFuel (pending leftStore) ∧
     Core.runStateful 0 (pending []) = .fault (.invalidCellLocation 0) (pending []))) "pending Core load was mistaken for body store replay"
-  let (source, inputs) ← actual "function pending(c: Bool,x: Cell) returns (Cell){if(c){let z: Cell=x;return z;}else{return x;}}"
+  let (source, inputs, _) ← actual "function pending(c: Bool,x: Cell) returns (Cell){if(c){let z: Cell=x;return z;}else{return x;}}"
     [boolArg true, ⟨.cell .word, .cellRef .word 0, .cellRef⟩]
   let core := Core.Expr.ifE (.var 1) (.letE (.var 0) (.var 0)) (.var 0)
   if accepted : inputs.checkTypedLetReturnTree? types owner source.value.body = some (core, .cell .word) then

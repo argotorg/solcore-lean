@@ -3,15 +3,14 @@ import Solcore.Frontend.TypedLetReturnTreeRunnerTypeExtensionProperties
 import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
+import Solcore.Frontend.RuntimeFunctionEntry
 import Solcore.Frontend.RuntimeFunctionCompilation
-
 /-! Independent original-syntax provenance meets semantic dictionary extension.
 Inputs are bound once under the original table. Whole rejection is preserved only
 mutually; a repaired unselected annotation need not change the raw selected path. -/
 set_option autoImplicit false
 namespace Tests
 open Solcore Solcore.Frontend
-
 private def assertTrue (condition : Bool) (label : String) : IO Unit := do
   unless condition do throw (IO.userError label)
 private def owner : Resolved.DeclarationId := ⟨⟨.main, ⟨[⟨"TreeTypes", by decide⟩], by decide⟩⟩, 17⟩
@@ -59,7 +58,6 @@ private def actual (source : Syntax.FunctionDecl) (arguments : List TypedRuntime
       assertTrue (decide (inputs.names = static.names ∧ inputs.context = static.context ∧
         inputs.environment.values = arguments.reverse.map (·.value))) "original rows or single argument reversal changed"
       return inputs
-
 private structure Expression (inputs : LocalTypeInputs) (source : Syntax.Expr) (core : Core.Expr) (type : Core.Ty) where
   resolved : Resolved.Expr
   resolution : ResolvesLocalExpression inputs.names source resolved
@@ -87,7 +85,6 @@ private def expression (inputs : LocalTypeInputs) (source : Syntax.Expr) (core :
         by rw [typeAt]; exact .binary l.typing r.typing⟩
   | _, _, _ => throw (IO.userError "expression differs from independent fixture Core")
 termination_by sizeOf source
-
 private structure Evidence (types : TypeNameTable) (inputs : LocalTypeInputs) (body : Syntax.Block) (core : Core.Expr) (type : Core.Ty) : Type where
   elaboration : TypedLetReturnTreeElaborates types owner inputs body core type
 private def certify (types : TypeNameTable) (inputs : LocalTypeInputs) (body : Syntax.Block) (core : Core.Expr) (type : Core.Ty) :
@@ -184,7 +181,14 @@ private def fixture (content : String) (arguments : List TypedRuntimeArgument) (
   assertTrue (decide (interpretRuntimeFunctionHeader? base source.value.signature = some expected.type)) "body contrast used invalid header"
   runChecked inputs source.value.body core expected cost bound
   for table in [base, alternate, extended] do
-    assertTrue (compileRuntimeFunction? table owner source).isNone "separate recursive body expanded an old entry"
+    assertTrue (decide ((compileRuntimeFunction? table owner source).map (fun c => (c.core, c.returnType, c.inputs.names, c.inputs.context.values)) =
+      some (core, expected.type, inputs.names, inputs.context.values)) && (prepareRuntimeFunction? table owner source arguments).any (fun p =>
+        decide (p.core = core ∧ p.returnType = expected.type ∧ p.inputs.names = inputs.names ∧ p.inputs.context.values = inputs.context.values ∧
+          p.inputs.environment.values = arguments.reverse.map (·.value)))) "table changed exact entry or original actual rows"
+    for store in stores do
+      for fuel in List.range (bound + 3) do
+        assertTrue (decide (runRuntimeFunction? table owner source arguments fuel store =
+          some (expected.type, Core.runStateful fuel (.initial core inputs.environment.values store)))) "table changed full entry result or checkpoint"
 private def rawReference (inputs : LocalInputs) (store : Core.Store) (source : Syntax.Expr) (value : Core.Value) :
     IO (PLift (LocalExpressionEvaluatesWithCost inputs.names inputs.environment store source value store 1)) := do
   match sourceAt : source with
@@ -208,9 +212,11 @@ def frontendParsedTypedLetReturnTreeTypeExtensionTests : IO Unit := do
     for depth in [1, 2, 5, 12] do
       let (body, core) := alternating depth 0 annotation
       let source ← parsed (s!"function nominal(x: {annotation},y: {annotation},c: Bool) returns ({annotation})" ++ "{" ++ body ++ "}")
-      staticCheck (← declared source) source.value.body (some (core, type))
-      assertTrue (decide (interpretRuntimeFunctionHeader? base source.value.signature = some type) &&
-        (compileRuntimeFunction? extended owner source).isNone) "nominal contrast had a bad header or expanded old entry"
+      let inputs ← declared source
+      staticCheck inputs source.value.body (some (core, type))
+      assertTrue (decide (interpretRuntimeFunctionHeader? base source.value.signature = some type ∧
+        (compileRuntimeFunction? extended owner source).map (fun c => (c.core, c.returnType, c.inputs.names, c.inputs.context.values)) =
+          some (core, type, inputs.names, inputs.context.values))) "nominal extension changed exact Core or demanded an inhabitant"
   let left : TypedRuntimeArgument := ⟨.function .bool .bool, .closure .bool .bool (.var 1) [.bool true], .closure (.cons .bool .nil) (.var rfl)⟩
   let right : TypedRuntimeArgument := ⟨.function .bool .bool, .closure .bool .bool (.var 0) [], .closure .nil (.var rfl)⟩
   for (annotation, x, y) in [("Word", wordArg 9, wordArg 2), ("Cell", ⟨.cell .word, .cellRef .word 17, .cellRef⟩, ⟨.cell .word, .cellRef .word 29, .cellRef⟩),
@@ -290,5 +296,4 @@ def frontendParsedTypedLetReturnTreeTypeExtensionTests : IO Unit := do
       fixed.context.values = [.bool, .word] ∧ fixed.environment.values = [.bool true, .word (word 9)])) "row inclusion or rebinding was mistaken for semantic extension"
   let unchanged ← parsed "function unchanged(x: Word,c: Bool) returns (Word){return x;}"
   assertTrue (decide (fixed.checkTypedLetReturnTree? shadow owner unchanged.value.body = some (.var 1, .word))) "dictionary change silently rebound fixed parameters"
-
 end Tests

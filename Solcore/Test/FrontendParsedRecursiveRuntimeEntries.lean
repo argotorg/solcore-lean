@@ -3,6 +3,8 @@ import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
 import Solcore.Frontend.RuntimeFunctionOwnerProperties
 import Solcore.Frontend.RuntimeFunctionStoreProperties
+import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
 import Solcore.Resolved.LocalScopeProperties
 
 /-! Compile actual recursive declarations once, then supply independent actual
@@ -115,7 +117,8 @@ private def compile (content : String) (core : Core.Expr) (type : Core.Ty) (para
         pure name.value
       assertTrue (decide (compiled.core = core ∧ compiled.returnType = type ∧ compiled.inputs.context.values = parameterTypes.reverse ∧
         compiled.inputs.names = (names.zipIdx.map (fun (name, index) => (name, (⟨owner, index⟩ : Resolved.LocalId)))).reverse ∧
-        Core.infer? parameterTypes.reverse core = some type ∧ terminalReturnTreeFuelBound source.value.body = bound))
+        Core.infer? parameterTypes.reverse core = some type ∧ terminalReturnTreeFuelBound source.value.body = bound ∧
+        typedLetReturnTreeFuelBound source.value.body = bound))
         "value-free compilation changed actual Core/type/rows/source budget"
       let wrong : Core.Expr := match compiled.core with
         | .ifE condition left right => .ifE (.unary .boolNot condition) left right
@@ -140,11 +143,11 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument) (c
         "preparation changed source positions, Core or actual values"
       for store in stores do
         let certificate ← certify prepared.inputs.names prepared.inputs.environment store entry.source.value.body choices
-        let costed := RuntimeFunctionEvaluatesWithCost.intro preparation (.terminal certificate.costed)
+        let costed := RuntimeFunctionEvaluatesWithCost.intro preparation (certificate.costed.typedLetReturnTree owner)
         have _ := costed.compiled_toSteps entry.provenance
         have _ := costed.cost_le_fuelBound
         have _ := costed.hasType.run_done_of_fuelBound store
-        let bound := typedLetReturnBodyFuelBound entry.source.value.body
+        let bound := typedLetReturnTreeFuelBound entry.source.value.body
         have _ := entry.provenance.run_done_of_fuelBound arguments matching store bound (Nat.le_refl _)
         assertTrue (decide (certificate.cost = cost ∧ certificate.value = value)) "independent recursive source cost/value changed"
         let initial := Core.State.initial entry.compiled.core (arguments.reverse.map (·.value)) store
@@ -188,7 +191,7 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument) (c
 private def rejectArguments (entry : Entry) (arguments : List TypedRuntimeArgument) : IO Unit := do
   assertTrue (decide (arguments.map (·.type) ≠ entry.compiled.inputs.context.values.reverse)) "negative arguments actually matched"
   for store in stores do
-    for fuel in [0, terminalReturnTreeFuelBound entry.source.value.body, 60] do
+    for fuel in [0, typedLetReturnTreeFuelBound entry.source.value.body, 60] do
       assertTrue ((prepareRuntimeFunction? types owner entry.source arguments).isNone &&
         (runRuntimeFunction? types owner entry.source arguments fuel store).isNone) "argument rejection produced a checkpoint"
 private def reject (content : String) (location : Syntax.Parser.FunctionLocation := .module) : IO Unit := do
@@ -197,7 +200,7 @@ private def reject (content : String) (location : Syntax.Parser.FunctionLocation
   for arguments in [[], [boolArg true], [boolArg true, boolArg true, wordArg 7, wordArg 9], [boolArg true, boolArg false, wordArg 7, wordArg 9],
       [boolArg false, boolArg true, wordArg 7, wordArg 9]] do
     for store in stores do
-      for fuel in [0, terminalReturnTreeFuelBound source.value.body, 60] do
+      for fuel in [0, typedLetReturnTreeFuelBound source.value.body, 60] do
         assertTrue ((prepareRuntimeFunction? types owner source arguments).isNone &&
           (runRuntimeFunction? types owner source arguments fuel store).isNone) "whole rejection depended on fuel or selected path"
 

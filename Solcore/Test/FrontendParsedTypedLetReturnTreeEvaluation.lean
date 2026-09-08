@@ -4,11 +4,13 @@ import Solcore.Frontend.TypedLetReturnTreeEvaluationProperties
 import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.LocalInputsProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.RuntimeFunctionEntry
+import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.TypedLetReturnBodyRunner
 
 /-! Actual source-path scripts certify strict old-scope initializers and selected
 recursive arms. Independent expected Core, values and costs are not runner output.
-The existing runtime entry remains unchanged; no new runner or bound is defined. -/
+Recursive entries preserve the same actual Core path; old body adapters stay narrow. -/
 set_option autoImplicit false
 namespace Tests
 open Solcore Solcore.Frontend
@@ -23,7 +25,7 @@ private def types : TypeNameTable := [(["Word"], .word), (["Bool"], .bool), (["U
   (["Cell"], .cell .word), (["Fn"], .function .bool .bool)]
 private def stores : List Core.Store := [[.word (word 101), .cellRef .word 31],
   [.closure .bool .bool (.var 0) [], .bool false, .word Core.Word.maximum]]
-private def actual (content : String) (arguments : List TypedRuntimeArgument) : IO (Syntax.FunctionDecl × LocalInputs) := do
+private def actual (content : String) (arguments : List TypedRuntimeArgument) : IO (Syntax.FunctionDecl × LocalInputs × List TypedRuntimeArgument) := do
   let file : Syntax.SourceFile := { id := ⟨.main, "parsed-let-tree-evaluation.sol"⟩, content }
   let .ok lexed ← pure (Syntax.Lexer.lex file) | throw (IO.userError "lexer invariant")
   let .ok source next := Syntax.Parser.functionDecl .module (Syntax.Parser.State.initial file lexed)
@@ -40,7 +42,7 @@ private def actual (content : String) (arguments : List TypedRuntimeArgument) : 
         inputs.names = (names.zipIdx.map (fun (name, index) => (name, (⟨owner, index⟩ : Resolved.LocalId)))).reverse ∧
         (declareRuntimeParameters? types owner source.value.signature.parameters.elements).map (fun i => (i.names, i.context.values)) =
           some (inputs.names, inputs.context.values))) "actual source positions, original IDs, values or static factorization changed"
-      return (source, inputs)
+      return (source, inputs, arguments)
 private structure Expression (table : LocalNameTable) (environment : Resolved.Environment) (store : Core.Store) (source : Syntax.Expr) where
   value : Core.Value
   cost : Nat
@@ -137,7 +139,7 @@ private theorem arbitraryContinuation {inputs : LocalTypeInputs} {environment : 
     (sameIds : environment.ids = inputs.context.ids) (continuation : List Core.Frame) :
     Core.Steps certificate.cost ⟨.eval core environment.values, continuation, store⟩ ⟨.ret certificate.value, continuation, store⟩ :=
   certificate.costed.checked_toStepsWithContinuation accepted sameIds continuation
-private def checked (source : Syntax.FunctionDecl) (inputs : LocalInputs) (choices : List Bool)
+private def checked (source : Syntax.FunctionDecl) (inputs : LocalInputs) (arguments : List TypedRuntimeArgument) (choices : List Bool)
     (expectedCore : Core.Expr) (expected : TypedRuntimeArgument) (cost : Nat) (branchBindings : Bool := true) : IO Unit := do
   have aligned : inputs.environment.ids = inputs.toTypeInputs.context.ids := by
     simpa only [LocalInputs.toTypeInputs_context] using inputs.sameIds
@@ -165,8 +167,14 @@ private def checked (source : Syntax.FunctionDecl) (inputs : LocalInputs) (choic
         have _ := arbitraryContinuation certificate accepted aligned
         assertTrue (decide (core = expectedCore ∧ type = expected.type ∧ Core.infer? inputs.context.values core = some type ∧
           interpretRuntimeFunctionHeader? types source.value.signature = some type)) "actual accepted Core/type/header changed"
-        if branchBindings then assertTrue (compileRuntimeFunction? types owner source).isNone "dynamic theorem expanded the existing entry"
+        assertTrue (decide ((compileRuntimeFunction? types owner source).map (fun c => (c.core, c.returnType, c.inputs.names, c.inputs.context.values)) =
+          some (expectedCore, expected.type, inputs.names, inputs.context.values)) && (prepareRuntimeFunction? types owner source arguments).any (fun p =>
+            decide (p.core = expectedCore ∧ p.returnType = expected.type ∧ p.inputs.names = inputs.names ∧ p.inputs.context.values = inputs.context.values ∧
+              p.inputs.environment.values = arguments.reverse.map (·.value)))) "entry changed Core or original actual parameter rows"
+        if branchBindings then assertTrue (inputs.checkTypedLetReturnBody? types owner source.value.body).isNone "old prefix adapter broadened"
         for fuel in List.range (cost + 3) do
+          assertTrue (decide (runRuntimeFunction? types owner source arguments fuel store =
+            some (expected.type, Core.runStateful fuel (.initial expectedCore inputs.environment.values store)))) "entry changed the full same-fuel machine result"
           assertTrue (match Core.runStateful fuel (.initial core inputs.environment.values store) with
             | .done value finalStore => decide (cost ≤ fuel ∧ value = expected.value ∧ finalStore = store)
             | .outOfFuel checkpoint => decide (fuel < cost ∧ checkpoint.store = store)
@@ -202,7 +210,7 @@ private theorem initializerRequired {table : LocalNameTable} {environment : Reso
   | single child => cases child
   | binding child _ => exact absent ⟨_, _, child⟩
 private def boundaries : IO Unit := do
-  let (source, inputs) ← actual "function alignment(x: Word,y: Word) returns (Word){let z: Word=x;return y;}" [wordArg 9, wordArg 2]
+  let (source, inputs, _) ← actual "function alignment(x: Word,y: Word) returns (Word){let z: Word=x;return y;}" [wordArg 9, wordArg 2]
   let untyped : Resolved.Environment := inputs.environment.map fun row => (row.1, Core.Value.bool true)
   have aligned : untyped.ids = inputs.toTypeInputs.context.ids := by
     simpa only [untyped, Resolved.LocalScope.ids, List.map_map, Function.comp_def, LocalInputs.toTypeInputs_context] using inputs.sameIds
@@ -247,18 +255,18 @@ def frontendParsedTypedLetReturnTreeEvaluationTests : IO Unit := do
     let (body, core) := alternating depth 0
     for c in [false, true] do
       for d in [false, true] do
-        let (source, inputs) ← actual ("function alternating(c: Bool,d: Bool,x: Word,y: Word) returns (Word){" ++ body ++ "}")
+        let (source, inputs, arguments) ← actual ("function alternating(c: Bool,d: Bool,x: Word,y: Word) returns (Word){" ++ body ++ "}")
           [boolArg c, boolArg d, wordArg 9, wordArg 2]
         let choices := if depth = 0 then [] else if !c then [false] else if depth = 1 then [true]
           else if d then [true, true] else (List.range depth).map fun level => level % 2 == 0
-        checked source inputs choices core (if depth == 0 || (c && (depth == 1 || !d)) then wordArg 9 else wordArg 2)
+        checked source inputs arguments choices core (if depth == 0 || (c && (depth == 1 || !d)) then wordArg 9 else wordArg 2)
           (if depth = 0 then 1 else if !c || depth == 1 then 7 else if d then 13 else 6 * depth + 1) (depth != 0)
   for (x, y) in [(9, 2), (2, 9), (0, Core.Word.maximum.val), (2 ^ 255, 7)] do
     for c in [false, true] do
       for d in [false, true] do
-        let (source, inputs) ← actual "function asymmetric(c: Bool,d: Bool,x: Word,y: Word) returns (Word){if(c){let z: Word=x - y;if(d){let w: Word=z;return ~w;}else{let w: Word=y - z;return w;}}else{let z: Word=y - x;return y;}}"
+        let (source, inputs, arguments) ← actual "function asymmetric(c: Bool,d: Bool,x: Word,y: Word) returns (Word){if(c){let z: Word=x - y;if(d){let w: Word=z;return ~w;}else{let w: Word=y - z;return w;}}else{let z: Word=y - x;return y;}}"
           [boolArg c, boolArg d, wordArg x, wordArg y]
-        checked source inputs (if c then [true, d] else [false]) (.ifE (.var 3)
+        checked source inputs arguments (if c then [true, d] else [false]) (.ifE (.var 3)
           (.letE (.binary .wordSub (.var 1) (.var 0)) (.ifE (.var 3) (.letE (.var 0) (.unary .wordNot (.var 0)))
             (.letE (.binary .wordSub (.var 1) (.var 0)) (.var 0)))) (.letE (.binary .wordSub (.var 0) (.var 1)) (.var 1)))
           ⟨.word, .word (if c then if d then ((word x).sub (word y)).bitNot else (word y).sub ((word x).sub (word y)) else word y), .word⟩
@@ -268,16 +276,16 @@ def frontendParsedTypedLetReturnTreeEvaluationTests : IO Unit := do
   for (name, x, y) in [("Fn", left, right), ("Cell", ⟨.cell .word, .cellRef .word 17, .cellRef⟩, ⟨.cell .word, .cellRef .word 29, .cellRef⟩),
       ("Unit", ⟨.unit, .unit, .unit⟩, ⟨.unit, .unit, .unit⟩)] do
     for c in [false, true] do
-      let (source, inputs) ← actual (s!"function opaque(c: Bool,x: {name},y: {name}) returns ({name})" ++ "{if(c){let z: " ++ name ++
+      let (source, inputs, arguments) ← actual (s!"function opaque(c: Bool,x: {name},y: {name}) returns ({name})" ++ "{if(c){let z: " ++ name ++
         "=x;if(c){let w: " ++ name ++ "=y;return z;}else{return z;}}else{let z: " ++ name ++ "=y;return z;}}") [boolArg c, x, y]
-      checked source inputs (if c then [true, true] else [false]) (.ifE (.var 2)
+      checked source inputs arguments (if c then [true, true] else [false]) (.ifE (.var 2)
         (.letE (.var 1) (.ifE (.var 3) (.letE (.var 1) (.var 1)) (.var 0))) (.letE (.var 0) (.var 0))) (if c then x else y) (if c then 13 else 7)
-  let (bare, bareInputs) ← actual "function bare(c: Bool,x: Word){if(c){let z: Word=x;return;}else{return;}}" [boolArg true, wordArg 9]
-  checked bare bareInputs [true] (.ifE (.var 1) (.letE (.var 0) .unit) .unit) ⟨.unit, .unit, .unit⟩ 7
+  let (bare, bareInputs, bareArguments) ← actual "function bare(c: Bool,x: Word){if(c){let z: Word=x;return;}else{return;}}" [boolArg true, wordArg 9]
+  checked bare bareInputs bareArguments [true] (.ifE (.var 1) (.letE (.var 0) .unit) .unit) ⟨.unit, .unit, .unit⟩ 7
   for (body, expected) in [("{if(c){let z: Unknown=x;return z;}else{return y;}}", 9), ("{if(c){let z: Bool=x;return z;}else{return y;}}", 9),
       ("{if(c){let x: Word=y;return x;}else{return y;}}", 2), ("{if(c){let z: Word=x;return z;}else{let z: Word=missing;return y;}}", 9),
       ("{if(c){let z: Word=x;return z;}else{return c;}}", 9), ("{if(c){let z: Word=x;return z;}else{if(c){return y;}else{return missing;}}}", 9)] do
-    let (source, inputs) ← actual ("function raw(c: Bool,x: Word,y: Word) returns (Word)" ++ body) [boolArg true, wordArg 9, wordArg 2]
+    let (source, inputs, _) ← actual ("function raw(c: Bool,x: Word,y: Word) returns (Word)" ++ body) [boolArg true, wordArg 9, wordArg 2]
     for store in stores do
       let certificate ← certify inputs.names inputs.environment store source.value.body [true]
       assertTrue (decide (certificate.cost = 7 ∧ certificate.value = .word (word expected)) &&

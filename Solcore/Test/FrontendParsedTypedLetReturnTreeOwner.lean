@@ -3,11 +3,12 @@ import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
 import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
+import Solcore.Frontend.RuntimeFunctionEntry
 import Solcore.Frontend.RuntimeFunctionCompilation
 
 /-! Original parsed syntax and separately supplied Core build independent
 provenance. Owner covariance retains actual values and full fixed-store states;
-nominal successes require no inhabitants or runtime-entry extension. -/
+nominal entry compilation requires no inhabitants and keeps parameter-only rows. -/
 set_option autoImplicit false
 namespace Tests
 open Solcore Solcore.Frontend
@@ -170,9 +171,17 @@ private def fixture (content : String) (arguments : List TypedRuntimeArgument) (
     (expected : TypedRuntimeArgument) (cost bound : Nat) : IO Unit := do
   let source ← parsed content
   let inputs ← actual source arguments
-  assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some expected.type) &&
-    (compileRuntimeFunction? types owner source).isNone && (compileRuntimeFunction? types (shift owner) source).isNone)
-    "branch-local contrast had a bad header or expanded an old entry"
+  assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some expected.type)) "branch-local entry had a bad header"
+  for chosenOwner in [owner, shift owner] do
+    let names := if chosenOwner = owner then inputs.names else (inputs.mapIds mapping mappingInjective).names
+    assertTrue (decide ((compileRuntimeFunction? types chosenOwner source).map (fun c => (c.core, c.returnType, c.inputs.names, c.inputs.context.values)) =
+      some (core, expected.type, names, inputs.context.values)) && (prepareRuntimeFunction? types chosenOwner source arguments).any (fun p =>
+        decide (p.core = core ∧ p.returnType = expected.type ∧ p.inputs.names = names ∧ p.inputs.context.values = inputs.context.values ∧
+          p.inputs.environment.values = arguments.reverse.map (·.value)))) "owner changed exact compilation or actual parameter rows"
+    for store in stores do
+      for fuel in List.range (bound + 3) do
+        assertTrue (decide (runRuntimeFunction? types chosenOwner source arguments fuel store =
+          some (expected.type, Core.runStateful fuel (.initial core inputs.environment.values store)))) "owner changed the full entry result or checkpoint"
   runChecked inputs source.value.body core expected.type expected.value cost bound arguments.length
 
 def frontendParsedTypedLetReturnTreeOwnerTests : IO Unit := do
@@ -185,9 +194,13 @@ def frontendParsedTypedLetReturnTreeOwnerTests : IO Unit := do
     for depth in [1, 2, 5, 12] do
       let (body, core) := alternating depth 0 annotation
       let source ← parsed (s!"function nominal(x: {annotation},y: {annotation},c: Bool) returns ({annotation})" ++ "{" ++ body ++ "}")
-      checkedStatic (← declared source) source.value.body core type 3
-      assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some type) &&
-        (compileRuntimeFunction? types owner source).isNone) "value-free branch-local success changed old compilation"
+      let inputs ← declared source
+      checkedStatic inputs source.value.body core type 3
+      for chosenOwner in [owner, shift owner] do
+        let names := if chosenOwner = owner then inputs.names else (inputs.mapIds mapping mappingInjective).names
+        assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some type ∧
+          (compileRuntimeFunction? types chosenOwner source).map (fun c => (c.core, c.returnType, c.inputs.names, c.inputs.context.values)) =
+            some (core, type, names, inputs.context.values))) "nominal owner compilation changed exact Core or demanded an inhabitant"
   let left : TypedRuntimeArgument := ⟨.function .bool .bool, .closure .bool .bool (.var 1) [.bool true], .closure (.cons .bool .nil) (.var rfl)⟩
   let right : TypedRuntimeArgument := ⟨.function .bool .bool, .closure .bool .bool (.var 0) [], .closure .nil (.var rfl)⟩
   for (annotation, x, y) in [("Word", wordArg 9, wordArg 2), ("Cell", ⟨.cell .word, .cellRef .word 17, .cellRef⟩, ⟨.cell .word, .cellRef .word 29, .cellRef⟩),

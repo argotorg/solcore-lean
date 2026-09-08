@@ -3,8 +3,8 @@ import Solcore.Frontend.TypedLetReturnBodyEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
 
 /-! Parsed typed prefixes retain original initializer scopes and exact ordered
-Core without argument values. Runtime entries now use this static adapter;
-the old tree boundary remains narrower, including for nominal inputs. -/
+Core without argument values. Recursive entries include this older adapter;
+the old body boundaries remain narrower, including for nominal inputs. -/
 
 set_option autoImplicit false
 
@@ -178,7 +178,7 @@ private def repeated (count : Nat) (annotation : String) (type : Core.Ty) : IO U
     "{" ++ prefixText ++ suffix ++ "}") [("x", type), ("y", type), ("c", .bool)]
     (indices.map fun index => s!"z{index}") core type
 
-private def rejected (body : String) : IO Unit := do
+private def rejected (body : String) (entryCore : Option Core.Expr := none) : IO Unit := do
   let some source ← parsed? (Syntax.Parser.functionDecl .module)
       ("function rejected(x: Word,y: Word,c: Bool,q: Opaque,f: Fn) returns (Word)" ++ body)
     | throw (IO.userError s!"semantic rejection failed to completely parse: {body}")
@@ -189,7 +189,12 @@ private def rejected (body : String) : IO Unit := do
     | some _ => throw (IO.userError s!"whole typed-prefix rejection was bypassed: {body}")
     | none =>
         have _ := elaborateTypedLetReturnBody?_eq_none_iff.mp failed
-        assertTrue (compileRuntimeFunction? types owner source).isNone "unsupported body changed the old entry"
+        match entryCore with
+        | none => assertTrue (compileRuntimeFunction? types owner source).isNone "invalid whole body entered runtime compilation"
+        | some core => assertTrue (decide (Core.infer? inputs.context.values core = some .word ∧
+            (compileRuntimeFunction? types owner source).map (fun compiled =>
+              (compiled.core, compiled.returnType, compiled.inputs.names, compiled.inputs.context.values)) =
+                some (core, .word, inputs.names, inputs.context.values))) "recursive entry changed exact Core or original parameter-only rows"
     compatibility owner inputs source.value.body
 
 private def dictionaryBoundary : IO Unit := do
@@ -237,6 +242,13 @@ def frontendParsedTypedLetReturnBodyTests : IO Unit := do
   accepted "function old(c: Bool,x: Word) returns (Word){if(c){return x;}else{return x;}}"
     [("c", .bool), ("x", .word)] [] (.ifE (.var 1) (.var 0) (.var 0)) .word
   dictionaryBoundary
+  for (body, core) in [
+      ("{let z: Word = x;if(c){let a: Word = z;return a;}else{return z;}}",
+        Core.Expr.letE (.var 4) (.ifE (.var 3) (.letE (.var 0) (.var 0)) (.var 0))),
+      ("{let z: Word = x;if(0 == 0){return z;}else{let a: Word = z;return a;}}",
+        .letE (.var 4) (.ifE (.binary .wordEq (.word Core.Word.zero) (.word Core.Word.zero)) (.var 0) (.letE (.var 0) (.var 0)))),
+      ("{if(c){let z: Word = x;return z;}else{return y;}}", .ifE (.var 2) (.letE (.var 4) (.var 0)) (.var 3))] do
+    rejected body (some core)
   rejected ("{let z: Word = " ++ toString (2 ^ 256 : Nat) ++ ";return x;}")
   for body in ["{let z = x;return z;}", "{let z: Word;return x;}", "{let z;return x;}",
       "{let z: Word = z;return x;}", "{let a: Word = b;let b: Word = x;return a;}",
@@ -247,9 +259,6 @@ def frontendParsedTypedLetReturnBodyTests : IO Unit := do
       "{let z: Opaque = f(x);return x;}", "{let z: Word = (0 == 0) ? x : missing;return x;}",
       "{let z: Word = x;}", "{let z: Word = x;return z;return x;}",
       "{let z: Word = x;z = y;return z;}", "{let z: Word = x;{return z;}}",
-      "{let z: Word = x;if(c){let a: Word = z;return a;}else{return z;}}",
-      "{let z: Word = x;if(0 == 0){return z;}else{let a: Word = z;return a;}}",
-      "{if(c){let z: Word = x;return z;}else{return y;}}",
       "{let z: Word = x;if(c){return z;}}", "{let z: Word = x;if(x){return z;}else{return y;}}",
       "{let z: Word = x;if(0 == 0){return z;}else{if(c){return y;}else{return missing;}}}",
       "{let z: Word = x;if(0 == 0){return z;}else{return c;}}",

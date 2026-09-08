@@ -1,6 +1,7 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.TerminalReturnTreeEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Recursive bodies are checked statically using actual parsed parameters.
 No values, tree execution or costs are assumed by recursive entry compilation.
@@ -42,6 +43,11 @@ private def bury : Nat → Bool → String → String
       let nested := bury depth (!right) content
       if right then "{if(d){return y;}else" ++ nested ++ "}"
       else "{if(c)" ++ nested ++ "else{return x;}}"
+private def buriedCore : Nat → Bool → Core.Expr → Core.Expr
+  | 0, _, core => core
+  | depth + 1, right, core =>
+      let nested := buriedCore depth (!right) core
+      if right then .ifE (.var 5) (.var 3) nested else .ifE (.var 6) nested (.var 4)
 
 private def parsed? {α : Type} (parser : Syntax.Parser.Parser α) (content : String) : IO (Option α) := do
   let file : Syntax.SourceFile := { id := ⟨.main, "parsed-static-return-trees.sol"⟩, content }
@@ -195,7 +201,7 @@ private def checkFixture (fixture : TreeFixture) (type : Core.Ty) (annotation : 
           some (fixture.core, type))) "old source shapes lost their exact optional result"
   else throw (IO.userError "entry contrast had a bad header rather than a deeper body")
 
-private def rejected (content : String) : IO Unit := do
+private def rejected (content : String) (entryCore : Option Core.Expr := none) : IO Unit := do
   let some block ← parsed? (Syntax.Parser.block .allow) content
     | throw (IO.userError s!"semantic tree rejection did not fully parse: {content}")
   let some source ← parsed? (Syntax.Parser.functionDecl .module)
@@ -208,7 +214,14 @@ private def rejected (content : String) : IO Unit := do
     | none =>
         have _ := elaborateTerminalReturnTree?_eq_none_iff.mp failed
         compatibility inputs ownBody
-  assertTrue (compileRuntimeFunction? types owner source).isNone "tree failure changed the existing entry boundary"
+    if entryCore.isSome then
+      assertTrue (elaborateTypedLetReturnBody? types owner inputs ownBody).isNone "recursive entry changed the old prefix adapter"
+  match entryCore with
+  | none => assertTrue (compileRuntimeFunction? types owner source).isNone "invalid whole source entered runtime compilation"
+  | some core => assertTrue (decide (Core.infer? parameterTypes.reverse core = some (.namedData ⟨91⟩) ∧
+      (compileRuntimeFunction? types owner source).map (fun compiled =>
+        (compiled.core, compiled.returnType, compiled.inputs.names, compiled.inputs.context.values)) =
+          some (core, .namedData ⟨91⟩, inputs.names, parameterTypes.reverse))) "nominal recursive entry changed exact Core or original parameter-only rows"
 
 def frontendParsedTerminalReturnTreeTests : IO Unit := do
   let left := leaf "x" (.var 4)
@@ -232,9 +245,17 @@ def frontendParsedTerminalReturnTreeTests : IO Unit := do
   checkFixture (spine 3 false arithmetic (leaf "w" (.var 1))) .word "Word"
   rejected "{return missing;}"
   rejected "{return f(w);}"
+  for depth in [0, 2, 5] do
+    for direction in [false, true] do
+      let deep := bury depth direction "{let z: Opaque = x;return z;}"
+      let core := buriedCore depth direction (.letE (.var 4) (.var 0))
+      let equal := Core.Expr.binary .wordEq (.word .zero) (.word .zero)
+      let content := if direction then "{if(0 == 0){return x;}else" ++ deep ++ "}"
+        else "{if(0 != 0)" ++ deep ++ "else{return y;}}"
+      rejected content (some (if direction then .ifE equal (.var 4) core else .ifE (.unary .boolNot equal) core (.var 3)))
   for invalid in ["{return missing;}", "{return c;}", "{return;}",
       "{if(w){return x;}else{return y;}}", "{if(c){return x;}}", "{return x;return y;}",
-      "{}", "{{return x;}}", "{return f(w);}", "{let z: Opaque = x;return z;}"] do
+      "{}", "{{return x;}}", "{return f(w);}"] do
     for depth in [0, 2, 5] do
       for direction in [false, true] do
         let deep := bury depth direction invalid

@@ -4,7 +4,7 @@ import Solcore.Frontend.RuntimeFunctionCompilationProperties
 
 /-! Completely parsed alternating let/if trees are checked against independent
 open Core. Siblings reuse their original scope and may reuse a fresh identity.
-This is value-free static checking, not a new runtime-entry profile. -/
+Value-free entry compilation keeps the original parameter-only rows. -/
 set_option autoImplicit false
 namespace Tests
 open Solcore Solcore.Frontend
@@ -144,10 +144,12 @@ private def accepted (content : String) (parameters : List (String × Core.Ty))
           assertTrue (decide (Core.infer? inputs.context.values wrong = some type)) "wrong-source contrast was not equally typed"
         else throw (IO.userError "wrong-source contrast became identical")
         inspect owner inputs source.value.body core type parameters.length
+        assertTrue (decide ((compileRuntimeFunction? types owner source).map (fun compiled =>
+          (compiled.core, compiled.returnType, compiled.inputs.names, compiled.inputs.context.values)) =
+            some (core, type, inputs.names, inputs.context.values))) "entry changed independent Core/type or original parameters"
         if branchBindings then
           assertTrue ((elaborateTypedLetReturnBody? types owner inputs source.value.body).isNone &&
-            (elaborateTerminalReturnTree? inputs.names inputs.context source.value.body).isNone &&
-            (compileRuntimeFunction? types owner source).isNone) "separate static adapter changed an existing profile or runtime entry"
+            (elaborateTerminalReturnTree? inputs.names inputs.context source.value.body).isNone) "recursive entry broadened an old body adapter"
         else
           assertTrue (decide (elaborateTypedLetReturnBody? types owner inputs source.value.body = some (core, type) ∧
             (compileRuntimeFunction? types owner source).map (fun compiled => (compiled.core, compiled.returnType)) = some (core, type)))

@@ -3,6 +3,7 @@ import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
 import Solcore.Frontend.RuntimeFunctionOwnerProperties
 import Solcore.Frontend.RuntimeFunctionStoreProperties
+import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
 
 /-! Compile each complete declaration once without values, then supply actual
 ordered arguments. Terminal entries preserve exact costs, genuine checkpoints,
@@ -64,7 +65,8 @@ private def compile (content : String) (core : Core.Expr) (type : Core.Ty)
       assertTrue (decide (compiled.core = core ∧ compiled.returnType = type ∧
         compiled.inputs.context.values = parameterTypes.reverse ∧ compiled.inputs.names = expectedNames ∧
         Core.infer? parameterTypes.reverse core = some type)) "wrong open Core, source IDs, or declared return type"
-      assertTrue (terminalReturnTreeFuelBound declaration.value.body == bound) "wrong integrated entry bound"
+      assertTrue (terminalReturnTreeFuelBound declaration.value.body == bound &&
+        typedLetReturnTreeFuelBound declaration.value.body == bound) "wrong old body or integrated entry bound"
       match declaration.value.body.value with
       | [⟨_, .returnStmt _⟩] =>
           assertTrue (returnBodyFuelBound declaration.value.body == bound) "singleton source bound changed"
@@ -80,7 +82,7 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument)
     (value : Core.Value) (cost : Nat) : IO Unit := do
   let source := entry.declaration
   let compiled := entry.compiled
-  let bound := typedLetReturnBodyFuelBound source.value.body
+  let bound := typedLetReturnTreeFuelBound source.value.body
   assertTrue (decide (0 < cost ∧ cost ≤ bound)) "actual selected cost exceeded source budget"
   if matching : arguments.map (·.type) = compiled.inputs.context.values.reverse then
     let some prepared := prepareRuntimeFunction? types owner source arguments
@@ -147,7 +149,7 @@ private def rejectArguments (entry : Entry) (arguments : List TypedRuntimeArgume
     "negative actual arguments accidentally matched"
   assertTrue (prepareRuntimeFunction? types owner entry.declaration arguments).isNone "ordered argument guard bypassed"
   for store in stores do
-    for fuel in [0, terminalReturnTreeFuelBound entry.declaration.value.body, 60] do
+    for fuel in [0, typedLetReturnTreeFuelBound entry.declaration.value.body, 60] do
       assertTrue (runRuntimeFunction? types otherOwner entry.declaration arguments fuel store).isNone
         "ample fuel or owner change bypassed actual argument guard"
 
@@ -158,7 +160,7 @@ private def reject (content : String) (location : Syntax.Parser.FunctionLocation
       [boolArg false, wordArg 7, wordArg 9], [boolArg true, wordArg 7, wordArg 9]] do
     assertTrue (prepareRuntimeFunction? types owner source arguments).isNone "rejected entry prepared actual arguments"
     for store in stores do
-      for fuel in [0, terminalReturnTreeFuelBound source.value.body, 60] do
+      for fuel in [0, typedLetReturnTreeFuelBound source.value.body, 60] do
         assertTrue (runRuntimeFunction? types owner source arguments fuel store).isNone
           "whole header/parameter/arm rejection depended on fuel or selected value"
 

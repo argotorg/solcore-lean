@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RuntimeFunctionCompilationOwnerProperties
+import Solcore.Frontend.TerminalReturnTree
 
 /-! Compilation owner laws are consumed without constructing runtime arguments.
 Nominal and mixed type-only declarations retain exact Core/type projections;

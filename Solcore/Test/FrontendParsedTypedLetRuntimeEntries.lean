@@ -4,6 +4,8 @@ import Solcore.Frontend.RuntimeFunctionResumptionProperties
 import Solcore.Frontend.RuntimeFunctionOwnerProperties
 import Solcore.Frontend.RuntimeFunctionStoreProperties
 import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
+import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
+import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
 
 /-! Compile completely parsed prefixes once, then run actual arguments against
 independent Core, typed value and source-cost expectations. Prefix locals are
@@ -39,12 +41,14 @@ private structure Entry where
   source : Syntax.FunctionDecl
   compiled : CompiledRuntimeFunction
   provenance : RuntimeFunctionCompiles types owner source compiled
+  oldPrefix : Bool
 private theorem excludeWrong {source : Syntax.FunctionDecl} {compiled : CompiledRuntimeFunction}
     (provenance : RuntimeFunctionCompiles types owner source compiled) {wrong : Core.Expr} (different : wrong ≠ compiled.core) :
     ¬ RuntimeFunctionCompiles types owner source { compiled with core := wrong } := by
   intro other
   exact different (congrArg CompiledRuntimeFunction.core (other.result_unique provenance))
-private def compile (content : String) (core : Core.Expr) (type : Core.Ty) (parameterTypes : List Core.Ty) (bound : Nat) : IO Entry := do
+private def compile (content : String) (core : Core.Expr) (type : Core.Ty) (parameterTypes : List Core.Ty) (bound : Nat)
+    (oldPrefix : Bool := true) : IO Entry := do
   let some source ← parsed? content | throw (IO.userError "positive whole declaration did not completely parse")
   match accepted : compileRuntimeFunction? types owner source with
   | none => throw (IO.userError "valid typed-prefix entry did not compile")
@@ -58,8 +62,9 @@ private def compile (content : String) (core : Core.Expr) (type : Core.Ty) (para
       assertTrue (decide (compiled.core = core ∧ compiled.returnType = type ∧ compiled.inputs.context.values = parameterTypes.reverse ∧
         compiled.inputs.names = (names.zipIdx.map (fun (name, index) => (name, (⟨owner, index⟩ : Resolved.LocalId)))).reverse ∧
         compiled.inputs.bindings.length = parameterTypes.length ∧ Core.infer? parameterTypes.reverse core = some type ∧
-        typedLetReturnBodyFuelBound source.value.body = bound ∧ terminalReturnTreeFuelBound source.value.body = 0))
+        typedLetReturnTreeFuelBound source.value.body = bound ∧ terminalReturnTreeFuelBound source.value.body = 0))
         "compiled prefix changed exact Core/type/bound or leaked locals into original parameter rows"
+      if oldPrefix then assertTrue (typedLetReturnBodyFuelBound source.value.body == bound) "old successful prefix bound changed"
       assertTrue ((elaborateTerminalReturnTree? compiled.inputs.names compiled.inputs.context source.value.body).isNone)
         "entry integration broadened the old tree adapter"
       have _ := provenance.core_hasType
@@ -73,7 +78,7 @@ private def compile (content : String) (core : Core.Expr) (type : Core.Ty) (para
         have _ := excludeWrong provenance different
         assertTrue (decide (Core.infer? parameterTypes.reverse wrong = some type)) "wrong-Core contrast was not equally typed"
       else throw (IO.userError "wrong-Core contrast became identical")
-      return ⟨source, compiled, provenance⟩
+      return ⟨source, compiled, provenance, oldPrefix⟩
 private def observation (observed : Option (Core.Ty × Core.StatefulRunResult))
     (expected : TypedRuntimeArgument) (store : Core.Store) (cost fuel : Nat) : Bool :=
   match observed with
@@ -81,7 +86,7 @@ private def observation (observed : Option (Core.Ty × Core.StatefulRunResult))
   | some (type, .outOfFuel checkpoint) => decide (type = expected.type ∧ checkpoint.store = store ∧ fuel < cost)
   | _ => false
 private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument) (expected : TypedRuntimeArgument) (cost : Nat) : IO Unit := do
-  let bound := typedLetReturnBodyFuelBound entry.source.value.body
+  let bound := typedLetReturnTreeFuelBound entry.source.value.body
   assertTrue (decide (expected.type = entry.compiled.returnType ∧ 0 < cost ∧ cost ≤ bound)) "independent value type or source cost disagreed"
   if matching : arguments.map (·.type) = entry.compiled.inputs.context.values.reverse then
     match preparedAt : prepareRuntimeFunction? types owner entry.source arguments with
@@ -93,8 +98,10 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument) (e
       assertTrue (decide (prepared.core = entry.compiled.core ∧ prepared.returnType = expected.type ∧
         prepared.inputs.names = entry.compiled.inputs.names ∧ prepared.inputs.context.values = entry.compiled.inputs.context.values ∧
         prepared.inputs.environment.values = arguments.reverse.map (·.value) ∧ prepared.inputs.bindings.length = arguments.length ∧
-        prepared.inputs.checkTypedLetReturnBody? types owner entry.source.value.body = some (entry.compiled.core, expected.type)))
+        prepared.inputs.checkTypedLetReturnTree? types owner entry.source.value.body = some (entry.compiled.core, expected.type)))
         "preparation rebound prefix locals as parameters or changed original ordered actual values"
+      if entry.oldPrefix then assertTrue (decide (prepared.inputs.checkTypedLetReturnBody? types owner entry.source.value.body =
+        some (entry.compiled.core, expected.type))) "old successful prefix checker changed"
       for store in stores do
         have _ := entry.provenance.run_done_of_fuelBound arguments matching store bound (Nat.le_refl _)
         have _ := preparation.hasType.run_done_of_fuelBound store bound (Nat.le_refl _)
@@ -111,9 +118,12 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument) (e
           have _ := runRuntimeFunction?_factorization types owner entry.source arguments fuel store
           have _ := runRuntimeFunction?_owner_eq types owner otherOwner entry.source arguments fuel store
           assertTrue (decide (run fuel = some (expected.type, Core.runStateful fuel initial) ∧
-            run fuel = prepared.inputs.runTypedLetReturnBody? types owner fuel entry.source.value.body store ∧
+            run fuel = prepared.inputs.runTypedLetReturnTree? types owner fuel entry.source.value.body store ∧
             run fuel = runRuntimeFunction? extended owner entry.source arguments fuel store ∧
             run fuel = runRuntimeFunction? types otherOwner entry.source arguments fuel store)) "entry factorization, owner or table extension changed the full result"
+          if entry.oldPrefix then
+            assertTrue (decide (run fuel = prepared.inputs.runTypedLetReturnBody? types owner fuel entry.source.value.body store))
+              "old successful prefix full same-fuel result changed"
           assertTrue (observation (run fuel) expected store cost fuel) "entry changed independent value, cost threshold or own store"
           for replacement in stores do
             have _ := runRuntimeFunction?_done_store_iff types owner entry.source arguments fuel store replacement expected.type expected.value
@@ -144,7 +154,7 @@ private def checkCase (entry : Entry) (arguments : List TypedRuntimeArgument) (e
 private def rejectArguments (entry : Entry) (arguments : List TypedRuntimeArgument) : IO Unit := do
   assertTrue (decide (arguments.map (·.type) ≠ entry.compiled.inputs.context.values.reverse)) "argument guard contrast became matching"
   for store in stores do
-    for fuel in [0, typedLetReturnBodyFuelBound entry.source.value.body, 60] do
+    for fuel in [0, typedLetReturnTreeFuelBound entry.source.value.body, 60] do
       have _ := runRuntimeFunction?_factorization types owner entry.source arguments fuel store
       assertTrue ((prepareRuntimeFunction? types owner entry.source arguments).isNone &&
         (runRuntimeFunction? types owner entry.source arguments fuel store).isNone) "invalid actual arity/type produced a checkpoint"
@@ -152,7 +162,7 @@ private def reject (source : Syntax.FunctionDecl) : IO Unit := do
   assertTrue (compileRuntimeFunction? types owner source).isNone "invalid whole entry compiled"
   for arguments in [[], [wordArg 9], [wordArg 9, boolArg true], [wordArg 9, wordArg 2]] do
     for store in stores do
-      for fuel in [0, typedLetReturnBodyFuelBound source.value.body, 60] do
+      for fuel in [0, typedLetReturnTreeFuelBound source.value.body, 60] do
         assertTrue ((prepareRuntimeFunction? types owner source arguments).isNone &&
           (runRuntimeFunction? types owner source arguments fuel store).isNone) "whole rejection depended on arguments, store or fuel"
 
@@ -191,6 +201,11 @@ def frontendParsedTypedLetRuntimeEntryTests : IO Unit := do
   let constant ← compile "function constant() returns (Word){let z: Word=7;return z;}" (.letE (.word (word 7)) (.var 0)) .word [] 4
   checkCase constant [] (wordArg 7) 4
   rejectArguments constant [wordArg 7]
+  let branch ← compile "function branch(x: Word,c: Bool) returns (Word){let z: Word=x;if(c){let y: Word=z;return y;}else{return x;}}"
+    (.letE (.var 1) (.ifE (.var 1) (.letE (.var 0) (.var 0)) (.var 2))) .word [.word, .bool] 10 false
+  assertTrue (typedLetReturnBodyFuelBound branch.source.value.body == 7 &&
+    (elaborateTypedLetReturnBody? types owner branch.compiled.inputs branch.source.value.body).isNone) "old prefix adapter or bound changed"
+  for c in [false, true] do checkCase branch [wordArg 9, boolArg c] (wordArg 9) (if c then 10 else 7)
   have _ (id : Core.DataTypeId) : ¬ ∃ value, Core.ValueHasType value (.namedData id) := by
     rintro ⟨value, typed⟩
     cases typed with
@@ -219,7 +234,7 @@ def frontendParsedTypedLetRuntimeEntryTests : IO Unit := do
       "{let y: Word=z;let z: Word=x;return y;}", "{let z: Word=missing;return x;}", "{let z: Word=x();return x;}",
       "{let z: Word=c ? x : missing;return x;}", "{let z: Word=x;if(c){if(c){return z;}else{return missing;}}else{return x;}}",
       "{let z: Word=x;if(c){return z;}else{return c;}}", "{let z: Word=x;if(x){return z;}else{return x;}}",
-      "{let z: Word=x;if(c){return z;}}", "{let z: Word=x;if(c){let y: Word=z;return y;}else{return x;}}",
+      "{let z: Word=x;if(c){return z;}}",
       "{let z: Word=x;return z;return x;}", "{let z: Word=x;z=x;return z;}", "{}"] do
     let some source ← parsed? ("function invalid(x: Word,c: Bool) returns (Word)" ++ body) | throw (IO.userError "bad-prefix fixture did not parse")
     assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some .word) &&
