@@ -3,7 +3,7 @@ import Solcore.Frontend.WordLiteral
 
 /-! An additive canonical adapter for identifiers, strict Word literals, grouping,
 conditionals, Boolean operators, Word arithmetic/bitwise operators, unsigned
-Word greater-than, and Word equality. Its explicit name table
+Word greater-than, and Word equality/inequality. Its explicit name table
 supplies identities, including any bindings for `true` or `false`; literals do
 not consult that table. This fixed literal interpretation is local to the adapter,
 not a general source conversion or overload policy. Other operators, source
@@ -42,6 +42,9 @@ def resolveLocalExpression? (table : LocalNameTable) (source : Syntax.Expr) :
   | ⟨_, .binary left ⟨_, .equal⟩ right⟩ => do
       return .binary .wordEq (← resolveLocalExpression? table left)
         (← resolveLocalExpression? table right)
+  | ⟨_, .binary left ⟨_, .notEqual⟩ right⟩ => do
+      return .unary .boolNot (.binary .wordEq (← resolveLocalExpression? table left)
+        (← resolveLocalExpression? table right))
   | ⟨_, .binary left ⟨_, .bitAnd⟩ right⟩ => do
       return .binary .wordAnd (← resolveLocalExpression? table left)
         (← resolveLocalExpression? table right)
@@ -123,6 +126,13 @@ inductive ResolvesLocalExpression (table : LocalNameTable) :
       ResolvesLocalExpression table
         { span, value := .binary left ⟨operatorSpan, .equal⟩ right }
         (.binary .wordEq resolvedLeft resolvedRight)
+  | notEqual {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {resolvedLeft resolvedRight : Resolved.Expr}
+      (leftChild : ResolvesLocalExpression table left resolvedLeft)
+      (rightChild : ResolvesLocalExpression table right resolvedRight) :
+      ResolvesLocalExpression table
+        { span, value := .binary left ⟨operatorSpan, .notEqual⟩ right }
+        (.unary .boolNot (.binary .wordEq resolvedLeft resolvedRight))
   | bitAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {resolvedLeft resolvedRight : Resolved.Expr}
       (leftChild : ResolvesLocalExpression table left resolvedLeft)
