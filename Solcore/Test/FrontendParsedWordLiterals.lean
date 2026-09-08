@@ -2,9 +2,9 @@ import Solcore.Syntax.Parser.Term
 import Solcore.Frontend.WordLiteral
 import Solcore.Frontend.LocalInputsExecution
 
-/-! Full-source literal regressions for the standalone numeric interpreter.
+/-! Full-source literal regressions for numeric interpretation and checked execution.
 Parser acceptance, natural-number meaning, and strict Word range are distinct.
-The local-expression checker still does not accept numeric literal syntax. -/
+The monomorphic local-expression adapter admits exactly the strict Word values. -/
 
 set_option autoImplicit false
 
@@ -40,15 +40,35 @@ private def checkNumeric (content : String) (expectedPayload : Syntax.CoreLitera
   let actual := interpretWordLiteral? literal
   assertTrue (decide (actual = Core.Word.ofNat? expected))
     s!"{content}: wrong strict Word range or value"
+  let source : Syntax.Expr := ⟨literal.span, .literal literal⟩
+  let checked := LocalInputs.empty.check? source
+  let store : Core.Store := [.word Core.Word.zero, .bool false]
   match actual with
-  | some word => assertTrue (decide (word.val = expected)) s!"{content}: Word value was reduced"
-  | none => assertTrue (decide (Core.wordModulus ≤ expected)) s!"{content}: in-range value was rejected"
+  | some word =>
+      assertTrue (decide (word.val = expected)) s!"{content}: Word value was reduced"
+      assertTrue (decide (checked = some (.word word, .word)))
+        s!"{content}: wrong literal Core or source type"
+      let some (actualCore, _) := checked
+        | throw (IO.userError s!"{content}: literal did not check")
+      assertTrue (decide (LocalInputs.empty.run? 0 source store =
+        some (.word, .outOfFuel (Core.State.initial actualCore [] store))))
+        s!"{content}: literal completed without its one transition"
+      for fuel in [1, 6] do
+        assertTrue (decide (LocalInputs.empty.run? fuel source store =
+          some (.word, .done (.word word) store)))
+          s!"{content}: checked literal changed value or store"
+  | none =>
+      assertTrue (decide (Core.wordModulus ≤ expected)) s!"{content}: in-range value was rejected"
+      assertTrue checked.isNone s!"{content}: overflowing literal checked"
+      for fuel in [0, 7] do
+        assertTrue (LocalInputs.empty.run? fuel source store).isNone
+          s!"{content}: overflowing literal reached execution"
   let shifted : Syntax.CoreLiteral :=
     { literal with span := ⟨⟨.main, "unrelated.sol"⟩, 900, 2⟩ }
   assertTrue (decide (interpretWordLiteral? shifted = actual))
     s!"{content}: literal interpretation depended on source ranges"
-  assertTrue (decide (LocalInputs.empty.check? ⟨literal.span, .literal literal⟩ = none))
-    "standalone literal interpretation unexpectedly widened the local-expression checker"
+  assertTrue (decide (LocalInputs.empty.check? ⟨shifted.span, .literal shifted⟩ = checked))
+    s!"{content}: literal checking depended on either source range"
 
 def frontendParsedWordLiteralTests : IO Unit := do
   checkNumeric "0" (.decimal "0") 0
@@ -78,5 +98,7 @@ def frontendParsedWordLiteralTests : IO Unit := do
     | throw (IO.userError "quoted source should parse as a string literal")
   assertTrue (decide (numericLiteralValue? quoted.value = none ∧ interpretWordLiteral? quoted = none))
     "a quoted string received numeric meaning"
+  assertTrue (LocalInputs.empty.check? ⟨quoted.span, .literal quoted⟩).isNone
+    "a quoted string became a checked numeric expression"
 
 end Tests

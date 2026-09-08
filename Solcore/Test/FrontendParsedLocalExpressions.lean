@@ -101,6 +101,7 @@ private def checkBundledRun : IO Unit := do
   let conjunction ← parsedExpression "c && !c"
   let disjunction ← parsedExpression "c || !c"
   let complemented ← parsedExpression "~t"
+  let literalCondition ← parsedExpression "c ? 7 : ~0xaF"
   let unsupported ← parsedExpression "c ? t : missing"
   for choice in [false, true] do
     let inputs := bundledInputs choice
@@ -136,8 +137,15 @@ private def checkBundledRun : IO Unit := do
     assertTrue (decide (extended.run? 6 conjunction store = inputs.run? 6 conjunction store ∧
       extended.run? 6 disjunction store = inputs.run? 6 disjunction store))
       "unused input insertion changed parsed short-circuit execution"
+    let literalValue := if choice then word 7 else .word (Core.Word.ofNatModulo 175).bitNot
+    let literalFuel := if choice then 4 else 6
+    assertTrue (decide (inputs.run? literalFuel literalCondition store =
+      some (.word, .done literalValue store) ∧
+      extended.run? literalFuel literalCondition store = inputs.run? literalFuel literalCondition store))
+      "parsed literal branches changed under unused input insertion"
     let renamed := extended.mapIds relabel relabel_injective
-    for checkedSource in [source, negatedSource, conjunction, disjunction, complemented, unsupported] do
+    for checkedSource in [source, negatedSource, conjunction, disjunction, complemented,
+        literalCondition, unsupported] do
       assertTrue (decide (renamed.check? checkedSource = extended.check? checkedSource))
         "identity relabeling changed parsed checked Core or type"
       for fuel in [0, 2, 4, 6] do
@@ -175,7 +183,8 @@ private def checkShortCircuitRuns : IO Unit := do
   checkRun "c && (d ? !c : c) ? t : e" nested true true (word 22) 12
   checkRun "c && (d ? !c : c) ? t : e" nested true false (word 11) 10
   checkUnsupported "c && missing"
-  checkUnsupported "c || 7"
+  checkIllTyped "c || 7"
+  checkUnsupported "c || \"7\""
   checkUnsupported "c & d"
   checkUnsupported "c | d"
   checkIllTyped "c && n"
@@ -193,7 +202,12 @@ private def checkWordComplementRuns : IO Unit := do
       choice true (if choice then word 11 else .word (Core.Word.ofNatModulo 22).bitNot)
       (if choice then 4 else 6)
   checkUnsupported "~missing"
-  checkUnsupported "~7"
+  checkRun "~7" (.unary .wordNot (.word (Core.Word.ofNatModulo 7)))
+    false false (.word (Core.Word.ofNatModulo 7).bitNot) 3
+  checkRun "~~((0007))" (.unary .wordNot (.unary .wordNot (.word (Core.Word.ofNatModulo 7))))
+    false false (word 7) 5
+  checkUnsupported "~\"7\""
+  checkIllTyped "!7"
   checkIllTyped "!~n"
   checkIllTyped "~(!c)"
   checkIllTyped "(~n) ? t : e"
@@ -227,7 +241,15 @@ def frontendParsedLocalExpressionTests : IO Unit := do
   checkRun "!false ? t : e"
     (.ifE (.unary .boolNot (.var 7)) (.var 2) (.var 3)) false false (word 22) 6
   checkUnsupported "c ? t : missing"
-  checkUnsupported "c ? t : 7"
+  for choice in [false, true] do
+    checkRun "c ? t : 7" (.ifE (.var 1) (.var 2) (.word (Core.Word.ofNatModulo 7)))
+      choice false (if choice then word 11 else word 7) 4
+    checkRun "c ? 7 : 0xaF"
+      (.ifE (.var 1) (.word (Core.Word.ofNatModulo 7)) (.word (Core.Word.ofNatModulo 175)))
+      choice true (if choice then word 7 else word 175) 4
+  checkUnsupported "c ? t : \"7\""
+  checkIllTyped "7 ? t : e"
+  checkIllTyped "c ? 7 : d"
   checkUnsupported "t + e"
   checkIllTyped "~c"
   checkIllTyped "n ? t : e"
