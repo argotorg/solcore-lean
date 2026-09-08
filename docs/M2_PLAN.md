@@ -413,9 +413,9 @@ return has full Option equality, but old branch-let failures may become successe
 Arbitrary-depth source proofs and complete parsed declarations exercise exact
 Core, original parameter positions, same-ID siblings, ancestor visibility,
 noncommutative initialization, qualified/first-match meanings and deep rejection.
-Existing body adapters and ADR-0215 entries remain unchanged. Evaluation/cost
+Existing body adapters remain unchanged. Evaluation/cost
 is supplied by ADR-0217 and separate body runner/fuel/resumption by ADR-0218.
-Eventual entry integration remains separate, without calls or broader policy.
+ADR-0222 now supplies entry integration, without calls or broader policy.
 
 Recursive typed-let evaluation/cost (ADR-0217) now evaluates strict initializers
 in their old scope, extends tails with actual obtained values and follows only
@@ -514,7 +514,7 @@ Old body-only adapters and the absence of general source calls/early returns are
 unchanged. Independent and parsed entry consumers retain exact source Core,
 real arguments, asymmetric bounds and actual multi-chunk checkpoints.
 
-Typed-prefix entry integration (ADR-0215) now connects the same APIs to the
+Typed-prefix entry integration (ADR-0215) initially connected the same APIs to the
 annotated, initialized, nonshadowing outer prefix followed by a terminal tree.
 Compilation uses complete value-free inputs; preparation uses their exact actual
 projection. Parameter-declaration uniqueness preserves that entire bundle across
@@ -529,8 +529,27 @@ and parsed whole declarations cover exact positional Core, nominal types without
 inhabitants, actual opaque values, strict unused work and real multi-chunk states.
 Valid prefix entry failures migrate to exact success without changing old tree
 rejection. Missing annotation/initializer, shadowing, self/forward references,
-arm-local lets and all invalid whole contracts remain outside this adapter.
+arm-local lets and all invalid whole contracts remained outside that adapter.
 No parser/Core/Wire change, inference, defaults, general calls or binding policy.
+
+Recursive typed-let entry integration (ADR-0222) now connects the compiler,
+preparer, whole typing and cost constructor to independent recursive judgments.
+Both arms keep the same original scope; annotated, initialized, fresh-name lets
+may alternate with terminal conditions at any finite depth. Original parameter-only
+records, ordered actual-value reversal, header/argument/declared-return guards and
+direct Core execution stay fixed. Erased parameter-bundle uniqueness transports
+body typing across same-typed arguments without assuming nominal inhabitants.
+Owner/type-name transport, exact provenance/factorization, own-store observations,
+safety and real checkpoint resumption reuse the existing body contracts.
+Only three generic fuel formulas change to `typedLetReturnTreeFuelBound`: a
+branch-local let costs seven against the old prefix bound of four. Old body
+adapters/bounds and prior accepted full results remain unchanged. Independent
+arbitrary-depth proofs and parsed actual declarations cover exact positional Core,
+strict noncommutative/unused work, asymmetric costs, opaque values and all-fuel
+multi-chunk checkpoints. Valid arm-local rejections become exact successes;
+missing annotations/initializers, shadowing, sibling leakage, mismatched returns,
+bad headers/arguments and invalid unselected children still reject. No inference,
+defaults, general calls, separate block wrappers or broader binding policy is added.
 
 Arbitrary-position parameter semantics (ADR-0171) now connect source index `k`
 to identity `(owner, k)`, exact Core position `n - 1 - k`, and the original

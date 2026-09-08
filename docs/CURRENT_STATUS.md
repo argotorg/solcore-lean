@@ -946,8 +946,8 @@ Independent arbitrary-length proofs and complete parsed declarations cover
 alternating depth, noncommutative initialization, sibling isolation, original
 parameter positions, first-match annotation meanings and qualified keys.
 This static unit itself adds no runtime-entry integration. Independent
-evaluation/cost and a separate body runner follow in ADR-0217/0218; the existing
-function entries still reject arm-local lets. Missing
+evaluation/cost and a separate body runner follow in ADR-0217/0218;
+ADR-0222 now connects these recursive bodies to existing function entries. Missing
 annotations/initializers, shadowing, extra statements after a conditional,
 separate block wrappers and general calls remain outside this new adapter;
 no parser/Core/Wire change, inference or global binding policy is implied.
@@ -1099,8 +1099,8 @@ or broader binding policy is changed by this unit.
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime
-parameters, typed let prefix and terminal return tree in one entry
-(ADR-0170, ADR-0198, ADR-0208, ADR-0215). Independent exact
+parameters and recursive typed let/return tree in one entry
+(ADR-0170, ADR-0198, ADR-0208, ADR-0215, ADR-0222). Independent exact
 preparation retains both the actual lowered Core and its declared return type,
 not merely some Core of that type. Success and failure correspond to this
 independent relation, and a whole-entry typing contract is distinct from
@@ -1108,36 +1108,41 @@ body-only typing. A Bool-return declaration with a Word body is rejected here
 while remaining a Word body at the existing body-only endpoint.
 
 The compiler, preparer, whole-entry typing and independent entry cost now use
-the typed let-prefix judgments. Finite outer annotated, initialized, unused-name
-declarations precede a recursively checked terminal tree. Each initializer uses
+the recursive typed let/return-tree judgments. Annotated, initialized, unused-name
+declarations alternate with terminal if/else inside either arm. Each initializer uses
 the old scope and its exact annotation type; the freshly extended tail becomes
 the actual nested Core `letE`. The original entry APIs and three-field data
 record layouts remain unchanged. Records retain only original parameter inputs:
-prefix locals do not alter argument count, ordered type guards or value reversal.
+branch-local lets do not alter argument count, ordered type guards or value reversal.
+Both arms start from the original scope and can reuse the same fresh ID without
+leaking names. Descendants see ancestor lets but cannot shadow them.
 Exact-Core factorization, parameter positions, owner/type-name transport, stores
 and checkpoints lift through the new provenance. The runner still executes the
 prepared Core directly and adds no transitions or second value reversal.
 
-The three entry fuel-bound theorems now use `typedLetReturnBodyFuelBound`, adding
-each initializer bound and two before the terminal tree's recursive maximum.
-One initialized variable and return cost four while the old tree bound is zero,
-so the old tree formula cannot remain the general entry guarantee. Other generic
+The three entry fuel-bound theorems now use `typedLetReturnTreeFuelBound`, adding
+each initializer bound and two, or a condition bound and maximum recursive arm
+bound and two. A selected branch-local let costs seven while the old prefix bound
+is four, so the old formula cannot remain the general entry guarantee. Other generic
 entry theorem statements retain their premises and
 conclusions over the broadened judgments. Value-free compilation still requires
 no actual inhabitants, while safe execution requires real matching typed arguments
 and provenance. Same-typed wrong Core cannot replace the source's actual Core.
 
-Old singleton and one-level values, costs and complete same-fuel results remain
-unchanged. Valid annotated-prefix entry rejection fixtures now become exact
-successes while old tree-adapter rejection remains. Invalid headers, parameters,
+Old singleton, terminal-tree and outer-prefix values, costs and complete same-fuel
+results remain unchanged. Valid branch-local entry rejection fixtures now become
+exact successes while old body-adapter rejection remains. Invalid headers, parameters,
 declared return mismatches and unselected deep arms still reject. Missing
-annotations/initializers, shadowing, self/forward references, arm-local lets,
+annotations/initializers, shadowing, self/forward or sibling references,
 extra returns, missing else and separate nested-block wrappers remain unsupported;
 this is not a global binding policy. All old body-only adapters and bounds are
-unchanged. Independent arbitrary-length source proofs retain static nominal
-types without values, exact `3n + 1` costs, original parameter rows and actual
-multi-chunk let checkpoints. Parsed whole declarations additionally retain
-noncommutative/unused initialization, asymmetric paths and complete rejections.
+unchanged. Independent arbitrary-depth source proofs retain static nominal
+types without values, exact `10n + 1` costs, original parameter rows and actual
+conditional/initializer/tail checkpoints. Parsed whole declarations additionally
+retain alternating `6n + 1` bounds, noncommutative/unused initialization, asymmetric
+paths and full multi-chunk results at every below-cost checkpoint. Selected raw
+success cannot hide an invalid unselected annotation. Exact-Core uniqueness
+excludes equally typed substituted code; opaque values remain actual arguments.
 
 The restricted header excludes generics, where clauses, and contract modifiers.
 No return clause means Unit; an explicit clause has exactly one supported

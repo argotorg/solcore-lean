@@ -193,8 +193,8 @@ type-only and runtime parameter inputs, singleton and terminal-conditional retur
 and restricted explicit
 function entries with value-free compilation. Independent source rules
 connect to checked Core execution. General source-program resolution, parser
-changes, and wire publication are not implied. Function entries support typed
-outer let prefixes before finite terminal if/else trees with singleton-return leaves; compilation owner
+changes, and wire publication are not implied. Function entries support finite
+alternation of typed lets and terminal if/else trees inside either arm; compilation owner
 invariance requires no runtime argument inhabitants.
 Recursive terminal return trees additionally have independent static and
 selected-path evaluation/cost semantics with exact Core continuation paths,
@@ -211,9 +211,8 @@ each completed or suspended observation retaining its own store. Injective
 owner-only relabeling commutes with fresh binding and preserves exact Core,
 whole optional results and checkpoints at a fixed store. First-match type-meaning
 extension preserves success, and mutual extension also preserves rejection.
-Existing function entries reuse the typed-prefix judgments and additive bound,
-retaining original parameter records, argument guards and direct Core execution.
-No arm-local let is added to those runtime entries. A separate recursive static
+Older prefix successes retain their exact Core and complete runner results.
+A separate recursive static
 adapter admits annotated, initialized, nonshadowing lets inside either arm,
 with exact ordered Core, independent typing and success-only old embeddings.
 Sibling scopes start from the same inputs and may reuse the same fresh ID.
@@ -234,6 +233,9 @@ First-match type-name extension retains successful exact checker and full runner
 pairs with fixed inputs; mutual extension retains whole Options. One-way extension
 can repair unknown annotations, and conflicting first-match overrides are not
 semantic extensions.
-Existing function entries are unchanged. No inference, default
-initialization or broader binding policy is added.
+Existing function entries reuse these recursive judgments and additive/max-arm
+bound, retaining original parameter-only records, header/argument guards and
+direct Core execution. Actual branch-local work contributes no wrapper overhead.
+Old body-only adapters and bounds remain unchanged. No inference, default
+initialization, general calls or broader binding policy is added.
 -/
