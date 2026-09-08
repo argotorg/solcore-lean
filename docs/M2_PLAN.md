@@ -287,9 +287,20 @@ and ordered Core `ifE` nodes, and prove Core typing, exact uniqueness and failur
 characterization without runtime values. Old successes embed exactly; complete
 Option equality only applies to old singleton/one-level shapes. Deep positive
 and negative parsed trees retain valid static parameters/header while contrasting
-unchanged old body/entry rejection. Recursive evaluation/cost, continuation,
-fuel/resumption and invariance proofs follow separately before entry integration;
-this static unit changes no existing acceptance or execution policy.
+unchanged old body/entry rejection. This static unit changes no existing
+acceptance or execution policy.
+
+Recursive selected-path evaluation/cost semantics (ADR-0205) now retain each
+condition and only its selected arm, exact stores and child costs plus two per
+node. Raw/cost determinism, store preservation and cost erasure/existence/positivity
+need no whole acceptance. Typed existence remains conditional on real aligned,
+typed environments. Whole acceptance plus identity alignment alone characterizes
+exact Core evaluation, even without runtime typing. Exact cost paths retain any
+pending continuation unexecuted; no arbitrary-continuation inverse is asserted.
+Old raw/cost profiles embed exactly without checking premises. Deep selected-path,
+untyped-aligned and misaligned-ID consumers retain those distinct boundaries.
+Checked runners, recursive bounds, resumption and replay invariance still precede
+any later entry integration; existing executable adapters remain unchanged.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent

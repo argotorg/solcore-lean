@@ -944,6 +944,34 @@ example := @Solcore.Frontend.TerminalReturnTreeHasType.conditional
 example := @Solcore.Frontend.TerminalReturnTreeElaborates.single
 example := @Solcore.Frontend.TerminalReturnTreeElaborates.conditional
 
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.store_eq
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.deterministic
+example := @Solcore.Frontend.TerminalReturnTreeHasType.evaluates
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.preserves_type
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.erase
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.exists_cost
+example := @Solcore.Frontend.terminalReturnTreeEvaluates_iff_exists_cost
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.store_eq
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.cost_pos
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.deterministic
+example := @Solcore.Frontend.elaborateTerminalReturnTree?_evaluates_iff
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.checked_toStepsWithContinuation
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.checked_toSteps
+example := @Solcore.Frontend.ReturnBodyEvaluates.returnTree
+example := @Solcore.Frontend.ReturnBodyEvaluatesWithCost.returnTree
+example := @Solcore.Frontend.ConditionalReturnBodyEvaluates.returnTree
+example := @Solcore.Frontend.ConditionalReturnBodyEvaluatesWithCost.returnTree
+example := @Solcore.Frontend.TerminalReturnBodyEvaluates.returnTree
+example := @Solcore.Frontend.TerminalReturnBodyEvaluatesWithCost.returnTree
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.single
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.ifTrue
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.ifFalse
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.single
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.ifTrue
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.ifFalse
+
 section TerminalEntryContracts
 
 open Solcore Solcore.Frontend

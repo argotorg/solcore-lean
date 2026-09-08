@@ -696,11 +696,29 @@ a valid deeper tree is accepted here but rejected by the old nonrecursive body
 and function-entry adapters. Independent and parsed consumers retain that
 contrast with valid parameter and header evidence.
 
-This is static body semantics only. Recursive raw/cost correspondence, safe
-execution, recursive fuel bounds, identity/store invariance and checkpoint
-resumption remain subsequent work before entry integration. Existing checkers,
-compilation and runtime policies are unchanged; no general early return, extra
-statements, missing else, local declarations, calls or fallthrough are added.
+The static layer is now complemented by independent recursive evaluation and
+cost semantics (ADR-0205). Only the selected arm is evaluated; a node costs its
+condition plus the selected arm plus two Core transitions. Leaves reuse the
+existing return semantics without extra cost. Raw and cost determinism, unchanged
+stores, cost erasure/existence and positivity need no whole-tree acceptance.
+Aligned, actually typed environments separately give typed evaluation existence
+and type preservation. No arbitrary static type is assumed inhabited.
+
+With whole acceptance and identity alignment alone, raw evaluation is equivalent
+to evaluation of the exact checked Core. Runtime typing is not required for this
+correspondence and cannot be inferred from it. Checked source costs yield exact
+Core transition paths retaining any original pending continuation, with an
+empty-continuation specialization. The path endpoint does not execute or unwind
+that continuation, and no inverse path-length claim is made for arbitrary frames.
+Core can observe a pending-frame fault at zero remaining fuel; reaching this
+endpoint is not an unconditional claim of fuel exhaustion under arbitrary frames.
+Old raw/cost evidence embeds with identical value, stores and cost, even without
+whole checking. Deep skipped invalid subtrees retain raw success/whole rejection.
+
+Checked runners, recursive fuel bounds, identity/store replay invariance and
+checkpoint resumption remain subsequent work before entry integration. Existing
+checkers, compilation and runtime policies are unchanged; no general early return,
+extra statements, missing else, local declarations, calls or fallthrough are added.
 
 ### Explicit restricted runtime function entry
 

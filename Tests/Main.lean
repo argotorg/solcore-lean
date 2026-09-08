@@ -100,6 +100,8 @@ import Solcore.Test.FrontendTypeTableExtensionProperties
 import Solcore.Test.FrontendParsedTypeTableExtensions
 import Solcore.Test.FrontendTerminalReturnTreeProperties
 import Solcore.Test.FrontendParsedTerminalReturnTrees
+import Solcore.Test.FrontendTerminalReturnTreeEvaluationProperties
+import Solcore.Test.FrontendParsedTerminalReturnTreeEvaluation
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5651,6 +5653,7 @@ def run : IO Unit := do
   frontendParsedParameterCompilationTests
   frontendParsedTypeTableExtensionTests
   frontendParsedTerminalReturnTreeTests
+  frontendParsedTerminalReturnTreeEvaluationTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
