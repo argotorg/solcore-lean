@@ -18,6 +18,7 @@ import Solcore.Resolved.ScopeExtensionEvaluationProperties
 import Solcore.Resolved.ScopeExtensionReflectionProperties
 import Solcore.Resolved.WordLessWithIds
 import Solcore.Resolved.WordLessWithIdsEvaluationProperties
+import Solcore.Resolved.LocalFragmentProperties
 
 /-!
 Semantic frontend foundation for already-resolved local expressions. Exact

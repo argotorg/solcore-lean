@@ -88,6 +88,19 @@ explicitly. No unrestricted Core weakening theorem is assumed. This is a resolve
 foundation, not canonical `<` support or a hidden source temporary allocator;
 existing resolver and arbitrary identity-map guarantees are unchanged.
 
+An independent Core local-fragment predicate and exact environment-insertion
+equivalence are now available (ADR-0188). Its eight structural forms match the
+current resolved lowering; a separate `Lowers.localFragment` proof connects
+them without Core depending on Resolved evaluation. With free indices shifted
+past an arbitrary inserted value behind any retained prefix, successful
+evaluation preserves and reflects the identical result and both stores. The
+proof passes directly under Core lets and needs no type, scoping, freshness or
+runtime-world premise; missing positional references stay missing too. Runtime
+closures/cell references may be returned unchanged, but closure creation/calls
+and cell operations are outside the predicate. CellFree alone would be too broad:
+a created lambda captures a different environment after insertion. No equality
+of suspended states, exact-cost transport or canonical `<` support is claimed.
+
 The resolved fragment alone is not a canonical source adapter. It does not interpret literal
 spelling, resolve `true`/`false` or overloaded operators, allocate source-wide IDs,
 decide source shadowing or mutable-declaration semantics, or cover imports,

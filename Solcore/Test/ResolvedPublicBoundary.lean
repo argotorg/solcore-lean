@@ -118,5 +118,6 @@ example := @Solcore.Resolved.infer_wordLtWithIds
 example := @Solcore.Resolved.Evaluates.wordLtWithIds
 example := @Solcore.Resolved.Evaluates.wordLtWithIds_inv
 example := @Solcore.Resolved.wordLtWithIds_evaluates_iff
+example := @Solcore.Resolved.Lowers.localFragment
 
 end Tests

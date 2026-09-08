@@ -641,5 +641,20 @@ example := @Solcore.Resolved.Evaluates.wordLtWithIds_inv
 example := @Solcore.Resolved.wordLtWithIds_evaluates_iff
 example := @Solcore.Frontend.CostStepComposition.letE
 example := @Solcore.Frontend.CostStepComposition.wordLt
+example := @Solcore.Core.Expr.LocalFragment
+example := @Solcore.Core.Expr.LocalFragment.weakenAt
+example := @Solcore.Core.Expr.LocalFragment.unit
+example := @Solcore.Core.Expr.LocalFragment.bool
+example := @Solcore.Core.Expr.LocalFragment.word
+example := @Solcore.Core.Expr.LocalFragment.var
+example := @Solcore.Core.Expr.LocalFragment.unary
+example := @Solcore.Core.Expr.LocalFragment.binary
+example := @Solcore.Core.Expr.LocalFragment.letE
+example := @Solcore.Core.Expr.LocalFragment.ifE
+example := @Solcore.Core.Expr.LocalFragment.evaluates_insert_iff
+example := @Solcore.Core.Expr.LocalFragment.evaluates_weaken_zero_iff
+example := @Solcore.Core.Evaluates.weakenAt_zero_localFragment
+example := @Solcore.Core.Evaluates.reflect_weakenAt_zero_localFragment
+example := @Solcore.Resolved.Lowers.localFragment
 
 end Tests

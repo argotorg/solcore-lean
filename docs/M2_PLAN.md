@@ -65,6 +65,17 @@ path explicitly supplied. Canonical `<` integration and a restricted-Core exact
 insertion theorem remain separate; no hidden allocation changes the existing
 resolver's identity-map contract.
 
+The next prerequisite, exact untyped insertion for the local Core fragment
+(ADR-0188), is proved independently of Resolved correspondence. A structural
+eight-form predicate is closed under weakening and includes every currently
+lowered resolved expression. Inserting an arbitrary runtime value behind any
+retained prefix while shifting free indices preserves and reflects exact
+evaluation values/stores, including under nested lets and for missing variables.
+Typing, scope, freshness and runtime-world premises are unnecessary. Closure
+creation/calls and cell access remain excluded even when a broader CellFree
+judgment holds; returned existing values remain arbitrary. Exact-cost transport,
+typing reflection and canonical `<` integration are still separate steps.
+
 Canonical identifiers and grouping now have an exact explicit-table adapter
 to typed resolved references and Core variables (ADR-0155). The name table does
 not replace source scope construction. Execution correspondence retains exact

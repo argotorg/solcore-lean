@@ -87,6 +87,9 @@ import Solcore.Frontend.RuntimeFunctionResumptionProperties
 import Solcore.Resolved.WordLessWithIds
 import Solcore.Resolved.WordLessWithIdsEvaluationProperties
 import Solcore.Frontend.WordLessCostStepComposition
+import Solcore.Core.LocalFragment
+import Solcore.Core.LocalFragmentInsertionProperties
+import Solcore.Resolved.LocalFragmentProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
