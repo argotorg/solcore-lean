@@ -1652,6 +1652,19 @@ name event but does not commit the terminal identifier report: field names use
 checked identifiers, not Boolean expression names. Duplicate prior events, unread
 boundary tokens, hidden dots, and missing backing slots are checked separately.
 
+The actual atom-plus-maximal-postfix parser now composes independent atom and
+nested relations with exact atom-before-tail event order. Atom/nested joint laws
+give independent uniqueness/disjointness; observed success/rejection soundness
+uses their explicit trace and successful context contracts. Pointwise invariant
+exclusion yields both completeness directions and complete State/Failure iff
+laws, with weak rejected file/endByte frames only when reconstructing rejection
+States. Separate numerical totality accepts an ordinary atom outcome and a bound
+at each successful atom endpoint; a stronger form takes independently supplied
+atom/nested progress contracts and two input bounds. Soundness plus that totality
+gives actual and independent traced outcome existence without joint assumptions.
+The atom progress contract is still a premise here, not a result of child trace
+contracts or a claim of recursive expression closure.
+
 An empty token carrier has its own complete normal-output contract: retained
 comments and lexical diagnostics, no AST items, and no parser diagnostics.
 Validation alone suffices at the token boundary; canonical lexing supplies it

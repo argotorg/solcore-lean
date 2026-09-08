@@ -1215,6 +1215,14 @@ Boolean-keyword rejection as a field, duplicate prior events, and hidden/missing
 suffix termination. These consumers instantiate production adequacy rather than
 assuming it from trace correspondence.
 
+Actual atom-plus-postfix composition now has independent ordered traces and
+joint exactness, observed soundness, and pointwise complete State/Failure
+correspondence under explicit invariant exclusion. Numerical totality separately
+uses an ordinary atom and its successful endpoint bounds, or supplied atom/nested
+progress contracts with two input bounds. Separate actual/independent existence
+follows totality and soundness, not uniqueness. Atom contract construction and
+recursive expression closure remain separate obligations.
+
 At the complete diagnostic-free declaration level, strict soundness now covers
 all four canonical import forms—plain, namespace, wildcard with or without a
 hiding clause, and selective imports—transparent type aliases, and traits.

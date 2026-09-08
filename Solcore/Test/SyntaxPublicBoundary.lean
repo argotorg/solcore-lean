@@ -3367,4 +3367,29 @@ example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_success_stat
 example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_failure_state_iff_of_ne_invariant
 example := @Syntax.Parser.ExpressionAtomInternals.postfixTail_trace_reject_state_iff_of_ne_invariant
 
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceParses
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceRejects
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceParses.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceRejects.result_unique
+example := @Syntax.DeclarativeGrammar.ExpressionPostfixTraceRejects.disjoint_success
+example := @Syntax.DeclarativeGrammar.expressionPostfixTraceExactOutcomeSpec
+example := @Syntax.Parser.expressionPostfix_trace_success_sound
+example := @Syntax.Parser.expressionPostfix_reject_trace_sound
+example := @Syntax.Parser.expressionPostfix_trace_success_context
+example := @Syntax.Parser.expressionPostfix_reject_context_of_windowProjection
+example := @Syntax.Parser.expressionPostfix_ordinary_of_atomOutcome_bound
+example := @Syntax.Parser.expressionPostfix_ne_invariant_of_atomOutcome_bound
+example := @Syntax.Parser.expressionPostfix_ordinary_of_unrestrictedElementFuels
+example := @Syntax.Parser.expressionPostfix_ne_invariant_of_unrestrictedElementFuels
+example := @Syntax.Parser.expressionPostfix_exists_trace_outcome_of_unrestrictedElementFuels
+example := @Syntax.Parser.expressionPostfixTrace_outcome_exists_of_unrestrictedElementFuels
+example := @Syntax.Parser.expressionPostfix_trace_success_complete_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_complete_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_success_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_failure_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_success_state_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_failure_state_iff_of_ne_invariant
+example := @Syntax.Parser.expressionPostfix_trace_reject_state_iff_of_ne_invariant
+
 end Tests

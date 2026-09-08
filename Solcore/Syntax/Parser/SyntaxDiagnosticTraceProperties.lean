@@ -209,6 +209,14 @@ import Solcore.Syntax.Parser.PostfixTailRejectionTraceCompletenessProperties
 import Solcore.Syntax.Parser.PostfixTailTraceCorrespondenceProperties
 import Solcore.Syntax.Parser.PostfixTailBoundedTraceProperties
 import Solcore.Syntax.Parser.PostfixTailTraceStateProperties
+import Solcore.Syntax.DeclarativeExpressionPostfixTraceGrammar
+import Solcore.Syntax.DeclarativeExpressionPostfixTraceProperties
+import Solcore.Syntax.Parser.ExpressionPostfixTraceSoundnessProperties
+import Solcore.Syntax.Parser.ExpressionPostfixTraceContextProperties
+import Solcore.Syntax.Parser.ExpressionPostfixUnrestrictedFuelTotalityProperties
+import Solcore.Syntax.Parser.ExpressionPostfixTraceExistenceProperties
+import Solcore.Syntax.Parser.ExpressionPostfixTraceCorrespondenceProperties
+import Solcore.Syntax.Parser.ExpressionPostfixTraceStateProperties
 
 /-! Exact primitive, pragma success/rejection, and recovery traces with independent
 mixed-report filtering. Complete public slices cover empty tokens, one top-item
@@ -270,4 +278,6 @@ the concrete selected-core/public layer composes recursive child contracts, with
 maximal postfix tails have independent exact prioritized traces and all-fuel ordinary-outcome soundness under child contracts;
 postfix derivations execute above their own thresholds, while explicit progress/budgets separately give production totality and trace existence;
 pointwise postfix correspondences reconstruct complete States with explicit rejected source/end-byte frames;
+actual atom-plus-postfix composition preserves ordered traces and pointwise complete States under explicit atom/nested contracts;
+separate bounded composition totality and trace existence still require an atom endpoint budget or a supplied atom contract;
 general expressions and remaining statement traces remain open. -/
