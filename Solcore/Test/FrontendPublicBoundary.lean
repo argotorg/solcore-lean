@@ -464,5 +464,8 @@ example := @Solcore.Frontend.RuntimeParametersBind.reference_return_elaborates_a
 example := @Solcore.Frontend.runtimeFunction_parameter_prepares
 example := @Solcore.Frontend.runtimeFunction_parameter_cost
 example := @Solcore.Frontend.runRuntimeFunction?_parameter
+example := @Solcore.Frontend.RuntimeParametersBindFrom.transport_types
+example := @Solcore.Frontend.RuntimeFunctionPrepares.transport_argument_types
+example := @Solcore.Frontend.prepareRuntimeFunction?_static_projection_eq
 
 end Tests

@@ -34,6 +34,8 @@ import Solcore.Test.FrontendParsedReturnBodies
 import Solcore.Test.FrontendParsedRuntimeFunctionEntries
 import Solcore.Test.FrontendRuntimeFunctionEntryProperties
 import Solcore.Test.FrontendRuntimeParameterPositionProperties
+import Solcore.Test.FrontendRuntimeArgumentStaticProperties
+import Solcore.Test.FrontendParsedRuntimeArgumentStatic
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5558,6 +5560,7 @@ def run : IO Unit := do
   frontendParsedRuntimeParameterTests
   frontendParsedReturnBodyTests
   frontendParsedRuntimeFunctionEntryTests
+  frontendParsedRuntimeArgumentStaticTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

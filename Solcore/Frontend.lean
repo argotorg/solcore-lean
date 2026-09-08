@@ -55,6 +55,8 @@ import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
 import Solcore.Frontend.RuntimeParametersPositionProperties
 import Solcore.Frontend.RuntimeParameterReferenceProperties
 import Solcore.Frontend.RuntimeFunctionParameterReturnProperties
+import Solcore.Frontend.RuntimeParametersStaticProperties
+import Solcore.Frontend.RuntimeFunctionStaticProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,

@@ -441,6 +441,24 @@ every position across one through eight arguments, typed closures, and
 unallocated references. This strengthens existing semantics without changing
 the executable adapters or adding a public synthesis interface.
 
+### Static preparation under changed runtime values
+
+Equal ordered argument types now preserve the full static preparation result
+(ADR-0172): acceptance or rejection, names, context, identities, exact Core,
+and declared return type. The independent binding transport works from arbitrary
+initial inputs with equal names and contexts and uses the replacement values
+and their structural typing evidence in the new rows. It does not require an
+extra initial-name uniqueness assumption or introduce a new executable interface.
+
+This is deliberately not execution equivalence. Independent consumers and
+fully parsed declarations show equal static Core but different environments,
+zero-fuel states, returned values, or costs. A Boolean example returns false
+under both inputs but takes four versus six transitions; fuel five therefore
+completes only one run. Unresolved, ill-typed, or return-mismatched whole
+declarations remain rejected for both value choices. Typed closures and
+unallocated references may be replaced as opaque arguments without implying
+application or allocation safety.
+
 ### Semantic Core
 
 Semantic Core is the syntax-independent language consumed by the evaluator.

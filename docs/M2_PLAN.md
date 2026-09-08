@@ -203,6 +203,13 @@ matching entry contract. Exact zero/one fuel behavior is preserved. Parsed
 regressions check all positions across several arities and mixed argument types;
 no executable semantics or supported source form is changed by this proof layer.
 
+Static argument invariance (ADR-0172) now proves independent parameter and entry
+transport under an unchanged ordered type list. The executable preparation's
+optional static projection is exactly equal, retaining failure as well as names,
+context, identities, Core, and return type. Actual runtime values and costs may
+differ; consumers and parsed declarations demonstrate that distinction. No
+runtime argument decoder, unchecked-value shortcut, or new evaluator is added.
+
 Further frontend semantics should preserve exact identity, binding, and Core
 execution correspondence while extending supported expressions and declarations.
 General calls and control flow remain separate. The resolved immutable expression
