@@ -259,6 +259,16 @@ unselected arms, extra/nested statements and absent else. Existing singleton
 body and function entry contracts remain unchanged; integrating this new body
 form into a broader explicitly specified entry profile is a subsequent step.
 
+The nonrecursive `TerminalReturnBody` union (ADR-0196) provides a common body-only
+interface for singleton and explicit-if/else profiles. Shape dispatch and the
+independent two-case judgments add no Core nodes, values, stores or cost.
+Typing/exact elaboration, raw and cost laws, exact continuation paths, all fuel
+thresholds, source bounds and genuine-state resumption lift from the original
+profiles. Full optional runner results are equal to the selected old runner,
+including failure and suspended states. Parsed tests retain actual values and
+confirm old singleton entries still work while conditional entries remain
+rejected. The two conditional arms remain singleton bodies, not recursive unions.
+
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent
 preparation characterizes success/failure and fixes the actual Core, while

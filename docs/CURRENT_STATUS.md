@@ -621,6 +621,25 @@ mismatch are rejected. Existing singleton body and runtime-function entry APIs
 remain unchanged; this is not yet conditional-function compilation, general
 early-return unwinding, source mutation or sequential statement semantics.
 
+### Common nonrecursive terminal-body interface
+
+The `TerminalReturnBody` interface now unifies singleton returns and the
+separate explicit-if/else profile without changing either meaning (ADR-0196).
+Original body shape selects the component checker; the independent typing,
+exact elaboration, raw evaluation and cost judgments wrap the corresponding
+component judgments. Core, returned values, stores and transition costs are
+unchanged. The common source bound selects the existing component bound.
+Conditional arms still use singleton returns, so this union is not recursive.
+
+The common checked runner has exact typing/Core correspondence, safe typed
+execution, all completion/exhaustion thresholds and genuine-state resumption.
+Its full optional result equals the original runner at every fuel and store,
+including failed checks and complete suspended states. Independent and parsed
+consumers retain actual Unit/Word/Bool/cell/closure values, unequal arm costs,
+pending frames and invalid-unselected-arm rejection. Existing singleton entry
+compilation still behaves as before and still rejects statement conditionals;
+entry integration and its owner/store/provenance contracts remain subsequent work.
+
 ### Explicit restricted runtime function entry
 
 An explicitly supplied canonical declaration now connects its header, runtime
