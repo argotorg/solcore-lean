@@ -220,6 +220,24 @@ shadowing can retain the result but change the cost, protecting the avoidance
 premise. Parsed observations exercise the stronger fuel boundary without
 changing evaluation or source-name allocation.
 
+Direct local-expression evaluation (ADR-0223) now follows original syntax and
+explicit actual tables, returning the exact raw value and Core-transition cost
+without checking, resolution, lowering or Core execution. Independent soundness
+and completeness cover every existing raw constructor, with exact absence and
+uncosted-value projection laws. General store correspondence retains the final
+store equality. First-match duplicate/sparse/unaligned rows and untyped opaque
+values remain legitimate raw inputs. Strict operands preserve their order and
+existing overheads, including both operands for zero divisors; selected-only
+conditions/short-circuit forms do not validate skipped syntax or impose extra
+typing on the forwarded right value. Raw success is not whole acceptance.
+Whole checking and ID alignment separately give exact checked Core paths and
+fuel thresholds, while completed runs reflect the same computed cost. Typed
+actual environments supply successful output; bundled runner equivalences retain
+whole source typing. Retained-continuation endpoints do not guarantee completion.
+Independent and complete parsed consumers retain raw/checked, literal, row-order,
+opaque-value and actual-checkpoint boundaries. Existing APIs and language policies
+stay fixed; direct recursive-body evaluation is a later composition.
+
 Explicit monomorphic type-name interpretation (ADR-0167) now supplies a first
 bridge from canonical named/no-arguments types to caller-provided Core types.
 Independent first-match rules and exact qualified component keys characterize

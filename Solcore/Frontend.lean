@@ -43,6 +43,11 @@ import Solcore.Frontend.LocalExpressionCostCorrespondence
 import Solcore.Frontend.LocalExpressionCostExecutionProperties
 import Solcore.Frontend.LocalExpressionCostInvariance
 import Solcore.Frontend.LocalInputsCostInvariance
+import Solcore.Frontend.LocalExpressionEvaluator
+import Solcore.Frontend.LocalExpressionEvaluatorSoundnessProperties
+import Solcore.Frontend.LocalExpressionEvaluatorCompletenessProperties
+import Solcore.Frontend.LocalExpressionEvaluatorProperties
+import Solcore.Frontend.LocalExpressionEvaluatorExecutionProperties
 import Solcore.Frontend.TypeName
 import Solcore.Frontend.TypeNameProperties
 import Solcore.Frontend.TypeNameTableExtensionProperties
@@ -192,7 +197,11 @@ Canonical explicit-table frontend adapters for local expressions, type names,
 type-only and runtime parameter inputs, singleton and terminal-conditional return bodies,
 and restricted explicit
 function entries with value-free compilation. Independent source rules
-connect to checked Core execution. General source-program resolution, parser
+connect to checked Core execution. A direct original-expression evaluator
+returns exactly the independent raw value and transition cost without checking
+or Core execution; whole checking and actual ID alignment separately connect
+successful output to checked Core paths and fuel thresholds. Raw selected success
+is not whole acceptance. General source-program resolution, parser
 changes, and wire publication are not implied. Function entries support finite
 alternation of typed lets and terminal if/else trees inside either arm; compilation owner
 invariance requires no runtime argument inhabitants.

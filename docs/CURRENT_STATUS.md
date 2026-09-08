@@ -551,6 +551,36 @@ same-spelling shadowing can preserve a final Boolean value yet change cost
 from four to ten, so the unused-name premise cannot be dropped. This strengthens
 proof interfaces only, not executable behavior or allocation policy.
 
+### Direct local-expression evaluation and cost
+
+A total evaluator now follows the original expression and explicit name/actual
+environment tables directly (ADR-0223). It returns the selected value and exact
+Core-transition cost without resolving, lowering, checking or running Core.
+Soundness and completeness construct and consume the existing independent raw
+cost rules. Successful pairs, absent raw derivations and the uncosted value
+projection are characterized exactly; arbitrary final-store correspondence
+retains the necessary `finalStore = initialStore` conjunct.
+
+First-match caller tables may contain duplicate spellings or IDs, sparse owners,
+unaligned rows and untyped actual values. Strict Word literals keep their complete
+spelling/range checks. Both strict operands execute in their original order,
+including division/remainder by zero. Existing unary, binary and derived-comparison
+overheads are unchanged. Conditions and short-circuit operators visit only the
+selected child; selected short-circuit right values remain arbitrary at this raw
+boundary. Opaque values are supplied, not allocated or invoked. Skipped unresolved
+or unsupported children may coexist with raw success and whole checking failure.
+
+Whole checking and actual identity alignment separately turn successful output
+into exact Core paths and completion/exhaustion thresholds. Actual completed
+checked runs recover that same value and cost without a runtime-typing premise.
+Typed aligned environments supply successful typed results, and bundled runner
+equivalences retain whole source typing explicitly. A retained continuation path
+ends before its pending frames execute; no whole-run guarantee follows there.
+Independent and parsed consumers exercise exact operator values/costs, literal
+boundaries, first-match rows, raw/whole rejection and real machine checkpoints.
+No existing checker, evaluator, body/entry, parser/Core/Wire or binding policy
+changes; direct recursive-body evaluation remains a separate later composition.
+
 ### Explicit canonical type names
 
 An additive type-name adapter now interprets canonical named types without

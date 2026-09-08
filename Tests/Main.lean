@@ -136,6 +136,8 @@ import Solcore.Test.FrontendTypedLetReturnTreeTypeExtensionProperties
 import Solcore.Test.FrontendParsedTypedLetReturnTreeTypeExtension
 import Solcore.Test.FrontendRecursiveTypedLetRuntimeEntryProperties
 import Solcore.Test.FrontendParsedRecursiveTypedLetRuntimeEntries
+import Solcore.Test.FrontendLocalExpressionEvaluatorProperties
+import Solcore.Test.FrontendParsedLocalExpressionEvaluator
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5705,6 +5707,7 @@ def run : IO Unit := do
   frontendParsedTypedLetReturnTreeOwnerTests
   frontendParsedTypedLetReturnTreeTypeExtensionTests
   frontendParsedRecursiveTypedLetRuntimeEntryTests
+  frontendParsedLocalExpressionEvaluatorTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

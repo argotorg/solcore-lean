@@ -1246,4 +1246,22 @@ example := @Solcore.Frontend.LocalInputs.checkTypedLetReturnTree?_eq_of_mutual_e
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_some_of_extends
 example := @Solcore.Frontend.LocalInputs.runTypedLetReturnTree?_eq_of_mutual_extends
 
+example := @Solcore.Frontend.evaluateLocalWordBinaryWithCost?
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_sound
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_complete
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_iff
+example := @Solcore.Frontend.localExpressionEvaluatesWithCost_iff_evaluate
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_eq_none_iff
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_exists_cost_iff
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_value_iff
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_checked_toStepsWithContinuation
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_checked_runStateful_done_iff
+example := @Solcore.Frontend.evaluateLocalExpressionWithCost?_checked_runStateful_outOfFuel_iff
+example := @Solcore.Frontend.elaborateLocalExpression?_run_done_iff_evaluator
+example := @Solcore.Frontend.elaborateLocalExpression?_typed_evaluator_exists
+example := @Solcore.Frontend.LocalInputs.run?_done_iff_evaluator
+example := @Solcore.Frontend.LocalInputs.run?_outOfFuel_iff_evaluator
+example := @Solcore.Frontend.LocalInputs.typed_evaluator_execution
+
 end Tests
