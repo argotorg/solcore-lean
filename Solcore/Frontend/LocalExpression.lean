@@ -3,7 +3,7 @@ import Solcore.Frontend.WordLiteral
 
 /-! An additive canonical adapter for identifiers, strict Word literals, grouping,
 conditionals, Boolean operators, Word arithmetic/bitwise operators, unsigned
-Word comparisons and equality/inequality. Its explicit name table
+Word comparisons, equality/inequality and binary tuples. Its explicit name table
 supplies identities, including any bindings for `true` or `false`; literals do
 not consult that table. This fixed literal interpretation is local to the adapter,
 not a general source conversion or overload policy. Other expression forms,
@@ -23,6 +23,8 @@ def resolveLocalExpression? (table : LocalNameTable) (source : Syntax.Expr) :
   | ⟨_, .identifier name⟩ => (table.lookup? name.value).map Resolved.Expr.var
   | ⟨_, .literal literal⟩ => (interpretWordLiteral? literal).map Resolved.Expr.word
   | ⟨_, .group inner⟩ => resolveLocalExpression? table inner
+  | ⟨_, .tuple ⟨_, [left, right]⟩⟩ => do
+      return .pair (← resolveLocalExpression? table left) (← resolveLocalExpression? table right)
   | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ =>
       (resolveLocalExpression? table operand).map (Resolved.Expr.unary .boolNot)
   | ⟨_, .unary ⟨_, .bitNot⟩ operand⟩ =>
@@ -93,6 +95,12 @@ inductive ResolvesLocalExpression (table : LocalNameTable) :
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr} {resolved : Resolved.Expr}
       (child : ResolvesLocalExpression table inner resolved) :
       ResolvesLocalExpression table { span, value := .group inner } resolved
+  | pair {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {resolvedLeft resolvedRight : Resolved.Expr}
+      (leftChild : ResolvesLocalExpression table left resolvedLeft)
+      (rightChild : ResolvesLocalExpression table right resolvedRight) :
+      ResolvesLocalExpression table
+        { span, value := .tuple ⟨tupleSpan, [left, right]⟩ } (.pair resolvedLeft resolvedRight)
   | logicalNot {span operatorSpan : Syntax.SourceSpan}
       {operand : Syntax.Expr} {resolvedOperand : Resolved.Expr}
       (operandChild : ResolvesLocalExpression table operand resolvedOperand) :

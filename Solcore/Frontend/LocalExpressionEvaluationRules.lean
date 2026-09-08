@@ -7,7 +7,8 @@ import Solcore.Resolved.EvaluationProperties
 Evaluation requires only the selected branch, not whole-expression resolution.
 Short-circuit forms forward any selected right value at this raw boundary;
 source typing separately requires both operands to be Boolean. Word arithmetic,
-bitwise operations, unsigned comparisons, and Word equality/inequality evaluate both operands left to right.
+bitwise operations, unsigned comparisons, Word equality/inequality and binary tuples
+evaluate both operands left to right. Tuples retain arbitrary actual component values.
 Both stores are explicit even though every constructor is store-preserving. Strict Word literals
 return their independently denoted value without consulting caller tables. -/
 
@@ -33,6 +34,13 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       (child : LocalExpressionEvaluates table environment initialStore inner value finalStore) :
       LocalExpressionEvaluates table environment initialStore
         { span, value := .group inner } value finalStore
+  | pair {initialStore middleStore finalStore : Core.Store}
+      {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Value}
+      (leftEvaluation : LocalExpressionEvaluates table environment initialStore left leftValue middleStore)
+      (rightEvaluation : LocalExpressionEvaluates table environment middleStore right rightValue finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        { span, value := .tuple ⟨tupleSpan, [left, right]⟩ } (.pair leftValue rightValue) finalStore
   | logicalNot {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
       {operand : Syntax.Expr} {value : Bool}
       (child : LocalExpressionEvaluates table environment initialStore operand (.bool value) finalStore) :
@@ -207,6 +215,7 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
   | group _ ih | logicalNot _ ih | bitNot _ ih | andFalse _ ih | orTrue _ ih => exact ih
   | ifTrue _ _ conditionIH branchIH | ifFalse _ _ conditionIH branchIH =>
       exact branchIH.trans conditionIH
+  | pair _ _ leftIH rightIH
   | add _ _ leftIH rightIH | bitAnd _ _ leftIH rightIH | bitOr _ _ leftIH rightIH | bitXor _ _ leftIH rightIH
   | subtract _ _ leftIH rightIH | multiply _ _ leftIH rightIH | greater _ _ leftIH rightIH
   | divide _ _ leftIH rightIH | modulo _ _ leftIH rightIH

@@ -2,7 +2,7 @@ import Solcore.Frontend.LocalExpressionEvaluation
 
 /-! Independent successful source evaluation indexed by Core transition count.
 Costs do not measure frontend traversal, lookup, decoding, gas, or elapsed time.
-Unselected branches carry no premise; strict Word operands retain their order
+Unselected branches carry no premise; strict Word and binary tuple operands retain their order
 and both store endpoints. This relation does not assume execution or erasure. -/
 
 set_option autoImplicit false
@@ -29,6 +29,16 @@ inductive LocalExpressionEvaluatesWithCost
         initialStore inner value finalStore childCost) :
       LocalExpressionEvaluatesWithCost table environment initialStore
         { span, value := .group inner } value finalStore childCost
+  | pair {initialStore middleStore finalStore : Core.Store}
+      {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Value} {leftCost rightCost : Nat}
+      (leftEvaluation : LocalExpressionEvaluatesWithCost table environment
+        initialStore left leftValue middleStore leftCost)
+      (rightEvaluation : LocalExpressionEvaluatesWithCost table environment
+        middleStore right rightValue finalStore rightCost) :
+      LocalExpressionEvaluatesWithCost table environment initialStore
+        { span, value := .tuple ⟨tupleSpan, [left, right]⟩ }
+        (.pair leftValue rightValue) finalStore (leftCost + rightCost + 3)
   | logicalNot {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
       {operand : Syntax.Expr} {value : Bool} {childCost : Nat}
       (child : LocalExpressionEvaluatesWithCost table environment

@@ -29,7 +29,7 @@ def evaluateLocalWordBinaryWithCost? (operator : Syntax.BinaryOp) (left right : 
   | .greaterEqual => some (.bool (!(decide (left < right))), 11)
   | .logicalAnd | .logicalOr => none
 
-/-- First-match actual lookup, strict primitive shapes and selected-only control
+/-- First-match actual lookup, strict primitive/binary tuple shapes and selected-only control
 flow. No store, type context, alignment, uniqueness or spelling validity is needed.
 `none` denotes raw evaluation absence, not source-language invalidity. -/
 def evaluateLocalExpressionWithCost? (table : LocalNameTable) (environment : Resolved.Environment)
@@ -42,6 +42,10 @@ def evaluateLocalExpressionWithCost? (table : LocalNameTable) (environment : Res
   | ⟨_, .literal literal⟩ => do
       return (.word (← interpretWordLiteral? literal), 1)
   | ⟨_, .group inner⟩ => evaluateLocalExpressionWithCost? table environment inner
+  | ⟨_, .tuple ⟨_, [left, right]⟩⟩ => do
+      let (leftValue, leftCost) ← evaluateLocalExpressionWithCost? table environment left
+      let (rightValue, rightCost) ← evaluateLocalExpressionWithCost? table environment right
+      return (.pair leftValue rightValue, leftCost + rightCost + 3)
   | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ => do
       let (.bool value, cost) ← evaluateLocalExpressionWithCost? table environment operand | none
       return (.bool (!value), cost + 2)

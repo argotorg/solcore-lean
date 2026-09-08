@@ -10,7 +10,7 @@ namespace Solcore.Frontend
 
 /-- No identifier in this expression has the specified spelling. Literal validity
 is not required, since literal payloads do not perform name lookup.
-All conditional children and both operands of each binary form are checked, including
+All conditional children and both operands of each binary form/tuple are checked, including
 children that a particular runtime environment might skip. -/
 inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | identifier {span : Syntax.SourceSpan} {identifier : Syntax.Identifier}
@@ -21,6 +21,9 @@ inductive AvoidsLocalName (name : String) : Syntax.Expr → Prop where
   | group {span : Syntax.SourceSpan} {inner : Syntax.Expr}
       (child : AvoidsLocalName name inner) :
       AvoidsLocalName name { span, value := .group inner }
+  | pair {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftAvoids : AvoidsLocalName name left) (rightAvoids : AvoidsLocalName name right) :
+      AvoidsLocalName name { span, value := .tuple ⟨tupleSpan, [left, right]⟩ }
   | logicalNot {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr}
       (child : AvoidsLocalName name operand) :
       AvoidsLocalName name { span, value := .unary ⟨operatorSpan, .logicalNot⟩ operand }
