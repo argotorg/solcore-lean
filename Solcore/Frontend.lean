@@ -172,6 +172,10 @@ import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Frontend.TypedLetReturnTreeElaboration
 import Solcore.Frontend.TypedLetReturnTreeProperties
 import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnTreeEvaluation
+import Solcore.Frontend.TypedLetReturnTreeEvaluationProperties
+import Solcore.Frontend.TypedLetReturnTreeExecutionProperties
+import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
@@ -203,6 +207,10 @@ No arm-local let is added to those runtime entries. A separate recursive static
 adapter admits annotated, initialized, nonshadowing lets inside either arm,
 with exact ordered Core, independent typing and success-only old embeddings.
 Sibling scopes start from the same inputs and may reuse the same fresh ID.
-This new adapter adds no evaluation, fuel bound, runner or entry integration;
+Independent recursive evaluation and cost now retain strict old-scope
+initialization and only selected arms, with exact checked Core paths under
+arbitrary retained continuations. Raw paths do not imply whole checking;
+typed existence separately requires actual aligned, typed environments.
+This recursive adapter adds no fuel bound, runner or entry integration;
 no inference, default initialization or broader binding policy is added.
 -/

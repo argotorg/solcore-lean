@@ -945,11 +945,41 @@ equality. Old failures may become new successes and are not preserved generally.
 Independent arbitrary-length proofs and complete parsed declarations cover
 alternating depth, noncommutative initialization, sibling isolation, original
 parameter positions, first-match annotation meanings and qualified keys.
-This unit adds no evaluation/cost, runner, bound, resumption or runtime-entry
-integration. The existing entries below still reject arm-local lets. Missing
+This static unit adds no runner, bound, resumption or runtime-entry integration;
+independent evaluation/cost is supplied below by ADR-0217. The existing entries
+below still reject arm-local lets. Missing
 annotations/initializers, shadowing, extra statements after a conditional,
 separate block wrappers and general calls remain outside this new adapter;
 no parser/Core/Wire change, inference or global binding policy is implied.
+
+### Recursive typed let/return trees: evaluation and cost
+
+Independent raw and cost judgments now follow the original recursive body
+(ADR-0217). Each initializer evaluates once in the old name table/environment;
+its actual value extends only the tail. A condition evaluates only its selected
+arm in the original scope. Each let and conditional adds exactly two existing
+Core transitions to its evaluated child costs. Unselected arms contribute no
+cost, but selected unused initializers still execute fully. Sibling scopes never
+exchange locals or allocations.
+
+Raw unchanged-store, value determinism, cost erasure/existence, positivity and
+uniqueness laws need no checking, name freshness or runtime typing premises.
+Raw paths may exist with unknown annotations, repeated names or invalid
+unselected children, without establishing source acceptance. Whole typing plus
+an actual aligned, typed environment separately gives evaluation and typed
+results; each initializer supplies the real value used in the extended tail.
+Nominal static inputs still do not provide inhabitants, while existing opaque
+cell references and captured closures need no allocation or invocation.
+
+Whole acceptance and aligned IDs give evaluation iff for the exact checked Core
+and exact-cost paths under arbitrary retained continuations. ID alignment alone
+does not imply runtime typing. A retained frame is not executed or unwound at
+the path endpoint; incompatible frames can fault at zero remaining fuel. Old raw
+terminal-tree and outer-prefix paths/costs embed unchanged without new premises.
+Independent source proofs and complete parsed argument execution cover depth,
+strict/noncommutative initialization, asymmetric selected costs, actual stores
+and the raw/checked/continuation boundaries. No new body runner, source bound,
+resumption or entry integration is added, and all old profiles remain unchanged.
 
 ### Explicit restricted runtime function entry
 

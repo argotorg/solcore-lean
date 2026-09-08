@@ -413,9 +413,24 @@ return has full Option equality, but old branch-let failures may become successe
 Arbitrary-depth source proofs and complete parsed declarations exercise exact
 Core, original parameter positions, same-ID siblings, ancestor visibility,
 noncommutative initialization, qualified/first-match meanings and deep rejection.
-Existing body adapters and ADR-0215 entries remain unchanged. Evaluation/cost,
-runner/fuel/resumption and eventual entry integration are separate subsequent
-proof boundaries; no general calls, inference, defaults or broader scope policy.
+Existing body adapters and ADR-0215 entries remain unchanged. Evaluation/cost
+is supplied by ADR-0217; runner/fuel/resumption and eventual entry integration
+remain separate proof boundaries, without calls, inference or broader policy.
+
+Recursive typed-let evaluation/cost (ADR-0217) now evaluates strict initializers
+in their old scope, extends tails with actual obtained values and follows only
+the selected original-scope arm. Let and conditional costs are evaluated child
+costs plus two; selected unused initialization is not erased. Independent raw
+store/value/cost laws impose no annotation meaning, freshness or runtime typing.
+Whole source typing with real aligned, typed environments separately proves
+existence and preservation. Whole acceptance and ID alignment suffice for the
+actual Core evaluation iff and exact-cost paths with arbitrary retained frames.
+Those frames are neither executed nor unwound; a bad frame may fault at zero
+remaining fuel. Old tree/prefix raw paths and costs embed unchanged. Source and
+parsed consumers retain arbitrary depth, noncommutative/unused work, asymmetric
+choices, opaque values, actual stores and raw rejection/ID/continuation contrasts.
+No checker policy, body runner, bound, resumption, entry, parser/Core/Wire change
+or fabricated runtime inhabitants are added in this unit.
 
 The explicit runtime entry (ADR-0170) now connects a restricted header's return
 contract, typed parameter binding, and exact body elaboration. Independent

@@ -1175,4 +1175,32 @@ example := @Solcore.Frontend.TypedLetReturnBodyElaborates.returnTree
 example := @Solcore.Frontend.elaborateTypedLetReturnTree?_some_of_terminalReturnTree
 example := @Solcore.Frontend.elaborateTypedLetReturnTree?_some_of_typedLetReturnBody
 
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates.single
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates.binding
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates.ifTrue
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates.ifFalse
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.single
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.binding
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.ifTrue
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.ifFalse
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates.store_eq
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates.deterministic
+example := @Solcore.Frontend.TypedLetReturnTreeHasType.evaluates
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates.preserves_type
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.erase
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluates.exists_cost
+example := @Solcore.Frontend.typedLetReturnTreeEvaluates_iff_exists_cost
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.store_eq
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.cost_pos
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.deterministic
+example := @Solcore.Frontend.elaborateTypedLetReturnTree?_evaluates_iff
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.checked_toStepsWithContinuation
+example := @Solcore.Frontend.TypedLetReturnTreeEvaluatesWithCost.checked_toSteps
+example := @Solcore.Frontend.TerminalReturnTreeEvaluates.typedLetReturnTree
+example := @Solcore.Frontend.TerminalReturnTreeEvaluatesWithCost.typedLetReturnTree
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluates.returnTree
+example := @Solcore.Frontend.TypedLetReturnBodyEvaluatesWithCost.returnTree
+
 end Tests
