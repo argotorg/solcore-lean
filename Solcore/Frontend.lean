@@ -4,9 +4,19 @@ import Solcore.Frontend.LocalReferenceElaboration
 import Solcore.Frontend.LocalReferenceElaborationProperties
 import Solcore.Frontend.LocalReferenceEvaluation
 import Solcore.Frontend.LocalReferenceExecutionProperties
+import Solcore.Frontend.LocalExpression
+import Solcore.Frontend.LocalExpressionResolutionProperties
+import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.LocalExpressionTypingProperties
+import Solcore.Frontend.LocalExpressionEvaluation
+import Solcore.Frontend.LocalExpressionEvaluationProperties
+import Solcore.Frontend.LocalExpressionSafetyProperties
+import Solcore.Frontend.LocalExpressionExecutionProperties
+import Solcore.Frontend.LocalReferenceEmbeddingProperties
 
 /-!
-Canonical local-reference semantic adapter with explicit caller-supplied name,
-type, and runtime tables. Only identifiers and grouping are supported here;
-no source program resolution, parser change, or wire publication is implied.
+Canonical local-reference and conditional-expression semantic adapters with
+explicit caller-supplied name, type, and runtime tables. Independent source
+typing and evaluation correspond exactly to checked Core execution. No source
+program resolution, parser change, or wire publication is implied.
 -/
