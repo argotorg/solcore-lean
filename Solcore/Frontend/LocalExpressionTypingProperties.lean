@@ -15,6 +15,7 @@ theorem LocalExpressionHasType.resolves {table : LocalNameTable} {context : Reso
     (typing : LocalExpressionHasType table context source type) :
     ∃ resolved, ResolvesLocalExpression table source resolved ∧ Resolved.HasType context resolved type := by
   induction typing with
+  | unit => exact ⟨.unit, .unit, .unit⟩
   | identifier named found => exact ⟨_, .identifier named, .var found⟩
   | wordLiteral meaning => exact ⟨_, .wordLiteral meaning, .word⟩
   | group _ ih =>
@@ -107,6 +108,9 @@ theorem ResolvesLocalExpression.reflects_type {table : LocalNameTable} {context 
     (typing : Resolved.HasType context resolved type) :
     LocalExpressionHasType table context source type := by
   induction resolution generalizing type with
+  | unit =>
+      cases typing with
+      | unit => exact .unit
   | identifier named =>
       cases typing with
       | var found => exact .identifier named found

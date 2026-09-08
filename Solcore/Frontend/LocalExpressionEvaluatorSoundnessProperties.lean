@@ -30,7 +30,10 @@ theorem evaluateLocalExpressionWithCost?_sound {table : LocalNameTable}
         cases elements with
         | mk tupleSpan children =>
           cases children with
-          | nil => simp [evaluateLocalExpressionWithCost?] at accepted
+          | nil =>
+              simp only [evaluateLocalExpressionWithCost?, Option.some.injEq, Prod.mk.injEq] at accepted
+              obtain ⟨rfl, rfl⟩ := accepted
+              exact .unit
           | cons left remaining =>
             cases remaining with
             | nil => simp [evaluateLocalExpressionWithCost?] at accepted

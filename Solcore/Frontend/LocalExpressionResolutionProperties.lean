@@ -15,6 +15,7 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
     (resolution : ResolvesLocalExpression table source resolved) :
     resolveLocalExpression? table source = some resolved := by
   induction resolution with
+  | unit => simp only [resolveLocalExpression?]
   | identifier found =>
       simp only [resolveLocalExpression?, LocalNameTable.lookup?_iff.mpr found, Option.map_some]
   | wordLiteral meaning =>
@@ -58,7 +59,10 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
         cases elements with
         | mk tupleSpan elements =>
             cases elements with
-            | nil => simp only [resolveLocalExpression?, reduceCtorEq] at result
+            | nil =>
+                simp only [resolveLocalExpression?, Option.some.injEq] at result
+                cases result
+                exact .unit
             | cons left rest =>
                 cases rest with
                 | nil => simp only [resolveLocalExpression?, reduceCtorEq] at result

@@ -17,6 +17,7 @@ theorem ResolvesLocalExpression.mapIds {table : LocalNameTable}
     ResolvesLocalExpression (LocalNameTable.mapIds mapping table) source
       (resolved.renameIds mapping) := by
   induction resolution with
+  | unit => exact .unit
   | identifier found =>
       exact .identifier ((LocalNameTable.lookup_mapIds_iff_exists mapping).mpr ⟨_, found, rfl⟩)
   | wordLiteral meaning => exact .wordLiteral meaning
@@ -52,6 +53,7 @@ theorem resolvesLocalExpression_mapIds_iff_exists (mapping : Resolved.LocalId �
   constructor
   · intro resolution
     induction resolution with
+    | unit => exact ⟨.unit, .unit, rfl⟩
     | identifier found =>
         obtain ⟨original, originalFound, rfl⟩ :=
           (LocalNameTable.lookup_mapIds_iff_exists mapping).mp found

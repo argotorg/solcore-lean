@@ -15,6 +15,7 @@ theorem LocalExpressionEvaluates.deterministic {table : LocalNameTable}
     (rightEvaluation : LocalExpressionEvaluates table environment initialStore source right rightStore) :
     left = right ∧ leftStore = rightStore := by
   induction leftEvaluation generalizing right rightStore with
+  | unit => cases rightEvaluation; exact ⟨rfl, rfl⟩
   | identifier named found =>
       cases rightEvaluation with
       | identifier otherNamed otherFound =>

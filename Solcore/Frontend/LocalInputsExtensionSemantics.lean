@@ -23,6 +23,7 @@ theorem AvoidsLocalName.bindFresh_evaluates_iff {name : String} {source : Syntax
         initialStore source result finalStore ↔
       LocalExpressionEvaluates inputs.names inputs.environment initialStore source result finalStore := by
   induction avoids generalizing initialStore finalStore result with
+  | unit => constructor <;> intro evaluation <;> cases evaluation <;> exact .unit
   | identifier different =>
       constructor
       · intro evaluation

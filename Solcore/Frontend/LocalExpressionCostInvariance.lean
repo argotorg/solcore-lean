@@ -47,6 +47,7 @@ theorem AvoidsLocalName.bindFresh_cost_iff {name : String} {source : Syntax.Expr
       · intro evaluation
         cases evaluation with
         | wordLiteral meaning => exact .wordLiteral meaning
+  | unit => constructor <;> intro evaluation <;> cases evaluation <;> exact .unit
   | group _ ih =>
       constructor
       · intro evaluation

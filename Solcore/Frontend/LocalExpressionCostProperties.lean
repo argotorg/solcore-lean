@@ -28,6 +28,7 @@ theorem LocalExpressionEvaluatesWithCost.deterministic {table : LocalNameTable}
       | wordLiteral otherMeaning =>
           cases meaning.value_unique otherMeaning
           exact ⟨rfl, rfl, rfl⟩
+  | unit => cases rightEvaluation; exact ⟨rfl, rfl, rfl⟩
   | group _ ih =>
       cases rightEvaluation with
       | group child => exact ih child

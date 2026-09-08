@@ -55,6 +55,7 @@ theorem LocalExpressionEvaluatesWithCost.toStepsWithContinuation
           cases meaning.value_unique otherMeaning
           cases lowered
           exact .cons .word .refl
+  | unit => cases resolution; cases lowered; exact .cons .unit .refl
   | group _ ih =>
       cases resolution with
       | group child => exact ih child lowered continuation

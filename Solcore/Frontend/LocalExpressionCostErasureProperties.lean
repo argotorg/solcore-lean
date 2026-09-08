@@ -17,6 +17,7 @@ theorem LocalExpressionEvaluatesWithCost.erase {table : LocalNameTable}
   induction evaluation with
   | identifier named found => exact .identifier named found
   | wordLiteral meaning => exact .wordLiteral meaning
+  | unit => exact .unit
   | group _ ih => exact .group ih
   | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
   | logicalNot _ ih => exact .logicalNot ih
@@ -51,6 +52,7 @@ theorem LocalExpressionEvaluates.exists_cost {table : LocalNameTable}
   induction evaluation with
   | identifier named found => exact ⟨1, .identifier named found⟩
   | wordLiteral meaning => exact ⟨1, .wordLiteral meaning⟩
+  | unit => exact ⟨1, .unit⟩
   | group _ ih =>
       obtain ⟨cost, child⟩ := ih
       exact ⟨_, .group child⟩

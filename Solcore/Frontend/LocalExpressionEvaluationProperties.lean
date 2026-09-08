@@ -15,6 +15,7 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
     (evaluation : LocalExpressionEvaluates table environment initialStore source value finalStore) :
     Resolved.Evaluates environment initialStore resolved value finalStore := by
   induction resolution generalizing initialStore finalStore value with
+  | unit => cases evaluation; exact .unit
   | identifier named =>
       cases evaluation with
       | identifier otherNamed found =>
@@ -100,6 +101,7 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
     (evaluation : Resolved.Evaluates environment initialStore resolved value finalStore) :
     LocalExpressionEvaluates table environment initialStore source value finalStore := by
   induction resolution generalizing initialStore finalStore value with
+  | unit => cases evaluation; exact .unit
   | identifier named =>
       cases evaluation with
       | var found => exact .identifier named found

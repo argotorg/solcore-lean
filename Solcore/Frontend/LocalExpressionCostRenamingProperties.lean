@@ -26,6 +26,7 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
         cases ordinary with
         | identifier oldNamed oldFound => exact .identifier oldNamed oldFound
     | wordLiteral meaning => exact .wordLiteral meaning
+    | unit => exact .unit
     | group _ ih => exact .group ih
     | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
     | logicalNot _ ih => exact .logicalNot ih
@@ -58,6 +59,7 @@ theorem localExpressionEvaluatesWithCost_mapIds_iff
         cases ordinary with
         | identifier newNamed newFound => exact .identifier newNamed newFound
     | wordLiteral meaning => exact .wordLiteral meaning
+    | unit => exact .unit
     | group _ ih => exact .group ih
     | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
     | logicalNot _ ih => exact .logicalNot ih

@@ -26,6 +26,8 @@ theorem AvoidsLocalName.resolves_cons_iff {name : String} {source : Syntax.Expr}
     ResolvesLocalExpression ((name, id) :: table) source resolved ↔
       ResolvesLocalExpression table source resolved := by
   induction avoids generalizing resolved with
+  | unit =>
+      constructor <;> intro resolution <;> cases resolution <;> exact .unit
   | identifier different =>
       constructor
       · intro resolution

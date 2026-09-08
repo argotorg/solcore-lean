@@ -19,6 +19,8 @@ theorem AvoidsLocalName.bindFresh_hasType_iff {name : String} {source : Syntax.E
         (inputs.bindFresh owner name newType newValue valueTyped).context source resultType ↔
       LocalExpressionHasType inputs.names inputs.context source resultType := by
   induction avoids generalizing resultType with
+  | unit =>
+      constructor <;> intro typing <;> cases typing <;> exact .unit
   | identifier different =>
       constructor
       · intro typing

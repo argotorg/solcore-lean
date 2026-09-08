@@ -15,6 +15,7 @@ theorem LocalExpressionEvaluatesWithCost.change_store
     (replacement : Core.Store) :
     LocalExpressionEvaluatesWithCost table environment replacement source value replacement cost := by
   induction evaluation with
+  | unit => exact .unit
   | identifier named found => exact .identifier named found
   | wordLiteral meaning => exact .wordLiteral meaning
   | group _ ih => exact .group ih

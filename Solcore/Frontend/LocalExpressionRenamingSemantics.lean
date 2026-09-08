@@ -47,6 +47,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
   constructor
   · intro evaluation
     induction evaluation with
+    | unit => exact .unit
     | identifier named found =>
         obtain ⟨id, oldNamed, same⟩ := (LocalNameTable.lookup_mapIds_iff_exists mapping).mp named
         rw [← same] at found
@@ -78,6 +79,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
     | ifFalse _ _ conditionIH branchIH => exact .ifFalse conditionIH branchIH
   · intro evaluation
     induction evaluation with
+    | unit => exact .unit
     | identifier named found =>
         exact .identifier ((LocalNameTable.lookup_mapIds_iff mapping injective).mpr named)
           ((Resolved.LocalScope.lookup_mapIds_iff mapping injective).mpr found)
