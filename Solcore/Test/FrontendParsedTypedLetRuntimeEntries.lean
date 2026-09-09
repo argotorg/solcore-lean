@@ -229,7 +229,13 @@ def frontendParsedTypedLetRuntimeEntryTests : IO Unit := do
     assertTrue (decide (LocalInputs.empty.checkTypedLetReturnBody? types owner source.value.body =
       some (.letE (.word (word 7)) (.var 0), .word))) "header/parameter contrast did not retain an independently valid body"
     reject source
-  for body in ["{let z=x;return z;}", "{let z: Word;return x;}", "{let z: Unknown=x;return x;}", "{let z: Bool=x;return x;}",
+  let inferred ← compile "function invalid(x: Word,c: Bool) returns (Word){let z=x;return z;}"
+    (.letE (.var 1) (.var 0)) .word [.word, .bool] 4 false
+  assertTrue (typedLetReturnBodyFuelBound inferred.source.value.body == 0 &&
+    (elaborateTypedLetReturnBody? types owner inferred.compiled.inputs inferred.source.value.body).isNone) "old annotated prefix boundary changed"
+  checkCase inferred [wordArg 9, boolArg true] (wordArg 9) 4
+  for arguments in [[], [wordArg 9], [wordArg 9, wordArg 2]] do rejectArguments inferred arguments
+  for body in ["{let z: Word;return x;}", "{let z: Unknown=x;return x;}", "{let z: Bool=x;return x;}",
       "{let x: Word=x;return x;}", "{let z: Word=x;let z: Word=x;return z;}", "{let z: Word=z;return x;}",
       "{let y: Word=z;let z: Word=x;return y;}", "{let z: Word=missing;return x;}", "{let z: Word=x();return x;}",
       "{let z: Word=c ? x : missing;return x;}", "{let z: Word=x;if(c){if(c){return z;}else{return missing;}}else{return x;}}",

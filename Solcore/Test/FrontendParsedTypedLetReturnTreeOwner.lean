@@ -2,6 +2,7 @@ import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
 import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.RuntimeFunctionEntry
 import Solcore.Frontend.RuntimeFunctionCompilation
@@ -114,6 +115,19 @@ private def certify (inputs : LocalTypeInputs) (body : Syntax.Block) (core : Cor
               exact .binding (interpretTypeName?_sound meaning).structural unused
                 child.resolution child.lowered child.typing childTail.elaboration⟩
           else throw (IO.userError "independent binding reused a name")
+  | ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩, .letE initial tail, type =>
+      let .identifier originalName := initializer.value | throw (IO.userError "inferred fixture expected original reference")
+      let some inferredType := (inputs.names.lookup? originalName.value).bind inputs.context.lookup?
+        | throw (IO.userError "original reference type missing")
+      if unused : name.value ∉ inputs.names.map Prod.fst then
+        let child ← expression inputs initializer initial inferredType
+        let extended := inputs.bindFresh owner name.value inferredType
+        assertTrue (blockSpan.contains letSpan && letSpan.contains name.span && letSpan.contains initializer.span &&
+          decide (name.span.endByte ≤ initializer.span.startByte ∧ extended.context = (⟨owner, nextIndex⟩, inferredType) :: inputs.context) &&
+          (elaborateTypedLetReturnBody? types owner inputs body).isNone) "inferred annotation/span/fresh type or old prefix changed"
+        let childTail ← certify extended ⟨blockSpan, rest⟩ tail type (nextIndex + 1)
+        return ⟨by rw [sourceAt, coreAt, typeAt]; exact .inferred unused child.resolution child.lowered child.typing childTail.elaboration⟩
+      else throw (IO.userError "independent inference reused a name")
   | ⟨_, [⟨_, .ifThen condition left (some right)⟩]⟩, .ifE guard first second, type =>
       let child ← expression inputs condition guard .bool
       let l ← certify inputs left first type nextIndex
@@ -171,7 +185,8 @@ private def fixture (content : String) (arguments : List TypedRuntimeArgument) (
     (expected : TypedRuntimeArgument) (cost bound : Nat) : IO Unit := do
   let source ← parsed content
   let inputs ← actual source arguments
-  assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some expected.type)) "branch-local entry had a bad header"
+  assertTrue (decide (interpretRuntimeFunctionHeader? types source.value.signature = some expected.type) &&
+    (elaborateTypedLetReturnBody? types owner inputs.toTypeInputs source.value.body).isNone) "header or old prefix boundary changed"
   for chosenOwner in [owner, shift owner] do
     let names := if chosenOwner = owner then inputs.names else (inputs.mapIds mapping mappingInjective).names
     assertTrue (decide ((compileRuntimeFunction? types chosenOwner source).map (fun c => (c.core, c.returnType, c.inputs.names, c.inputs.context.values)) =
@@ -250,10 +265,13 @@ def frontendParsedTypedLetReturnTreeOwnerTests : IO Unit := do
     Resolved.freshLocalId owner (([] : List Resolved.LocalId).map indexShift) ≠ indexShift (Resolved.freshLocalId owner []) ∧
     Resolved.freshLocalId owner (rawIds.map (ownerLocalIdMap (fun _ => owner))) ≠
       ownerLocalIdMap (fun _ => owner) (Resolved.freshLocalId owner rawIds))) "inadmissible allocator mapping was silently generalized"
+  for c in [false, true] do
+    fixture "function rejected(x: Word,y: Word,c: Bool) returns (Word){if(c){let z=x;return z;}else{return y;}}"
+      [wordArg 9, wordArg 2, boolArg c] (.ifE (.var 0) (.letE (.var 2) (.var 0)) (.var 1)) (wordArg (if c then 9 else 2)) (if c then 7 else 4) 7
   for body in ["{if(c){let z: Word=x;return z;}else{let z: Unknown=y;return z;}}",
       "{if(c){let z: Word=x;return z;}else{let z: Bool=y;return y;}}", "{if(c){let x: Word=y;return x;}else{return y;}}",
       "{if(c){let z: Word=z;return x;}else{return y;}}", "{if(c){return x;}else{return z;}}",
-      "{if(c){let z=x;return z;}else{return y;}}", "{if(c){let z: Word;return x;}else{return y;}}",
+      "{if(c){let z: Word;return x;}else{return y;}}",
       "{if(c){let z: Word=x;return z;}else{if(c){return y;}else{return missing;}}}",
       "{if(c){return x;}else{return c;}}", "{if(x){return x;}else{return y;}}", "{if(c){return x;}}", "{return x;return y;}", "{}"] do
     let source ← parsed ("function rejected(x: Word,y: Word,c: Bool) returns (Word)" ++ body)

@@ -85,11 +85,15 @@ private structure Certificate (currentOwner : Resolved.DeclarationId) (table : L
 private def certify (currentOwner : Resolved.DeclarationId) (table : LocalNameTable) (env : Resolved.Environment) (store : Core.Store)
     (body : Syntax.Block) (choices : List Bool) : IO (Certificate currentOwner table env store body) := do
   match atBody : body with
-  | ⟨span, ⟨_, .letDecl name (some _) (some initializer)⟩ :: rest⟩ =>
+  | ⟨span, ⟨_, .letDecl name annotation (some initializer)⟩ :: rest⟩ =>
       let child ← expression table env store initializer
       let id := Resolved.freshLocalId currentOwner (table.map Prod.snd)
       let tail ← certify currentOwner ((name.value, id) :: table) ((id, child.value) :: env) store ⟨span, rest⟩ choices
-      return ⟨tail.value, child.cost + tail.cost + 2, by rw [atBody]; exact .binding child.costed tail.costed⟩
+      return ⟨tail.value, child.cost + tail.cost + 2, by
+        rw [atBody]
+        cases annotation with
+        | none => exact .inferred child.costed tail.costed
+        | some _ => exact .binding child.costed tail.costed⟩
   | ⟨_, [⟨_, .ifThen condition left (some right)⟩]⟩ =>
       let choice :: rest := choices | throw (IO.userError "independent branch script missing")
       let guard ← reference table env store condition
@@ -204,6 +208,9 @@ def frontendParsedTypedLetReturnTreeRawOwnerTests : IO Unit := do
             else w (r + Core.wordModulus - (l + Core.wordModulus - r) % Core.wordModulus) else w r,
             if c then if d then 19 else 21 else 11)) (if c then [true, d] else [false])
   let actual := inputs 9 2 true false
+  let inferred ← parsed "{let z=l;return z;}"
+  raw actual.names actual.environment inferred (some (w 9, 4))
+  checked actual inferred
   for (content, value, cost, choices) in [("{return;}", Core.Value.unit, 1, []),
       ("{let unused: Word=l - r;return r;}", w 2, 8, []),
       ("{let z: Unknown=l;return z;}", w 9, 4, []), ("{let z: Bool=l;return z;}", w 9, 4, []),
@@ -214,7 +221,7 @@ def frontendParsedTypedLetReturnTreeRawOwnerTests : IO Unit := do
     raw actual.names actual.environment body (some (value, cost)) choices
     if content != "{return;}" && content != "{let unused: Word=l - r;return r;}" then
       assertTrue ((actual.checkTypedLetReturnTree? types owner body).isNone) "raw success became whole acceptance"
-  for content in ["{}", "{let z=l;return z;}", "{let z: Word;return l;}", "{let z: Word=l;}",
+  for content in ["{}", "{let z: Word;return l;}", "{let z: Word=l;}",
       "{return l;return r;}", "{if(c){return l;}}", "{if(c){return l;}else{return r;}return l;}",
       "{let unused: Word=missing;return r;}", "{let unused: Word=~c;return r;}", "{let z: Word=z;return l;}", "{return f(l);}",
       "{if(l){return l;}else{return r;}}"] do raw actual.names actual.environment (← parsed content) none

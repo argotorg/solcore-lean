@@ -92,6 +92,24 @@ private def inspect (owner : Resolved.DeclarationId) (inputs : LocalTypeInputs) 
         extended.names = (name.value, ⟨owner, nextIndex⟩) :: inputs.names ∧
         extended.context = (⟨owner, nextIndex⟩, declaredType) :: inputs.context)) "ancestor allocation or exact extended row changed"
       inspect owner extended ⟨blockSpan, rest⟩ tailCore type (nextIndex + 1)
+  | ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩, .letE initializerCore tailCore =>
+      let .identifier originalName := initializer.value | throw (IO.userError "inferred fixture expected original reference")
+      let some inferredType := (inputs.names.lookup? originalName.value).bind inputs.context.lookup?
+        | throw (IO.userError "original reference had no static type")
+      if checked : elaborateTypedLetReturnTree? types owner inputs
+          ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩ = some (.letE initializerCore tailCore, type) then
+        have _ := elaborateTypedLetReturnTree?_inferred_children checked
+        pure ()
+      else throw (IO.userError "inferred binding lost original child evidence")
+      assertTrue (decide (name.value ∉ inputs.names.map Prod.fst ∧
+        elaborateLocalExpression? inputs.names inputs.context initializer = some (initializerCore, inferredType)) &&
+        blockSpan.contains letSpan && letSpan.contains name.span && letSpan.contains initializer.span &&
+        decide (name.span.endByte ≤ initializer.span.startByte)) "inference rewrote annotation, scope or original spans"
+      let extended := inputs.bindFresh owner name.value inferredType
+      assertTrue (decide (extended.ids = (⟨owner, nextIndex⟩ : Resolved.LocalId) :: inputs.ids ∧
+        extended.names = (name.value, ⟨owner, nextIndex⟩) :: inputs.names ∧
+        extended.context = (⟨owner, nextIndex⟩, inferredType) :: inputs.context)) "inference changed fresh type or position"
+      inspect owner extended ⟨blockSpan, rest⟩ tailCore type (nextIndex + 1)
   | ⟨blockSpan, [⟨ifSpan, .ifThen condition thenBody (some elseBody)⟩]⟩, .ifE conditionCore thenCore elseCore =>
       if checked : elaborateTypedLetReturnTree? types owner inputs
           ⟨blockSpan, [⟨ifSpan, .ifThen condition thenBody (some elseBody)⟩]⟩ = some (.ifE conditionCore thenCore elseCore, type) then
@@ -222,7 +240,10 @@ def frontendParsedTypedLetReturnTreeTests : IO Unit := do
     [("x", .word), ("c", .bool)] (.letE (.var 1) (.ifE (.var 1) (.var 0) (.var 2))) .word false
   accepted "function bare(){return;}" [] .unit .unit false
   dictionaryBoundary
-  for body in ["{if(c){let z=x;return z;}else{return y;}}", "{if(c){let z: Word;return x;}else{return y;}}",
+  accepted "function rejected(x: Word,y: Word,c: Bool,q: Opaque,f: Fn) returns (Word){if(c){let z=x;return z;}else{return y;}}"
+    [("x", .word), ("y", .word), ("c", .bool), ("q", .namedData ⟨91⟩), ("f", .function .word (.namedData ⟨91⟩))]
+    (.ifE (.var 2) (.letE (.var 4) (.var 0)) (.var 3)) .word true
+  for body in ["{if(c){let z: Word;return x;}else{return y;}}",
       "{if(c){let z;return x;}else{return y;}}", "{if(c){let z: Word=z;return x;}else{return y;}}",
       "{if(c){let a: Word=b;let b: Word=x;return a;}else{return y;}}",
       "{if(c){let z: Word=x;return z;}else{return z;}}", "{if(c){return z;}else{let z: Word=y;return z;}}",

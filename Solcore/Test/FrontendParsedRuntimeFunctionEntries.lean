@@ -95,7 +95,38 @@ private def checkRejected (content : String) (arguments : List TypedRuntimeArgum
     assertTrue (runRuntimeFunction? types owner source arguments fuel store).isNone
       s!"{content}: running bypassed whole declaration preparation"
 
+private def checkInferredLocal : IO Unit := do
+  let some source ← parsed? "function local() returns (Word) { let x = 7; return x; }"
+    | throw (IO.userError "original inferred local declaration did not parse")
+  assertTrue (match source.value.body.value with
+    | [⟨ls,.letDecl name none (some ⟨_,.literal ⟨_,.decimal spelling⟩⟩)⟩,
+        ⟨rs,.returnStmt (some ⟨_,.identifier returned⟩)⟩] =>
+        decide (name.value = "x" ∧ returned.value = "x" ∧ spelling = "7") &&
+        source.value.body.span.contains ls && source.value.body.span.contains rs
+    | _ => false) "original missing annotation or written initializer was changed"
+  let core : Core.Expr := .letE (.word seven) (.var 0)
+  let some prepared := prepareRuntimeFunction? types owner source []
+    | throw (IO.userError "inferred initialized local was rejected")
+  checkOrder source [] prepared.inputs
+  assertTrue (decide (prepared.core = core ∧ prepared.returnType = .word) &&
+    (prepared.inputs.checkReturnBody? source.value.body).isNone)
+    "inferred local changed exact Core or broadened the old singleton body"
+  for initialStore in [store, []] do
+    have paths (k : List Core.Frame) : Core.Steps 4 ⟨.eval core [], k, initialStore⟩
+        ⟨.ret (.word seven), k, initialStore⟩ :=
+      .cons .enterLet (.cons .word (.cons .bindLet (.cons (.var rfl) .refl)))
+    have _ := paths []
+    for fuel in List.range 7 ++ [20] do
+      assertTrue (match runRuntimeFunction? types owner source [] fuel initialStore with
+        | some (.word,.done value final) => decide (4 ≤ fuel ∧ value = .word seven ∧ final = initialStore)
+        | some (.word,.outOfFuel saved) => decide (fuel < 4 ∧ saved.store = initialStore)
+        | _ => false) "inferred local changed its independently counted four steps"
+    let saved : Core.State := ⟨.ret (.word seven),[.letBody (.var 0) []],initialStore⟩
+    assertTrue (decide (runRuntimeFunction? types owner source [] 2 initialStore = some (.word,.outOfFuel saved) ∧
+      Core.runStateful 2 saved = .done (.word seven) initialStore)) "inferred local lost its genuine pending let"
+
 def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
+  checkInferredLocal
   checkAccepted types "function empty() { return; }" [] .unit .unit .unit 1
   checkAccepted types "function explicit() returns (U,) { return; }" [] .unit .unit .unit 1
   checkAccepted types "/* lead */ function literal() returns (Word) { return ((0007)); }"
@@ -170,7 +201,6 @@ def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
       "function emptyBody() {}", "function nested() { { return; } }",
       "function repeated() { return; return; }", "function tail() returns (Word) { 7 }",
       "function discarded() { return; missing; }", "function before() { 7; return; }",
-      "function local() returns (Word) { let x = 7; return x; }",
       "function call() returns (Word) { return missing(); }"] do
     checkRejected content
   for content in ["function publicOnly() public { return; }",

@@ -2,6 +2,7 @@ import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.TypedLetReturnTreeRunnerTypeExtensionProperties
 import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
+import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.RuntimeFunctionEntry
 import Solcore.Frontend.RuntimeFunctionCompilation
@@ -36,8 +37,7 @@ private theorem fromLookup {old next : TypeNameTable}
 private theorem forward : TypeNameTable.Extends base alternate := fromLookup sameLookup
 private theorem backward : TypeNameTable.Extends alternate base := fromLookup (fun key => (sameLookup key).symm)
 private theorem grows : TypeNameTable.Extends base extended := TypeNameTable.Extends.append_right base extras
-private def stores : List Core.Store := [[.word (word 91), .cellRef .word 40],
-  [.closure .bool .bool (.var 0) [], .bool true, .word Core.Word.maximum]]
+private def stores : List Core.Store := [[.word (word 91), .cellRef .word 40], [.closure .bool .bool (.var 0) [], .bool true, .word Core.Word.maximum]]
 private def parsed (content : String) : IO Syntax.FunctionDecl := do
   let file : Syntax.SourceFile := { id := ⟨.main, "parsed-tree-type-extension.sol"⟩, content }
   let .ok lexed ← pure (Syntax.Lexer.lex file) | throw (IO.userError "lexer invariant")
@@ -63,8 +63,7 @@ private structure Expression (inputs : LocalTypeInputs) (source : Syntax.Expr) (
   resolution : ResolvesLocalExpression inputs.names source resolved
   lowered : Resolved.Lowers inputs.ids resolved core
   typing : Resolved.HasType inputs.context resolved type
-private def expression (inputs : LocalTypeInputs) (source : Syntax.Expr) (core : Core.Expr) (type : Core.Ty) :
-    IO (Expression inputs source core type) := do
+private def expression (inputs : LocalTypeInputs) (source : Syntax.Expr) (core : Core.Expr) (type : Core.Ty) : IO (Expression inputs source core type) := do
   match sourceAt : source, coreAt : core, typeAt : type with
   | ⟨_, .identifier name⟩, .var index, type =>
       match named : inputs.names.lookup? name.value with
@@ -78,8 +77,7 @@ private def expression (inputs : LocalTypeInputs) (source : Syntax.Expr) (core :
             else throw (IO.userError "independent reference type differs")
           else throw (IO.userError "independent reference position differs")
   | ⟨_, .binary left ⟨_, .subtract⟩ right⟩, .binary .wordSub first second, .word =>
-      let l ← expression inputs left first .word
-      let r ← expression inputs right second .word
+      let l ← expression inputs left first .word; let r ← expression inputs right second .word
       return ⟨.binary .wordSub l.resolved r.resolved, by rw [sourceAt]; exact .subtract l.resolution r.resolution,
         by rw [coreAt]; exact .binary l.lowered r.lowered,
         by rw [typeAt]; exact .binary l.typing r.typing⟩
@@ -87,8 +85,7 @@ private def expression (inputs : LocalTypeInputs) (source : Syntax.Expr) (core :
 termination_by sizeOf source
 private structure Evidence (types : TypeNameTable) (inputs : LocalTypeInputs) (body : Syntax.Block) (core : Core.Expr) (type : Core.Ty) : Type where
   elaboration : TypedLetReturnTreeElaborates types owner inputs body core type
-private def certify (types : TypeNameTable) (inputs : LocalTypeInputs) (body : Syntax.Block) (core : Core.Expr) (type : Core.Ty) :
-    IO (Evidence types inputs body core type) := do
+private def certify (types : TypeNameTable) (inputs : LocalTypeInputs) (body : Syntax.Block) (core : Core.Expr) (type : Core.Ty) : IO (Evidence types inputs body core type) := do
   match sourceAt : body, coreAt : core, typeAt : type with
   | ⟨_, [⟨_, .returnStmt none⟩]⟩, .unit, .unit => return ⟨by rw [sourceAt, coreAt, typeAt]; exact .single .bare⟩
   | ⟨_, [⟨_, .returnStmt (some source)⟩]⟩, core, type =>
@@ -103,13 +100,21 @@ private def certify (types : TypeNameTable) (inputs : LocalTypeInputs) (body : S
             let child ← expression inputs initializer initial declaredType
             let childTail ← certify types (inputs.bindFresh owner name.value declaredType) ⟨blockSpan, rest⟩ tail type
             return ⟨by
-              rw [sourceAt, coreAt, typeAt]
-              exact .binding (interpretTypeName?_sound meaning).structural unused child.resolution child.lowered child.typing childTail.elaboration⟩
+              rw [sourceAt, coreAt, typeAt]; exact .binding (interpretTypeName?_sound meaning).structural unused child.resolution child.lowered child.typing childTail.elaboration⟩
           else throw (IO.userError "independent binding reused a name")
+  | ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩, .letE initial tail, type =>
+      let .identifier originalName := initializer.value | throw (IO.userError "inferred fixture expected original reference")
+      let some inferredType := (inputs.names.lookup? originalName.value).bind inputs.context.lookup? | throw (IO.userError "original reference type missing")
+      if unused : name.value ∉ inputs.names.map Prod.fst then
+        let child ← expression inputs initializer initial inferredType
+        assertTrue (blockSpan.contains letSpan && letSpan.contains name.span && letSpan.contains initializer.span &&
+          decide (name.span.endByte ≤ initializer.span.startByte) && (elaborateTypedLetReturnBody? types owner inputs body).isNone) "inferred annotation/spans or old prefix changed"
+        let childTail ← certify types (inputs.bindFresh owner name.value inferredType) ⟨blockSpan, rest⟩ tail type
+        return ⟨by rw [sourceAt, coreAt, typeAt]; exact .inferred unused child.resolution child.lowered child.typing childTail.elaboration⟩
+      else throw (IO.userError "independent inference reused a name")
   | ⟨_, [⟨_, .ifThen condition left (some right)⟩]⟩, .ifE guard first second, type =>
       let child ← expression inputs condition guard .bool
-      let l ← certify types inputs left first type
-      let r ← certify types inputs right second type
+      let l ← certify types inputs left first type; let r ← certify types inputs right second type
       return ⟨by rw [sourceAt, coreAt, typeAt]; exact .conditional child.resolution child.lowered child.typing l.elaboration r.elaboration⟩
   | _, _, _ => throw (IO.userError "original tree differs from independent Core")
 termination_by sizeOf body
@@ -124,8 +129,7 @@ private def staticCheck (inputs : LocalTypeInputs) (body : Syntax.Block) (expect
     have _ := elaborateTypedLetReturnTree?_some_of_extends grows proof.elaboration.complete
     assertTrue (decide (elaborateTypedLetReturnTree? extended owner inputs body = expected ∧
       Core.infer? inputs.context.values core = some type)) "one-way extension changed independent Core/type"
-private def runChecked (inputs : LocalInputs) (body : Syntax.Block) (core : Core.Expr) (expected : TypedRuntimeArgument)
-    (cost bound : Nat) : IO Unit := do
+private def runChecked (inputs : LocalInputs) (body : Syntax.Block) (core : Core.Expr) (expected : TypedRuntimeArgument) (cost bound : Nat) : IO Unit := do
   staticCheck inputs.toTypeInputs body (some (core, expected.type))
   have _ := inputs.checkTypedLetReturnTree?_eq_of_mutual_extends forward backward owner body
   match checked : inputs.checkTypedLetReturnTree? base owner body with
@@ -157,8 +161,7 @@ private def runChecked (inputs : LocalInputs) (body : Syntax.Block) (core : Core
                 have _ := LocalInputs.runTypedLetReturnTree?_resume nextOut remaining
                 have _ := LocalInputs.runTypedLetReturnTree?_resume (same.symm.trans exhausted) remaining
                 assertTrue (decide (run base (fuel + remaining) = some (type, Core.runStateful remaining state) ∧
-                  run alternate (fuel + remaining) = run base (fuel + remaining) ∧ run extended (fuel + remaining) = run base (fuel + remaining)))
-                  "dictionary extension rebuilt a genuine checkpoint"
+                  run alternate (fuel + remaining) = run base (fuel + remaining) ∧ run extended (fuel + remaining) = run base (fuel + remaining))) "dictionary extension rebuilt a genuine checkpoint"
               let middle := (cost - fuel) / 2
               let .outOfFuel second := Core.runStateful middle state | throw (IO.userError "middle checkpoint disappeared")
               for last in [cost - fuel - middle - 1, cost - fuel - middle, cost - fuel - middle + 2] do
@@ -174,11 +177,10 @@ private def alternating (depth level : Nat) (annotation : String) : String × Co
       ("if(c){" ++ s!"let z{level}: {annotation}=" ++ (if level = 0 then "x" else s!"z{level - 1}") ++ ";" ++ tail ++
         "}else{" ++ s!"let z{level}: {annotation}=y;return z{level};" ++ "}",
         .ifE (.var level) (.letE (.var (if level = 0 then 2 else 0)) core) (.letE (.var (level + 1)) (.var 0)))
-private def fixture (content : String) (arguments : List TypedRuntimeArgument) (core : Core.Expr)
-    (expected : TypedRuntimeArgument) (cost bound : Nat) : IO Unit := do
-  let source ← parsed content
-  let inputs ← actual source arguments
-  assertTrue (decide (interpretRuntimeFunctionHeader? base source.value.signature = some expected.type)) "body contrast used invalid header"
+private def fixture (content : String) (arguments : List TypedRuntimeArgument) (core : Core.Expr) (expected : TypedRuntimeArgument) (cost bound : Nat) : IO Unit := do
+  let source ← parsed content; let inputs ← actual source arguments
+  assertTrue (decide (interpretRuntimeFunctionHeader? base source.value.signature = some expected.type) &&
+    (elaborateTypedLetReturnBody? base owner inputs.toTypeInputs source.value.body).isNone) "header or old prefix boundary changed"
   runChecked inputs source.value.body core expected cost bound
   for table in [base, alternate, extended] do
     assertTrue (decide ((compileRuntimeFunction? table owner source).map (fun c => (c.core, c.returnType, c.inputs.names, c.inputs.context.values)) =
@@ -189,8 +191,7 @@ private def fixture (content : String) (arguments : List TypedRuntimeArgument) (
       for fuel in List.range (bound + 3) do
         assertTrue (decide (runRuntimeFunction? table owner source arguments fuel store =
           some (expected.type, Core.runStateful fuel (.initial core inputs.environment.values store)))) "table changed full entry result or checkpoint"
-private def rawReference (inputs : LocalInputs) (store : Core.Store) (source : Syntax.Expr) (value : Core.Value) :
-    IO (PLift (LocalExpressionEvaluatesWithCost inputs.names inputs.environment store source value store 1)) := do
+private def rawReference (inputs : LocalInputs) (store : Core.Store) (source : Syntax.Expr) (value : Core.Value) : IO (PLift (LocalExpressionEvaluatesWithCost inputs.names inputs.environment store source value store 1)) := do
   match sourceAt : source with
   | ⟨_, .identifier name⟩ =>
       match named : inputs.names.lookup? name.value with
@@ -238,13 +239,14 @@ def frontendParsedTypedLetReturnTreeTypeExtensionTests : IO Unit := do
   for c in [false, true] do
     fixture "function siblings(x: Word,c: Bool){if(c){let z: Word=x;return;}else{let z: Bool=c;return;}}"
       [wordArg 9, boolArg c] (.ifE (.var 0) (.letE (.var 1) .unit) (.letE (.var 0) .unit)) ⟨.unit, .unit, .unit⟩ 7 7
+    fixture "function rejected(x: Word,y: Word,c: Bool) returns (Word){if(c){let z=x;return z;}else{return y;}}"
+      [wordArg 9, wordArg 2, boolArg c] (.ifE (.var 0) (.letE (.var 2) (.var 0)) (.var 1)) (wordArg (if c then 9 else 2)) (if c then 7 else 4) 7
   for body in ["{if(c){let z: Unknown=x;return z;}else{return y;}}", "{if(c){let z: Bool=x;return z;}else{return y;}}",
       "{if(c){let x: Word=y;return x;}else{return y;}}", "{if(c){let z: Word=z;return x;}else{return y;}}",
-      "{if(c){let z=x;return z;}else{return y;}}", "{if(c){let z: Word;return x;}else{return y;}}",
+      "{if(c){let z: Word;return x;}else{return y;}}",
       "{if(c){return x;}else{let a: Word=y;if(c){return a;}else{return missing;}}}",
       "{if(c){return x;}else{return c;}}", "{if(x){return x;}else{return y;}}", "{if(c){return x;}}", "{return x;return y;}", "{}"] do
-    let source ← parsed ("function rejected(x: Word,y: Word,c: Bool) returns (Word)" ++ body)
-    let inputs ← actual source [wordArg 9, wordArg 2, boolArg true]
+    let source ← parsed ("function rejected(x: Word,y: Word,c: Bool) returns (Word)" ++ body); let inputs ← actual source [wordArg 9, wordArg 2, boolArg true]
     staticCheck inputs.toTypeInputs source.value.body none
     have _ := inputs.checkTypedLetReturnTree?_eq_of_mutual_extends forward backward owner source.value.body
     for store in stores do
@@ -263,8 +265,7 @@ def frontendParsedTypedLetReturnTreeTypeExtensionTests : IO Unit := do
   for store in stores do
     match sourceAt : repair.value.body with
     | ⟨_, [⟨_, .ifThen condition ⟨_, [⟨_, .returnStmt (some returned)⟩]⟩ (some _)⟩]⟩ =>
-        let guard ← rawReference fixed store condition (.bool true)
-        let result ← rawReference fixed store returned (.word (word 9))
+        let guard ← rawReference fixed store condition (.bool true); let result ← rawReference fixed store returned (.word (word 9))
         have raw : TypedLetReturnTreeEvaluatesWithCost owner fixed.names fixed.environment store repair.value.body (.word (word 9)) store 4 := by
           rw [sourceAt]; exact .ifTrue guard.down (.single (.expression result.down))
         have _ := raw.erase
@@ -276,8 +277,7 @@ def frontendParsedTypedLetReturnTreeTypeExtensionTests : IO Unit := do
           some (.word, Core.runStateful fuel (.initial repairedCore fixed.environment.values store)))) "one-way extension wrongly preserved none or changed raw selected value"
       if 4 ≤ fuel then assertTrue (decide (fixed.runTypedLetReturnTree? extended owner fuel repair.value.body store =
         some (.word, .done (.word (word 9)) store))) "unselected repair changed the independent four-step selected path"
-  let nominal ← parsed "function repaired(x: Opaque,c: Bool) returns (Opaque){if(c){return x;}else{let z: Alias=x;return z;}}"
-  let nominalInputs ← declared nominal
+  let nominal ← parsed "function repaired(x: Opaque,c: Bool) returns (Opaque){if(c){return x;}else{let z: Alias=x;return z;}}"; let nominalInputs ← declared nominal
   staticCheck nominalInputs nominal.value.body none
   let nominalProof ← certify extended nominalInputs nominal.value.body repairedCore (.namedData ⟨91⟩)
   have _ := nominalProof.elaboration.complete

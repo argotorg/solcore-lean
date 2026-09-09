@@ -89,11 +89,15 @@ private structure Certificate (currentOwner : Resolved.DeclarationId) (table : L
 private def certify (currentOwner : Resolved.DeclarationId) (table : LocalNameTable) (env : Resolved.Environment) (store : Core.Store)
     (body : Syntax.Block) (choices : List Bool) : IO (Certificate currentOwner table env store body) := do
   match atBody : body with
-  | ⟨span, ⟨_, .letDecl name (some _) (some initializer)⟩ :: rest⟩ =>
+  | ⟨span, ⟨_, .letDecl name annotation (some initializer)⟩ :: rest⟩ =>
       let child ← expression table env store initializer
       let id := Resolved.freshLocalId currentOwner (table.map Prod.snd)
       let tail ← certify currentOwner ((name.value, id) :: table) ((id, child.value) :: env) store ⟨span, rest⟩ choices
-      return ⟨tail.value, child.cost + tail.cost + 2, by rw [atBody]; exact .binding child.costed tail.costed⟩
+      return ⟨tail.value, child.cost + tail.cost + 2, by
+        rw [atBody]
+        cases annotation with
+        | none => exact .inferred child.costed tail.costed
+        | some _ => exact .binding child.costed tail.costed⟩
   | ⟨_, [⟨_, .ifThen condition left (some right)⟩]⟩ =>
       let choice :: rest := choices | throw (IO.userError "independent branch script missing")
       let guard ← reference table env store condition
@@ -205,6 +209,7 @@ private def checked : IO Unit := do
       checkedRight.runTypedLetReturnTree? types (owner 3) 2 body store)) "equal raw results were mistaken for equal checkpoints"
 
 def frontendParsedRawLookupTests : IO Unit := do
+  sample "{let z=l;return z;}" (w 9) (w 2) true false (some (w 9, 4))
   for depth in [0, 1, 2, 5, 12] do
     for c in [false, true] do
       sample ("{" ++ spine depth 0 ++ "}") (w 9) (w 2) c false
@@ -222,7 +227,7 @@ def frontendParsedRawLookupTests : IO Unit := do
       ("{let z: Unknown=l;return z;}", w 9, 4, []), ("{let z: Bool=l;return z;}", w 9, 4, []), ("{let l: Word=l - r;return l;}", w 7, 8, []),
       ("{if(c){return l;}else{let z: Unknown=ghost;return z;}}", w 9, 4, [true])] do
     sample content (w 9) (w 2) true false (some (value, cost)) choices
-  for content in ["{}", "{return ghost;}", "{return missing;}", "{let z=l;return z;}", "{let z: Word;return l;}",
+  for content in ["{}", "{return ghost;}", "{return missing;}", "{let z: Word;return l;}",
       "{let z: Word=l;}", "{return l;return r;}", "{if(c){return l;}}", "{if(c){return l;}else{return r;}return l;}",
       "{let unused: Word=ghost;return r;}", "{let unused: Word=~c;return r;}", "{return f(l);}",
       "{if(l){return l;}else{return r;}}"] do sample content (w 9) (w 2) true false none

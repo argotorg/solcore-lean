@@ -101,11 +101,14 @@ private structure Certificate (table : LocalNameTable) (environment : Resolved.E
 private def certify (table : LocalNameTable) (environment : Resolved.Environment) (store : Core.Store) (body : Syntax.Block)
     (choices : List Bool) : IO (Certificate table environment store body) := do
   match sourceAt : body with
-  | ⟨blockSpan, ⟨_, .letDecl name (some _) (some initializer)⟩ :: rest⟩ =>
+  | ⟨blockSpan, ⟨_, .letDecl name annotation (some initializer)⟩ :: rest⟩ =>
       let value ← expression table environment store initializer
       let id := Resolved.freshLocalId owner (table.map Prod.snd)
       let tail ← certify ((name.value, id) :: table) ((id, value.value) :: environment) store ⟨blockSpan, rest⟩ choices
-      return ⟨tail.value, value.cost + tail.cost + 2, by rw [sourceAt]; exact .binding value.costed tail.costed⟩
+      return ⟨tail.value, value.cost + tail.cost + 2, by
+        rw [sourceAt]; cases annotation with
+        | none => exact .inferred value.costed tail.costed
+        | some _ => exact .binding value.costed tail.costed⟩
   | ⟨_, [⟨_, .ifThen condition left (some right)⟩]⟩ =>
       let choice :: rest := choices | throw (IO.userError "missing selected branch")
       let guard ← expression table environment store condition
@@ -270,7 +273,10 @@ def frontendParsedRecursiveTypedLetRuntimeEntryTests : IO Unit := do
     let raw ← certify actual.names actual.environment store invalid.value.body [true]
     assertTrue (decide (raw.value = .word (word 9) ∧ raw.cost = 7) && (compileRuntimeFunction? types owner invalid).isNone &&
       (runRuntimeFunction? types owner invalid [boolArg true, wordArg 9] 7 store).isNone) "selected raw success hid an invalid unselected annotation"
-  for body in ["{if(c){let z=x;return z;}else{return x;}}", "{if(c){let z: Word;return x;}else{return x;}}",
+  let inferred ← compile "function invalid(c: Bool,x: Word) returns (Word){if(c){let z=x;return z;}else{return x;}}"
+    (.ifE (.var 1) (.letE (.var 0) (.var 0)) (.var 0)) .word [.bool, .word] 7
+  for c in [false, true] do checkCase inferred [boolArg c, wordArg 9] [c] (wordArg 9) (if c then 7 else 4)
+  for body in ["{if(c){let z: Word;return x;}else{return x;}}",
       "{if(c){let z: Unknown=x;return x;}else{return x;}}", "{if(c){let z: Bool=x;return x;}else{return x;}}", "{if(c){let x: Word=x;return x;}else{return x;}}",
       "{if(c){let z: Word=z;return x;}else{return x;}}", "{if(c){let z: Word=x;return z;}else{return z;}}",
       "{if(c){let z: Word=x;return z;}else{if(c){return x;}else{return missing;}}}", "{if(c){let z: Word=x;return z;}else{return c;}}",

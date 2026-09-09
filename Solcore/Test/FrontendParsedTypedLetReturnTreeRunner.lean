@@ -82,11 +82,12 @@ private structure Certificate (table : LocalNameTable) (environment : Resolved.E
 private def certify (table : LocalNameTable) (environment : Resolved.Environment) (store : Core.Store)
     (source : Syntax.Block) (choices : List Bool) : IO (Certificate table environment store source) := do
   match sourceAt : source with
-  | ⟨blockSpan, ⟨_, .letDecl name (some _) (some initializer)⟩ :: rest⟩ =>
+  | ⟨blockSpan, ⟨_, .letDecl name annotation (some initializer)⟩ :: rest⟩ =>
       let child ← expression table environment store initializer
       let id := Resolved.freshLocalId owner (table.map Prod.snd)
       let tail ← certify ((name.value, id) :: table) ((id, child.value) :: environment) store ⟨blockSpan, rest⟩ choices
-      return ⟨tail.value, child.cost + tail.cost + 2, by rw [sourceAt]; exact .binding child.costed tail.costed⟩
+      return ⟨tail.value, child.cost + tail.cost + 2, by
+        rw [sourceAt]; cases annotation <;> first | exact .binding child.costed tail.costed | exact .inferred child.costed tail.costed⟩
   | ⟨_, [⟨_, .ifThen condition left (some right)⟩]⟩ =>
       let choice :: rest := choices | throw (IO.userError "missing selected-branch script")
       let guard ← reference table environment store condition
@@ -263,11 +264,22 @@ def frontendParsedTypedLetReturnTreeRunnerTests : IO Unit := do
     let (source, inputs, arguments) ← actual ("function old(c: Bool,x: Word,y: Word)" ++ (if value.type = .unit then "" else " returns (Word)") ++ body)
       [boolArg true, wordArg 9, wordArg 2]
     checked source inputs arguments choices core value cost cost false
+  let (inferred, original, args) ← actual "function rejected(c: Bool,x: Word,y: Word) returns (Word){let z=x;return z;}" [boolArg true, wordArg 9, wordArg 2]
+  let ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: _⟩ := inferred.value.body | throw (IO.userError "original none annotation changed")
+  assertTrue (blockSpan.contains letSpan && letSpan.contains name.span && letSpan.contains initializer.span &&
+    decide (name.value = "z" ∧ name.span.endByte ≤ initializer.span.startByte ∧ typedLetReturnBodyFuelBound inferred.value.body = 0 ∧
+      (original.toTypeInputs.bindFresh owner name.value .word).context = (⟨owner, 3⟩, .word) :: original.context)) "inferred span/type/ID or old bound changed"
+  checked inferred original args [] (.letE (.var 1) (.var 0)) (wordArg 9) 4 4
+  for store in stores do
+    let env := original.environment.values
+    for (spent, state) in [(1, (⟨.eval (.var 1) env, [.letBody (.var 0) env], store⟩ : Core.State)),
+        (2, ⟨.ret (.word (word 9)), [.letBody (.var 0) env], store⟩), (3, ⟨.eval (.var 0) (.word (word 9) :: env), [], store⟩)] do
+      assertTrue (decide (original.runTypedLetReturnTree? types owner spent inferred.value.body store = some (.word, .outOfFuel state))) "inferred initializer/tail checkpoint changed"
   for (body, bound, script) in [("{if(c){let z: Unknown=x;return z;}else{return y;}}", 7, some [true]),
       ("{if(c){let x: Word=x;return x;}else{return y;}}", 7, some [true]),
       ("{if(c){let z: Word=x;return z;}else{if(c){return y;}else{return missing;}}}", 7, some [true]),
       ("{if(c){let z: Word=missing;return x;}else{return y;}}", 7, none), ("{if(c){return x;}else{return c;}}", 4, none),
-      ("{let z=x;return z;}", 0, none), ("{let z: Word;return x;}", 0, none), ("{}", 0, none), ("{return x;return y;}", 0, none), ("{return missing;}", 1, none)] do
+      ("{let z: Word;return x;}", 0, none), ("{}", 0, none), ("{return x;return y;}", 0, none), ("{return missing;}", 1, none)] do
     let (source, inputs, _) ← actual ("function rejected(c: Bool,x: Word,y: Word) returns (Word)" ++ body) [boolArg true, wordArg 9, wordArg 2]
     assertTrue (decide (typedLetReturnTreeFuelBound source.value.body = bound) && (inputs.checkTypedLetReturnTree? types owner source.value.body).isNone)
       "numerical bound licensed whole rejected syntax"

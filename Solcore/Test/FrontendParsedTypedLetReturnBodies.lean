@@ -242,7 +242,7 @@ def frontendParsedTypedLetReturnBodyTests : IO Unit := do
   accepted "function old(c: Bool,x: Word) returns (Word){if(c){return x;}else{return x;}}"
     [("c", .bool), ("x", .word)] [] (.ifE (.var 1) (.var 0) (.var 0)) .word
   dictionaryBoundary
-  for (body, core) in [
+  for (body, core) in [("{let z = x;return z;}", Core.Expr.letE (.var 4) (.var 0)),
       ("{let z: Word = x;if(c){let a: Word = z;return a;}else{return z;}}",
         Core.Expr.letE (.var 4) (.ifE (.var 3) (.letE (.var 0) (.var 0)) (.var 0))),
       ("{let z: Word = x;if(0 == 0){return z;}else{let a: Word = z;return a;}}",
@@ -250,7 +250,7 @@ def frontendParsedTypedLetReturnBodyTests : IO Unit := do
       ("{if(c){let z: Word = x;return z;}else{return y;}}", .ifE (.var 2) (.letE (.var 4) (.var 0)) (.var 3))] do
     rejected body (some core)
   rejected ("{let z: Word = " ++ toString (2 ^ 256 : Nat) ++ ";return x;}")
-  for body in ["{let z = x;return z;}", "{let z: Word;return x;}", "{let z;return x;}",
+  for body in ["{let z: Word;return x;}", "{let z;return x;}",
       "{let z: Word = z;return x;}", "{let a: Word = b;let b: Word = x;return a;}",
       "{let x: Word = y;return x;}", "{let z: Word = x;let z: Word = y;return z;}",
       "{let z: Word = missing;return x;}", "{let z: Bool = x;return x;}",

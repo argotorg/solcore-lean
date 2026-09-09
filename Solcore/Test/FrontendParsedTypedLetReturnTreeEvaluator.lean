@@ -79,11 +79,15 @@ private structure Certificate (table : LocalNameTable) (env : Resolved.Environme
 private def certify (table : LocalNameTable) (env : Resolved.Environment) (store : Core.Store)
     (body : Syntax.Block) (choices : List Bool) : IO (Certificate table env store body) := do
   match atBody : body with
-  | ⟨span, ⟨_, .letDecl name (some _) (some initializer)⟩ :: rest⟩ =>
+  | ⟨span, ⟨_, .letDecl name annotation (some initializer)⟩ :: rest⟩ =>
       let child ← expression table env store initializer
       let id := Resolved.freshLocalId owner (table.map Prod.snd)
       let tail ← certify ((name.value, id) :: table) ((id, child.value) :: env) store ⟨span, rest⟩ choices
-      return ⟨tail.value, child.cost + tail.cost + 2, by rw [atBody]; exact .binding child.costed tail.costed⟩
+      return ⟨tail.value, child.cost + tail.cost + 2, by
+        rw [atBody]
+        cases annotation with
+        | none => exact .inferred child.costed tail.costed
+        | some _ => exact .binding child.costed tail.costed⟩
   | ⟨_, [⟨_, .ifThen condition left (some right)⟩]⟩ =>
       let choice :: rest := choices | throw (IO.userError "independent branch script missing")
       let guard ← reference table env store condition
@@ -222,6 +226,7 @@ def frontendParsedTypedLetReturnTreeEvaluatorTests : IO Unit := do
   let actual := inputs 9 2 true false
   checked "{return;}" actual [] .unit .unit .unit 1
   checked "{let z: Word=l;return;}" actual [] (.letE (.var 3) .unit) .unit .unit 4
+  checked "{let z=l;return z;}" actual [] (.letE (.var 3) (.var 0)) .word (w 9) 4
   checked "{let unused: Word=l - r;return r;}" actual [] (.letE (.binary .wordSub (.var 3) (.var 2)) (.var 3)) .word (w 2) 8
   checkOpaque "Cell" (.cell .word) (.cellRef .word 999) (.cellRef .word 40) .cellRef .cellRef
   checkOpaque "Fn" (.function .word .word) (.closure .word .word (.var 0) []) (.closure .word .word (.var 1) [w 7])
@@ -232,7 +237,7 @@ def frontendParsedTypedLetReturnTreeEvaluatorTests : IO Unit := do
       ("{let l: Word=l - r;return l;}", w 7, 8, []),
       ("{if(c){let z: Word=l;return z;}else{let z: Unknown=missing;return z;}}", w 9, 7, [true]),
       ("{if(c){return l;}else{return c;}}", w 9, 4, [true])] do contrast content actual (some (value, cost)) choices
-  for content in ["{}", "{let z=l;return z;}", "{let z: Word;return l;}", "{let z: Word=l;}",
+  for content in ["{}", "{let z: Word;return l;}", "{let z: Word=l;}",
       "{return l;return r;}", "{if(c){return l;}}", "{if(c){return l;}else{return r;}return l;}",
       "{let z: Word=missing;return r;}", "{let z: Word=z;return l;}", "{let z: Word=f(l);return r;}",
       "{if(l){return l;}else{return r;}}", "{if(c && l){return l;}else{return r;}}"] do contrast content actual none
