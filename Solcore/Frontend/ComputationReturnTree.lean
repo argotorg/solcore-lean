@@ -1,6 +1,7 @@
 import Solcore.Frontend.StructuralType
 import Solcore.Frontend.LocalTypeInputs
 import Solcore.Frontend.WordMatch
+import Solcore.Frontend.ComputationBindingScope
 
 /-! Shared mixed bodies parameterize only their child expression operations.
 Checker, typing and exact elaboration remain independent interfaces. -/
@@ -19,30 +20,26 @@ def elaborateComputationReturnTree?
       checkChild inputs.names inputs.context expression
   | ⟨_, [⟨innerSpan, .block statements⟩]⟩ =>
       elaborateComputationReturnTree? checkChild types owner inputs ⟨innerSpan, statements⟩
-  | ⟨blockSpan, ⟨_, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ =>
-      if name.value ∉ inputs.names.map Prod.fst then do
-        let declaredType ← interpretStructuralType? types annotation
-        let (initializerCore, initializerType) ← checkChild inputs.names inputs.context initializer
-        if initializerType = declaredType then do
-          let (tailCore, returnType) ← elaborateComputationReturnTree? checkChild types owner
-            (inputs.bindFresh owner name.value declaredType) ⟨blockSpan, rest⟩
-          return (.letE initializerCore tailCore, returnType)
-        else none
-      else none
-  | ⟨blockSpan, ⟨_, .letDecl name none (some initializer)⟩ :: rest⟩ =>
-      if name.value ∉ inputs.names.map Prod.fst then do
-        let (initializerCore, initializerType) ← checkChild inputs.names inputs.context initializer
+  | ⟨blockSpan, ⟨_, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ => do
+      let declaredType ← interpretStructuralType? types annotation
+      let (initializerCore, initializerType) ← checkChild inputs.names inputs.context initializer
+      if initializerType = declaredType then do
         let (tailCore, returnType) ← elaborateComputationReturnTree? checkChild types owner
-          (inputs.bindFresh owner name.value initializerType) ⟨blockSpan, rest⟩
+          (inputs.bindFresh owner name.value declaredType) ⟨blockSpan, rest⟩
         return (.letE initializerCore tailCore, returnType)
       else none
+  | ⟨blockSpan, ⟨_, .letDecl name none (some initializer)⟩ :: rest⟩ => do
+      let (initializerCore, initializerType) ← checkChild inputs.names inputs.context initializer
+      let (tailCore, returnType) ← elaborateComputationReturnTree? checkChild types owner
+        (inputs.bindFresh owner name.value initializerType) ⟨blockSpan, rest⟩
+      return (.letE initializerCore tailCore, returnType)
   | ⟨blockSpan, ⟨_, .expression expression true⟩ :: rest⟩ => do
       let (expressionCore, _) ← checkChild inputs.names inputs.context expression
       let (tailCore, returnType) ← elaborateComputationReturnTree? checkChild types owner inputs ⟨blockSpan, rest⟩
       return (.letE expressionCore (tailCore.weakenAt 0), returnType)
   | ⟨_, [⟨_, .ifThen condition thenBody (some elseBody)⟩]⟩ => do
       let (conditionCore, conditionType) ← checkChild inputs.names inputs.context condition
-      if conditionType = .bool then do
+      if conditionType = .bool ∧ computationBlockPreservesNames (inputs.names.map Prod.fst) thenBody = true then do
         let (thenCore, thenType) ← elaborateComputationReturnTree? checkChild types owner inputs thenBody
         let (elseCore, elseType) ← elaborateComputationReturnTree? checkChild types owner inputs elseBody
         if thenType = elseType then return (.ifE conditionCore thenCore elseCore, thenType)
@@ -108,7 +105,6 @@ inductive ComputationReturnTreeHasType
       {name : Syntax.Identifier} {annotation : Syntax.TypeExpr} {initializer : Syntax.Expr}
       {rest : List Syntax.Statement} {declaredType returnType : Core.Ty}
       (meaning : StructuralTypeDenotes types annotation declaredType)
-      (unused : name.value ∉ inputs.names.map Prod.fst)
       (initializerTyping : ChildHasType inputs.names inputs.context initializer declaredType)
       (tailTyping : ComputationReturnTreeHasType ChildHasType types owner
         (inputs.bindFresh owner name.value declaredType) ⟨blockSpan, rest⟩ returnType) :
@@ -117,7 +113,6 @@ inductive ComputationReturnTreeHasType
   | inferred {inputs : LocalTypeInputs} {blockSpan letSpan : Syntax.SourceSpan}
       {name : Syntax.Identifier} {initializer : Syntax.Expr} {rest : List Syntax.Statement}
       {inferredType returnType : Core.Ty}
-      (unused : name.value ∉ inputs.names.map Prod.fst)
       (initializerTyping : ChildHasType inputs.names inputs.context initializer inferredType)
       (tailTyping : ComputationReturnTreeHasType ChildHasType types owner
         (inputs.bindFresh owner name.value inferredType) ⟨blockSpan, rest⟩ returnType) :
@@ -132,6 +127,7 @@ inductive ComputationReturnTreeHasType
   | conditional {inputs : LocalTypeInputs} {blockSpan ifSpan : Syntax.SourceSpan}
       {condition : Syntax.Expr} {thenBody elseBody : Syntax.Block} {type : Core.Ty}
       (conditionTyping : ChildHasType inputs.names inputs.context condition .bool)
+      (nameProtection : ComputationNamesProtected (inputs.names.map Prod.fst) thenBody)
       (thenTyping : ComputationReturnTreeHasType ChildHasType types owner inputs thenBody type)
       (elseTyping : ComputationReturnTreeHasType ChildHasType types owner inputs elseBody type) :
       ComputationReturnTreeHasType ChildHasType types owner inputs
@@ -172,7 +168,6 @@ inductive ComputationReturnTreeElaborates
       {name : Syntax.Identifier} {annotation : Syntax.TypeExpr} {initializer : Syntax.Expr}
       {rest : List Syntax.Statement} {declaredType returnType : Core.Ty} {initializerCore tailCore : Core.Expr}
       (meaning : StructuralTypeDenotes types annotation declaredType)
-      (unused : name.value ∉ inputs.names.map Prod.fst)
       (initializerElaboration : ChildElab inputs.names inputs.context initializer initializerCore declaredType)
       (tailElaboration : ComputationReturnTreeElaborates ChildElab types owner
         (inputs.bindFresh owner name.value declaredType) ⟨blockSpan, rest⟩ tailCore returnType) :
@@ -182,7 +177,6 @@ inductive ComputationReturnTreeElaborates
   | inferred {inputs : LocalTypeInputs} {blockSpan letSpan : Syntax.SourceSpan}
       {name : Syntax.Identifier} {initializer : Syntax.Expr} {rest : List Syntax.Statement}
       {inferredType returnType : Core.Ty} {initializerCore tailCore : Core.Expr}
-      (unused : name.value ∉ inputs.names.map Prod.fst)
       (initializerElaboration : ChildElab inputs.names inputs.context initializer initializerCore inferredType)
       (tailElaboration : ComputationReturnTreeElaborates ChildElab types owner
         (inputs.bindFresh owner name.value inferredType) ⟨blockSpan, rest⟩ tailCore returnType) :
@@ -201,6 +195,7 @@ inductive ComputationReturnTreeElaborates
       {condition : Syntax.Expr} {thenBody elseBody : Syntax.Block}
       {conditionCore thenCore elseCore : Core.Expr} {type : Core.Ty}
       (conditionElaboration : ChildElab inputs.names inputs.context condition conditionCore .bool)
+      (nameProtection : ComputationNamesProtected (inputs.names.map Prod.fst) thenBody)
       (thenElaboration : ComputationReturnTreeElaborates ChildElab types owner inputs thenBody thenCore type)
       (elseElaboration : ComputationReturnTreeElaborates ChildElab types owner inputs elseBody elseCore type) :
       ComputationReturnTreeElaborates ChildElab types owner inputs
