@@ -10,17 +10,24 @@ namespace Solcore.Frontend
 
 private theorem fold_fragment {F : Core.Expr → Prop}
     (childWeakening : ∀ {core}, F core → ∀ cutoff, F (core.weakenAt cutoff))
-    (entries : List (Syntax.MatchCase × (Core.Word × Core.Expr))) (defaultCore : Core.Expr)
+    (entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))) (defaultCore : Core.Expr)
     (branches : ∀ entry ∈ entries, ComputationBodyFragment F entry.2.2)
     (fallback : ComputationBodyFragment F defaultCore) :
     ComputationBodyFragment F (entries.foldr
-      (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1)) (entry.2.2.weakenAt 0) tail)
+      (fun entry tail => match entry.2.1 with
+        | none => entry.2.2.weakenAt 0
+        | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
       (defaultCore.weakenAt 0)) := by
   induction entries with
   | nil => exact fallback.weakenAt childWeakening 0
   | cons entry rest ih =>
-      exact .ifE .wordTest ((branches entry (by simp)).weakenAt childWeakening 0)
-        (ih (fun item member => branches item (by simp [member])))
+      cases tag : entry.2.1 with
+      | none => simpa only [List.foldr_cons, tag] using (branches entry (by simp)).weakenAt childWeakening 0
+      | some word =>
+          simpa only [List.foldr_cons, tag] using
+            ComputationBodyFragment.ifE (.wordTest (word := word) (index := 0))
+              ((branches entry (by simp)).weakenAt childWeakening 0)
+              (ih (fun item member => branches item (by simp [member])))
 
 theorem ComputationReturnTreeElaborates.core_fragment
     {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}

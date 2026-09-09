@@ -33,10 +33,12 @@ private theorem insert_zero_path {F : Core.Expr → Prop}
   exact sameCost.symm ▸ (paths continuation).2
 
 private theorem fold_path
-    (entries : List (Syntax.MatchCase × (Core.Word × Core.Expr))) (defaultCore : Core.Expr)
+    (entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))) (defaultCore : Core.Expr)
     {actual value : Core.Value} {environment : Core.Environment} {initialStore finalStore : Core.Store}
     {defaultBody selected : Syntax.Block} {tests branchCost : Nat}
-    (patterns : ∀ entry ∈ entries, WordMatchPatternDenotes entry.1.value.pattern entry.2.1)
+    (patterns : ∀ entry ∈ entries, match entry.2.1 with
+      | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
+      | some word => WordMatchPatternDenotes entry.1.value.pattern word)
     (choice : WordMatchChooses actual (entries.map Prod.fst) defaultBody selected tests)
     (branches : ∀ entry ∈ entries, entry.1.value.body = selected → ∀ continuation,
       Core.Steps branchCost ⟨.eval (entry.2.2.weakenAt 0) (actual :: environment), continuation, initialStore⟩
@@ -47,36 +49,55 @@ private theorem fold_path
     (continuation : List Core.Frame) :
     Core.Steps (branchCost + 7 * tests)
       ⟨.eval (entries.foldr
-        (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1)) (entry.2.2.weakenAt 0) tail)
+        (fun entry tail => match entry.2.1 with
+          | none => entry.2.2.weakenAt 0
+          | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
         (defaultCore.weakenAt 0)) (actual :: environment), continuation, initialStore⟩
       ⟨.ret value, continuation, finalStore⟩ := by
   induction entries generalizing actual selected tests with
   | nil => cases choice; simpa using fallback rfl continuation
   | cons entry rest ih =>
-      cases choice with
-      | hit meaning =>
-          have equal := meaning.value_unique (patterns entry (by simp))
-          subst_vars
-          have guard (k) : Core.Steps 5
-              ⟨.eval (.binary .wordEq (.var 0) (.word entry.2.1)) (.word entry.2.1 :: environment), k, initialStore⟩
-              ⟨.ret (.bool true), k, initialStore⟩ :=
-            CostStepComposition.binary (.cons (.var rfl) .refl) (.cons .word .refl) (by simp [Core.BinaryOp.apply])
-          have costEq : 5 + branchCost + 2 = branchCost + 7 * 1 := by omega
-          rw [← costEq]
-          exact CostStepComposition.ifTrue (guard _) (branches entry (by simp) rfl continuation)
-      | miss meaning different tail =>
-          have equal := meaning.value_unique (patterns entry (by simp))
-          subst_vars
-          rename_i word tests
-          have guard (k) : Core.Steps 5
-              ⟨.eval (.binary .wordEq (.var 0) (.word entry.2.1)) (.word word :: environment), k, initialStore⟩
-              ⟨.ret (.bool false), k, initialStore⟩ :=
-            CostStepComposition.binary (.cons (.var rfl) .refl) (.cons .word .refl) (by simp [Core.BinaryOp.apply, different])
-          have restPath := ih (fun item member => patterns item (by simp [member])) tail
-            (fun item member => branches item (by simp [member])) fallback
-          have costEq : 5 + (branchCost + 7 * tests) + 2 = branchCost + 7 * (tests + 1) := by omega
-          rw [← costEq]
-          exact CostStepComposition.ifFalse (guard _) restPath
+      rcases entry with ⟨arm, tag, branchCore⟩
+      have pattern := patterns ⟨arm, tag, branchCore⟩ (by simp)
+      cases tag with
+      | none =>
+          obtain ⟨marker, shape⟩ := pattern
+          cases choice with
+          | wildcard _ => simpa using branches ⟨arm, none, branchCore⟩ (by simp) rfl continuation
+          | hit meaning | miss meaning _ _ =>
+              obtain ⟨literal, literalShape, _⟩ := meaning
+              rw [shape] at literalShape
+              cases literalShape
+      | some literal =>
+          cases choice with
+          | wildcard shape =>
+              obtain ⟨source, literalShape, _⟩ := pattern
+              rw [shape] at literalShape
+              cases literalShape
+          | hit meaning =>
+              have equal := meaning.value_unique pattern
+              subst_vars
+              rename_i literal
+              have guard (k) : Core.Steps 5
+                  ⟨.eval (.binary .wordEq (.var 0) (.word literal)) (.word literal :: environment), k, initialStore⟩
+                  ⟨.ret (.bool true), k, initialStore⟩ :=
+                CostStepComposition.binary (.cons (.var rfl) .refl) (.cons .word .refl) (by simp [Core.BinaryOp.apply])
+              have costEq : 5 + branchCost + 2 = branchCost + 7 * 1 := by omega
+              rw [← costEq]
+              exact CostStepComposition.ifTrue (guard _) (branches ⟨arm, some literal, branchCore⟩ (by simp) rfl continuation)
+          | miss meaning different tail =>
+              have equal := meaning.value_unique pattern
+              subst_vars
+              rename_i word literal tests
+              have guard (k) : Core.Steps 5
+                  ⟨.eval (.binary .wordEq (.var 0) (.word literal)) (.word word :: environment), k, initialStore⟩
+                  ⟨.ret (.bool false), k, initialStore⟩ :=
+                CostStepComposition.binary (.cons (.var rfl) .refl) (.cons .word .refl) (by simp [Core.BinaryOp.apply, different])
+              have restPath := ih (fun item member => patterns item (by simp [member])) tail
+                (fun item member => branches item (by simp [member])) fallback
+              have costEq : 5 + (branchCost + 7 * tests) + 2 = branchCost + 7 * (tests + 1) := by omega
+              rw [← costEq]
+              exact CostStepComposition.ifFalse (guard _) restPath
 
 theorem ComputationReturnTreeEvaluatesWithCost.toStepsWithContinuation
     {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}
@@ -166,8 +187,9 @@ theorem ComputationReturnTreeEvaluatesWithCost.toStepsWithContinuation
               exact insert_zero_path (F := F) childPaths
                 (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening fallback)
                 (defaultIH actual sameIds []) _ k) continuation
-          simpa only [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using
-            CostStepComposition.letE (childSteps initializer scrutinee sameIds _) selectedPath
+          have path := CostStepComposition.letE (childSteps initializer scrutinee sameIds _) selectedPath
+          simp only [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] at path ⊢
+          exact path
 
 theorem ComputationReturnTreeElaborates.evaluatesWithCost_iff_steps
     {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}
