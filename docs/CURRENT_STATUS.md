@@ -1098,6 +1098,29 @@ worlds and resumption; corrupt stores still fail the separate runtime validator
 and preserve preceding effects on raw faults. Source lambdas, global resolution,
 general early returns and older non-shadowing endpoint policies are unchanged.
 
+Shared computation bodies and function entries now preserve their complete
+results when caller type-name tables preserve existing first-match meanings
+(ADR-0274). Four body and eight function laws transport independent typing and
+elaboration, compiled records, actual prepared inputs and full runner outcomes.
+Original syntax, annotation leaves, all conditional/match branches, fresh local
+identities, Core and actual captured values remain fixed. This is an additive
+proof layer: every existing executable and earlier theorem body is unchanged.
+
+One-way extension preserves successful results; mutual extension additionally
+preserves rejection. Hidden conflicting rows may change while visible meanings
+remain identical. A prefix changing the first meaning is not an extension, and
+adding an unknown annotation can turn whole-source rejection into acceptance,
+even when that annotation is in an unselected branch whose raw counterpart did
+not need it. These distinctions are exercised on original parsed declarations.
+
+The operational equations use the same arbitrary child checker on both sides,
+without a new correctness premise. Its private success graph is only an
+equational proof device, not independent source semantics. Symbolic consumers
+retain arbitrary types, nested function/tuple annotations and repeated names;
+parsed consumers retain actual captured references, allocations, exact costs,
+faults and genuine checkpoints. Same-fuel/store transport does not validate
+stores, reconstruct runtime inhabitants or expand source admission.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

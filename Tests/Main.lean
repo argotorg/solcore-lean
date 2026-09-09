@@ -292,6 +292,10 @@ import Solcore.Test.FrontendComputationScopeBoundaryProperties
 import Solcore.Test.FrontendParsedScopedShadowingMigrations
 import Solcore.Test.FrontendParsedScopedShadowingBoundaries
 import Solcore.Test.FrontendParsedScopedShadowingEffects
+import Solcore.Test.FrontendComputationTypeTableProperties
+import Solcore.Test.FrontendComputationFunctionTypeTableProperties
+import Solcore.Test.FrontendParsedComputationTypeTableBoundaries
+import Solcore.Test.FrontendParsedComputationTypeTableEffects
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5956,6 +5960,8 @@ def run : IO Unit := do
   frontendParsedScopedShadowingMigrationTests
   frontendParsedScopedShadowingBoundaryTests
   frontendParsedScopedShadowingEffectTests
+  frontendParsedComputationTypeTableBoundaryTests
+  frontendParsedComputationTypeTableEffectTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

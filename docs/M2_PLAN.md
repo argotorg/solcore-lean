@@ -709,6 +709,23 @@ Further scope expansion must account for branch leakage and subsequent statement
 explicitly; this change does not establish nonterminal block/if sequencing,
 source lambdas, global resolution or automatic runtime-world validation.
 
+Meaning-preserving type-name tables now transport shared body/function results
+(ADR-0274): four body and eight entry laws retain original independent evidence,
+exact Core, parameter IDs/order, complete actual preparations and all present
+runner results. Every original branch is transported, including unreachable
+match rows and conditional arms; scoped shadowing and nested unary-function /
+ordered-tuple annotations need no new cases in executable code.
+
+Keep the one-way/mutual distinction explicit. Append and fresh-key prepend
+preserve successes; complete optional equality requires meaning preservation in
+both directions, not equal row lists. Unknown-type repair can change rejection,
+and a changed first-match prefix is not an extension. Fixed arbitrary child
+operations need no new correctness premise for their operational equations;
+independent judgments still have their own original-evidence transport proofs.
+Actual capture/effect/fault and checkpoint consumers preserve the same values,
+fuel and store, without an inferred world or runtime-safety claim. Old semantic
+definitions, theorem signatures/bodies and consumer contexts remain unchanged.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
