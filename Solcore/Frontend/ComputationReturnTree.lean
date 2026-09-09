@@ -57,10 +57,7 @@ def elaborateComputationReturnTree?
               let branch ← elaborateComputationReturnTree? checkChild types owner inputs source
               pure (some (source, branch))
         let checked : List (Syntax.MatchCase × (Option Core.Word × (Core.Expr × Core.Ty))) ← cases.attach.mapM fun arm => do
-          let tag ← match arm.val.value.pattern.value with
-            | .literal literal => (interpretWordLiteral? literal).map some
-            | .wildcard _ => some none
-            | _ => none
+          let tag ← interpretWordMatchPattern? arm.val.value.pattern
           let branch ← elaborateComputationReturnTree? checkChild types owner inputs arm.val.value.body
           return (arm.val, tag, branch)
         let returnType ← match defaultChecked with
@@ -142,11 +139,9 @@ inductive ComputationReturnTreeHasType
   | wordMatch {inputs : LocalTypeInputs} {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
       {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody : Option Syntax.Block} {type : Core.Ty}
       (scrutineeTyping : ChildHasType inputs.names inputs.context scrutinee .word)
-      (patterns : ∀ arm ∈ cases, ∃ tag : Option Core.Word, match tag with
-        | none => ∃ marker, arm.value.pattern.value = .wildcard marker
-        | some word => WordMatchPatternDenotes arm.value.pattern word)
+      (patterns : ∀ arm ∈ cases, ∃ tag, WordMatchPatternClassifies arm.value.pattern tag)
       (covered : defaultBody.isSome = true ∨
-        ∃ arm ∈ cases, ∃ marker, arm.value.pattern.value = .wildcard marker)
+        ∃ arm ∈ cases, WordMatchPatternClassifies arm.value.pattern none)
       (branches : ∀ arm ∈ cases, ComputationReturnTreeHasType ChildHasType types owner inputs arm.value.body type)
       (defaultTyping : ∀ source ∈ defaultBody.toList,
         ComputationReturnTreeHasType ChildHasType types owner inputs source type) :
@@ -215,9 +210,7 @@ inductive ComputationReturnTreeElaborates
       {defaultEntry : Option (Syntax.Block × Core.Expr)}
       (scrutineeElaboration : ChildElab inputs.names inputs.context scrutinee scrutineeCore .word)
       (ordered : entries.map Prod.fst = cases)
-      (patterns : ∀ entry ∈ entries, match entry.2.1 with
-        | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
-        | some word => WordMatchPatternDenotes entry.1.value.pattern word)
+      (patterns : ∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1)
       (branches : ∀ entry ∈ entries,
         ComputationReturnTreeElaborates ChildElab types owner inputs entry.1.value.body entry.2.2 type)
       (defaultOrdered : defaultEntry.map Prod.fst = defaultBody)
