@@ -48,6 +48,7 @@ theorem TypedLetReturnTreeElaborates.localFragment
       exact .letE lowered.localFragment ih
   | discard _ lowered _ _ ih =>
       exact .letE lowered.localFragment (ih.weakenAt 0)
+  | block _ ih => exact ih
   | conditional _ lowered _ _ _ thenIH elseIH =>
       exact .ifE lowered.localFragment thenIH elseIH
 

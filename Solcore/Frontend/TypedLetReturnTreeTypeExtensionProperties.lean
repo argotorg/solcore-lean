@@ -16,6 +16,7 @@ theorem TypedLetReturnTreeElaborates.extend_types
     TypedLetReturnTreeElaborates new owner inputs body core type := by
   induction elaboration with
   | single child => exact .single child
+  | block _ ih => exact .block ih
   | binding meaning unused resolution lowered typing _ ih =>
       exact .binding (meaning.extend_types extension) unused resolution lowered typing ih
   | inferred unused resolution lowered typing _ ih =>
@@ -32,6 +33,7 @@ theorem TypedLetReturnTreeHasType.extend_types
     TypedLetReturnTreeHasType new owner inputs body type := by
   induction typing with
   | single child => exact .single child
+  | block _ ih => exact .block ih
   | binding meaning unused initializer _ ih =>
       exact .binding (meaning.extend_types extension) unused initializer ih
   | inferred unused initializer _ ih => exact .inferred unused initializer ih

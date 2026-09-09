@@ -24,6 +24,7 @@ theorem TypedLetReturnTreeElaborates.mapOwner
       apply TypedLetReturnTreeElaborates.single
       simpa only [LocalTypeInputs.mapIds_names, LocalTypeInputs.mapIds_context] using
         (child.mapIds (ownerLocalIdMap mapping) (ownerLocalIdMap_injective mapping injective))
+  | block _ ih => exact .block ih
   | @binding inputs blockSpan letSpan name annotation initializer rest declaredType returnType
       resolved initializerCore tailCore meaning unused resolution lowered typing _ ih =>
       refine .binding (initializerResolved := resolved.renameIds (ownerLocalIdMap mapping))
@@ -113,6 +114,11 @@ theorem elaborateTypedLetReturnTree?_mapOwner
                       LocalTypeInputs.mapIds_names, LocalTypeInputs.mapIds_context,
                       elaborateReturnBody?_mapIds (ownerLocalIdMap mapping)
                         (ownerLocalIdMap_injective mapping injective)]
+                | cons _ _ => simp only [elaborateTypedLetReturnTree?]
+              case block statements =>
+                cases rest with
+                | nil => simpa only [elaborateTypedLetReturnTree?_block] using
+                    elaborateTypedLetReturnTree?_mapOwner mapping injective types owner inputs ⟨statementSpan, statements⟩
                 | cons _ _ => simp only [elaborateTypedLetReturnTree?]
               case letDecl name optionalType optionalInitializer =>
                 cases optionalType with

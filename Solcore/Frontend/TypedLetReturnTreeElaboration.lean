@@ -13,6 +13,12 @@ theorem elaborateTypedLetReturnTree?_single (types : TypeNameTable) (owner : Res
       elaborateReturnBody? inputs.names inputs.context ⟨blockSpan, [⟨returnSpan, .returnStmt returned⟩]⟩ := by
   rw [elaborateTypedLetReturnTree?]
 
+theorem elaborateTypedLetReturnTree?_block (types : TypeNameTable) (owner : Resolved.DeclarationId)
+    (inputs : LocalTypeInputs) (outerSpan innerSpan : Syntax.SourceSpan) (statements : List Syntax.Statement) :
+    elaborateTypedLetReturnTree? types owner inputs ⟨outerSpan, [⟨innerSpan, .block statements⟩]⟩ =
+      elaborateTypedLetReturnTree? types owner inputs ⟨innerSpan, statements⟩ := by
+  rw [elaborateTypedLetReturnTree?]
+
 theorem elaborateTypedLetReturnTree?_binding_children
     {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
     {blockSpan letSpan : Syntax.SourceSpan} {name : Syntax.Identifier}
@@ -125,6 +131,7 @@ theorem TypedLetReturnTreeElaborates.complete
   | single child =>
       have accepted := child.complete
       cases child <;> simpa only [elaborateTypedLetReturnTree?] using accepted
+  | block _ ih => simpa only [elaborateTypedLetReturnTree?_block] using ih
   | binding meaning unused resolution lowered typing _ ih =>
       have initializerAccepted := elaborateLocalExpression?_complete resolution
         (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
@@ -164,6 +171,11 @@ theorem elaborateTypedLetReturnTree?_elaborates
                 cases rest with
                 | nil => exact .single (elaborateReturnBody?_elaborates
                     (by simpa only [elaborateTypedLetReturnTree?_single] using accepted))
+                | cons _ _ => simp only [elaborateTypedLetReturnTree?, reduceCtorEq] at accepted
+              case block statements =>
+                cases rest with
+                | nil => exact .block (elaborateTypedLetReturnTree?_elaborates
+                    (by simpa only [elaborateTypedLetReturnTree?_block] using accepted))
                 | cons _ _ => simp only [elaborateTypedLetReturnTree?, reduceCtorEq] at accepted
               case letDecl name optionalType optionalInitializer =>
                 cases optionalType with

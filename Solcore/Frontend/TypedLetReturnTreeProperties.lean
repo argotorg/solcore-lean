@@ -16,6 +16,7 @@ theorem TypedLetReturnTreeElaborates.hasType
     TypedLetReturnTreeHasType types owner inputs body type := by
   induction elaboration with
   | single child => exact .single child.hasType
+  | block _ ih => exact .block ih
   | binding meaning unused resolution _ typing _ ih =>
       exact .binding meaning unused (resolution.reflects_type typing) ih
   | inferred unused resolution _ typing _ ih =>
@@ -33,6 +34,9 @@ theorem TypedLetReturnTreeHasType.elaborates_exact
   | single child =>
       obtain ⟨core, elaboration⟩ := child.elaborates_exact
       exact ⟨core, .single elaboration⟩
+  | block _ ih =>
+      obtain ⟨core, elaboration⟩ := ih
+      exact ⟨core, .block elaboration⟩
   | binding meaning unused initializerTyping _ ih =>
       obtain ⟨resolved, resolution, typed⟩ := initializerTyping.resolves
       obtain ⟨initializerCore, lowered, _⟩ := typed.lowers
@@ -97,6 +101,7 @@ theorem elaborateTypedLetReturnTree?_core_hasType
   clear accepted
   induction elaboration with
   | single child => exact elaborateReturnBody?_core_hasType child.complete
+  | block _ ih => exact ih
   | binding _ _ _ lowered typing _ ih | inferred _ _ lowered typing _ ih =>
       apply Core.HasType.letE
       · rw [← LocalTypeInputs.context_ids] at lowered
