@@ -3,7 +3,8 @@ import Solcore.Resolved.FreshIdentity
 
 /-! Direct raw recursive-body evaluation. Optional annotations do not affect
 type-free execution. Fresh IDs use the name table alone, and strict
-initializers supply the actual values placed in the extended tail scope. -/
+initializers supply the actual values placed in the extended tail scope.
+Discarded expressions execute strictly without extending source scopes. -/
 set_option autoImplicit false
 namespace Solcore.Frontend
 
@@ -22,6 +23,10 @@ def evaluateTypedLetReturnTreeWithCost? (owner : Resolved.DeclarationId)
       let (value, tailCost) ← evaluateTypedLetReturnTreeWithCost? owner
         ((name.value, id) :: table) ((id, boundValue) :: environment) ⟨blockSpan, rest⟩
       return (value, initializerCost + tailCost + 2)
+  | ⟨blockSpan, ⟨_, .expression expression true⟩ :: rest⟩ => do
+      let (_, expressionCost) ← evaluateLocalExpressionWithCost? table environment expression
+      let (value, tailCost) ← evaluateTypedLetReturnTreeWithCost? owner table environment ⟨blockSpan, rest⟩
+      return (value, expressionCost + tailCost + 2)
   | ⟨_, [⟨_, .ifThen condition thenBody (some elseBody)⟩]⟩ => do
       let (.bool choice, conditionCost) ← evaluateLocalExpressionWithCost? table environment condition
         | none

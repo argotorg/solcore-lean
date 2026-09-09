@@ -5,14 +5,16 @@ import Solcore.Frontend.LocalTypeInputsProperties
 /-! A separate value-free adapter for recursive typed prefixes and terminal
 if/else branches. Siblings start in the same original scope; their local fresh
 IDs need not be globally distinct. Structural annotations or independently inferred
-initializer types reuse existing Core and entry records. -/
+initializer types reuse existing Core and entry records. Strict expression
+prefixes discard their values without extending the original source scope. -/
 
 set_option autoImplicit false
 
 namespace Solcore.Frontend
 
-/-- Every written initializer and arm is checked in its own original scope.
-The exact Core tail is already under its binder; no additional weakening is used. -/
+/-- Every written child is checked in its original scope. Named lets extend
+that scope; discarded expressions instead weaken the unchanged tail Core under
+a hidden Core binder, without introducing a source name or identity. -/
 def elaborateTypedLetReturnTree? (types : TypeNameTable) (owner : Resolved.DeclarationId)
     (inputs : LocalTypeInputs) (body : Syntax.Block) : Option (Core.Expr × Core.Ty) :=
   match body with
@@ -34,6 +36,10 @@ def elaborateTypedLetReturnTree? (types : TypeNameTable) (owner : Resolved.Decla
           (inputs.bindFresh owner name.value initializerType) ⟨blockSpan, rest⟩
         return (.letE initializerCore tailCore, returnType)
       else none
+  | ⟨blockSpan, ⟨_, .expression expression true⟩ :: rest⟩ => do
+      let (expressionCore, _) ← elaborateLocalExpression? inputs.names inputs.context expression
+      let (tailCore, returnType) ← elaborateTypedLetReturnTree? types owner inputs ⟨blockSpan, rest⟩
+      return (.letE expressionCore (tailCore.weakenAt 0), returnType)
   | ⟨_, [⟨_, .ifThen condition thenBody (some elseBody)⟩]⟩ => do
       let (conditionCore, conditionType) ← elaborateLocalExpression? inputs.names inputs.context condition
       if conditionType = .bool then do
@@ -69,6 +75,12 @@ inductive TypedLetReturnTreeHasType (types : TypeNameTable) (owner : Resolved.De
         (inputs.bindFresh owner name.value inferredType) ⟨blockSpan, rest⟩ returnType) :
       TypedLetReturnTreeHasType types owner inputs
         ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩ returnType
+  | discard {inputs : LocalTypeInputs} {blockSpan statementSpan : Syntax.SourceSpan}
+      {expression : Syntax.Expr} {rest : List Syntax.Statement} {discardedType returnType : Core.Ty}
+      (expressionTyping : LocalExpressionHasType inputs.names inputs.context expression discardedType)
+      (tailTyping : TypedLetReturnTreeHasType types owner inputs ⟨blockSpan, rest⟩ returnType) :
+      TypedLetReturnTreeHasType types owner inputs
+        ⟨blockSpan, ⟨statementSpan, .expression expression true⟩ :: rest⟩ returnType
   | conditional {inputs : LocalTypeInputs} {blockSpan ifSpan : Syntax.SourceSpan}
       {condition : Syntax.Expr} {thenBody elseBody : Syntax.Block} {type : Core.Ty}
       (conditionTyping : LocalExpressionHasType inputs.names inputs.context condition .bool)
@@ -111,6 +123,16 @@ inductive TypedLetReturnTreeElaborates (types : TypeNameTable) (owner : Resolved
       TypedLetReturnTreeElaborates types owner inputs
         ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩
         (.letE initializerCore tailCore) returnType
+  | discard {inputs : LocalTypeInputs} {blockSpan statementSpan : Syntax.SourceSpan}
+      {expression : Syntax.Expr} {rest : List Syntax.Statement} {discardedType returnType : Core.Ty}
+      {resolved : Resolved.Expr} {expressionCore tailCore : Core.Expr}
+      (resolution : ResolvesLocalExpression inputs.names expression resolved)
+      (lowered : Resolved.Lowers inputs.ids resolved expressionCore)
+      (typing : Resolved.HasType inputs.context resolved discardedType)
+      (tailElaboration : TypedLetReturnTreeElaborates types owner inputs ⟨blockSpan, rest⟩ tailCore returnType) :
+      TypedLetReturnTreeElaborates types owner inputs
+        ⟨blockSpan, ⟨statementSpan, .expression expression true⟩ :: rest⟩
+        (.letE expressionCore (tailCore.weakenAt 0)) returnType
   | conditional {inputs : LocalTypeInputs} {blockSpan ifSpan : Syntax.SourceSpan}
       {condition : Syntax.Expr} {thenBody elseBody : Syntax.Block} {conditionResolved : Resolved.Expr}
       {conditionCore thenCore elseCore : Core.Expr} {type : Core.Ty}
