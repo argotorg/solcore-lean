@@ -134,7 +134,29 @@ private def rejected (content : String) (location : Syntax.Parser.FunctionLocati
   for owner in owners do
     assertTrue (compileRuntimeFunction? types owner source).isNone "owner change enabled a rejected whole declaration"
 
+private def terminalBlock : IO Unit := do
+  let some source ← parsed? "function nested(){{return;}}"
+    | throw (IO.userError "original terminal wrapper did not parse")
+  checkProjections source (some (.unit, .unit, []))
+  for owner in owners do
+    match atBody : source.value.body with
+    | ⟨outerSpan, [⟨innerSpan, .block [⟨returnSpan, .returnStmt none⟩]⟩]⟩ =>
+        have _ : TypedLetReturnTreeElaborates types owner .empty source.value.body .unit .unit := by
+          rw [atBody]; exact .block (.single .bare)
+        assertTrue (outerSpan.contains innerSpan && innerSpan.contains returnSpan &&
+          decide (outerSpan.startByte < innerSpan.startByte ∧ innerSpan.endByte < outerSpan.endByte))
+          "original inner block range changed"
+    | _ => throw (IO.userError "original lexical wrapper AST changed")
+    let some compiled := compileRuntimeFunction? types owner source
+      | throw (IO.userError "terminal block lost owner-independent compilation")
+    assertTrue (decide (compiled.core = .unit ∧ compiled.returnType = .unit ∧ rows compiled.inputs = []) &&
+      (elaborateTerminalReturnTree? compiled.inputs.names compiled.inputs.context source.value.body).isNone)
+      "wrapper introduced a parameter row or widened the old tree adapter"
+    have _ (definitions : Core.DataEnvironment) : Core.HasType [] .unit .unit definitions := .unit
+    have _ := arbitraryOwnerProjections types owner (shiftOwner owner) source
+
 def frontendParsedCompilationOwnersTests : IO Unit := do
+  terminalBlock
   accepted "function bare(){return;}" [] .unit .unit
   accepted "function literal() returns (Word){return 7;}" [] (.word (Core.Word.ofNatModulo 7)) .word
   accepted "function opaque(x: Opaque) returns (Opaque){return x;}" [.namedData ⟨91⟩] (.var 0) (.namedData ⟨91⟩)
@@ -164,7 +186,7 @@ def frontendParsedCompilationOwnersTests : IO Unit := do
       "function constrained() where Word: Eq {return;}", "function duplicate(x: Bool,x: Bool){return;}",
       "function duplicate(x: Word,y: Bool,x: Opaque){return;}", "function staged(comptime x: Bool){return;}",
       "function unknown(x: Unknown){return;}", "function unsupported(x: Word<Bool>){return;}",
-      "function emptyBody(){}", "function extra(){return;return;}", "function nested(){{return;}}",
+      "function emptyBody(){}", "function extra(){return;return;}",
       "function call(f: Fn) returns (Bool){return f();}",
       "function missing(c: Bool,x: Opaque) returns (Opaque){return c ? x : missing;}",
       "function missing(c: Bool,x: Opaque) returns (Opaque){if(c){return x;}else{return missing;}}",

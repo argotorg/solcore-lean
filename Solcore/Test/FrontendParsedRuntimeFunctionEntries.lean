@@ -160,9 +160,39 @@ private def checkDiscardLiteral : IO Unit := do
     assertTrue (decide (runRuntimeFunction? types owner source [] 2 initialStore = some (.unit,.outOfFuel saved) ∧
       Core.runStateful 2 saved = .done .unit initialStore)) "discard lost the actual pending expression value"
 
+private def checkTerminalBlock : IO Unit := do
+  let some source ← parsed? "function nested() { { return; } }"
+    | throw (IO.userError "original nested declaration did not parse")
+  match atBody : source.value.body with
+  | ⟨outerSpan, [⟨innerSpan, .block [⟨returnSpan, .returnStmt none⟩]⟩]⟩ =>
+      have _ : TypedLetReturnTreeElaborates types owner .empty source.value.body .unit .unit := by
+        rw [atBody]; exact .block (.single .bare)
+      assertTrue (outerSpan.contains innerSpan && innerSpan.contains returnSpan &&
+        decide (outerSpan.startByte < innerSpan.startByte ∧ innerSpan.endByte < outerSpan.endByte))
+        "original inner braces were replaced by the outer block range"
+  | _ => throw (IO.userError "original nested return AST changed")
+  let some prepared := prepareRuntimeFunction? types owner source []
+    | throw (IO.userError "terminal block was rejected")
+  checkOrder source [] prepared.inputs
+  assertTrue (decide (prepared.core = .unit ∧ prepared.returnType = .unit) &&
+    (prepared.inputs.checkReturnBody? source.value.body).isNone) "wrapper changed Core or the old adapter"
+  for initialStore in [store, []] do
+    have paths (k : List Core.Frame) : Core.Steps 1 ⟨.eval .unit [], k, initialStore⟩
+        ⟨.ret .unit, k, initialStore⟩ := .cons .unit .refl
+    have _ := paths []
+    for fuel in List.range 4 ++ [20] do
+      assertTrue (decide (runRuntimeFunction? types owner source [] fuel initialStore =
+        some (.unit, Core.runStateful fuel (.initial .unit [] initialStore)))) "wrapper added a transition"
+      assertTrue (match runRuntimeFunction? types owner source [] fuel initialStore with
+        | some (.unit, .done value final) => decide (1 ≤ fuel ∧ value = .unit ∧ final = initialStore)
+        | some (.unit, .outOfFuel cp) => decide (fuel = 0 ∧ cp = .initial .unit [] initialStore ∧
+            Core.runStateful 1 cp = .done .unit initialStore)
+        | _ => false) "wrapped return changed its genuine one-step residual"
+
 def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
   checkInferredLocal
   checkDiscardLiteral
+  checkTerminalBlock
   checkAccepted types "function empty() { return; }" [] .unit .unit .unit 1
   checkAccepted types "function explicit() returns (U,) { return; }" [] .unit .unit .unit 1
   checkAccepted types "/* lead */ function literal() returns (Word) { return ((0007)); }"
@@ -234,7 +264,7 @@ def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
       "function proxy() returns (@Word) { return 7; }",
       "function tuple() returns ((Word, Bool)) { return 7; }",
       "function generic<T>() { return; }", "function constrained() where Word: Eq { return; }",
-      "function emptyBody() {}", "function nested() { { return; } }",
+      "function emptyBody() {}",
       "function repeated() { return; return; }", "function tail() returns (Word) { 7 }",
       "function discarded() { return; missing; }",
       "function call() returns (Word) { return missing(); }"] do
