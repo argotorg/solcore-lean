@@ -280,7 +280,7 @@ def frontendParsedRecursiveUnaryComputationTests : IO Unit := do
     check (decide (p.core=.ifE (.unary .boolNot (call 6 2)) (call 4 0) (.var 1) ∧ p.type=a)) "value-free nominal/Cell/function branches"
     for text in ["!f(x)","~f(x)"] do
       check ((elaborateRecursiveLocalComputation? names (context a) (← parsed text)).isNone) "non Bool/Word recursive operand"
-  for (a,text) in [(Core.Ty.word,"!f(x)"),(.bool,"~f(x)"),(.word,"~Missing"),(.bool,"!Missing"),(.word,"(~f(x),y)"),(.bool,"!(f(x) && c)"),(.word,"~f()")] do
+  for (a,text) in [(Core.Ty.word,"!f(x)"),(.bool,"~f(x)"),(.word,"~Missing"),(.bool,"!Missing"),(.word,"(~f(x),y)"),(.word,"~f()")] do
     check ((elaborateRecursiveLocalComputation? names (context a) (← parsed text)).isNone) "wrong type/name/unsupported root"
   let rawSource ← parsed "!(c ? f(x) : Missing)"
   let raw ← actual (environment .bool (.bool false) (.bool true) true false) rawSource

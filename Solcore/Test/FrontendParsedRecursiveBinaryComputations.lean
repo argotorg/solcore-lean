@@ -286,8 +286,5 @@ def frontendParsedRecursiveBinaryComputationTests : IO Unit := do
   for text in ["f(x) < g(y)","f(x) <= g(y)","f(x) >= g(y)","f(x) != g(y)","(f(x),y)","f()","f(x,y)","f(Missing) + y"] do
     let s ← parsed text
     check (decide (elaborateRecursiveLocalComputation? names (context .word) s=none ∧ elaborateLocalComputation? names (context .word) s=none)) "retained nonrecursive root boundary"
-  for text in ["f(x) && g(y)","f(x) || g(y)"] do
-    let inner ← parsed "f(x)"; let c ← statics (context .bool) inner
-    check (decide (c.type=.bool)) "independent valid Bool child"
-    let s ← parsed text; check ((elaborateRecursiveLocalComputation? names (context .bool) s).isNone) "lazy root still pure-only"
+  -- The two original Bool lazy cases now have independent positive migration coverage.
 end Tests
