@@ -1,7 +1,8 @@
-import Solcore.Frontend.TypeNameProperties
+import Solcore.Frontend.StructuralTypeProperties
 import Solcore.Syntax.Declaration
 
 /-! Explicit single-return contracts for unmodified, nongeneric runtime entries.
+The one written annotation has structural meaning; parameters and lets are unchanged.
 Empty/multiple return clauses are outside this profile, not invalid syntax. -/
 
 set_option autoImplicit false
@@ -11,14 +12,14 @@ namespace Solcore.Frontend
 inductive RuntimeReturnTypeDenotes (types : TypeNameTable) : Option Syntax.ReturnClause → Core.Ty → Prop where
   | absent : RuntimeReturnTypeDenotes types none .unit
   | single {clauseSpan typesSpan : Syntax.SourceSpan} {annotation : Syntax.TypeExpr} {type : Core.Ty}
-      (meaning : TypeNameDenotes types annotation type) :
+      (meaning : StructuralTypeDenotes types annotation type) :
       RuntimeReturnTypeDenotes types
         (some { span := clauseSpan, types := ⟨typesSpan, [annotation]⟩ }) type
 
 def interpretRuntimeReturnType? (types : TypeNameTable) : Option Syntax.ReturnClause → Option Core.Ty
   | none => some .unit
   | some clause => match clause.types.elements with
-    | [annotation] => interpretTypeName? types annotation
+    | [annotation] => interpretStructuralType? types annotation
     | _ => none
 
 /-- Header shape restrictions are independent of any executable check. -/
@@ -53,7 +54,7 @@ theorem interpretRuntimeReturnType?_iff {types : TypeNameTable}
         | nil => simp only [interpretRuntimeReturnType?, reduceCtorEq] at accepted
         | cons annotation rest =>
             cases rest with
-            | nil => exact .single (interpretTypeName?_sound accepted)
+            | nil => exact .single (interpretStructuralType?_sound accepted)
             | cons next rest => simp only [interpretRuntimeReturnType?, reduceCtorEq] at accepted
   · intro meaning
     cases meaning with
