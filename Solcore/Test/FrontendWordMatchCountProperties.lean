@@ -48,12 +48,14 @@ private theorem calleeElab (side : Bool) : RecursiveLocalComputationElaborates i
 private theorem argumentElab : RecursiveLocalComputationElaborates inputs.names inputs.context (ref "x") (.var 2) .word :=
   .pure (.identifier (id := id 2) (LocalNameTable.lookup?_iff.mp rfl))
     (.var (Resolved.LocalScope.index?_iff.mp rfl)) (.var (Resolved.LocalScope.lookup?_iff.mp rfl))
-private def rows : Nat → Bool → List (Syntax.MatchCase × (Core.Word × Core.Expr))
-  | 0,hit => if hit then [(arm true,one,.apply (.var 1) (.var 2))] else []
-  | n+1,hit => (arm false,.zero,.var 2) :: rows n hit
+private def rows : Nat → Bool → List (Syntax.MatchCase × (Option Core.Word × Core.Expr))
+  | 0,hit => if hit then [(arm true,some one,.apply (.var 1) (.var 2))] else []
+  | n+1,hit => (arm false,some .zero,.var 2) :: rows n hit
 private theorem rowFacts (n : Nat) (hit : Bool) :
     (rows n hit).map Prod.fst = cases n hit ∧ ∀ entry ∈ rows n hit,
-      WordMatchPatternDenotes entry.1.value.pattern entry.2.1 ∧
+      (match entry.2.1 with
+        | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
+        | some word => WordMatchPatternDenotes entry.1.value.pattern word) ∧
       RecursiveComputationReturnTreeElaborates [] owner inputs entry.1.value.body entry.2.2 .word := by
   induction n with
   | zero =>
@@ -71,7 +73,9 @@ private theorem rowFacts (n : Nat) (hit : Bool) :
 private theorem elaborated (n : Nat) (hit : Bool) :
     RecursiveComputationReturnTreeElaborates [] owner inputs (source n hit) (core n hit) .word := by
   have folded : tree n hit = (rows n hit).foldr
-      (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1)) (entry.2.2.weakenAt 0) tail)
+      (fun entry tail => match entry.2.1 with
+        | none => entry.2.2.weakenAt 0
+        | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
       ((.apply (.var 1) (.var 2) : Core.Expr).weakenAt 0) := by
     induction n with
     | zero => cases hit <;> simp [tree,rows,selectedCore,guard,Core.Expr.weakenAt]
@@ -248,6 +252,7 @@ theorem malformed_first_row_cannot_be_skipped (actual : Core.Value) (extra : Lis
     ¬ WordMatchChooses actual (⟨span,⟨⟨span,.error⟩,unused⟩⟩::extra) defaultBody selected count := by
   intro choice
   cases choice with
+  | wildcard shape => cases shape
   | hit meaning => rcases meaning with ⟨literal,shape,_⟩; cases shape
   | miss meaning _ _ => rcases meaning with ⟨literal,shape,_⟩; cases shape
 theorem selected_body_and_visited_count_ignore_no_earlier_test (n : Nat) (hit : Bool)
