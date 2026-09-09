@@ -174,11 +174,27 @@ under mutual extension are proved without row uniqueness or inhabitation.
 Independent source/parsed consumers cover ordering, aliases, hidden duplicates,
 nominal types, invalid ranges, strict missing leaves and unsupported forms.
 One-way extension may turn rejection into success, so no full-result invariant is claimed
-for it. Parameter/header/let gates remain named-only, and correct-arity parsed
-entry rejection tests keep this separation explicit. Connecting the new type
-adapter to those gates requires a subsequent scoped integration. Larger tuples,
+for it. The prerequisite initially leaves parameter/header/let gates named-only;
+the return/header integration follows separately in ADR-0233 below. Correct-arity
+parsed tests preserve the remaining parameter/let rejection boundary. Larger tuples,
 other type forms, expressions, Core/resolved semantics, diagnostics and frozen
 wire formats do not change.
+
+Single structural return annotations now reach the existing compilation,
+preparation and execution path (ADR-0233). The shared independent return rule
+widens its annotation premise; all seven generic header/extension theorem
+contracts remain unchanged. Explicit empty/multiple clause lists stay distinct
+from a single Unit/product annotation. Absent returns still denote Unit, and
+old named-only meanings remain usable through the compatibility proof.
+
+Independent source/parsed entries cover exact ordered/nested Core, strict named
+lets, conditional costs, nominal static types, opaque values, original parameter
+records and all fuel/checkpoint boundaries. Legacy return negatives become
+independent positives, with 110 affected source-test theorem headers unchanged.
+Parameter/let annotations remain named-only; whole-body, type/arity, modifier,
+unsupported-type and empty/multiple-clause gates remain. No new entry API,
+runtime transition, expression, Core/resolved, diagnostic or frozen wire change
+is introduced. Parameter and let integration remain separately scoped work.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

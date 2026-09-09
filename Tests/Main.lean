@@ -158,6 +158,8 @@ import Solcore.Test.FrontendParsedUnits
 import Solcore.Test.FrontendParsedUnitEntries
 import Solcore.Test.FrontendStructuralTypeProperties
 import Solcore.Test.FrontendParsedStructuralTypes
+import Solcore.Test.FrontendStructuralReturnProperties
+import Solcore.Test.FrontendParsedStructuralReturns
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5739,6 +5741,7 @@ def run : IO Unit := do
   frontendParsedUnitTests
   frontendParsedUnitEntryTests
   frontendParsedStructuralTypeTests
+  frontendParsedStructuralReturnTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

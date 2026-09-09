@@ -211,7 +211,9 @@ type-only and runtime parameter inputs, singleton and terminal-conditional retur
 and restricted explicit
 function entries with value-free compilation. A separate opt-in structural type
 adapter interprets named leaves and zero/one/two-element tuple types with independent
-meaning and table-extension proofs; existing parameter/header/let gates stay named-only.
+meaning and table-extension proofs. Single return annotations use it at the existing
+entry; parameter and let annotations remain named-only, and empty/multiple return
+clauses remain outside the entry profile.
 Independent source rules
 connect to checked Core execution. A direct original-expression evaluator
 accepts empty canonical tuples as Unit and two-element tuples as ordered binary products, using

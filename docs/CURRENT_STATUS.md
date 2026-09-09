@@ -228,11 +228,32 @@ lookup extensionality, successful semantic extension and full mutual-extension
 equality are proved. Independent source and complete parsed-type consumers
 cover explicit nesting/order, hidden duplicates, missing written leaves,
 arbitrary raw ranges and unchanged unsupported forms. One-way extension may
-enable a formerly missing leaf. This prerequisite is not yet connected to
-parameter/header/let annotation gates: those existing entry APIs retain every
-tuple-type rejection, checked with correct-arity actual arguments and original
-parsed annotations. Larger tuple lists, other type constructors, expressions,
+enable a formerly missing leaf. This prerequisite initially left all
+parameter/header/let annotation gates named-only; the shared single-return gate
+is connected separately in ADR-0233 below. Parameter and let tuple-type rejections
+remain checked with correct-arity actual arguments and original parsed annotations.
+Larger tuple lists, other type constructors, expressions,
 Core/resolved semantics, diagnostics and frozen wire formats are unchanged.
+
+The existing shared return/header gate now accepts one structural annotation
+(ADR-0233). `returns(())` denotes Unit, singleton parentheses preserve their
+child type, and `returns((Word,Bool))` denotes an ordered product. Explicit
+empty `returns()` and multiple `returns(Word,Bool)` remain rejected. No parallel
+entry API is added. The independent single-return constructor intentionally
+widens its premise to structural meaning; all seven general header/extension
+theorem statements and 110 affected legacy source-test contracts stay unchanged.
+Named-only evidence transports through the proved compatibility bridge.
+
+Independent source and complete parsed-entry consumers retain original header
+and body evidence, exact Core, original parameter-only records and reversed actual
+environments. Unit/singleton, ordered and explicitly nested products, strict named
+lets, conditional branches and opaque values keep their existing exact costs,
+own stores and actual checkpoint/resumption paths. Static nominal results need
+no inhabitants; type agreement never substitutes for exact Core provenance.
+Old structural-return negatives migrate to independent positives. Parameter/let
+annotations remain named-only, and argument, modifier, whole-body, unknown-leaf,
+empty/multiple-clause and unsupported-type gates remain in force. There is no
+new runtime transition, expression, parser, Core/resolved, diagnostic or wire policy.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
