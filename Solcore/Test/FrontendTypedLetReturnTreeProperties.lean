@@ -193,9 +193,9 @@ private theorem badRejected (body : Syntax.Block) (member : body ∈ badBodies) 
   have noMissing := missing "missing" (by decide)
   have noZ := missing "z" (by decide)
   have names : inputs.names.map Prod.fst = ["y", "x", "c"] := rfl
-  have payload : interpretTypeName? (types .word) (annotation "Payload") = some .word := rfl
-  have flag : interpretTypeName? (types .word) (annotation "Flag") = some .bool := rfl
-  have unknown : interpretTypeName? (types .word) (annotation "Missing") = none := rfl
+  have payload : interpretStructuralType? (types .word) (annotation "Payload") = some .word := by simp only [annotation, interpretStructuralType?_named_eq_typeName]; rfl
+  have flag : interpretStructuralType? (types .word) (annotation "Flag") = some .bool := by simp only [annotation, interpretStructuralType?_named_eq_typeName]; rfl
+  have unknown : interpretStructuralType? (types .word) (annotation "Missing") = none := by simp only [annotation, interpretStructuralType?_named_eq_typeName]; rfl
   simp only [badBodies, List.mem_cons, List.not_mem_nil, or_false] at member
   rcases member with rfl | rfl | rfl | rfl | rfl | rfl
   · simp [bind, elaborateTypedLetReturnTree?, names, unknown]
@@ -251,9 +251,11 @@ theorem first_binding_decomposition_retains_old_scope_and_the_extended_tail (typ
         (branch (returned "z") (returned "z")) = some (tailCore, type) ∧ treeCore 1 = .letE initializerCore tailCore := by
   obtain ⟨declaredType, initializerCore, tailCore, _, meaning, initial, tailAccepted, shape⟩ :=
     elaborateTypedLetReturnTree?_binding_children (seedTree ["z"] type (by decide) (by decide)).complete
+  have originalMeaning : interpretTypeName? (types type) (annotation "Payload") = some declaredType := by
+    simpa only [annotation, interpretStructuralType?_named_eq_typeName] using meaning
   have same : type = declaredType := by
-    change some type = some declaredType at meaning
-    exact Option.some.inj meaning
+    change some type = some declaredType at originalMeaning
+    exact Option.some.inj originalMeaning
   subst declaredType
   exact ⟨initializerCore, tailCore, initial, tailAccepted, shape⟩
 
@@ -271,7 +273,7 @@ theorem qualified_components_keep_their_meaning_and_do_not_flatten (type : Core.
       (.single (.expression (.identifier .head) (.var .head) (.var .head)))
   refine ⟨elaboration, elaboration.complete, ?_⟩
   have unused : "z" ∉ (seed type).names.map Prod.fst := by change "z" ∉ ["seed"]; decide
-  have missing : interpretTypeName? [(["Pkg.Token"], type)] qualified = none := rfl
+  have missing : interpretStructuralType? [(["Pkg.Token"], type)] qualified = none := by simp only [qualified, interpretStructuralType?_named_eq_typeName]; rfl
   simp only [qualifiedBody, elaborateTypedLetReturnTree?, if_pos unused, missing]
   rfl
 

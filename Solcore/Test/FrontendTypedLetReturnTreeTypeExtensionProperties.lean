@@ -45,7 +45,7 @@ private theorem treeElab (names : List String) (previous : String) (type : Core.
   | cons name rest ih =>
     have parts := List.nodup_cons.mp distinct
     simp only [tree, List.length_cons, treeCore, binding]
-    apply TypedLetReturnTreeElaborates.binding (name := ⟨span, name⟩) meaning (fresh name (by simp)) resolution lowered typing
+    apply TypedLetReturnTreeElaborates.binding (name := ⟨span, name⟩) meaning.structural (fresh name (by simp)) resolution lowered typing
     apply TypedLetReturnTreeElaborates.conditional (.equal (.wordLiteral zeroMeaning) (.wordLiteral zeroMeaning))
       (.binary .word .word) (.binary .word .word)
     · apply ih name (inputs.bindFresh owner name type) _ parts.2
@@ -215,7 +215,7 @@ private def repairCore : Core.Expr := .ifE (.var 2) (.var 0) (.letE (.var 0) (.v
 private theorem repairElab (type : Core.Ty) (table : TypeNameTable) (annotation : Syntax.TypeExpr) (meaning : TypeNameDenotes table annotation type) :
     TypedLetReturnTreeElaborates table owner (initial type) (repair annotation) repairCore type :=
   .conditional (cR _) (cL _) (cT _) (.single (.expression (.identifier .head) (.var .head) (.var .head)))
-    (.binding meaning (by change "z" ∉ ["seed", "side", "c"]; decide) (.identifier .head) (.var .head) (.var .head)
+    (.binding meaning.structural (by change "z" ∉ ["seed", "side", "c"]; decide) (.identifier .head) (.var .head) (.var .head)
       (.single (.expression (.identifier .head) (.var .head) (.var .head))))
 private theorem opaqueDone {type : Core.Ty} (actual : Actual type) (side : Core.Word) (store : Core.Store) (extras : TypeNameTable) :
     (inputs actual side false).runTypedLetReturnTree? (types type ++ extras) owner 7 (repair (named "Payload")) store = some (type, .done actual.val store) :=
@@ -247,7 +247,7 @@ theorem a_previously_unknown_unselected_annotation_can_repair_the_same_input_bun
     | single child => cases child
     | binding meaning _ _ _ =>
       have impossible := meaning.complete
-      simp [interpretTypeName?, named, types, qualifiedTypeNameKey, TypeNameTable.lookup?, Syntax.NonemptyList.toList] at impossible
+      simp [interpretStructuralType?, named, types, qualifiedTypeNameKey, TypeNameTable.lookup?, Syntax.NonemptyList.toList] at impossible
 
 theorem keeping_every_row_does_not_allow_a_conflicting_first_meaning :
     (∀ row ∈ types .word, row ∈ ((["Payload"], Core.Ty.bool) :: types .word)) ∧
@@ -260,7 +260,7 @@ theorem keeping_every_row_does_not_allow_a_conflicting_first_meaning :
     cases conflict
   · have seedAccepted : elaborateLocalExpression? (initial .word).names (initial .word).context (ref "seed") = some (.var 0, .word) :=
       elaborateLocalExpression?_complete (.identifier .head) (.var .head) (.var .head)
-    simp [tree, binding, elaborateTypedLetReturnTree?, seedAccepted, interpretTypeName?, named, types,
+    simp [tree, binding, elaborateTypedLetReturnTree?, seedAccepted, interpretStructuralType?, named, types,
       qualifiedTypeNameKey, TypeNameTable.lookup?, Syntax.NonemptyList.toList]
 
 private def qualified : Syntax.TypeExpr := ⟨span, .named ⟨span, ⟨⟨⟨span, "Pkg"⟩, [⟨span, "Token"⟩]⟩⟩⟩ none⟩
@@ -270,7 +270,7 @@ theorem qualified_components_do_not_collapse_to_a_dotted_key (type : Core.Ty) :
     elaborateTypedLetReturnTree? [(["Pkg.Token"], type)] owner (initial type) (tree qualified ["z"] "seed") = none := by
   refine ⟨TypeNameTable.Extends.cons_fresh _ ["Pkg.Token"] .bool (by change ["Pkg.Token"] ∉ [["Pkg", "Token"]]; decide),
     (oneElab type _ qualified (.named (.tail (by decide) .head))).complete, ?_⟩
-  simp [tree, binding, elaborateTypedLetReturnTree?, interpretTypeName?, qualified, qualifiedTypeNameKey, TypeNameTable.lookup?, Syntax.NonemptyList.toList]
+  simp [tree, binding, elaborateTypedLetReturnTree?, interpretStructuralType?, qualified, qualifiedTypeNameKey, TypeNameTable.lookup?, Syntax.NonemptyList.toList]
 
 theorem branch_local_bindings_remain_outside_the_old_prefix_adapter (table : TypeNameTable) (inputs : LocalTypeInputs) :
     elaborateTypedLetReturnBody? table owner inputs body = none := by

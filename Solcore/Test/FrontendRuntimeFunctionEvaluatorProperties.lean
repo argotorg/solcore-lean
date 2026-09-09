@@ -47,7 +47,7 @@ private theorem treeElab (names : List String) (previous : String) (type : Core.
     have eta : ⟨span, (tree rest name).value⟩ = tree rest name := by cases rest <;> rfl
     refine .conditional (.equal (.wordLiteral zeroMeaning) (.wordLiteral zeroMeaning)) (.binary .word .word) (.binary .word .word) ?_ ?_
     · apply TypedLetReturnTreeElaborates.binding (name := ⟨span, name⟩)
-        (show TypeNameDenotes (types type) (named "Payload") type from .named .head) (fresh name (by simp)) resolution lowered typing
+        (show TypeNameDenotes (types type) (named "Payload") type from .named .head).structural (fresh name (by simp)) resolution lowered typing
       rw [eta]
       apply ih name (inputs.bindFresh owner name type) _ parts.2
       · intro next member
@@ -273,6 +273,7 @@ theorem direct_body_short_circuiting_does_not_remove_the_unselected_entry_contra
       | single child => cases child
       | binding meaning _ _ _ _ _ =>
         have impossible := meaning.complete
+        simp only [named, interpretStructuralType?_named_eq_typeName] at impossible
         change none = some _ at impossible
         cases impossible
 

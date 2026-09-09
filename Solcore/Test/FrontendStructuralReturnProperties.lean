@@ -2,6 +2,7 @@ import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
 import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
+import Solcore.Frontend.TypedLetReturnBodyProperties
 
 /-! Independent structural return contracts meet the existing entry only through
 original parameter/body provenance. Static types do not supply runtime arguments. -/
@@ -223,16 +224,16 @@ theorem named_unused_initializers_remain_strict_before_a_structural_product_retu
 
 private def letBody (annotation : Syntax.TypeExpr) : Syntax.Block :=
   ⟨span, [⟨span, .letDecl ⟨span, "x"⟩ (some annotation) (some (source 0))⟩, ⟨span, .returnStmt (some (source 0))⟩]⟩
-theorem structural_annotations_remain_outside_the_old_named_only_and_let_adapters
+theorem structural_annotations_remain_outside_the_old_named_only_and_prefix_adapters
     (types : TypeNameTable) (elements : List Syntax.TypeExpr) :
     interpretTypeName? types ⟨span, .tuple elements⟩ = none ∧
-    elaborateTypedLetReturnTree? types owner .empty (letBody ⟨span, .tuple elements⟩) = none := by
+    elaborateTypedLetReturnBody? types owner .empty (letBody ⟨span, .tuple elements⟩) = none := by
   constructor
   · rfl
-  · apply elaborateTypedLetReturnTree?_eq_none_iff.mpr
+  · apply elaborateTypedLetReturnBody?_eq_none_iff.mpr
     rintro ⟨type, typing⟩
     cases typing with
-    | single child => cases child
+    | terminal child => cases child with | single child => cases child
     | binding meaning _ _ _ => cases meaning
 
 theorem raw_unit_success_does_not_bypass_a_missing_child_in_the_return_annotation :

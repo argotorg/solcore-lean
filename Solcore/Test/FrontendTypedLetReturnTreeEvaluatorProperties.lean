@@ -224,7 +224,7 @@ theorem an_unknown_unused_annotation_has_a_strict_raw_path_but_no_whole_acceptan
     · exact .single (.expression (.identifier (.tail (by decide) .head) (.tail (by decide) .head)))
   refine ⟨evaluateTypedLetReturnTreeWithCost?_complete raw, ?_⟩
   have unused : "unused" ∉ (initial type).names.map Prod.fst := by change "unused" ∉ ["seed"]; decide
-  have missing : interpretTypeName? (types type) (annotation "Unknown") = none := rfl
+  have missing : interpretStructuralType? (types type) (annotation "Unknown") = none := by simp only [annotation, interpretStructuralType?_named_eq_typeName]; rfl
   simp only [unknown, binding, elaborateTypedLetReturnTree?, if_pos unused, missing]; rfl
 
 private def other : Resolved.DeclarationId := { owner with declarationIndex := 9 }
@@ -294,6 +294,6 @@ theorem an_unselected_unknown_annotation_is_skipped_only_by_raw_evaluation
     | single child => cases child
     | binding meaning _ _ _ =>
       have impossible := meaning.complete
-      have absent : interpretTypeName? (types type) (annotation "Unknown") = none := rfl
+      have absent : interpretStructuralType? (types type) (annotation "Unknown") = none := by simp only [annotation, interpretStructuralType?_named_eq_typeName]; rfl
       rw [absent] at impossible; cases impossible
 end Tests.FrontendTypedLetReturnTreeEvaluator

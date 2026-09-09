@@ -202,7 +202,7 @@ private theorem unknownCost (value : Core.Value) (store : Core.Store) :
   · exact .single (.expression (.identifier (.tail (by decide) .head) (.tail (by decide) .head)))
 private theorem unknownNone (type : Core.Ty) : elaborateTypedLetReturnTree? (types type) owner (inputs type) unknown = none := by
   have unused : "unused" ∉ (inputs type).names.map Prod.fst := by change "unused" ∉ ["seed"]; decide
-  have missing : interpretTypeName? (types type) (annotation "Missing") = none := rfl
+  have missing : interpretStructuralType? (types type) (annotation "Missing") = none := by simp only [annotation, interpretStructuralType?_named_eq_typeName]; rfl
   simp only [unknown, binding, elaborateTypedLetReturnTree?, if_pos unused, missing]
   rfl
 private def buried : Nat → Syntax.Block
