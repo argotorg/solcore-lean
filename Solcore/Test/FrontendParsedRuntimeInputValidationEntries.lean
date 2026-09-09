@@ -85,10 +85,10 @@ private def body (table : TypeNameTable) (inputs : LocalTypeInputs) (source : Sy
       if unused : name.value ∉ inputs.names.map Prod.fst then
         let a ← child inputs e; let b ← body table (inputs.bindFresh owner name.value a.type) ⟨span,rest⟩
         match annotationAt : annotation with
-        | none => return ⟨.letE a.core b.core,b.type,by rw [shape,annotationAt]; exact .inferred unused a.evidence b.evidence⟩
+        | none => return ⟨.letE a.core b.core,b.type,by rw [shape,annotationAt]; exact .inferred a.evidence b.evidence⟩
         | some t =>
             let m ← meaning table t
-            if same : m.1=a.type then return ⟨.letE a.core b.core,b.type,by rw [shape,annotationAt]; exact .binding (same ▸ m.2.down) unused a.evidence b.evidence⟩
+            if same : m.1=a.type then return ⟨.letE a.core b.core,b.type,by rw [shape,annotationAt]; exact .binding (same ▸ m.2.down) a.evidence b.evidence⟩
             else throw (IO.userError "binding annotation")
       else throw (IO.userError "fresh binding")
   | ⟨span,⟨_,.expression e true⟩::rest⟩ =>

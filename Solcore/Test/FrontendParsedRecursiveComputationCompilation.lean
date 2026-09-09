@@ -140,20 +140,21 @@ private def body (ts : TypeNameTable) (o : Resolved.DeclarationId) (i : LocalTyp
       if unused : name.value ∉ i.names.map Prod.fst then
         let c ← child i init; let tail ← body ts o (i.bindFresh o name.value c.type) ⟨bs,rest⟩
         match ann : annotation with
-        | none => return ⟨.letE c.core tail.core,tail.type,by rw [shape,ann]; exact .inferred unused c.evidence tail.evidence⟩
+        | none => return ⟨.letE c.core tail.core,tail.type,by rw [shape,ann]; exact .inferred c.evidence tail.evidence⟩
         | some a =>
             check (ls.contains a.span && decide (a.span.endByte ≤ init.span.startByte)) "annotation before initializer"
             let m ← meaning ts a
-            if same : m.type = c.type then return ⟨.letE c.core tail.core,tail.type,by rw [shape,ann]; exact .binding (same ▸ m.evidence) unused c.evidence tail.evidence⟩
+            if same : m.type = c.type then return ⟨.letE c.core tail.core,tail.type,by rw [shape,ann]; exact .binding (same ▸ m.evidence) c.evidence tail.evidence⟩
             else throw (IO.userError "initializer annotation mismatch")
       else throw (IO.userError "shadowing")
   | ⟨bs,⟨_,.expression s true⟩::rest⟩ =>
       let c ← child i s; let tail ← body ts o i ⟨bs,rest⟩
       return ⟨.letE c.core (tail.core.weakenAt 0),tail.type,by rw [shape]; exact .discard c.evidence tail.evidence⟩
   | ⟨_,[⟨_,.ifThen guard yes (some no)⟩]⟩ =>
+      let protection ← if h : computationBlockPreservesNames (i.names.map Prod.fst) yes=true then pure (PLift.up (computationBlockPreservesNames_iff.mp h)) else throw (IO.userError "original then scope")
       let c ← child i guard; let a ← body ts o i yes; let d ← body ts o i no
       if ct : c.type = .bool then
-        if same : d.type = a.type then return ⟨.ifE c.core a.core d.core,a.type,by rw [shape]; exact .conditional (ct ▸ c.evidence) a.evidence (same ▸ d.evidence)⟩
+        if same : d.type = a.type then return ⟨.ifE c.core a.core d.core,a.type,by rw [shape]; exact .conditional (ct ▸ c.evidence) protection.down a.evidence (same ▸ d.evidence)⟩
         else throw (IO.userError "arm types")
       else throw (IO.userError "guard type")
   | _ => throw (IO.userError "outside body fixture")
@@ -287,7 +288,7 @@ def frontendParsedRecursiveComputationCompilationTests : IO Unit := do
       "function example(f:F,g:G,x:Missing) returns(R)","function example(f:F,g:G,f:A) returns(R)"] do rejected (head++suffix) true
   for marker in ["public","payable"] do rejected ("function example(f:F,g:G,x:A) "++marker++" returns(R)"++suffix) true .contract
   let _ ← positive .word .word .word (owner 4) (text "return f(g(x))+1;") (.binary .wordAdd (.apply (.var 2) (call 1 0)) (.word (Core.Word.ofNatModulo 1)))
-  for b in ["let x=f(g(x));return x;","let r;return x;","let r=f(g(x));return f(r,x);",
+  for b in ["let r;return x;","let r=f(g(x));return f(r,x);",
       "{let r=f(g(x));}return r;","return f(g(x));return x;","let r:Missing=f(g(x));return r;"] do rejected (text b) false
   rejected (text "if(f(g(x))){return x;}else{{let r:Missing=x;return r;}}") false .module .bool
 end Tests

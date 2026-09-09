@@ -6,6 +6,7 @@ import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
 import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
 import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
 import Solcore.Frontend.ComputationReturnTreeRuntimeSafetyProperties
+import Solcore.Frontend.ComputationBindingScopeProperties
 import Solcore.Frontend.ComputationReturnTreeRuntimeCheckpointProperties
 import Solcore.Core.FuelResumptionProperties
 /-! Original mixed bodies, sparse caller rows, independently counted source rules
@@ -159,7 +160,7 @@ private def tree (i : LocalTypeInputs) (e : Resolved.Environment) (s : Core.Stor
           simpa only [LocalTypeInputs.bindFresh_names,LocalTypeInputs.names_ids] using b.raw
         match ann : annotation with
         | none => return ⟨.letE a.core b.core,b.type,b.value,b.final,a.cost+b.cost+2,
-            by rw [original,ann]; exact .inferred unused a.elaboration b.elaboration,
+            by rw [original,ann]; exact .inferred a.elaboration b.elaboration,
             by rw [original,ann]; exact .inferred a.raw tail⟩
         | some written =>
             check (ls.contains written.span) "original type range"
@@ -168,7 +169,7 @@ private def tree (i : LocalTypeInputs) (e : Resolved.Environment) (s : Core.Stor
                 if found : types.lookup? (qualifiedTypeNameKey name)=some a.type then
                   have meaning : StructuralTypeDenotes types written a.type := by rw [atType]; exact .named (TypeNameTable.lookup?_iff.mp found)
                   return ⟨.letE a.core b.core,b.type,b.value,b.final,a.cost+b.cost+2,
-                    by rw [original,ann]; exact .binding meaning unused a.elaboration b.elaboration,
+                    by rw [original,ann]; exact .binding meaning a.elaboration b.elaboration,
                     by rw [original,ann]; exact .binding a.raw tail⟩
                 else throw (IO.userError "original annotation")
             | _ => throw (IO.userError "annotation shape")
@@ -178,15 +179,16 @@ private def tree (i : LocalTypeInputs) (e : Resolved.Environment) (s : Core.Stor
       return ⟨.letE a.core (b.core.weakenAt 0),b.type,b.value,b.final,a.cost+b.cost+2,
         by rw [original]; exact .discard a.elaboration b.elaboration,by rw [original]; exact .discard a.raw b.raw⟩
   | ⟨_,[⟨_,.ifThen guard yes (some no)⟩]⟩ =>
+      let protection ← if h : computationBlockPreservesNames (i.names.map Prod.fst) yes=true then pure (PLift.up (computationBlockPreservesNames_iff.mp h)) else throw (IO.userError "original then scope")
       let c ← child i e s guard; let a ← tree i e c.final yes; let b ← tree i e c.final no
       if ct : c.type=.bool then
         if same : b.type=a.type then
           match cv : c.value with
           | .bool true => return ⟨.ifE c.core a.core b.core,a.type,a.value,a.final,c.cost+a.cost+2,
-              by rw [original]; exact .conditional (ct ▸ c.elaboration) a.elaboration (same ▸ b.elaboration),
+              by rw [original]; exact .conditional (ct ▸ c.elaboration) protection.down a.elaboration (same ▸ b.elaboration),
               by rw [original]; exact .ifTrue (cv ▸ c.raw) a.raw⟩
           | .bool false => return ⟨.ifE c.core a.core b.core,a.type,b.value,b.final,c.cost+b.cost+2,
-              by rw [original]; exact .conditional (ct ▸ c.elaboration) a.elaboration (same ▸ b.elaboration),
+              by rw [original]; exact .conditional (ct ▸ c.elaboration) protection.down a.elaboration (same ▸ b.elaboration),
               by rw [original]; exact .ifFalse (cv ▸ c.raw) b.raw⟩
           | _ => throw (IO.userError "actual Bool")
         else throw (IO.userError "both original branches")

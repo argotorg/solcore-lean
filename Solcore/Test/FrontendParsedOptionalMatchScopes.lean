@@ -142,7 +142,7 @@ private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (fun c =>
       let a ← child i e
       if unused : name.value ∉ i.names.map Prod.fst then
         let r ← body (i.bindFresh owner name.value a.1) ⟨span,rest⟩
-        return ⟨.letE a.2.core r.core,by rw [shape]; exact .inferred unused a.2.evidence r.evidence⟩
+        return ⟨.letE a.2.core r.core,by rw [shape]; exact .inferred a.2.evidence r.evidence⟩
       else throw (IO.userError "source binding freshness")
   | ⟨span,⟨_,.expression e true⟩::rest⟩ => let a ← child i e; let r ← body i ⟨span,rest⟩; return ⟨.letE a.2.core (r.core.weakenAt 0),by rw [shape]; exact .discard a.2.evidence r.evidence⟩
   | ⟨_,[⟨matchSpan,.matchWith ⟨scrutineeSpan,⟨e,[]⟩⟩ ⟨armsSpan,⟨[arm,wildArm],none⟩⟩⟩]⟩ =>

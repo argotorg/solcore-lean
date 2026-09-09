@@ -86,19 +86,20 @@ private def body (types : TypeNameTable) (inputs : LocalTypeInputs) (source : Sy
         let a ← child inputs initializer
         let b ← body types (inputs.bindFresh owner name.value a.type) ⟨span,rest⟩
         match annotationShape : annotation with
-        | none => return ⟨.letE a.core b.core,b.type,by rw [shape,annotationShape]; exact .inferred unused a.evidence b.evidence⟩
+        | none => return ⟨.letE a.core b.core,b.type,by rw [shape,annotationShape]; exact .inferred a.evidence b.evidence⟩
         | some annotation =>
             let m ← meaning types annotation
-            if same : m.1=a.type then return ⟨.letE a.core b.core,b.type,by rw [shape,annotationShape]; exact .binding (same ▸ m.2.down) unused a.evidence b.evidence⟩
+            if same : m.1=a.type then return ⟨.letE a.core b.core,b.type,by rw [shape,annotationShape]; exact .binding (same ▸ m.2.down) a.evidence b.evidence⟩
             else throw (IO.userError "initializer annotation")
       else throw (IO.userError "fresh original binding")
   | ⟨span,⟨_,.expression expression true⟩::rest⟩ =>
       let a ← child inputs expression; let b ← body types inputs ⟨span,rest⟩
       return ⟨.letE a.core (b.core.weakenAt 0),b.type,by rw [shape]; exact .discard a.evidence b.evidence⟩
   | ⟨_,[⟨_,.ifThen condition yes (some no)⟩]⟩ =>
+      let protection ← if h : computationBlockPreservesNames (inputs.names.map Prod.fst) yes=true then pure (PLift.up (computationBlockPreservesNames_iff.mp h)) else throw (IO.userError "original then scope")
       let c ← child inputs condition; let a ← body types inputs yes; let b ← body types inputs no
       if valid : c.type=.bool ∧ b.type=a.type then return ⟨.ifE c.core a.core b.core,a.type,
-        by rw [shape]; exact .conditional (valid.1 ▸ c.evidence) a.evidence (valid.2 ▸ b.evidence)⟩
+        by rw [shape]; exact .conditional (valid.1 ▸ c.evidence) protection.down a.evidence (valid.2 ▸ b.evidence)⟩
       else throw (IO.userError "whole guard/branch types")
   | _ => throw (IO.userError "original mixed body")
 termination_by sizeOf source

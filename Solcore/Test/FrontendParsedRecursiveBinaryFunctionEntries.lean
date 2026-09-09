@@ -176,21 +176,22 @@ private def tree (types : TypeNameTable) (s : LocalTypeInputs) (env : Resolved.E
         have raw : RecursiveComputationReturnTreeEvaluatesWithCost owner s.names env store source b.value b.final (a.cost+b.cost+2) := by
           rw [original]; cases annotation <;> first | exact .inferred a.raw (by simpa only [LocalTypeInputs.bindFresh_names,LocalTypeInputs.names_ids] using b.raw) | exact .binding a.raw (by simpa only [LocalTypeInputs.bindFresh_names,LocalTypeInputs.names_ids] using b.raw)
         match annotationAt : annotation with
-        | none => return ⟨.letE a.core b.core,b.type,b.value,b.final,a.cost+b.cost+2,by rw [original,annotationAt]; exact .inferred unused a.elaboration b.elaboration,raw⟩
+        | none => return ⟨.letE a.core b.core,b.type,b.value,b.final,a.cost+b.cost+2,by rw [original,annotationAt]; exact .inferred a.elaboration b.elaboration,raw⟩
         | some t =>
             let m ← meaning types t
-            if same : m.1=a.type then return ⟨.letE a.core b.core,b.type,b.value,b.final,a.cost+b.cost+2,by rw [original,annotationAt]; exact .binding (same ▸ m.2.down) unused a.elaboration b.elaboration,raw⟩
+            if same : m.1=a.type then return ⟨.letE a.core b.core,b.type,b.value,b.final,a.cost+b.cost+2,by rw [original,annotationAt]; exact .binding (same ▸ m.2.down) a.elaboration b.elaboration,raw⟩
             else throw (IO.userError "original binding annotation differs")
       else throw (IO.userError "shadowing is still excluded")
   | ⟨span,⟨_,.expression e true⟩::rest⟩ =>
       let a ← child s env store e; let b ← tree types s env a.final ⟨span,rest⟩
       return ⟨.letE a.core (b.core.weakenAt 0),b.type,b.value,b.final,a.cost+b.cost+2,by rw [original]; exact .discard a.elaboration b.elaboration,by rw [original]; exact .discard a.raw b.raw⟩
   | ⟨_,[⟨_,.ifThen e yes (some no)⟩]⟩ =>
+      let protection ← if h : computationBlockPreservesNames (s.names.map Prod.fst) yes=true then pure (PLift.up (computationBlockPreservesNames_iff.mp h)) else throw (IO.userError "original then scope")
       let c ← child s env store e
       if ct : c.type=.bool then
         let a ← tree types s env c.final yes; let b ← tree types s env c.final no
         if same : b.type=a.type then
-          have el : RecursiveComputationReturnTreeElaborates types owner s source (.ifE c.core a.core b.core) a.type := by rw [original]; exact .conditional (ct ▸ c.elaboration) a.elaboration (same ▸ b.elaboration)
+          have el : RecursiveComputationReturnTreeElaborates types owner s source (.ifE c.core a.core b.core) a.type := by rw [original]; exact .conditional (ct ▸ c.elaboration) protection.down a.elaboration (same ▸ b.elaboration)
           match cv : c.value with
           | .bool true => return ⟨.ifE c.core a.core b.core,a.type,a.value,a.final,c.cost+a.cost+2,el,by rw [original]; exact .ifTrue (cv ▸ c.raw) a.raw⟩
           | .bool false => return ⟨.ifE c.core a.core b.core,a.type,b.value,b.final,c.cost+b.cost+2,el,by rw [original]; exact .ifFalse (cv ▸ c.raw) b.raw⟩

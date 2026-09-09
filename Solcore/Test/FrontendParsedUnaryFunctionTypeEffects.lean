@@ -103,7 +103,7 @@ private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (Recursiv
       if same : m.1=a.type then
         if unused : name.value ∉ i.names.map Prod.fst then
           let r ← body (i.bindFresh owner name.value a.type) ⟨span,rest⟩
-          return ⟨.letE a.core r.core,r.type,by rw [shape]; exact .binding (same ▸ m.2.down) unused a.evidence r.evidence⟩
+          return ⟨.letE a.core r.core,r.type,by rw [shape]; exact .binding (same ▸ m.2.down) a.evidence r.evidence⟩
         else throw (IO.userError "fresh typed let")
       else throw (IO.userError "typed let annotation")
   | ⟨span,⟨_,.expression e true⟩::rest⟩ => let a ← child i e; let r ← body i ⟨span,rest⟩; return ⟨.letE a.core (r.core.weakenAt 0),r.type,by rw [shape]; exact .discard a.evidence r.evidence⟩

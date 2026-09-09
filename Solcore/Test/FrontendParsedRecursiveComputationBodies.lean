@@ -105,16 +105,16 @@ private def statics (ts : TypeNameTable) (i : LocalTypeInputs) (b : Syntax.Block
       if unused : name.value ∉ i.names.map Prod.fst then
         let c ← child i init; let tail ← statics ts (i.bindFresh owner name.value c.type) ⟨bs,rest⟩
         match ann : annotation with
-        | none => return ⟨.letE c.core tail.core,tail.type,by rw [shape,ann]; exact .inferred unused c.elaboration tail.elaboration,
-            by rw [shape,ann]; exact .inferred unused c.typing tail.typing⟩
+        | none => return ⟨.letE c.core tail.core,tail.type,by rw [shape,ann]; exact .inferred c.elaboration tail.elaboration,
+            by rw [shape,ann]; exact .inferred c.typing tail.typing⟩
         | some annotationSource =>
             check (ls.contains annotationSource.span && decide (name.span.endByte≤annotationSource.span.startByte ∧ annotationSource.span.endByte≤init.span.startByte)) "original annotation order/span"
             match written : annotationSource with
             | ⟨_,.named name none⟩ =>
                 if lookup : ts.lookup? (qualifiedTypeNameKey name) = some c.type then
                   have m : StructuralTypeDenotes ts annotationSource c.type := by rw [written]; exact .named (TypeNameTable.lookup?_iff.mp lookup)
-                  return ⟨.letE c.core tail.core,tail.type,by rw [shape,ann]; exact .binding m unused c.elaboration tail.elaboration,
-                    by rw [shape,ann]; exact .binding m unused c.typing tail.typing⟩
+                  return ⟨.letE c.core tail.core,tail.type,by rw [shape,ann]; exact .binding m c.elaboration tail.elaboration,
+                    by rw [shape,ann]; exact .binding m c.typing tail.typing⟩
                 else throw (IO.userError "annotation meaning")
             | _ => throw (IO.userError "annotation shape")
       else throw (IO.userError "shadow")
@@ -123,10 +123,11 @@ private def statics (ts : TypeNameTable) (i : LocalTypeInputs) (b : Syntax.Block
       return ⟨.letE c.core (tail.core.weakenAt 0),tail.type,by rw [shape]; exact .discard c.elaboration tail.elaboration,
         by rw [shape]; exact .discard c.typing tail.typing⟩
   | ⟨_,[⟨_,.ifThen guard yes (some no)⟩]⟩ =>
+      let protection ← if h : computationBlockPreservesNames (i.names.map Prod.fst) yes=true then pure (PLift.up (computationBlockPreservesNames_iff.mp h)) else throw (IO.userError "original then scope")
       let c ← child i guard; let a ← statics ts i yes; let d ← statics ts i no
       if valid : c.type=.bool ∧ d.type=a.type then return ⟨.ifE c.core a.core d.core,a.type,
-        by rw [shape]; exact .conditional (valid.1 ▸ c.elaboration) a.elaboration (valid.2 ▸ d.elaboration),
-        by rw [shape]; exact .conditional (valid.1 ▸ c.typing) a.typing (valid.2 ▸ d.typing)⟩
+        by rw [shape]; exact .conditional (valid.1 ▸ c.elaboration) protection.down a.elaboration (valid.2 ▸ d.elaboration),
+        by rw [shape]; exact .conditional (valid.1 ▸ c.typing) protection.down a.typing (valid.2 ▸ d.typing)⟩
       else throw (IO.userError "Bool guard/whole arms")
   | _ => throw (IO.userError "outside static fixture")
 termination_by sizeOf b
@@ -285,11 +286,10 @@ def frontendParsedRecursiveComputationBodyTests : IO Unit := do
     CostStepComposition.letE (invoke rfl (invoke rfl (.cons (.var rfl) .refl) (.cons (.var rfl) .refl)) (.cons (.var rfl) .refl))
       (CostStepComposition.letE (invoke rfl (invoke rfl (.cons (.var rfl) .refl) (.cons (.var rfl) .refl)) (.cons (.var rfl) .refl))
         (CostStepComposition.letE (.cons (.var rfl) .refl) (.cons .enterBinary (.cons (.var rfl) (.cons .enterBinaryRight (.cons .word (.cons (.applyBinary rfl) .refl))))))))
-  for text in ["if(p(g(x))){return x;}else{let r:Unknown=x;return r;}",
-      "if(p(g(x))){return x;}else{let x=x;return x;}","let x=f(g(x));return x;"] do
+  for text in ["if(p(g(x))){return x;}else{let r:Unknown=x;return r;}"] do
     let body ← parsed text; let r ← costs (inputs .word).names (env .word (.word (w 17)) true) body
     have _ := (computationReturnTreeEvaluates_iff_exists_cost (ChildEval := RecursiveLocalComputationEvaluates) (ChildCost := RecursiveLocalComputationEvaluatesWithCost) recursiveLocalComputationEvaluates_iff_exists_cost).mpr ⟨_,r.evidence []⟩
-    check (decide (r.value=.word (w 17) ∧ r.cost=14 ∧ elaborateRecursiveComputationReturnTree? (types .word) owner (inputs .word) body=none)) "raw success/whole unknown or duplicate"
+    check (decide (r.value=.word (w 17) ∧ r.cost=14 ∧ elaborateRecursiveComputationReturnTree? (types .word) owner (inputs .word) body=none)) "raw success/whole unknown"
   staticCheck .word "return f(g(x))+1;" (.binary .wordAdd (nested 1 2 0) (.word (w 1))) .word
   for text in ["","f(g(x));","{return x;}return x;","let r=r;return r;","if(p(g(x))){return x;}"] do
     let body ← parsed text
