@@ -1202,6 +1202,26 @@ and literal Core evidence retain arbitrary closure costs, strict effects, full
 saved states and resumption. No source feature, header policy, raw function
 evaluator, runtime-world premise or existing executable definition changes.
 
+Independent shared function argument factorization is now available directly
+for an arbitrary child elaboration relation (ADR-0279). Five additive laws erase
+preparation to compilation, reconstruct preparation from supplied typed arguments
+with matching ordered types, characterize a fixed compiled projection, preserve
+the reverse-once actual value sequence, and identify preparations having the
+same arguments and compiled projection. No child checker or its graph is needed.
+
+Value-free compilation does not invent runtime inhabitants. Reconstruction
+retains every supplied value and capture, together with the original source,
+parameters, local IDs, Core and return type. Matching type lists preserve arity
+and ordered parameter types but do not prohibit same-typed value permutations.
+Those different supplied values can produce distinct prepared records and runs.
+
+Uniqueness is deliberately limited to a fixed compiled projection: an arbitrary
+child relation need not choose one Core term. Explicit artificial nondeterminism
+and hand-built invalid-record consumers check that boundary separately from
+actual source semantics. Original symbolic/parsed consumers reconstruct actual
+rows and retain raw costs, ordered effects and full saved states without a
+runtime-world assumption. Existing operational factorization is unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

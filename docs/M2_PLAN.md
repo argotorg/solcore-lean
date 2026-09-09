@@ -780,6 +780,18 @@ duplicate parameters and invalid unselected bodies remain preparation failures;
 successful preparation may still expose genuine faults and saved states. New
 source forms and nominal/type-name relabeling remain separate work.
 
+Independent argument factorization is now exposed for the shared function
+judgments (ADR-0279), not only a private child-checker graph. A fixed compiled
+projection is preparable exactly when independent compilation holds and the
+supplied typed arguments match its ordered parameter types. Erasure, exact
+actual values and fixed-projection uniqueness are public generic laws.
+
+Do not infer runtime inhabitants from compilation, or unconditional compilation
+uniqueness from an arbitrary child relation. Same-typed argument permutations
+may retain the compiled projection while changing actual prepared rows and
+effects. Reconstruction keeps those values literal and does not supply a
+runtime world or establish safety for the separately provided store.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
