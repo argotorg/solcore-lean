@@ -632,6 +632,24 @@ pure and singleton-application cases embed one way; old endpoints are unchanged.
 Runtime-world/store evidence is still needed for safety, and no new source-only
 bound, unfuelled evaluator or global source-call mechanism is introduced.
 
+A separate recursive expression profile now admits nested single-argument calls,
+computed callees and arbitrary grouping (ADR-0253). Each original callee and
+argument is checked recursively in the same scope; other roots retain the old
+pure interpretation. Independent syntax/type/Core evidence and raw/cost rules
+preserve the exact actual closure, captures and callee-to-argument-to-body store
+order. Grouping adds no Core wrapper or transitions, even where pure/group
+derivations overlap. Fourteen shared kernels connect checking, typing, exact
+execution/cost and caller insertion, with unchanged old-success embeddings.
+
+The recursive caller fragment permits applications of recursively admitted
+children, not closure generation. Its paired insertion paths use the same actual
+body path and one cost before every continuation; intermediate caller states
+need not coincide. Old mixed-body/function entries remain unchanged and do not
+yet accept these nested expressions. Calls under operators, tuples or conditional
+roots, source lambdas and global function resolution remain outside this new
+profile; pure such subtrees remain usable as call children. No source-only fuel
+bound, store-invariance or arbitrary-store safety is inferred.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

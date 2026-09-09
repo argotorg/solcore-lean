@@ -445,7 +445,20 @@ same-typed swaps, all faults and genuine checkpoints remain observable. Old pure
 and singleton-application successes embed without changing their endpoints.
 Body typing/cost and generic Core runtime-world safety/resumption are reused
 directly instead of adding parallel wrapper families. Source-function resolution
-and recursive expression calls remain subsequent language extensions.
+remains separate; recursive expression calls are handled by the profile below.
+
+Recursive local computation expressions are available separately (ADR-0253):
+nested argument/callee calls and groups preserve the original AST and positional
+scope, with independent static/raw/cost judgments. Exact execution laws retain
+actual captures and ordered intermediate stores; recursive caller insertion
+uses shared closed body paths without identifying intermediate checkpoints.
+The fourteen-kernel interface embeds old computation successes unchanged and
+does not broaden old pure, mixed-body or explicit-function endpoints.
+
+Next integrate this recursive child into mixed bodies and their explicit
+entries using the shared contracts. Recursion under other expression operators,
+expected-type source lambdas and global function resolution remain separate;
+the old stronger pure store/source-bound guarantees do not transfer.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
