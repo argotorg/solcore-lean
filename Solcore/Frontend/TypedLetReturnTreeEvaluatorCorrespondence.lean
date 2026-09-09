@@ -35,6 +35,12 @@ theorem evaluateTypedLetReturnTreeWithCost?_sound
                     | some source =>
                         rw [evaluateTypedLetReturnTreeWithCost?] at accepted
                         exact .single (.expression (evaluateLocalExpressionWithCost?_sound accepted store))
+              case block inner =>
+                cases rest with
+                | cons _ _ => simp only [evaluateTypedLetReturnTreeWithCost?, reduceCtorEq] at accepted
+                | nil =>
+                    rw [evaluateTypedLetReturnTreeWithCost?] at accepted
+                    exact .block (evaluateTypedLetReturnTreeWithCost?_sound accepted store)
               case letDecl name optionalType optionalInitializer =>
                 cases optionalInitializer with
                 | none => simp only [evaluateTypedLetReturnTreeWithCost?, reduceCtorEq] at accepted
@@ -97,6 +103,7 @@ theorem evaluateTypedLetReturnTreeWithCost?_complete
       | bare => simp only [evaluateTypedLetReturnTreeWithCost?]
       | expression evaluated =>
           simpa only [evaluateTypedLetReturnTreeWithCost?] using evaluateLocalExpressionWithCost?_complete evaluated
+  | block _ ih => simpa only [evaluateTypedLetReturnTreeWithCost?] using ih
   | binding initializer _ ih | inferred initializer _ ih | discard initializer _ ih
   | ifTrue initializer _ ih | ifFalse initializer _ ih =>
       simp [evaluateTypedLetReturnTreeWithCost?, evaluateLocalExpressionWithCost?_complete initializer, ih]

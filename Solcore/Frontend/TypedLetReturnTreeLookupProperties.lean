@@ -67,6 +67,13 @@ theorem evaluateTypedLetReturnTreeWithCost?_congr_lookup
                         simpa only [evaluateTypedLetReturnTreeWithCost?] using
                           evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
                             leftEnvironment rightEnvironment sameLookup source
+              case block inner =>
+                cases rest with
+                | cons _ _ => simp only [evaluateTypedLetReturnTreeWithCost?]
+                | nil =>
+                    simpa only [evaluateTypedLetReturnTreeWithCost?] using
+                      evaluateTypedLetReturnTreeWithCost?_congr_lookup leftOwner rightOwner leftTable rightTable
+                        leftEnvironment rightEnvironment sameLookup ⟨statementSpan, inner⟩
               case letDecl name optionalType optionalInitializer =>
                 cases optionalInitializer with
                 | none => simp only [evaluateTypedLetReturnTreeWithCost?]

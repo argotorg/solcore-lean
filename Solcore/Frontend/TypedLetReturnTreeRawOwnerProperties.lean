@@ -71,6 +71,12 @@ theorem evaluateTypedLetReturnTreeWithCost?_mapOwner
                         simpa only [evaluateTypedLetReturnTreeWithCost?] using
                           expression_mapIds (ownerLocalIdMap mapping)
                             (ownerLocalIdMap_injective mapping injective) table environment source
+              case block inner =>
+                cases rest with
+                | cons _ _ => simp only [evaluateTypedLetReturnTreeWithCost?]
+                | nil =>
+                    simpa only [evaluateTypedLetReturnTreeWithCost?] using
+                      evaluateTypedLetReturnTreeWithCost?_mapOwner mapping injective owner table environment ⟨statementSpan, inner⟩
               case letDecl name optionalType optionalInitializer =>
                 cases optionalInitializer with
                 | none => simp only [evaluateTypedLetReturnTreeWithCost?]
