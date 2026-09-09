@@ -1,5 +1,5 @@
 import Solcore.Frontend.ComputationReturnTree
-import Solcore.Frontend.WordLiteralProperties
+import Solcore.Frontend.WordMatchProperties
 
 /-! Exact optional-match checking preserves original case/default provenance.
 No elaboration, typing or runtime law is assumed. -/
@@ -13,37 +13,23 @@ variable {checkChild : LocalNameTable → Resolved.Context → Syntax.Expr → O
 
 private def check_arm (check : Syntax.Block → Option (Core.Expr × Core.Ty))
     (arm : Syntax.MatchCase) : Option (Option Core.Word × (Core.Expr × Core.Ty)) := do
-  let tag ← match arm.value.pattern.value with
-    | .literal literal => (interpretWordLiteral? literal).map some
-    | .wildcard _ => some none
-    | _ => none
+  let tag ← interpretWordMatchPattern? arm.value.pattern
   let branch ← check arm.value.body
   return (tag, branch)
 
 private theorem check_arm_map {check : Syntax.Block → Option (Core.Expr × Core.Ty)}
     {arm : Syntax.MatchCase} :
-    (check_arm check arm).map (arm, ·) = (match arm.value.pattern.value with
-      | .literal literal => do
-          let tag ← (interpretWordLiteral? literal).map some
-          let branch ← check arm.value.body
-          return (arm, tag, branch)
-      | .wildcard _ => do
-          let branch ← check arm.value.body
-          return (arm, none, branch)
-      | _ => none) := by
-  cases shape : arm.value.pattern.value <;>
-    simp [check_arm, shape, bind, Option.map_bind, Function.comp_def]
+    (check_arm check arm).map (arm, ·) = (do
+      let tag ← interpretWordMatchPattern? arm.value.pattern
+      let branch ← check arm.value.body
+      return (arm, tag, branch)) := by
+  simp [check_arm, bind, Option.map_bind, Function.comp_def]
 
 private theorem check_arm_iff {check : Syntax.Block → Option (Core.Expr × Core.Ty)}
     {type : Core.Ty} {arm : Syntax.MatchCase} {tag : Option Core.Word} {core : Core.Expr} :
     check_arm check arm = some (tag, core, type) ↔
-      (match tag with
-        | none => ∃ marker, arm.value.pattern.value = .wildcard marker
-        | some word => WordMatchPatternDenotes arm.value.pattern word) ∧
-      check arm.value.body = some (core, type) := by
-  cases shape : arm.value.pattern.value <;> cases tag <;>
-    simp [check_arm, shape, WordMatchPatternDenotes, bind,
-      Option.bind_eq_some_iff, Option.map_eq_some_iff, interpretWordLiteral?_iff, Prod.mk.injEq]
+      WordMatchPatternClassifies arm.value.pattern tag ∧ check arm.value.body = some (core, type) := by
+  simp [check_arm, bind, Option.bind_eq_some_iff, Prod.mk.injEq, interpretWordMatchPattern?_iff]
 
 private theorem entries_check_iff {α β : Type} {check : α → Option β}
     {cases : List α} {entries : List (α × β)} :
@@ -108,9 +94,7 @@ private theorem check_match_iff {check : Syntax.Block → Option (Core.Expr × C
     check_match check scrutineeCore cases defaultBody = some (core, type) ↔
     ∃ (bodyCore : Core.Expr) (entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)))
       (defaultEntry : Option (Syntax.Block × Core.Expr)), entries.map Prod.fst = cases ∧
-      (∀ entry ∈ entries, match entry.2.1 with
-        | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
-        | some word => WordMatchPatternDenotes entry.1.value.pattern word) ∧
+      (∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1) ∧
       (∀ entry ∈ entries, check entry.1.value.body = some (entry.2.2, type)) ∧
       defaultEntry.map Prod.fst = defaultBody ∧ (∀ entry ∈ defaultEntry.toList, check entry.1 = some (entry.2, type)) ∧
       entries.foldr (fun entry tail => match entry.2.1 with
@@ -179,9 +163,7 @@ theorem ComputationReturnTreeChecking.match_iff
     ∃ scrutineeCore, checkChild inputs.names inputs.context scrutinee = some (scrutineeCore, .word) ∧
     ∃ (bodyCore : Core.Expr) (entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)))
       (defaultEntry : Option (Syntax.Block × Core.Expr)), entries.map Prod.fst = cases ∧
-      (∀ entry ∈ entries, match entry.2.1 with
-        | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
-        | some word => WordMatchPatternDenotes entry.1.value.pattern word) ∧
+      (∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1) ∧
       (∀ entry ∈ entries, elaborateComputationReturnTree? checkChild types owner inputs entry.1.value.body =
         some (entry.2.2, type)) ∧ defaultEntry.map Prod.fst = defaultBody ∧
       (∀ entry ∈ defaultEntry.toList, elaborateComputationReturnTree? checkChild types owner inputs entry.1 =

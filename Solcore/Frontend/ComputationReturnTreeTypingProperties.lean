@@ -1,4 +1,5 @@
 import Solcore.Frontend.ComputationReturnTree
+import Solcore.Frontend.WordMatchProperties
 import Solcore.Frontend.LocalTypeInputsProperties
 import Solcore.Core.Renaming
 
@@ -14,15 +15,13 @@ variable {ChildHasType : LocalNameTable → Resolved.Context → Syntax.Expr →
 
 private theorem fold_coverage {entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))}
     {defaultEntry : Option (Syntax.Block × Core.Expr)}
-    (patterns : ∀ entry ∈ entries, match entry.2.1 with
-      | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
-      | some word => WordMatchPatternDenotes entry.1.value.pattern word) :
+    (patterns : ∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1) :
     (entries.foldr (fun entry tail => match entry.2.1 with
       | none => some (entry.2.2.weakenAt 0)
       | some word => tail.map (fun core =>
           .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) core))
       (defaultEntry.map (fun entry => entry.2.weakenAt 0))).isSome = true ↔
-    defaultEntry.isSome = true ∨ ∃ entry ∈ entries, ∃ marker, entry.1.value.pattern.value = .wildcard marker := by
+    defaultEntry.isSome = true ∨ ∃ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern none := by
   induction entries with
   | nil => simp
   | cons entry rest ih =>
@@ -30,12 +29,14 @@ private theorem fold_coverage {entries : List (Syntax.MatchCase × (Option Core.
       cases tag : entry.2.1 with
       | none =>
           simp only [tag] at meaning
-          obtain ⟨marker, shape⟩ := meaning
-          simp [tag, shape]
+          simp [tag, meaning]
       | some word =>
           simp only [tag] at meaning
-          obtain ⟨literal, shape, _⟩ := meaning
-          simpa [tag, shape] using ih (fun item member => patterns item (by simp [member]))
+          have notCatchAll : ¬ WordMatchPatternClassifies entry.1.value.pattern none := by
+            intro caught
+            have impossible := meaning.tag_unique caught
+            cases impossible
+          simpa [tag, notCatchAll] using ih (fun item member => patterns item (by simp [member]))
 
 private theorem hasType
     (childTyping : ∀ {table context source type},
@@ -62,9 +63,9 @@ private theorem hasType
         rw [← ordered] at member
         obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
         exact ⟨entry.2.1, patterns entry entryMember⟩
-      · rcases (fold_coverage patterns).mp (congrArg Option.isSome lowered) with present | ⟨entry, member, marker, shape⟩
+      · rcases (fold_coverage patterns).mp (congrArg Option.isSome lowered) with present | ⟨entry, member, meaning⟩
         · left; rw [← defaultOrdered]; simpa using present
-        · exact .inr ⟨entry.1, ordered ▸ List.mem_map.mpr ⟨entry, member, rfl⟩, marker, shape⟩
+        · exact .inr ⟨entry.1, ordered ▸ List.mem_map.mpr ⟨entry, member, rfl⟩, meaning⟩
       · intro arm member
         rw [← ordered] at member
         obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
@@ -75,14 +76,10 @@ private theorem hasType
         exact defaultIH entry entryMember
 
 private theorem entries_exist {cases : List Syntax.MatchCase} {P : Syntax.Block → Core.Expr → Prop}
-    (patterns : ∀ arm ∈ cases, ∃ tag : Option Core.Word, match tag with
-      | none => ∃ marker, arm.value.pattern.value = .wildcard marker
-      | some word => WordMatchPatternDenotes arm.value.pattern word)
+    (patterns : ∀ arm ∈ cases, ∃ tag, WordMatchPatternClassifies arm.value.pattern tag)
     (branches : ∀ arm ∈ cases, ∃ core, P arm.value.body core) :
     ∃ entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)), entries.map Prod.fst = cases ∧
-      (∀ entry ∈ entries, match entry.2.1 with
-        | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
-        | some word => WordMatchPatternDenotes entry.1.value.pattern word) ∧
+      (∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1) ∧
       (∀ entry ∈ entries, P entry.1.value.body entry.2.2) := by
   induction cases with
   | nil => exact ⟨[], rfl, by simp, by simp⟩
@@ -147,12 +144,12 @@ private theorem elaborates
             obtain ⟨core, elaboration⟩ := defaultIH source (by simp)
             exact ⟨some (source, core), rfl, by intro entry member; simpa using (List.mem_singleton.mp member ▸ elaboration)⟩
       obtain ⟨defaultEntry, defaultOrdered, defaults⟩ := defaults
-      have coveredFold : defaultEntry.isSome = true ∨ ∃ entry ∈ entries, ∃ marker, entry.1.value.pattern.value = .wildcard marker := by
-        rcases covered with present | ⟨arm, member, marker, shape⟩
+      have coveredFold : defaultEntry.isSome = true ∨ ∃ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern none := by
+        rcases covered with present | ⟨arm, member, meaning⟩
         · left; rw [← defaultOrdered] at present; simpa using present
         · rw [← ordered] at member
           obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
-          exact .inr ⟨entry, entryMember, marker, shape⟩
+          exact .inr ⟨entry, entryMember, meaning⟩
       obtain ⟨bodyCore, lowered⟩ := Option.isSome_iff_exists.mp ((fold_coverage meanings).mpr coveredFold)
       exact ⟨_, .wordMatch scrutineeElaboration ordered meanings elaborations defaultOrdered defaults lowered⟩
 
