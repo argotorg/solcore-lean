@@ -8,6 +8,7 @@ retains its actual value, while skipping evaluates one internal Bool literal.
 Unary operations use the actual child payload and preserve its final store.
 Fixed negated comparisons evaluate both actual Words before comparison and negation.
 Ordered comparisons retain both original Words before swapping their saved positions.
+Tuples retain arbitrary actual components in original order, with right-associated tails.
 Grouping preserves the exact value, stores and cost of its child. -/
 
 set_option autoImplicit false
@@ -35,6 +36,26 @@ inductive RecursiveLocalComputationEvaluates
       (bodyEvaluation : Core.Evaluates (argumentValue :: captured) bodyStore body result finalStore) :
       RecursiveLocalComputationEvaluates table environment initialStore
         ⟨span, .call callee ⟨argumentsSpan, [argument]⟩⟩ result finalStore
+
+  | pair {initialStore middleStore finalStore : Core.Store}
+      {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Value}
+      (leftEvaluation : RecursiveLocalComputationEvaluates table environment
+        initialStore left leftValue middleStore)
+      (rightEvaluation : RecursiveLocalComputationEvaluates table environment
+        middleStore right rightValue finalStore) :
+      RecursiveLocalComputationEvaluates table environment initialStore
+        ⟨span, .tuple ⟨tupleSpan, [left, right]⟩⟩ (.pair leftValue rightValue) finalStore
+  | many {initialStore middleStore finalStore : Core.Store}
+      {span tupleSpan : Syntax.SourceSpan} {first second third : Syntax.Expr}
+      {rest : List Syntax.Expr} {headValue tailValue : Core.Value}
+      (headEvaluation : RecursiveLocalComputationEvaluates table environment
+        initialStore first headValue middleStore)
+      (tailEvaluation : RecursiveLocalComputationEvaluates table environment middleStore
+        ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ tailValue finalStore) :
+      RecursiveLocalComputationEvaluates table environment initialStore
+        ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩
+        (.pair headValue tailValue) finalStore
 
   | binary {initialStore middleStore finalStore : Core.Store}
       {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}

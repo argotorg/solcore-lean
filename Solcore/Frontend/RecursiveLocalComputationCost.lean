@@ -3,7 +3,8 @@ import Solcore.Core.Machine
 import Solcore.Frontend.DirectWordBinary
 
 /-! Independent exact costs retain original source children, actual closure paths
-and stores. Ordered comparisons include both generated positional bindings. -/
+and stores. Ordered comparisons include both generated positional bindings.
+Each ordered tuple pair adds three transitions, without a terminal Unit. -/
 
 set_option autoImplicit false
 
@@ -36,6 +37,27 @@ inductive RecursiveLocalComputationEvaluatesWithCost
       RecursiveLocalComputationEvaluatesWithCost table environment initialStore
         ⟨span, .call callee ⟨argumentsSpan, [argument]⟩⟩ result finalStore
         (functionCost + argumentCost + bodyCost + 3)
+
+  | pair {initialStore middleStore finalStore : Core.Store}
+      {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Value} {leftCost rightCost : Nat}
+      (leftEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        initialStore left leftValue middleStore leftCost)
+      (rightEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        middleStore right rightValue finalStore rightCost) :
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+        ⟨span, .tuple ⟨tupleSpan, [left, right]⟩⟩ (.pair leftValue rightValue) finalStore
+        (leftCost + rightCost + 3)
+  | many {initialStore middleStore finalStore : Core.Store}
+      {span tupleSpan : Syntax.SourceSpan} {first second third : Syntax.Expr}
+      {rest : List Syntax.Expr} {headValue tailValue : Core.Value} {headCost tailCost : Nat}
+      (headEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        initialStore first headValue middleStore headCost)
+      (tailEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment middleStore
+        ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ tailValue finalStore tailCost) :
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+        ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩
+        (.pair headValue tailValue) finalStore (headCost + tailCost + 3)
 
   | binary {initialStore middleStore finalStore : Core.Store}
       {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}

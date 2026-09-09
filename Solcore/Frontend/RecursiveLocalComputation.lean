@@ -2,7 +2,7 @@ import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Frontend.DirectWordBinary
 
 /-! Recursive calls and groups with unary/Word binary operations, fixed ordered/negated
-comparisons, conditionals and fixed lazy expressions.
+comparisons, conditionals, fixed lazy expressions and right-associated tuples.
 Original children keep their scope; this does not change the older profiles. -/
 
 set_option autoImplicit false
@@ -22,6 +22,15 @@ def elaborateRecursiveLocalComputation? (table : LocalNameTable) (context : Reso
           else none
       | _ => none
   | ⟨_, .group inner⟩ => elaborateRecursiveLocalComputation? table context inner
+  | ⟨_, .tuple ⟨_, [left, right]⟩⟩ => do
+      let (leftCore, leftType) ← elaborateRecursiveLocalComputation? table context left
+      let (rightCore, rightType) ← elaborateRecursiveLocalComputation? table context right
+      return (.pair leftCore rightCore, .product leftType rightType)
+  | ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩ => do
+      let (headCore, headType) ← elaborateRecursiveLocalComputation? table context first
+      let (tailCore, tailType) ← elaborateRecursiveLocalComputation? table context
+        ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩
+      return (.pair headCore tailCore, .product headType tailType)
   | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ => do
       let (operandCore, operandType) ← elaborateRecursiveLocalComputation? table context operand
       if operandType = .bool then some (.unary .boolNot operandCore, .bool) else none
@@ -98,6 +107,20 @@ inductive RecursiveLocalComputationHasType (table : LocalNameTable) (context : R
       RecursiveLocalComputationHasType table context
         ⟨span, .call callee ⟨argumentsSpan, [argument]⟩⟩ resultType
 
+  | pair {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftType rightType : Core.Ty}
+      (leftTyped : RecursiveLocalComputationHasType table context left leftType)
+      (rightTyped : RecursiveLocalComputationHasType table context right rightType) :
+      RecursiveLocalComputationHasType table context
+        ⟨span, .tuple ⟨tupleSpan, [left, right]⟩⟩ (.product leftType rightType)
+  | many {span tupleSpan : Syntax.SourceSpan} {first second third : Syntax.Expr}
+      {rest : List Syntax.Expr} {headType tailType : Core.Ty}
+      (headTyped : RecursiveLocalComputationHasType table context first headType)
+      (tailTyped : RecursiveLocalComputationHasType table context
+        ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ tailType) :
+      RecursiveLocalComputationHasType table context
+        ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩ (.product headType tailType)
+
   | binary {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp}
       (operator : DirectWordBinary sourceOp op)
@@ -173,6 +196,21 @@ inductive RecursiveLocalComputationElaborates (table : LocalNameTable) (context 
       (argumentElaborated : RecursiveLocalComputationElaborates table context argument argumentCore parameterType) :
       RecursiveLocalComputationElaborates table context
         ⟨span, .call callee ⟨argumentsSpan, [argument]⟩⟩ (.apply functionCore argumentCore) resultType
+
+  | pair {span tupleSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftCore rightCore : Core.Expr} {leftType rightType : Core.Ty}
+      (leftElaborated : RecursiveLocalComputationElaborates table context left leftCore leftType)
+      (rightElaborated : RecursiveLocalComputationElaborates table context right rightCore rightType) :
+      RecursiveLocalComputationElaborates table context
+        ⟨span, .tuple ⟨tupleSpan, [left, right]⟩⟩ (.pair leftCore rightCore) (.product leftType rightType)
+  | many {span tupleSpan : Syntax.SourceSpan} {first second third : Syntax.Expr}
+      {rest : List Syntax.Expr} {headCore tailCore : Core.Expr} {headType tailType : Core.Ty}
+      (headElaborated : RecursiveLocalComputationElaborates table context first headCore headType)
+      (tailElaborated : RecursiveLocalComputationElaborates table context
+        ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ tailCore tailType) :
+      RecursiveLocalComputationElaborates table context
+        ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩
+        (.pair headCore tailCore) (.product headType tailType)
 
   | binary {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
       {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp} {leftCore rightCore : Core.Expr}
