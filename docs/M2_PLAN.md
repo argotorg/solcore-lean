@@ -287,6 +287,22 @@ captured environment. Membership alone implies neither evaluation nor valid
 indices, source acceptance or provenance for arbitrary records. This proof-only
 step changes no existing definition, generic statement or source policy.
 
+Strict expression prefixes now use these insertion foundations (ADR-0240).
+The existing recursive adapter accepts an original `.expression source true`
+before an accepted terminal tail. Both source children use the same input scope;
+exact Core uses `letE expressionCore (tailCore.weakenAt 0)` without allocating a
+source LocalId or changing parameter records. Four discard rules keep all old
+constructors and 58 affected generic statements intact, with one exact original
+child-decomposition theorem. Typing and raw iff reuse insertion/reflection;
+actual discarded values lift closed tail paths into arbitrary retained
+continuations at unchanged costs. Head plus tail plus two counts strict work,
+not optimized Rust transitions. Independent source/parsed consumers retain
+mixed let/if scopes, nominal/opaque boundaries, exact Core and genuine residuals.
+Four original parsed rejections become positives; narrower adapters and all
+neighboring invalid forms remain. No unterminated prefix, missing terminal tail,
+assignment, source call, general early return, parser or runtime-record policy
+is added.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

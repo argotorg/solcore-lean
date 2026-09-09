@@ -293,6 +293,15 @@ binding rules and generic proof contracts remain intact. Older body-only adapter
 and bounds remain unchanged. No general inference, default initialization,
 general calls or broader binding policy is added.
 
+Semicolon-terminated expression prefixes now execute strictly before their
+original tail, without adding a source name, identity or parameter row. Exact
+Core uses a let whose tail is positionally weakened under the hidden binder;
+typing, raw evaluation and exact costs reuse local-fragment insertion/reflection.
+Four independent discard rules retain all earlier constructors and generic
+contracts. Costs add head plus tail plus two even when the head is unused.
+Unterminated expressions, missing terminal tails and general early returns are
+not introduced, and narrower body-only adapters keep their original boundaries.
+
 Exact expression, singleton-return, terminal-tree and recursive-let provenance
 now expose membership in the independent local Core fragment. Compilation and
 preparation project the same structural fact without restricting actual opaque

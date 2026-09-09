@@ -398,6 +398,34 @@ nor whole-entry provenance for an arbitrary same-typed record. No accepted or
 rejected source form, existing definition, constructor, theorem statement, parser,
 diagnostic or wire policy changes in this proof-only step.
 
+Strict semicolon-terminated expression prefixes now compose with the existing
+recursive body and function-entry adapters (ADR-0240). The original expression
+is resolved, lowered and typed in the existing inputs, with no Unit-type
+restriction. Its original tail uses those same inputs: no source spelling,
+LocalId or parameter row is introduced. Exact Core is a strict `letE` whose tail
+is weakened under its hidden positional binder. Original AST spans, statement
+order, first-match caller tables and owner-relative allocation remain intact.
+
+Four independent discard constructors retain all previous constructors, and
+all 58 directly affected theorem statements remain unchanged. A new exact
+child-decomposition theorem retains the original expression and unweakened tail
+Core. Typing and raw evaluation compose existing insertion/reflection laws;
+exact paths first insert the actual discarded value into the tail's closed path
+and then preserve any outer continuation. Cost and source bound add head plus
+tail plus two. Discarded work remains strict, including unused products or
+noncommutative arithmetic. These are the existing Lean Core transition counts,
+not optimized Rust execution counts.
+
+Independent mixed-prefix and complete parsed consumers retain original scopes,
+exact Core, nominal static types, actual opaque values, complete entry contracts
+and genuine saved-continuation residuals. Four previous parsed rejection claims
+become independent successes using their original sources and callers. Narrower
+body-only adapters and neighboring rejections remain unchanged. Missing
+semicolons or terminal tails, statements after return, assignment, general calls,
+unknown children and invalid whole contracts are not accepted by this extension.
+Core/Resolved definitions, parameter-only records, parser, diagnostics and wire
+formats do not change.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
@@ -1504,10 +1532,13 @@ leaking names. Descendants see ancestor lets but cannot shadow them.
 Exact-Core factorization, parameter positions, owner/type-name transport, stores
 and checkpoints lift through the new provenance. The runner still executes the
 prepared Core directly and adds no transitions or second value reversal.
+Semicolon-terminated expression prefixes also compose at these positions
+(ADR-0240), retaining the source scope while weakening only the tail Core under
+a strict hidden binder. They add no parameter rows or source identities.
 
 The three entry fuel-bound theorems now use `typedLetReturnTreeFuelBound`, adding
-each initializer bound and two, or a condition bound and maximum recursive arm
-bound and two. A selected branch-local let costs seven while the old prefix bound
+each initializer or discarded-expression bound and two, or a condition bound and
+maximum recursive arm bound and two. A selected branch-local let costs seven while the old prefix bound
 is four, so the old formula cannot remain the general entry guarantee. Other generic
 entry theorem statements retain their premises and
 conclusions over the broadened judgments. Value-free compilation still requires

@@ -177,6 +177,9 @@ import Solcore.Test.FrontendParsedInferredLetEntries
 import Solcore.Test.FrontendLocalFragmentProperties
 import Solcore.Test.FrontendParsedLocalFragments
 import Solcore.Test.FrontendParsedLocalFragmentEntries
+import Solcore.Test.FrontendDiscardStatementProperties
+import Solcore.Test.FrontendParsedDiscardStatements
+import Solcore.Test.FrontendParsedDiscardEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5770,6 +5773,8 @@ def run : IO Unit := do
   frontendParsedInferredLetEntryTests
   frontendParsedLocalFragmentTests
   frontendParsedLocalFragmentEntryTests
+  frontendParsedDiscardStatementTests
+  frontendParsedDiscardEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
