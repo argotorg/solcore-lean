@@ -46,6 +46,8 @@ theorem TypedLetReturnTreeElaborates.localFragment
   | single child => exact child.localFragment
   | binding _ _ _ lowered _ _ ih | inferred _ _ lowered _ _ ih =>
       exact .letE lowered.localFragment ih
+  | discard _ lowered _ _ ih =>
+      exact .letE lowered.localFragment (ih.weakenAt 0)
   | conditional _ lowered _ _ _ thenIH elseIH =>
       exact .ifE lowered.localFragment thenIH elseIH
 

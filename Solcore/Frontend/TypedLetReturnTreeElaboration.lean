@@ -97,6 +97,25 @@ theorem elaborateTypedLetReturnTree?_conditional_children
     next different => cases result
   next notBool => cases remaining
 
+theorem elaborateTypedLetReturnTree?_discard_children
+    {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
+    {blockSpan statementSpan : Syntax.SourceSpan} {source : Syntax.Expr}
+    {rest : List Syntax.Statement} {core : Core.Expr} {type : Core.Ty}
+    (accepted : elaborateTypedLetReturnTree? types owner inputs
+      ⟨blockSpan, ⟨statementSpan, .expression source true⟩ :: rest⟩ = some (core, type)) :
+    ∃ expressionType expressionCore tailCore,
+      elaborateLocalExpression? inputs.names inputs.context source = some (expressionCore, expressionType) ∧
+      elaborateTypedLetReturnTree? types owner inputs ⟨blockSpan, rest⟩ = some (tailCore, type) ∧
+      core = .letE expressionCore (tailCore.weakenAt 0) := by
+  rw [elaborateTypedLetReturnTree?] at accepted
+  simp only [bind, Option.bind_eq_some_iff] at accepted
+  obtain ⟨⟨expressionCore, expressionType⟩, expressionAccepted,
+    ⟨tailCore, returnType⟩, tailAccepted, result⟩ := accepted
+  change some (.letE expressionCore (tailCore.weakenAt 0), returnType) = some (core, type) at result
+  simp only [Option.some.injEq, Prod.mk.injEq] at result
+  rcases result with ⟨rfl, rfl⟩
+  exact ⟨expressionType, expressionCore, tailCore, expressionAccepted, tailAccepted, rfl⟩
+
 theorem TypedLetReturnTreeElaborates.complete
     {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
     {body : Syntax.Block} {core : Core.Expr} {type : Core.Ty}
@@ -117,6 +136,11 @@ theorem TypedLetReturnTreeElaborates.complete
         (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
       rw [elaborateTypedLetReturnTree?]
       simp only [if_pos unused, initializerAccepted, ih, bind, Option.bind_some, pure, Pure.pure]
+  | discard resolution lowered typing _ ih =>
+      have expressionAccepted := elaborateLocalExpression?_complete resolution
+        (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
+      rw [elaborateTypedLetReturnTree?]
+      simp only [expressionAccepted, ih, bind, Option.bind_some, pure, Pure.pure]
   | conditional resolution lowered typing _ _ thenIH elseIH =>
       have conditionAccepted := elaborateLocalExpression?_complete resolution
         (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
@@ -179,6 +203,15 @@ theorem elaborateTypedLetReturnTree?_elaborates
                           (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
                           (elaborateTypedLetReturnTree?_elaborates thenAccepted)
                           (elaborateTypedLetReturnTree?_elaborates elseAccepted)
+              case expression source trailingSemicolon =>
+                cases trailingSemicolon with
+                | false => simp only [elaborateTypedLetReturnTree?, reduceCtorEq] at accepted
+                | true =>
+                    obtain ⟨expressionType, expressionCore, tailCore,
+                      expressionAccepted, tailAccepted, rfl⟩ := elaborateTypedLetReturnTree?_discard_children accepted
+                    obtain ⟨resolved, resolution, lowered, typing⟩ := elaborateLocalExpression?_sound expressionAccepted
+                    exact .discard resolution (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
+                      (elaborateTypedLetReturnTree?_elaborates tailAccepted)
 termination_by sizeOf body
 
 theorem elaborateTypedLetReturnTree?_iff

@@ -53,6 +53,17 @@ theorem TypedLetReturnTreeElaborates.mapOwner
           (Resolved.typing_renameIds_iff (ownerLocalIdMap mapping)
             (ownerLocalIdMap_injective mapping injective)).mpr typing
       · simpa only [LocalTypeInputs.bindFresh_mapOwner inputs owner mapping injective] using ih
+  | @discard inputs blockSpan statementSpan expression rest discardedType returnType
+      resolved expressionCore tailCore resolution lowered typing _ ih =>
+      refine .discard (discardedType := discardedType)
+        (resolved := resolved.renameIds (ownerLocalIdMap mapping)) ?_ ?_ ?_ ih
+      · simpa only [LocalTypeInputs.mapIds_names] using (resolution.mapIds (ownerLocalIdMap mapping))
+      · simpa only [LocalTypeInputs.mapIds_ids] using
+          (Resolved.lowers_renameIds_iff (ownerLocalIdMap mapping)
+            (ownerLocalIdMap_injective mapping injective)).mpr lowered
+      · simpa only [LocalTypeInputs.mapIds_context] using
+          (Resolved.typing_renameIds_iff (ownerLocalIdMap mapping)
+            (ownerLocalIdMap_injective mapping injective)).mpr typing
   | @conditional inputs blockSpan ifSpan condition thenBody elseBody resolved
       conditionCore thenCore elseCore type resolution lowered typing _ _ thenIH elseIH =>
       refine .conditional (conditionResolved := resolved.renameIds (ownerLocalIdMap mapping))
@@ -146,6 +157,15 @@ theorem elaborateTypedLetReturnTree?_mapOwner
                           (ownerLocalIdMap_injective mapping injective),
                           elaborateTypedLetReturnTree?_mapOwner mapping injective types owner inputs thenBody,
                           elaborateTypedLetReturnTree?_mapOwner mapping injective types owner inputs elseBody]
+              case expression source trailingSemicolon =>
+                cases trailingSemicolon with
+                | false => simp only [elaborateTypedLetReturnTree?]
+                | true =>
+                    rw [elaborateTypedLetReturnTree?, elaborateTypedLetReturnTree?]
+                    simp only [LocalTypeInputs.mapIds_names, LocalTypeInputs.mapIds_context]
+                    rw [elaborateLocalExpression?_mapIds (ownerLocalIdMap mapping)
+                      (ownerLocalIdMap_injective mapping injective),
+                      elaborateTypedLetReturnTree?_mapOwner mapping injective types owner inputs ⟨blockSpan, rest⟩]
 termination_by sizeOf body
 
 end Solcore.Frontend

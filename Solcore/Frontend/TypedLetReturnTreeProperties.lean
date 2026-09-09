@@ -1,4 +1,6 @@
 import Solcore.Frontend.TypedLetReturnTreeElaboration
+import Solcore.Frontend.LocalFragmentProperties
+import Solcore.Core.LocalFragmentTypingInsertionProperties
 
 /-! Independent whole typing fixes recursive lets and both ordered branches.
 The original input types need no runtime values or extra name-uniqueness premise. -/
@@ -18,6 +20,7 @@ theorem TypedLetReturnTreeElaborates.hasType
       exact .binding meaning unused (resolution.reflects_type typing) ih
   | inferred unused resolution _ typing _ ih =>
       exact .inferred unused (resolution.reflects_type typing) ih
+  | discard resolution _ typing _ ih => exact .discard (resolution.reflects_type typing) ih
   | conditional resolution _ typing _ _ thenIH elseIH =>
       exact .conditional (resolution.reflects_type typing) thenIH elseIH
 
@@ -41,6 +44,12 @@ theorem TypedLetReturnTreeHasType.elaborates_exact
       obtain ⟨initializerCore, lowered, _⟩ := typed.lowers
       obtain ⟨tailCore, tailElaboration⟩ := ih
       exact ⟨.letE initializerCore tailCore, .inferred unused resolution
+        (by simpa only [LocalTypeInputs.context_ids] using lowered) typed tailElaboration⟩
+  | discard expressionTyping _ ih =>
+      obtain ⟨resolved, resolution, typed⟩ := expressionTyping.resolves
+      obtain ⟨expressionCore, lowered, _⟩ := typed.lowers
+      obtain ⟨tailCore, tailElaboration⟩ := ih
+      exact ⟨.letE expressionCore (tailCore.weakenAt 0), .discard resolution
         (by simpa only [LocalTypeInputs.context_ids] using lowered) typed tailElaboration⟩
   | conditional conditionTyping _ _ thenIH elseIH =>
       obtain ⟨resolved, resolution, typed⟩ := conditionTyping.resolves
@@ -94,6 +103,9 @@ theorem elaborateTypedLetReturnTree?_core_hasType
         exact lowered.preserves_type typing
       · simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.values,
           List.map_cons, Prod.snd] using ih
+  | discard _ lowered typing tail ih =>
+      rw [← LocalTypeInputs.context_ids] at lowered
+      exact .letE (lowered.preserves_type typing) (ih.weakenAt_zero_localFragment tail.localFragment _)
   | conditional _ lowered typing _ _ thenIH elseIH =>
       rw [← LocalTypeInputs.context_ids] at lowered
       exact .ifE (lowered.preserves_type typing) thenIH elseIH
