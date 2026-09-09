@@ -522,6 +522,25 @@ delayed closures, writes, allocation and rejected unselected branches. The old
 pure and whole-entry endpoints remain unchanged; a direct source-call evaluator,
 body/entry integration and runtime-world validation are still separate work.
 
+Original singleton application-return bodies now have a separate opt-in profile
+(ADR-0247). The complete block must contain exactly one return with an original
+application expression. Four independent rules preserve the block/return/child
+syntax and the child's exact Core, type, value, stores and actual cost. Static
+checking corresponds exactly to independent elaboration and whole typing; raw
+evaluation and cost laws retain the child semantics. Ordered IDs give Core
+evaluation and closed exact-cost correspondence both ways, with the same cost
+under every retained continuation.
+
+The new body checker and runner equal their child endpoints as complete Options,
+at every fuel and store. No return frame, binder, source ID or transition is added.
+This preserves faults, static tags and genuine checkpoints as well as successful
+results, so existing cost, resumption and runtime-world guarantees transfer using
+the same actual inputs. Whole-body absence and fixed-fuel typed-cost reflection
+also hold. Bare or pure returns, surrounding statements, conditional statements,
+nested blocks and nested calls are outside this profile. Existing pure/recursive
+body and whole-entry acceptance remain unchanged; general body integration must
+separately address their local-fragment insertion, store and fuel contracts.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

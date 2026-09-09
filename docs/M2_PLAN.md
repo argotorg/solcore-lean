@@ -370,6 +370,21 @@ or whole-function entries. A direct source-call evaluator, body integration and 
 executable runtime-world validator remain separate work; there is no source-only
 bound or arbitrary-store safety claim.
 
+An original singleton application return is now connected as a separate body
+profile (ADR-0247). Independent whole typing, exact elaboration, raw evaluation
+and actual costs retain the original child and both enclosing spans. Static
+correspondence and raw/cost laws reuse the application proofs, including both
+directions of closed Core correspondence and forward paths at one fixed cost
+under every continuation. Complete child/body checker and runner equalities
+preserve rejection, faults, tags and saved states at every fuel and store, with
+zero extra Core transitions. Existing runtime-world and resumption guarantees
+transfer through those equalities; fixed-fuel whole-body typed-cost reflection
+does not assume successful evaluation from structural inputs alone. Old body and
+whole-entry endpoints remain unchanged. General body integration is separate:
+recursive discards also rely on local-fragment positional insertion, not just
+store independence and source-only bounds. The new profile does not add bare or
+pure returns, surrounding statements, nested blocks or nested calls.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
