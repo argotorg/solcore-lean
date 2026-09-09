@@ -1067,6 +1067,37 @@ Named-only adapters, source lambdas, global resolution and unsupported type
 constructors remain unchanged. Old rejection fixtures migrate with their exact
 source contexts; wrong Unit/Word arguments still fail actual binding.
 
+Shared computation bodies now admit typed and inferred same-name let bindings,
+including parameter shadowing and repeated same-block bindings (ADR-0273).
+Each original initializer uses the old scope; only afterward does the existing
+owner-filtered allocator prepend a new identity, type and actual value.
+First-match lookup selects the new row in the tail, while every old row and
+captured value remains present. A new binding may have a different type.
+The Core let, raw evaluation and exact-cost rules are unchanged.
+
+Admission has a deliberate terminal-if boundary. The pinned Rust resolver visits
+bare then and else lists sequentially in one scope, whereas explicit blocks and
+individual match arms introduce scopes. A source-only occurrence relation and
+exact Boolean guard therefore require the then body not to expose any let that
+rebinds a current input spelling. Both arms of nested unscoped ifs are inspected;
+explicit block and match interiors stop that inspection. Else shadowing is
+allowed because these ifs are terminal. Then-only new names are still unavailable
+to Lean's else inputs: this is a conservative profile, not complete reference
+name resolution or permission for nonterminal sequencing.
+
+Independent typing, checking, execution and cost retain the shared twelve,
+recursive fourteen and entry four theorem contracts. The old fresh-name body
+adapters and earlier runtime endpoints retain their restrictions and one-way
+embedding; duplicate parameters remain rejected. Only three original recursive
+rejection fixtures move to positives, preserving their source contexts and costs.
+New consumers cover arbitrary repeated spellings and actual values, sparse and
+foreign identities, changed types, explicit scope barriers and rejected bare
+then shadows despite successful raw else evaluation. Parsed captured-reader and
+writer examples retain allocations, writes, exact 45-step paths, genuine saved
+worlds and resumption; corrupt stores still fail the separate runtime validator
+and preserve preceding effects on raw faults. Source lambdas, global resolution,
+general early returns and older non-shadowing endpoint policies are unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

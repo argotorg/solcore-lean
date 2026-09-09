@@ -287,6 +287,11 @@ import Solcore.Test.FrontendUnaryFunctionTypeProperties
 import Solcore.Test.FrontendParsedUnaryFunctionTypes
 import Solcore.Test.FrontendParsedUnaryFunctionParameters
 import Solcore.Test.FrontendParsedUnaryFunctionTypeEffects
+import Solcore.Test.FrontendScopedShadowingProperties
+import Solcore.Test.FrontendComputationScopeBoundaryProperties
+import Solcore.Test.FrontendParsedScopedShadowingMigrations
+import Solcore.Test.FrontendParsedScopedShadowingBoundaries
+import Solcore.Test.FrontendParsedScopedShadowingEffects
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5948,6 +5953,9 @@ def run : IO Unit := do
   frontendParsedUnaryFunctionTypeTests
   frontendParsedUnaryFunctionParameterTests
   frontendParsedUnaryFunctionTypeEffectTests
+  frontendParsedScopedShadowingMigrationTests
+  frontendParsedScopedShadowingBoundaryTests
+  frontendParsedScopedShadowingEffectTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

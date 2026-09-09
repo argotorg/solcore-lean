@@ -688,6 +688,27 @@ closures, exact costs, all-fuel outcomes and genuine checkpoint/world extension.
 No source lambda, call-arity expansion, global resolution or implicit runtime
 world/inhabitant follows from function type meaning.
 
+Scoped same-name lets now extend the shared body engine (ADR-0273), not the
+older fresh-name body adapters. Typed and inferred initializers retain original
+inputs, then prepend a fresh identity and their own type/actual value without
+overwriting old rows. Repeated spellings, parameter shadowing and changed types
+reuse the existing Core let and raw/cost rules; duplicate parameters stay invalid.
+
+Preserve the pinned resolver boundary: bare if branches share sequential name
+resolution, explicit blocks and match arms do not. Independent source occurrence
+and Boolean exactness protect current input names from then-side exposed lets,
+including nested unscoped else branches. Else-side shadowing is terminal-only;
+then-only new names remain unavailable to Lean's else. This intentionally omits
+some reference programs rather than asserting complete name-resolution agreement.
+
+The shared12/recursive14/entry4 contracts and old one-way body embedding remain
+intact. Consumers retain the exact three migrated source contexts, arbitrary
+repeated-name proofs, actual captures/stores, old-name initializer lookup,
+45-step effect paths, raw failures and genuine checkpoint/world resumption.
+Further scope expansion must account for branch leakage and subsequent statements
+explicitly; this change does not establish nonterminal block/if sequencing,
+source lambdas, global resolution or automatic runtime-world validation.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
