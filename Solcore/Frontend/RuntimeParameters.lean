@@ -1,4 +1,4 @@
-import Solcore.Frontend.TypeNameProperties
+import Solcore.Frontend.StructuralTypeProperties
 import Solcore.Frontend.LocalInputs
 
 /-! Explicit runtime parameter input preparation. This restricted adapter starts
@@ -24,7 +24,7 @@ inductive RuntimeParametersBindFrom (types : TypeNameTable)
       List TypedRuntimeArgument → LocalInputs → Prop
   | nil {initial} : RuntimeParametersBindFrom types owner initial [] [] initial
   | cons {initial final span name annotation params argument args}
-      (meaning : TypeNameDenotes types annotation argument.type)
+      (meaning : StructuralTypeDenotes types annotation argument.type)
       (unused : name.value ∉ initial.names.map Prod.fst)
       (tail : RuntimeParametersBindFrom types owner
         (initial.bindFresh owner name.value argument.type argument.value argument.valueTyped)
@@ -44,7 +44,7 @@ private def bindRuntimeParametersFrom? (types : TypeNameTable)
   | [], [] => some initial
   | ⟨_, .typed none name annotation⟩ :: params, argument :: args =>
       if name.value ∉ initial.names.map Prod.fst then
-        if interpretTypeName? types annotation = some argument.type then
+        if interpretStructuralType? types annotation = some argument.type then
           bindRuntimeParametersFrom? types owner
             (initial.bindFresh owner name.value argument.type argument.value argument.valueTyped)
             params args
@@ -94,8 +94,8 @@ private theorem bindRuntimeParametersFrom?_sound
               | nil => simp only [bindRuntimeParametersFrom?, reduceCtorEq] at result
               | cons argument args =>
                   by_cases unused : name.value ∉ initial.names.map Prod.fst
-                  · by_cases meaning : interpretTypeName? types annotation = some argument.type
-                    · exact .cons (interpretTypeName?_sound meaning) unused
+                  · by_cases meaning : interpretStructuralType? types annotation = some argument.type
+                    · exact .cons (interpretStructuralType?_sound meaning) unused
                         (ih (by simpa only [bindRuntimeParametersFrom?, if_pos unused,
                           if_pos meaning] using result))
                     · simp only [bindRuntimeParametersFrom?, if_pos unused, if_neg meaning,

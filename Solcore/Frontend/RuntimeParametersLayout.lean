@@ -14,7 +14,7 @@ inductive RuntimeParameterRow (types : TypeNameTable) :
     Syntax.FunctionParameter → TypedRuntimeArgument → TypedLocalBinding → Prop where
   | typed {span : Syntax.SourceSpan} {name : Syntax.Identifier}
       {annotation : Syntax.TypeExpr} {argument : TypedRuntimeArgument} {id : Resolved.LocalId}
-      (meaning : TypeNameDenotes types annotation argument.type) :
+      (meaning : StructuralTypeDenotes types annotation argument.type) :
       RuntimeParameterRow types ⟨span, .typed none name annotation⟩ argument
         { name := name.value, id, type := argument.type, value := argument.value,
           valueTyped := argument.valueTyped }

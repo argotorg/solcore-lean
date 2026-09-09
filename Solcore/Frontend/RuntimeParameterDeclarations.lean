@@ -1,4 +1,4 @@
-import Solcore.Frontend.TypeNameProperties
+import Solcore.Frontend.StructuralTypeProperties
 import Solcore.Frontend.LocalTypeInputs
 import Solcore.Syntax.Declaration
 
@@ -14,7 +14,7 @@ inductive RuntimeParametersDeclareFrom (types : TypeNameTable)
       List Syntax.FunctionParameter → LocalTypeInputs → Prop
   | nil {initial} : RuntimeParametersDeclareFrom types owner initial [] initial
   | cons {initial final span name annotation type params}
-      (meaning : TypeNameDenotes types annotation type)
+      (meaning : StructuralTypeDenotes types annotation type)
       (unused : name.value ∉ initial.names.map Prod.fst)
       (tail : RuntimeParametersDeclareFrom types owner
         (initial.bindFresh owner name.value type) params final) :
@@ -31,7 +31,7 @@ private def declareRuntimeParametersFrom? (types : TypeNameTable)
   | [] => some initial
   | ⟨_, .typed none name annotation⟩ :: params =>
       if name.value ∉ initial.names.map Prod.fst then do
-        let type ← interpretTypeName? types annotation
+        let type ← interpretStructuralType? types annotation
         declareRuntimeParametersFrom? types owner (initial.bindFresh owner name.value type) params
       else none
   | _ => none
@@ -72,12 +72,12 @@ private theorem declareRuntimeParametersFrom?_sound {types : TypeNameTable}
           | some marker => simp only [declareRuntimeParametersFrom?, reduceCtorEq] at result
           | none =>
               by_cases unused : name.value ∉ initial.names.map Prod.fst
-              · cases interpreted : interpretTypeName? types annotation with
+              · cases interpreted : interpretStructuralType? types annotation with
                 | none =>
                     simp only [declareRuntimeParametersFrom?, if_pos unused, interpreted,
                       bind, Option.bind_none, reduceCtorEq] at result
                 | some type =>
-                    exact .cons (interpretTypeName?_sound interpreted) unused
+                    exact .cons (interpretStructuralType?_sound interpreted) unused
                       (ih (by simpa only [declareRuntimeParametersFrom?, if_pos unused,
                         interpreted, bind, Option.bind_some] using result))
               · simp only [declareRuntimeParametersFrom?, if_neg unused, reduceCtorEq] at result
