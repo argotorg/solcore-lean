@@ -35,9 +35,7 @@ private theorem fold_evaluates_iff
     {environment : Core.Environment} {actual value : Core.Value}
     {initialStore finalStore : Core.Store}
     {E : Syntax.Block → Prop}
-    (patterns : ∀ entry ∈ entries, match entry.2.1 with
-      | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
-      | some word => WordMatchPatternDenotes entry.1.value.pattern word)
+    (patterns : ∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1)
     (branches : ∀ entry ∈ entries, Core.Evaluates (actual :: environment) initialStore
       (entry.2.2.weakenAt 0) value finalStore ↔ E entry.1.value.body)
     (fallback : ∀ entry ∈ defaultEntry.toList, Core.Evaluates (actual :: environment) initialStore
@@ -70,14 +68,13 @@ private theorem fold_evaluates_iff
           have same : entry.2.2.weakenAt 0 = core := by
             simpa only [List.foldr_cons, tag, Option.some.injEq] using lowered
           subst core
-          obtain ⟨marker, shape⟩ := meaning
           constructor
-          · intro evaluation; exact ⟨_, 0, .wildcard shape, branch.mp evaluation⟩
+          · intro evaluation; exact ⟨_, 0, .wildcard meaning, branch.mp evaluation⟩
           · rintro ⟨selected, tests, choice, evaluated⟩
             cases choice with
             | wildcard _ => exact branch.mpr evaluated
-            | hit other => obtain ⟨_, wrong, _⟩ := other; simp [shape] at wrong
-            | miss other _ _ => obtain ⟨_, wrong, _⟩ := other; simp [shape] at wrong
+            | hit other => cases meaning.tag_unique other
+            | miss other _ _ => cases meaning.tag_unique other
       | some literal =>
           simp only [tag] at meaning
           simp only [List.foldr_cons, tag] at lowered
@@ -99,7 +96,7 @@ private theorem fold_evaluates_iff
                 exact ⟨selected, tests + 1, .miss meaning unequal choice, selectedBranch⟩
           · rintro ⟨selected, tests, choice, evaluated⟩
             cases choice with
-            | wildcard shape => obtain ⟨_, wrong, _⟩ := meaning; simp [shape] at wrong
+            | wildcard other => cases meaning.tag_unique other
             | hit actualMeaning =>
                 have same := actualMeaning.value_unique meaning
                 subst same

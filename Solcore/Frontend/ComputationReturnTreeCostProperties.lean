@@ -37,9 +37,7 @@ private theorem fold_path
     (defaultEntry : Option (Syntax.Block × Core.Expr))
     {actual value : Core.Value} {environment : Core.Environment} {initialStore finalStore : Core.Store}
     {selected : Syntax.Block} {tests branchCost : Nat} {core : Core.Expr}
-    (patterns : ∀ entry ∈ entries, match entry.2.1 with
-      | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
-      | some word => WordMatchPatternDenotes entry.1.value.pattern word)
+    (patterns : ∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1)
     (choice : WordMatchChooses actual (entries.map Prod.fst) (defaultEntry.map Prod.fst) selected tests)
     (branches : ∀ entry ∈ entries, entry.1.value.body = selected → ∀ continuation,
       Core.Steps branchCost ⟨.eval (entry.2.2.weakenAt 0) (actual :: environment), continuation, initialStore⟩
@@ -70,23 +68,17 @@ private theorem fold_path
       have pattern := patterns ⟨arm, tag, branchCore⟩ (by simp)
       cases tag with
       | none =>
-          obtain ⟨marker, shape⟩ := pattern
           simp only [List.foldr_cons, Option.some.injEq] at lowered
           subst core
           cases choice with
           | wildcard _ => simpa using branches ⟨arm, none, branchCore⟩ (by simp) rfl continuation
           | hit meaning | miss meaning _ _ =>
-              obtain ⟨literal, literalShape, _⟩ := meaning
-              rw [shape] at literalShape
-              cases literalShape
+              cases meaning.tag_unique pattern
       | some literal =>
           simp only [List.foldr_cons, Option.map_eq_some_iff] at lowered
           obtain ⟨tailCore, tailLowered, rfl⟩ := lowered
           cases choice with
-          | wildcard shape =>
-              obtain ⟨source, literalShape, _⟩ := pattern
-              rw [shape] at literalShape
-              cases literalShape
+          | wildcard meaning => cases meaning.tag_unique pattern
           | hit meaning =>
               have equal := meaning.value_unique pattern
               subst_vars
