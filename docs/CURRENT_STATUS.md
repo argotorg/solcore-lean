@@ -579,6 +579,22 @@ success nor permits closure-producing children: such children can capture the
 added slot. No executable or old body/entry contract changes; recursive mixed
 bodies still need a separate structural insertion proof beyond this call leaf.
 
+A shared nonrecursive computation child now combines the unchanged pure
+expression and root single-argument application profiles (ADR-0250). The original
+root selects its old checker; independent whole typing and exact provenance
+agree with this combined checker. Raw and cost relations wrap either original
+child without changing values, stores or transition counts. Whole typing still
+checks children skipped by raw evaluation; actual call values and effects are
+not inferred from static types.
+
+Eight shared contracts cover checking, typing, raw/cost existence and determinism,
+raw/Core correspondence, uniform continuation paths and exact closed costs.
+Three insertion kernels preserve arbitrary caller/context slots for either
+branch. No duplicate runner, runtime-world or source-bound family is introduced.
+This is a child for subsequent mixed-body work, not yet a new let/discard/guard
+or whole-entry implementation. Nested calls, calls inside pure operators and
+grouping around an entire call remain outside this nonrecursive union.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

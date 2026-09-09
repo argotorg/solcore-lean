@@ -413,6 +413,17 @@ These proof-only leaf laws support future discard integration; the old pure
 fragment and all executable body/entry contracts remain unchanged. A mixed body
 still needs its own recursive closure argument and effect-aware semantics.
 
+A common pure-or-root-application computation child is available (ADR-0250).
+Its original-root dispatch, independent exact provenance and zero-overhead
+raw/cost union preserve both older profiles unchanged. Eight common semantic
+contracts and three insertion kernels support later mixed-body proofs without
+duplicating checker/runner/safety aliases. Static typing remains separate from
+actual runtime-world typing, skipped raw children remain skipped, and effects
+retain both store endpoints. This does not yet add whole-body acceptance for
+call initializers, discards or guards; recursive body insertion closure is still
+required. Nested call syntax and calls embedded inside the pure profile are
+not added by the union.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
