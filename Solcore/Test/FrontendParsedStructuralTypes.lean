@@ -5,7 +5,7 @@ import Solcore.Frontend.RuntimeFunctionCompilation
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
 
 /-! Complete types carry independent meaning. One structural return annotation
-now executes; parameter and initialized-let annotations remain named-only. -/
+and parameters now execute; initialized-let annotations remain named-only. -/
 set_option autoImplicit false
 namespace Tests
 open Solcore Solcore.Frontend
@@ -126,64 +126,95 @@ private def raw (names : LocalNameTable) (env : Resolved.Environment) (store : C
         rw [sourceAt]; exact .pair first.costed second.costed⟩
   | _ => throw (IO.userError "outside independent migrated return script")
 termination_by sizeOf source
+private structure Declared (initial : LocalTypeInputs) (parameters : List Syntax.FunctionParameter) where
+  inputs : LocalTypeInputs
+  evidence : RuntimeParametersDeclareFrom table owner initial parameters inputs
+private def declared (initial : LocalTypeInputs) (parameters : List Syntax.FunctionParameter) :
+    IO (Declared initial parameters) := do
+  match parametersAt : parameters with
+  | [] => return ⟨initial, by rw [parametersAt]; exact .nil⟩
+  | ⟨_, .typed none name annotation⟩ :: rest =>
+      let certificate ← certify table annotation
+      if unused : name.value ∉ initial.names.map Prod.fst then
+        let tail ← declared (initial.bindFresh owner name.value certificate.type) rest
+        return ⟨tail.inputs, by rw [parametersAt]; exact .cons certificate.meaning unused tail.evidence⟩
+      else throw (IO.userError "original parameter spelling repeated")
+  | _ => throw (IO.userError "unsupported original parameter shape")
 private def checkedReturn (content : String) (arguments : List TypedRuntimeArgument)
     (core : Core.Expr) (type : Core.Ty) (value : Core.Value) (cost : Nat)
     (path : ∀ store k, Core.Steps cost ⟨.eval core (arguments.reverse.map (·.value)), k, store⟩
-      ⟨.ret value, k, store⟩) : IO Unit := do
+      ⟨.ret value, k, store⟩) (structuralReturn : Bool := true) : IO Unit := do
   let source ← declaration content
-  match returnsAt : source.value.signature.returnsClause with
-  | some ⟨_, ⟨_, [annotation]⟩⟩ =>
-      let independent ← certify table annotation
-      if sameType : independent.type = type then
-        let meaning : StructuralTypeDenotes table annotation type := sameType ▸ independent.meaning
-        have returnsMeaning : RuntimeReturnTypeDenotes table source.value.signature.returnsClause type := by
-          rw [returnsAt]; exact .single meaning
-        if policy : source.value.signature.genericParameters = none ∧ source.value.signature.whereClause = none ∧
-            source.value.signature.modifiers.publicMarker = none ∧ source.value.signature.modifiers.payableMarker = none then
-          have header : RuntimeFunctionHeader table source.value.signature type :=
-            ⟨policy.1, policy.2.1, policy.2.2.1, policy.2.2.2, returnsMeaning⟩
-          have _ := interpretRuntimeFunctionHeader?_iff.mpr header
-          assertTrue (interpretTypeName? table annotation).isNone "old named-only type adapter broadened"
-          let some compiled := compileRuntimeFunction? table owner source | throw (IO.userError "structural return did not compile")
-          assertTrue (decide (compiled.core = core ∧ compiled.returnType = type)) "migrated return changed fixed Core/type"
-          match preparedAt : prepareRuntimeFunction? table owner source arguments with
-          | none => throw (IO.userError "original actual arguments did not prepare")
-          | some prepared =>
-              let preparation := prepareRuntimeFunction?_sound preparedAt
-              assertTrue (decide (prepared.core = core ∧ prepared.returnType = type ∧
-                prepared.inputs.names = compiled.inputs.names ∧ prepared.inputs.context = compiled.inputs.context ∧
-                prepared.inputs.bindings.length = source.value.signature.parameters.elements.length ∧
-                prepared.inputs.environment.values = arguments.reverse.map (·.value))) "original argument layout changed"
-              match bodyAt : source.value.body with
-              | ⟨_, [⟨_, .returnStmt (some operand)⟩]⟩ =>
-                  for store in [[], [w.value, .cellRef .word 99]] do
-                    let original ← raw prepared.inputs.names prepared.inputs.environment store operand
-                    assertTrue (decide (original.value = value ∧ original.cost = cost)) "independent source value/cost changed"
-                    have bodyCost : TypedLetReturnTreeEvaluatesWithCost owner prepared.inputs.names prepared.inputs.environment
-                        store source.value.body original.value store original.cost := by
-                      rw [bodyAt]; exact .single (.expression original.costed)
-                    let costed := RuntimeFunctionEvaluatesWithCost.intro preparation bodyCost
-                    have _ := (runtimeFunctionEvaluatesWithCost_iff_evaluate.mp costed).2
-                    have _ := (path store []).runStateful_done_iff (fuel := cost)
-                    assertTrue (decide (evaluateRuntimeFunctionWithCost? table owner source arguments = some (type, value, cost)))
-                      "whole direct return differs from independent fixture"
-                    for fuel in List.range (cost + 3) do
-                      have _ := costed.run_done_iff (fuel := fuel)
-                      assertTrue (match runRuntimeFunction? table owner source arguments fuel store with
-                        | some (t, .done v s) => decide (cost ≤ fuel ∧ t = type ∧ v = value ∧ s = store)
-                        | some (t, .outOfFuel checkpoint) => decide (fuel < cost ∧ t = type ∧ checkpoint.store = store)
-                        | _ => false) "migrated return changed threshold or own store"
-                    for spent in List.range cost do
-                      match exhausted : runRuntimeFunction? table owner source arguments spent store with
-                      | some (t, .outOfFuel checkpoint) =>
-                          have _ := runRuntimeFunction?_resume exhausted (cost - spent)
-                          assertTrue (decide (t = type ∧ Core.runStateful (cost - spent) checkpoint = .done value store))
-                            "migrated return lost its genuine remaining path"
-                      | _ => throw (IO.userError "migrated return checkpoint missing")
-              | _ => throw (IO.userError "original migrated body shape changed")
-        else throw (IO.userError "independent header policy not satisfied")
-      else throw (IO.userError "independent structural return type differs from fixture")
-  | _ => throw (IO.userError "expected exactly one original return annotation")
+  let returnsMeaning : PLift (RuntimeReturnTypeDenotes table source.value.signature.returnsClause type) ←
+    match returnsAt : source.value.signature.returnsClause with
+    | none =>
+        if same : type = .unit then pure ⟨by rw [returnsAt, same]; exact .absent⟩
+        else throw (IO.userError "absent return must have Unit type")
+    | some ⟨_, ⟨_, [annotation]⟩⟩ =>
+        let independent ← certify table annotation
+        if same : independent.type = type then
+          if structuralReturn then
+            assertTrue (interpretTypeName? table annotation).isNone "old named-only type adapter broadened"
+          pure ⟨by rw [returnsAt]; exact .single (same ▸ independent.meaning)⟩
+        else throw (IO.userError "independent structural return type differs from fixture")
+    | _ => throw (IO.userError "expected exactly one return annotation")
+  if policy : source.value.signature.genericParameters = none ∧ source.value.signature.whereClause = none ∧
+      source.value.signature.modifiers.publicMarker = none ∧ source.value.signature.modifiers.payableMarker = none then
+    have header : RuntimeFunctionHeader table source.value.signature type :=
+      ⟨policy.1, policy.2.1, policy.2.2.1, policy.2.2.2, returnsMeaning.down⟩
+    have _ := interpretRuntimeFunctionHeader?_iff.mpr header
+  else throw (IO.userError "independent header policy not satisfied")
+  let independent ← declared .empty source.value.signature.parameters.elements
+  have _ := RuntimeParametersDeclare.complete independent.evidence
+  if !structuralReturn then
+    for parameter in source.value.signature.parameters.elements do
+      let .typed none _ annotation := parameter.value | throw (IO.userError "parameter shape changed")
+      assertTrue (interpretTypeName? table annotation).isNone "old named-only parameter meaning broadened"
+  let expectedNames ← source.value.signature.parameters.elements.mapM fun parameter => do
+    let .typed none name _ := parameter.value | throw (IO.userError "parameter shape changed")
+    pure name.value
+  let expected := (expectedNames.zip arguments).zipIdx.map fun (entry, index) =>
+    (entry.1, (⟨owner, index⟩ : Resolved.LocalId), entry.2.type)
+  assertTrue (decide (independent.inputs.bindings.map (fun row => (row.name,row.id,row.type)) = expected.reverse ∧
+    expectedNames.length = arguments.length)) "one original parameter no longer has one exact row/argument"
+  let some compiled := compileRuntimeFunction? table owner source | throw (IO.userError "structural return did not compile")
+  assertTrue (decide (compiled.core = core ∧ compiled.returnType = type ∧
+    compiled.inputs.names = independent.inputs.names ∧ compiled.inputs.context = independent.inputs.context)) "migrated return changed fixed Core/type"
+  match preparedAt : prepareRuntimeFunction? table owner source arguments with
+  | none => throw (IO.userError "original actual arguments did not prepare")
+  | some prepared =>
+      let preparation := prepareRuntimeFunction?_sound preparedAt
+      assertTrue (decide (prepared.core = core ∧ prepared.returnType = type ∧
+        prepared.inputs.names = compiled.inputs.names ∧ prepared.inputs.context = compiled.inputs.context ∧
+        prepared.inputs.bindings.length = source.value.signature.parameters.elements.length ∧
+        prepared.inputs.environment.values = arguments.reverse.map (·.value))) "original argument layout changed"
+      match bodyAt : source.value.body with
+      | ⟨_, [⟨_, .returnStmt (some operand)⟩]⟩ =>
+          for store in [[], [w.value, .cellRef .word 99]] do
+            let original ← raw prepared.inputs.names prepared.inputs.environment store operand
+            assertTrue (decide (original.value = value ∧ original.cost = cost)) "independent source value/cost changed"
+            have bodyCost : TypedLetReturnTreeEvaluatesWithCost owner prepared.inputs.names prepared.inputs.environment
+                store source.value.body original.value store original.cost := by
+              rw [bodyAt]; exact .single (.expression original.costed)
+            let costed := RuntimeFunctionEvaluatesWithCost.intro preparation bodyCost
+            have _ := (runtimeFunctionEvaluatesWithCost_iff_evaluate.mp costed).2
+            have _ := (path store []).runStateful_done_iff (fuel := cost)
+            assertTrue (decide (evaluateRuntimeFunctionWithCost? table owner source arguments = some (type, value, cost)))
+              "whole direct return differs from independent fixture"
+            for fuel in List.range (cost + 3) do
+              have _ := costed.run_done_iff (fuel := fuel)
+              assertTrue (match runRuntimeFunction? table owner source arguments fuel store with
+                | some (t, .done v s) => decide (cost ≤ fuel ∧ t = type ∧ v = value ∧ s = store)
+                | some (t, .outOfFuel checkpoint) => decide (fuel < cost ∧ t = type ∧ checkpoint.store = store)
+                | _ => false) "migrated return changed threshold or own store"
+            for spent in List.range cost do
+              match exhausted : runRuntimeFunction? table owner source arguments spent store with
+              | some (t, .outOfFuel checkpoint) =>
+                  have _ := runRuntimeFunction?_resume exhausted (cost - spent)
+                  assertTrue (decide (t = type ∧ Core.runStateful (cost - spent) checkpoint = .done value store))
+                    "migrated return lost its genuine remaining path"
+              | _ => throw (IO.userError "migrated return checkpoint missing")
+      | _ => throw (IO.userError "original migrated body shape changed")
 end ParsedStructuralTypes
 open ParsedStructuralTypes
 
@@ -236,9 +267,12 @@ def frontendParsedStructuralTypeTests : IO Unit := do
     have _ := interpretStructuralType?_congr_lookup table (table ++ table) sameLookup source
     assertTrue (decide (interpretStructuralType? table source = interpretStructuralType? (table ++ table) source))
       "duplicate-suffix lookup-equivalent tables changed the full optional result"
-  oldGateRejected "function unitParam(x: ()){return ();}" [u] .unit
-  oldGateRejected "function pairParam(x: (Word,Bool)){return ();}" [p] (.product .word .bool)
-  oldGateRejected "function singleParam(x: (Word)) returns(Word){return x;}" [w] .word
+  checkedReturn "function unitParam(x: ()){return ();}" [u] .unit .unit .unit 1
+    (by intro store k; exact .cons .unit .refl) false
+  checkedReturn "function pairParam(x: (Word,Bool)){return ();}" [p] .unit .unit .unit 1
+    (by intro store k; exact .cons .unit .refl) false
+  checkedReturn "function singleParam(x: (Word)) returns(Word){return x;}" [w] (.var 0) .word w.value 1
+    (by intro store k; exact .cons (.var rfl) .refl) false
   checkedReturn "function unitReturn() returns(()){return ();}" [] .unit .unit .unit 1
     (by intro store k; exact .cons .unit .refl)
   checkedReturn "function pairReturn(x: Word,c: Bool) returns((Word,Bool)){return (x,c);}" [w,b]

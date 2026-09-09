@@ -88,7 +88,33 @@ private def checkBinding (content : String) (expectedTypes : List Core.Ty)
   assertTrue (decide (bound.environment.values = arguments.reverse.map (·.value)))
     "static preparation lost actual argument values or their order"
 
+private def checkProductParameter : IO Unit := do
+  let content := "(x: (Word, Bool))"
+  let some parameters ← parsed? Syntax.Parser.functionParameters content
+    | throw (IO.userError "original product parameter did not fully parse")
+  match parametersAt : parameters.elements with
+  | [⟨_, .typed none name annotation⟩] =>
+      match annotationAt : annotation with
+      | ⟨_, .tuple [left, right]⟩ =>
+          if meanings : interpretTypeName? types left = some .word ∧ interpretTypeName? types right = some .bool then
+            have meaning : StructuralTypeDenotes types annotation (.product .word .bool) := by
+              rw [annotationAt]
+              exact .pair (interpretTypeName?_sound meanings.1).structural (interpretTypeName?_sound meanings.2).structural
+            have independent : RuntimeParametersDeclare types owner parameters.elements
+                (LocalTypeInputs.empty.bindFresh owner name.value (.product .word .bool)) := by
+              rw [parametersAt]; exact .cons meaning (by simp) .nil
+            have _ := independent.complete
+            let inputs ← checkDeclaration parameters.elements [.product .word .bool]
+            assertTrue (decide (rows inputs = [("x", ⟨owner, 0⟩, .product .word .bool)])) "product parameter was flattened"
+            checkExpression inputs "x" (.var 0) (.product .word .bool)
+            checkBinding content [.product .word .bool]
+              [⟨.product .word .bool, .pair wordArg.value (.bool true), .pair .word .bool⟩]
+          else throw (IO.userError "independent original product leaves changed")
+      | _ => throw (IO.userError "original structural annotation lost its two children")
+  | _ => throw (IO.userError "original source no longer has exactly one parameter")
+
 def frontendParsedParameterDeclarationTests : IO Unit := do
+  checkProductParameter
   let empty ← declare "()" []
   assertTrue empty.bindings.isEmpty "empty declaration introduced a binding"
   let opaqueInputs ← declare "(x: Opaque)" [.namedData ⟨91⟩]
@@ -124,7 +150,7 @@ def frontendParsedParameterDeclarationTests : IO Unit := do
   for content in ["(x: Bool, x: Bool)", "(x: Bool, y: Word, x: Word)",
       "(x: Unknown)", "(x: bool)", "(x: Bool<Word>)", "(x: @Bool)",
       "(x: mapping(Word => Bool))", "(x: function(Word) returns (Bool))",
-      "(x: (Word, Bool))", "(comptime x: Bool)"] do
+      "(comptime x: Bool)"] do
     let some parameters ← parsed? Syntax.Parser.functionParameters content
       | throw (IO.userError s!"{content}: adapter rejection case should parse")
     assertTrue (declareRuntimeParameters? types owner parameters.elements).isNone

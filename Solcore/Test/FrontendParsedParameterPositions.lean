@@ -41,7 +41,7 @@ private theorem desiredPosition {table : TypeNameTable} {owner : Resolved.Declar
       Resolved.LocalScope.Lookup inputs.context ⟨owner, index⟩ type ∧
       Resolved.LocalScope.IndexOf inputs.context.ids ⟨owner, index⟩ (parameters.length - 1 - index) := by
   obtain ⟨bounded, actualType, actualMeaning, rowAt, named, typed, indexed⟩ := declared.position parameterAt
-  have same := actualMeaning.type_unique meaning
+  have same := actualMeaning.type_unique meaning.structural
   cases same
   exact ⟨bounded, rowAt, named, typed, indexed⟩
 
