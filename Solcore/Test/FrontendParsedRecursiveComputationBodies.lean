@@ -16,8 +16,7 @@ namespace Tests
 open Solcore Solcore.Frontend
 open RecursiveLocalComputationElaborates RecursiveLocalComputationFragment RecursiveLocalComputationEvaluatesWithCost
 namespace ParsedRecursiveComputationBodies
-private def check (p : Bool) (label : String) : IO Unit := do
-  unless p do throw (IO.userError label)
+private def check (p : Bool) (label : String) : IO Unit := do unless p do throw (IO.userError label)
 private def owner : Resolved.DeclarationId := ⟨⟨.main,⟨[⟨"Shared",by decide⟩],by decide⟩⟩,54⟩
 private def id (n : Nat) : Resolved.LocalId := ⟨owner,n⟩
 private def foreign : Resolved.LocalId := ⟨{owner with declarationIndex := 91},302⟩
@@ -27,8 +26,7 @@ private def inputs (a : Core.Ty) : LocalTypeInputs := ⟨[⟨"x",id 4,a⟩,⟨"f
 private def types (a : Core.Ty) : TypeNameTable := [(["Word"],.word),(["A"],a),(["A"],.bool)]
 private def w (n : Nat) := Core.Word.ofNatModulo n
 private def identity (a : Core.Ty) : Core.Value := .closure a a (.var 0) [.bool false]
-private def env (a : Core.Ty) (v : Core.Value) (choice : Bool) : Resolved.Environment :=
-  [(id 4,v),(foreign,identity a),(id 9,identity a),(id 12,identity a),(id 15,identity a),
+private def env (a : Core.Ty) (v : Core.Value) (choice : Bool) : Resolved.Environment := [(id 4,v),(foreign,identity a),(id 9,identity a),(id 12,identity a),(id 15,identity a),
     (id 20,.closure a .bool (.bool choice) [.unit]),(id 25,.bool false)]
 private def parsed (text : String) : IO Syntax.Block := do
   let text := "function original(){"++text++"}"; let file : Syntax.SourceFile := ⟨⟨.main,"shared-body.sol"⟩,text⟩
@@ -60,13 +58,7 @@ private def pureChild (i : LocalTypeInputs) (s : Syntax.Expr) : IO (Pure i s) :=
       if spelling : literal.value=.decimal "1" then
         return ⟨.word (w 1),.word (w 1),.word,by rw [shape]; exact .wordLiteral (one spelling),.word,.word⟩
       else throw (IO.userError "fixture literal")
-  | ⟨_,.binary left ⟨_,.add⟩ right⟩ =>
-      let a ← pureChild i left; let b ← pureChild i right
-      if both : a.type=.word ∧ b.type=.word then return ⟨.binary .wordAdd a.resolved b.resolved,.binary .wordAdd a.core b.core,.word,
-        by rw [shape]; exact .add a.resolution b.resolution,.binary a.lowered b.lowered,.binary (show Resolved.HasType i.context a.resolved .word from both.1 ▸ a.typing) (show Resolved.HasType i.context b.resolved .word from both.2 ▸ b.typing)⟩
-      else throw (IO.userError "Word operands")
   | _ => throw (IO.userError "pure fixture")
-termination_by sizeOf s
 private structure Child (i : LocalTypeInputs) (s : Syntax.Expr) where
   core : Core.Expr
   type : Core.Ty
@@ -86,6 +78,12 @@ private def child (i : LocalTypeInputs) (s : Syntax.Expr) : IO (Child i s) := do
             by rw [shape]; exact .application (ft ▸ f.typing) (same ▸ a.typing)⟩
           else throw (IO.userError "argument type")
       | _ => throw (IO.userError "Function type")
+  | ⟨_,.binary left ⟨_,.add⟩ right⟩ =>
+      let a ← child i left; let b ← child i right
+      if both : a.type=.word ∧ b.type=.word then return ⟨.binary .wordAdd a.core b.core,.word,
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.elaboration) (by simpa only [Core.BinaryOp.rightType, both.2] using b.elaboration),
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.typing) (by simpa only [Core.BinaryOp.rightType, both.2] using b.typing)⟩
+      else throw (IO.userError "Word operands")
   | _ => let a ← pureChild i s; return ⟨a.core,a.type,.pure a.resolution a.lowered a.typing,.pure (a.resolution.reflects_type a.typing)⟩
 termination_by sizeOf s
 private structure Static (ts : TypeNameTable) (i : LocalTypeInputs) (b : Syntax.Block) where
@@ -292,7 +290,8 @@ def frontendParsedRecursiveComputationBodyTests : IO Unit := do
     let body ← parsed text; let r ← costs (inputs .word).names (env .word (.word (w 17)) true) body
     have _ := (computationReturnTreeEvaluates_iff_exists_cost (ChildEval := RecursiveLocalComputationEvaluates) (ChildCost := RecursiveLocalComputationEvaluatesWithCost) recursiveLocalComputationEvaluates_iff_exists_cost).mpr ⟨_,r.evidence []⟩
     check (decide (r.value=.word (w 17) ∧ r.cost=14 ∧ elaborateRecursiveComputationReturnTree? (types .word) owner (inputs .word) body=none)) "raw success/whole unknown or duplicate"
-  for text in ["","f(g(x));","return f(g(x))+1;","{return x;}return x;","let r=r;return r;","if(p(g(x))){return x;}"] do
+  staticCheck .word "return f(g(x))+1;" (.binary .wordAdd (nested 1 2 0) (.word (w 1))) .word
+  for text in ["","f(g(x));","{return x;}return x;","let r=r;return r;","if(p(g(x))){return x;}"] do
     let body ← parsed text
     check (decide (elaborateRecursiveComputationReturnTree? (types .word) owner (inputs .word) body=none ∧
       elaborateComputationReturnTree? elaborateLocalComputation? (types .word) owner (inputs .word) body=none ∧ elaborateLocalComputationReturnTree? (types .word) owner (inputs .word) body=none)) "retained rejection boundary"

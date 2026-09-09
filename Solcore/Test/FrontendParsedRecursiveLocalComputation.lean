@@ -99,6 +99,12 @@ private def statics (ctx : Resolved.Context) (s : Syntax.Expr) : IO (Static ctx 
             by rw [shape]; exact .application (ft ▸ f.typing) (same ▸ a.typing)⟩
           else throw (IO.userError "argument type")
       | _ => throw (IO.userError "function type")
+  | ⟨_,.binary left ⟨_,.add⟩ right⟩ =>
+      let a ← statics ctx left; let b ← statics ctx right
+      if both : a.type=.word ∧ b.type=.word then return ⟨.binary .wordAdd a.core b.core,.word,
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.elaboration) (by simpa only [Core.BinaryOp.rightType, both.2] using b.elaboration),
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.typing) (by simpa only [Core.BinaryOp.rightType, both.2] using b.typing)⟩
+      else throw (IO.userError "migration Word operands")
   | _ => let p ← pureChild ctx s; return ⟨p.core,p.type,.pure p.resolution p.lowered p.typing,.pure (p.resolution.reflects_type p.typing)⟩
 termination_by sizeOf s
 private def staticCheck (a b c : Core.Ty) (text : String) (core : Core.Expr) (type : Core.Ty) (old : Bool := false) : IO Unit := do
@@ -232,7 +238,8 @@ def frontendParsedRecursiveLocalComputationTests : IO Unit := do
       exercise type x y (grouped depth "(maker(x))(y)") (.apply (call 3 0) (.var 4)) y 11 applied
     exercise type x y "f((maker(x))(y))" (.apply (.var 1) (.apply (call 3 0) (.var 4))) y 16
       (invoke (leaf 1 (identity type) rfl) applied (fun _ => .cons (.var rfl) .refl))
-  for text in ["f(g(x)) + x","(g(x),x)","c ? f(g(x)) : x","!g(x)","f()","f(x,y)","f(g(Missing))",
+  staticCheck .word .word .word "f(g(x)) + x" (.binary .wordAdd (.apply (.var 1) (call 2 0)) (.var 0)) .word
+  for text in ["(g(x),x)","c ? f(g(x)) : x","!g(x)","f()","f(x,y)","f(g(Missing))",
       "x(y)","f(c)","g(c ? x : Missing)","(lam(z: Word){return z;})(x)"] do
     let s ← parsed text
     check ((elaborateRecursiveLocalComputation? names (context .word .word .word) s).isNone) "outside recursive-call profile"

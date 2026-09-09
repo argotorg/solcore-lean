@@ -89,6 +89,13 @@ private def atom (i : LocalTypeInputs) (s : Syntax.Expr) : IO (Atom i s) := do
               .var (Resolved.LocalScope.index?_iff.mp indexed),.var (Resolved.LocalScope.lookup?_iff.mp typed)⟩
           | _,_ => throw (IO.userError "original row")
       | _ => throw (IO.userError "original name")
+  | ⟨_,.literal literal⟩ =>
+      if spelling : literal.value=.decimal "1" then
+        have denoted : WordLiteralDenotes literal (Core.Word.ofNatModulo 1) := by
+          change NumericLiteralDenotes literal.value 1; rw [spelling]
+          exact .decimal (by decide) (.cons (.decimal (digit := 1) (by decide) rfl) .nil)
+        return ⟨.word (Core.Word.ofNatModulo 1),.word (Core.Word.ofNatModulo 1),.word,by rw [shape]; exact .wordLiteral denoted,.word,.word⟩
+      else throw (IO.userError "migration literal")
   | _ => throw (IO.userError "not fixture atom")
 private structure Child (i : LocalTypeInputs) (s : Syntax.Expr) where
   core : Core.Expr
@@ -108,6 +115,11 @@ private def child (i : LocalTypeInputs) (s : Syntax.Expr) : IO (Child i s) := do
             rw [shape]; exact .application (ft ▸ f.evidence) (same ▸ a.evidence)⟩
           else throw (IO.userError "argument type")
       | _ => throw (IO.userError "callee type")
+  | ⟨_,.binary left ⟨_,.add⟩ right⟩ =>
+      let a ← child i left; let b ← child i right
+      if both : a.type=.word ∧ b.type=.word then return ⟨.binary .wordAdd a.core b.core,.word,
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.evidence) (by simpa only [Core.BinaryOp.rightType, both.2] using b.evidence)⟩
+      else throw (IO.userError "migration Word operands")
   | _ => let a ← atom i s; return ⟨a.core,a.type,.pure a.resolution a.lowered a.typing⟩
 termination_by sizeOf s
 private structure Body (ts : TypeNameTable) (o : Resolved.DeclarationId) (i : LocalTypeInputs) (b : Syntax.Block) where
@@ -274,7 +286,8 @@ def frontendParsedRecursiveComputationCompilationTests : IO Unit := do
       "function example(f:F,g:G,x:A) returns(Missing)","function example(comptime f:F,g:G,x:A) returns(R)",
       "function example(f:F,g:G,x:Missing) returns(R)","function example(f:F,g:G,f:A) returns(R)"] do rejected (head++suffix) true
   for marker in ["public","payable"] do rejected ("function example(f:F,g:G,x:A) "++marker++" returns(R)"++suffix) true .contract
-  for b in ["let x=f(g(x));return x;","let r;return x;","return f(g(x))+1;","let r=f(g(x));return f(r,x);",
+  let _ ← positive .word .word .word (owner 4) (text "return f(g(x))+1;") (.binary .wordAdd (.apply (.var 2) (call 1 0)) (.word (Core.Word.ofNatModulo 1)))
+  for b in ["let x=f(g(x));return x;","let r;return x;","let r=f(g(x));return f(r,x);",
       "{let r=f(g(x));}return r;","return f(g(x));return x;","let r:Missing=f(g(x));return r;"] do rejected (text b) false
   rejected (text "if(f(g(x))){return x;}else{{let r:Missing=x;return r;}}") false .module .bool
 end Tests
