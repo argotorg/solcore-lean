@@ -49,6 +49,14 @@ theorem recursiveLocalComputationHasType_iff_elaborates
         obtain ⟨leftCore, leftChild⟩ := leftIH
         obtain ⟨rightCore, rightChild⟩ := rightIH
         exact ⟨.ifE leftCore (.bool true) rightCore, .logicalOr leftChild rightChild⟩
+    | notEqual _ _ leftIH rightIH =>
+        obtain ⟨leftCore, leftChild⟩ := leftIH
+        obtain ⟨rightCore, rightChild⟩ := rightIH
+        exact ⟨.unary .boolNot (.binary .wordEq leftCore rightCore), .notEqual leftChild rightChild⟩
+    | lessEqual _ _ leftIH rightIH =>
+        obtain ⟨leftCore, leftChild⟩ := leftIH
+        obtain ⟨rightCore, rightChild⟩ := rightIH
+        exact ⟨.unary .boolNot (.binary .wordGt leftCore rightCore), .lessEqual leftChild rightChild⟩
   · rintro ⟨core, elaboration⟩
     induction elaboration with
     | pure resolution _ typing => exact .pure (resolution.reflects_type typing)
@@ -60,6 +68,8 @@ theorem recursiveLocalComputationHasType_iff_elaborates
     | bitNot _ ih => exact .bitNot ih
     | logicalAnd _ _ leftIH rightIH => exact .logicalAnd leftIH rightIH
     | logicalOr _ _ leftIH rightIH => exact .logicalOr leftIH rightIH
+    | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
+    | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
 
 theorem RecursiveLocalComputationElaborates.core_hasType
     {table : LocalNameTable} {context : Resolved.Context}
@@ -75,5 +85,6 @@ theorem RecursiveLocalComputationElaborates.core_hasType
   | logicalNot _ ih | bitNot _ ih => exact .unary ih
   | logicalAnd _ _ leftIH rightIH => exact .ifE leftIH rightIH .bool
   | logicalOr _ _ leftIH rightIH => exact .ifE leftIH .bool rightIH
+  | notEqual _ _ leftIH rightIH | lessEqual _ _ leftIH rightIH => exact .unary (.binary leftIH rightIH)
 
 end Solcore.Frontend
