@@ -1,7 +1,8 @@
 import Solcore.Core.LocalFragment
 
-/-! Recursive applications of pure callers. Membership does not constrain an
-actual returned closure's body or captures, and creates no new closure. -/
+/-! Recursive applications and strict binary combinations of pure callers.
+Membership does not constrain actual returned closure bodies or captures;
+the caller syntax itself has no lambda constructor. -/
 
 set_option autoImplicit false
 
@@ -13,5 +14,10 @@ inductive RecursiveLocalComputationFragment : Core.Expr → Prop where
       (callee : RecursiveLocalComputationFragment function)
       (operand : RecursiveLocalComputationFragment argument) :
       RecursiveLocalComputationFragment (.apply function argument)
+
+  | binary {op : Core.BinaryOp} {left right : Core.Expr}
+      (leftChild : RecursiveLocalComputationFragment left)
+      (rightChild : RecursiveLocalComputationFragment right) :
+      RecursiveLocalComputationFragment (.binary op left right)
 
 end Solcore.Frontend

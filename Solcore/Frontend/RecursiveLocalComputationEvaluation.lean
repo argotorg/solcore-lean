@@ -1,8 +1,10 @@
 import Solcore.Frontend.LocalExpressionCost
 import Solcore.Core.Machine
+import Solcore.Frontend.DirectWordBinary
 
-/-! Original recursive calls evaluate callee, argument and actual closure body
-in order. Grouping preserves the exact value, stores and cost of its child. -/
+/-! Original calls retain actual bodies and captures. Strict binary children
+thread their real stores left to right before applying the actual operator.
+Grouping preserves the exact value, stores and cost of its child. -/
 
 set_option autoImplicit false
 
@@ -29,6 +31,18 @@ inductive RecursiveLocalComputationEvaluates
       (bodyEvaluation : Core.Evaluates (argumentValue :: captured) bodyStore body result finalStore) :
       RecursiveLocalComputationEvaluates table environment initialStore
         ⟨span, .call callee ⟨argumentsSpan, [argument]⟩⟩ result finalStore
+
+  | binary {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp} {leftValue rightValue result : Core.Value}
+      (operator : DirectWordBinary sourceOp op)
+      (leftEvaluation : RecursiveLocalComputationEvaluates table environment
+        initialStore left leftValue middleStore)
+      (rightEvaluation : RecursiveLocalComputationEvaluates table environment
+        middleStore right rightValue finalStore)
+      (applied : op.apply leftValue rightValue = some result) :
+      RecursiveLocalComputationEvaluates table environment initialStore
+        ⟨span, .binary left ⟨operatorSpan, sourceOp⟩ right⟩ result finalStore
 
 inductive RecursiveLocalComputationEvaluatesWithCost
     (table : LocalNameTable) (environment : Resolved.Environment) :
@@ -57,5 +71,18 @@ inductive RecursiveLocalComputationEvaluatesWithCost
       RecursiveLocalComputationEvaluatesWithCost table environment initialStore
         ⟨span, .call callee ⟨argumentsSpan, [argument]⟩⟩ result finalStore
         (functionCost + argumentCost + bodyCost + 3)
+
+  | binary {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp} {leftValue rightValue result : Core.Value}
+      {leftCost rightCost : Nat}
+      (operator : DirectWordBinary sourceOp op)
+      (leftEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        initialStore left leftValue middleStore leftCost)
+      (rightEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        middleStore right rightValue finalStore rightCost)
+      (applied : op.apply leftValue rightValue = some result) :
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+        ⟨span, .binary left ⟨operatorSpan, sourceOp⟩ right⟩ result finalStore (leftCost + rightCost + 3)
 
 end Solcore.Frontend
