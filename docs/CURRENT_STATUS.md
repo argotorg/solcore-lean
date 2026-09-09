@@ -1161,6 +1161,26 @@ General binder-index maps, nominal declaration renaming and function/header
 owner integration remain separate. No old executable or semantic contract
 changes, and source admission does not expand.
 
+Shared raw computation bodies now preserve and reflect successful evaluation
+and exact costs under injective owner-only relabeling (ADR-0277). Two additive
+generic laws each assume only their own fixed child's covariance. Independent
+inductions retain the original source, selected branches, actual values and
+both stores; no relation between the raw and cost child interfaces is imposed.
+
+Name tables and environments remain separate ordered inputs. Duplicate IDs or
+spellings, missing/reordered rows and environment-only fresh-ID collisions are
+allowed. Fresh IDs still come only from the name table, and a new binding
+prepends its actual value without repairing or removing existing rows. Strict
+initializers/discards retain every effect and cost; the same match choice keeps
+the selected source body and visited-comparison count.
+
+Raw success does not inspect typed-let annotations, unselected branches or
+static scope guards. Absence of successful evidence is reflected, but is not a
+fault or termination classification. Original parsed consumers separate such
+raw-only rows from independently elaborated/aligned Core execution examples,
+including actual captures, ordered cell effects and full checkpoints. No world,
+checker, typing or fresh-in-environment premise is added to either new law.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

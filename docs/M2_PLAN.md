@@ -753,6 +753,19 @@ but arbitrary covariant child checking need not be semantically correct or
 runtime safe. General binder-index changes still do not commute with fresh
 allocation, and type-name/nominal identities are not being renamed.
 
+The raw shared-body integration is also proved (ADR-0277): separate evaluation
+and exact-cost iff laws lift their own fixed child covariance through every
+original raw body constructor. Fresh allocation follows only the name table;
+duplicate or misaligned environments, including an already-present fresh ID,
+are not repaired. Actual values/stores and selected match comparison counts
+remain literal, without an inverse or a raw/cost-existence bridge premise.
+
+Keep raw success and its reflected absence distinct from whole-source checking,
+fault classification and runtime safety. Unknown annotations and exposed then
+shadowing may still have selected raw paths. Positional-Core observations use
+separate original elaboration/alignment, never the arbitrary raw-row theorem
+alone. Function/header owner integration and further source forms remain next.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
