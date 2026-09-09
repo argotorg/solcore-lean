@@ -2,6 +2,8 @@ import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.TerminalReturnTreeEmbeddingProperties
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
 import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 
 /-! Recursive bodies are checked statically using actual parsed parameters.
 No values, tree execution or costs are assumed by recursive entry compilation.
@@ -253,9 +255,21 @@ def frontendParsedTerminalReturnTreeTests : IO Unit := do
       let content := if direction then "{if(0 == 0){return x;}else" ++ deep ++ "}"
         else "{if(0 != 0)" ++ deep ++ "else{return y;}}"
       rejected content (some (if direction then .ifE equal (.var 4) core else .ifE (.unary .boolNot equal) core (.var 3)))
+  let some wrapped ← parsed? (Syntax.Parser.block .allow) "{{return x;}}"
+    | throw (IO.userError "original terminal block leaf did not parse")
+  assertTrue (terminalReturnTreeFuelBound wrapped == 0 && typedLetReturnTreeFuelBound wrapped == 1)
+    "terminal wrappers changed the old unsupported bound or added a new transition"
+  for depth in [0, 2, 5] do
+    for direction in [false, true] do
+      let deep := bury depth direction "{{return x;}}"
+      let core := buriedCore depth direction (.var 4)
+      let equal := Core.Expr.binary .wordEq (.word .zero) (.word .zero)
+      let content := if direction then "{if(0 == 0){return x;}else" ++ deep ++ "}"
+        else "{if(0 != 0)" ++ deep ++ "else{return y;}}"
+      rejected content (some (if direction then .ifE equal (.var 4) core else .ifE (.unary .boolNot equal) core (.var 3)))
   for invalid in ["{return missing;}", "{return c;}", "{return;}",
       "{if(w){return x;}else{return y;}}", "{if(c){return x;}}", "{return x;return y;}",
-      "{}", "{{return x;}}", "{return f(w);}"] do
+      "{}", "{return f(w);}"] do
     for depth in [0, 2, 5] do
       for direction in [false, true] do
         let deep := bury depth direction invalid

@@ -69,6 +69,8 @@ completed run.
 Migrate obsolete entry/body rejection claims using the same original sources
 and callers: closed bare-return wrappers in runtime, compilation-owner and
 recursive-entry consumers, and the typed-let wrapper in a conditional arm.
+Also retain the six original buried nominal-block declarations in the older
+terminal-tree consumer as whole-compilation successes while its own adapter rejects.
 Keep narrower singleton/terminal-tree/prefix adapters unchanged, along with
 neighboring invalid inputs. Do not weaken common rejection helpers.
 
