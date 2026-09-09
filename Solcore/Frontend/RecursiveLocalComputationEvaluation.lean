@@ -5,6 +5,7 @@ import Solcore.Frontend.DirectWordBinary
 /-! Original calls retain actual bodies and captures. Strict binary children
 thread their real stores left to right before applying the actual operator.
 Conditionals evaluate the actual Bool guard and selected branch only.
+Unary operations use the actual child payload and preserve its final store.
 Grouping preserves the exact value, stores and cost of its child. -/
 
 set_option autoImplicit false
@@ -63,6 +64,19 @@ inductive RecursiveLocalComputationEvaluates
         middleStore elseBranch value finalStore) :
       RecursiveLocalComputationEvaluates table environment initialStore
         ⟨span, .conditional condition question thenBranch colon elseBranch⟩ value finalStore
+
+  | logicalNot {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+      {operand : Syntax.Expr} {value : Bool}
+      (child : RecursiveLocalComputationEvaluates table environment
+        initialStore operand (.bool value) finalStore) :
+      RecursiveLocalComputationEvaluates table environment initialStore
+        ⟨span, .unary ⟨operatorSpan, .logicalNot⟩ operand⟩ (.bool (!value)) finalStore
+  | bitNot {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+      {operand : Syntax.Expr} {value : Core.Word}
+      (child : RecursiveLocalComputationEvaluates table environment
+        initialStore operand (.word value) finalStore) :
+      RecursiveLocalComputationEvaluates table environment initialStore
+        ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩ (.word value.bitNot) finalStore
 
 inductive RecursiveLocalComputationEvaluatesWithCost
     (table : LocalNameTable) (environment : Resolved.Environment) :
@@ -125,5 +139,18 @@ inductive RecursiveLocalComputationEvaluatesWithCost
       RecursiveLocalComputationEvaluatesWithCost table environment initialStore
         ⟨span, .conditional condition question thenBranch colon elseBranch⟩ value finalStore
         (conditionCost + branchCost + 2)
+
+  | logicalNot {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+      {operand : Syntax.Expr} {value : Bool} {childCost : Nat}
+      (child : RecursiveLocalComputationEvaluatesWithCost table environment
+        initialStore operand (.bool value) finalStore childCost) :
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+        ⟨span, .unary ⟨operatorSpan, .logicalNot⟩ operand⟩ (.bool (!value)) finalStore (childCost + 2)
+  | bitNot {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+      {operand : Syntax.Expr} {value : Core.Word} {childCost : Nat}
+      (child : RecursiveLocalComputationEvaluatesWithCost table environment
+        initialStore operand (.word value) finalStore childCost) :
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+        ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩ (.word value.bitNot) finalStore (childCost + 2)
 
 end Solcore.Frontend
