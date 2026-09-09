@@ -2,7 +2,7 @@ import Solcore.Frontend.RecursiveLocalComputationDeterminismProperties
 import Solcore.Core.Correspondence
 
 /-! Raw success and exact cost agree across overlapping pure and recursive
-groups, direct/negated comparisons, conditionals and fixed lazy operators.
+groups, direct/ordered/negated comparisons, conditionals and fixed lazy operators.
 Actual closures, arguments and stores are fixed by evaluation,
 not by a checker, type tags or a global restriction on skipped source syntax. -/
 
@@ -33,6 +33,8 @@ private theorem erase {table : LocalNameTable} {environment : Resolved.Environme
   | orFalse _ _ leftIH rightIH => exact .orFalse leftIH rightIH
   | notEqual _ _ leftIH rightIH => exact .notEqual leftIH rightIH
   | lessEqual _ _ leftIH rightIH => exact .lessEqual leftIH rightIH
+  | less _ _ leftIH rightIH => exact .less leftIH rightIH
+  | greaterEqual _ _ leftIH rightIH => exact .greaterEqual leftIH rightIH
 
 private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value}
@@ -93,6 +95,14 @@ private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Env
       obtain ⟨_, leftCosted⟩ := leftIH
       obtain ⟨_, rightCosted⟩ := rightIH
       exact ⟨_, .lessEqual leftCosted rightCosted⟩
+  | less _ _ leftIH rightIH =>
+      obtain ⟨_, leftCosted⟩ := leftIH
+      obtain ⟨_, rightCosted⟩ := rightIH
+      exact ⟨_, .less leftCosted rightCosted⟩
+  | greaterEqual _ _ leftIH rightIH =>
+      obtain ⟨_, leftCosted⟩ := leftIH
+      obtain ⟨_, rightCosted⟩ := rightIH
+      exact ⟨_, .greaterEqual leftCosted rightCosted⟩
 
 theorem recursiveLocalComputationEvaluates_iff_exists_cost {table : LocalNameTable}
     {environment : Resolved.Environment} {initialStore finalStore : Core.Store}

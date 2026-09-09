@@ -100,6 +100,23 @@ private theorem agrees_with_pure {table : LocalNameTable} {environment : Resolve
           cases sameRight
           exact ⟨rfl, rfl, rfl⟩
 
+  | less _ _ leftIH rightIH =>
+      cases pureEvaluation with
+      | less leftChild rightChild =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
+          cases sameLeft
+          obtain ⟨sameRight, rfl, rfl⟩ := rightIH rightChild
+          cases sameRight
+          exact ⟨rfl, rfl, rfl⟩
+  | greaterEqual _ _ leftIH rightIH =>
+      cases pureEvaluation with
+      | greaterEqual leftChild rightChild =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH leftChild
+          cases sameLeft
+          obtain ⟨sameRight, rfl, rfl⟩ := rightIH rightChild
+          cases sameRight
+          exact ⟨rfl, rfl, rfl⟩
+
 /-- Successful recursive derivations determine the actual value, final store
 and cost jointly, including overlapping pure derivations and selected branches. -/
 theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalNameTable}
@@ -137,7 +154,7 @@ theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalN
           obtain ⟨rfl, rfl, rfl⟩ := rightIH otherRight
           cases operator <;> cases otherOperator
           all_goals exact ⟨Option.some.inj (applied.symm.trans otherApplied), rfl, rfl⟩
-      | andTrue _ _ | andFalse _ | orTrue _ | orFalse _ _ | notEqual _ _ | lessEqual _ _ => cases operator
+      | andTrue _ _ | andFalse _ | orTrue _ | orFalse _ _ | notEqual _ _ | lessEqual _ _ | less _ _ | greaterEqual _ _ => cases operator
   | ifTrue condition branch conditionIH branchIH =>
       cases rightEvaluation with
       | pure other => exact agrees_with_pure (.ifTrue condition branch) other
@@ -215,6 +232,27 @@ theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalN
       | pure other => exact agrees_with_pure (.lessEqual leftChild rightChild) other
       | binary operator _ _ _ => cases operator
       | lessEqual otherLeft otherRight =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH otherLeft
+          cases sameLeft
+          obtain ⟨sameRight, rfl, rfl⟩ := rightIH otherRight
+          cases sameRight
+          exact ⟨rfl, rfl, rfl⟩
+
+  | less leftChild rightChild leftIH rightIH =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.less leftChild rightChild) other
+      | binary operator _ _ _ => cases operator
+      | less otherLeft otherRight =>
+          obtain ⟨sameLeft, rfl, rfl⟩ := leftIH otherLeft
+          cases sameLeft
+          obtain ⟨sameRight, rfl, rfl⟩ := rightIH otherRight
+          cases sameRight
+          exact ⟨rfl, rfl, rfl⟩
+  | greaterEqual leftChild rightChild leftIH rightIH =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.greaterEqual leftChild rightChild) other
+      | binary operator _ _ _ => cases operator
+      | greaterEqual otherLeft otherRight =>
           obtain ⟨sameLeft, rfl, rfl⟩ := leftIH otherLeft
           cases sameLeft
           obtain ⟨sameRight, rfl, rfl⟩ := rightIH otherRight
