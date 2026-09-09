@@ -541,6 +541,28 @@ nested blocks and nested calls are outside this profile. Existing pure/recursive
 body and whole-entry acceptance remain unchanged; general body integration must
 separately address their local-fragment insertion, store and fuel contracts.
 
+A separate explicit whole-function entry now connects this application-return
+body to the original declaration (ADR-0248). New compilation and preparation
+propositions require the unchanged header policy, original parameter declaration
+or actual argument binding, and the exact body Core at the declared return type.
+Distinct compile/prepare/run endpoints reuse only the existing data records;
+local body acceptance does not bypass a whole-header or return-type failure.
+Static compilation needs no argument inhabitants, and exact success/rejection
+and complete-record uniqueness hold independently for both stages.
+
+Preparation erases to the new compilation and can be reconstructed from actual
+supplied arguments with matching arity and ordered types. Complete-Option
+factorization retains failures; full-result execution equals the prepared body
+runner and the compiled Core on the original argument values reversed once.
+Binding fixes those actual values and captures, while execution separately fixes
+the store. Same-typed value swaps may change prepared inputs and results without
+changing the compiled projection. Body/child cost, checkpoint, resumption and
+runtime-world guarantees transfer through the complete execution equalities.
+Missing cells and wrong payloads remain observable; arbitrary-store safety,
+store independence and source-only bounds are not imported from the old entry.
+Old endpoints and records remain unchanged. This is explicit entry execution,
+not global/source-function resolution, source closure creation or recursive calls.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

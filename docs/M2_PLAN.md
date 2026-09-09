@@ -385,6 +385,22 @@ recursive discards also rely on local-fragment positional insertion, not just
 store independence and source-only bounds. The new profile does not add bare or
 pure returns, surrounding statements, nested blocks or nested calls.
 
+The application-return profile now has separate whole-function compile,
+prepare and run endpoints (ADR-0248). Independent new provenance retains the
+original header, parameters and exact body at the declared return type while
+reusing existing data-only records. Local success alone cannot open a whole
+entry. Compilation remains value-free; actual preparation requires exactly the
+supplied typed arguments. Success/rejection and record uniqueness are exact.
+Preparation/compilation factorization includes failure and the ordered type/arity
+guard. Full-result entry/body equality and compiled execution retain actual
+values reversed once and the separately supplied store. Same-typed value swaps
+can change preparation and results even with identical compiled projections.
+Existing body costs, saved-state resumption and explicit runtime-world safety
+transfer without new duplicate entry judgments. Old endpoint, record and lower
+layer definitions remain unchanged; their stronger arbitrary-store/local-fragment
+claims are not reused. General source calls, closure creation and recursive-body
+integration remain separate work.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
