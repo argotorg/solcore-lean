@@ -186,6 +186,9 @@ import Solcore.Test.FrontendParsedTerminalBlockEntries
 import Solcore.Test.FrontendRuntimeTypeExtensionProperties
 import Solcore.Test.FrontendParsedRuntimeParameterTypeExtensions
 import Solcore.Test.FrontendParsedRuntimeTypeExtensionEntries
+import Solcore.Test.FrontendLocalFunctionApplicationProperties
+import Solcore.Test.FrontendParsedLocalFunctionApplications
+import Solcore.Test.FrontendParsedLocalFunctionApplicationEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5785,6 +5788,8 @@ def run : IO Unit := do
   frontendParsedTerminalBlockEntryTests
   frontendParsedRuntimeParameterTypeExtensionTests
   frontendParsedRuntimeTypeExtensionEntryTests
+  frontendParsedLocalFunctionApplicationTests
+  frontendParsedLocalFunctionApplicationEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

@@ -10,6 +10,8 @@ import Solcore.Frontend.LocalExpressionResolutionProperties
 import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Frontend.LocalExpressionTypingResolution
 import Solcore.Frontend.LocalExpressionTypingProperties
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.LocalFunctionApplicationProperties
 import Solcore.Frontend.LocalFragmentProperties
 import Solcore.Frontend.LocalExpressionEvaluationRules
 import Solcore.Frontend.LocalExpressionEvaluation
@@ -221,6 +223,14 @@ Explicit nested children are not flattened. Single return, parameter and recursi
 annotations use it at the existing entry; each parameter retains exactly one
 original argument and position. Older prefix let annotations remain named-only,
 and empty/multiple return clauses remain outside the entry profile.
+
+A separate static root-application adapter specializes a known Function type
+with exactly one original argument. Both children use the old pure local
+grammar and caller scope; independent typing and exact provenance yield their
+ordered Core application. Unit/products are single arguments, not argument-list
+packing. This adds no call evaluator or entry integration and does not inherit
+the local fragment's store-preservation or source-only fuel guarantees.
+
 Independent source rules
 connect to checked Core execution. A direct original-expression evaluator
 accepts empty canonical tuples as Unit and arbitrary finite lists of two or more

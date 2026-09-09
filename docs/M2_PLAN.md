@@ -319,6 +319,18 @@ nonterminal blocks, implicit or general early returns, scope escape and
 shadowing are not introduced. Core/Resolved, parser, diagnostics and runtime
 records remain unchanged.
 
+A separate static root-application prerequisite now handles exactly one original
+argument to a known Function-typed callee (ADR-0243). Independent old-profile
+child resolution, lowering and typing yield the exact ordered Core application;
+whole-call typing and success/rejection correspondence require no runtime values.
+This is the builtin Function arity-one specialization, not general Invokable
+selection. Unit/products remain individual arguments without packing or implicit
+Unit insertion. Old pure/body/entry adapters and every existing generic contract
+remain unchanged. Nested calls, source lambdas, fields/global resolution and
+entry integration are separate work. Dynamic proofs must retain actual closure
+bodies, captures, effects and body costs; local-fragment store/fuel guarantees
+do not apply to the new Core application.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

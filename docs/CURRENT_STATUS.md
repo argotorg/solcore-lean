@@ -448,6 +448,24 @@ shadowing, implicit returns and general early returns are not added. The zero
 additional cost is a Lean Core fact, not a Rust optimizer or emitted-cost claim.
 No Core/Resolved, parser, diagnostic, wire or runtime-record definition changes.
 
+An opt-in static root-application adapter now handles a known single-argument
+Function type (ADR-0243). Original callee and argument expressions check in the
+same caller scope using the existing pure child grammar. Independent whole
+typing and exact elaboration retain the two original child lowerings and their
+ordered `Core.apply`, with complete success/rejection correspondence and exact
+Core/result-type uniqueness. No actual argument or closure inhabitants are
+needed for static checking, including nominal context types.
+
+This specializes the pinned builtin Function Invokable case, not general
+overload or global resolution. One Unit/product argument is not a zero- or
+multiple-argument list. Root grouping, nested calls, fields, source lambdas and
+other invocation forms remain outside this adapter. Existing pure expressions,
+return-body adapters and whole entries retain their previous boundaries. No
+source-call evaluation relation or runner is added, and application does not
+inherit local-fragment membership, store preservation or source-only fuel bounds.
+Actual closure bodies, captured values and allocated stores remain separate
+dynamic obligations. Core, Resolved, parser and wire definitions are unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
