@@ -43,6 +43,8 @@ import Solcore.Frontend.RuntimeComputationFunctionCompilation
 import Solcore.Frontend.RuntimeComputationFunctionEntry
 import Solcore.Frontend.RuntimeComputationFunctionProperties
 import Solcore.Frontend.RuntimeComputationFunctionFactorizationProperties
+import Solcore.Frontend.DirectWordBinary
+import Solcore.Frontend.DirectWordBinaryProperties
 import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.RecursiveLocalComputationEvaluation
 import Solcore.Frontend.RecursiveLocalComputationFragment

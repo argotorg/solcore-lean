@@ -473,10 +473,21 @@ argument count/types and actual values reversed once remain explicit, with full
 fault/checkpoint outcomes and the separately supplied store. Five concrete
 specializations reuse the four laws; old entry endpoints remain unchanged.
 
-Next broaden recursive expression semantics beyond call/group roots using the
-shared body and entry contracts. Expected-type source lambdas and global
-function resolution remain separate; the old stronger pure store/source-bound
-guarantees do not transfer, and structural arguments alone do not validate stores.
+Ten direct Word binary roots now recurse through the same child (ADR-0256),
+using an independent finite operator relation and one map-correspondence law.
+The existing fourteen proof signatures and shared body/entry implementations
+remain unchanged. Both children preserve original scope and exact Core; raw
+execution retains left-to-right actual stores and child costs plus three.
+Pure/binary overlap is resolved privately without global call-free premises,
+and binary caller insertion retains literal observations and a shared cost.
+Three old recursive addition rejection fixtures become exact independent
+positive cases; older nonrecursive endpoints remain unchanged.
+
+Next extend recursive children to the remaining expression forms using these
+shared contracts. Expanded comparisons, lazy Bool operators, tuples, unary and
+conditional roots, expected-type source lambdas and global function resolution
+remain separate. The old stronger pure store/source-bound guarantees do not
+transfer, and structural arguments alone do not validate stores.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
