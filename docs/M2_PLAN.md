@@ -327,9 +327,21 @@ This is the builtin Function arity-one specialization, not general Invokable
 selection. Unit/products remain individual arguments without packing or implicit
 Unit insertion. Old pure/body/entry adapters and every existing generic contract
 remain unchanged. Nested calls, source lambdas, fields/global resolution and
-entry integration are separate work. Dynamic proofs must retain actual closure
-bodies, captures, effects and body costs; local-fragment store/fuel guarantees
-do not apply to the new Core application.
+entry integration are separate work. Local-fragment store/fuel guarantees do not
+apply to the new Core application.
+
+Independent actual source-call evaluation and exact costs now connect to that
+static provenance (ADR-0244). Both original pure children use the caller scope;
+the resulting actual closure supplies the body and captured values. The actual
+argument precedes those captures, with all stores retained. Raw/cost erasure,
+existence and uniqueness need no static or runtime typing; ordered ID alignment
+gives exact Core evaluation and path correspondence in both directions.
+Child costs plus the actual body cost plus three transitions work uniformly
+under every continuation. Pending frames may still fault after the endpoint,
+and actual bodies can have effects or different costs for the same source call.
+Source-call evaluators, runtime-world safety and whole-entry integration remain
+separate work; existing executable definitions and old generic contracts are
+unchanged.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

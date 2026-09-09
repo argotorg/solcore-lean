@@ -460,11 +460,28 @@ This specializes the pinned builtin Function Invokable case, not general
 overload or global resolution. One Unit/product argument is not a zero- or
 multiple-argument list. Root grouping, nested calls, fields, source lambdas and
 other invocation forms remain outside this adapter. Existing pure expressions,
-return-body adapters and whole entries retain their previous boundaries. No
-source-call evaluation relation or runner is added, and application does not
-inherit local-fragment membership, store preservation or source-only fuel bounds.
-Actual closure bodies, captured values and allocated stores remain separate
-dynamic obligations. Core, Resolved, parser and wire definitions are unchanged.
+return-body adapters and whole entries retain their previous boundaries. Static
+acceptance alone does not supply execution, local-fragment membership, store
+preservation or source-only fuel bounds. Core, Resolved, parser and wire
+definitions are unchanged.
+
+Independent successful source-call evaluation and exact costs now account for
+the actual closure body, captured values and threaded stores (ADR-0244). The
+original callee and argument evaluate in the caller environment; the body uses
+the actual argument followed by the actual captures. Raw and cost judgments need
+no checker premise. Erasure, cost existence and value/store/cost uniqueness hold
+without runtime typing. Exact static provenance plus ordered runtime-ID alignment
+gives both directions of Core evaluation and exact closed-path correspondence.
+
+The cost is the original child costs plus the actual body path and three
+application transitions. That same cost works under every continuation, whose
+pending frames are retained rather than executed. The actual body may access or
+change cells and have a different cost for identical source syntax and types.
+Structural value typing does not establish allocated cells; raw selected-branch
+success does not establish whole static acceptance. These proofs provide no
+automatic termination/no-fault result, source-call evaluator or whole-entry
+integration. Existing body/entry contracts and all executable definitions remain
+unchanged.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

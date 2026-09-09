@@ -12,6 +12,10 @@ import Solcore.Frontend.LocalExpressionTypingResolution
 import Solcore.Frontend.LocalExpressionTypingProperties
 import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Frontend.LocalFunctionApplicationProperties
+import Solcore.Frontend.LocalFunctionApplicationEvaluation
+import Solcore.Frontend.LocalFunctionApplicationEvaluationProperties
+import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.LocalFunctionApplicationExecutionProperties
 import Solcore.Frontend.LocalFragmentProperties
 import Solcore.Frontend.LocalExpressionEvaluationRules
 import Solcore.Frontend.LocalExpressionEvaluation
@@ -230,6 +234,13 @@ grammar and caller scope; independent typing and exact provenance yield their
 ordered Core application. Unit/products are single arguments, not argument-list
 packing. This adds no call evaluator or entry integration and does not inherit
 the local fragment's store-preservation or source-only fuel guarantees.
+
+Independent call evaluation now retains the actual closure body and captures,
+ordered original pure children, and all store endpoints. Its exact cost includes
+the actual body path plus three application transitions, uniformly under every
+continuation. Aligned runtime IDs connect it bidirectionally to the original
+Core application without inferring runtime typing, allocated cells, termination,
+or execution of pending continuation frames. Whole entries remain unchanged.
 
 Independent source rules
 connect to checked Core execution. A direct original-expression evaluator
