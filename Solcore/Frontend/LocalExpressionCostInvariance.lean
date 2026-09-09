@@ -64,6 +64,14 @@ theorem AvoidsLocalName.bindFresh_cost_iff {name : String} {source : Syntax.Expr
       · intro evaluation
         cases evaluation with
         | pair left right => exact .pair (leftIH.mpr left) (rightIH.mpr right)
+  | many _ _ headIH tailIH =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | many head tail => exact .many (headIH.mp head) (tailIH.mp tail)
+      · intro evaluation
+        cases evaluation with
+        | many head tail => exact .many (headIH.mpr head) (tailIH.mpr tail)
   | logicalNot _ ih =>
       constructor
       · intro evaluation

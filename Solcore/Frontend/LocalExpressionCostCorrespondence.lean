@@ -65,6 +65,12 @@ theorem LocalExpressionEvaluatesWithCost.toStepsWithContinuation
           cases lowered with
           | pair lowerLeft lowerRight =>
               exact pair_steps (leftIH leftChild lowerLeft _) (rightIH rightChild lowerRight _)
+  | many _ _ headIH tailIH =>
+      cases resolution with
+      | many headChild tailChild =>
+          cases lowered with
+          | pair lowerHead lowerTail =>
+              exact pair_steps (headIH headChild lowerHead _) (tailIH tailChild lowerTail _)
   | logicalNot _ ih =>
       cases resolution with
       | logicalNot child =>

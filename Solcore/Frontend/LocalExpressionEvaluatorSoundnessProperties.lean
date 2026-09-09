@@ -39,7 +39,12 @@ theorem evaluateLocalExpressionWithCost?_sound {table : LocalNameTable}
             | nil => simp [evaluateLocalExpressionWithCost?] at accepted
             | cons right tail =>
               cases tail with
-              | cons _ _ => simp [evaluateLocalExpressionWithCost?] at accepted
+              | cons third rest =>
+                rw [evaluateLocalExpressionWithCost?] at accepted
+                simp only [bind, Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at accepted
+                obtain ⟨⟨headValue, headCost⟩, headResult, ⟨tailValue, tailCost⟩, tailResult, rfl, rfl⟩ := accepted
+                exact .many (evaluateLocalExpressionWithCost?_sound headResult store)
+                  (evaluateLocalExpressionWithCost?_sound tailResult store)
               | nil =>
                 simp only [evaluateLocalExpressionWithCost?, bind, Option.bind_eq_some_iff,
                   pure, Option.some.injEq, Prod.mk.injEq] at accepted

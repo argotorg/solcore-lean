@@ -26,13 +26,27 @@ theorem evaluateLocalExpressionWithCost?_congr_lookup
         exact evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
           leftEnvironment rightEnvironment sameLookup inner
       case tuple elements =>
-        rcases elements with ⟨tupleSpan, _ | ⟨left, _ | ⟨right, _ | ⟨third, rest⟩⟩⟩⟩ <;>
-          simp only [evaluateLocalExpressionWithCost?]
-        have first := evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
-          leftEnvironment rightEnvironment sameLookup left
-        have second := evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
-          leftEnvironment rightEnvironment sameLookup right
-        simp only [first, second]
+        cases elements with
+        | mk tupleSpan children =>
+          cases children with
+          | nil => simp only [evaluateLocalExpressionWithCost?]
+          | cons left remaining =>
+            cases remaining with
+            | nil => simp only [evaluateLocalExpressionWithCost?]
+            | cons right tail =>
+              have first := evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
+                leftEnvironment rightEnvironment sameLookup left
+              cases tail with
+              | nil =>
+                have second := evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
+                  leftEnvironment rightEnvironment sameLookup right
+                simp only [evaluateLocalExpressionWithCost?, first, second]
+              | cons third rest =>
+                have remaining := evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
+                  leftEnvironment rightEnvironment sameLookup ⟨span,.tuple ⟨tupleSpan,right :: third :: rest⟩⟩
+                conv => lhs; rw [evaluateLocalExpressionWithCost?]
+                conv => rhs; rw [evaluateLocalExpressionWithCost?]
+                rw [first, remaining]
       case unary operator operand =>
         have child := evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
           leftEnvironment rightEnvironment sameLookup operand

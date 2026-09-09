@@ -23,6 +23,9 @@ theorem evaluateLocalExpressionWithCost?_complete {table : LocalNameTable}
       simp [evaluateLocalExpressionWithCost?, interpretWordLiteral?_complete meaning]
   | group _ ih => simpa only [evaluateLocalExpressionWithCost?] using ih
   | unit => simp only [evaluateLocalExpressionWithCost?]
+  | many _ _ headIH tailIH =>
+      rw [evaluateLocalExpressionWithCost?]
+      simp only [headIH, tailIH, bind, Option.bind_some, pure]
   | logicalNot _ ih | bitNot _ ih | andFalse _ ih | orTrue _ ih =>
       simp [evaluateLocalExpressionWithCost?, ih]
   | pair _ _ leftIH rightIH
