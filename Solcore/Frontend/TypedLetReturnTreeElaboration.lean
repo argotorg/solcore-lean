@@ -43,6 +43,29 @@ theorem elaborateTypedLetReturnTree?_binding_children
     next different => cases remaining
   next used => cases accepted
 
+theorem elaborateTypedLetReturnTree?_inferred_children
+    {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
+    {blockSpan letSpan : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {initializer : Syntax.Expr} {rest : List Syntax.Statement} {core : Core.Expr} {type : Core.Ty}
+    (accepted : elaborateTypedLetReturnTree? types owner inputs
+      ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩ = some (core, type)) :
+    ∃ initializerType initializerCore tailCore,
+      name.value ∉ inputs.names.map Prod.fst ∧
+      elaborateLocalExpression? inputs.names inputs.context initializer = some (initializerCore, initializerType) ∧
+      elaborateTypedLetReturnTree? types owner (inputs.bindFresh owner name.value initializerType)
+        ⟨blockSpan, rest⟩ = some (tailCore, type) ∧ core = .letE initializerCore tailCore := by
+  rw [elaborateTypedLetReturnTree?] at accepted
+  split at accepted
+  next unused =>
+    simp only [bind, Option.bind_eq_some_iff] at accepted
+    obtain ⟨⟨initializerCore, initializerType⟩, initializerAccepted,
+      ⟨tailCore, returnType⟩, tailAccepted, result⟩ := accepted
+    change some (.letE initializerCore tailCore, returnType) = some (core, type) at result
+    simp only [Option.some.injEq, Prod.mk.injEq] at result
+    rcases result with ⟨rfl, rfl⟩
+    exact ⟨initializerType, initializerCore, tailCore, unused, initializerAccepted, tailAccepted, rfl⟩
+  next used => cases accepted
+
 theorem elaborateTypedLetReturnTree?_conditional_children
     {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
     {blockSpan ifSpan : Syntax.SourceSpan} {condition : Syntax.Expr}
@@ -89,6 +112,11 @@ theorem TypedLetReturnTreeElaborates.complete
       rw [elaborateTypedLetReturnTree?]
       simp only [if_pos unused, meaning.complete, initializerAccepted, ih, bind,
         Option.bind_some, ite_true, pure, Pure.pure]
+  | inferred unused resolution lowered typing _ ih =>
+      have initializerAccepted := elaborateLocalExpression?_complete resolution
+        (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
+      rw [elaborateTypedLetReturnTree?]
+      simp only [if_pos unused, initializerAccepted, ih, bind, Option.bind_some, pure, Pure.pure]
   | conditional resolution lowered typing _ _ thenIH elseIH =>
       have conditionAccepted := elaborateLocalExpression?_complete resolution
         (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
@@ -115,7 +143,17 @@ theorem elaborateTypedLetReturnTree?_elaborates
                 | cons _ _ => simp only [elaborateTypedLetReturnTree?, reduceCtorEq] at accepted
               case letDecl name optionalType optionalInitializer =>
                 cases optionalType with
-                | none => simp only [elaborateTypedLetReturnTree?, reduceCtorEq] at accepted
+                | none =>
+                    cases optionalInitializer with
+                    | none => simp only [elaborateTypedLetReturnTree?, reduceCtorEq] at accepted
+                    | some initializer =>
+                        obtain ⟨initializerType, initializerCore, tailCore, unused,
+                          initializerAccepted, tailAccepted, rfl⟩ :=
+                          elaborateTypedLetReturnTree?_inferred_children accepted
+                        obtain ⟨resolved, resolution, lowered, typing⟩ := elaborateLocalExpression?_sound initializerAccepted
+                        exact .inferred unused resolution
+                          (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
+                          (elaborateTypedLetReturnTree?_elaborates tailAccepted)
                 | some annotation =>
                     cases optionalInitializer with
                     | none => simp only [elaborateTypedLetReturnTree?, reduceCtorEq] at accepted

@@ -18,6 +18,8 @@ theorem TypedLetReturnTreeElaborates.extend_types
   | single child => exact .single child
   | binding meaning unused resolution lowered typing _ ih =>
       exact .binding (meaning.extend_types extension) unused resolution lowered typing ih
+  | inferred unused resolution lowered typing _ ih =>
+      exact .inferred unused resolution lowered typing ih
   | conditional resolution lowered typing _ _ thenIH elseIH =>
       exact .conditional resolution lowered typing thenIH elseIH
 
@@ -31,6 +33,7 @@ theorem TypedLetReturnTreeHasType.extend_types
   | single child => exact .single child
   | binding meaning unused initializer _ ih =>
       exact .binding (meaning.extend_types extension) unused initializer ih
+  | inferred unused initializer _ ih => exact .inferred unused initializer ih
   | conditional condition _ _ thenIH elseIH =>
       exact .conditional condition thenIH elseIH
 

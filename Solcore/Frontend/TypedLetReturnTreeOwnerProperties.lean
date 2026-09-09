@@ -38,6 +38,21 @@ theorem TypedLetReturnTreeElaborates.mapOwner
           (Resolved.typing_renameIds_iff (ownerLocalIdMap mapping)
             (ownerLocalIdMap_injective mapping injective)).mpr typing
       · simpa only [LocalTypeInputs.bindFresh_mapOwner inputs owner mapping injective] using ih
+  | @inferred inputs blockSpan letSpan name initializer rest initializerType returnType
+      resolved initializerCore tailCore unused resolution lowered typing _ ih =>
+      refine .inferred (inferredType := initializerType)
+        (initializerResolved := resolved.renameIds (ownerLocalIdMap mapping))
+        ?_ ?_ ?_ ?_ ?_
+      · simpa only [LocalTypeInputs.mapIds_names, LocalNameTable.mapIds,
+          List.map_map, Function.comp_def] using unused
+      · simpa only [LocalTypeInputs.mapIds_names] using (resolution.mapIds (ownerLocalIdMap mapping))
+      · simpa only [LocalTypeInputs.mapIds_ids] using
+          (Resolved.lowers_renameIds_iff (ownerLocalIdMap mapping)
+            (ownerLocalIdMap_injective mapping injective)).mpr lowered
+      · simpa only [LocalTypeInputs.mapIds_context] using
+          (Resolved.typing_renameIds_iff (ownerLocalIdMap mapping)
+            (ownerLocalIdMap_injective mapping injective)).mpr typing
+      · simpa only [LocalTypeInputs.bindFresh_mapOwner inputs owner mapping injective] using ih
   | @conditional inputs blockSpan ifSpan condition thenBody elseBody resolved
       conditionCore thenCore elseCore type resolution lowered typing _ _ thenIH elseIH =>
       refine .conditional (conditionResolved := resolved.renameIds (ownerLocalIdMap mapping))
@@ -90,7 +105,20 @@ theorem elaborateTypedLetReturnTree?_mapOwner
                 | cons _ _ => simp only [elaborateTypedLetReturnTree?]
               case letDecl name optionalType optionalInitializer =>
                 cases optionalType with
-                | none => simp only [elaborateTypedLetReturnTree?]
+                | none =>
+                    cases optionalInitializer with
+                    | none => simp only [elaborateTypedLetReturnTree?]
+                    | some initializer =>
+                        have tailSame (initializerType : Core.Ty) :=
+                          elaborateTypedLetReturnTree?_mapOwner mapping injective types owner
+                            (inputs.bindFresh owner name.value initializerType) ⟨blockSpan, rest⟩
+                        rw [elaborateTypedLetReturnTree?, elaborateTypedLetReturnTree?]
+                        simp only [LocalTypeInputs.mapIds_names, LocalTypeInputs.mapIds_context]
+                        rw [elaborateLocalExpression?_mapIds (ownerLocalIdMap mapping)
+                          (ownerLocalIdMap_injective mapping injective)]
+                        simp only [LocalNameTable.mapIds, List.map_map, Function.comp_def,
+                          ← LocalTypeInputs.bindFresh_mapOwner inputs owner mapping injective name.value,
+                          tailSame]
                 | some annotation =>
                     cases optionalInitializer with
                     | none => simp only [elaborateTypedLetReturnTree?]

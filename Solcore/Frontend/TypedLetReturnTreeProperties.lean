@@ -16,6 +16,8 @@ theorem TypedLetReturnTreeElaborates.hasType
   | single child => exact .single child.hasType
   | binding meaning unused resolution _ typing _ ih =>
       exact .binding meaning unused (resolution.reflects_type typing) ih
+  | inferred unused resolution _ typing _ ih =>
+      exact .inferred unused (resolution.reflects_type typing) ih
   | conditional resolution _ typing _ _ thenIH elseIH =>
       exact .conditional (resolution.reflects_type typing) thenIH elseIH
 
@@ -33,6 +35,12 @@ theorem TypedLetReturnTreeHasType.elaborates_exact
       obtain ⟨initializerCore, lowered, _⟩ := typed.lowers
       obtain ⟨tailCore, tailElaboration⟩ := ih
       exact ⟨.letE initializerCore tailCore, .binding meaning unused resolution
+        (by simpa only [LocalTypeInputs.context_ids] using lowered) typed tailElaboration⟩
+  | inferred unused initializerTyping _ ih =>
+      obtain ⟨resolved, resolution, typed⟩ := initializerTyping.resolves
+      obtain ⟨initializerCore, lowered, _⟩ := typed.lowers
+      obtain ⟨tailCore, tailElaboration⟩ := ih
+      exact ⟨.letE initializerCore tailCore, .inferred unused resolution
         (by simpa only [LocalTypeInputs.context_ids] using lowered) typed tailElaboration⟩
   | conditional conditionTyping _ _ thenIH elseIH =>
       obtain ⟨resolved, resolution, typed⟩ := conditionTyping.resolves
@@ -80,7 +88,7 @@ theorem elaborateTypedLetReturnTree?_core_hasType
   clear accepted
   induction elaboration with
   | single child => exact elaborateReturnBody?_core_hasType child.complete
-  | binding _ _ _ lowered typing _ ih =>
+  | binding _ _ _ lowered typing _ ih | inferred _ _ lowered typing _ ih =>
       apply Core.HasType.letE
       · rw [← LocalTypeInputs.context_ids] at lowered
         exact lowered.preserves_type typing
