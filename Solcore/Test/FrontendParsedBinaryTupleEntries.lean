@@ -3,8 +3,8 @@ import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
 import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
 
-/-! Complete original declarations use named product aliases, not tuple type
-syntax or multiple returns. Raw source and fixed Core certificates are separate. -/
+/-! Complete declarations use named aliases and one structural return annotation,
+not multiple returns. Raw source and fixed Core certificates are separate. -/
 set_option autoImplicit false
 namespace Tests
 open Solcore Solcore.Frontend
@@ -205,6 +205,8 @@ def frontendParsedBinaryTupleEntryTests : IO Unit := do
       for wrong in [[], [wordArg n], [boolArg choice, wordArg n], [wordArg n, boolArg choice, wordArg 0]] do rejected simple wrong
       let _ ← check "function grouped(x: Word,c: Bool) returns(Pair){return (((x,),c,));}" arguments
         (.pair (.var 1) (.var 0)) pairType value 5
+      let _ ← check "function tupleType(x: Word,c: Bool) returns((Word,Bool)){return (x,c);}" arguments
+        (.pair (.var 1) (.var 0)) pairType value 5
       let _ ← check "function nested(x: Word,c: Bool) returns(Nested){return ((x,c),x);}" arguments
         (.pair (.pair (.var 1) (.var 0)) (.var 1)) nestedType (.pair value (w n)) 9
       let bound ← check "function bound(x: Word,c: Bool) returns(Nested){let p: Pair=(x,c);return (p,x);}" arguments
@@ -222,7 +224,6 @@ def frontendParsedBinaryTupleEntryTests : IO Unit := do
       for declaration in ["function wrong(x: Word,c: Bool) returns(Bool){return (x,c);}",
           "function unknown(x: Word,c: Bool) returns(Unknown){return (x,c);}",
           "function many(x: Word,c: Bool) returns(Word,Bool){return (x,c);}",
-          "function tupleType(x: Word,c: Bool) returns((Word,Bool)){return (x,c);}",
           "function unused(x: Word,c: Bool) returns(Pair){if(c){return (x,c);}else{return (missing,c);}}"] do
         let source ← parsed declaration
         let some actual := bindRuntimeParameters? types owner source.value.signature.parameters.elements arguments

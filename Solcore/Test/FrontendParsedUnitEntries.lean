@@ -146,6 +146,7 @@ open UnitEntries
 def frontendParsedUnitEntryTests : IO Unit := do
   for declaration in ["function empty(){return ();}",
       "function alias() returns(UnitAlias){return ();}",
+      "function emptyType() returns(()){return ();}",
       "function grouped(){return (());}", "function trailing(){return ((),);}"] do
     let source ← check declaration [] .unit .unit .unit 1 (by intro store k; exact .cons .unit .refl)
     for store in stores do
@@ -197,7 +198,7 @@ def frontendParsedUnitEntryTests : IO Unit := do
                 (.cons .enterLet (.cons .unit (.cons .bindLet (.cons (.var rfl) .refl)))))))
   for declaration in ["function wrong() returns(Word){return ();}",
       "function unknown() returns(Unknown){return ();}", "function emptyHeader() returns(){return ();}",
-      "function emptyType() returns(()){return ();}", "function many() returns(Unit,Unit){return ();}",
+      "function many() returns(Unit,Unit){return ();}",
       "function unknownUnused(x: Unknown){return ();}",
       "function unselected(c: Bool){if(c){return ();}else{return missing;}}"] do
     let source ← parsed declaration

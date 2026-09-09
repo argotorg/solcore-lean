@@ -2,9 +2,10 @@ import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.StructuralTypeTableProperties
 import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
 import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.RuntimeFunctionResumptionProperties
 
-/-! Complete type occurrences carry independent source meaning, not a type
-computed by the tested interpreter. Existing entry gates remain named-only. -/
+/-! Complete types carry independent meaning. One structural return annotation
+now executes; parameter and initialized-let annotations remain named-only. -/
 set_option autoImplicit false
 namespace Tests
 open Solcore Solcore.Frontend
@@ -73,13 +74,16 @@ private def w : TypedRuntimeArgument := ⟨.word, .word (Core.Word.ofNatModulo 9
 private def b : TypedRuntimeArgument := ⟨.bool, .bool true, .bool⟩
 private def u : TypedRuntimeArgument := ⟨.unit, .unit, .unit⟩
 private def p : TypedRuntimeArgument := ⟨.product .word .bool, .pair w.value b.value, .pair .word .bool⟩
-private def oldGateRejected (content : String) (arguments : List TypedRuntimeArgument)
-    (expected : Core.Ty) : IO Unit := do
+private def declaration (content : String) : IO Syntax.FunctionDecl := do
   let .ok lexed := Syntax.Lexer.lex (file content) | throw (IO.userError "entry lexer invariant")
   let .ok source next := Syntax.Parser.functionDecl .module (Syntax.Parser.State.initial (file content) lexed)
     | throw (IO.userError "complete gate declaration did not parse")
   assertTrue (next.atEnd && next.diagnostics.isEmpty && lexed.diagnostics.isEmpty &&
     decide (source.span = ⟨(file content).id, 0, content.utf8ByteSize⟩)) "gate source lost original completion or range"
+  return source
+private def oldGateRejected (content : String) (arguments : List TypedRuntimeArgument)
+    (expected : Core.Ty) : IO Unit := do
+  let source ← declaration content
   let annotations := source.value.signature.parameters.elements.filterMap (fun parameter =>
     match parameter.value with | .typed none _ annotation => some annotation | _ => none)
   let annotations := annotations ++ (source.value.signature.returnsClause.map (·.types.elements)).getD []
@@ -98,6 +102,88 @@ private def oldGateRejected (content : String) (arguments : List TypedRuntimeArg
   for store in [[], [w.value, .cellRef .word 99]] do
     for fuel in [0, 1, 40] do
       assertTrue (runRuntimeFunction? table owner source arguments fuel store).isNone "rejected gate exposed execution"
+private structure Raw (names : LocalNameTable) (env : Resolved.Environment) (store : Core.Store) (source : Syntax.Expr) where
+  value : Core.Value
+  cost : Nat
+  costed : LocalExpressionEvaluatesWithCost names env store source value store cost
+private def raw (names : LocalNameTable) (env : Resolved.Environment) (store : Core.Store)
+    (source : Syntax.Expr) : IO (Raw names env store source) := do
+  match sourceAt : source with
+  | ⟨_, .tuple ⟨_, []⟩⟩ => return ⟨.unit, 1, by rw [sourceAt]; exact .unit⟩
+  | ⟨_, .identifier name⟩ =>
+      match named : names.lookup? name.value with
+      | none => throw (IO.userError "independent source name missing")
+      | some id =>
+          match found : env.lookup? id with
+          | none => throw (IO.userError "independent actual value missing")
+          | some value => return ⟨value, 1, by
+              rw [sourceAt]
+              exact .identifier (LocalNameTable.lookup?_iff.mp named) (Resolved.LocalScope.lookup?_iff.mp found)⟩
+  | ⟨_, .tuple ⟨_, [left, right]⟩⟩ =>
+      let first ← raw names env store left
+      let second ← raw names env store right
+      return ⟨.pair first.value second.value, first.cost + second.cost + 3, by
+        rw [sourceAt]; exact .pair first.costed second.costed⟩
+  | _ => throw (IO.userError "outside independent migrated return script")
+termination_by sizeOf source
+private def checkedReturn (content : String) (arguments : List TypedRuntimeArgument)
+    (core : Core.Expr) (type : Core.Ty) (value : Core.Value) (cost : Nat)
+    (path : ∀ store k, Core.Steps cost ⟨.eval core (arguments.reverse.map (·.value)), k, store⟩
+      ⟨.ret value, k, store⟩) : IO Unit := do
+  let source ← declaration content
+  match returnsAt : source.value.signature.returnsClause with
+  | some ⟨_, ⟨_, [annotation]⟩⟩ =>
+      let independent ← certify table annotation
+      if sameType : independent.type = type then
+        let meaning : StructuralTypeDenotes table annotation type := sameType ▸ independent.meaning
+        have returnsMeaning : RuntimeReturnTypeDenotes table source.value.signature.returnsClause type := by
+          rw [returnsAt]; exact .single meaning
+        if policy : source.value.signature.genericParameters = none ∧ source.value.signature.whereClause = none ∧
+            source.value.signature.modifiers.publicMarker = none ∧ source.value.signature.modifiers.payableMarker = none then
+          have header : RuntimeFunctionHeader table source.value.signature type :=
+            ⟨policy.1, policy.2.1, policy.2.2.1, policy.2.2.2, returnsMeaning⟩
+          have _ := interpretRuntimeFunctionHeader?_iff.mpr header
+          assertTrue (interpretTypeName? table annotation).isNone "old named-only type adapter broadened"
+          let some compiled := compileRuntimeFunction? table owner source | throw (IO.userError "structural return did not compile")
+          assertTrue (decide (compiled.core = core ∧ compiled.returnType = type)) "migrated return changed fixed Core/type"
+          match preparedAt : prepareRuntimeFunction? table owner source arguments with
+          | none => throw (IO.userError "original actual arguments did not prepare")
+          | some prepared =>
+              let preparation := prepareRuntimeFunction?_sound preparedAt
+              assertTrue (decide (prepared.core = core ∧ prepared.returnType = type ∧
+                prepared.inputs.names = compiled.inputs.names ∧ prepared.inputs.context = compiled.inputs.context ∧
+                prepared.inputs.bindings.length = source.value.signature.parameters.elements.length ∧
+                prepared.inputs.environment.values = arguments.reverse.map (·.value))) "original argument layout changed"
+              match bodyAt : source.value.body with
+              | ⟨_, [⟨_, .returnStmt (some operand)⟩]⟩ =>
+                  for store in [[], [w.value, .cellRef .word 99]] do
+                    let original ← raw prepared.inputs.names prepared.inputs.environment store operand
+                    assertTrue (decide (original.value = value ∧ original.cost = cost)) "independent source value/cost changed"
+                    have bodyCost : TypedLetReturnTreeEvaluatesWithCost owner prepared.inputs.names prepared.inputs.environment
+                        store source.value.body original.value store original.cost := by
+                      rw [bodyAt]; exact .single (.expression original.costed)
+                    let costed := RuntimeFunctionEvaluatesWithCost.intro preparation bodyCost
+                    have _ := (runtimeFunctionEvaluatesWithCost_iff_evaluate.mp costed).2
+                    have _ := (path store []).runStateful_done_iff (fuel := cost)
+                    assertTrue (decide (evaluateRuntimeFunctionWithCost? table owner source arguments = some (type, value, cost)))
+                      "whole direct return differs from independent fixture"
+                    for fuel in List.range (cost + 3) do
+                      have _ := costed.run_done_iff (fuel := fuel)
+                      assertTrue (match runRuntimeFunction? table owner source arguments fuel store with
+                        | some (t, .done v s) => decide (cost ≤ fuel ∧ t = type ∧ v = value ∧ s = store)
+                        | some (t, .outOfFuel checkpoint) => decide (fuel < cost ∧ t = type ∧ checkpoint.store = store)
+                        | _ => false) "migrated return changed threshold or own store"
+                    for spent in List.range cost do
+                      match exhausted : runRuntimeFunction? table owner source arguments spent store with
+                      | some (t, .outOfFuel checkpoint) =>
+                          have _ := runRuntimeFunction?_resume exhausted (cost - spent)
+                          assertTrue (decide (t = type ∧ Core.runStateful (cost - spent) checkpoint = .done value store))
+                            "migrated return lost its genuine remaining path"
+                      | _ => throw (IO.userError "migrated return checkpoint missing")
+              | _ => throw (IO.userError "original migrated body shape changed")
+        else throw (IO.userError "independent header policy not satisfied")
+      else throw (IO.userError "independent structural return type differs from fixture")
+  | _ => throw (IO.userError "expected exactly one original return annotation")
 end ParsedStructuralTypes
 open ParsedStructuralTypes
 
@@ -153,9 +239,14 @@ def frontendParsedStructuralTypeTests : IO Unit := do
   oldGateRejected "function unitParam(x: ()){return ();}" [u] .unit
   oldGateRejected "function pairParam(x: (Word,Bool)){return ();}" [p] (.product .word .bool)
   oldGateRejected "function singleParam(x: (Word)) returns(Word){return x;}" [w] .word
-  oldGateRejected "function unitReturn() returns(()){return ();}" [] .unit
-  oldGateRejected "function pairReturn(x: Word,c: Bool) returns((Word,Bool)){return (x,c);}" [w,b] (.product .word .bool)
-  oldGateRejected "function singleReturn(x: Word) returns((Word)){return x;}" [w] .word
+  checkedReturn "function unitReturn() returns(()){return ();}" [] .unit .unit .unit 1
+    (by intro store k; exact .cons .unit .refl)
+  checkedReturn "function pairReturn(x: Word,c: Bool) returns((Word,Bool)){return (x,c);}" [w,b]
+    (.pair (.var 1) (.var 0)) (.product .word .bool) (.pair w.value b.value) 5
+    (by intro store k; exact .cons .enterPair (.cons (.var rfl)
+      (.cons .enterPairRight (.cons (.var rfl) (.cons .applyPair .refl)))))
+  checkedReturn "function singleReturn(x: Word) returns((Word)){return x;}" [w] (.var 0) .word w.value 1
+    (by intro store k; exact .cons (.var rfl) .refl)
   oldGateRejected "function unitLet(){let x: ()=();return x;}" [] .unit
   oldGateRejected "function pairLet(x: Word,c: Bool) returns(PairAlias){let p: (Word,Bool)=(x,c);return p;}" [w,b] (.product .word .bool)
   for text in ["", "(", "Word Bool", "(Word,,Bool)", "(Word,Bool))", "(,)", "Word<>"] do
