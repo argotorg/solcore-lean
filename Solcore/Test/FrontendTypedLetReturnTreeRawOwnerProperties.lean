@@ -149,6 +149,7 @@ theorem raw_selected_success_does_not_establish_the_unselected_annotation_contra
     | single child => cases child
     | binding meaning _ _ _ =>
       have impossible := meaning.complete
+      simp only [annotation, interpretStructuralType?_named_eq_typeName] at impossible
       change none = some _ at impossible
       cases impossible
 

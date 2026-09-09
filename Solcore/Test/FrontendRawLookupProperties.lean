@@ -260,8 +260,10 @@ theorem the_same_raw_observation_does_not_preserve_whole_annotation_acceptance (
     output, (leftElab word).complete, ?_⟩
   have initializer : elaborateLocalExpression? bad.names bad.context (ref "seed") = some (.var 0, .bool) :=
     elaborateLocalExpression?_complete (.identifier .head) (.var .head) (.var .head)
+  have meaning : interpretStructuralType? [(["Word"], .word)] annotation = some .word :=
+    (show StructuralTypeDenotes [(["Word"], .word)] annotation .word from .named .head).complete
   have fresh : "x" ∉ bad.names.map Prod.fst := by change "x" ∉ ["seed"]; decide
-  simp only [checkedBody, binding, elaborateTypedLetReturnTree?, if_pos fresh, initializer]
+  simp only [checkedBody, binding, elaborateTypedLetReturnTree?, if_pos fresh, meaning, initializer]
   rfl
 
 end Tests.FrontendRawLookup
