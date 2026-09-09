@@ -82,6 +82,12 @@ private def statics (ctx : Resolved.Context) (s : Syntax.Expr) : IO (Static ctx 
         by rw [shape]; exact .binary meaning (both.1 ▸ a.elaboration) (both.2 ▸ b.elaboration),
         by rw [shape]; exact .binary meaning (both.1 ▸ a.typing) (both.2 ▸ b.typing)⟩
       else throw (IO.userError "Word operands")
+  | ⟨_,.conditional guard _ yes _ no⟩ =>
+      let g ← statics ctx guard; let a ← statics ctx yes; let b ← statics ctx no
+      if valid : g.type=.bool ∧ b.type=a.type then return ⟨.ifE g.core a.core b.core,a.type,
+        by rw [shape]; exact .conditional (valid.1 ▸ g.elaboration) a.elaboration (valid.2 ▸ b.elaboration),
+        by rw [shape]; exact .conditional (valid.1 ▸ g.typing) a.typing (valid.2 ▸ b.typing)⟩
+      else throw (IO.userError "migration conditional types")
   | _ => let a ← leaf ctx s; return ⟨a.core,a.type,.pure a.resolution a.lowered a.typing,.pure (a.resolution.reflects_type a.typing)⟩
 termination_by sizeOf s
 private structure RawLeaf (env : Resolved.Environment) (s : Syntax.Expr) where
@@ -115,6 +121,16 @@ private def actual (env : Resolved.Environment) (s : Syntax.Expr) : IO (Actual e
       match applied : op.apply a.value b.value with
       | some v => return ⟨v,a.cost+b.cost+3,fun store => by rw [shape]; exact .binary meaning (a.evidence store) (b.evidence store) applied⟩
       | _ => throw (IO.userError "primitive actual operands")
+  | ⟨_,.conditional guard _ yes _ no⟩ =>
+      let g ← actual env guard
+      match gv : g.value with
+      | .bool true =>
+          let a ← actual env yes
+          return ⟨a.value,g.cost+a.cost+2,fun store => by rw [shape]; exact .ifTrue (gv ▸ g.evidence store) (a.evidence store)⟩
+      | .bool false =>
+          let b ← actual env no
+          return ⟨b.value,g.cost+b.cost+2,fun store => by rw [shape]; exact .ifFalse (gv ▸ g.evidence store) (b.evidence store)⟩
+      | _ => throw (IO.userError "migration actual Bool guard")
   | _ => let a ← rawLeaf env s; return ⟨a.value,1,fun store => .pure (a.evidence store)⟩
 termination_by sizeOf s
 private theorem oldBinary {ctx : Resolved.Context} {span opSpan : Syntax.SourceSpan}
@@ -246,7 +262,13 @@ def frontendParsedRecursiveBinaryComputationTests : IO Unit := do
       ("-",.wordSub,w 0,w 1,.word Core.Word.maximum),("*",.wordMul,Core.Word.maximum,w 2,.word (w (Core.wordModulus-2))),
       ("/",.wordDiv,w 17,w 0,.word (w 0)),("%",.wordMod,w 17,w 0,.word (w 0)),
       (">",.wordGt,w 5,w 17,.bool false),("==",.wordEq,w 17,w 17,.bool true)] do vector token op x y value
-  for text in ["f(x) < g(y)","f(x) <= g(y)","f(x) >= g(y)","f(x) != g(y)","(f(x),y)","~f(x)","c ? f(x) : y","f()","f(x,y)","f(Missing) + y"] do
+  let ternary := Core.Expr.ifE (.var 4) (call 1 0) (.var 3)
+  exercise "c ? f(x) : y" (w 17) (w 5) ternary .word (.word (w 17)) 9 (fun _ _ =>
+    CostStepComposition.ifTrue (.cons (.var rfl) .refl)
+      (CostStepComposition.apply (.cons (.var rfl) .refl) (.cons (.var rfl) .refl) (.cons (.var rfl) .refl)))
+  let original ← parsed "c ? f(x) : y"
+  check (decide (elaborateLocalExpression? names (context .word) original=none ∧ elaborateLocalComputation? names (context .word) original=none)) "conditional migration retains old rejection"
+  for text in ["f(x) < g(y)","f(x) <= g(y)","f(x) >= g(y)","f(x) != g(y)","(f(x),y)","~f(x)","f()","f(x,y)","f(Missing) + y"] do
     let s ← parsed text
     check (decide (elaborateRecursiveLocalComputation? names (context .word) s=none ∧ elaborateLocalComputation? names (context .word) s=none)) "retained nonrecursive root boundary"
   for text in ["f(x) && g(y)","f(x) || g(y)","!f(x)"] do

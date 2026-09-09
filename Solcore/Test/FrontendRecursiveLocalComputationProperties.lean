@@ -246,6 +246,7 @@ theorem pure_group_overlap_preserves_unselected_unsupported_source (value : Core
     (.identifier .head (.tail (by decide) .head)))),
     .group (.pure (.ifTrue (conditionCost := 1) (branchCost := 1)
       (.identifier (.tail (by decide) .head) .head) (.identifier .head (.tail (by decide) .head)))), ?_⟩
-  simp [elaborateRecursiveLocalComputation?, skipped, ref, elaborateLocalExpression?, resolveLocalExpression?]
+  simp [elaborateRecursiveLocalComputation?, skipped, ref, elaborateLocalExpression?,
+    resolveLocalExpression?, names, LocalNameTable.lookup?]
 
 end Tests.FrontendRecursiveLocalComputation
