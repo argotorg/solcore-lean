@@ -125,8 +125,44 @@ private def checkInferredLocal : IO Unit := do
     assertTrue (decide (runRuntimeFunction? types owner source [] 2 initialStore = some (.word,.outOfFuel saved) ∧
       Core.runStateful 2 saved = .done (.word seven) initialStore)) "inferred local lost its genuine pending let"
 
+private def checkDiscardLiteral : IO Unit := do
+  let some source ← parsed? "function before() { 7; return; }"
+    | throw (IO.userError "original discarded literal declaration did not parse")
+  assertTrue (match source.value.body.value with
+    | [⟨ss,.expression ⟨es,.literal ⟨_,.decimal spelling⟩⟩ true⟩, ⟨rs,.returnStmt none⟩] =>
+        decide (spelling = "7") && ss.contains es && source.value.body.span.contains ss &&
+        source.value.body.span.contains rs
+    | _ => false) "original expression, semicolon or bare return was changed"
+  let core : Core.Expr := .letE (.word seven) .unit
+  let some prepared := prepareRuntimeFunction? types owner source []
+    | throw (IO.userError "strict discarded literal was rejected")
+  checkOrder source [] prepared.inputs
+  assertTrue (decide (prepared.core = core ∧ prepared.returnType = .unit) &&
+    (prepared.inputs.checkReturnBody? source.value.body).isNone)
+    "discard changed exact Core or widened the old singleton adapter"
+  for initialStore in [store, []] do
+    have paths (k : List Core.Frame) : Core.Steps 4 ⟨.eval core [], k, initialStore⟩
+        ⟨.ret .unit, k, initialStore⟩ :=
+      .cons .enterLet (.cons .word (.cons .bindLet (.cons .unit .refl)))
+    have _ := paths []
+    for fuel in List.range 7 ++ [20] do
+      assertTrue (match runRuntimeFunction? types owner source [] fuel initialStore with
+        | some (.unit,.done value final) => decide (4 ≤ fuel ∧ value = .unit ∧ final = initialStore)
+        | some (.unit,.outOfFuel saved) => decide (fuel < 4 ∧ saved.store = initialStore)
+        | _ => false) "discarded literal work was skipped or counted twice"
+    for spent in List.range 4 do
+      let some (.unit,.outOfFuel saved) := runRuntimeFunction? types owner source [] spent initialStore
+        | throw (IO.userError "genuine discard checkpoint absent")
+      for remaining in List.range 7 do
+        assertTrue (decide (Core.runStateful remaining saved =
+          Core.runStateful (spent + remaining) (.initial core [] initialStore))) "discard checkpoint was restarted"
+    let saved : Core.State := ⟨.ret (.word seven),[.letBody .unit []],initialStore⟩
+    assertTrue (decide (runRuntimeFunction? types owner source [] 2 initialStore = some (.unit,.outOfFuel saved) ∧
+      Core.runStateful 2 saved = .done .unit initialStore)) "discard lost the actual pending expression value"
+
 def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
   checkInferredLocal
+  checkDiscardLiteral
   checkAccepted types "function empty() { return; }" [] .unit .unit .unit 1
   checkAccepted types "function explicit() returns (U,) { return; }" [] .unit .unit .unit 1
   checkAccepted types "/* lead */ function literal() returns (Word) { return ((0007)); }"
@@ -200,7 +236,7 @@ def frontendParsedRuntimeFunctionEntryTests : IO Unit := do
       "function generic<T>() { return; }", "function constrained() where Word: Eq { return; }",
       "function emptyBody() {}", "function nested() { { return; } }",
       "function repeated() { return; return; }", "function tail() returns (Word) { 7 }",
-      "function discarded() { return; missing; }", "function before() { 7; return; }",
+      "function discarded() { return; missing; }",
       "function call() returns (Word) { return missing(); }"] do
     checkRejected content
   for content in ["function publicOnly() public { return; }",

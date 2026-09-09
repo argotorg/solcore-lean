@@ -129,6 +129,16 @@ private def certify (s : LocalTypeInputs) (e : Resolved.Environment) (aligned : 
                 else throw (IO.userError "written annotation disagrees")
             | _ => throw (IO.userError "outside independent annotation script")
       else throw (IO.userError "written name is already used")
+  | ⟨span, ⟨_, .expression source true⟩ :: rest⟩ =>
+      let a ← expression s e aligned store source
+      let b ← certify s e aligned store ⟨span, rest⟩
+      return ⟨.letE a.core (b.core.weakenAt 0), b.type, b.value, a.cost + b.cost + 2,
+        by rw [atBody]; exact .discard a.resolution a.lowered a.typing b.elaboration,
+        by rw [atBody]; exact .discard a.raw b.raw, fun k => by
+          have tail := (b.paths []).weakenAt_zero_localFragment b.elaboration.localFragment a.value k
+          have path := Core.Steps.cons .enterLet ((a.paths (.letBody (b.core.weakenAt 0) e.values :: k)).trans
+            (.cons .bindLet tail))
+          simpa only [Nat.add_assoc] using path⟩
   | ⟨_, [⟨_, .ifThen guard yes (some no)⟩]⟩ =>
       let c ← expression s e aligned store guard
       let a ← certify s e aligned store yes; let b ← certify s e aligned store no
@@ -217,6 +227,7 @@ end LocalFragments
 open LocalFragments
 
 def frontendParsedLocalFragmentTests : IO Unit := do
+  checked "{x;return x;}" .word (w 9) true (.letE (.var 2) (.var 3)) .word (w 9) 4
   checked "{return x;}" .word (w 9) true (.var 2) .word (w 9) 1
   checked "{return (x,r);}" .word (w 9) true (.pair (.var 2) (.var 1))
     (.product .word .word) (.pair (w 9) (w 2)) 5
@@ -247,7 +258,7 @@ def frontendParsedLocalFragmentTests : IO Unit := do
     check (decide (Core.runStateful 2 original = .outOfFuel ⟨.ret (w 9), [.letBody (.var 0) values], store⟩ ∧
       Core.runStateful 2 shifted = .outOfFuel ⟨.ret (w 9), [.letBody (.var 0) (.unit :: values)], store⟩ ∧
       Core.runStateful 2 original ≠ Core.runStateful 2 shifted)) "different captured environments were identified"
-  for source in ["{x;return x;}", "{let z;return x;}", "{let z=z;return x;}",
+  for source in ["{let z;return x;}", "{let z=z;return x;}",
       "{let x=r;return x;}", "{return f(x);}", "{if(c){return x;}else{return missing;}}"] do
     check ((elaborateTypedLetReturnTree? types owner (inputs .word) (← parsed source)).isNone)
       "structural bridge changed a source rejection"
