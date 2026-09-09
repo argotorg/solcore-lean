@@ -175,7 +175,7 @@ theorem ComputationReturnTreeEvaluatesWithCost.toStepsWithContinuation
       | ifFalse condition branch =>
           exact CostStepComposition.ifFalse (childSteps condition guard sameIds _)
             (elseIH branch sameIds continuation)
-  | wordMatch scrutinee ordered patterns branches defaultOrdered fallback lowered branchIH defaultIH =>
+  | wordMatch scrutinee ordered patterns _ branches defaultOrdered fallback lowered branchIH defaultIH =>
       cases evaluation with
       | wordMatch initializer choice branch =>
           rw [← ordered, ← defaultOrdered] at choice

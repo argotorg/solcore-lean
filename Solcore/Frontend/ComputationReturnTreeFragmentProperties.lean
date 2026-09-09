@@ -58,7 +58,7 @@ theorem ComputationReturnTreeElaborates.core_fragment
   | inferred _ child _ ih => exact .letE (.leaf (childMembership child)) ih
   | discard child _ ih => exact .letE (.leaf (childMembership child)) (ComputationBodyFragment.weakenAt childWeakening ih 0)
   | conditional guard _ _ yesIH noIH => exact .ifE (.leaf (childMembership guard)) yesIH noIH
-  | wordMatch scrutinee _ _ _ _ _ lowered branchesIH defaultIH =>
+  | wordMatch scrutinee _ _ _ _ _ _ lowered branchesIH defaultIH =>
       exact .letE (.leaf (childMembership scrutinee))
         (fold_fragment childWeakening _ _ branchesIH defaultIH lowered)
 

@@ -214,7 +214,7 @@ theorem ComputationReturnTreeElaborates.evaluates_iff
             exact .ifTrue ((childExecution guard sameIds).mpr condition) ((thenIH sameIds).mpr branch)
         | ifFalse condition branch =>
             exact .ifFalse ((childExecution guard sameIds).mpr condition) ((elseIH sameIds).mpr branch)
-  | @wordMatch inputs _ _ _ _ _ _ _ _ _ _ _ _ scrutinee ordered patterns branches defaultOrdered defaults lowered branchIH defaultIH =>
+  | @wordMatch inputs _ _ _ _ _ _ _ _ _ _ _ _ _ scrutinee ordered patterns _ branches defaultOrdered defaults lowered branchIH defaultIH =>
       subst ordered
       subst defaultOrdered
       have folded {actual : Core.Value} {store : Core.Store} := fold_evaluates_iff _ _
