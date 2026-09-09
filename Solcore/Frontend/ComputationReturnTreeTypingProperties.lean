@@ -12,6 +12,31 @@ namespace Solcore.Frontend
 variable {ChildHasType : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Ty → Prop}
     {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}
 
+private theorem fold_coverage {entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))}
+    {defaultEntry : Option (Syntax.Block × Core.Expr)}
+    (patterns : ∀ entry ∈ entries, match entry.2.1 with
+      | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
+      | some word => WordMatchPatternDenotes entry.1.value.pattern word) :
+    (entries.foldr (fun entry tail => match entry.2.1 with
+      | none => some (entry.2.2.weakenAt 0)
+      | some word => tail.map (fun core =>
+          .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) core))
+      (defaultEntry.map (fun entry => entry.2.weakenAt 0))).isSome = true ↔
+    defaultEntry.isSome = true ∨ ∃ entry ∈ entries, ∃ marker, entry.1.value.pattern.value = .wildcard marker := by
+  induction entries with
+  | nil => simp
+  | cons entry rest ih =>
+      have meaning := patterns entry (by simp)
+      cases tag : entry.2.1 with
+      | none =>
+          simp only [tag] at meaning
+          obtain ⟨marker, shape⟩ := meaning
+          simp [tag, shape]
+      | some word =>
+          simp only [tag] at meaning
+          obtain ⟨literal, shape, _⟩ := meaning
+          simpa [tag, shape] using ih (fun item member => patterns item (by simp [member]))
+
 private theorem hasType
     (childTyping : ∀ {table context source type},
       ChildHasType table context source type ↔ ∃ core, ChildElab table context source core type)
@@ -31,16 +56,23 @@ private theorem hasType
       exact .discard (childTyping.mpr ⟨_, expression⟩) ih
   | conditional condition _ _ thenIH elseIH =>
       exact .conditional (childTyping.mpr ⟨_, condition⟩) thenIH elseIH
-  | wordMatch scrutinee ordered patterns _ _ branchIH defaultIH =>
-      refine .wordMatch (childTyping.mpr ⟨_, scrutinee⟩) ?_ ?_ defaultIH
+  | wordMatch scrutinee ordered patterns _ defaultOrdered _ lowered branchIH defaultIH =>
+      refine .wordMatch (childTyping.mpr ⟨_, scrutinee⟩) ?_ ?_ ?_ ?_
       · intro arm member
         rw [← ordered] at member
         obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
         exact ⟨entry.2.1, patterns entry entryMember⟩
+      · rcases (fold_coverage patterns).mp (congrArg Option.isSome lowered) with present | ⟨entry, member, marker, shape⟩
+        · left; rw [← defaultOrdered]; simpa using present
+        · exact .inr ⟨entry.1, ordered ▸ List.mem_map.mpr ⟨entry, member, rfl⟩, marker, shape⟩
       · intro arm member
         rw [← ordered] at member
         obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
         exact branchIH entry entryMember
+      · intro source member
+        rw [← defaultOrdered, Option.toList_map] at member
+        obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
+        exact defaultIH entry entryMember
 
 private theorem entries_exist {cases : List Syntax.MatchCase} {P : Syntax.Block → Core.Expr → Prop}
     (patterns : ∀ arm ∈ cases, ∃ tag : Option Core.Word, match tag with
@@ -102,13 +134,27 @@ private theorem elaborates
       obtain ⟨thenCore, thenElaboration⟩ := thenIH
       obtain ⟨elseCore, elseElaboration⟩ := elseIH
       exact ⟨.ifE conditionCore thenCore elseCore, .conditional conditionElaboration thenElaboration elseElaboration⟩
-  | @wordMatch inputs _ _ _ _ _ _ _ type scrutinee patterns _ _ branchIH defaultIH =>
+  | @wordMatch inputs _ _ _ _ _ _ defaultBody type scrutinee patterns covered _ _ branchIH defaultIH =>
       obtain ⟨scrutineeCore, scrutineeElaboration⟩ := childTyping.mp scrutinee
-      obtain ⟨defaultCore, defaultElaboration⟩ := defaultIH
       obtain ⟨entries, ordered, meanings, elaborations⟩ :=
         entries_exist (P := fun body core => ComputationReturnTreeElaborates ChildElab types owner inputs body core type)
           patterns branchIH
-      exact ⟨_, .wordMatch scrutineeElaboration ordered meanings elaborations defaultElaboration⟩
+      have defaults : ∃ defaultEntry : Option (Syntax.Block × Core.Expr), defaultEntry.map Prod.fst = defaultBody ∧
+          ∀ entry ∈ defaultEntry.toList, ComputationReturnTreeElaborates ChildElab types owner inputs entry.1 entry.2 type := by
+        cases defaultBody with
+        | none => exact ⟨none, rfl, by simp⟩
+        | some source =>
+            obtain ⟨core, elaboration⟩ := defaultIH source (by simp)
+            exact ⟨some (source, core), rfl, by intro entry member; simpa using (List.mem_singleton.mp member ▸ elaboration)⟩
+      obtain ⟨defaultEntry, defaultOrdered, defaults⟩ := defaults
+      have coveredFold : defaultEntry.isSome = true ∨ ∃ entry ∈ entries, ∃ marker, entry.1.value.pattern.value = .wildcard marker := by
+        rcases covered with present | ⟨arm, member, marker, shape⟩
+        · left; rw [← defaultOrdered] at present; simpa using present
+        · rw [← ordered] at member
+          obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
+          exact .inr ⟨entry, entryMember, marker, shape⟩
+      obtain ⟨bodyCore, lowered⟩ := Option.isSome_iff_exists.mp ((fold_coverage meanings).mpr coveredFold)
+      exact ⟨_, .wordMatch scrutineeElaboration ordered meanings elaborations defaultOrdered defaults lowered⟩
 
 theorem computationReturnTreeHasType_iff_elaborates
     (childTyping : ∀ {table context source type},
@@ -119,25 +165,30 @@ theorem computationReturnTreeHasType_iff_elaborates
       ∃ core, ComputationReturnTreeElaborates ChildElab types owner inputs body core type :=
   ⟨elaborates childTyping, fun ⟨_, elaboration⟩ => hasType childTyping elaboration⟩
 
-private theorem fold_hasType {context : Core.Context} {type : Core.Ty} {defaultCore : Core.Expr}
+private theorem fold_hasType {context : Core.Context} {type : Core.Ty} {bodyCore : Core.Expr}
+    {defaultEntry : Option (Syntax.Block × Core.Expr)}
     {entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))}
-    (fallback : Core.HasType context defaultCore type)
-    (branches : ∀ entry ∈ entries, Core.HasType context entry.2.2 type) :
-    Core.HasType (.word :: context) (entries.foldr
+    (fallback : ∀ entry ∈ defaultEntry.toList, Core.HasType context entry.2 type)
+    (branches : ∀ entry ∈ entries, Core.HasType context entry.2.2 type)
+    (lowered : entries.foldr
       (fun entry tail => match entry.2.1 with
-        | none => entry.2.2.weakenAt 0
-        | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
-      (defaultCore.weakenAt 0)) type := by
-  induction entries with
-  | nil => simpa only [List.foldr_nil, Core.Context.insertAt] using fallback.weakenAt 0
+        | none => some (entry.2.2.weakenAt 0)
+        | some word => tail.map (fun core => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) core))
+      (defaultEntry.map (fun entry => entry.2.weakenAt 0)) = some bodyCore) :
+    Core.HasType (.word :: context) bodyCore type := by
+  induction entries generalizing bodyCore with
+  | nil =>
+      obtain ⟨entry, member, rfl⟩ := Option.map_eq_some_iff.mp lowered
+      simpa only [Core.Context.insertAt] using (fallback entry (Option.mem_toList.mpr member)).weakenAt 0
   | cons entry rest ih =>
       have head : Core.HasType (.word :: context) (entry.2.2.weakenAt 0) type := by
         simpa only [Core.Context.insertAt] using (branches entry (by simp)).weakenAt 0
       cases tag : entry.2.1 with
-      | none => simpa only [List.foldr_cons, tag] using head
-      | some word => simpa only [List.foldr_cons, tag] using
-          (Core.HasType.ifE (.binary (.var rfl) (.word)) head
-            (ih (fun row member => branches row (by simp [member]))))
+      | none => simp only [List.foldr_cons, tag, Option.some.injEq] at lowered; exact lowered ▸ head
+      | some word =>
+          simp only [List.foldr_cons, tag] at lowered
+          obtain ⟨tail, found, rfl⟩ := Option.map_eq_some_iff.mp lowered
+          exact .ifE (.binary (.var rfl) (.word)) head (ih (fun row member => branches row (by simp [member])) found)
 
 theorem ComputationReturnTreeElaborates.core_hasType
     (childCoreType : ∀ {table context source core type},
@@ -156,7 +207,7 @@ theorem ComputationReturnTreeElaborates.core_hasType
   | discard expression _ ih =>
       exact .letE (childCoreType expression) (by simpa only [Core.Context.insertAt] using ih.weakenAt 0)
   | conditional condition _ _ thenIH elseIH => exact .ifE (childCoreType condition) thenIH elseIH
-  | wordMatch scrutinee _ _ _ _ branchIH defaultIH =>
-      exact .letE (childCoreType scrutinee) (fold_hasType defaultIH branchIH)
+  | wordMatch scrutinee _ _ _ _ _ lowered branchIH defaultIH =>
+      exact .letE (childCoreType scrutinee) (fold_hasType defaultIH branchIH lowered)
 
 end Solcore.Frontend
