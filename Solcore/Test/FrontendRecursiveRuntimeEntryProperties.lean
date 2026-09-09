@@ -262,8 +262,11 @@ theorem whole_header_and_complete_parameter_policy_still_precede_deep_body_accep
     compileRuntimeFunction? (types type) owner (duplicateEntry depth) = none :=
   by
     refine ⟨elaborated depth type, rfl, ?_⟩
-    simp only [compileRuntimeFunction?, duplicateEntry, declaration, interpretRuntimeFunctionHeader?,
-      interpretRuntimeReturnType?, annotation, interpretStructuralType?_named_eq_typeName]
-    rfl
+    apply compileRuntimeFunction?_eq_none_iff.mpr
+    rintro ⟨candidate, accepted⟩
+    cases accepted.parameters with
+    | cons _ _ tail => cases tail with
+      | cons _ _ tail => cases tail with
+        | cons _ unused _ => exact unused (by change "x" ∈ ["x", "c"]; decide)
 
 end Tests.FrontendRecursiveRuntimeEntry
