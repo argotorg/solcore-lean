@@ -54,10 +54,10 @@ theorem ComputationReturnTreeElaborates.core_fragment
   | bare => exact .unit
   | expression child => exact .leaf (childMembership child)
   | block _ ih => exact ih
-  | binding _ _ child _ ih => exact .letE (.leaf (childMembership child)) ih
-  | inferred _ child _ ih => exact .letE (.leaf (childMembership child)) ih
+  | binding _ child _ ih => exact .letE (.leaf (childMembership child)) ih
+  | inferred child _ ih => exact .letE (.leaf (childMembership child)) ih
   | discard child _ ih => exact .letE (.leaf (childMembership child)) (ComputationBodyFragment.weakenAt childWeakening ih 0)
-  | conditional guard _ _ yesIH noIH => exact .ifE (.leaf (childMembership guard)) yesIH noIH
+  | conditional guard _ _ _ yesIH noIH => exact .ifE (.leaf (childMembership guard)) yesIH noIH
   | wordMatch scrutinee _ _ _ _ _ _ lowered branchesIH defaultIH =>
       exact .letE (.leaf (childMembership scrutinee))
         (fold_fragment childWeakening _ _ branchesIH defaultIH lowered)

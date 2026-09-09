@@ -142,7 +142,7 @@ theorem ComputationReturnTreeEvaluatesWithCost.toStepsWithContinuation
   | block _ ih =>
       cases evaluation with
       | block actual => exact ih actual sameIds continuation
-  | @binding inputs _ _ _ _ _ _ _ _ _ _ _ _ child _ ih =>
+  | @binding inputs _ _ _ _ _ _ _ _ _ _ _ child _ ih =>
       cases evaluation with
       | binding initializer tail =>
           rename_i middleStore boundValue initializerCost tailCost
@@ -151,7 +151,7 @@ theorem ComputationReturnTreeEvaluatesWithCost.toStepsWithContinuation
           · simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using tail
           · simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.ids, List.map_cons]
               using congrArg (List.cons _) sameIds
-  | @inferred inputs _ _ _ _ _ _ _ _ _ _ child _ ih =>
+  | @inferred inputs _ _ _ _ _ _ _ _ _ child _ ih =>
       cases evaluation with
       | inferred initializer tail =>
           rename_i middleStore boundValue initializerCost tailCost
@@ -167,7 +167,7 @@ theorem ComputationReturnTreeEvaluatesWithCost.toStepsWithContinuation
           exact CostStepComposition.letE (childSteps expression child sameIds _)
             (insert_zero_path (F := F) childPaths
               (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening tailElaboration) (ih tail sameIds []) discardedValue continuation)
-  | conditional guard _ _ thenIH elseIH =>
+  | conditional guard _ _ _ thenIH elseIH =>
       cases evaluation with
       | ifTrue condition branch =>
           exact CostStepComposition.ifTrue (childSteps condition guard sameIds _)

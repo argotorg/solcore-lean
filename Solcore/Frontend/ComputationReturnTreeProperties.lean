@@ -1,5 +1,6 @@
 import Solcore.Frontend.ComputationReturnTreeCheckingProperties
 import Solcore.Frontend.StructuralTypeProperties
+import Solcore.Frontend.ComputationBindingScopeProperties
 
 /-! Shared checking uses only the child's exact checker correspondence.
 Original tails, branches and fresh scopes stay independent of runtime laws. -/
@@ -19,23 +20,20 @@ private theorem binding_children
     (accepted : elaborateComputationReturnTree? checkChild types owner inputs
       ⟨blockSpan, ⟨letSpan, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ = some (core, type)) :
     ∃ declaredType initializerCore tailCore,
-      name.value ∉ inputs.names.map Prod.fst ∧ interpretStructuralType? types annotation = some declaredType ∧
+      interpretStructuralType? types annotation = some declaredType ∧
       checkChild inputs.names inputs.context initializer = some (initializerCore, declaredType) ∧
       elaborateComputationReturnTree? checkChild types owner (inputs.bindFresh owner name.value declaredType)
         ⟨blockSpan, rest⟩ = some (tailCore, type) ∧ core = .letE initializerCore tailCore := by
   rw [elaborateComputationReturnTree?] at accepted
-  split at accepted
-  next unused =>
-    simp only [bind, Option.bind_eq_some_iff] at accepted
-    obtain ⟨declaredType, meaning, ⟨initializerCore, initializerType⟩, initializerAccepted, remaining⟩ := accepted
-    split at remaining
-    next sameType =>
-      change initializerType = declaredType at sameType; subst initializerType
-      simp only [Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at remaining
-      obtain ⟨⟨tailCore, returnType⟩, tailAccepted, rfl, rfl⟩ := remaining
-      exact ⟨declaredType, initializerCore, tailCore, unused, meaning, initializerAccepted, tailAccepted, rfl⟩
-    next different => cases remaining
-  next used => cases accepted
+  simp only [bind, Option.bind_eq_some_iff] at accepted
+  obtain ⟨declaredType, meaning, ⟨initializerCore, initializerType⟩, initializerAccepted, remaining⟩ := accepted
+  split at remaining
+  next sameType =>
+    change initializerType = declaredType at sameType; subst initializerType
+    simp only [Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at remaining
+    obtain ⟨⟨tailCore, returnType⟩, tailAccepted, rfl, rfl⟩ := remaining
+    exact ⟨declaredType, initializerCore, tailCore, meaning, initializerAccepted, tailAccepted, rfl⟩
+  next different => cases remaining
 
 private theorem conditional_children
     {blockSpan ifSpan : Syntax.SourceSpan} {condition : Syntax.Expr}
@@ -44,6 +42,7 @@ private theorem conditional_children
       ⟨blockSpan, [⟨ifSpan, .ifThen condition thenBody (some elseBody)⟩]⟩ = some (core, type)) :
     ∃ conditionCore thenCore elseCore,
       checkChild inputs.names inputs.context condition = some (conditionCore, .bool) ∧
+      ComputationNamesProtected (inputs.names.map Prod.fst) thenBody ∧
       elaborateComputationReturnTree? checkChild types owner inputs thenBody = some (thenCore, type) ∧
       elaborateComputationReturnTree? checkChild types owner inputs elseBody = some (elseCore, type) ∧
       core = .ifE conditionCore thenCore elseCore := by
@@ -51,7 +50,8 @@ private theorem conditional_children
   simp only [bind, Option.bind_eq_some_iff] at accepted
   obtain ⟨⟨conditionCore, conditionType⟩, conditionAccepted, remaining⟩ := accepted
   split at remaining
-  next conditionBool =>
+  next conditionGuard =>
+    obtain ⟨conditionBool, namesGuard⟩ := conditionGuard
     change conditionType = .bool at conditionBool; subst conditionType
     simp only [Option.bind_eq_some_iff] at remaining
     obtain ⟨⟨thenCore, thenType⟩, thenAccepted, ⟨elseCore, elseType⟩, elseAccepted, result⟩ := remaining
@@ -60,7 +60,8 @@ private theorem conditional_children
       change thenType = elseType at sameType; subst elseType
       simp only [pure, Option.some.injEq, Prod.mk.injEq] at result
       rcases result with ⟨rfl, rfl⟩
-      exact ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩
+      exact ⟨conditionCore, thenCore, elseCore, conditionAccepted,
+        computationBlockPreservesNames_iff.mp namesGuard, thenAccepted, elseAccepted, rfl⟩
     next different => cases result
   next notBool => cases remaining
 
@@ -74,18 +75,18 @@ private theorem complete
   | bare => simp only [elaborateComputationReturnTree?]
   | expression child => simpa only [elaborateComputationReturnTree?] using childCorrect.mpr child
   | block _ ih => simpa only [elaborateComputationReturnTree?] using ih
-  | binding meaning unused initializer _ ih =>
+  | binding meaning initializer _ ih =>
       rw [elaborateComputationReturnTree?]
-      simp [unused, meaning.complete, childCorrect.mpr initializer, ih]
-  | inferred unused initializer _ ih =>
+      simp [meaning.complete, childCorrect.mpr initializer, ih]
+  | inferred initializer _ ih =>
       rw [elaborateComputationReturnTree?]
-      simp [unused, childCorrect.mpr initializer, ih]
+      simp [childCorrect.mpr initializer, ih]
   | discard expression _ ih =>
       rw [elaborateComputationReturnTree?]
       simp only [childCorrect.mpr expression, ih, bind, Option.bind_some, pure, Pure.pure]
-  | conditional condition _ _ thenIH elseIH =>
+  | conditional condition protection _ _ thenIH elseIH =>
       rw [elaborateComputationReturnTree?]
-      simp [childCorrect.mpr condition, thenIH, elseIH]
+      simp [childCorrect.mpr condition, computationBlockPreservesNames_iff.mpr protection, thenIH, elseIH]
   | wordMatch scrutinee ordered patterns compatible _ defaultOrdered _ lowered branchIH defaultIH =>
       exact ComputationReturnTreeChecking.match_iff.mpr
         ⟨_, _, childCorrect.mpr scrutinee, _, _, _, ordered, patterns, compatible, branchIH, defaultOrdered, defaultIH, lowered, rfl⟩
@@ -127,17 +128,14 @@ private theorem sound
                     cases optionalType with
                     | none =>
                         rw [elaborateComputationReturnTree?] at accepted
-                        split at accepted
-                        next unused =>
-                          simp only [bind, Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at accepted
-                          obtain ⟨⟨initializerCore, initializerType⟩, initializerAccepted,
-                            ⟨tailCore, returnType⟩, tailAccepted, rfl, rfl⟩ := accepted
-                          exact .inferred unused (childCorrect.mp initializerAccepted) (sound childCorrect tailAccepted)
-                        next used => cases accepted
+                        simp only [bind, Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at accepted
+                        obtain ⟨⟨initializerCore, initializerType⟩, initializerAccepted,
+                          ⟨tailCore, returnType⟩, tailAccepted, rfl, rfl⟩ := accepted
+                        exact .inferred (childCorrect.mp initializerAccepted) (sound childCorrect tailAccepted)
                     | some annotation =>
-                        obtain ⟨declaredType, initializerCore, tailCore, unused, meaning,
+                        obtain ⟨declaredType, initializerCore, tailCore, meaning,
                           initializerAccepted, tailAccepted, rfl⟩ := binding_children accepted
-                        exact .binding (interpretStructuralType?_sound meaning) unused
+                        exact .binding (interpretStructuralType?_sound meaning)
                           (childCorrect.mp initializerAccepted) (sound childCorrect tailAccepted)
               case ifThen condition thenBody optionalElse =>
                 cases rest with
@@ -146,9 +144,9 @@ private theorem sound
                     cases optionalElse with
                     | none => simp only [elaborateComputationReturnTree?, reduceCtorEq] at accepted
                     | some elseBody =>
-                        obtain ⟨conditionCore, thenCore, elseCore, conditionAccepted,
+                        obtain ⟨conditionCore, thenCore, elseCore, conditionAccepted, protection,
                           thenAccepted, elseAccepted, rfl⟩ := conditional_children accepted
-                        exact .conditional (childCorrect.mp conditionAccepted)
+                        exact .conditional (childCorrect.mp conditionAccepted) protection
                           (sound childCorrect thenAccepted) (sound childCorrect elseAccepted)
               case expression source trailingSemicolon =>
                 cases trailingSemicolon with

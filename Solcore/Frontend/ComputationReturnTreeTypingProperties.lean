@@ -49,14 +49,14 @@ private theorem hasType
   | bare => exact .bare
   | expression child => exact .expression (childTyping.mpr ⟨_, child⟩)
   | block _ ih => exact .block ih
-  | binding meaning unused initializer _ ih =>
-      exact .binding meaning unused (childTyping.mpr ⟨_, initializer⟩) ih
-  | inferred unused initializer _ ih =>
-      exact .inferred unused (childTyping.mpr ⟨_, initializer⟩) ih
+  | binding meaning initializer _ ih =>
+      exact .binding meaning (childTyping.mpr ⟨_, initializer⟩) ih
+  | inferred initializer _ ih =>
+      exact .inferred (childTyping.mpr ⟨_, initializer⟩) ih
   | discard expression _ ih =>
       exact .discard (childTyping.mpr ⟨_, expression⟩) ih
-  | conditional condition _ _ thenIH elseIH =>
-      exact .conditional (childTyping.mpr ⟨_, condition⟩) thenIH elseIH
+  | conditional condition protection _ _ thenIH elseIH =>
+      exact .conditional (childTyping.mpr ⟨_, condition⟩) protection thenIH elseIH
   | wordMatch scrutinee ordered patterns compatible _ defaultOrdered _ lowered branchIH defaultIH =>
       refine .wordMatch (childTyping.mpr ⟨_, scrutinee⟩) ?_ ?_ ?_ ?_ ?_
       · intro arm member
@@ -120,23 +120,23 @@ private theorem elaborates
   | block _ ih =>
       obtain ⟨core, elaboration⟩ := ih
       exact ⟨core, .block elaboration⟩
-  | binding meaning unused initializer _ ih =>
+  | binding meaning initializer _ ih =>
       obtain ⟨initializerCore, initializerElaboration⟩ := childTyping.mp initializer
       obtain ⟨tailCore, tailElaboration⟩ := ih
-      exact ⟨.letE initializerCore tailCore, .binding meaning unused initializerElaboration tailElaboration⟩
-  | inferred unused initializer _ ih =>
+      exact ⟨.letE initializerCore tailCore, .binding meaning initializerElaboration tailElaboration⟩
+  | inferred initializer _ ih =>
       obtain ⟨initializerCore, initializerElaboration⟩ := childTyping.mp initializer
       obtain ⟨tailCore, tailElaboration⟩ := ih
-      exact ⟨.letE initializerCore tailCore, .inferred unused initializerElaboration tailElaboration⟩
+      exact ⟨.letE initializerCore tailCore, .inferred initializerElaboration tailElaboration⟩
   | discard expression _ ih =>
       obtain ⟨expressionCore, expressionElaboration⟩ := childTyping.mp expression
       obtain ⟨tailCore, tailElaboration⟩ := ih
       exact ⟨.letE expressionCore (tailCore.weakenAt 0), .discard expressionElaboration tailElaboration⟩
-  | conditional condition _ _ thenIH elseIH =>
+  | conditional condition protection _ _ thenIH elseIH =>
       obtain ⟨conditionCore, conditionElaboration⟩ := childTyping.mp condition
       obtain ⟨thenCore, thenElaboration⟩ := thenIH
       obtain ⟨elseCore, elseElaboration⟩ := elseIH
-      exact ⟨.ifE conditionCore thenCore elseCore, .conditional conditionElaboration thenElaboration elseElaboration⟩
+      exact ⟨.ifE conditionCore thenCore elseCore, .conditional conditionElaboration protection thenElaboration elseElaboration⟩
   | @wordMatch inputs _ _ _ _ _ _ defaultBody scrutineeType type scrutinee patterns compatible covered _ _ branchIH defaultIH =>
       obtain ⟨scrutineeCore, scrutineeElaboration⟩ := childTyping.mp scrutinee
       obtain ⟨entries, ordered, meanings, elaborations⟩ :=
@@ -215,12 +215,12 @@ theorem ComputationReturnTreeElaborates.core_hasType
   | bare => exact .unit
   | expression child => exact childCoreType child
   | block _ ih => exact ih
-  | binding _ _ initializer _ ih | inferred _ initializer _ ih =>
+  | binding _ initializer _ ih | inferred initializer _ ih =>
       exact .letE (childCoreType initializer)
         (by simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.values, List.map_cons, Prod.snd] using ih)
   | discard expression _ ih =>
       exact .letE (childCoreType expression) (by simpa only [Core.Context.insertAt] using ih.weakenAt 0)
-  | conditional condition _ _ thenIH elseIH => exact .ifE (childCoreType condition) thenIH elseIH
+  | conditional condition _ _ _ thenIH elseIH => exact .ifE (childCoreType condition) thenIH elseIH
   | wordMatch scrutinee _ _ compatible _ _ _ lowered branchIH defaultIH =>
       exact .letE (childCoreType scrutinee) (fold_hasType defaultIH branchIH compatible lowered)
 

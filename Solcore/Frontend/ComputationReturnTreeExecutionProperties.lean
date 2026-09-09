@@ -144,7 +144,7 @@ theorem ComputationReturnTreeElaborates.evaluates_iff
         | block evaluated => exact (ih sameIds).mp evaluated
       · intro evaluation
         exact .block ((ih sameIds).mpr evaluation)
-  | @binding inputs _ _ name _ _ _ declaredType _ _ _ _ _ child _ ih =>
+  | @binding inputs _ _ name _ _ _ declaredType _ _ _ _ child _ ih =>
       constructor
       · intro evaluation
         cases evaluation with
@@ -164,7 +164,7 @@ theorem ComputationReturnTreeElaborates.evaluates_iff
             · simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using evaluated
             · simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.ids, List.map_cons]
                 using congrArg (List.cons _) sameIds
-  | @inferred inputs _ _ name _ _ inferredType _ _ _ _ child _ ih =>
+  | @inferred inputs _ _ name _ _ inferredType _ _ _ child _ ih =>
       constructor
       · intro evaluation
         cases evaluation with
@@ -200,7 +200,7 @@ theorem ComputationReturnTreeElaborates.evaluates_iff
             exact .discard ((childExecution child sameIds).mpr head)
               ((ih sameIds).mpr ((ComputationBodyFragment.evaluates_insert_iff (F := F) childInserts
                 (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening tailElaboration) [] environment.values _).mp tail))
-  | conditional guard _ _ thenIH elseIH =>
+  | conditional guard _ _ _ thenIH elseIH =>
       constructor
       · intro evaluation
         cases evaluation with
