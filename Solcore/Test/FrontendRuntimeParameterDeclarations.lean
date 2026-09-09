@@ -58,7 +58,7 @@ theorem nominal_annotation_success_does_not_assert_runtime_inhabitation
       (declaredInputs (.namedData dataType) .unit) ∧
     (¬ ∃ value, Core.ValueHasType value (.namedData dataType) []) ∧
     (¬ ∃ argument : TypedRuntimeArgument, argument.type = .namedData dataType) := by
-  refine ⟨rfl, declared _ _, noNamedValue dataType, ?_⟩
+  refine ⟨(declared _ _).complete, declared _ _, noNamedValue dataType, ?_⟩
   rintro ⟨argument, sameType⟩
   apply noNamedValue dataType
   exact ⟨argument.value, sameType ▸ argument.valueTyped⟩
@@ -153,9 +153,31 @@ theorem duplicates_unknown_annotations_arguments_staging_and_recovery_are_reject
     (params : List Syntax.FunctionParameter) (member : params ∈ rejectedParameters) :
     declareRuntimeParameters? (types .bool .word) owner params = none ∧
     ¬ ∃ inputs, RuntimeParametersDeclare (types .bool .word) owner params inputs := by
-  have rejected : declareRuntimeParameters? (types .bool .word) owner params = none := by
+  have absent : ¬ ∃ inputs, RuntimeParametersDeclare (types .bool .word) owner params inputs := by
     simp only [rejectedParameters, List.mem_cons, List.not_mem_nil, or_false] at member
-    rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
-  exact ⟨rejected, declareRuntimeParameters?_eq_none_iff.mp rejected⟩
+    rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    · rintro ⟨_, declared⟩
+      cases declared with
+      | cons _ _ tail => cases tail with
+        | cons _ unused _ => exact unused (by change "x" ∈ ["x"]; decide)
+    · rintro ⟨_, declared⟩
+      cases declared with
+      | cons _ _ tail => cases tail with
+        | cons _ _ tail => cases tail with
+          | cons _ unused _ => exact unused (by change "x" ∈ ["y", "x"]; decide)
+    · rintro ⟨_, declared⟩
+      cases declared with
+      | cons meaning _ _ => cases meaning with
+        | named found =>
+          have impossible := TypeNameTable.lookup?_iff.mpr found
+          change (none : Option Core.Ty) = some _ at impossible
+          cases impossible
+    · rintro ⟨_, declared⟩
+      cases declared with | cons meaning _ _ => cases meaning
+    · rintro ⟨_, declared⟩; cases declared
+    · rintro ⟨_, declared⟩; cases declared
+    · rintro ⟨_, declared⟩
+      cases declared with | cons meaning _ _ => cases meaning
+  exact ⟨declareRuntimeParameters?_eq_none_iff.mpr absent, absent⟩
 
 end Tests.FrontendRuntimeParameterDeclarations

@@ -225,8 +225,8 @@ private theorem wordAnnotation : TypeNameDenotes types (annotation "Word") .word
   .named (.tail (by decide) .head)
 private theorem compilation : RuntimeFunctionCompiles types owner (declaration "Bool") compiled :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (.named .head)⟩,
-    .cons wordAnnotation (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
-      (.cons wordAnnotation (by change "r" ∉ ["l"]; simp) .nil),
+    .cons wordAnnotation.structural (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
+      (.cons wordAnnotation.structural (by change "r" ∉ ["l"]; simp) .nil),
     TypedLetReturnBodyElaborates.returnTree <| .terminal <| .single <| .expression (.lessEqual (.identifier (.tail names_ne .head)) (.identifier .head))
       (.unary (.binary (.var (.tail ids_ne .head)) (.var .head)))
       (.unary (.binary (.var (.tail ids_ne .head)) (.var .head)))⟩
@@ -236,8 +236,8 @@ private theorem preparation (left right : Core.Word) :
     RuntimeFunctionPrepares types owner (declaration "Bool") (arguments left right)
       ⟨inputs left right, core, .bool⟩ :=
   ⟨compilation.header,
-    .cons wordAnnotation (by simp [LocalInputs.empty, LocalInputs.names])
-      (.cons wordAnnotation (by change "r" ∉ ["l"]; simp) .nil), compilation.body⟩
+    .cons wordAnnotation.structural (by simp [LocalInputs.empty, LocalInputs.names])
+      (.cons wordAnnotation.structural (by change "r" ∉ ["l"]; simp) .nil), compilation.body⟩
 
 theorem independent_compilation_preparation_and_exact_bool_entry_cost
     (left right : Core.Word) (store : Core.Store) :

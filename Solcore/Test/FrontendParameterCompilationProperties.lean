@@ -42,9 +42,9 @@ private theorem conditionMeaning (payload condition : Core.Ty) :
     TypeNameDenotes (types payload condition) (annotation "Cond") condition := .named (.tail (by decide) .head)
 private theorem declared (id : Resolved.DeclarationId) (payload condition : Core.Ty) :
     RuntimeParametersDeclare (types payload condition) id parameters (inputs id payload condition) :=
-  .cons (conditionMeaning payload condition) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
-    (.cons (payloadMeaning payload condition) (by change "t" ∉ ["c"]; decide)
-      (.cons (payloadMeaning payload condition) (by change "f" ∉ ["t", "c"]; decide) .nil))
+  .cons (conditionMeaning payload condition).structural (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
+    (.cons (payloadMeaning payload condition).structural (by change "t" ∉ ["c"]; decide)
+      (.cons (payloadMeaning payload condition).structural (by change "f" ∉ ["t", "c"]; decide) .nil))
 private theorem header (payload condition : Core.Ty) (body : Syntax.Block) :
     RuntimeFunctionHeader (types payload condition) (entry parameters "Payload" body).value.signature payload :=
   ⟨rfl, rfl, rfl, rfl, .single (payloadMeaning payload condition).structural⟩
@@ -176,10 +176,22 @@ theorem a_selected_valid_parameter_does_not_bypass_the_return_contract_or_other_
       ⟨rfl, rfl, rfl, rfl, .single (conditionMeaning .word .bool).structural⟩
     rw [bodyType] at headerType
     cases headerType
-  all_goals
-    simp only [compileRuntimeFunction?, entry, interpretRuntimeFunctionHeader?,
-      interpretRuntimeReturnType?, annotation, interpretStructuralType?_named_eq_typeName]
-    rfl
+  · apply compileRuntimeFunction?_eq_none_iff.mpr
+    rintro ⟨candidate, accepted⟩
+    cases accepted.parameters with
+    | cons _ _ tail => cases tail with
+      | cons _ _ tail => cases tail with
+        | cons _ unused _ => exact unused (by change "t" ∈ ["t", "c"]; decide)
+  · apply compileRuntimeFunction?_eq_none_iff.mpr
+    rintro ⟨candidate, accepted⟩
+    cases accepted.parameters with
+    | cons _ _ tail => cases tail with
+      | cons _ _ tail => cases tail with
+        | cons meaning _ _ => cases meaning with
+          | named found =>
+            have impossible := TypeNameTable.lookup?_iff.mpr found
+            change (none : Option Core.Ty) = some _ at impossible
+            cases impossible
 
 theorem owner_relabeling_preserves_whole_compilation_and_positional_core
     (id : Resolved.DeclarationId) (payload : Core.Ty) (conditional : Bool)

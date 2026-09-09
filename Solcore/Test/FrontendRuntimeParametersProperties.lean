@@ -35,8 +35,8 @@ private theorem aliasMeaning : TypeNameDenotes types (annotation "Alias") .bool 
   .named (.tail (by decide) .head)
 private theorem bound (first second : Bool) :
     RuntimeParametersBind types owner parameters [boolArg first, boolArg second] (inputs first second) :=
-  .cons flagMeaning (by simp [LocalInputs.empty, LocalInputs.names])
-    (.cons aliasMeaning (by change "second" ∉ ["first"]; simp) .nil)
+  .cons flagMeaning.structural (by simp [LocalInputs.empty, LocalInputs.names])
+    (.cons aliasMeaning.structural (by change "second" ∉ ["first"]; simp) .nil)
 
 theorem empty_parameters_and_arguments_produce_exactly_empty_inputs
     (suppliedTypes : TypeNameTable) (suppliedOwner : Resolved.DeclarationId) :
@@ -121,10 +121,33 @@ theorem duplicates_mismatch_staging_recovery_and_unsupported_annotations_have_no
     (pair : List Syntax.FunctionParameter × List TypedRuntimeArgument) (present : pair ∈ rejectedPairs) :
     bindRuntimeParameters? types owner pair.1 pair.2 = none ∧
     ¬ ∃ result, RuntimeParametersBind types owner pair.1 pair.2 result := by
-  have rejected : bindRuntimeParameters? types owner pair.1 pair.2 = none := by
+  have absent : ¬ ∃ result, RuntimeParametersBind types owner pair.1 pair.2 result := by
     simp only [rejectedPairs, List.mem_cons, List.not_mem_nil, or_false] at present
-    rcases present with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
-  exact ⟨rejected, bindRuntimeParameters?_eq_none_iff.mp rejected⟩
+    rcases present with rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    · rintro ⟨_, bound⟩
+      cases bound with
+      | cons _ _ tail => cases tail with
+        | cons _ unused _ => exact unused (by change "x" ∈ ["x"]; decide)
+    · rintro ⟨_, bound⟩
+      cases bound with
+      | cons _ _ tail => cases tail with
+        | cons _ _ tail => cases tail with
+          | cons _ unused _ => exact unused (by change "x" ∈ ["y", "x"]; decide)
+    · rintro ⟨_, bound⟩
+      cases bound with
+      | cons meaning _ _ => cases meaning.type_unique flagMeaning.structural
+    · rintro ⟨_, bound⟩
+      cases bound with
+      | cons meaning _ _ => cases meaning with
+        | named found =>
+          have impossible := TypeNameTable.lookup?_iff.mpr found
+          change (none : Option Core.Ty) = some .bool at impossible
+          cases impossible
+    · rintro ⟨_, bound⟩; cases bound
+    · rintro ⟨_, bound⟩; cases bound
+    · rintro ⟨_, bound⟩
+      cases bound with | cons meaning _ _ => cases meaning
+  exact ⟨bindRuntimeParameters?_eq_none_iff.mpr absent, absent⟩
 
 theorem arbitrary_parameter_and_type_ranges_do_not_change_the_supplied_binding
     (outer nameSpan typeSpan qualifiedSpan componentSpan : Syntax.SourceSpan) (value : Bool) :
@@ -154,8 +177,8 @@ private theorem cellMeaning : TypeNameDenotes types (annotation "Cell") (.cell .
 private theorem opaqueBound (location : Core.Location) :
     RuntimeParametersBind types owner [parameter "f" "Fn", parameter "p" "Cell"]
       [closureArg, cellArg location] (opaqueInputs location) :=
-  .cons functionMeaning (by simp [LocalInputs.empty, LocalInputs.names])
-    (.cons cellMeaning (by change "p" ∉ ["f"]; simp) .nil)
+  .cons functionMeaning.structural (by simp [LocalInputs.empty, LocalInputs.names])
+    (.cons cellMeaning.structural (by change "p" ∉ ["f"]; simp) .nil)
 
 theorem typed_closures_and_unallocated_references_are_inputs_not_store_allocation
     (location : Core.Location) (store : Core.Store) :

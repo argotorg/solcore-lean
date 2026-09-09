@@ -223,15 +223,12 @@ theorem named_unused_initializers_remain_strict_before_a_structural_product_retu
 
 private def letBody (annotation : Syntax.TypeExpr) : Syntax.Block :=
   ⟨span, [⟨span, .letDecl ⟨span, "x"⟩ (some annotation) (some (source 0))⟩, ⟨span, .returnStmt (some (source 0))⟩]⟩
-theorem structural_parameter_and_let_annotations_remain_outside_the_old_named_only_adapters
+theorem structural_annotations_remain_outside_the_old_named_only_and_let_adapters
     (types : TypeNameTable) (elements : List Syntax.TypeExpr) :
-    declareRuntimeParameters? types owner [parameter ⟨span, .tuple elements⟩] = none ∧
+    interpretTypeName? types ⟨span, .tuple elements⟩ = none ∧
     elaborateTypedLetReturnTree? types owner .empty (letBody ⟨span, .tuple elements⟩) = none := by
   constructor
-  · apply declareRuntimeParameters?_eq_none_iff.mpr
-    rintro ⟨output, declared⟩
-    cases declared with
-    | cons meaning _ _ => cases meaning
+  · rfl
   · apply elaborateTypedLetReturnTree?_eq_none_iff.mpr
     rintro ⟨type, typing⟩
     cases typing with

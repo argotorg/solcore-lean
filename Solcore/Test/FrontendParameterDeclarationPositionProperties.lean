@@ -32,9 +32,9 @@ private theorem nominalMeaning (type : Core.Ty) (dataType : Core.DataTypeId) :
   .named (.tail (by decide) .head)
 private theorem declared (id : Resolved.DeclarationId) (type : Core.Ty) (dataType : Core.DataTypeId) :
     RuntimeParametersDeclare (types type dataType) id parameters (inputs id type dataType) :=
-  .cons (sameMeaning type dataType) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
-    (.cons (nominalMeaning type dataType) (by change "nominal" ∉ ["first"]; decide)
-      (.cons (sameMeaning type dataType) (by change "last" ∉ ["nominal", "first"]; decide) .nil))
+  .cons (sameMeaning type dataType).structural (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
+    (.cons (nominalMeaning type dataType).structural (by change "nominal" ∉ ["first"]; decide)
+      (.cons (sameMeaning type dataType).structural (by change "last" ∉ ["nominal", "first"]; decide) .nil))
 
 theorem independent_static_declaration_retains_source_rows_and_generated_reverse_order
     (id : Resolved.DeclarationId) (type : Core.Ty) (dataType : Core.DataTypeId) :
@@ -47,6 +47,15 @@ theorem independent_static_declaration_retains_source_rows_and_generated_reverse
     (declared id type dataType).bindings_length, (declared id type dataType).names_nodup,
     (declared id type dataType).generated_ids⟩
 
+private theorem original_named_annotation {index : Nat} {name : Syntax.Identifier}
+    {parameterSpan : Syntax.SourceSpan} {ann : Syntax.TypeExpr} {table : TypeNameTable} {type : Core.Ty}
+    (parameterAt : parameters[index]? = some ⟨parameterSpan, .typed none name ann⟩)
+    (meaning : StructuralTypeDenotes table ann type) : TypeNameDenotes table ann type := by
+  have member := List.mem_of_getElem? parameterAt
+  simp only [parameters, List.mem_cons, List.not_mem_nil, or_false] at member
+  rcases member with same | same | same <;> cases same <;> cases meaning with
+  | named found => exact .named found
+
 theorem source_lookup_alone_selects_an_annotation_row_and_its_exact_reversed_position
     (id : Resolved.DeclarationId) (type : Core.Ty) (dataType : Core.DataTypeId)
     {index : Nat} {name : Syntax.Identifier} {parameterSpan : Syntax.SourceSpan} {ann : Syntax.TypeExpr}
@@ -58,9 +67,11 @@ theorem source_lookup_alone_selects_an_annotation_row_and_its_exact_reversed_pos
       (inputs id type dataType).bindings[2 - index]? = some ⟨name.value, ⟨id, index⟩, actualType⟩ ∧
       LocalNameTable.Lookup (inputs id type dataType).names name.value ⟨id, index⟩ ∧
       Resolved.LocalScope.Lookup (inputs id type dataType).context ⟨id, index⟩ actualType ∧
-      Resolved.LocalScope.IndexOf (Resolved.LocalScope.ids (inputs id type dataType).context) ⟨id, index⟩ (2 - index) :=
-  ⟨(declared id type dataType).rows.arity, (declared id type dataType).rows.row_at parameterAt,
-    (declared id type dataType).position parameterAt⟩
+      Resolved.LocalScope.IndexOf (Resolved.LocalScope.ids (inputs id type dataType).context) ⟨id, index⟩ (2 - index) := by
+  obtain ⟨bounded, actualType, meaning, rowAt, named, contextLookup, indexed⟩ :=
+    (declared id type dataType).position parameterAt
+  exact ⟨(declared id type dataType).rows.arity, (declared id type dataType).rows.row_at parameterAt,
+    bounded, actualType, original_named_annotation parameterAt meaning, rowAt, named, contextLookup, indexed⟩
 
 theorem equal_outer_types_do_not_exchange_the_three_checked_positions
     (id : Resolved.DeclarationId) (type : Core.Ty) (dataType : Core.DataTypeId)
@@ -117,8 +128,8 @@ private def extended (type : Core.Ty) (dataType : Core.DataTypeId) : LocalTypeIn
   ((sparse type).bindFresh (owner 0) "newA" type).bindFresh (owner 0) "newB" (.namedData dataType)
 private theorem extension (type : Core.Ty) (dataType : Core.DataTypeId) :
     RuntimeParametersDeclareFrom (types type dataType) (owner 0) (sparse type) addedParameters (extended type dataType) :=
-  .cons (sameMeaning type dataType) (by change "newA" ∉ ["old", "foreign", "older"]; decide)
-    (.cons (nominalMeaning type dataType) (by change "newB" ∉ ["newA", "old", "foreign", "older"]; decide) .nil)
+  .cons (sameMeaning type dataType).structural (by change "newA" ∉ ["old", "foreign", "older"]; decide)
+    (.cons (nominalMeaning type dataType).structural (by change "newB" ∉ ["newA", "old", "foreign", "older"]; decide) .nil)
 
 theorem sparse_mixed_owners_start_at_eight_and_retain_all_initial_rows
     (type : Core.Ty) (dataType : Core.DataTypeId) :
@@ -144,7 +155,7 @@ private def repeated (type : Core.Ty) : LocalTypeInputs :=
 private theorem repeatedExtension (type : Core.Ty) (dataType : Core.DataTypeId) :
     RuntimeParametersDeclareFrom (types type dataType) (owner 0) (repeated type)
       [parameter "new" "Same"] ((repeated type).bindFresh (owner 0) "new" type) :=
-  .cons (sameMeaning type dataType) (by change "new" ∉ ["old", "old"]; decide) .nil
+  .cons (sameMeaning type dataType).structural (by change "new" ∉ ["old", "old"]; decide) .nil
 
 theorem a_legal_initial_duplicate_is_not_repaired_by_a_new_distinct_parameter
     (type : Core.Ty) (dataType : Core.DataTypeId) :
@@ -169,7 +180,7 @@ theorem row_annotation_meaning_does_not_supply_allocation_provenance
       [⟨"first", ⟨owner 0, 100⟩, type⟩] ∧
     ¬ ∃ output : LocalTypeInputs, output.bindings = [⟨"first", ⟨owner 0, 100⟩, type⟩] ∧
       RuntimeParametersDeclare (types type dataType) (owner 0) [parameter "first" "Same"] output := by
-  refine ⟨.cons (.typed (sameMeaning type dataType)) .nil, ?_⟩
+  refine ⟨.cons (.typed (sameMeaning type dataType).structural) .nil, ?_⟩
   rintro ⟨output, rows, declaration⟩
   have ids := declaration.generated_ids
   change output.bindings.map (·.id) = [⟨owner 0, 0⟩] at ids

@@ -39,9 +39,9 @@ private theorem conditionMeaning (payload : Core.Ty) :
     TypeNameDenotes (types payload) (annotation "Cond") .bool := .named (.tail (by decide) .head)
 private theorem declared (id : Resolved.DeclarationId) (payload : Core.Ty) :
     RuntimeParametersDeclare (types payload) id parameters (inputs id payload) :=
-  .cons (conditionMeaning payload) (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
-    (.cons (payloadMeaning payload) (by change "x" ∉ ["c"]; decide)
-      (.cons (payloadMeaning payload) (by change "y" ∉ ["x", "c"]; decide) .nil))
+  .cons (conditionMeaning payload).structural (by simp [LocalTypeInputs.empty, LocalTypeInputs.names])
+    (.cons (payloadMeaning payload).structural (by change "x" ∉ ["c"]; decide)
+      (.cons (payloadMeaning payload).structural (by change "y" ∉ ["x", "c"]; decide) .nil))
 private theorem header (payload : Core.Ty) (conditional : Bool) :
     RuntimeFunctionHeader (types payload) (entry "Payload" conditional).value.signature payload :=
   ⟨rfl, rfl, rfl, rfl, .single (payloadMeaning payload).structural⟩
@@ -83,7 +83,7 @@ theorem arbitrary_initial_rows_and_the_same_fresh_identity_are_retained
     (initial.bindFresh id "next" payload).bindings =
       ⟨"next", Resolved.freshLocalId id initial.ids, payload⟩ :: initial.bindings := by
   have original : RuntimeParametersDeclareFrom (types payload) id initial [parameter "next" "Payload"]
-      (initial.bindFresh id "next" payload) := .cons (payloadMeaning payload) unused .nil
+      (initial.bindFresh id "next" payload) := .cons (payloadMeaning payload).structural unused .nil
   exact ⟨original, original.extend_types extension, rfl⟩
 
 theorem a_nonempty_nominal_initial_row_needs_no_old_annotation_meaning_or_value
