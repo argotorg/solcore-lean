@@ -599,6 +599,22 @@ the allocation/write cases reuse existing state preservation. The old state and
 no-fault kernel, all entry contracts and executable definitions remain unchanged;
 equal-length separately typed stores or unrelated saved states are insufficient.
 
+Terminal Word literal matches now use these shared contracts (ADR-0267).
+One original statically Word scrutinee is evaluated once before an ordered case
+selection, with a required default and all original bodies checked at a common
+result type. Duplicate literals retain first-match priority, not a rejection
+gate. Independent pattern/choice rules preserve source spans, order and actual
+effects; no source binding or additional runner family is introduced.
+
+One hidden Core let and ordered Word tests give actual scrutinee plus selected
+body costs plus two and seven per visited test. Existing shared theorem
+signatures, actual-value insertion, full fuel and genuine resumption contracts
+remain intact. Empty cases deliberately perform no comparison, so raw non-Word
+success there does not justify treating a non-Word comparison as a miss.
+Symbolic arbitrary case counts and parsed effectful bodies protect those
+boundaries. Broader patterns, optional-default exhaustiveness, source lambdas
+and global function resolution remain separate work.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

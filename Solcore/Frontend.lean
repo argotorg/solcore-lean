@@ -60,6 +60,8 @@ import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
 import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
 import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
 import Solcore.Frontend.ComputationBodyFragment
+import Solcore.Frontend.WordMatch
+import Solcore.Frontend.WordMatchProperties
 import Solcore.Frontend.ComputationBodyFragmentInsertionPaths
 import Solcore.Frontend.ComputationBodyFragmentInsertionProperties
 import Solcore.Frontend.ComputationBodyFragmentProperties

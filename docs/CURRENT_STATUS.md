@@ -945,6 +945,30 @@ a genuine checkpoint. The earlier state/no-fault kernel remains unchanged.
 No source-ID alignment, child execution/cost law, new state relation, runner,
 validator or executable definition is added.
 
+Terminal single-scrutinee Word matches now extend the shared computation body
+engine (ADR-0267). Original literal cases remain in order, including duplicates,
+and a required default closes the selected profile. Every case and default body
+is checked in the original caller scope at one common result type. Only strict
+in-range Word literals are admitted; binders, wildcard/grouped patterns,
+multiple scrutinees and missing default remain outside this interface.
+
+Independent source selection evaluates the original scrutinee once, keeps its
+effects, and executes only the first matching body or the default. Static checks
+still inspect unselected bodies. Exact Core uses one hidden let and ordered
+Word comparisons, weakening each original branch under the saved actual value
+without adding a source name or identity. Each visited comparison adds seven
+transitions, and the hidden let adds two, on top of both actual child costs.
+These are Core costs, not a claim about Rust/Hull instruction counts.
+
+The existing checker, typing, raw execution, exact-cost and insertion contracts
+retain their signatures. Arbitrary case-count consumers preserve actual called
+bodies, captures, stores and pending continuations, including allocations and
+genuine checkpoints after any visited prefix. A default-only match performs no
+Word comparison and may return an arbitrary raw value; nonempty literal cases
+instead fault on an actual non-Word operand. The separate runtime input/safety
+premises remain necessary. Older local-only body and entry interfaces are
+unchanged; general pattern matching and overflow agreement are not claimed.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

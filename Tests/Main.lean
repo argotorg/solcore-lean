@@ -263,6 +263,10 @@ import Solcore.Test.FrontendParsedRuntimeArgumentConstructionEntries
 import Solcore.Test.FrontendCheckpointWorldBoundaryProperties
 import Solcore.Test.FrontendCheckpointWorldExtensionProperties
 import Solcore.Test.FrontendParsedCheckpointWorldExtensions
+import Solcore.Test.FrontendWordMatchBoundaryProperties
+import Solcore.Test.FrontendWordMatchCountProperties
+import Solcore.Test.FrontendParsedWordMatchEffects
+import Solcore.Test.FrontendParsedWordMatchScopes
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5911,6 +5915,8 @@ def run : IO Unit := do
   frontendParsedRuntimeInputValidationEntryTests
   frontendParsedRuntimeArgumentConstructionEntryTests
   frontendParsedCheckpointWorldExtensionTests
+  frontendParsedWordMatchEffectTests
+  frontendParsedWordMatchScopeTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
