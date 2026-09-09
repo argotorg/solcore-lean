@@ -576,8 +576,8 @@ closed path preserves and reflects its exact cost, result and final store.
 Caller frames and exhaustion checkpoints can differ, and a retained continuation
 endpoint is not necessarily final. This neither guarantees arbitrary-store
 success nor permits closure-producing children: such children can capture the
-added slot. No executable or old body/entry contract changes; recursive mixed
-bodies still need a separate structural insertion proof beyond this call leaf.
+added slot. This leaf changes no executable or old body/entry contract; recursive
+mixed bodies use the separate structural insertion proof described below.
 
 A shared nonrecursive computation child now combines the unchanged pure
 expression and root single-argument application profiles (ADR-0250). The original
@@ -591,9 +591,29 @@ Eight shared contracts cover checking, typing, raw/cost existence and determinis
 raw/Core correspondence, uniform continuation paths and exact closed costs.
 Three insertion kernels preserve arbitrary caller/context slots for either
 branch. No duplicate runner, runtime-world or source-bound family is introduced.
-This is a child for subsequent mixed-body work, not yet a new let/discard/guard
-or whole-entry implementation. Nested calls, calls inside pure operators and
+This is a child profile, not itself a let/discard/guard or whole-entry
+implementation. Nested calls, calls inside pure operators and
 grouping around an entire call remain outside this nonrecursive union.
+
+A separate recursive mixed body now uses that child in returned expressions,
+annotated/inferred initializers, strict discards and terminal if/else guards
+(ADR-0251). It also retains bare returns and terminal lexical blocks. The original
+AST, spans, optional annotations, first-match tables and fresh named IDs determine
+exact Core and types independently of the checker. Every named initializer uses
+the old scope; a discard adds only a hidden Core binder, with unchanged source
+scope. Both written arms are checked, while raw evaluation selects only one.
+
+The new raw and cost semantics pass each child's actual intermediate store to
+the tail or chosen arm, including effectful calls and returned callable values.
+A separate four-form caller fragment proves closure under repeated weakening
+and exact raw/cost insertion without restricting actual closure bodies or
+captures. Original-ID agreement gives bidirectional Core correspondence and
+exact costs before any continuation. The old pure elaboration embeds with the
+same Core and type, but its store/source-bound guarantees are not transferred.
+Call-result lets, effectful discards and call guards are now body-level forms;
+nested expression calls, general early returns and new whole-function entry
+gates remain separate. Old pure/application entries and all runtime records are
+unchanged. Arbitrary-store safety and a source-only cost bound are not claimed.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

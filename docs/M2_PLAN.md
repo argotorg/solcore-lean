@@ -409,9 +409,9 @@ exact successful cost, value and final store. Runtime caller contexts need not
 equal source contexts, and inserted types need no inhabitants. Intermediate
 frames/checkpoints are not equated, pending continuations are not executed by
 the path theorem, and closure-producing children remain outside the premise.
-These proof-only leaf laws support future discard integration; the old pure
-fragment and all executable body/entry contracts remain unchanged. A mixed body
-still needs its own recursive closure argument and effect-aware semantics.
+These proof-only leaf laws support discard integration; the old pure fragment
+and old executable body/entry contracts remain unchanged. The separate mixed
+body below supplies its recursive closure argument and effect-aware semantics.
 
 A common pure-or-root-application computation child is available (ADR-0250).
 Its original-root dispatch, independent exact provenance and zero-overhead
@@ -419,10 +419,21 @@ raw/cost union preserve both older profiles unchanged. Eight common semantic
 contracts and three insertion kernels support later mixed-body proofs without
 duplicating checker/runner/safety aliases. Static typing remains separate from
 actual runtime-world typing, skipped raw children remain skipped, and effects
-retain both store endpoints. This does not yet add whole-body acceptance for
-call initializers, discards or guards; recursive body insertion closure is still
-required. Nested call syntax and calls embedded inside the pure profile are
-not added by the union.
+retain both store endpoints. The union alone does not add whole-body acceptance
+for call initializers, discards or guards. Nested call syntax and calls embedded
+inside the pure profile are not added by the union.
+
+A separate mixed recursive body integrates those child positions (ADR-0251).
+Its seven static cases preserve original syntax and scopes; eight raw/cost cases
+thread real stores and actual bound values through calls, lets, discards and
+selected branches. A separate four-form caller fragment handles whole-tail
+insertion under nested hidden binders without changing actual closure captures.
+Checker/typing correspondence, Core typing, raw/Core equivalence, exact costs
+and uniform continuation paths are proved independently. The old pure tree
+embeds with unchanged Core/type, not its stronger store or source-bound laws.
+Next connect this body to a separate original-header/actual-argument entry;
+existing pure/application entries stay unchanged. General nested call syntax,
+source functions and arbitrary-store safety are outside this body profile.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
