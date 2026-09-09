@@ -50,16 +50,16 @@ def elaborateComputationReturnTree?
       else none
   | ⟨_, [⟨_, .matchWith ⟨_, ⟨scrutinee, []⟩⟩ ⟨_, ⟨cases, defaultBody⟩⟩⟩]⟩ => do
       let (scrutineeCore, scrutineeType) ← checkChild inputs.names inputs.context scrutinee
-      if scrutineeType = .word then do
-        let defaultChecked : Option (Syntax.Block × (Core.Expr × Core.Ty)) ← match defaultBody with
-          | none => some none
-          | some source => do
-              let branch ← elaborateComputationReturnTree? checkChild types owner inputs source
-              pure (some (source, branch))
-        let checked : List (Syntax.MatchCase × (Option Core.Word × (Core.Expr × Core.Ty))) ← cases.attach.mapM fun arm => do
-          let tag ← interpretWordMatchPattern? arm.val.value.pattern
-          let branch ← elaborateComputationReturnTree? checkChild types owner inputs arm.val.value.body
-          return (arm.val, tag, branch)
+      let defaultChecked : Option (Syntax.Block × (Core.Expr × Core.Ty)) ← match defaultBody with
+        | none => some none
+        | some source => do
+            let branch ← elaborateComputationReturnTree? checkChild types owner inputs source
+            pure (some (source, branch))
+      let checked : List (Syntax.MatchCase × (Option Core.Word × (Core.Expr × Core.Ty))) ← cases.attach.mapM fun arm => do
+        let tag ← interpretWordMatchPattern? arm.val.value.pattern
+        let branch ← elaborateComputationReturnTree? checkChild types owner inputs arm.val.value.body
+        return (arm.val, tag, branch)
+      if scrutineeType = .word ∨ checked.all (fun entry => entry.2.1.isNone) = true then do
         let returnType ← match defaultChecked with
           | some entry => some entry.2.2
           | none => checked.head?.map (fun entry => entry.2.2.2)
@@ -137,9 +137,12 @@ inductive ComputationReturnTreeHasType
       ComputationReturnTreeHasType ChildHasType types owner inputs
         ⟨blockSpan, [⟨ifSpan, .ifThen condition thenBody (some elseBody)⟩]⟩ type
   | wordMatch {inputs : LocalTypeInputs} {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
-      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody : Option Syntax.Block} {type : Core.Ty}
-      (scrutineeTyping : ChildHasType inputs.names inputs.context scrutinee .word)
+      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody : Option Syntax.Block}
+      {scrutineeType type : Core.Ty}
+      (scrutineeTyping : ChildHasType inputs.names inputs.context scrutinee scrutineeType)
       (patterns : ∀ arm ∈ cases, ∃ tag, WordMatchPatternClassifies arm.value.pattern tag)
+      (compatible : scrutineeType = .word ∨
+        ∀ arm ∈ cases, WordMatchPatternClassifies arm.value.pattern none)
       (covered : defaultBody.isSome = true ∨
         ∃ arm ∈ cases, WordMatchPatternClassifies arm.value.pattern none)
       (branches : ∀ arm ∈ cases, ComputationReturnTreeHasType ChildHasType types owner inputs arm.value.body type)
@@ -205,12 +208,13 @@ inductive ComputationReturnTreeElaborates
         (.ifE conditionCore thenCore elseCore) type
   | wordMatch {inputs : LocalTypeInputs} {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
       {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody : Option Syntax.Block}
-      {scrutineeCore bodyCore : Core.Expr} {type : Core.Ty}
+      {scrutineeCore bodyCore : Core.Expr} {scrutineeType type : Core.Ty}
       {entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))}
       {defaultEntry : Option (Syntax.Block × Core.Expr)}
-      (scrutineeElaboration : ChildElab inputs.names inputs.context scrutinee scrutineeCore .word)
+      (scrutineeElaboration : ChildElab inputs.names inputs.context scrutinee scrutineeCore scrutineeType)
       (ordered : entries.map Prod.fst = cases)
       (patterns : ∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1)
+      (compatible : scrutineeType = .word ∨ ∀ entry ∈ entries, entry.2.1 = none)
       (branches : ∀ entry ∈ entries,
         ComputationReturnTreeElaborates ChildElab types owner inputs entry.1.value.body entry.2.2 type)
       (defaultOrdered : defaultEntry.map Prod.fst = defaultBody)
