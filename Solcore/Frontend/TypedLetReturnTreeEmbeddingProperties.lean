@@ -35,7 +35,7 @@ theorem TypedLetReturnBodyHasType.returnTree
     TypedLetReturnTreeHasType types owner inputs body type := by
   induction typing with
   | terminal child => exact child.typedLetReturnTree types owner
-  | binding meaning unused initializerTyping _ ih => exact .binding meaning unused initializerTyping ih
+  | binding meaning unused initializerTyping _ ih => exact .binding meaning.structural unused initializerTyping ih
 
 theorem TypedLetReturnBodyElaborates.returnTree
     {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
@@ -45,7 +45,7 @@ theorem TypedLetReturnBodyElaborates.returnTree
   induction elaboration with
   | terminal child => exact child.typedLetReturnTree types owner
   | binding meaning unused resolution lowered typing _ ih =>
-      exact .binding meaning unused resolution lowered typing ih
+      exact .binding meaning.structural unused resolution lowered typing ih
 
 theorem elaborateTypedLetReturnTree?_some_of_terminalReturnTree
     {inputs : LocalTypeInputs} {body : Syntax.Block} {core : Core.Expr} {type : Core.Ty}

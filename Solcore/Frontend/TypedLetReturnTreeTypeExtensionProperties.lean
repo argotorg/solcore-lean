@@ -1,5 +1,5 @@
 import Solcore.Frontend.TypedLetReturnTreeElaboration
-import Solcore.Frontend.TypeNameTableExtensionProperties
+import Solcore.Frontend.StructuralTypeTableProperties
 
 /-! Preserve annotation meanings throughout recursive bodies without changing
 source, owner, inputs or exact Core. Both arms retain their original scope. -/

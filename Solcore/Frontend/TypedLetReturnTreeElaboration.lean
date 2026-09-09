@@ -21,7 +21,7 @@ theorem elaborateTypedLetReturnTree?_binding_children
     (accepted : elaborateTypedLetReturnTree? types owner inputs
       ⟨blockSpan, ⟨letSpan, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ = some (core, type)) :
     ∃ declaredType initializerCore tailCore,
-      name.value ∉ inputs.names.map Prod.fst ∧ interpretTypeName? types annotation = some declaredType ∧
+      name.value ∉ inputs.names.map Prod.fst ∧ interpretStructuralType? types annotation = some declaredType ∧
       elaborateLocalExpression? inputs.names inputs.context initializer = some (initializerCore, declaredType) ∧
       elaborateTypedLetReturnTree? types owner (inputs.bindFresh owner name.value declaredType)
         ⟨blockSpan, rest⟩ = some (tailCore, type) ∧ core = .letE initializerCore tailCore := by
@@ -124,7 +124,7 @@ theorem elaborateTypedLetReturnTree?_elaborates
                           initializerAccepted, tailAccepted, rfl⟩ :=
                           elaborateTypedLetReturnTree?_binding_children accepted
                         obtain ⟨resolved, resolution, lowered, typing⟩ := elaborateLocalExpression?_sound initializerAccepted
-                        exact .binding (interpretTypeName?_sound meaning) unused resolution
+                        exact .binding (interpretStructuralType?_sound meaning) unused resolution
                           (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
                           (elaborateTypedLetReturnTree?_elaborates tailAccepted)
               case ifThen condition thenBody optionalElse =>
