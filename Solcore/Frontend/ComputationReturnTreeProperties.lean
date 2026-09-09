@@ -1,6 +1,5 @@
-import Solcore.Frontend.ComputationReturnTree
+import Solcore.Frontend.ComputationReturnTreeCheckingProperties
 import Solcore.Frontend.StructuralTypeProperties
-import Solcore.Frontend.WordLiteralProperties
 
 /-! Shared checking uses only the child's exact checker correspondence.
 Original tails, branches and fresh scopes stay independent of runtime laws. -/
@@ -12,75 +11,6 @@ namespace Solcore.Frontend
 variable {checkChild : LocalNameTable → Resolved.Context → Syntax.Expr → Option (Core.Expr × Core.Ty)}
     {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}
     {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
-
-private def check_arm (check : Syntax.Block → Option (Core.Expr × Core.Ty)) (type : Core.Ty)
-    (arm : Syntax.MatchCase) : Option (Option Core.Word × Core.Expr) := do
-  let tag ← match arm.value.pattern.value with
-    | .literal literal => (interpretWordLiteral? literal).map some
-    | .wildcard _ => some none
-    | _ => none
-  let branch ← check arm.value.body
-  if branch.2 = type then return (tag, branch.1) else none
-
-private theorem check_arm_map {check : Syntax.Block → Option (Core.Expr × Core.Ty)}
-    {type : Core.Ty} {arm : Syntax.MatchCase} :
-    (check_arm check type arm).map (arm, ·) = (do
-      let tag ← match arm.value.pattern.value with
-        | .literal literal => (interpretWordLiteral? literal).map some
-        | .wildcard _ => some none
-        | _ => none
-      let branch ← check arm.value.body
-      if branch.2 = type then return (arm, tag, branch.1) else none) := by
-  cases shape : arm.value.pattern.value <;>
-    simp [check_arm, shape, bind, Option.map_bind, Function.comp_def, apply_ite]
-
-private theorem check_arm_iff {check : Syntax.Block → Option (Core.Expr × Core.Ty)}
-    {type : Core.Ty} {arm : Syntax.MatchCase} {tag : Option Core.Word} {core : Core.Expr} :
-    check_arm check type arm = some (tag, core) ↔
-      (match tag with
-        | none => ∃ marker, arm.value.pattern.value = .wildcard marker
-        | some word => WordMatchPatternDenotes arm.value.pattern word) ∧
-      check arm.value.body = some (core, type) := by
-  have branch (found : Option Core.Word) :
-      ((check arm.value.body).bind fun branch =>
-        if branch.2 = type then some (found, branch.1) else none) = some (tag, core) ↔
-      found = tag ∧ check arm.value.body = some (core, type) := by
-    simp only [Option.bind_eq_some_iff]
-    constructor
-    · rintro ⟨⟨branchCore, branchType⟩, accepted, result⟩
-      split at result <;> simp_all [Option.some.injEq, Prod.mk.injEq]
-    · rintro ⟨rfl, accepted⟩
-      exact ⟨(core, type), accepted, by simp⟩
-  cases shape : arm.value.pattern.value <;> cases tag <;>
-    simp [check_arm, shape, WordMatchPatternDenotes, bind, branch,
-      Option.bind_eq_some_iff, Option.map_eq_some_iff, interpretWordLiteral?_iff]
-  constructor
-  · rintro ⟨_, ⟨word, meaning, rfl⟩, same, accepted⟩
-    cases same; exact ⟨meaning, accepted⟩
-  · rintro ⟨meaning, accepted⟩
-    exact ⟨_, ⟨_, meaning, rfl⟩, rfl, accepted⟩
-
-private theorem entries_check_iff {α β : Type} {check : α → Option β}
-    {cases : List α} {entries : List (α × β)} :
-    cases.attach.mapM (fun arm => (check arm.val).map (arm.val, ·)) = some entries ↔
-      entries.map Prod.fst = cases ∧ ∀ entry ∈ entries, check entry.1 = some entry.2 := by
-  change cases.attach.mapM ((fun arm => (check arm).map (arm, ·)) ∘ Subtype.val) = some entries ↔ _
-  rw [← List.mapM_map, List.attach_map_subtype_val]
-  induction cases generalizing entries with
-  | nil => cases entries <;> simp
-  | cons arm rest ih =>
-      cases entries with
-      | nil => simp [List.mapM_cons, bind, Option.bind_eq_some_iff]
-      | cons entry entries =>
-          simp only [List.mapM_cons, bind, Option.bind_eq_some_iff, Option.map_eq_some_iff,
-            pure, Option.some.injEq, List.cons.injEq, List.map_cons,
-            List.mem_cons, forall_eq_or_imp, ih]
-          constructor
-          · rintro ⟨_, ⟨value, accepted, rfl⟩, _, ⟨ordered, checked⟩, rfl, rfl⟩
-            exact ⟨⟨rfl, ordered⟩, accepted, checked⟩
-          · rintro ⟨⟨rfl, ordered⟩, accepted, checked⟩
-            exact ⟨entry, ⟨entry.2, accepted, by cases entry; rfl⟩, entries,
-              ⟨ordered, checked⟩, rfl, rfl⟩
 
 private theorem binding_children
     {blockSpan letSpan : Syntax.SourceSpan} {name : Syntax.Identifier}
@@ -156,13 +86,9 @@ private theorem complete
   | conditional condition _ _ thenIH elseIH =>
       rw [elaborateComputationReturnTree?]
       simp [childCorrect.mpr condition, thenIH, elseIH]
-  | @wordMatch inputs _ _ _ _ _ cases _ _ _ type entries scrutinee ordered patterns _ _ branchIH defaultIH =>
-      have checked := entries_check_iff.mpr ⟨ordered,
-        fun entry member => check_arm_iff.mpr ⟨patterns entry member, branchIH entry member⟩⟩
-      rw [elaborateComputationReturnTree?]
-      simp only [childCorrect.mpr scrutinee, bind, Option.bind_some, ite_true, defaultIH]
-      simp only [check_arm_map, bind] at checked
-      exact Option.bind_eq_some_iff.mpr ⟨entries, checked, rfl⟩
+  | wordMatch scrutinee ordered patterns _ defaultOrdered _ lowered branchIH defaultIH =>
+      exact ComputationReturnTreeChecking.match_iff.mpr
+        ⟨_, childCorrect.mpr scrutinee, _, _, _, ordered, patterns, branchIH, defaultOrdered, defaultIH, lowered, rfl⟩
 
 private theorem sound
     (childCorrect : ∀ {table context source core type},
@@ -239,28 +165,19 @@ private theorem sound
                 rcases armsShape : arms with ⟨armsSpan, armValues⟩
                 rcases valuesShape : armValues with ⟨cases, optionalDefault⟩
                 rw [scrutineeShape, elementsShape, armsShape, valuesShape] at accepted
-                cases rest <;> cases scrutineeRest <;> cases optionalDefault <;>
+                cases rest <;> cases scrutineeRest <;>
                   try (solve | simp only [elaborateComputationReturnTree?, reduceCtorEq] at accepted)
-                rename_i defaultBody
-                rw [elaborateComputationReturnTree?] at accepted
-                simp only [bind, Option.bind_eq_some_iff] at accepted
-                obtain ⟨⟨scrutineeCore, scrutineeType⟩, scrutineeAccepted, remaining⟩ := accepted
-                split at remaining
-                next isWord =>
-                  change scrutineeType = .word at isWord
-                  subst scrutineeType
-                  simp only [Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at remaining
-                  obtain ⟨⟨defaultCore, returnType⟩, defaultAccepted, entries, entriesAccepted, rfl, rfl⟩ := remaining
-                  have checked : entries.map Prod.fst = cases ∧ ∀ entry ∈ entries,
-                      check_arm (elaborateComputationReturnTree? checkChild types owner inputs) returnType entry.1 =
-                        some entry.2 := entries_check_iff.mp (by simp only [check_arm_map, bind]; exact entriesAccepted)
-                  refine .wordMatch (childCorrect.mp scrutineeAccepted) checked.1
-                    (fun entry member => (check_arm_iff.mp (checked.2 entry member)).1) ?_
-                    (sound childCorrect defaultAccepted)
-                  intro entry member
-                  have originalMember : entry.1 ∈ cases := checked.1 ▸ List.mem_map.mpr ⟨entry, member, rfl⟩
-                  exact sound childCorrect (check_arm_iff.mp (checked.2 entry member)).2
-                next notWord => cases remaining
+                obtain ⟨scrutineeCore, scrutineeAccepted, bodyCore, entries, defaults, ordered, patterns,
+                  branches, defaultOrdered, defaultBranches, lowered, rfl⟩ :=
+                    ComputationReturnTreeChecking.match_iff.mp accepted
+                refine .wordMatch (childCorrect.mp scrutineeAccepted) ordered patterns ?_ defaultOrdered ?_ lowered
+                · intro entry member
+                  have originalMember : entry.1 ∈ cases := ordered ▸ List.mem_map.mpr ⟨entry, member, rfl⟩
+                  exact sound childCorrect (branches entry member)
+                · intro entry member
+                  have originalDefault : optionalDefault = some entry.1 := by
+                    rw [← defaultOrdered, Option.mem_toList.mp member]; rfl
+                  exact sound childCorrect (defaultBranches entry member)
 termination_by sizeOf body
 decreasing_by
   all_goals simp_all
