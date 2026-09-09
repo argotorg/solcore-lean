@@ -1758,6 +1758,32 @@ compilation evidence on common actual arguments, preserving rejection and genuin
 checkpoints without asserting prepared-record equality from a projection. No
 lookup, compiler, header/body or runtime policy changes.
 
+The actual runtime side now has direct transport laws (ADR-0242). Independent
+paired binding preserves arbitrary initial and final typed input bundles, the
+original parameter and argument lists, owner, fresh identities and actual values.
+Only annotation evidence changes. This composes with existing header and body
+transport to retain the complete prepared record and whole-entry typing, without
+recovering value equality from an erased compiled projection.
+
+Successful binding, preparation and whole execution retain their exact optional
+payloads. Whole run equality includes present exhaustion and its genuine saved
+state at the same fuel and store, so existing resumption retains the same
+residual computation. Mutual extension additionally preserves rejection at all
+three endpoints. One-way extension can supply missing annotation meanings and
+enable actual preparation; changing an existing first-match meaning is not an
+extension. Equal argument types alone do not make different actual values or
+prepared records interchangeable. All executable definitions, the private
+general binder and source acceptance remain unchanged.
+
+Independent source and complete parsed consumers retain sparse mixed-owner
+rows, duplicate initial spellings, structural tuple parameters and actual
+opaque values. Hand-built whole provenance and manual paths fix the original
+Core and exact costs before comparing tables. Mutual lookup-equivalent tables
+preserve both outcomes, while unknown parameter/return/unselected annotations,
+changed first matches and same-type argument replacements expose the separate
+boundaries. Full machine states and genuine residuals are checked across
+multiple stores; nominal static cases never fabricate runtime arguments.
+
 The restricted explicit function profile now compiles before runtime arguments
 are supplied (ADR-0175). Independent compilation combines the existing header
 meaning, type-only parameter declaration, and exact return-body elaboration.

@@ -909,6 +909,18 @@ one-way extension may turn unknown-type rejection into success. Qualified keys,
 initial rows and generated IDs remain exact. Existing same-Core observation laws
 connect already compiled entries without changing lookup or execution policy.
 
+Actual-argument transport now completes this boundary directly (ADR-0242).
+Independent binding retains arbitrary initial/final value-bearing rows and
+original arguments, names, owner-relative identities and source order. Header
+and recursive-body transport preserve the same complete prepared record and
+whole-entry typing, not just its compiled projection. Exact successful binding,
+preparation and run payloads survive one-way extension; mutual extension also
+preserves all rejections. Whole outcomes include actual exhaustion states at
+the same fuel/store and their genuine residual execution. Unknown meanings can
+repair a one-way rejection, and changing first-match meanings or actual values
+is not justified by equal row membership, types or compiled projections.
+No executable definition, accepted syntax, runtime record or private binder changes.
+
 Value-free restricted function compilation (ADR-0175) now combines these
 static inputs with the existing header and exact return-body semantics. The
 independent compilation relation characterizes the executable compiler and

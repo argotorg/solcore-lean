@@ -62,6 +62,7 @@ import Solcore.Frontend.RuntimeParameterDeclarationsTypeExtensionProperties
 import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
 import Solcore.Frontend.RuntimeParameters
 import Solcore.Frontend.RuntimeParametersProperties
+import Solcore.Frontend.RuntimeParametersTypeExtensionProperties
 import Solcore.Frontend.RuntimeParametersLayout
 import Solcore.Frontend.ReturnBody
 import Solcore.Frontend.ReturnBodyProperties
@@ -70,6 +71,7 @@ import Solcore.Frontend.ReturnBodyElaboration
 import Solcore.Frontend.RuntimeFunctionHeader
 import Solcore.Frontend.RuntimeFunctionEntry
 import Solcore.Frontend.RuntimeFunctionEntryProperties
+import Solcore.Frontend.RuntimeFunctionTypeExtensionProperties
 import Solcore.Frontend.RuntimeFunctionEntryCost
 import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
 import Solcore.Frontend.RuntimeFunctionEvaluator
@@ -284,6 +286,12 @@ First-match type-name extension retains successful exact checker and full runner
 pairs with fixed inputs; mutual extension retains whole Options. One-way extension
 can repair unknown annotations, and conflicting first-match overrides are not
 semantic extensions.
+The actual parameter binder and whole-entry preparation now retain their full
+value-bearing records under the same meaning preservation. Initial rows,
+generated IDs and caller-supplied values remain unchanged, not merely their
+compiled projection. Successful whole run results preserve all machine states
+at the same fuel and store; mutual extension also preserves rejection. These
+laws require the same actual arguments and do not invent nominal inhabitants.
 Existing function entries reuse these recursive judgments and additive/max-arm
 bound, retaining original parameter-only records, header/argument guards and
 direct Core execution. Actual branch-local work contributes no wrapper overhead.
