@@ -46,4 +46,64 @@ This checks structural typing, not allocation or a supplied runtime world. -/
 def buildRuntimeArgument? (value : Core.Value) : Option TypedRuntimeArgument :=
   (buildValue? value).map (fun typed => ⟨value.type,value,typed.down⟩)
 
+private theorem environment_types {definitions : Core.DataEnvironment}
+    {environment : Core.Environment} {context : Core.Context}
+    (typed : Core.EnvironmentHasTypes environment context definitions) :
+    environment.map Core.Value.type = context := by
+  induction typed using Core.EnvironmentHasTypes.rec
+      (motive_1 := fun _ _ _ _ => True) with
+  | unit | bool | word | pair | inLeft | inRight | closure | cellRef | constructed => trivial
+  | nil => rfl
+  | cons head _ _ ih => simp only [List.map_cons, head.type_eq, ih]
+
+private theorem buildValue?_complete {definitions : Core.DataEnvironment}
+    {value : Core.Value} {type : Core.Ty} (typed : Core.ValueHasType value type definitions)
+    (empty : definitions = []) : (buildValue? value).isSome = true := by
+  revert empty
+  induction typed using Core.ValueHasType.rec
+      (motive_2 := fun environment _ definitions _ =>
+        definitions = [] → (buildEnvironment? environment).isSome = true) with
+  | unit | bool | word | cellRef => intro _; simp only [buildValue?, Option.isSome_some]
+  | pair _ _ leftIH rightIH =>
+      intro empty
+      obtain ⟨left,leftChecked⟩ := Option.isSome_iff_exists.mp (leftIH empty)
+      obtain ⟨right,rightChecked⟩ := Option.isSome_iff_exists.mp (rightIH empty)
+      simp only [buildValue?, leftChecked, rightChecked, bind, Option.bind_some, pure, Option.isSome_some]
+  | inLeft _ ih | inRight _ ih =>
+      intro empty
+      obtain ⟨proof,checked⟩ := Option.isSome_iff_exists.mp (ih empty)
+      simp only [buildValue?, checked, bind, Option.bind_some, pure, Option.isSome_some]
+  | closure environment body ih =>
+      intro empty
+      obtain ⟨proof,checked⟩ := Option.isSome_iff_exists.mp (ih empty)
+      have inferred := Core.infer_complete body
+      rw [empty, ← environment_types environment] at inferred
+      simp only [buildValue?, checked, bind, Option.bind_some, dif_pos inferred, pure, Option.isSome_some]
+  | constructed found _ _ => intro empty; rw [empty] at found; cases found
+  | nil => simp only [buildEnvironment?, Option.isSome_some]
+  | cons _ _ headIH tailIH =>
+      rename_i empty
+      obtain ⟨head,headChecked⟩ := Option.isSome_iff_exists.mp (headIH empty)
+      obtain ⟨tail,tailChecked⟩ := Option.isSome_iff_exists.mp (tailIH empty)
+      simp only [buildEnvironment?, headChecked, tailChecked, bind, Option.bind_some, pure, Option.isSome_some]
+
+theorem buildRuntimeArgument?_iff {value : Core.Value} {argument : TypedRuntimeArgument} :
+    buildRuntimeArgument? value = some argument ↔ argument.value = value := by
+  constructor
+  · intro built
+    cases checked : buildValue? value with
+    | none => simp only [buildRuntimeArgument?, checked, Option.map_none] at built; cases built
+    | some proof =>
+        simp only [buildRuntimeArgument?, checked, Option.map_some, Option.some.injEq] at built
+        rw [← built]
+  · intro same
+    cases argument with
+    | mk type original typed =>
+        simp only at same
+        subst original
+        have tag := typed.type_eq
+        subst type
+        obtain ⟨proof,checked⟩ := Option.isSome_iff_exists.mp (buildValue?_complete typed rfl)
+        simp only [buildRuntimeArgument?, checked, Option.map_some]
+
 end Solcore.Frontend
