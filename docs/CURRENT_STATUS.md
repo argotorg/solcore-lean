@@ -948,8 +948,8 @@ validator or executable definition is added.
 Terminal single-scrutinee Word matches now extend the shared computation body
 engine (ADR-0267). Original literal cases remain in order, including duplicates,
 and a required default closes the selected profile. Every case and default body
-is checked in the original caller scope at one common result type. Only strict
-in-range Word literals are admitted; binders, wildcard/grouped patterns,
+is checked in the original caller scope at one common result type. Literal
+patterns remain strict in-range Words; binders and grouped patterns,
 multiple scrutinees and missing default remain outside this interface.
 
 Independent source selection evaluates the original scrutinee once, keeps its
@@ -968,6 +968,23 @@ Word comparison and may return an arbitrary raw value; nonempty literal cases
 instead fault on an actual non-Word operand. The separate runtime input/safety
 premises remain necessary. Older local-only body and entry interfaces are
 unchanged; general pattern matching and overflow agreement are not claimed.
+
+Ordered wildcard cases now extend that profile (ADR-0268). An original `case _`
+selects its body immediately when reached, without a comparison or binding.
+Later literal/wildcard cases and the required default remain original static
+obligations even when unreachable. The checker distinguishes a successful
+wildcard tag from failure, checks every body, and only then discards the unused
+Core tail. Literal pattern meaning and the existing shared theorem signatures
+are unchanged; wildcard marker spans are not identified with enclosing spans.
+
+The scrutinee still runs once through the existing hidden let. Cost counts
+executed literal comparisons only: wildcard adds zero, while the outer let
+still adds two. Leading wildcard can therefore accept an arbitrary actual raw
+value; an earlier literal comparison on a non-Word still faults and retains
+prior effects. Original-source consumers retain captures, stores, selected
+effects and genuine checkpoints, separately consuming the opt-in runtime
+input/safety contracts. Missing default, non-Word static scrutinees, binding
+patterns and general exhaustiveness remain outside the selected interface.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

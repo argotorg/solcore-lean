@@ -612,8 +612,23 @@ signatures, actual-value insertion, full fuel and genuine resumption contracts
 remain intact. Empty cases deliberately perform no comparison, so raw non-Word
 success there does not justify treating a non-Word comparison as a miss.
 Symbolic arbitrary case counts and parsed effectful bodies protect those
-boundaries. Broader patterns, optional-default exhaustiveness, source lambdas
+boundaries. Binding/constructor patterns, optional-default exhaustiveness, source lambdas
 and global function resolution remain separate work.
+
+Original wildcard cases now share this same engine (ADR-0268). They preserve
+case order and marker spans, choose the first reached body without binding or
+comparison, and do not bypass the typing of any later case/default. Tagged
+entries separate wildcard success from checker failure; the Core fold removes
+only the already-checked unreachable tail. All shared typing, execution, cost,
+insertion and runtime contracts retain their existing theorem signatures.
+
+The scrutinee and hidden let remain unconditional. Only literal comparisons
+contribute seven transitions each; wildcard contributes zero. Raw leading
+wildcard success is distinct from a preceding non-Word comparison fault.
+The formerly rejected parsed wildcard example is migrated with its original
+header, owner, types, arguments and source location; independent source costs
+and literal Core paths protect effects and genuine resumption. Required default
+and statically Word scrutinees remain explicit restrictions.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution

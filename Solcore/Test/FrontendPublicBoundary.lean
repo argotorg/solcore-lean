@@ -407,6 +407,7 @@ example := @Solcore.Frontend.ComputationBodyFragment
 example := @Solcore.Frontend.WordMatchPatternDenotes
 example := @Solcore.Frontend.WordMatchChooses
 example := @Solcore.Frontend.WordMatchChooses.fallback
+example := @Solcore.Frontend.WordMatchChooses.wildcard
 example := @Solcore.Frontend.WordMatchChooses.hit
 example := @Solcore.Frontend.WordMatchChooses.miss
 example := @Solcore.Frontend.WordMatchPatternDenotes.value_unique
