@@ -17,6 +17,13 @@ theorem WordMatchPatternDenotes.value_unique {pattern : Syntax.Pattern} {left ri
   subst rightLiteral
   exact leftMeaning.value_unique rightMeaning
 
+private theorem literal_not_wildcard {pattern : Syntax.Pattern} {word : Core.Word}
+    {marker : Syntax.SourceSpan} (meaning : WordMatchPatternDenotes pattern word)
+    (shape : pattern.value = .wildcard marker) : False := by
+  obtain ⟨literal, literalShape, _⟩ := meaning
+  rw [shape] at literalShape
+  cases literalShape
+
 theorem WordMatchChooses.deterministic
     {value : Core.Value} {cases : List Syntax.MatchCase} {defaultBody left right : Syntax.Block}
     {leftTests rightTests : Nat}
@@ -25,12 +32,19 @@ theorem WordMatchChooses.deterministic
     left = right ∧ leftTests = rightTests := by
   induction first generalizing right rightTests with
   | fallback => cases second; exact ⟨rfl, rfl⟩
+  | wildcard shape =>
+      cases second with
+      | wildcard _ => exact ⟨rfl, rfl⟩
+      | hit meaning => exact False.elim (literal_not_wildcard meaning shape)
+      | miss meaning _ _ => exact False.elim (literal_not_wildcard meaning shape)
   | hit meaning =>
       cases second with
+      | wildcard shape => exact False.elim (literal_not_wildcard meaning shape)
       | hit _ => exact ⟨rfl, rfl⟩
       | miss other different _ => exact False.elim (different (meaning.value_unique other))
   | miss meaning different _ ih =>
       cases second with
+      | wildcard shape => exact False.elim (literal_not_wildcard meaning shape)
       | hit other => exact False.elim (different (other.value_unique meaning))
       | miss _ _ tail =>
           obtain ⟨rfl, rfl⟩ := ih tail
