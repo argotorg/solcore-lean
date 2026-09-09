@@ -1,4 +1,4 @@
-import Solcore.Frontend.TypeNameTableExtensionProperties
+import Solcore.Frontend.StructuralTypeTableProperties
 import Solcore.Frontend.RuntimeParameterDeclarations
 
 /-! Meaning-preserving table extension retains exact static declarations,

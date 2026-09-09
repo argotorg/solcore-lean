@@ -57,7 +57,7 @@ theorem RuntimeParametersBind.position {types : TypeNameTable} {owner : Resolved
     {annotation : Syntax.TypeExpr} {argument : TypedRuntimeArgument}
     (parameterAt : parameters[index]? = some ⟨parameterSpan, .typed none name annotation⟩)
     (argumentAt : arguments[index]? = some argument) :
-    index < arguments.length ∧ TypeNameDenotes types annotation argument.type ∧
+    index < arguments.length ∧ StructuralTypeDenotes types annotation argument.type ∧
       inputs.bindings[arguments.length - 1 - index]? = some
         { name := name.value, id := ⟨owner, index⟩, type := argument.type,
           value := argument.value, valueTyped := argument.valueTyped } ∧

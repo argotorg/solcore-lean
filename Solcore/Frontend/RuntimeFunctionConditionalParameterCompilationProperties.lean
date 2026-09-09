@@ -43,7 +43,7 @@ private theorem conditional_parameter_body_elaborates
         (.var (declaration.value.signature.parameters.elements.length - 1 - elseIndex))) type := by
   rw [bodyShape]
   obtain ⟨_, _, actualMeaning, _, named, found, indexed⟩ := declared.position conditionAt
-  cases actualMeaning.type_unique conditionMeaning
+  cases actualMeaning.type_unique conditionMeaning.structural
   refine .conditional (.identifier named) ?_ (.var found)
     (.single (declared.reference_return_elaborates_at thenAt thenMeaning
       thenBlockSpan thenReturnSpan thenSpan thenNameSpan))

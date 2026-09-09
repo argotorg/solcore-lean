@@ -55,7 +55,7 @@ theorem RuntimeParametersDeclare.position {types : TypeNameTable} {owner : Resol
     {index : Nat} {parameterSpan : Syntax.SourceSpan} {name : Syntax.Identifier}
     {annotation : Syntax.TypeExpr}
     (parameterAt : parameters[index]? = some ⟨parameterSpan, .typed none name annotation⟩) :
-    index < parameters.length ∧ ∃ type, TypeNameDenotes types annotation type ∧
+    index < parameters.length ∧ ∃ type, StructuralTypeDenotes types annotation type ∧
       inputs.bindings[parameters.length - 1 - index]? = some
         { name := name.value, id := ⟨owner, index⟩, type } ∧
       LocalNameTable.Lookup inputs.names name.value ⟨owner, index⟩ ∧

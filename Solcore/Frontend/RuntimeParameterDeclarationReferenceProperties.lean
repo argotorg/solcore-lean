@@ -30,7 +30,7 @@ theorem reference_elaborates_at
       ⟨span, .identifier ⟨nameSpan, name.value⟩⟩ =
         some (.var (parameters.length - 1 - index), type) := by
   obtain ⟨_, _, actualMeaning, _, named, found, indexed⟩ := declared.position parameterAt
-  cases actualMeaning.type_unique meaning
+  cases actualMeaning.type_unique meaning.structural
   exact elaborateLocalExpression?_complete (.identifier named) (.var indexed) (.var found)
 
 /-- Singleton return embeds the same positional resolution, lowering and type
@@ -44,7 +44,7 @@ theorem reference_return_elaborates_at
       ⟨blockSpan, [⟨returnSpan, .returnStmt (some ⟨span, .identifier ⟨nameSpan, name.value⟩⟩)⟩]⟩
       (.var (parameters.length - 1 - index)) type := by
   obtain ⟨_, _, actualMeaning, _, named, found, indexed⟩ := declared.position parameterAt
-  cases actualMeaning.type_unique meaning
+  cases actualMeaning.type_unique meaning.structural
   exact .expression (.identifier named) (.var indexed) (.var found)
 
 end Solcore.Frontend.RuntimeParametersDeclare
