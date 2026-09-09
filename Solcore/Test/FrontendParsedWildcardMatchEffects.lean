@@ -143,7 +143,7 @@ private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (fun c =>
   | ⟨_,[⟨matchSpan,.matchWith ⟨scrutineeSpan,⟨e,[]⟩⟩ ⟨armsSpan,⟨cs,some d⟩⟩⟩]⟩ =>
       check (b.span.contains matchSpan && matchSpan.contains scrutineeSpan && scrutineeSpan.contains e.span && matchSpan.contains armsSpan && armsSpan.contains d.span && cs.all (fun c => armsSpan.contains c.span) && decide (scrutineeSpan.endByte≤armsSpan.startByte)) "original match scrutinee/arms/default spans"
       let sc ← child i e; let bs ← arms i cs; let dc ← returned i d
-      if same : sc.1=.word then return ⟨.letE sc.2.core (bs.1.foldr (fun en t => match en.2.1 with | none => en.2.2.weakenAt 0 | some v => .ifE (.binary .wordEq (.var 0) (.word v)) (en.2.2.weakenAt 0) t) (dc.core.weakenAt 0)),by rw [shape]; exact .wordMatch (same ▸ sc.2.evidence) bs.2.down.1 (fun e h => (bs.2.down.2 e h).1) (fun e h => (bs.2.down.2 e h).2) dc.evidence⟩
+      if same : sc.1=.word then return ⟨.letE sc.2.core (bs.1.foldr (fun en t => match en.2.1 with | none => en.2.2.weakenAt 0 | some v => .ifE (.binary .wordEq (.var 0) (.word v)) (en.2.2.weakenAt 0) t) (dc.core.weakenAt 0)),by rw [shape]; exact .wordMatch (defaultEntry := some (d,dc.core)) (same ▸ sc.2.evidence) bs.2.down.1 (fun e h => (bs.2.down.2 e h).1) (fun e h => (bs.2.down.2 e h).2) rfl (by intro e h; cases List.mem_singleton.mp h; exact dc.evidence) (by simp only [Option.map_some]; induction bs.1 with | nil => rfl | cons e es ih => cases tag : e.2.1 <;> simp only [List.foldr_cons,tag,ih,Option.map_some])⟩
       else throw (IO.userError "scrutinee type")
   | _ => throw (IO.userError "original terminal match")
 private def prepare (source : Syntax.FunctionDecl) (args : List TypedRuntimeArgument) (fixed : Core.Expr) : IO (Σ p, PLift (RecursiveComputationFunctionPrepares types owner source args p ∧ p.core=fixed ∧ p.returnType=.word)) := do
@@ -191,7 +191,7 @@ private def rawChild (table : LocalNameTable) (env : Resolved.Environment) (s : 
       | _ => throw (IO.userError "raw callee")
   | _ => throw (IO.userError "raw child")
 termination_by sizeOf e
-private def choose (v : Core.Value) (cs : List Syntax.MatchCase) (d : Syntax.Block) : IO (Σ selected : Syntax.Block × Nat, PLift (WordMatchChooses v cs d selected.1 selected.2)) := do
+private def choose (v : Core.Value) (cs : List Syntax.MatchCase) (d : Syntax.Block) : IO (Σ selected : Syntax.Block × Nat, PLift (WordMatchChooses v cs (some d) selected.1 selected.2)) := do
   match shape : cs with
   | [] => return ⟨(d,0),⟨by rw [shape]; exact .fallback⟩⟩
   | c::rest =>
@@ -293,7 +293,7 @@ def frontendParsedWildcardMatchEffectTests : IO Unit := do
     let unselected ← parsed text; let ps ← parameters .empty .empty unselected.value.signature.parameters.elements args
     let raw ← rawBody ps.actual.names ps.actual.environment [w 0,w 41,w 99] unselected.value.body
     check (decide (raw.value=w 41 ∧ raw.final=[w 0,w 41,w 99,w 14] ∧ raw.cost=23 ∧ compileRecursiveComputationFunction? types owner unselected=none)) "original raw wildcard skips tail but all static obligations remain"
-  for text in ["match(f(x)){case _{return r(x);}}","match(f(x)==0){case _{return r(x);}default{return r(x);}}"] do
+  for text in ["match(f(x)==0){case _{return r(x);}default{return r(x);}}"] do
     let rejected ← parsed text
-    check (decide (compileRecursiveComputationFunction? types owner rejected=none)) "required default and Word scrutinee despite wildcard"
+    check (decide (compileRecursiveComputationFunction? types owner rejected=none)) "Word scrutinee despite wildcard"
 end Tests

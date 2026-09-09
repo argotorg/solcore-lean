@@ -72,20 +72,21 @@ private theorem rowFacts (n : Nat) (hit : Bool) :
       · exact ih.2 entry member
 private theorem elaborated (n : Nat) (hit : Bool) :
     RecursiveComputationReturnTreeElaborates [] owner inputs (source n hit) (core n hit) .word := by
-  have folded : tree n hit = (rows n hit).foldr
+  have folded : (rows n hit).foldr
       (fun entry tail => match entry.2.1 with
-        | none => entry.2.2.weakenAt 0
-        | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
-      ((.apply (.var 1) (.var 2) : Core.Expr).weakenAt 0) := by
+        | none => some (entry.2.2.weakenAt 0)
+        | some word => tail.map (fun t => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) t))
+      (some ((.apply (.var 1) (.var 2) : Core.Expr).weakenAt 0)) = some (tree n hit) := by
     induction n with
     | zero => cases hit <;> simp [tree,rows,selectedCore,guard,Core.Expr.weakenAt]
-    | succ n ih => simpa [tree,rows,guard,Core.Expr.weakenAt] using congrArg (Core.Expr.ifE (guard .zero) (.var 3)) ih
-  rw [core,folded]
-  exact .wordMatch (.application (calleeElab false) argumentElab) (rowFacts n hit).1
+    | succ n ih => simpa [tree,rows,guard,Core.Expr.weakenAt] using congrArg (Option.map (Core.Expr.ifE (guard .zero) (.var 3))) ih
+  exact .wordMatch (defaultEntry := some (branch,.apply (.var 1) (.var 2)))
+    (.application (calleeElab false) argumentElab) (rowFacts n hit).1
     (fun entry member => ((rowFacts n hit).2 entry member).1)
     (fun entry member => ((rowFacts n hit).2 entry member).2)
-    (.expression (.application (calleeElab true) argumentElab))
-private theorem chosen (n : Nat) (hit : Bool) : WordMatchChooses (.word one) (cases n hit) branch branch (tests n hit) := by
+    rfl (by intro entry member; simp at member; subst entry
+            exact .expression (.application (calleeElab true) argumentElab)) folded
+private theorem chosen (n : Nat) (hit : Bool) : WordMatchChooses (.word one) (cases n hit) (some branch) branch (tests n hit) := by
   induction n with
   | zero => cases hit; exact .fallback; exact .hit (meaning true)
   | succ n ih => simpa [cases,tests,Nat.add_right_comm] using WordMatchChooses.miss (meaning false) (by decide : one ≠ .zero) ih
@@ -155,7 +156,7 @@ private theorem manual (a : Actual) (n : Nat) (hit : Bool) (k : List Core.Frame)
 
 theorem original_counted_source_and_independent_core (n : Nat) (hit : Bool) :
     RecursiveComputationReturnTreeElaborates [] owner inputs (source n hit) (core n hit) .word ∧
-    WordMatchChooses (.word one) (cases n hit) branch branch (n + if hit then 1 else 0) :=
+    WordMatchChooses (.word one) (cases n hit) (some branch) branch (n + if hit then 1 else 0) :=
   ⟨elaborated n hit,chosen n hit⟩
 theorem checker_and_both_typing_interfaces (n : Nat) (hit : Bool) :
     elaborateRecursiveComputationReturnTree? [] owner inputs (source n hit)=some (core n hit,.word) ∧
@@ -245,11 +246,11 @@ theorem each_visited_prefix_is_a_genuine_checkpoint (a : Actual) (passed remaini
   exact ⟨exhausted,Core.runStateful_resume exhausted⟩
 theorem first_match_ignores_duplicate_and_malformed_later_rows (extra : List Syntax.MatchCase)
     (defaultBody : Syntax.Block) :
-    WordMatchChooses (.word one) (arm true::arm true::⟨span,⟨⟨span,.error⟩,unused⟩⟩::extra) defaultBody branch 1 :=
+    WordMatchChooses (.word one) (arm true::arm true::⟨span,⟨⟨span,.error⟩,unused⟩⟩::extra) (some defaultBody) branch 1 :=
   .hit (meaning true)
 theorem malformed_first_row_cannot_be_skipped (actual : Core.Value) (extra : List Syntax.MatchCase)
     (defaultBody selected : Syntax.Block) (count : Nat) :
-    ¬ WordMatchChooses actual (⟨span,⟨⟨span,.error⟩,unused⟩⟩::extra) defaultBody selected count := by
+    ¬ WordMatchChooses actual (⟨span,⟨⟨span,.error⟩,unused⟩⟩::extra) (some defaultBody) selected count := by
   intro choice
   cases choice with
   | wildcard shape => cases shape
@@ -257,7 +258,7 @@ theorem malformed_first_row_cannot_be_skipped (actual : Core.Value) (extra : Lis
   | miss meaning _ _ => rcases meaning with ⟨literal,shape,_⟩; cases shape
 theorem selected_body_and_visited_count_ignore_no_earlier_test (n : Nat) (hit : Bool)
     {selected : Syntax.Block} {count : Nat}
-    (choice : WordMatchChooses (.word one) (cases n hit) branch selected count) :
+    (choice : WordMatchChooses (.word one) (cases n hit) (some branch) selected count) :
     selected=branch ∧ count=n+(if hit then 1 else 0) := choice.deterministic (chosen n hit)
 
 private def allocating (word : Core.Word) : Core.Expr := .letE (.newCell .word (.var 0)) (.word word)

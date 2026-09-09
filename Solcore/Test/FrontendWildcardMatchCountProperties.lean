@@ -96,21 +96,22 @@ private theorem rowFacts (n : Nat) (marker : Syntax.SourceSpan) (suffix : Suffix
       · exact ih.2 entry member
 private theorem elaborated (n : Nat) (marker : Syntax.SourceSpan) (suffix : Suffix) :
     RecursiveComputationReturnTreeElaborates [] owner inputs (source n marker suffix) (core n) .word := by
-  have folded : tree n = (rows n marker suffix).foldr
+  have folded : (rows n marker suffix).foldr
       (fun entry tail => match entry.2.1 with
-        | none => entry.2.2.weakenAt 0
-        | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
-      ((.apply (.var 1) (.var 2) : Core.Expr).weakenAt 0) := by
+        | none => some (entry.2.2.weakenAt 0)
+        | some word => tail.map (fun t => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) t))
+      (some ((.apply (.var 1) (.var 2) : Core.Expr).weakenAt 0)) = some (tree n) := by
     induction n with
     | zero => simp [tree,rows,selectedCore,Core.Expr.weakenAt]
-    | succ n ih => simpa [tree,rows,guard,Core.Expr.weakenAt] using congrArg (Core.Expr.ifE guard (.var 3)) ih
-  rw [core,folded]
-  exact .wordMatch (.application (calleeElab false) argumentElab) (rowFacts n marker suffix).1
+    | succ n ih => simpa [tree,rows,guard,Core.Expr.weakenAt] using congrArg (Option.map (Core.Expr.ifE guard (.var 3))) ih
+  exact .wordMatch (defaultEntry := some (branch,.apply (.var 1) (.var 2)))
+    (.application (calleeElab false) argumentElab) (rowFacts n marker suffix).1
     (fun entry member => ((rowFacts n marker suffix).2 entry member).1)
     (fun entry member => ((rowFacts n marker suffix).2 entry member).2)
-    (.expression (.application (calleeElab true) argumentElab))
+    rfl (by intro entry member; simp at member; subst entry
+            exact .expression (.application (calleeElab true) argumentElab)) folded
 private theorem chosen (n : Nat) (marker : Syntax.SourceSpan) (extra : List Syntax.MatchCase) (fallback : Syntax.Block) :
-    WordMatchChooses (.word one) (cases n marker extra) fallback branch n := by
+    WordMatchChooses (.word one) (cases n marker extra) (some fallback) branch n := by
   induction n with
   | zero => exact .wildcard rfl
   | succ n ih => exact .miss meaning (by decide : one ≠ .zero) ih
@@ -176,7 +177,7 @@ private theorem manual (a : Actual) (n : Nat) (k : List Core.Frame) :
 
 theorem original_prefix_wildcard_and_all_typed_suffix_rows (n : Nat) (marker : Syntax.SourceSpan) (suffix : Suffix) :
     RecursiveComputationReturnTreeElaborates [] owner inputs (source n marker suffix) (core n) .word ∧
-    WordMatchChooses (.word one) (cases n marker suffix.original) branch branch n :=
+    WordMatchChooses (.word one) (cases n marker suffix.original) (some branch) branch n :=
   ⟨elaborated n marker suffix,chosen n marker suffix.original branch⟩
 theorem checker_and_both_typing_interfaces (n : Nat) (marker : Syntax.SourceSpan) (suffix : Suffix) :
     elaborateRecursiveComputationReturnTree? [] owner inputs (source n marker suffix)=some (core n,.word) ∧
@@ -261,8 +262,8 @@ theorem each_visited_prefix_is_a_genuine_checkpoint (a : Actual) (passed remaini
   exact ⟨exhausted,Core.runStateful_resume exhausted⟩
 theorem first_wildcard_beats_duplicate_wildcards_and_any_later_rows (n : Nat) (marker later : Syntax.SourceSpan)
     (extra : List Syntax.MatchCase) (fallback : Syntax.Block) :
-    WordMatchChooses (.word one) (cases n marker (⟨span,⟨⟨span,.wildcard later⟩,unused⟩⟩::miss::extra)) fallback branch n ∧
-    ∀ selected count, WordMatchChooses (.word one) (cases n marker (⟨span,⟨⟨span,.wildcard later⟩,unused⟩⟩::miss::extra)) fallback selected count →
+    WordMatchChooses (.word one) (cases n marker (⟨span,⟨⟨span,.wildcard later⟩,unused⟩⟩::miss::extra)) (some fallback) branch n ∧
+    ∀ selected count, WordMatchChooses (.word one) (cases n marker (⟨span,⟨⟨span,.wildcard later⟩,unused⟩⟩::miss::extra)) (some fallback) selected count →
       selected=branch ∧ count=n :=
   ⟨chosen n marker _ fallback,fun _ _ other => other.deterministic (chosen n marker _ fallback)⟩
 theorem arbitrarily_repeated_suffix_rows_are_checked_without_extra_comparisons
