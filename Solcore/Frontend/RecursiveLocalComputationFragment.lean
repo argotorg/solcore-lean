@@ -1,6 +1,6 @@
 import Solcore.Core.LocalFragment
 
-/-! Recursive applications, unary/strict binaries and conditionals of pure callers.
+/-! Recursive applications, unary/strict binaries and conditionals/lets of pure callers.
 Membership does not constrain actual returned closure bodies or captures;
 the caller syntax itself has no lambda constructor. -/
 
@@ -29,5 +29,10 @@ inductive RecursiveLocalComputationFragment : Core.Expr → Prop where
   | unary {op : Core.UnaryOp} {operand : Core.Expr}
       (child : RecursiveLocalComputationFragment operand) :
       RecursiveLocalComputationFragment (.unary op operand)
+
+  | letE {initializer body : Core.Expr}
+      (initializerChild : RecursiveLocalComputationFragment initializer)
+      (bodyChild : RecursiveLocalComputationFragment body) :
+      RecursiveLocalComputationFragment (.letE initializer body)
 
 end Solcore.Frontend

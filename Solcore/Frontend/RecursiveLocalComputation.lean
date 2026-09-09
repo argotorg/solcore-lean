@@ -1,7 +1,7 @@
 import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Frontend.DirectWordBinary
 
-/-! Recursive calls and groups with unary/Word binary operations, fixed negated
+/-! Recursive calls and groups with unary/Word binary operations, fixed ordered/negated
 comparisons, conditionals and fixed lazy expressions.
 Original children keep their scope; this does not change the older profiles. -/
 
@@ -58,6 +58,18 @@ def elaborateRecursiveLocalComputation? (table : LocalNameTable) (context : Reso
       let (rightCore, rightType) ← elaborateRecursiveLocalComputation? table context right
       if leftType = .word ∧ rightType = .word then
         some (.unary .boolNot (.binary .wordGt leftCore rightCore), .bool)
+      else none
+  | ⟨_, .binary left ⟨_, .less⟩ right⟩ => do
+      let (leftCore, leftType) ← elaborateRecursiveLocalComputation? table context left
+      let (rightCore, rightType) ← elaborateRecursiveLocalComputation? table context right
+      if leftType = .word ∧ rightType = .word then
+        some (leftCore.wordLt rightCore, .bool)
+      else none
+  | ⟨_, .binary left ⟨_, .greaterEqual⟩ right⟩ => do
+      let (leftCore, leftType) ← elaborateRecursiveLocalComputation? table context left
+      let (rightCore, rightType) ← elaborateRecursiveLocalComputation? table context right
+      if leftType = .word ∧ rightType = .word then
+        some (.unary .boolNot (leftCore.wordLt rightCore), .bool)
       else none
   | ⟨_, .binary left ⟨_, sourceOp⟩ right⟩ =>
       match directWordBinary? sourceOp with
@@ -133,6 +145,17 @@ inductive RecursiveLocalComputationHasType (table : LocalNameTable) (context : R
       RecursiveLocalComputationHasType table context
         ⟨span, .binary left ⟨operatorSpan, .lessEqual⟩ right⟩ .bool
 
+  | less {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftTyped : RecursiveLocalComputationHasType table context left .word)
+      (rightTyped : RecursiveLocalComputationHasType table context right .word) :
+      RecursiveLocalComputationHasType table context
+        ⟨span, .binary left ⟨operatorSpan, .less⟩ right⟩ .bool
+  | greaterEqual {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftTyped : RecursiveLocalComputationHasType table context left .word)
+      (rightTyped : RecursiveLocalComputationHasType table context right .word) :
+      RecursiveLocalComputationHasType table context
+        ⟨span, .binary left ⟨operatorSpan, .greaterEqual⟩ right⟩ .bool
+
 inductive RecursiveLocalComputationElaborates (table : LocalNameTable) (context : Resolved.Context) :
     Syntax.Expr → Core.Expr → Core.Ty → Prop where
   | pure {source : Syntax.Expr} {resolved : Resolved.Expr} {core : Core.Expr} {type : Core.Ty}
@@ -204,5 +227,20 @@ inductive RecursiveLocalComputationElaborates (table : LocalNameTable) (context 
       RecursiveLocalComputationElaborates table context
         ⟨span, .binary left ⟨operatorSpan, .lessEqual⟩ right⟩
         (.unary .boolNot (.binary .wordGt leftCore rightCore)) .bool
+
+  | less {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftCore rightCore : Core.Expr}
+      (leftElaborated : RecursiveLocalComputationElaborates table context left leftCore .word)
+      (rightElaborated : RecursiveLocalComputationElaborates table context right rightCore .word) :
+      RecursiveLocalComputationElaborates table context
+        ⟨span, .binary left ⟨operatorSpan, .less⟩ right⟩
+        (leftCore.wordLt rightCore) .bool
+  | greaterEqual {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftCore rightCore : Core.Expr}
+      (leftElaborated : RecursiveLocalComputationElaborates table context left leftCore .word)
+      (rightElaborated : RecursiveLocalComputationElaborates table context right rightCore .word) :
+      RecursiveLocalComputationElaborates table context
+        ⟨span, .binary left ⟨operatorSpan, .greaterEqual⟩ right⟩
+        (.unary .boolNot (leftCore.wordLt rightCore)) .bool
 
 end Solcore.Frontend
