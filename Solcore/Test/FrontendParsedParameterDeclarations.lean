@@ -149,7 +149,7 @@ def frontendParsedParameterDeclarationTests : IO Unit := do
       s!"{content}: static success bypassed runtime arity or ordered type matching"
   for content in ["(x: Bool, x: Bool)", "(x: Bool, y: Word, x: Word)",
       "(x: Unknown)", "(x: bool)", "(x: Bool<Word>)", "(x: @Bool)",
-      "(x: mapping(Word => Bool))", "(x: function(Word) returns (Bool))",
+      "(x: mapping(Word => Bool))",
       "(comptime x: Bool)"] do
     let some parameters ← parsed? Syntax.Parser.functionParameters content
       | throw (IO.userError s!"{content}: adapter rejection case should parse")

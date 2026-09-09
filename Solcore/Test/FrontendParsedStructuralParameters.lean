@@ -210,6 +210,7 @@ def frontendParsedStructuralParameterTests : IO Unit := do
     (some [pair (w 9) (pair (b true) (w 2))])
   for (text,args) in [("(x: ())",[]), ("(x: ())",[w 9]), ("()",[u]),
       ("(x: (Word,Bool,Word))",[u]),
+      ("(x: function(Word) returns(Bool))",[u]),
       ("(x: (Word,Bool))",[w 9,b true]), ("(x: (Word,Bool))",[pair (b true) (w 9)]),
       ("(x: (Word,Bool))",[b true]), ("(x: ((Word,Bool),()))",[pair (w 9) (pair (b true) u)]),
       ("(u: (), w: Word)",[w 9,u]), ("(unused: (N,()))",[pair (w 9) u])] do
@@ -219,7 +220,7 @@ def frontendParsedStructuralParameterTests : IO Unit := do
     assertTrue (bindRuntimeParameters? table owner source.elements args).isNone "missing, flattened or wrongly typed argument accepted"
   for text in ["(x: (), x: ())", "(x: ((),Unknown))", "(x: (Unknown,()))",
       "(x: Word<Bool>)", "(x: (Word,@Bool))", "(x: mapping(Word => Bool))",
-      "(x: function(Word) returns(Bool))", "(comptime x: ())"] do
+      "(comptime x: ())"] do
     let source ← parsed text
     have _ := declareRuntimeParameters?_eq_none_iff (types := table) (owner := owner) (params := source.elements)
     assertTrue (declareRuntimeParameters? table owner source.elements).isNone "unsupported written parameter gained a row"

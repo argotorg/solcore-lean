@@ -257,7 +257,7 @@ def frontendParsedStructuralTypeTests : IO Unit := do
   let _ ← checked "(Word,Bool,Word)" table (.product .word (.product .bool .word))
   let _ ← checked "((),(),(),())" table (.product .unit (.product .unit (.product .unit .unit)))
   for text in ["Word<Bool>", "(Word<Bool>)",
-      "mapping(Word => Bool)", "@Word", "function(Word) returns(Bool)", "comptime<Word>",
+      "mapping(Word => Bool)", "@Word", "comptime<Word>",
       "((),@Word)", "(function() returns(),Word)"] do
     let source ← parsed text
     assertTrue (interpretStructuralType? table source).isNone "unsupported written constructor gained meaning"

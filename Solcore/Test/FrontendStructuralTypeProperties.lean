@@ -133,7 +133,7 @@ theorem nominal_structural_types_need_neither_well_formed_data_nor_runtime_inhab
 
 private def unsupported (child : Syntax.TypeExpr) : List Syntax.TypeExprValue :=
   [.named (qualified span "Known") (some ⟨span, ⟨child, []⟩⟩), .mapping span span child child,
-   .proxy span child, .function span ⟨span, [child]⟩ (some ⟨span, [child]⟩), .comptime span span child, .error]
+   .proxy span child, .comptime span span child, .error]
 theorem unsupported_constructors_cannot_be_rescued_by_meaningful_children
     (table : TypeNameTable) (child : Syntax.TypeExpr) (type : Core.Ty)
     (meaning : StructuralTypeDenotes table child type) (payload : Syntax.TypeExprValue)
@@ -142,7 +142,7 @@ theorem unsupported_constructors_cannot_be_rescued_by_meaningful_children
     ¬ ∃ result, StructuralTypeDenotes table ⟨outer, payload⟩ result := by
   refine ⟨meaning.complete, ?_⟩
   simp only [unsupported, List.mem_cons, List.not_mem_nil, or_false] at present
-  rcases present with rfl | rfl | rfl | rfl | rfl | rfl <;>
+  rcases present with rfl | rfl | rfl | rfl | rfl <;>
     exact ⟨by simp only [interpretStructuralType?], by rintro ⟨result, denoted⟩; cases denoted⟩
 
 theorem larger_tuples_remain_named_only_rejections_and_missing_children_stay_strict

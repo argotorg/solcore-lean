@@ -60,6 +60,8 @@ private theorem everyChild {table : TypeNameTable} {source : Syntax.TypeExpr} {t
       rcases List.mem_cons.mp member with rfl | remaining
       · exact ⟨_, head⟩
       · exact tailIH _ _ rfl child remaining
+  | functionDefault _ _ => intro span elements same; cases same
+  | functionReturns _ _ _ _ => intro span elements same; cases same
 
 theorem arbitrary_finite_lists_have_independent_right_associated_meaning
     (table : TypeNameTable) (span : Syntax.SourceSpan) (elements : List Syntax.TypeExpr) (types : List Core.Ty)
