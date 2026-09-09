@@ -1,4 +1,5 @@
 import Solcore.Frontend.ComputationReturnTreeEvaluation
+import Solcore.Frontend.WordMatchProperties
 
 /-! Child laws lift through original mixed-body constructors. Raw cost
 existence and joint determinism remain independent of checking and typing. -/
@@ -32,6 +33,9 @@ private theorem erase_cost
       exact .ifTrue (childCostIff.mpr ⟨_, condition⟩) ih
   | ifFalse condition _ ih =>
       exact .ifFalse (childCostIff.mpr ⟨_, condition⟩) ih
+
+  | wordMatch scrutinee choice _ ih =>
+      exact .wordMatch (childCostIff.mpr ⟨_, scrutinee⟩) choice ih
 
 private theorem cost_exists
     {ChildEval : LocalNameTable → Resolved.Environment → Core.Store → Syntax.Expr → Core.Value → Core.Store → Prop}
@@ -73,6 +77,11 @@ private theorem cost_exists
       obtain ⟨_, childCost⟩ := childCostIff.mp condition
       obtain ⟨_, branchCost⟩ := ih
       exact ⟨_, .ifFalse childCost branchCost⟩
+
+  | wordMatch scrutinee choice _ ih =>
+      obtain ⟨_, childCost⟩ := childCostIff.mp scrutinee
+      obtain ⟨_, branchCost⟩ := ih
+      exact ⟨_, .wordMatch childCost choice branchCost⟩
 
 theorem computationReturnTreeEvaluates_iff_exists_cost
     {ChildEval : LocalNameTable → Resolved.Environment → Core.Store → Syntax.Expr → Core.Value → Core.Store → Prop}
@@ -139,6 +148,14 @@ theorem ComputationReturnTreeEvaluatesWithCost.deterministic
       | ifTrue otherCondition _ => cases (childDeterministic condition otherCondition).1
       | ifFalse otherCondition otherBranch =>
           obtain ⟨_, rfl, rfl⟩ := childDeterministic condition otherCondition
+          obtain ⟨rfl, rfl, rfl⟩ := ih otherBranch
+          exact ⟨rfl, rfl, rfl⟩
+
+  | wordMatch scrutinee choice _ ih =>
+      cases second with
+      | wordMatch otherScrutinee otherChoice otherBranch =>
+          obtain ⟨rfl, rfl, rfl⟩ := childDeterministic scrutinee otherScrutinee
+          obtain ⟨rfl, rfl⟩ := choice.deterministic otherChoice
           obtain ⟨rfl, rfl, rfl⟩ := ih otherBranch
           exact ⟨rfl, rfl, rfl⟩
 
