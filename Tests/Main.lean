@@ -257,6 +257,9 @@ import Solcore.Test.FrontendParsedComputationRuntimeSafetyEntries
 import Solcore.Test.FrontendRuntimeInputStoreValidationProperties
 import Solcore.Test.FrontendRuntimeInputReferenceValidationProperties
 import Solcore.Test.FrontendParsedRuntimeInputValidationEntries
+import Solcore.Test.FrontendRuntimeArgumentConstructionProperties
+import Solcore.Test.FrontendRuntimeArgumentConstructionBoundaryProperties
+import Solcore.Test.FrontendParsedRuntimeArgumentConstructionEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5903,6 +5906,7 @@ def run : IO Unit := do
   frontendParsedComputationRuntimeSafetyTests
   frontendParsedComputationRuntimeSafetyEntryTests
   frontendParsedRuntimeInputValidationEntryTests
+  frontendParsedRuntimeArgumentConstructionEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

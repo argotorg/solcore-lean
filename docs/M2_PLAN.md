@@ -578,6 +578,17 @@ changing original source preparation, actual records or any runner result.
 No raw/JSON validator, inferred world, repair, extra signature well-formedness,
 public helper or automatic entry guard is added.
 
+Raw Core values now construct the existing structurally typed argument records
+through one exact Option builder (ADR-0265). Its record iff preserves each
+literal input and unique type, including original order under list traversal.
+Actual closure bodies are checked in the actual captured-type context, and all
+captures are checked even when unused. No extra signature/unselected-type
+well-formedness is imposed; forged bodies, host values and constructed values
+under empty definitions are rejected. Unallocated references remain structurally
+accepted, with same-world/store validation still supplied separately by ADR-0264.
+Original preparation, execution, actual stores, costs and checkpoints remain
+unchanged; no JSON decoder, source closure profile or automatic guard is added.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

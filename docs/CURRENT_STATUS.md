@@ -908,6 +908,25 @@ lengths, a matching prefix or valid referenced cells alone are insufficient.
 The validator only returns a Bool: it does not infer, extend or repair a world,
 change a value/store, reject source preparation or guard an existing runner.
 
+Raw Core values can now independently construct existing TypedRuntimeArgument
+records (ADR-0265). The one public Option builder preserves the literal actual
+value and its exact tag. Its exact-record iff accepts precisely any existing
+typed record whose value is that original input; structural type uniqueness
+and proof irrelevance retain the whole record, not just a matching type list.
+Ordinary list traversal therefore preserves original arguments and order without
+a new list adapter or any change to preparation and full runner results.
+
+The builder checks all actual pair/selected sum payloads and captures, including
+unused and nested captures. Closure bodies use the existing complete Core type
+checker under the parameter and the actual captured-value types. This is not
+typing a newly wrapped lambda: signature and unselected sum types gain no extra
+well-formedness conditions. Same-tag malformed bodies, host values and nominal
+constructed values under empty definitions are rejected. Actual references are
+structurally accepted without asserting allocation; the separate ADR-0264
+validator checks the supplied world and complete store before its iff can
+supply ADR-0263's safety premises. Neither stage evaluates, repairs or replaces
+the input, decodes JSON, enables source closures, or guards an existing runner.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
