@@ -31,39 +31,45 @@ private theorem word_test_iff {environment : Core.Environment} {actual : Core.Va
 
 private theorem fold_evaluates_iff
     (entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)))
+    (defaultEntry : Option (Syntax.Block × Core.Expr))
     {environment : Core.Environment} {actual value : Core.Value}
-    {initialStore finalStore : Core.Store} {defaultBody : Syntax.Block} {defaultCore : Core.Expr}
+    {initialStore finalStore : Core.Store}
     {E : Syntax.Block → Prop}
     (patterns : ∀ entry ∈ entries, match entry.2.1 with
       | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
       | some word => WordMatchPatternDenotes entry.1.value.pattern word)
     (branches : ∀ entry ∈ entries, Core.Evaluates (actual :: environment) initialStore
       (entry.2.2.weakenAt 0) value finalStore ↔ E entry.1.value.body)
-    (fallback : Core.Evaluates (actual :: environment) initialStore
-      (defaultCore.weakenAt 0) value finalStore ↔ E defaultBody) :
-    Core.Evaluates (actual :: environment) initialStore
-      (entries.foldr (fun entry tail => match entry.2.1 with
-        | none => entry.2.2.weakenAt 0
-        | some word => .ifE (.binary .wordEq (.var 0) (.word word))
-            (entry.2.2.weakenAt 0) tail) (defaultCore.weakenAt 0)) value finalStore ↔
-      ∃ selected tests, WordMatchChooses actual (entries.map Prod.fst) defaultBody selected tests ∧ E selected := by
+    (fallback : ∀ entry ∈ defaultEntry.toList, Core.Evaluates (actual :: environment) initialStore
+      (entry.2.weakenAt 0) value finalStore ↔ E entry.1) :
+    ∀ {core : Core.Expr},
+      entries.foldr (fun entry tail => match entry.2.1 with
+        | none => some (entry.2.2.weakenAt 0)
+        | some word => tail.map (fun tailCore => .ifE (.binary .wordEq (.var 0) (.word word))
+            (entry.2.2.weakenAt 0) tailCore)) (defaultEntry.map (fun entry => entry.2.weakenAt 0)) = some core →
+      (Core.Evaluates (actual :: environment) initialStore core value finalStore ↔
+        ∃ selected tests, WordMatchChooses actual (entries.map Prod.fst)
+          (defaultEntry.map Prod.fst) selected tests ∧ E selected) := by
   revert patterns branches
   induction entries with
   | nil =>
-      intro _ _
+      intro _ _ core lowered
+      obtain ⟨entry, found, rfl⟩ := Option.map_eq_some_iff.mp lowered
+      have branch := fallback entry (by simp [found])
+      simp only [List.map_nil, found, Option.map_some]
       constructor
-      · intro evaluation; exact ⟨_, 0, .fallback, fallback.mp evaluation⟩
-      · rintro ⟨_, _, choice, branch⟩; cases choice; exact fallback.mpr branch
+      · intro evaluation; exact ⟨_, 0, .fallback, branch.mp evaluation⟩
+      · rintro ⟨_, _, choice, evaluated⟩; cases choice; exact branch.mpr evaluated
   | cons entry rest ih =>
-      intro patterns branches
-      have tail := ih (fun item member => patterns item (List.mem_cons_of_mem entry member))
-        (fun item member => branches item (List.mem_cons_of_mem entry member))
+      intro patterns branches core lowered
       have meaning := patterns entry (List.mem_cons_self)
       have branch := branches entry (List.mem_cons_self)
       cases tag : entry.2.1 with
       | none =>
           simp only [tag] at meaning
-          simp only [List.foldr_cons, tag]
+          have same : entry.2.2.weakenAt 0 = core := by
+            simpa only [List.foldr_cons, tag, Option.some.injEq] using lowered
+          subst core
           obtain ⟨marker, shape⟩ := meaning
           constructor
           · intro evaluation; exact ⟨_, 0, .wildcard shape, branch.mp evaluation⟩
@@ -74,7 +80,10 @@ private theorem fold_evaluates_iff
             | miss other _ _ => obtain ⟨_, wrong, _⟩ := other; simp [shape] at wrong
       | some literal =>
           simp only [tag] at meaning
-          simp only [List.foldr_cons, tag]
+          simp only [List.foldr_cons, tag] at lowered
+          obtain ⟨tailCore, tailLowered, rfl⟩ := Option.map_eq_some_iff.mp lowered
+          have tail := ih (fun item member => patterns item (List.mem_cons_of_mem entry member))
+            (fun item member => branches item (List.mem_cons_of_mem entry member)) tailLowered
           constructor
           · intro evaluation
             cases evaluation with
@@ -208,18 +217,19 @@ theorem ComputationReturnTreeElaborates.evaluates_iff
             exact .ifTrue ((childExecution guard sameIds).mpr condition) ((thenIH sameIds).mpr branch)
         | ifFalse condition branch =>
             exact .ifFalse ((childExecution guard sameIds).mpr condition) ((elseIH sameIds).mpr branch)
-  | @wordMatch inputs _ _ _ _ _ _ _ _ _ _ _ scrutinee ordered patterns branches fallback branchIH fallbackIH =>
+  | @wordMatch inputs _ _ _ _ _ _ _ _ _ _ _ _ scrutinee ordered patterns branches defaultOrdered defaults lowered branchIH defaultIH =>
       subst ordered
-      have folded {actual : Core.Value} {store : Core.Store} := fold_evaluates_iff _
+      subst defaultOrdered
+      have folded {actual : Core.Value} {store : Core.Store} := fold_evaluates_iff _ _
         (actual := actual) (initialStore := store) (finalStore := finalStore) (value := value)
         (E := fun selected => ComputationReturnTreeEvaluates ChildEval owner inputs.names
           environment store selected value finalStore) patterns
         (fun entry member => (ComputationBodyFragment.evaluates_insert_iff (F := F) childInserts
           (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening
             (branches entry member)) [] environment.values actual).trans ((branchIH entry member sameIds).symm))
-        ((ComputationBodyFragment.evaluates_insert_iff (F := F) childInserts
-          (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening fallback)
-          [] environment.values actual).trans (fallbackIH sameIds).symm)
+        (fun entry member => (ComputationBodyFragment.evaluates_insert_iff (F := F) childInserts
+          (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening
+            (defaults entry member)) [] environment.values actual).trans ((defaultIH entry member sameIds).symm)) lowered
       constructor
       · intro evaluation
         cases evaluation with
