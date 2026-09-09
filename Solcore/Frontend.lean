@@ -30,6 +30,10 @@ import Solcore.Frontend.LocalInputsProperties
 import Solcore.Frontend.LocalInputsLookupProperties
 import Solcore.Frontend.LocalInputsExecution
 import Solcore.Frontend.LocalInputsExecutionProperties
+import Solcore.Frontend.LocalInputsApplication
+import Solcore.Frontend.LocalInputsApplicationProperties
+import Solcore.Frontend.LocalInputsApplicationCostProperties
+import Solcore.Frontend.LocalInputsApplicationRuntimeProperties
 import Solcore.Frontend.LocalNameAvoidance
 import Solcore.Frontend.LocalNameAvoidanceProperties
 import Solcore.Frontend.LocalInputsExtensionLookupSupport

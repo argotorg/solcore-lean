@@ -355,6 +355,21 @@ The existing restricted Core payload/reducibility rules justify successful
 execution, without a source-only bound, arbitrary-store guarantee, or any change
 to executable definitions or old body/entry acceptance.
 
+A separate checked local application runner is now implemented (ADR-0246).
+The existing actual `LocalInputs` projections supply its static gate and Core
+environment without new records. Only static rejection yields outer absence;
+all checked machine outcomes retain their exact state and static result tag.
+Independent whole typing plus raw evaluation characterizes completion at some fuel; actual
+costs give exact fuel thresholds, and genuine checkpoints give residual paths
+and full-result resumption, including faults. Same-world runtime typing of the
+actual values and store separately establishes typed completion, a sufficient
+actual cost and all-fuel fault exclusion. Missing/wrong-payload stores, delayed
+closures, effects and unselected-branch rejection retain their distinct meanings.
+Original parsed declarations use this local endpoint without enabling old pure
+or whole-function entries. A direct source-call evaluator, body integration and an
+executable runtime-world validator remain separate work; there is no source-only
+bound or arbitrary-store safety claim.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

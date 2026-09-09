@@ -502,6 +502,26 @@ it is not a termination claim for arbitrary stateful closure languages or a
 source-only bound. No checker/evaluator, body/entry, parser or Core definition
 changes are introduced.
 
+A separate checked application endpoint now runs on the existing actual
+`LocalInputs` record (ADR-0246). `checkApplication?` preserves exact original-call
+elaboration, and `runApplication?` uses the same ordered values and supplied
+store. Outer absence is exactly static rejection, independent of fuel and store;
+successful checking preserves the static type tag and every complete Core result,
+including faults and genuine exhaustion states. Completion reflects independent
+raw evaluation, and completion at some fuel is equivalent to whole typing plus
+that evaluation.
+
+Whole typing with an actual cost gives exact completion/exhaustion thresholds;
+genuine checkpoints retain exact residual paths and full-result resumption,
+including fault outcomes and the same tag. Explicit runtime-world typing of these
+same values and store separately supplies typed completion, an actual sufficient
+cost and all-fuel fault exclusion. Structural input typing alone does not:
+a missing cell can fault, and a wrong payload can produce a Bool under a checked
+Word tag. Independent original parsed calls and declarations cover these cases,
+delayed closures, writes, allocation and rejected unselected branches. The old
+pure and whole-entry endpoints remain unchanged; a direct source-call evaluator,
+body/entry integration and runtime-world validation are still separate work.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

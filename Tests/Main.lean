@@ -195,6 +195,9 @@ import Solcore.Test.FrontendParsedLocalApplicationEvaluationEntries
 import Solcore.Test.FrontendLocalApplicationRuntimeSafetyProperties
 import Solcore.Test.FrontendParsedLocalApplicationRuntimeSafety
 import Solcore.Test.FrontendParsedLocalApplicationRuntimeSafetyEntries
+import Solcore.Test.FrontendLocalApplicationRunnerProperties
+import Solcore.Test.FrontendParsedLocalApplicationRunner
+import Solcore.Test.FrontendParsedLocalApplicationRunnerEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5800,6 +5803,8 @@ def run : IO Unit := do
   frontendParsedLocalApplicationEvaluationEntryTests
   frontendParsedLocalApplicationRuntimeSafetyTests
   frontendParsedLocalApplicationRuntimeSafetyEntryTests
+  frontendParsedLocalApplicationRunnerTests
+  frontendParsedLocalApplicationRunnerEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
