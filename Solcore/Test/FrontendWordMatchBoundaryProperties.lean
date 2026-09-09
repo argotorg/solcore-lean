@@ -38,7 +38,7 @@ private theorem emptyElaborates :
     (ComputationReturnTreeElaborates.wordMatch (types := []) (owner := owner)
       (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
       (defaultBody := some returned) (defaultEntry := some (returned,.var 0))
-      (entries := []) xElaborates rfl (by simp) (by simp) rfl
+      (entries := []) xElaborates rfl (by simp) (.inl rfl) (by simp) rfl
       (by intro entry member; simp only [Option.toList_some,List.mem_singleton] at member
           subst entry; exact .expression xElaborates) rfl)
 private theorem guardedElaborates :
@@ -48,7 +48,7 @@ private theorem guardedElaborates :
       (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
       (defaultBody := some returned) (defaultEntry := some (returned,.var 0))
       (entries := [(arm,some zero,Core.Expr.var 0)]) xElaborates rfl
-      (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact .literal zeroMeaning)
+      (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact .literal zeroMeaning) (.inl rfl)
       (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact .expression xElaborates)
       rfl (by intro entry member; simp only [Option.toList_some,List.mem_singleton] at member
               subst entry; exact .expression xElaborates) rfl)
@@ -142,7 +142,7 @@ theorem a_malformed_unselected_case_still_blocks_static_typing (store : Core.Sto
       (.pure (.identifier .head .head)) (.hit (.literal zeroMeaning)) (.expression (.pure (.identifier .head .head)))
   · intro typing
     cases typing with
-    | wordMatch _ patterns _ _ _ =>
+    | wordMatch _ patterns _ _ _ _ =>
         obtain ⟨tag,meaning⟩ := patterns ⟨span,⟨⟨span,.error⟩,returned⟩⟩ (by simp)
         have checked := interpretWordMatchPattern?_iff.mpr meaning
         simp [interpretWordMatchPattern?] at checked

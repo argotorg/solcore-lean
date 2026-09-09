@@ -160,7 +160,7 @@ private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (fun c =>
       check (wildArm.span.contains wildArm.value.pattern.span && wildArm.span.contains wildArm.value.body.span) "original grouped wildcard and branch ranges"
       if same : sc.1=.word then return ⟨.letE sc.2.core (.ifE (.binary .wordEq (.var 0) (.word p.1)) (a.core.weakenAt 0) (b.core.weakenAt 0)),by
         rw [shape]; exact .wordMatch (defaultEntry := none) (entries := [(arm,some p.1,a.core),(wildArm,none,b.core)]) (same ▸ sc.2.evidence) rfl
-          (by intro entry h; simp only [List.mem_cons,List.not_mem_nil,or_false] at h; rcases h with rfl|rfl; exact p.2.down; exact wild.down)
+          (by intro entry h; simp only [List.mem_cons,List.not_mem_nil,or_false] at h; rcases h with rfl|rfl; exact p.2.down; exact wild.down) (.inl rfl)
           (by intro entry h; simp only [List.mem_cons,List.not_mem_nil,or_false] at h; rcases h with rfl|rfl; exact a.evidence; exact b.evidence) rfl (by intro entry h; cases h) rfl⟩
       else throw (IO.userError "scrutinee type")
   | _ => throw (IO.userError "fixed original body shape")

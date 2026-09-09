@@ -62,7 +62,7 @@ private theorem originalElaborates (type : Core.Ty) (groups : List Syntax.Source
       (source [wild groups marker,literal groups]) core type := by
   refine ComputationReturnTreeElaborates.wordMatch
     (defaultEntry := none) (entries := [(wild groups marker,none,.var 1),(literal groups,some .zero,.var 1)])
-    (xElaborates type) rfl ?_ ?_ rfl (by simp) ?_
+    (xElaborates type) rfl ?_ (.inl rfl) ?_ rfl (by simp) ?_
   · intro entry member
     simp only [List.mem_cons,List.not_mem_nil,or_false] at member
     rcases member with rfl | rfl
@@ -155,7 +155,7 @@ theorem a_grouped_literal_hit_does_not_supply_missing_static_coverage
         (Resolved.LocalScope.lookup?_iff.mp rfl))))
   · intro resultType typing
     cases typing with
-    | wordMatch _ _ covered _ _ =>
+    | wordMatch _ _ _ covered _ _ =>
         rcases covered with present | ⟨arm,member,meaning⟩
         · cases present
         · cases List.mem_singleton.mp member
@@ -189,7 +189,7 @@ theorem an_unreachable_grouped_error_still_blocks_static_acceptance
   refine ⟨counted type groups marker _ scrutinee result store,?_⟩
   intro typing
   cases typing with
-  | wordMatch _ patterns _ _ _ =>
+  | wordMatch _ patterns _ _ _ _ =>
       obtain ⟨tag,meaning⟩ := patterns ⟨span,⟨wrap groups ⟨span,.error⟩,returned⟩⟩ (by simp)
       have checked := interpretWordMatchPattern?_iff.mpr meaning
       simp only [wrapChecks,interpretWordMatchPattern?] at checked

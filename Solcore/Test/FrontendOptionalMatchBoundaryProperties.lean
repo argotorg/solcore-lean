@@ -44,7 +44,7 @@ private theorem originalElaborates (type : Core.Ty) (marker : Syntax.SourceSpan)
       (source [wildcard marker,literal]) core type := by
   refine ComputationReturnTreeElaborates.wordMatch
     (defaultEntry := none) (entries := [(wildcard marker,none,.var 1),(literal,some .zero,.var 1)])
-    (xElaborates type) rfl ?_ ?_ rfl (by simp) ?_
+    (xElaborates type) rfl ?_ (.inl rfl) ?_ rfl (by simp) ?_
   · intro entry member
     simp only [List.mem_cons,List.not_mem_nil,or_false] at member
     rcases member with rfl | rfl
@@ -74,7 +74,7 @@ private theorem noLiteralCoverage (type resultType : Core.Ty) :
     ¬ RecursiveComputationReturnTreeHasType [] owner (inputs type) (source [literal]) resultType := by
   intro typed
   cases typed with
-  | wordMatch _ _ covered _ _ =>
+  | wordMatch _ _ _ covered _ _ =>
       rcases covered with present | ⟨arm,member,meaning⟩
       · cases present
       · simp only [List.mem_singleton] at member
@@ -134,7 +134,7 @@ theorem an_empty_original_arm_collection_has_no_type_or_compiled_fallback (type 
       ¬ RecursiveComputationReturnTreeHasType [] owner (inputs type) (source []) resultType := by
     intro typed
     cases typed with
-    | wordMatch _ _ covered _ _ =>
+    | wordMatch _ _ _ covered _ _ =>
         rcases covered with present | ⟨arm,member,_⟩
         · cases present
         · cases member
@@ -184,7 +184,7 @@ theorem a_malformed_unreachable_pattern_still_prevents_static_acceptance
   refine ⟨counted type marker _ scrutinee result store,?_⟩
   intro typed
   cases typed with
-  | wordMatch _ patterns _ _ _ =>
+  | wordMatch _ patterns _ _ _ _ =>
       obtain ⟨tag,meaning⟩ := patterns ⟨span,⟨⟨span,.error⟩,returned⟩⟩ (by simp)
       have checked := interpretWordMatchPattern?_iff.mpr meaning
       simp [interpretWordMatchPattern?] at checked

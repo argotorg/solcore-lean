@@ -46,7 +46,7 @@ private theorem originalElaborates (marker : Syntax.SourceSpan) :
           rcases member with rfl | rfl | rfl
           exact .wildcard rfl
           exact .literal literalMeaning
-          exact .wildcard rfl)
+          exact .wildcard rfl) (.inl rfl)
       (by intro entry member; simp only [List.mem_cons,List.not_mem_nil,or_false] at member
           rcases member with rfl | rfl | rfl <;> exact .expression xElaborates)
       rfl (by intro entry member; simp only [Option.toList_some,List.mem_singleton] at member
@@ -71,7 +71,7 @@ private theorem guardedElaborates (marker : Syntax.SourceSpan) :
       (entries := [(literal,some zero,Core.Expr.var 0),(wildcard marker,none,.var 0)])
       xElaborates rfl
       (by intro entry member; simp only [List.mem_cons,List.not_mem_nil,or_false] at member
-          rcases member with rfl | rfl; exact .literal literalMeaning; exact .wildcard rfl)
+          rcases member with rfl | rfl; exact .literal literalMeaning; exact .wildcard rfl) (.inl rfl)
       (by intro entry member; simp only [List.mem_cons,List.not_mem_nil,or_false] at member
           rcases member with rfl | rfl <;> exact .expression xElaborates)
       rfl (by intro entry member; simp only [Option.toList_some,List.mem_singleton] at member
@@ -132,7 +132,7 @@ theorem an_unselected_malformed_pattern_still_blocks_all_body_typing
   refine ⟨counted marker _ value store,?_⟩
   intro typed
   cases typed with
-  | wordMatch _ patterns _ _ _ =>
+  | wordMatch _ patterns _ _ _ _ =>
       obtain ⟨tag,meaning⟩ := patterns ⟨span,⟨⟨span,.error⟩,returned⟩⟩ (by simp)
       have checked := interpretWordMatchPattern?_iff.mpr meaning
       simp [interpretWordMatchPattern?] at checked
