@@ -1,6 +1,7 @@
 import Solcore.Frontend.RecursiveLocalComputationCostExecutionProperties
 import Solcore.Frontend.RecursiveLocalComputationEvaluationProperties
 import Solcore.Frontend.LocalExpressionEvaluationProperties
+import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
 
 /-! Existing execution contracts retain original-source evidence.
 Forward success uses the exact cost path; reverse success is independent induction. -/
@@ -8,6 +9,36 @@ Forward success uses the exact cost path; reverse success is independent inducti
 set_option autoImplicit false
 
 namespace Solcore.Frontend
+
+private theorem ordered_inv {environment : Core.Environment}
+    {initialStore finalStore : Core.Store} {left right : Core.Expr} {value : Core.Value}
+    (evaluation : Core.Evaluates environment initialStore (left.wordLt right) value finalStore)
+    (rightFragment : RecursiveLocalComputationFragment right) :
+    ∃ leftWord rightWord middleStore,
+      Core.Evaluates environment initialStore left (.word leftWord) middleStore ∧
+      Core.Evaluates environment middleStore right (.word rightWord) finalStore ∧
+      value = .bool (decide (leftWord < rightWord)) := by
+  rw [Core.Expr.wordLt_expansion] at evaluation
+  cases evaluation with
+  | @letE _ _ _ _ _ _ boundLeft _ leftEvaluation bodyEvaluation =>
+      cases bodyEvaluation with
+      | @letE _ _ _ _ _ _ boundRight _ rightEvaluation comparison =>
+          cases comparison with
+          | @binary _ _ _ _ _ _ _ rightValue leftValue _ rightReference leftReference applied =>
+              cases rightReference with
+              | var foundRight =>
+                  have rightEq : boundRight = rightValue := by simpa using foundRight
+                  subst rightValue
+                  cases leftReference with
+                  | var foundLeft =>
+                      have leftEq : boundLeft = leftValue := by simpa using foundLeft
+                      subst leftValue
+                      cases boundRight <;> cases boundLeft <;>
+                        simp only [Core.BinaryOp.apply, reduceCtorEq] at applied
+                      case word.word rightWord leftWord =>
+                        cases applied
+                        exact ⟨leftWord, rightWord, _, leftEvaluation,
+                          (rightFragment.evaluates_insert_iff [] environment (.word leftWord)).mp rightEvaluation, rfl⟩
 
 theorem RecursiveLocalComputationElaborates.evaluates_iff
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
@@ -74,6 +105,16 @@ theorem RecursiveLocalComputationElaborates.evaluates_iff
             | @binary _ _ _ _ _ _ _ leftValue rightValue _ left right compared =>
                 cases leftValue <;> cases rightValue <;> cases compared <;> cases negated
                 exact .lessEqual (leftIH left) (rightIH right)
+
+    | less _ rightElab leftIH rightIH =>
+        obtain ⟨_, _, _, left, right, rfl⟩ := ordered_inv evaluation rightElab.core_fragment
+        exact .less (leftIH left) (rightIH right)
+    | greaterEqual _ rightElab leftIH rightIH =>
+        cases evaluation with
+        | unary comparison negated =>
+            obtain ⟨_, _, _, left, right, rfl⟩ := ordered_inv comparison rightElab.core_fragment
+            cases negated
+            exact .greaterEqual (leftIH left) (rightIH right)
 
 theorem RecursiveLocalComputationElaborates.evaluatesWithCost_iff_steps
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
