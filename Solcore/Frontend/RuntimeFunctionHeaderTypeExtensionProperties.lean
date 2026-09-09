@@ -1,4 +1,4 @@
-import Solcore.Frontend.TypeNameTableExtensionProperties
+import Solcore.Frontend.StructuralTypeTableProperties
 import Solcore.Frontend.RuntimeFunctionHeader
 
 /-! Retain complete runtime header policy while extending caller type meanings.
