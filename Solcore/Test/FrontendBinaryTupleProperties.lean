@@ -224,9 +224,8 @@ theorem real_pair_checkpoint_keeps_left_value_and_resumes_the_last_step
   intro wrong
   cases wrong
 
-theorem unsupported_arities_do_not_invent_nesting_and_tuple_types_stay_outside
-    (s t : Syntax.SourceSpan) (elements : List Syntax.Expr) (wrongLength : elements.length ≠ 2)
-    (nonempty : elements ≠ [])
+theorem manual_singleton_tuples_and_old_named_type_tuple_gates_remain_rejections
+    (s t : Syntax.SourceSpan) (elements : List Syntax.Expr) (singleton : elements.length = 1)
     (types : TypeNameTable) (typeElements : List Syntax.TypeExpr) :
     resolveLocalExpression? table ⟨s, .tuple ⟨t, elements⟩⟩ = none ∧
     evaluateLocalExpressionWithCost? table [] ⟨s, .tuple ⟨t, elements⟩⟩ = none ∧
