@@ -492,8 +492,17 @@ shared body/entry code. Private pure overlap, literal insertion, old rejection
 boundaries and genuine saved branch-choice checkpoints remain explicit.
 Static rejection of an unselected child does not rule out raw selected success.
 
+Canonical Bool negation and Word complement now recurse through the same child
+(ADR-0258). Original operands and prefix order retain fixed exact unary Core,
+independent static/raw evidence, actual final stores and child cost plus two.
+Nine constructors preserve the fourteen proof signatures and shared body/entry
+code without adding operator-map or wrapper-law families. Old pure overlap,
+caller insertion, genuine unaryApply checkpoints and faults after child effects
+remain explicit. Only well-typed original rejection fixtures are promoted;
+Logical negation of a Word and old nonrecursive endpoint boundaries remain unchanged.
+
 Next extend recursive children to the remaining expression forms using these
-shared contracts. Expanded comparisons, lazy Bool operators, tuples, unary and
+shared contracts. Expanded comparisons, lazy Bool operators, tuples,
 expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
 transfer, and structural arguments alone do not validate stores.

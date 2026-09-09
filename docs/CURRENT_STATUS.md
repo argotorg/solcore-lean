@@ -634,7 +634,7 @@ bound, unfuelled evaluator or global source-call mechanism is introduced.
 
 A separate recursive expression profile now admits nested single-argument calls,
 computed callees and arbitrary grouping (ADR-0253). Each original callee and
-argument is checked recursively in the same scope; direct Word binary and
+argument is checked recursively in the same scope; direct unary, Word binary and
 conditional roots are extended below, while other roots retain the old pure interpretation.
 Independent syntax/type/Core evidence and raw/cost rules
 preserve the exact actual closure, captures and callee-to-argument-to-body store
@@ -642,7 +642,7 @@ order. Grouping adds no Core wrapper or transitions, even where pure/group
 derivations overlap. Fourteen shared kernels connect checking, typing, exact
 execution/cost and caller insertion, with unchanged old-success embeddings.
 
-The recursive caller fragment permits applications, direct binary combinations
+The recursive caller fragment permits applications, direct unary/binary combinations
 and conditionals of recursively admitted children, without source lambda construction.
 Its paired insertion paths use the same actual
 body path and one cost before every continuation; intermediate caller states
@@ -706,8 +706,8 @@ evidence, including raw lazy branches that skip unsupported syntax. Binary calle
 insertion preserves literal values, stores and one cost before every continuation.
 The former recursive addition rejection fixtures now assert independent exact
 success; the older nonrecursive endpoints retain their rejection. Expanded
-comparisons, lazy Bool operators, tuples and unary roots do not gain recursive
-children here; recursive conditional roots are recorded below. Actual wrong
+comparisons, lazy Bool operators and tuples do not gain recursive children here;
+recursive conditional and unary roots are recorded below. Actual wrong
 payloads can fault after a successful right child's effects; neither structural
 typing nor this extension supplies store safety.
 
@@ -730,6 +730,25 @@ reject them. Parsed and symbolic consumers retain unequal branch costs, actual
 guard/selected effects, returned callables, full faults and genuine ifBranches
 checkpoints. No unselected effect, source-only bound or arbitrary-store safety
 is inferred; other unextended expression roots remain separate.
+
+The two canonical unary roots now recurse through this child (ADR-0258).
+Logical negation requires Bool and complement requires Word, preserving the
+original operand, prefix span/order and exact Core boolNot/wordNot. These are
+the existing fixed interpretations, not general named-function/class resolution.
+Raw rules use the actual child payload and preserve its final store at child
+cost plus two. Child effects remain visible even if a wrong payload then faults;
+a child fault prevents unary application. Pure/raw overlap can still skip
+unsupported child syntax without making that whole expression statically valid.
+
+Nine constructors extend the existing static/raw/cost and caller-fragment
+relations; the fourteen proof signatures and shared body/entry code stay
+unchanged, with no new operator map or wrapper laws. Literal caller insertion
+retains the actual child path and one cost before every continuation. Original
+Word complement and Bool negation rejection fixtures become independent exact
+successes, while logical negation of a Word and old nonrecursive entry rejection
+remain intact. Parsed/source/entry consumers retain exact values and captures,
+operand effects, full fault tags and genuine unaryApply checkpoints. No stronger
+store safety, general overload mechanism or source-only cost bound is implied.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
