@@ -45,5 +45,23 @@ theorem RecursiveLocalComputationFragment.insertion_paths
           · exact CostStepComposition.binary (leftPaths _).1 (rightPaths _).1 applied
           · simp only [Core.Expr.weakenAt]
             exact CostStepComposition.binary (leftPaths _).2 (rightPaths _).2 applied
+  | ifE _ _ _ conditionIH thenIH elseIH =>
+      cases evaluation with
+      | ifTrue condition branch =>
+          obtain ⟨conditionCost, conditionPaths⟩ := conditionIH condition
+          obtain ⟨branchCost, branchPaths⟩ := thenIH branch
+          refine ⟨conditionCost + branchCost + 2, fun continuation => ?_⟩
+          constructor
+          · exact CostStepComposition.ifTrue (conditionPaths _).1 (branchPaths _).1
+          · simp only [Core.Expr.weakenAt]
+            exact CostStepComposition.ifTrue (conditionPaths _).2 (branchPaths _).2
+      | ifFalse condition branch =>
+          obtain ⟨conditionCost, conditionPaths⟩ := conditionIH condition
+          obtain ⟨branchCost, branchPaths⟩ := elseIH branch
+          refine ⟨conditionCost + branchCost + 2, fun continuation => ?_⟩
+          constructor
+          · exact CostStepComposition.ifFalse (conditionPaths _).1 (branchPaths _).1
+          · simp only [Core.Expr.weakenAt]
+            exact CostStepComposition.ifFalse (conditionPaths _).2 (branchPaths _).2
 
 end Solcore.Frontend

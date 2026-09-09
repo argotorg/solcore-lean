@@ -20,6 +20,9 @@ theorem RecursiveLocalComputationFragment.weakenAt {expr : Core.Expr}
   | binary _ _ leftIH rightIH =>
       simp only [Core.Expr.weakenAt]
       exact .binary leftIH rightIH
+  | ifE _ _ _ conditionIH thenIH elseIH =>
+      simp only [Core.Expr.weakenAt]
+      exact .ifE conditionIH thenIH elseIH
 
 theorem RecursiveLocalComputationElaborates.core_fragment
     {table : LocalNameTable} {context : Resolved.Context} {source : Syntax.Expr}
@@ -31,5 +34,6 @@ theorem RecursiveLocalComputationElaborates.core_fragment
   | group _ ih => exact ih
   | application _ _ calleeIH operandIH => exact .application calleeIH operandIH
   | binary _ _ _ leftIH rightIH => exact .binary leftIH rightIH
+  | conditional _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
 
 end Solcore.Frontend
