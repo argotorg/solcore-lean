@@ -95,6 +95,10 @@ private def body (types : TypeNameTable) (s : LocalTypeInputs) (source : Syntax.
         let b ← body types (s.bindFresh owner name.value a.type) ⟨span, rest⟩
         return ⟨.letE a.core b.core, b.type, by rw [atSource]; exact .inferred unused a.resolution a.lowered a.typing b.evidence⟩
       else throw (IO.userError "ancestor name reused")
+  | ⟨span, ⟨_, .expression source true⟩ :: rest⟩ =>
+      let a ← expression s source; let b ← body types s ⟨span, rest⟩
+      return ⟨.letE a.core (b.core.weakenAt 0), b.type,
+        by rw [atSource]; exact .discard a.resolution a.lowered a.typing b.evidence⟩
   | ⟨_, [⟨_, .ifThen guard yes (some no)⟩]⟩ =>
       let c ← expression s guard; let a ← body types s yes; let b ← body types s no
       if ct : c.type = .bool then
@@ -214,10 +218,27 @@ private theorem forgedNotLocal (body : Core.Expr) :
   intro localBody
   cases localBody with
   | letE value _ => cases value
+private theorem copyPaths (value : Core.Value) (store : Core.Store) (k : List Core.Frame) :
+    Core.Steps 4 ⟨.eval (.letE (.var 0) (.var 1)) [value], k, store⟩ ⟨.ret value, k, store⟩ :=
+  .cons .enterLet (.cons (.var rfl) (.cons .bindLet (.cons (.var rfl) .refl)))
+private def discardedCopy : IO Unit := do
+  let source ← parsed "function f(x:T) returns(T){x;return x;}"
+  let proof ← compile (table .word) source
+  check (decide (proof.compiled.core = .letE (.var 0) (.var 1) ∧ proof.compiled.returnType = .word ∧
+    proof.compiled.inputs.names = [("x", ⟨owner, 0⟩)])) "original discard copy provenance changed"
+  have _ := proof.evidence.localFragment
+  for store in [[], [w 91]] do
+    for fuel in List.range 7 do
+      have _ := copyPaths (w 9) store []
+      check (match runRuntimeFunction? (table .word) owner source [⟨.word, w 9, .word⟩] fuel store with
+        | some (.word, .done value final) => decide (4 ≤ fuel ∧ value = w 9 ∧ final = store)
+        | some (.word, .outOfFuel checkpoint) => decide (fuel < 4 ∧ Core.runStateful (4 - fuel) checkpoint = .done (w 9) store)
+        | _ => false) "original discarded copy is not strict cost four"
 end LocalFragmentEntries
 open LocalFragmentEntries
 
 def frontendParsedLocalFragmentEntryTests : IO Unit := do
+  discardedCopy
   verify ⟨.word, w 9, .word⟩ ⟨.word, w 2, .word⟩ rfl true
   verify ⟨.word, w 9, .word⟩ ⟨.word, w 2, .word⟩ rfl false
   for c in [false, true] do
@@ -238,7 +259,7 @@ def frontendParsedLocalFragmentEntryTests : IO Unit := do
     have _ : ¬ RuntimeFunctionCompiles (table type) owner source forged := fun impossible => forgedNotLocal _ impossible.localFragment
     check (decide (Core.infer? forged.inputs.context.values forged.core = some forged.returnType)) "same-typed forged record contrast became trivial"
   for text in ["function f(x:T,c:Bool) returns(T){if(c){return x;}else{return missing;}}",
-      "function f(x:T) returns(T){x;return x;}", "function f(x:T,x:T) returns(T){return x;}",
+      "function f(x:T,x:T) returns(T){return x;}",
       "function f(x:T) returns(Bool){return x;}", "function f<T>(x:T) returns(T){return x;}"] do
     check ((compileRuntimeFunction? (table .word) owner (← parsed text)).isNone) "whole guard or unchanged statement boundary disappeared"
   have _ : Core.HasType [.cell .word] (.loadCell (.var 0)) .word := .loadCell (.var rfl) .word

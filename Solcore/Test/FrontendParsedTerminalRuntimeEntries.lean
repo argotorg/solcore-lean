@@ -164,7 +164,63 @@ private def reject (content : String) (location : Syntax.Parser.FunctionLocation
         assertTrue (runRuntimeFunction? types owner source arguments fuel store).isNone
           "whole header/parameter/arm rejection depended on fuel or selected value"
 
+private def discardedPrefix : IO Unit := do
+  let some source ← parsed? "function invalid(c: Bool,t: Word,f: Word) returns (Word){t; if(c){return t;}else{return f;}}"
+    | throw (IO.userError "original discarded-prefix declaration did not parse")
+  let tail : Core.Expr := .ifE (.var 3) (.var 2) (.var 1)
+  let core : Core.Expr := .letE (.var 1) tail
+  let some compiled := compileRuntimeFunction? types owner source
+    | throw (IO.userError "valid strict expression prefix did not compile")
+  let names : LocalNameTable := [("f", ⟨owner, 2⟩), ("t", ⟨owner, 1⟩), ("c", ⟨owner, 0⟩)]
+  assertTrue (decide (compiled.core = core ∧ compiled.returnType = .word ∧
+    compiled.inputs.names = names ∧ compiled.inputs.context.values = [.word, .word, .bool] ∧
+    elaborateTerminalReturnTree? compiled.inputs.names compiled.inputs.context source.value.body = none ∧
+    terminalReturnTreeFuelBound source.value.body = 0 ∧ typedLetReturnTreeFuelBound source.value.body = 7))
+    "discard prefix changed parameter-only records or the old adapter boundary"
+  match source.value.body.value with
+  | [⟨statementSpan, .expression expression true⟩, conditional] =>
+      assertTrue (statementSpan.contains expression.span &&
+        decide (statementSpan.endByte ≤ conditional.span.startByte)) "discard source order or semicolon changed"
+  | _ => throw (IO.userError "original strict prefix AST changed")
+  for choice in [false, true] do
+    let arguments := [boolArg choice, wordArg 7, wordArg 9]
+    let environment := [.word (word 9), .word (word 7), .bool choice]
+    let value := Core.Value.word (word (if choice then 7 else 9))
+    let some prepared := prepareRuntimeFunction? types owner source arguments
+      | throw (IO.userError "original ordered arguments did not prepare")
+    assertTrue (decide (prepared.core = core ∧ prepared.returnType = .word ∧
+      prepared.inputs.names = names ∧ prepared.inputs.environment.values = environment ∧
+      prepared.inputs.bindings.length = 3)) "discard added a source binding or reordered actual arguments"
+    for store in stores do
+      have paths (k : List Core.Frame) : Core.Steps 7
+          ⟨.eval core environment, k, store⟩ ⟨.ret value, k, store⟩ := by
+        cases choice <;>
+          exact .cons .enterLet (.cons (.var rfl) (.cons .bindLet
+            (.cons .enterIf (.cons (.var rfl)
+              (.cons (by first | exact .chooseFalse | exact .chooseTrue) (.cons (.var rfl) .refl))))))
+      have _ := paths []
+      let run := fun fuel => runRuntimeFunction? types owner source arguments fuel store
+      for fuel in List.range 10 do
+        assertTrue (decide (run fuel = some (.word, Core.runStateful fuel (Core.State.initial core environment store)) ∧
+          run fuel = prepared.inputs.runTypedLetReturnTree? types owner fuel source.value.body store))
+          "strict prefix entry disagreed with the original Core/body runner"
+        assertTrue (match run fuel with
+          | some (.word, .done result finalStore) => decide (7 ≤ fuel ∧ result = value ∧ finalStore = store)
+          | some (.word, .outOfFuel checkpoint) => decide (fuel < 7 ∧ checkpoint.store = store)
+          | _ => false) "discard prefix did not retain its exact seven-step cost"
+      assertTrue (decide (run 2 = some (.word, .outOfFuel
+        ⟨.ret (.word (word 7)), [.letBody tail environment], store⟩) ∧
+        run 3 = some (.word, .outOfFuel ⟨.eval tail (.word (word 7) :: environment), [], store⟩)))
+        "discard's hidden Core value or original saved environment changed"
+      for spent in List.range 7 do
+        let some (.word, .outOfFuel checkpoint) := run spent
+          | throw (IO.userError "discard checkpoint disappeared")
+        for remaining in List.range (10 - spent) do
+          assertTrue (decide (run (spent + remaining) = some (.word, Core.runStateful remaining checkpoint)))
+            "discard checkpoint did not resume exactly"
+
 def frontendParsedTerminalRuntimeEntriesTests : IO Unit := do
+  discardedPrefix
   let bare ← compile "function bare(){return;}" .unit .unit [] 1
   checkCase bare [] .unit 1
   let units ← compile "function units(c: Bool){if(c){return;}else{return;}}"
@@ -207,7 +263,7 @@ def frontendParsedTerminalRuntimeEntriesTests : IO Unit := do
   for argument in [unit, wordArg 7, boolArg false, cellLeft, closureLeft] do
     rejectArguments nominal [boolArg true, argument]
   for body in ["{}", "{if(c){return t;}}", "{if(c){return t;}else{return f;}return t;}",
-      "{t; if(c){return t;}else{return f;}}", "{if(c){return t;return f;}else{return f;}}",
+      "{if(c){return t;return f;}else{return f;}}",
       "{if(t){return t;}else{return f;}}",
       "{if(c){return t;}else{return c;}}", "{if(c){return;}else{return f;}}"] do
     reject ("function invalid(c: Bool,t: Word,f: Word) returns (Word)" ++ body)
