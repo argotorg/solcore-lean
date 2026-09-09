@@ -97,6 +97,13 @@ cost proofs, consumer migrations, new consumers and publication separately.
 Keep proof files small with local simplification and narrowly justified support
 boundaries if needed, without adding semantic premises to make proofs easier.
 
+The checker proof uses one such boundary: ComputationReturnTreeCheckingProperties
+exports ComputationReturnTreeChecking.match_iff, the exact decomposition of
+checking an original terminal optional-default match. Its private helpers cover
+pattern checking, ordered rows, optional defaults and the first-body type anchor.
+The existing soundness/completeness kernel consumes that decomposition without
+changing its public signature or assuming static coverage separately.
+
 Move the existing parsed no-default wildcard rejection to an independent
 success using the same original source/header/owner/types/arguments. Retain
 literal-only no-default rejection. Cover leading and later wildcard, a typed
