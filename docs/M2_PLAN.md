@@ -401,6 +401,18 @@ layer definitions remain unchanged; their stronger arbitrary-store/local-fragmen
 claims are not reused. General source calls, closure creation and recursive-body
 integration remain separate work.
 
+Checked application Core now has exact caller insertion laws (ADR-0249), using
+the two original local child lowerings and leaving actual closure body/captures
+unchanged. Arbitrary retained-prefix slots preserve and reflect raw evaluation
+and typing; paired uniform paths and closed-path cost uniqueness retain the
+exact successful cost, value and final store. Runtime caller contexts need not
+equal source contexts, and inserted types need no inhabitants. Intermediate
+frames/checkpoints are not equated, pending continuations are not executed by
+the path theorem, and closure-producing children remain outside the premise.
+These proof-only leaf laws support future discard integration; the old pure
+fragment and all executable body/entry contracts remain unchanged. A mixed body
+still needs its own recursive closure argument and effect-aware semantics.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

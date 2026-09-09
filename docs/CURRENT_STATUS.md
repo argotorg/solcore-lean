@@ -563,6 +563,22 @@ store independence and source-only bounds are not imported from the old entry.
 Old endpoints and records remain unchanged. This is explicit entry execution,
 not global/source-function resolution, source closure creation or recursive calls.
 
+Exact application provenance now supports caller-slot insertion without extending
+the old local fragment (ADR-0249). Both original child lowerings supply the
+existing pure-child insertion laws, so the actual returned closure, captures,
+argument and effectful body are retained literally. Raw evaluation and exact
+typing are equivalent before and after insertion at any retained-prefix cutoff;
+arbitrary caller contexts, inserted values/types and data definitions need no
+source-ID agreement, runtime inhabitants or runtime-world assumptions.
+
+Paired paths choose one common cost before the outer continuation. A supplied
+closed path preserves and reflects its exact cost, result and final store.
+Caller frames and exhaustion checkpoints can differ, and a retained continuation
+endpoint is not necessarily final. This neither guarantees arbitrary-store
+success nor permits closure-producing children: such children can capture the
+added slot. No executable or old body/entry contract changes; recursive mixed
+bodies still need a separate structural insertion proof beyond this call leaf.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
