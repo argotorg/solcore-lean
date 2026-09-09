@@ -983,8 +983,9 @@ still adds two. Leading wildcard can therefore accept an arbitrary actual raw
 value; an earlier literal comparison on a non-Word still faults and retains
 prior effects. Original-source consumers retain captures, stores, selected
 effects and genuine checkpoints, separately consuming the opt-in runtime
-input/safety contracts. Non-Word static scrutinees, binding
-patterns and general exhaustiveness remain outside the selected interface.
+input/safety contracts. This initial interface restricted static scrutinees to
+Word; ADR-0271 below relaxes that restriction only for catch-all-only matches.
+Binding patterns and general exhaustiveness remain separate.
 
 Original defaults are now optional when an original wildcard covers the Word
 cases (ADR-0269). Their absence stays literal in syntax, selection, typing,
@@ -1018,6 +1019,27 @@ checker-decomposition pattern premises; the shared 12, recursive 14 and entry 4
 signatures and old strict literal meaning remain unchanged. Grouped binders,
 Boolean/constructor patterns, tuples (including hand-built singleton tuples),
 comptime/error leaves and overflowing literals are not admitted by grouping.
+
+Catch-all-only matches now accept any scrutinee type supported by the existing
+child profile, independently of the common branch result type (ADR-0271).
+This includes original default-only matches and bare/grouped wildcard cases
+with present or absent defaults. The checker retains the inferred scrutinee
+type and checks every original pattern/body before requiring Word or all-none
+case tags. Independent typing uses original wildcard classifications; exact
+elaboration uses original row tags, related by classification uniqueness.
+Empty/no-default matches still fail coverage. An unreachable numeric literal
+still rejects a non-Word scrutinee despite raw leading-wildcard success.
+
+The same Core fold, raw selection and exact-cost rules remain unchanged.
+An ignored scrutinee still executes once and occupies its actual hidden slot;
+zero comparisons cost both child executions plus two. Arbitrary types do not
+create runtime inhabitants or validate captured references and stores.
+Independent consumers cover arbitrary types/row counts/actual payloads,
+allocation and full resumption. Exact formerly rejected Bool sources now have
+positive evidence; nested Bool/function scrutinees preserve named/discarded
+slots, captured closures, writes and genuine saved-world extension. Only match
+constructors and checker decomposition generalize; shared12, recursive14,
+entry4, strict/grouped pattern laws and older runtime interfaces stay intact.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

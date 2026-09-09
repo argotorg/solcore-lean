@@ -627,8 +627,8 @@ contribute seven transitions each; wildcard contributes zero. Raw leading
 wildcard success is distinct from a preceding non-Word comparison fault.
 The formerly rejected parsed wildcard example is migrated with its original
 header, owner, types, arguments and source location; independent source costs
-and literal Core paths protect effects and genuine resumption. Statically Word
-scrutinees remain an explicit restriction; optional defaults extend this below.
+and literal Core paths protect effects and genuine resumption. This initial
+Word restriction is relaxed for catch-all-only matches in ADR-0271 below.
 
 Original optional defaults now preserve this same body/entry pipeline (ADR-0269).
 Static coverage requires a present original default or an original wildcard;
@@ -652,6 +652,23 @@ Arbitrary group depth changes neither comparisons nor source/Core costs.
 Parsed effectful and nested-scope consumers retain actual captures, stores and
 genuine checkpoints. Binding/Boolean/constructor, tuple and comptime patterns
 remain separate work; parentheses do not make an unsupported leaf acceptable.
+
+Type-general catch-all matching now extends the same engine (ADR-0271).
+Any existing child-profile type is accepted when every original case classifies
+as a wildcard, including grouped cases and a default-only empty case list.
+Scrutinee and common result types are independent. Compatibility and coverage
+are separate: empty/no-default still fails, and an unreachable literal still
+requires a Word scrutinee. All unselected bodies/defaults retain their checking
+obligations. Classification uniqueness transports independent original-arm
+typing to exact checked-row elaboration without assuming runtime success.
+
+Only hidden-slot Core typing generalizes; the original fold, raw/cost rules,
+captures and shared12/recursive14/entry4 contracts remain unchanged. Consumers
+exercise arbitrary types/counts/actual payloads, real parsed Bool effects and
+nested Bool/function hidden slots, every fuel outcome and genuine checkpoint
+resumption with explicit same-world evidence. The three old Bool wildcard-only
+rejections migrate with exact original source contexts. Nominal construction,
+broader numeric patterns and global/constructor resolution are not implied.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution

@@ -279,6 +279,10 @@ import Solcore.Test.FrontendGroupedMatchBoundaryProperties
 import Solcore.Test.FrontendGroupedMatchCountProperties
 import Solcore.Test.FrontendParsedGroupedMatchEffects
 import Solcore.Test.FrontendParsedGroupedMatchScopes
+import Solcore.Test.FrontendTypeGeneralMatchBoundaryProperties
+import Solcore.Test.FrontendTypeGeneralMatchCountProperties
+import Solcore.Test.FrontendParsedTypeGeneralMatchEffects
+import Solcore.Test.FrontendParsedTypeGeneralMatchScopes
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5935,6 +5939,8 @@ def run : IO Unit := do
   frontendParsedOptionalMatchScopeTests
   frontendParsedGroupedMatchEffectTests
   frontendParsedGroupedMatchScopeTests
+  frontendParsedTypeGeneralMatchEffectTests
+  frontendParsedTypeGeneralMatchScopeTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
