@@ -4,7 +4,8 @@ import Solcore.Frontend.LocalExpressionEvaluationProperties
 import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
 
 /-! Existing execution contracts retain original-source evidence.
-Forward success uses the exact cost path; reverse success is independent induction. -/
+Forward success uses the exact cost path; reverse success is independent induction.
+Tuple inversion preserves arbitrary actual components and the intermediate store. -/
 
 set_option autoImplicit false
 
@@ -62,6 +63,12 @@ theorem RecursiveLocalComputationElaborates.evaluates_iff
         cases evaluation with
         | apply functionEvaluation argumentEvaluation bodyEvaluation =>
             exact .application (functionIH functionEvaluation) (argumentIH argumentEvaluation) bodyEvaluation
+    | pair _ _ leftIH rightIH =>
+        cases evaluation with
+        | pair left right => exact .pair (leftIH left) (rightIH right)
+    | many _ _ headIH tailIH =>
+        cases evaluation with
+        | pair head tail => exact .many (headIH head) (tailIH tail)
     | binary operator _ _ leftIH rightIH =>
         cases evaluation with
         | binary leftChild rightChild applied => exact .binary operator (leftIH leftChild) (rightIH rightChild) applied

@@ -7,7 +7,8 @@ import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
 import Solcore.Frontend.WordLessCostStepComposition
 
 /-! Private original-root cost inversions reconcile overlapping pure derivations.
-The existing continuation law preserves actual selected values, stores and costs. -/
+The existing continuation law preserves actual selected values, stores and costs.
+Tuple pairs retain both actual components and the original head-to-tail store order. -/
 
 set_option autoImplicit false
 
@@ -24,6 +25,12 @@ private theorem reflects_pure_cost {table : LocalNameTable} {environment : Resol
       cases resolution with
       | group child => exact .group (ih child)
   | application _ _ _ _ _ => cases resolution
+  | pair _ _ leftIH rightIH =>
+      cases resolution with
+      | pair left right => exact .pair (leftIH left) (rightIH right)
+  | many _ _ headIH tailIH =>
+      cases resolution with
+      | many head tail => exact .many (headIH head) (tailIH tail)
   | @binary initialStore middleStore finalStore span operatorSpan left right sourceOp op
       leftValue rightValue result leftCost rightCost operator _ _ applied leftIH rightIH =>
       cases operator <;> cases resolution
@@ -81,6 +88,23 @@ private theorem reflects_pure_cost {table : LocalNameTable} {environment : Resol
       cases resolution with
       | greaterEqual left right => exact .greaterEqual (leftIH left) (rightIH right)
 
+private theorem pair_path {environment : Core.Environment}
+    {initialStore middleStore finalStore : Core.Store} {left right : Core.Expr}
+    {leftValue rightValue : Core.Value} {leftCost rightCost : Nat}
+    {continuation : List Core.Frame}
+    (leftPath : Core.Steps leftCost
+      ⟨.eval left environment, .pairRight right environment :: continuation, initialStore⟩
+      ⟨.ret leftValue, .pairRight right environment :: continuation, middleStore⟩)
+    (rightPath : Core.Steps rightCost
+      ⟨.eval right environment, .pairApply leftValue :: continuation, middleStore⟩
+      ⟨.ret rightValue, .pairApply leftValue :: continuation, finalStore⟩) :
+    Core.Steps (leftCost + rightCost + 3)
+      ⟨.eval (.pair left right) environment, continuation, initialStore⟩
+      ⟨.ret (.pair leftValue rightValue), continuation, finalStore⟩ := by
+  have path := Core.Steps.cons .enterPair
+    (leftPath.trans (.cons .enterPairRight (rightPath.trans (.cons .applyPair .refl))))
+  simpa only [Nat.add_assoc] using path
+
 private theorem ordered_path {environment : Core.Environment}
     {initialStore middleStore finalStore : Core.Store} {left right : Core.Expr}
     {leftWord rightWord : Core.Word} {leftCost rightCost : Nat}
@@ -123,6 +147,18 @@ theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
       | pure child => cases child
       | application functionEvaluation argumentEvaluation bodyPath =>
           exact CostStepComposition.apply (functionIH functionEvaluation _) (argumentIH argumentEvaluation _) bodyPath
+  | pair _ _ leftIH rightIH =>
+      cases evaluation with
+      | pure child =>
+          cases child with
+          | pair left right => exact pair_path (leftIH (.pure left) _) (rightIH (.pure right) _)
+      | pair left right => exact pair_path (leftIH left _) (rightIH right _)
+  | many _ _ headIH tailIH =>
+      cases evaluation with
+      | pure child =>
+          cases child with
+          | many head tail => exact pair_path (headIH (.pure head) _) (tailIH (.pure tail) _)
+      | many head tail => exact pair_path (headIH head _) (tailIH tail _)
   | binary operator _ _ leftIH rightIH =>
       cases evaluation with
       | pure child =>
