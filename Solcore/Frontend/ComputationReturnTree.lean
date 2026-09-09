@@ -53,15 +53,17 @@ def elaborateComputationReturnTree?
       if scrutineeType = .word then do
         let (defaultCore, returnType) ← elaborateComputationReturnTree? checkChild types owner inputs defaultBody
         let entries ← cases.attach.mapM fun arm => do
-          match arm.val.value.pattern.value with
-          | .literal literal =>
-              let word ← interpretWordLiteral? literal
-              let (branchCore, branchType) ← elaborateComputationReturnTree? checkChild types owner inputs arm.val.value.body
-              if branchType = returnType then return (arm.val, word, branchCore)
-              else none
-          | _ => none
+          let tag ← match arm.val.value.pattern.value with
+            | .literal literal => (interpretWordLiteral? literal).map some
+            | .wildcard _ => some none
+            | _ => none
+          let (branchCore, branchType) ← elaborateComputationReturnTree? checkChild types owner inputs arm.val.value.body
+          if branchType = returnType then return (arm.val, tag, branchCore)
+          else none
         return (.letE scrutineeCore (entries.foldr
-          (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1)) (entry.2.2.weakenAt 0) tail)
+          (fun entry tail => match entry.2.1 with
+            | none => entry.2.2.weakenAt 0
+            | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
           (defaultCore.weakenAt 0)), returnType)
       else none
   | _ => none
@@ -128,7 +130,9 @@ inductive ComputationReturnTreeHasType
   | wordMatch {inputs : LocalTypeInputs} {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
       {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody : Syntax.Block} {type : Core.Ty}
       (scrutineeTyping : ChildHasType inputs.names inputs.context scrutinee .word)
-      (patterns : ∀ arm ∈ cases, ∃ word, WordMatchPatternDenotes arm.value.pattern word)
+      (patterns : ∀ arm ∈ cases, ∃ tag : Option Core.Word, match tag with
+        | none => ∃ marker, arm.value.pattern.value = .wildcard marker
+        | some word => WordMatchPatternDenotes arm.value.pattern word)
       (branches : ∀ arm ∈ cases, ComputationReturnTreeHasType ChildHasType types owner inputs arm.value.body type)
       (defaultTyping : ComputationReturnTreeHasType ChildHasType types owner inputs defaultBody type) :
       ComputationReturnTreeHasType ChildHasType types owner inputs
@@ -192,17 +196,21 @@ inductive ComputationReturnTreeElaborates
   | wordMatch {inputs : LocalTypeInputs} {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
       {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody : Syntax.Block}
       {scrutineeCore defaultCore : Core.Expr} {type : Core.Ty}
-      {entries : List (Syntax.MatchCase × (Core.Word × Core.Expr))}
+      {entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))}
       (scrutineeElaboration : ChildElab inputs.names inputs.context scrutinee scrutineeCore .word)
       (ordered : entries.map Prod.fst = cases)
-      (patterns : ∀ entry ∈ entries, WordMatchPatternDenotes entry.1.value.pattern entry.2.1)
+      (patterns : ∀ entry ∈ entries, match entry.2.1 with
+        | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
+        | some word => WordMatchPatternDenotes entry.1.value.pattern word)
       (branches : ∀ entry ∈ entries,
         ComputationReturnTreeElaborates ChildElab types owner inputs entry.1.value.body entry.2.2 type)
       (defaultElaboration : ComputationReturnTreeElaborates ChildElab types owner inputs defaultBody defaultCore type) :
       ComputationReturnTreeElaborates ChildElab types owner inputs
         ⟨blockSpan, [⟨matchSpan, .matchWith ⟨scrutineeSpan, ⟨scrutinee, []⟩⟩ ⟨armsSpan, ⟨cases, some defaultBody⟩⟩⟩]⟩
         (.letE scrutineeCore (entries.foldr
-          (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1)) (entry.2.2.weakenAt 0) tail)
+          (fun entry tail => match entry.2.1 with
+            | none => entry.2.2.weakenAt 0
+            | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
           (defaultCore.weakenAt 0))) type
 
 end Solcore.Frontend
