@@ -211,10 +211,10 @@ type-only and runtime parameter inputs, singleton and terminal-conditional retur
 and restricted explicit
 function entries with value-free compilation. A separate opt-in structural type
 adapter interprets named leaves and zero/one/two-element tuple types with independent
-meaning and table-extension proofs. Single return and parameter annotations use it
-at the existing entry; each parameter retains exactly one original argument and
-position. Let annotations remain named-only, and empty/multiple return clauses
-remain outside the entry profile.
+meaning and table-extension proofs. Single return, parameter and recursive let
+annotations use it at the existing entry; each parameter retains exactly one
+original argument and position. Older prefix let annotations remain named-only,
+and empty/multiple return clauses remain outside the entry profile.
 Independent source rules
 connect to checked Core execution. A direct original-expression evaluator
 accepts empty canonical tuples as Unit and two-element tuples as ordered binary products, using

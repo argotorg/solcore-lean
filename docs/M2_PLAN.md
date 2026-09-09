@@ -175,8 +175,8 @@ Independent source/parsed consumers cover ordering, aliases, hidden duplicates,
 nominal types, invalid ranges, strict missing leaves and unsupported forms.
 One-way extension may turn rejection into success, so no full-result invariant is claimed
 for it. The prerequisite initially leaves parameter/header/let gates named-only;
-the return/header integration follows separately in ADR-0233 and parameters in
-ADR-0234 below. Correct-arity parsed tests preserve the remaining let boundary. Larger tuples,
+the return/header integration follows separately in ADR-0233, parameters in
+ADR-0234 and recursive lets in ADR-0235 below. Older prefix lets stay named-only. Larger tuples,
 other type forms, expressions, Core/resolved semantics, diagnostics and frozen
 wire formats do not change.
 
@@ -191,7 +191,7 @@ Independent source/parsed entries cover exact ordered/nested Core, strict named
 lets, conditional costs, nominal static types, opaque values, original parameter
 records and all fuel/checkpoint boundaries. Legacy return negatives become
 independent positives, with 110 affected source-test theorem headers unchanged.
-Parameters are integrated separately in ADR-0234; let annotations remain named-only. Whole-body, type/arity, modifier,
+Parameters are integrated separately in ADR-0234 and recursive lets in ADR-0235. Whole-body, type/arity, modifier,
 unsupported-type and empty/multiple-clause gates remain. No new entry API,
 runtime transition, expression, Core/resolved, diagnostic or frozen wire change
 is introduced.
@@ -206,8 +206,22 @@ retain arbitrary nominal static types, sparse mixed-owner allocation, original
 positions, exact Core, costs, stores and checkpoints. Four parsed negatives migrate
 to independent positives; one obsolete source rejection is explicitly renamed,
 while 152 other affected source-test contracts remain unchanged. The old named-only
-API, typed let annotations, same-name rejection and other syntax/runtime boundaries
-are preserved. Structural typed-let integration remains a separate next slice.
+API, same-name rejection and other syntax/runtime boundaries are preserved.
+Structural recursive let integration follows separately in ADR-0235.
+
+Recursive typed let annotations now use the shared structural interpretation
+(ADR-0235), with two independent binding premises and one decomposition conclusion
+explicitly widened. Fifteen other affected generic statements remain unchanged;
+old prefix successes still embed without claiming full optional equality. Mandatory
+initializers stay strict in their old scope, fresh bindings extend only their tails,
+and complete conditional-arm checking and owner allocation remain intact.
+Independent arbitrary-depth source proofs and complete parsed entries retain
+exact Core, original parameter records, nominal/opaque boundaries, strict unused
+initializer costs, stores and actual resumptions. Three parsed declarations across
+eight actual vectors become positives; 106 legacy source statements stay unchanged,
+with one obsolete rejection explicitly moved to the old named-only/prefix boundary.
+Raw evaluation, source bounds, Core transitions and all unrelated syntax, diagnostic
+and wire policies do not change.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

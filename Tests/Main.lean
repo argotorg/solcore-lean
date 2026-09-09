@@ -163,6 +163,8 @@ import Solcore.Test.FrontendParsedStructuralReturns
 import Solcore.Test.FrontendStructuralParameterProperties
 import Solcore.Test.FrontendParsedStructuralParameters
 import Solcore.Test.FrontendParsedStructuralParameterEntries
+import Solcore.Test.FrontendStructuralLetProperties
+import Solcore.Test.FrontendParsedStructuralLetEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5747,6 +5749,7 @@ def run : IO Unit := do
   frontendParsedStructuralReturnTests
   frontendParsedStructuralParameterTests
   frontendParsedStructuralParameterEntryTests
+  frontendParsedStructuralLetEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

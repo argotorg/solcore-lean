@@ -230,9 +230,9 @@ cover explicit nesting/order, hidden duplicates, missing written leaves,
 arbitrary raw ranges and unchanged unsupported forms. One-way extension may
 enable a formerly missing leaf. This prerequisite initially left all
 parameter/header/let annotation gates named-only; the shared single-return gate
-is connected separately in ADR-0233 below, followed by parameters in ADR-0234.
-Original parsed annotations and correct-arity actuals distinguish these integrations
-from the still-named-only let boundary.
+is connected separately in ADR-0233 below, followed by parameters in ADR-0234
+and recursive lets in ADR-0235. Original parsed annotations and correct-arity
+actuals distinguish these integrations from the older named-only prefix adapter.
 Larger tuple lists, other type constructors, expressions,
 Core/resolved semantics, diagnostics and frozen wire formats are unchanged.
 
@@ -252,7 +252,7 @@ lets, conditional branches and opaque values keep their existing exact costs,
 own stores and actual checkpoint/resumption paths. Static nominal results need
 no inhabitants; type agreement never substitutes for exact Core provenance.
 Old structural-return negatives migrate to independent positives. Parameter
-integration follows in ADR-0234; let annotations stay named-only. Argument, modifier, whole-body, unknown-leaf,
+integration follows in ADR-0234 and recursive lets in ADR-0235. Argument, modifier, whole-body, unknown-leaf,
 empty/multiple-clause and unsupported-type gates remain in force. There is no
 new runtime transition, expression, parser, Core/resolved, diagnostic or wire policy.
 
@@ -271,10 +271,31 @@ actual environments, table extension and both source-position APIs. Whole entrie
 keep separately specified Core, values, costs, own stores and real resumptions;
 same-typed wrong Core cannot substitute for provenance. Four old parsed rejections
 become independent positives. One obsolete source rejection is explicitly renamed
-and narrowed to the unchanged named-only/let boundary; the other 152 affected
-source-test statements remain exact. Typed let annotations and same-name rejection,
+and narrowed to the then-unchanged named-only/let boundary; the other 152 affected
+source-test statements remain exact. Recursive lets follow in ADR-0235. Same-name rejection,
 larger tuples, unknown leaves, count/type checks, whole-body/header gates and all
 runtime, parser, diagnostic and wire policies remain unchanged.
+
+Recursive typed let bodies now interpret structural annotations at the existing
+entry boundary (ADR-0235). Two binding-rule premises and one annotation-decomposition
+conclusion intentionally widen; the other 15 affected generic proof statements
+stay unchanged. Old named-only prefix successes still embed, but new structural
+tree successes do not imply optional equality with that older adapter. Initializers
+remain mandatory, strict and checked in the old scope; only the fresh tail sees
+the new binding. Whole conditional arms, unused-name checks and owner-relative
+allocation retain their existing contracts.
+
+Independent source proofs cover arbitrary type/let depth, exact Core and fresh
+positions, nominal static types, opaque actual values, extension and relabeling.
+An unused product initializer still costs eight transitions. Complete parsed
+entries check original annotations, parameter-only records, explicitly specified
+Core/value/cost, both stores and every bounded fuel/checkpoint/resumption path.
+Three old parsed declarations (eight actual-argument vectors) become positives;
+106 affected legacy source statements remain unchanged and one obsolete rejection
+is explicitly renamed to retain the old named-only/prefix boundary. Product-on-Unit
+mismatches, unknown leaves, self/forward/sibling references, shadowing and invalid
+unselected arms remain rejected by the whole checker. Raw evaluation, fuel bounds,
+Core transitions, parser, diagnostics and wire formats are unchanged.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
