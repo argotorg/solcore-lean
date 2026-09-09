@@ -1,5 +1,6 @@
 import Solcore.Frontend.StructuralType
 import Solcore.Frontend.LocalTypeInputs
+import Solcore.Frontend.WordMatch
 
 /-! Shared mixed bodies parameterize only their child expression operations.
 Checker, typing and exact elaboration remain independent interfaces. -/
@@ -47,8 +48,33 @@ def elaborateComputationReturnTree?
         if thenType = elseType then return (.ifE conditionCore thenCore elseCore, thenType)
         else none
       else none
+  | ⟨_, [⟨_, .matchWith ⟨_, ⟨scrutinee, []⟩⟩ ⟨_, ⟨cases, some defaultBody⟩⟩⟩]⟩ => do
+      let (scrutineeCore, scrutineeType) ← checkChild inputs.names inputs.context scrutinee
+      if scrutineeType = .word then do
+        let (defaultCore, returnType) ← elaborateComputationReturnTree? checkChild types owner inputs defaultBody
+        let entries ← cases.attach.mapM fun arm => do
+          match arm.val.value.pattern.value with
+          | .literal literal =>
+              let word ← interpretWordLiteral? literal
+              let (branchCore, branchType) ← elaborateComputationReturnTree? checkChild types owner inputs arm.val.value.body
+              if branchType = returnType then return (arm.val, word, branchCore)
+              else none
+          | _ => none
+        return (.letE scrutineeCore (entries.foldr
+          (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1)) (entry.2.2.weakenAt 0) tail)
+          (defaultCore.weakenAt 0)), returnType)
+      else none
   | _ => none
 termination_by sizeOf body
+decreasing_by
+  all_goals simp_wf
+  all_goals try omega
+  have member := List.sizeOf_lt_of_mem arm.property
+  have child : sizeOf arm.val.value.body < sizeOf arm.val := by
+    rcases arm.val with ⟨span, ⟨pattern, body⟩⟩
+    simp
+    omega
+  omega
 
 inductive ComputationReturnTreeHasType
     (ChildHasType : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Ty → Prop)
@@ -99,6 +125,14 @@ inductive ComputationReturnTreeHasType
       (elseTyping : ComputationReturnTreeHasType ChildHasType types owner inputs elseBody type) :
       ComputationReturnTreeHasType ChildHasType types owner inputs
         ⟨blockSpan, [⟨ifSpan, .ifThen condition thenBody (some elseBody)⟩]⟩ type
+  | wordMatch {inputs : LocalTypeInputs} {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
+      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody : Syntax.Block} {type : Core.Ty}
+      (scrutineeTyping : ChildHasType inputs.names inputs.context scrutinee .word)
+      (patterns : ∀ arm ∈ cases, ∃ word, WordMatchPatternDenotes arm.value.pattern word)
+      (branches : ∀ arm ∈ cases, ComputationReturnTreeHasType ChildHasType types owner inputs arm.value.body type)
+      (defaultTyping : ComputationReturnTreeHasType ChildHasType types owner inputs defaultBody type) :
+      ComputationReturnTreeHasType ChildHasType types owner inputs
+        ⟨blockSpan, [⟨matchSpan, .matchWith ⟨scrutineeSpan, ⟨scrutinee, []⟩⟩ ⟨armsSpan, ⟨cases, some defaultBody⟩⟩⟩]⟩ type
 
 inductive ComputationReturnTreeElaborates
     (ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop)
@@ -155,5 +189,20 @@ inductive ComputationReturnTreeElaborates
       ComputationReturnTreeElaborates ChildElab types owner inputs
         ⟨blockSpan, [⟨ifSpan, .ifThen condition thenBody (some elseBody)⟩]⟩
         (.ifE conditionCore thenCore elseCore) type
+  | wordMatch {inputs : LocalTypeInputs} {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
+      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody : Syntax.Block}
+      {scrutineeCore defaultCore : Core.Expr} {type : Core.Ty}
+      {entries : List (Syntax.MatchCase × (Core.Word × Core.Expr))}
+      (scrutineeElaboration : ChildElab inputs.names inputs.context scrutinee scrutineeCore .word)
+      (ordered : entries.map Prod.fst = cases)
+      (patterns : ∀ entry ∈ entries, WordMatchPatternDenotes entry.1.value.pattern entry.2.1)
+      (branches : ∀ entry ∈ entries,
+        ComputationReturnTreeElaborates ChildElab types owner inputs entry.1.value.body entry.2.2 type)
+      (defaultElaboration : ComputationReturnTreeElaborates ChildElab types owner inputs defaultBody defaultCore type) :
+      ComputationReturnTreeElaborates ChildElab types owner inputs
+        ⟨blockSpan, [⟨matchSpan, .matchWith ⟨scrutineeSpan, ⟨scrutinee, []⟩⟩ ⟨armsSpan, ⟨cases, some defaultBody⟩⟩⟩]⟩
+        (.letE scrutineeCore (entries.foldr
+          (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1)) (entry.2.2.weakenAt 0) tail)
+          (defaultCore.weakenAt 0))) type
 
 end Solcore.Frontend

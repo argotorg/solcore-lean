@@ -1,9 +1,10 @@
 import Solcore.Frontend.LocalReference
+import Solcore.Frontend.WordMatch
 import Solcore.Resolved.Eval
 import Solcore.Resolved.FreshIdentity
 
 /-! Shared raw body rules depend only on the supplied raw child relation;
-cost rules depend only on the supplied cost relation. Neither checks syntax. -/
+cost rules depend only on the supplied cost relation. Neither invokes a checker. -/
 
 set_option autoImplicit false
 
@@ -75,9 +76,22 @@ inductive ComputationReturnTreeEvaluates
       ComputationReturnTreeEvaluates ChildEval owner table environment initialStore
         ⟨blockSpan, [⟨ifSpan, .ifThen condition thenBody (some elseBody)⟩]⟩ value finalStore
 
+  | wordMatch {table : LocalNameTable} {environment : Resolved.Environment}
+      {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
+      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody selected : Syntax.Block}
+      {initialStore middleStore finalStore : Core.Store} {scrutineeValue value : Core.Value} {tests : Nat}
+      (scrutineeEvaluation : ChildEval table environment initialStore scrutinee scrutineeValue middleStore)
+      (choice : WordMatchChooses scrutineeValue cases defaultBody selected tests)
+      (branchEvaluation : ComputationReturnTreeEvaluates ChildEval owner table environment
+        middleStore selected value finalStore) :
+      ComputationReturnTreeEvaluates ChildEval owner table environment initialStore
+        ⟨blockSpan, [⟨matchSpan, .matchWith ⟨scrutineeSpan, ⟨scrutinee, []⟩⟩
+          ⟨armsSpan, ⟨cases, some defaultBody⟩⟩⟩]⟩ value finalStore
+
 /-- Selected lets, discards and conditionals each add two existing Core transitions.
 An unused initializer or discarded expression still contributes its complete cost.
 Bare return costs one; expression return and terminal blocks keep child costs.
+Word matches add two for the hidden let and seven per visited comparison.
 These paths do not impose store independence on an actual called body. -/
 inductive ComputationReturnTreeEvaluatesWithCost
     (ChildCost : LocalNameTable → Resolved.Environment → Core.Store → Syntax.Expr → Core.Value → Core.Store → Nat → Prop)
@@ -161,5 +175,20 @@ inductive ComputationReturnTreeEvaluatesWithCost
       ComputationReturnTreeEvaluatesWithCost ChildCost owner table environment initialStore
         ⟨blockSpan, [⟨ifSpan, .ifThen condition thenBody (some elseBody)⟩]⟩
         value finalStore (conditionCost + branchCost + 2)
+
+  | wordMatch {table : LocalNameTable} {environment : Resolved.Environment}
+      {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
+      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody selected : Syntax.Block}
+      {initialStore middleStore finalStore : Core.Store} {scrutineeValue value : Core.Value}
+      {scrutineeCost branchCost tests : Nat}
+      (scrutineeEvaluation : ChildCost table environment
+        initialStore scrutinee scrutineeValue middleStore scrutineeCost)
+      (choice : WordMatchChooses scrutineeValue cases defaultBody selected tests)
+      (branchEvaluation : ComputationReturnTreeEvaluatesWithCost ChildCost owner table environment
+        middleStore selected value finalStore branchCost) :
+      ComputationReturnTreeEvaluatesWithCost ChildCost owner table environment initialStore
+        ⟨blockSpan, [⟨matchSpan, .matchWith ⟨scrutineeSpan, ⟨scrutinee, []⟩⟩
+          ⟨armsSpan, ⟨cases, some defaultBody⟩⟩⟩]⟩
+        value finalStore (scrutineeCost + branchCost + 2 + 7 * tests)
 
 end Solcore.Frontend
