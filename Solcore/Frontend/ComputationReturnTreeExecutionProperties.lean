@@ -2,6 +2,7 @@ import Solcore.Frontend.ComputationReturnTreeEvaluation
 import Solcore.Frontend.ComputationReturnTreeFragmentProperties
 import Solcore.Frontend.ComputationBodyFragmentInsertionProperties
 import Solcore.Frontend.LocalTypeInputsProperties
+import Solcore.Frontend.WordMatchProperties
 
 /-! Whole-body Core correspondence uses separate child execution and insertion
 laws at every original scope. Actual values and intermediate stores are retained. -/
@@ -9,6 +10,76 @@ laws at every original scope. Actual values and intermediate stores are retained
 set_option autoImplicit false
 
 namespace Solcore.Frontend
+
+private theorem word_test_iff {environment : Core.Environment} {actual : Core.Value}
+    {literal : Core.Word} {initialStore finalStore : Core.Store} {decision : Bool} :
+    Core.Evaluates (actual :: environment) initialStore
+      (.binary .wordEq (.var 0) (.word literal)) (.bool decision) finalStore ↔
+      ∃ word, actual = .word word ∧ (word == literal) = decision ∧ finalStore = initialStore := by
+  constructor
+  · intro evaluation
+    cases evaluation with
+    | binary left right applied =>
+        cases left with
+        | var found =>
+            simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+            subst found
+            cases right
+            cases actual <;> simp_all [Core.BinaryOp.apply]
+  · rintro ⟨word, rfl, rfl, rfl⟩
+    exact .binary (.var rfl) .word rfl
+
+private theorem fold_evaluates_iff
+    (entries : List (Syntax.MatchCase × (Core.Word × Core.Expr)))
+    {environment : Core.Environment} {actual value : Core.Value}
+    {initialStore finalStore : Core.Store} {defaultBody : Syntax.Block} {defaultCore : Core.Expr}
+    {E : Syntax.Block → Prop}
+    (patterns : ∀ entry ∈ entries, WordMatchPatternDenotes entry.1.value.pattern entry.2.1)
+    (branches : ∀ entry ∈ entries, Core.Evaluates (actual :: environment) initialStore
+      (entry.2.2.weakenAt 0) value finalStore ↔ E entry.1.value.body)
+    (fallback : Core.Evaluates (actual :: environment) initialStore
+      (defaultCore.weakenAt 0) value finalStore ↔ E defaultBody) :
+    Core.Evaluates (actual :: environment) initialStore
+      (entries.foldr (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1))
+        (entry.2.2.weakenAt 0) tail) (defaultCore.weakenAt 0)) value finalStore ↔
+      ∃ selected tests, WordMatchChooses actual (entries.map Prod.fst) defaultBody selected tests ∧ E selected := by
+  revert patterns branches
+  induction entries with
+  | nil =>
+      intro _ _
+      constructor
+      · intro evaluation; exact ⟨_, 0, .fallback, fallback.mp evaluation⟩
+      · rintro ⟨_, _, choice, branch⟩; cases choice; exact fallback.mpr branch
+  | cons entry rest ih =>
+      intro patterns branches
+      have tail := ih (fun item member => patterns item (List.mem_cons_of_mem entry member))
+        (fun item member => branches item (List.mem_cons_of_mem entry member))
+      have meaning := patterns entry (List.mem_cons_self)
+      have branch := branches entry (List.mem_cons_self)
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | ifTrue guard evaluated =>
+            obtain ⟨word, rfl, equal, rfl⟩ := word_test_iff.mp guard
+            have same : word = entry.2.1 := by simpa using equal
+            subst word
+            exact ⟨_, 1, .hit meaning, branch.mp evaluated⟩
+        | ifFalse guard evaluated =>
+            obtain ⟨word, rfl, different, rfl⟩ := word_test_iff.mp guard
+            have unequal : word ≠ entry.2.1 := by simpa using different
+            obtain ⟨selected, tests, choice, selectedBranch⟩ := tail.mp evaluated
+            exact ⟨selected, tests + 1, .miss meaning unequal choice, selectedBranch⟩
+      · rintro ⟨selected, tests, choice, evaluated⟩
+        cases choice with
+        | hit actualMeaning =>
+            have same := actualMeaning.value_unique meaning
+            subst same
+            exact .ifTrue (word_test_iff.mpr ⟨_, rfl, by simp, rfl⟩) (branch.mpr evaluated)
+        | miss otherMeaning different choice =>
+            have same := otherMeaning.value_unique meaning
+            subst same
+            exact .ifFalse (word_test_iff.mpr ⟨_, rfl, by simpa using different, rfl⟩)
+              (tail.mpr ⟨_, _, choice, evaluated⟩)
 
 theorem ComputationReturnTreeElaborates.evaluates_iff
     {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}
@@ -117,5 +188,27 @@ theorem ComputationReturnTreeElaborates.evaluates_iff
             exact .ifTrue ((childExecution guard sameIds).mpr condition) ((thenIH sameIds).mpr branch)
         | ifFalse condition branch =>
             exact .ifFalse ((childExecution guard sameIds).mpr condition) ((elseIH sameIds).mpr branch)
+  | @wordMatch inputs _ _ _ _ _ _ _ _ _ _ _ scrutinee ordered patterns branches fallback branchIH fallbackIH =>
+      subst ordered
+      have folded {actual : Core.Value} {store : Core.Store} := fold_evaluates_iff _
+        (actual := actual) (initialStore := store) (finalStore := finalStore) (value := value)
+        (E := fun selected => ComputationReturnTreeEvaluates ChildEval owner inputs.names
+          environment store selected value finalStore) patterns
+        (fun entry member => (ComputationBodyFragment.evaluates_insert_iff (F := F) childInserts
+          (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening
+            (branches entry member)) [] environment.values actual).trans ((branchIH entry member sameIds).symm))
+        ((ComputationBodyFragment.evaluates_insert_iff (F := F) childInserts
+          (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening fallback)
+          [] environment.values actual).trans (fallbackIH sameIds).symm)
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | wordMatch head choice tail =>
+            exact .letE ((childExecution scrutinee sameIds).mp head) (folded.mpr ⟨_, _, choice, tail⟩)
+      · intro evaluation
+        cases evaluation with
+        | letE head tail =>
+            obtain ⟨selected, tests, choice, branch⟩ := folded.mp tail
+            exact .wordMatch ((childExecution scrutinee sameIds).mpr head) choice branch
 
 end Solcore.Frontend
