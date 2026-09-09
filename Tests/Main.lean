@@ -234,6 +234,10 @@ import Solcore.Test.FrontendParsedRecursiveConditionalFunctionEntries
 import Solcore.Test.FrontendRecursiveUnaryComputationProperties
 import Solcore.Test.FrontendParsedRecursiveUnaryComputations
 import Solcore.Test.FrontendParsedRecursiveUnaryFunctionEntries
+import Solcore.Test.FrontendParsedRecursiveLazyMigrations
+import Solcore.Test.FrontendRecursiveLazyComputationProperties
+import Solcore.Test.FrontendParsedRecursiveLazyComputations
+import Solcore.Test.FrontendParsedRecursiveLazyFunctionEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5865,6 +5869,9 @@ def run : IO Unit := do
   frontendParsedRecursiveConditionalFunctionEntryTests
   frontendParsedRecursiveUnaryComputationTests
   frontendParsedRecursiveUnaryFunctionEntryTests
+  frontendParsedRecursiveLazyMigrationTests
+  frontendParsedRecursiveLazyComputationTests
+  frontendParsedRecursiveLazyFunctionEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

@@ -634,8 +634,8 @@ bound, unfuelled evaluator or global source-call mechanism is introduced.
 
 A separate recursive expression profile now admits nested single-argument calls,
 computed callees and arbitrary grouping (ADR-0253). Each original callee and
-argument is checked recursively in the same scope; direct unary, Word binary and
-conditional roots are extended below, while other roots retain the old pure interpretation.
+argument is checked recursively in the same scope; direct unary, Word binary,
+conditional and fixed lazy roots are extended below. Other roots retain the old pure interpretation.
 Independent syntax/type/Core evidence and raw/cost rules
 preserve the exact actual closure, captures and callee-to-argument-to-body store
 order. Grouping adds no Core wrapper or transitions, even where pure/group
@@ -706,8 +706,8 @@ evidence, including raw lazy branches that skip unsupported syntax. Binary calle
 insertion preserves literal values, stores and one cost before every continuation.
 The former recursive addition rejection fixtures now assert independent exact
 success; the older nonrecursive endpoints retain their rejection. Expanded
-comparisons, lazy Bool operators and tuples do not gain recursive children here;
-recursive conditional and unary roots are recorded below. Actual wrong
+comparisons and tuples do not gain recursive children here;
+recursive conditional, unary and fixed lazy roots are recorded below. Actual wrong
 payloads can fault after a successful right child's effects; neither structural
 typing nor this extension supplies store safety.
 
@@ -749,6 +749,32 @@ successes, while logical negation of a Word and old nonrecursive entry rejection
 remain intact. Parsed/source/entry consumers retain exact values and captures,
 operand effects, full fault tags and genuine unaryApply checkpoints. No stronger
 store safety, general overload mechanism or source-only cost bound is implied.
+
+Fixed Boolean conjunction and disjunction now recurse through this child
+(ADR-0259). Both original children are statically checked as Bool, while the
+exact Core expansion is `ifE left right (bool false)` or
+`ifE left (bool true) right`. The internal constants do not use source lookup.
+This extends the established ADR-0159 profile, not general Rust operator-function
+resolution: the pinned Rust version resolves named and/or functions as ordinary
+calls and explicitly leaves their short circuiting unimplemented. Only its
+residual logical BinOp emission uses the corresponding conditional expansion.
+
+Raw execution requires an actual Bool only on the left. A selected right child
+returns its actual value and final store at left cost plus right cost plus two;
+skipping keeps the left final store and costs left plus three, counting the
+internal literal. Thus a statically Bool right call can successfully return
+Word from an unchecked actual store, retaining the explicit entry's Bool tag.
+A wrong left payload faults before the right child; a missing right cell faults
+only when selected. Whole checking still rejects unknown unselected syntax.
+
+Twelve constructors preserve all fourteen recursive proof signatures. Existing
+typing and continuation laws move to smaller proof modules without new public
+helper families; caller-fragment constructors and insertion rules are unchanged.
+The shared body/entry code is reused unchanged. Three original rejection cases
+retain their source and ordered caller tables as independent exact successes.
+Parsed, symbolic and actual-entry consumers exercise selection-dependent costs,
+effects, faults, literal caller insertion and genuine ifBranches resumption.
+No source-only bound, arbitrary-store safety or general overload agreement follows.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

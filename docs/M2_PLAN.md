@@ -499,10 +499,23 @@ Nine constructors preserve the fourteen proof signatures and shared body/entry
 code without adding operator-map or wrapper-law families. Old pure overlap,
 caller insertion, genuine unaryApply checkpoints and faults after child effects
 remain explicit. Only well-typed original rejection fixtures are promoted;
-Logical negation of a Word and old nonrecursive endpoint boundaries remain unchanged.
+logical negation of a Word and old nonrecursive endpoint boundaries remain unchanged.
+
+The fixed ADR-0159 conjunction/disjunction profile now supports recursive
+children (ADR-0259), without claiming general Rust named-operator agreement.
+Both original children require Bool statically; execution requires an actual
+Bool on the left and either selects the right actual value/store at combined
+child costs plus two or skips it at left cost plus three. Internal Bool literals
+are not source lookups. Selected right payloads remain unrestricted, including
+Word success under a declared Bool entry tag with an unchecked actual store.
+Twelve constructors retain the fourteen recursive signatures and shared body/
+entry code. Existing typing and continuation proofs move to smaller modules;
+the caller fragment and insertion rules need no new constructors. Three original
+rejections migrate with unchanged source and caller tables, while whole checking,
+old endpoints, actual effects/faults and genuine ifBranches resumption stay explicit.
 
 Next extend recursive children to the remaining expression forms using these
-shared contracts. Expanded comparisons, lazy Bool operators, tuples,
+shared contracts. Expanded comparisons, tuples,
 expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
 transfer, and structural arguments alone do not validate stores.
