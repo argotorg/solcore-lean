@@ -307,6 +307,10 @@ import Solcore.Test.FrontendComputationBodyRawOwnerProperties
 import Solcore.Test.FrontendComputationBodyRawOwnerBoundaryProperties
 import Solcore.Test.FrontendParsedComputationRawOwnerRows
 import Solcore.Test.FrontendParsedComputationRawOwnerEffects
+import Solcore.Test.FrontendComputationFunctionOwnerProperties
+import Solcore.Test.FrontendComputationFunctionOwnerBoundaryProperties
+import Solcore.Test.FrontendParsedComputationFunctionOwnerBoundaries
+import Solcore.Test.FrontendParsedComputationFunctionOwnerEffects
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5978,6 +5982,8 @@ def run : IO Unit := do
   frontendParsedComputationOwnerEffectTests
   frontendParsedComputationRawOwnerRowTests
   frontendParsedComputationRawOwnerEffectTests
+  frontendParsedComputationFunctionOwnerBoundaryTests
+  frontendParsedComputationFunctionOwnerEffectTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

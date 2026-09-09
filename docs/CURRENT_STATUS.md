@@ -1181,6 +1181,27 @@ raw-only rows from independently elaborated/aligned Core execution examples,
 including actual captures, ordered cell effects and full checkpoints. No world,
 checker, typing or fresh-in-environment premise is added to either new law.
 
+Shared function compilation, actual-argument preparation and full execution now
+also commute with injective owner-only relabeling (ADR-0278). Five additive laws
+preserve and reflect independent compilation/preparation judgments, map the
+complete optional compiled/prepared records, and retain every full runner result
+at the same fuel and initial store. Only local-input IDs change; parameter order,
+binder indices, source/ranges, types, Core, actual values and captures remain.
+
+Each independent law assumes covariance of the same child elaboration relation;
+the executable laws instead require whole optional covariance of the same child
+checker. Neither assumes checker correctness. Private parameter reflection keeps
+original input preimages and uses injectivity, not an inverse or covariance under
+all owner maps. Existing record dependencies remain; old direct-function owner
+proofs are not used to establish the shared-body result.
+
+Consumers distinguish value-free compilation from wrong actual arity/types,
+whole preparation rejection from selected raw body success, and preparation
+success from actual runtime faults or invalid store payloads. Independent source
+and literal Core evidence retain arbitrary closure costs, strict effects, full
+saved states and resumption. No source feature, header policy, raw function
+evaluator, runtime-world premise or existing executable definition changes.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

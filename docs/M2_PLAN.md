@@ -764,7 +764,21 @@ Keep raw success and its reflected absence distinct from whole-source checking,
 fault classification and runtime safety. Unknown annotations and exposed then
 shadowing may still have selected raw paths. Positional-Core observations use
 separate original elaboration/alignment, never the arbitrary raw-row theorem
-alone. Function/header owner integration and further source forms remain next.
+alone. Further source forms remain separate.
+
+Shared function owner integration is now proved (ADR-0278): independent compile
+and prepare iff laws plus complete optional compiled/prepared record covariance
+and full runner equality. Preserve the same original declaration, parameter and
+argument order, actual captures, Core/type, fuel and initial store; only owner
+components of input IDs change. Private parameter reflection needs no inverse,
+surjectivity or covariance under every possible owner map.
+
+Keep independent child-elaboration covariance separate from the fixed checker's
+whole optional covariance. Neither checker covariance nor structurally typed
+arguments establishes runtime safety for the supplied store. Wrong arity/types,
+duplicate parameters and invalid unselected bodies remain preparation failures;
+successful preparation may still expose genuine faults and saved states. New
+source forms and nominal/type-name relabeling remain separate work.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
