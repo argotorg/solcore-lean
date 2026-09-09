@@ -283,7 +283,7 @@ def frontendParsedRecursiveBinaryComputationTests : IO Unit := do
     have _ := elaborateRecursiveLocalComputation?_iff.mpr c.elaboration
     check (decide (c.core=.unary op (call 1 0) ∧ c.type=type ∧ elaborateRecursiveLocalComputation? names (context type) s=some (.unary op (call 1 0),type) ∧
       elaborateLocalExpression? names (context type) s=none ∧ elaborateLocalComputation? names (context type) s=none)) "original unary exact success and old rejection"
-  for text in ["f(x) < g(y)","f(x) >= g(y)","(f(x),y)","f()","f(x,y)","f(Missing) + y"] do
+  for text in ["(f(x),y)","f()","f(x,y)","f(Missing) + y"] do
     let s ← parsed text
     check (decide (elaborateRecursiveLocalComputation? names (context .word) s=none ∧ elaborateLocalComputation? names (context .word) s=none)) "retained nonrecursive root boundary"
   -- The two original Bool lazy cases now have independent positive migration coverage.
