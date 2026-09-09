@@ -175,8 +175,8 @@ Independent source/parsed consumers cover ordering, aliases, hidden duplicates,
 nominal types, invalid ranges, strict missing leaves and unsupported forms.
 One-way extension may turn rejection into success, so no full-result invariant is claimed
 for it. The prerequisite initially leaves parameter/header/let gates named-only;
-the return/header integration follows separately in ADR-0233 below. Correct-arity
-parsed tests preserve the remaining parameter/let rejection boundary. Larger tuples,
+the return/header integration follows separately in ADR-0233 and parameters in
+ADR-0234 below. Correct-arity parsed tests preserve the remaining let boundary. Larger tuples,
 other type forms, expressions, Core/resolved semantics, diagnostics and frozen
 wire formats do not change.
 
@@ -191,10 +191,23 @@ Independent source/parsed entries cover exact ordered/nested Core, strict named
 lets, conditional costs, nominal static types, opaque values, original parameter
 records and all fuel/checkpoint boundaries. Legacy return negatives become
 independent positives, with 110 affected source-test theorem headers unchanged.
-Parameter/let annotations remain named-only; whole-body, type/arity, modifier,
+Parameters are integrated separately in ADR-0234; let annotations remain named-only. Whole-body, type/arity, modifier,
 unsupported-type and empty/multiple-clause gates remain. No new entry API,
 runtime transition, expression, Core/resolved, diagnostic or frozen wire change
-is introduced. Parameter and let integration remain separately scoped work.
+is introduced.
+
+Structural parameter declarations and actual bindings now share the independent
+annotation interpretation atomically (ADR-0234). Four constructor premises and
+two position conclusions deliberately change meaning; general erase/restore,
+factorization, ID/order/layout and named-specialization statements stay intact.
+Original Unit/singleton/product parameters consume exactly one typed argument
+each, including unused Unit and opaque products. Source and parsed consumers
+retain arbitrary nominal static types, sparse mixed-owner allocation, original
+positions, exact Core, costs, stores and checkpoints. Four parsed negatives migrate
+to independent positives; one obsolete source rejection is explicitly renamed,
+while 152 other affected source-test contracts remain unchanged. The old named-only
+API, typed let annotations, same-name rejection and other syntax/runtime boundaries
+are preserved. Structural typed-let integration remains a separate next slice.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

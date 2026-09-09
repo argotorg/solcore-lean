@@ -230,8 +230,9 @@ cover explicit nesting/order, hidden duplicates, missing written leaves,
 arbitrary raw ranges and unchanged unsupported forms. One-way extension may
 enable a formerly missing leaf. This prerequisite initially left all
 parameter/header/let annotation gates named-only; the shared single-return gate
-is connected separately in ADR-0233 below. Parameter and let tuple-type rejections
-remain checked with correct-arity actual arguments and original parsed annotations.
+is connected separately in ADR-0233 below, followed by parameters in ADR-0234.
+Original parsed annotations and correct-arity actuals distinguish these integrations
+from the still-named-only let boundary.
 Larger tuple lists, other type constructors, expressions,
 Core/resolved semantics, diagnostics and frozen wire formats are unchanged.
 
@@ -250,10 +251,30 @@ environments. Unit/singleton, ordered and explicitly nested products, strict nam
 lets, conditional branches and opaque values keep their existing exact costs,
 own stores and actual checkpoint/resumption paths. Static nominal results need
 no inhabitants; type agreement never substitutes for exact Core provenance.
-Old structural-return negatives migrate to independent positives. Parameter/let
-annotations remain named-only, and argument, modifier, whole-body, unknown-leaf,
+Old structural-return negatives migrate to independent positives. Parameter
+integration follows in ADR-0234; let annotations stay named-only. Argument, modifier, whole-body, unknown-leaf,
 empty/multiple-clause and unsupported-type gates remain in force. There is no
 new runtime transition, expression, parser, Core/resolved, diagnostic or wire policy.
+
+Structural parameter annotations now feed the existing static declaration and
+actual binding adapters together (ADR-0234). Four constructor annotation premises
+and two position-theorem meaning conclusions intentionally widen to structural
+meaning. All other general contracts, including value erasure/restoration,
+preparation factorization and named-only positional specializations, are retained.
+Each original Unit, singleton or ordered/nested product parameter remains exactly
+one row, generated identity and typed actual argument. Products are not flattened;
+unused Unit parameters are not erased. Static nominal types need no inhabitants.
+
+Independent source and parsed consumers check exact declaration/binding evidence,
+original ranges, owner-relative sparse allocation, repeated initial names, reversed
+actual environments, table extension and both source-position APIs. Whole entries
+keep separately specified Core, values, costs, own stores and real resumptions;
+same-typed wrong Core cannot substitute for provenance. Four old parsed rejections
+become independent positives. One obsolete source rejection is explicitly renamed
+and narrowed to the unchanged named-only/let boundary; the other 152 affected
+source-test statements remain exact. Typed let annotations and same-name rejection,
+larger tuples, unknown leaves, count/type checks, whole-body/header gates and all
+runtime, parser, diagnostic and wire policies remain unchanged.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
