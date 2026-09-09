@@ -8,6 +8,7 @@ Conditionals evaluate the actual Bool guard and selected branch only.
 Fixed lazy operators require an actual Bool left child; a selected right child
 retains its actual value, while skipping evaluates one internal Bool literal.
 Unary operations use the actual child payload and preserve its final store.
+Fixed negated comparisons evaluate both actual Words before comparison and negation.
 Grouping preserves the exact value, stores and cost of its child. -/
 
 set_option autoImplicit false
@@ -108,6 +109,27 @@ inductive RecursiveLocalComputationEvaluates
         middleStore right value finalStore) :
       RecursiveLocalComputationEvaluates table environment initialStore
         ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩ value finalStore
+
+  | notEqual {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word}
+      (leftEvaluation : RecursiveLocalComputationEvaluates table environment
+        initialStore left (.word leftValue) middleStore)
+      (rightEvaluation : RecursiveLocalComputationEvaluates table environment
+        middleStore right (.word rightValue) finalStore) :
+      RecursiveLocalComputationEvaluates table environment initialStore
+        ⟨span, .binary left ⟨operatorSpan, .notEqual⟩ right⟩
+        (.bool (!(leftValue == rightValue))) finalStore
+  | lessEqual {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word}
+      (leftEvaluation : RecursiveLocalComputationEvaluates table environment
+        initialStore left (.word leftValue) middleStore)
+      (rightEvaluation : RecursiveLocalComputationEvaluates table environment
+        middleStore right (.word rightValue) finalStore) :
+      RecursiveLocalComputationEvaluates table environment initialStore
+        ⟨span, .binary left ⟨operatorSpan, .lessEqual⟩ right⟩
+        (.bool (!(decide (leftValue > rightValue)))) finalStore
 
 inductive RecursiveLocalComputationEvaluatesWithCost
     (table : LocalNameTable) (environment : Resolved.Environment) :
@@ -216,5 +238,26 @@ inductive RecursiveLocalComputationEvaluatesWithCost
         middleStore right value finalStore rightCost) :
       RecursiveLocalComputationEvaluatesWithCost table environment initialStore
         ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩ value finalStore (leftCost + rightCost + 2)
+
+  | notEqual {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word} {leftCost rightCost : Nat}
+      (leftEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        initialStore left (.word leftValue) middleStore leftCost)
+      (rightEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        middleStore right (.word rightValue) finalStore rightCost) :
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+        ⟨span, .binary left ⟨operatorSpan, .notEqual⟩ right⟩
+        (.bool (!(leftValue == rightValue))) finalStore (leftCost + rightCost + 5)
+  | lessEqual {initialStore middleStore finalStore : Core.Store}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftValue rightValue : Core.Word} {leftCost rightCost : Nat}
+      (leftEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        initialStore left (.word leftValue) middleStore leftCost)
+      (rightEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        middleStore right (.word rightValue) finalStore rightCost) :
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+        ⟨span, .binary left ⟨operatorSpan, .lessEqual⟩ right⟩
+        (.bool (!(decide (leftValue > rightValue)))) finalStore (leftCost + rightCost + 5)
 
 end Solcore.Frontend
