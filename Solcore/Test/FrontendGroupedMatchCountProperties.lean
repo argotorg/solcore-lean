@@ -106,7 +106,7 @@ private theorem elaborated (n : Nat) (shape : Shape) :
     | succ n ih => simpa [tree,rows,guard,Core.Expr.weakenAt] using congrArg (Option.map (Core.Expr.ifE guard (.var 3))) ih
   exact .wordMatch (defaultEntry := defaultEntry shape)
     (.application (calleeElab false) argumentElab) (rowFacts n shape).1
-    (fun entry member => ((rowFacts n shape).2 entry member).1)
+    (fun entry member => ((rowFacts n shape).2 entry member).1) (.inl rfl)
     (fun entry member => ((rowFacts n shape).2 entry member).2)
     (by cases choice : shape.hasDefault <;> simp [defaultEntry,defaultBody,choice])
     (by intro entry member; cases choice : shape.hasDefault <;> simp [defaultEntry,choice] at member

@@ -85,7 +85,7 @@ private theorem elaborated (n : Nat) (hit : Bool) :
     (fun entry member => by
       have meaning := ((rowFacts n hit).2 entry member).1; cases tag : entry.2.1 <;> simp only [tag] at meaning
       · exact .wildcard meaning.choose_spec
-      · exact .literal meaning)
+      · exact .literal meaning) (.inl rfl)
     (fun entry member => ((rowFacts n hit).2 entry member).2)
     rfl (by intro entry member; simp at member; subst entry
             exact .expression (.application (calleeElab true) argumentElab)) folded

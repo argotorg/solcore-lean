@@ -144,7 +144,7 @@ private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (fun c =>
       check (b.span.contains matchSpan && matchSpan.contains scrutineeSpan && scrutineeSpan.contains e.span && matchSpan.contains armsSpan && cs.all (fun c => armsSpan.contains c.span) && decide (scrutineeSpan.endByte≤armsSpan.startByte)) "original match ranges and genuinely absent default"
       let sc ← child i e; let bs ← arms i cs
       match lowered : bs.1.foldr (fun en t => match en.2.1 with | none => some (en.2.2.weakenAt 0) | some v => t.map (fun t => .ifE (.binary .wordEq (.var 0) (.word v)) (en.2.2.weakenAt 0) t)) none with
-      | some t => if same : sc.1=.word then return ⟨.letE sc.2.core t,by rw [shape]; exact .wordMatch (defaultEntry := none) (same ▸ sc.2.evidence) bs.2.down.1 (fun e h => (bs.2.down.2 e h).1) (fun e h => (bs.2.down.2 e h).2) rfl (by simp) lowered⟩ else throw (IO.userError "scrutinee type")
+      | some t => if same : sc.1=.word then return ⟨.letE sc.2.core t,by rw [shape]; exact .wordMatch (defaultEntry := none) (same ▸ sc.2.evidence) bs.2.down.1 (fun e h => (bs.2.down.2 e h).1) (.inl rfl) (fun e h => (bs.2.down.2 e h).2) rfl (by simp) lowered⟩ else throw (IO.userError "scrutinee type")
       | none => throw (IO.userError "uncovered original arms")
   | _ => throw (IO.userError "original terminal match without default")
 private def prepare (source : Syntax.FunctionDecl) (args : List TypedRuntimeArgument) (fixed : Core.Expr) : IO (Σ p, PLift (RecursiveComputationFunctionPrepares types owner source args p ∧ p.core=fixed ∧ p.returnType=.word)) := do

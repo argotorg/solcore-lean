@@ -109,7 +109,7 @@ private theorem elaborated (n : Nat) (marker : Syntax.SourceSpan) (suffix : Suff
     (fun entry member => by
       have meaning := ((rowFacts n marker suffix).2 entry member).1; cases tag : entry.2.1 <;> simp only [tag] at meaning
       · exact .wildcard meaning.choose_spec
-      · exact .literal meaning)
+      · exact .literal meaning) (.inl rfl)
     (fun entry member => ((rowFacts n marker suffix).2 entry member).2)
     rfl (by intro entry member; cases member) folded
 private theorem chosen (n : Nat) (marker : Syntax.SourceSpan) (extra : List Syntax.MatchCase) :

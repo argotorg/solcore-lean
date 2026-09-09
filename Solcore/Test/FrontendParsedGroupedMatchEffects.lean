@@ -141,7 +141,7 @@ private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (fun c =>
       let sc ← child i e; let bs ← arms i cs
       let dc : Σ de : Option (Syntax.Block × Core.Expr), PLift (de.map Prod.fst=d ∧ ∀ en ∈ de.toList, RecursiveComputationReturnTreeElaborates types owner i en.1 en.2 .word) ← match present : d with | none => pure ⟨none,⟨by simp [present]⟩⟩ | some b => do let c ← returned i b; pure ⟨some (b,c.core),⟨by refine ⟨present.symm,?_⟩; intro en h; cases List.mem_singleton.mp h; exact c.evidence⟩⟩
       match lowered : bs.1.foldr (fun en t => match en.2.1 with | none => some (en.2.2.weakenAt 0) | some v => t.map (fun t => .ifE (.binary .wordEq (.var 0) (.word v)) (en.2.2.weakenAt 0) t)) (dc.1.map (fun en => en.2.weakenAt 0)) with
-      | some t => if same : sc.1=.word then return ⟨.letE sc.2.core t,by rw [shape]; exact .wordMatch (defaultEntry := dc.1) (same ▸ sc.2.evidence) bs.2.down.1 (fun e h => (bs.2.down.2 e h).1) (fun e h => (bs.2.down.2 e h).2) dc.2.down.1 dc.2.down.2 lowered⟩ else throw (IO.userError "scrutinee type")
+      | some t => if same : sc.1=.word then return ⟨.letE sc.2.core t,by rw [shape]; exact .wordMatch (defaultEntry := dc.1) (same ▸ sc.2.evidence) bs.2.down.1 (fun e h => (bs.2.down.2 e h).1) (.inl rfl) (fun e h => (bs.2.down.2 e h).2) dc.2.down.1 dc.2.down.2 lowered⟩ else throw (IO.userError "scrutinee type")
       | none => throw (IO.userError "uncovered original arms")
   | _ => throw (IO.userError "original terminal grouped match")
 private def prepare (source : Syntax.FunctionDecl) (args : List TypedRuntimeArgument) (fixed : Core.Expr) : IO (Σ p, PLift (RecursiveComputationFunctionPrepares types owner source args p ∧ p.core=fixed ∧ p.returnType=.word)) := do
