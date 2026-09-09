@@ -3,8 +3,8 @@ import Solcore.Frontend.LocalExpressionCostProperties
 import Solcore.Core.Correspondence
 import Solcore.Core.ExactFuelProperties
 
-/-! Raw success and exact cost agree even when old pure grouping and recursive
-grouping overlap. Actual closures, arguments and stores are fixed by evaluation,
+/-! Raw success and exact cost agree even when old pure and recursive grouping
+or direct binary evaluation overlap. Actual closures, arguments and stores are fixed by evaluation,
 not by a checker, type tags or a global restriction on skipped source syntax. -/
 
 set_option autoImplicit false
@@ -22,6 +22,8 @@ private theorem erase {table : LocalNameTable} {environment : Resolved.Environme
   | group _ ih => exact .group ih
   | application _ _ bodyPath functionIH argumentIH =>
       exact .application functionIH argumentIH (Core.steps_from_initial_sound bodyPath)
+  | binary operator _ _ applied leftIH rightIH =>
+      exact .binary operator leftIH rightIH applied
 
 private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value}
@@ -41,6 +43,10 @@ private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Env
       obtain ⟨_, argumentCosted⟩ := argumentIH
       obtain ⟨_, bodyPath⟩ := bodyEvaluation.toSteps
       exact ⟨_, .application functionCosted argumentCosted bodyPath⟩
+  | binary operator _ _ applied leftIH rightIH =>
+      obtain ⟨_, leftCosted⟩ := leftIH
+      obtain ⟨_, rightCosted⟩ := rightIH
+      exact ⟨_, .binary operator leftCosted rightCosted applied⟩
 
 theorem recursiveLocalComputationEvaluates_iff_exists_cost {table : LocalNameTable}
     {environment : Resolved.Environment} {initialStore finalStore : Core.Store}
@@ -51,7 +57,7 @@ theorem recursiveLocalComputationEvaluates_iff_exists_cost {table : LocalNameTab
   ⟨exists_cost, fun ⟨_, evaluation⟩ => erase evaluation⟩
 
 -- The old pure relation has no root call, but may skip unsupported descendants.
--- Only group inversion is needed; no global call-free premise is introduced.
+-- Invert only the overlapping root; no global call-free premise is introduced.
 private theorem agrees_with_pure {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore : Core.Store} {source : Syntax.Expr} {left right : Core.Value}
     {leftStore rightStore : Core.Store} {leftCost rightCost : Nat}
@@ -66,9 +72,17 @@ private theorem agrees_with_pure {table : LocalNameTable} {environment : Resolve
       cases pureEvaluation with
       | group child => exact ih child
   | application => cases pureEvaluation
+  | binary operator _ _ applied leftIH rightIH =>
+      cases operator <;> cases pureEvaluation
+      all_goals
+        rename_i pureLeft pureRight
+        obtain ⟨rfl, rfl, rfl⟩ := leftIH pureLeft
+        obtain ⟨rfl, rfl, rfl⟩ := rightIH pureRight
+        cases applied
+        exact ⟨rfl, rfl, rfl⟩
 
 /-- Successful recursive derivations determine the actual value, final store
-and cost jointly, including the overlapping pure/group derivations. -/
+and cost jointly, including overlapping pure/group/binary derivations. -/
 theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalNameTable}
     {environment : Resolved.Environment} {initialStore : Core.Store} {source : Syntax.Expr}
     {left right : Core.Value} {leftStore rightStore : Core.Store} {leftCost rightCost : Nat}
@@ -96,5 +110,13 @@ theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalN
           obtain ⟨rfl, rfl, rfl⟩ := argumentIH otherArgument
           obtain ⟨rfl, sameValue, sameStore⟩ := bodyPath.final_unique otherPath
           exact ⟨sameValue, sameStore, rfl⟩
+  | binary operator leftChild rightChild applied leftIH rightIH =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.binary operator leftChild rightChild applied) other
+      | binary otherOperator otherLeft otherRight otherApplied =>
+          obtain ⟨rfl, rfl, rfl⟩ := leftIH otherLeft
+          obtain ⟨rfl, rfl, rfl⟩ := rightIH otherRight
+          cases operator <;> cases otherOperator
+          all_goals exact ⟨Option.some.inj (applied.symm.trans otherApplied), rfl, rfl⟩
 
 end Solcore.Frontend

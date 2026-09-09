@@ -4,24 +4,12 @@ import Solcore.Frontend.LocalExpressionEvaluationProperties
 import Solcore.Frontend.LocalExpressionCostCorrespondence
 import Solcore.Frontend.LocalFunctionApplicationStepComposition
 
-/-! Exact original provenance connects recursive calls to Core. Pure/group
+/-! Exact original provenance connects recursive calls to Core. Pure/group/binary
 overlap changes neither successful observations nor their exact costs. -/
 
 set_option autoImplicit false
 
 namespace Solcore.Frontend
-
-private theorem reflects_pure {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value}
-    (evaluation : RecursiveLocalComputationEvaluates table environment initialStore source value finalStore)
-    {resolved : Resolved.Expr} (resolution : ResolvesLocalExpression table source resolved) :
-    LocalExpressionEvaluates table environment initialStore source value finalStore := by
-  induction evaluation generalizing resolved with
-  | pure child => exact child
-  | group _ ih =>
-      cases resolution with
-      | group child => exact .group (ih child)
-  | application _ _ _ _ _ => cases resolution
 
 private theorem reflects_group {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {span : Syntax.SourceSpan} {inner : Syntax.Expr} {value : Core.Value}
@@ -43,6 +31,49 @@ private theorem reflects_pure_cost {table : LocalNameTable} {environment : Resol
       cases resolution with
       | group child => exact .group (ih child)
   | application _ _ _ _ _ => cases resolution
+  | @binary initialStore middleStore finalStore span operatorSpan left right sourceOp op
+      leftValue rightValue result leftCost rightCost operator _ _ applied leftIH rightIH =>
+      cases operator <;> cases resolution
+      all_goals
+        rename_i leftResolution rightResolution
+        cases leftValue <;> cases rightValue <;> cases applied
+        first
+        | exact .add (leftIH leftResolution) (rightIH rightResolution)
+        | exact .subtract (leftIH leftResolution) (rightIH rightResolution)
+        | exact .multiply (leftIH leftResolution) (rightIH rightResolution)
+        | exact .divide (leftIH leftResolution) (rightIH rightResolution)
+        | exact .modulo (leftIH leftResolution) (rightIH rightResolution)
+        | exact .bitAnd (leftIH leftResolution) (rightIH rightResolution)
+        | exact .bitOr (leftIH leftResolution) (rightIH rightResolution)
+        | exact .bitXor (leftIH leftResolution) (rightIH rightResolution)
+        | exact .greater (leftIH leftResolution) (rightIH rightResolution)
+        | exact .equal (leftIH leftResolution) (rightIH rightResolution)
+
+private theorem reflects_pure {table : LocalNameTable} {environment : Resolved.Environment}
+    {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value}
+    (evaluation : RecursiveLocalComputationEvaluates table environment initialStore source value finalStore)
+    {resolved : Resolved.Expr} (resolution : ResolvesLocalExpression table source resolved) :
+    LocalExpressionEvaluates table environment initialStore source value finalStore := by
+  obtain ⟨_, costed⟩ := recursiveLocalComputationEvaluates_iff_exists_cost.mp evaluation
+  exact (reflects_pure_cost costed resolution).erase
+
+private theorem reflects_binary_cost {table : LocalNameTable} {environment : Resolved.Environment}
+    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+    {left right : Syntax.Expr} {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp}
+    {value : Core.Value} {cost : Nat} (operator : DirectWordBinary sourceOp op)
+    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+      ⟨span, .binary left ⟨operatorSpan, sourceOp⟩ right⟩ value finalStore cost) :
+    ∃ middleStore leftValue rightValue leftCost rightCost,
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore left leftValue middleStore leftCost ∧
+      RecursiveLocalComputationEvaluatesWithCost table environment middleStore right rightValue finalStore rightCost ∧
+      op.apply leftValue rightValue = some value ∧ cost = leftCost + rightCost + 3 := by
+  cases evaluation with
+  | pure child =>
+      cases operator <;> cases child
+      all_goals exact ⟨_, _, _, _, _, .pure ‹_›, .pure ‹_›, rfl, rfl⟩
+  | binary otherOperator leftChild rightChild applied =>
+      cases operator <;> cases otherOperator
+      all_goals exact ⟨_, _, _, _, _, leftChild, rightChild, applied, rfl⟩
 
 private theorem reflects_group_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {span : Syntax.SourceSpan} {inner : Syntax.Expr}
@@ -80,6 +111,18 @@ theorem RecursiveLocalComputationElaborates.evaluates_iff
         cases evaluation with
         | apply functionEvaluation argumentEvaluation bodyEvaluation =>
             exact .application (functionIH.mpr functionEvaluation) (argumentIH.mpr argumentEvaluation) bodyEvaluation
+  | binary operator _ _ leftIH rightIH =>
+      constructor
+      · intro evaluation
+        obtain ⟨_, costed⟩ := recursiveLocalComputationEvaluates_iff_exists_cost.mp evaluation
+        obtain ⟨_, _, _, _, _, leftChild, rightChild, applied, _⟩ := reflects_binary_cost operator costed
+        exact .binary
+          (leftIH.mp (recursiveLocalComputationEvaluates_iff_exists_cost.mpr ⟨_, leftChild⟩))
+          (rightIH.mp (recursiveLocalComputationEvaluates_iff_exists_cost.mpr ⟨_, rightChild⟩)) applied
+      · intro evaluation
+        cases evaluation with
+        | binary leftChild rightChild applied =>
+            exact .binary operator (leftIH.mpr leftChild) (rightIH.mpr rightChild) applied
 
 theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
@@ -101,6 +144,9 @@ theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
       | pure child => cases child
       | application functionEvaluation argumentEvaluation bodyPath =>
           exact CostStepComposition.apply (functionIH functionEvaluation _) (argumentIH argumentEvaluation _) bodyPath
+  | binary operator _ _ leftIH rightIH =>
+      obtain ⟨_, _, _, _, _, leftChild, rightChild, applied, rfl⟩ := reflects_binary_cost operator evaluation
+      exact CostStepComposition.binary (leftIH leftChild _) (rightIH rightChild _) applied
 
 theorem RecursiveLocalComputationElaborates.evaluatesWithCost_iff_steps
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
