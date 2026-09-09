@@ -84,6 +84,14 @@ theorem evaluateTypedLetReturnTreeWithCost?_congr_lookup
                     rw [evaluateTypedLetReturnTreeWithCost?, evaluateTypedLetReturnTreeWithCost?,
                       evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable leftEnvironment rightEnvironment sameLookup]
                     simp only [tailSame]
+              case expression source terminated =>
+                cases terminated with
+                | false => simp only [evaluateTypedLetReturnTreeWithCost?]
+                | true =>
+                    rw [evaluateTypedLetReturnTreeWithCost?, evaluateTypedLetReturnTreeWithCost?,
+                      evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable leftEnvironment rightEnvironment sameLookup,
+                      evaluateTypedLetReturnTreeWithCost?_congr_lookup leftOwner rightOwner leftTable rightTable
+                        leftEnvironment rightEnvironment sameLookup ⟨blockSpan, rest⟩]
               case ifThen condition thenBody optionalElse =>
                 cases rest with
                 | cons _ _ => simp only [evaluateTypedLetReturnTreeWithCost?]

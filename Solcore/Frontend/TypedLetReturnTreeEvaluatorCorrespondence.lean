@@ -51,6 +51,17 @@ theorem evaluateTypedLetReturnTreeWithCost?_sound
                     | some annotation =>
                         exact .binding (evaluateLocalExpressionWithCost?_sound initializerAccepted store)
                           (evaluateTypedLetReturnTreeWithCost?_sound tailAccepted store)
+              case expression source terminated =>
+                cases terminated with
+                | false => simp only [evaluateTypedLetReturnTreeWithCost?, reduceCtorEq] at accepted
+                | true =>
+                    simp only [evaluateTypedLetReturnTreeWithCost?, bind, Option.bind_eq_some_iff] at accepted
+                    obtain ⟨⟨discarded, headCost⟩, headAccepted,
+                      ⟨actual, tailCost⟩, tailAccepted, result⟩ := accepted
+                    simp only [pure, Option.some.injEq, Prod.mk.injEq] at result
+                    obtain ⟨rfl, rfl⟩ := result
+                    exact .discard (evaluateLocalExpressionWithCost?_sound headAccepted store)
+                      (evaluateTypedLetReturnTreeWithCost?_sound tailAccepted store)
               case ifThen condition thenBody optionalElse =>
                 cases rest with
                 | cons _ _ => simp only [evaluateTypedLetReturnTreeWithCost?, reduceCtorEq] at accepted
@@ -86,7 +97,7 @@ theorem evaluateTypedLetReturnTreeWithCost?_complete
       | bare => simp only [evaluateTypedLetReturnTreeWithCost?]
       | expression evaluated =>
           simpa only [evaluateTypedLetReturnTreeWithCost?] using evaluateLocalExpressionWithCost?_complete evaluated
-  | binding initializer _ ih | inferred initializer _ ih
+  | binding initializer _ ih | inferred initializer _ ih | discard initializer _ ih
   | ifTrue initializer _ ih | ifFalse initializer _ ih =>
       simp [evaluateTypedLetReturnTreeWithCost?, evaluateLocalExpressionWithCost?_complete initializer, ih]
 

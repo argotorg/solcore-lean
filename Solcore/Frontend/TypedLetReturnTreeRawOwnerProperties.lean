@@ -95,6 +95,14 @@ theorem evaluateTypedLetReturnTreeWithCost?_mapOwner
                       expression_mapIds (ownerLocalIdMap mapping)
                         (ownerLocalIdMap_injective mapping injective)]
                     simp only [tailSame]
+              case expression source terminated =>
+                cases terminated with
+                | false => simp only [evaluateTypedLetReturnTreeWithCost?]
+                | true =>
+                    rw [evaluateTypedLetReturnTreeWithCost?, evaluateTypedLetReturnTreeWithCost?,
+                      expression_mapIds (ownerLocalIdMap mapping)
+                        (ownerLocalIdMap_injective mapping injective),
+                      evaluateTypedLetReturnTreeWithCost?_mapOwner mapping injective owner table environment ⟨blockSpan, rest⟩]
               case ifThen condition thenBody optionalElse =>
                 cases rest with
                 | cons _ _ => simp only [evaluateTypedLetReturnTreeWithCost?]
