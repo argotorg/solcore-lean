@@ -10,6 +10,7 @@ import Solcore.Frontend.LocalExpressionResolutionProperties
 import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Frontend.LocalExpressionTypingResolution
 import Solcore.Frontend.LocalExpressionTypingProperties
+import Solcore.Frontend.LocalFragmentProperties
 import Solcore.Frontend.LocalExpressionEvaluationRules
 import Solcore.Frontend.LocalExpressionEvaluation
 import Solcore.Frontend.LocalExpressionEvaluationProperties
@@ -94,6 +95,7 @@ import Solcore.Frontend.RuntimeParameterDeclarationsOwnerProperties
 import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
 import Solcore.Frontend.RuntimeFunctionCompilation
 import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.RuntimeFunctionLocalFragmentProperties
 import Solcore.Frontend.RuntimeFunctionCompilationOwnerProperties
 import Solcore.Frontend.RuntimeFunctionParameterCompilationProperties
 import Solcore.Frontend.RuntimeFunctionConditionalParameterCompilationProperties
@@ -290,4 +292,11 @@ neither strict evaluation nor the two existing let transitions. Old annotated
 binding rules and generic proof contracts remain intact. Older body-only adapters
 and bounds remain unchanged. No general inference, default initialization,
 general calls or broader binding policy is added.
+
+Exact expression, singleton-return, terminal-tree and recursive-let provenance
+now expose membership in the independent local Core fragment. Compilation and
+preparation project the same structural fact without restricting actual opaque
+values. Existing insertion laws then preserve typing, values and exact path
+lengths; original and inserted checkpoint payloads need not be equal. Membership
+alone is neither source provenance nor typing or execution of arbitrary records.
 -/

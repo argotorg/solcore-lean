@@ -379,6 +379,25 @@ initialization, assignment, general calls or new shadowing policy. Core/Resolved
 definitions, parameter/return annotations, parser, diagnostics and wire formats
 are unchanged.
 
+Exact frontend provenance now exposes membership in the independent local Core
+fragment (ADR-0239). Four body-level bridges cover successful expression
+elaboration and independent singleton-return, terminal-tree and recursive-let
+elaboration. They use exact lowering and every original child, including both
+conditional arms and written/inferred initializers. Four separate entry bridges
+project this fact from independent compilation/preparation or their successful
+executable results. No runtime values are manufactured, and body-level imports
+do not depend on entries.
+
+Independent source and parsed consumers compose these bridges with the existing
+positional insertion laws for types, actual values and exact costs. Retained
+prefixes, nested lets, nominal static types and existing opaque closures/cells
+remain intact. Original and inserted executions resume their own genuine
+checkpoints; matching final values and costs do not identify captured environments.
+Membership itself guarantees neither valid indices, evaluation, source acceptance
+nor whole-entry provenance for an arbitrary same-typed record. No accepted or
+rejected source form, existing definition, constructor, theorem statement, parser,
+diagnostic or wire policy changes in this proof-only step.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

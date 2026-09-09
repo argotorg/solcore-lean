@@ -274,6 +274,19 @@ positives while older prefix rejection and neighboring invalid cases remain.
 General inference, polymorphism, missing initialization, assignment, shadowing,
 calls, Core/Resolved definitions, parser, diagnostics and wire policy are not added.
 
+Exact frontend-to-local-fragment bridges now connect existing provenance to
+Core positional insertion (ADR-0239). Four body-level results retain exact
+expression lowering and all singleton, terminal-tree and recursive-let children;
+four entry-level results project independent or successfully checked compilation
+and preparation. No same-typed substitute or runtime inhabitant supplies the
+structural proof, and body imports remain independent of entries. Independent
+source and parsed consumers retain arbitrary inserted values/types, nested lets,
+original parameter rows, nominal/opaque boundaries and exact path lengths.
+Original and inserted suspended states are separate; each resumes with its own
+captured environment. Membership alone implies neither evaluation nor valid
+indices, source acceptance or provenance for arbitrary records. This proof-only
+step changes no existing definition, generic statement or source policy.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
