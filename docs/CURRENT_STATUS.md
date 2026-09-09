@@ -348,6 +348,37 @@ shadowing, multiple return clauses and old named-only prefix adapters remain
 outside this change. Core/Resolved definitions, parser, diagnostics and frozen
 wire formats are unchanged.
 
+Initialized local declarations now also accept an absent type annotation in the
+existing recursive body and function-entry adapters (ADR-0238). The original
+initializer independently fixes its unique type and exact Core in the old scope;
+only the original tail sees the fresh binding. No annotation is synthesized into
+the source AST, and an inferred product or nominal type need not occur as a whole
+in the caller's type-name table. Written annotations still require their exact
+structural meaning and matching initializer type.
+
+Four new independent `inferred` rules retain the four old annotated binding
+rules unchanged. All 53 directly affected generic theorem statements remain
+intact; a new child-decomposition theorem exposes exact initializer/tail Core,
+the inferred type and fresh scope. Whole typing, Core correspondence, raw value
+and store laws, exact costs, direct execution, owner/lookup/type-table transport,
+fuel bounds and checkpoint resumption include the new case. A copied leaf and
+return cost four, an unused binary-product initializer and return cost eight,
+and conditional selection can distinguish seven from four. Inference itself
+adds no Core transition; every initialized let retains child costs plus two.
+
+Independent mixed-prefix proofs and complete parsed consumers preserve original
+annotation absence/presence, byte ranges, sparse IDs, exact Core and fresh tails,
+nominal static types, typed opaque values, parameter-only records and real
+continuations/residual execution. Eleven obsolete parsed rejection claims become
+positives using their original source and callers; the older prefix adapter's
+rejection and all neighboring invalid forms remain. Missing initializers,
+self/forward/sibling references, ancestor shadowing and invalid unselected arms
+still fail whole checking, independently of raw selected execution. This limited
+monomorphic inference introduces no polymorphism, overload resolution, default
+initialization, assignment, general calls or new shadowing policy. Core/Resolved
+definitions, parameter/return annotations, parser, diagnostics and wire formats
+are unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
@@ -1434,7 +1465,7 @@ Checked execution still requires its own whole provenance and matching IDs.
 
 An explicitly supplied canonical declaration now connects its header, runtime
 parameters and recursive typed let/return tree in one entry
-(ADR-0170, ADR-0198, ADR-0208, ADR-0215, ADR-0222). Independent exact
+(ADR-0170, ADR-0198, ADR-0208, ADR-0215, ADR-0222, ADR-0238). Independent exact
 preparation retains both the actual lowered Core and its declared return type,
 not merely some Core of that type. Success and failure correspond to this
 independent relation, and a whole-entry typing contract is distinct from
@@ -1442,10 +1473,11 @@ body-only typing. A Bool-return declaration with a Word body is rejected here
 while remaining a Word body at the existing body-only endpoint.
 
 The compiler, preparer, whole-entry typing and independent entry cost now use
-the recursive typed let/return-tree judgments. Annotated, initialized, unused-name
-declarations alternate with terminal if/else inside either arm. Each initializer uses
-the old scope and its exact annotation type; the freshly extended tail becomes
-the actual nested Core `letE`. The original entry APIs and three-field data
+the recursive typed let/return-tree judgments. Initialized, unused-name declarations
+alternate with terminal if/else inside either arm. Each initializer uses the old
+scope; its inferred type must agree with any written structural annotation, while
+an absent annotation remains absent in the original source (ADR-0238). The freshly
+extended tail becomes the actual nested Core `letE`. The original entry APIs and three-field data
 record layouts remain unchanged. Records retain only original parameter inputs:
 branch-local lets do not alter argument count, ordered type guards or value reversal.
 Both arms start from the original scope and can reuse the same fresh ID without

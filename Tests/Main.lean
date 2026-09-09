@@ -171,6 +171,9 @@ import Solcore.Test.FrontendParsedManyTypeEntries
 import Solcore.Test.FrontendManyExpressionProperties
 import Solcore.Test.FrontendParsedManyExpressions
 import Solcore.Test.FrontendParsedManyTupleEntries
+import Solcore.Test.FrontendInferredLetProperties
+import Solcore.Test.FrontendParsedInferredLets
+import Solcore.Test.FrontendParsedInferredLetEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5760,6 +5763,8 @@ def run : IO Unit := do
   frontendParsedManyTypeEntryTests
   frontendParsedManyExpressionTests
   frontendParsedManyTupleEntryTests
+  frontendParsedInferredLetTests
+  frontendParsedInferredLetEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

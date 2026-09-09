@@ -261,7 +261,8 @@ whole optional results and checkpoints at a fixed store. First-match type-meanin
 extension preserves success, and mutual extension also preserves rejection.
 Older prefix successes retain their exact Core and complete runner results.
 A separate recursive static
-adapter admits annotated, initialized, nonshadowing lets inside either arm,
+adapter admits initialized, nonshadowing lets inside either arm, with a written
+structural annotation or the independently inferred initializer type,
 with exact ordered Core, independent typing and success-only old embeddings.
 Sibling scopes start from the same inputs and may reuse the same fresh ID.
 Independent recursive evaluation and cost now retain strict old-scope
@@ -284,6 +285,9 @@ semantic extensions.
 Existing function entries reuse these recursive judgments and additive/max-arm
 bound, retaining original parameter-only records, header/argument guards and
 direct Core execution. Actual branch-local work contributes no wrapper overhead.
-Old body-only adapters and bounds remain unchanged. No inference, default
-initialization, general calls or broader binding policy is added.
+Unannotated initializers keep their original syntax and scope; inference changes
+neither strict evaluation nor the two existing let transitions. Old annotated
+binding rules and generic proof contracts remain intact. Older body-only adapters
+and bounds remain unchanged. No general inference, default initialization,
+general calls or broader binding policy is added.
 -/

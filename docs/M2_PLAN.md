@@ -257,6 +257,23 @@ named-only type conclusion and the other ten source statements. Projections,
 inference, shadowing, multiple clauses, older prefix adapters, Core/Resolved,
 parser, diagnostics and wire policies remain unchanged.
 
+Initialized lets now support an absent original annotation through the existing
+recursive checker and function entry (ADR-0238). The old-scope initializer fixes
+its unique independent type and exact Core; the original tail receives the
+existing fresh binding, without source rewriting or inferred-type table membership.
+Four independent inferred rules keep every old annotated binding rule intact,
+and all 53 directly affected generic statements remain unchanged. A new exact
+child-decomposition theorem records the inferred type and original Core children.
+Raw/direct evaluation, safety, owner/lookup/type extension, costs, stores, bounds
+and genuine resumption retain their existing premises. Strict initialization
+still costs initializer plus tail plus two, including when its value is unused.
+Independent mixed-prefix and parsed consumers check annotation absence, original
+ranges, sparse IDs, exact Core, nominal/opaque boundaries, actual parameter-only
+records and checkpoints. Eleven old parsed rejection claims become independent
+positives while older prefix rejection and neighboring invalid cases remain.
+General inference, polymorphism, missing initialization, assignment, shadowing,
+calls, Core/Resolved definitions, parser, diagnostics and wire policy are not added.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
@@ -712,7 +729,7 @@ rejection. Missing annotation/initializer, shadowing, self/forward references,
 arm-local lets and all invalid whole contracts remained outside that adapter.
 No parser/Core/Wire change, inference, defaults, general calls or binding policy.
 
-Recursive typed-let entry integration (ADR-0222) now connects the compiler,
+Recursive typed-let entry integration (ADR-0222) connects the compiler,
 preparer, whole typing and cost constructor to independent recursive judgments.
 Both arms keep the same original scope; annotated, initialized, fresh-name lets
 may alternate with terminal conditions at any finite depth. Original parameter-only
@@ -728,8 +745,11 @@ arbitrary-depth proofs and parsed actual declarations cover exact positional Cor
 strict noncommutative/unused work, asymmetric costs, opaque values and all-fuel
 multi-chunk checkpoints. Valid arm-local rejections become exact successes;
 missing annotations/initializers, shadowing, sibling leakage, mismatched returns,
-bad headers/arguments and invalid unselected children still reject. No inference,
-defaults, general calls, separate block wrappers or broader binding policy is added.
+bad headers/arguments and invalid unselected children rejected in that initial
+profile. ADR-0238 additionally accepts initialized lets with absent annotations by
+inferring their initializer type; all the other rejection boundaries remain.
+No general inference, defaults, general calls, separate block wrappers or broader
+binding policy is added.
 
 Direct recursive-body evaluation (ADR-0224) now executes the existing raw typed
 let/return-tree grammar on original blocks and actual explicit tables, composing
