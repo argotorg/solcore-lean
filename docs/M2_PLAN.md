@@ -339,9 +339,21 @@ gives exact Core evaluation and path correspondence in both directions.
 Child costs plus the actual body cost plus three transitions work uniformly
 under every continuation. Pending frames may still fault after the endpoint,
 and actual bodies can have effects or different costs for the same source call.
-Source-call evaluators, runtime-world safety and whole-entry integration remain
-separate work; existing executable definitions and old generic contracts are
-unchanged.
+Source-call evaluators and whole-entry integration remain separate work;
+existing executable definitions and old generic contracts are unchanged.
+
+Runtime-world safety now bridges the dynamic typing gap (ADR-0245). The actual
+environment, including captures and referenced locations, and the actual store
+are typed in one world. Whole source typing supplies a successful actual cost
+and runtime-typed result/final store in an extending world. Exact elaboration
+gives uniform continuation paths and closed fuel thresholds; raw evaluation and
+checked completion preserve the result type under the same explicit premises.
+Typed continuations additionally give all-fuel fault exclusion and preservation
+through genuine checkpoints and resumption. These state-only results use
+positional values; source correspondence separately retains ordered IDs.
+The existing restricted Core payload/reducibility rules justify successful
+execution, without a source-only bound, arbitrary-store guarantee, or any change
+to executable definitions or old body/entry acceptance.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

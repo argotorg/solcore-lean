@@ -16,6 +16,8 @@ import Solcore.Frontend.LocalFunctionApplicationEvaluation
 import Solcore.Frontend.LocalFunctionApplicationEvaluationProperties
 import Solcore.Frontend.LocalFunctionApplicationStepComposition
 import Solcore.Frontend.LocalFunctionApplicationExecutionProperties
+import Solcore.Frontend.LocalFunctionApplicationRuntimeSafetyProperties
+import Solcore.Frontend.LocalFunctionApplicationRuntimeStateProperties
 import Solcore.Frontend.LocalFragmentProperties
 import Solcore.Frontend.LocalExpressionEvaluationRules
 import Solcore.Frontend.LocalExpressionEvaluation
@@ -241,6 +243,12 @@ the actual body path plus three application transitions, uniformly under every
 continuation. Aligned runtime IDs connect it bidirectionally to the original
 Core application without inferring runtime typing, allocated cells, termination,
 or execution of pending continuation frames. Whole entries remain unchanged.
+
+Explicit runtime-world and store typing now give original-call result type
+preservation and successful actual costs. A typed outer continuation also gives
+fault exclusion at every fuel and typing/safety of genuine saved checkpoints.
+These premises cover actual captures and allocated cells, not merely structural
+value types; they imply neither an unchanged store nor a source-only bound.
 
 Independent source rules
 connect to checked Core execution. A direct original-expression evaluator

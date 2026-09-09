@@ -478,10 +478,29 @@ application transitions. That same cost works under every continuation, whose
 pending frames are retained rather than executed. The actual body may access or
 change cells and have a different cost for identical source syntax and types.
 Structural value typing does not establish allocated cells; raw selected-branch
-success does not establish whole static acceptance. These proofs provide no
-automatic termination/no-fault result, source-call evaluator or whole-entry
-integration. Existing body/entry contracts and all executable definitions remain
-unchanged.
+success does not establish whole static acceptance. These raw correspondence
+proofs alone provide no automatic termination/no-fault result, source-call
+evaluator or whole-entry integration. Existing body/entry contracts and all
+executable definitions remain unchanged.
+
+Explicit runtime-world safety now supplies the missing dynamic premises
+(ADR-0245). Actual caller and captured values must be runtime-typed in the same
+world as the actual store, including allocated reference locations and valid
+payload types. Independent whole-call typing then yields successful source
+evaluation with an actual exact cost, a possibly extended world, a well-typed
+final store and runtime-typed result. Exact elaboration retains that same cost
+under every continuation and gives both closed-run fuel thresholds. Preservation
+also applies to an independently supplied successful evaluation or checked run.
+
+For machine-state safety, typed positional values, the typed store and a typed
+continuation suffice; source-ID alignment is needed only for source evaluation
+correspondence. All-fuel fault exclusion and preservation through actual
+exhaustion checkpoints retain complete frames, captures and current stores.
+Untyped pending frames may still fault. Successful execution reuses Core's
+existing restricted payload/reducibility theorem with the empty data environment;
+it is not a termination claim for arbitrary stateful closure languages or a
+source-only bound. No checker/evaluator, body/entry, parser or Core definition
+changes are introduced.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
