@@ -150,7 +150,7 @@ private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (fun c =>
       have smaller : sizeOf arm.value.body < sizeOf arm := by rcases arm with ⟨_,⟨_,_⟩⟩; simp; omega
       let sc ← child i e; let p ← pattern arm.value.pattern; let a ← body i arm.value.body; let dc ← body i d
       if same : sc.1=.word then return ⟨.letE sc.2.core (.ifE (.binary .wordEq (.var 0) (.word p.1)) (a.core.weakenAt 0) (dc.core.weakenAt 0)),by
-        rw [shape]; exact .wordMatch (entries := [(arm,p.1,a.core)]) (same ▸ sc.2.evidence) rfl
+        rw [shape]; exact .wordMatch (entries := [(arm,some p.1,a.core)]) (same ▸ sc.2.evidence) rfl
           (by intro entry h; cases List.mem_singleton.mp h; exact p.2.down)
           (by intro entry h; cases List.mem_singleton.mp h; exact a.evidence) dc.evidence⟩
       else throw (IO.userError "scrutinee type")
