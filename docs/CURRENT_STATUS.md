@@ -650,6 +650,26 @@ roots, source lambdas and global function resolution remain outside this new
 profile; pure such subtrees remain usable as call children. No source-only fuel
 bound, store-invariance or arbitrary-store safety is inferred.
 
+A shared body engine now connects these recursive expression children to mixed
+bodies (ADR-0254). Its checker, independent typing/elaboration and raw/cost
+relations take separate child operations or judgments, not a bundled runtime
+contract. The original seven static and eight raw cases retain source spans,
+owner-filtered fresh IDs, initializer-before-binding, unchanged discard scope
+and selected-branch store flow. The concrete recursive body uses the ADR-0253
+child; no parallel family of specialized proof aliases is added.
+
+Twelve shared laws cover exact checking/typing, raw cost existence and joint
+determinism, Core evaluation and exact cost before every continuation, plus
+whole-body membership, weakening and literal insertion. A separate unit/leaf/
+let/if fragment closes the entire discarded tail, without requiring arbitrary
+child predicates to contain bare return. Paired paths retain actual captures,
+bound values and stores, with one cost chosen before every continuation.
+Old mixed elaborations and costs embed unchanged; static checking still inspects
+unselected written branches even when raw evaluation can skip them. Existing
+whole-function endpoints remain unchanged: connecting the new body to explicit
+header/argument gates is the next unit. No source-only bound, source closure construction,
+general early return or arbitrary-store safety follows from this integration.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

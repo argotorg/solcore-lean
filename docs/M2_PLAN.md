@@ -455,10 +455,20 @@ uses shared closed body paths without identifying intermediate checkpoints.
 The fourteen-kernel interface embeds old computation successes unchanged and
 does not broaden old pure, mixed-body or explicit-function endpoints.
 
-Next integrate this recursive child into mixed bodies and their explicit
-entries using the shared contracts. Recursion under other expression operators,
-expected-type source lambdas and global function resolution remain separate;
-the old stronger pure store/source-bound guarantees do not transfer.
+Recursive children now integrate into a shared mixed-body engine (ADR-0254).
+Separate child checker/typing/elaboration/raw/cost parameters preserve the
+original syntax and concrete scope policy without copying a specialized proof
+family. Twelve shared laws cover static, raw, exact Core/cost and whole-tail
+insertion contracts; five operation/judgment specializations provide the concrete
+recursive body, and two old-body elaboration/cost embeddings retain all indices.
+The whole unit/leaf/let/if fragment handles hidden discard slots and actual
+intermediate stores without runtime typing or world premises.
+
+Next connect this shared body to explicit compilation/preparation/running with
+the original header and ordered argument gates. Existing endpoints remain
+unchanged. Recursion under other expression operators, expected-type source
+lambdas and global function resolution remain separate; the old stronger pure
+store/source-bound guarantees do not transfer.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
