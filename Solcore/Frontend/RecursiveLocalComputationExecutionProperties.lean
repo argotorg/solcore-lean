@@ -55,6 +55,13 @@ private theorem reflects_pure_cost {table : LocalNameTable} {environment : Resol
       cases resolution with
       | conditional condition _ no => exact .ifFalse (conditionIH condition) (branchIH no)
 
+  | logicalNot _ ih =>
+      cases resolution with
+      | logicalNot child => exact .logicalNot (ih child)
+  | bitNot _ ih =>
+      cases resolution with
+      | bitNot child => exact .bitNot (ih child)
+
 private theorem reflects_pure {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value}
     (evaluation : RecursiveLocalComputationEvaluates table environment initialStore source value finalStore)
@@ -101,6 +108,30 @@ private theorem reflects_conditional_cost {table : LocalNameTable} {environment 
       | ifFalse guard branch => exact .inr ⟨_, _, _, .pure guard, .pure branch, rfl⟩
   | ifTrue guard branch => exact .inl ⟨_, _, _, guard, branch, rfl⟩
   | ifFalse guard branch => exact .inr ⟨_, _, _, guard, branch, rfl⟩
+
+private theorem reflects_logicalNot_cost {table : LocalNameTable} {environment : Resolved.Environment}
+    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+    {operand : Syntax.Expr} {value : Core.Value} {cost : Nat}
+    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+      ⟨span, .unary ⟨operatorSpan, .logicalNot⟩ operand⟩ value finalStore cost) :
+    ∃ operandValue childCost,
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore operand (.bool operandValue) finalStore childCost ∧
+      value = .bool (!operandValue) ∧ cost = childCost + 2 := by
+  cases evaluation with
+  | pure child => cases child with | logicalNot operand => exact ⟨_, _, .pure operand, rfl, rfl⟩
+  | logicalNot child => exact ⟨_, _, child, rfl, rfl⟩
+
+private theorem reflects_bitNot_cost {table : LocalNameTable} {environment : Resolved.Environment}
+    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+    {operand : Syntax.Expr} {value : Core.Value} {cost : Nat}
+    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+      ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩ value finalStore cost) :
+    ∃ operandValue childCost,
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore operand (.word operandValue) finalStore childCost ∧
+      value = .word operandValue.bitNot ∧ cost = childCost + 2 := by
+  cases evaluation with
+  | pure child => cases child with | bitNot operand => exact ⟨_, _, .pure operand, rfl, rfl⟩
+  | bitNot child => exact ⟨_, _, child, rfl, rfl⟩
 
 private theorem reflects_group_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {span : Syntax.SourceSpan} {inner : Syntax.Expr}
@@ -164,6 +195,29 @@ theorem RecursiveLocalComputationElaborates.evaluates_iff
         | ifTrue guard branch => exact .ifTrue (conditionIH.mpr guard) (thenIH.mpr branch)
         | ifFalse guard branch => exact .ifFalse (conditionIH.mpr guard) (elseIH.mpr branch)
 
+  | logicalNot _ ih =>
+      constructor
+      · intro evaluation
+        obtain ⟨_, costed⟩ := recursiveLocalComputationEvaluates_iff_exists_cost.mp evaluation
+        obtain ⟨_, _, child, rfl, _⟩ := reflects_logicalNot_cost costed
+        exact .unary (ih.mp (recursiveLocalComputationEvaluates_iff_exists_cost.mpr ⟨_, child⟩)) rfl
+      · intro evaluation
+        cases evaluation with
+        | @unary _ _ _ _ _ childValue _ child applied =>
+            cases childValue <;> cases applied
+            exact .logicalNot (ih.mpr child)
+  | bitNot _ ih =>
+      constructor
+      · intro evaluation
+        obtain ⟨_, costed⟩ := recursiveLocalComputationEvaluates_iff_exists_cost.mp evaluation
+        obtain ⟨_, _, child, rfl, _⟩ := reflects_bitNot_cost costed
+        exact .unary (ih.mp (recursiveLocalComputationEvaluates_iff_exists_cost.mpr ⟨_, child⟩)) rfl
+      · intro evaluation
+        cases evaluation with
+        | @unary _ _ _ _ _ childValue _ child applied =>
+            cases childValue <;> cases applied
+            exact .bitNot (ih.mpr child)
+
 theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value} {cost : Nat}
@@ -191,6 +245,13 @@ theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
       rcases reflects_conditional_cost evaluation with ⟨_, _, _, guard, branch, rfl⟩ | ⟨_, _, _, guard, branch, rfl⟩
       · exact CostStepComposition.ifTrue (conditionIH guard _) (thenIH branch _)
       · exact CostStepComposition.ifFalse (conditionIH guard _) (elseIH branch _)
+
+  | logicalNot _ ih =>
+      obtain ⟨_, _, child, rfl, rfl⟩ := reflects_logicalNot_cost evaluation
+      exact CostStepComposition.unary (ih child _) rfl
+  | bitNot _ ih =>
+      obtain ⟨_, _, child, rfl, rfl⟩ := reflects_bitNot_cost evaluation
+      exact CostStepComposition.unary (ih child _) rfl
 
 theorem RecursiveLocalComputationElaborates.evaluatesWithCost_iff_steps
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}

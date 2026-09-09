@@ -4,7 +4,7 @@ import Solcore.Core.Correspondence
 import Solcore.Core.ExactFuelProperties
 
 /-! Raw success and exact cost agree across overlapping pure and recursive
-groups, binaries and conditionals. Actual closures, arguments and stores are fixed by evaluation,
+groups, unary/binary operations and conditionals. Actual closures, arguments and stores are fixed by evaluation,
 not by a checker, type tags or a global restriction on skipped source syntax. -/
 
 set_option autoImplicit false
@@ -26,6 +26,8 @@ private theorem erase {table : LocalNameTable} {environment : Resolved.Environme
       exact .binary operator leftIH rightIH applied
   | ifTrue _ _ conditionIH branchIH => exact .ifTrue conditionIH branchIH
   | ifFalse _ _ conditionIH branchIH => exact .ifFalse conditionIH branchIH
+  | logicalNot _ ih => exact .logicalNot ih
+  | bitNot _ ih => exact .bitNot ih
 
 private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value}
@@ -57,6 +59,12 @@ private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Env
       obtain ⟨_, conditionCosted⟩ := conditionIH
       obtain ⟨_, branchCosted⟩ := branchIH
       exact ⟨_, .ifFalse conditionCosted branchCosted⟩
+  | logicalNot _ ih =>
+      obtain ⟨_, costed⟩ := ih
+      exact ⟨_, .logicalNot costed⟩
+  | bitNot _ ih =>
+      obtain ⟨_, costed⟩ := ih
+      exact ⟨_, .bitNot costed⟩
 
 theorem recursiveLocalComputationEvaluates_iff_exists_cost {table : LocalNameTable}
     {environment : Resolved.Environment} {initialStore finalStore : Core.Store}
@@ -103,6 +111,19 @@ private theorem agrees_with_pure {table : LocalNameTable} {environment : Resolve
       | ifFalse condition branch =>
           obtain ⟨_, rfl, rfl⟩ := conditionIH condition
           obtain ⟨rfl, rfl, rfl⟩ := branchIH branch
+          exact ⟨rfl, rfl, rfl⟩
+
+  | logicalNot _ ih =>
+      cases pureEvaluation with
+      | logicalNot child =>
+          obtain ⟨sameValue, rfl, rfl⟩ := ih child
+          cases sameValue
+          exact ⟨rfl, rfl, rfl⟩
+  | bitNot _ ih =>
+      cases pureEvaluation with
+      | bitNot child =>
+          obtain ⟨sameValue, rfl, rfl⟩ := ih child
+          cases sameValue
           exact ⟨rfl, rfl, rfl⟩
 
 /-- Successful recursive derivations determine the actual value, final store
@@ -157,6 +178,21 @@ theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalN
       | ifFalse otherCondition otherBranch =>
           obtain ⟨_, rfl, rfl⟩ := conditionIH otherCondition
           obtain ⟨rfl, rfl, rfl⟩ := branchIH otherBranch
+          exact ⟨rfl, rfl, rfl⟩
+
+  | logicalNot child ih =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.logicalNot child) other
+      | logicalNot other =>
+          obtain ⟨sameValue, rfl, rfl⟩ := ih other
+          cases sameValue
+          exact ⟨rfl, rfl, rfl⟩
+  | bitNot child ih =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.bitNot child) other
+      | bitNot other =>
+          obtain ⟨sameValue, rfl, rfl⟩ := ih other
+          cases sameValue
           exact ⟨rfl, rfl, rfl⟩
 
 end Solcore.Frontend
