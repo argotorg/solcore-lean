@@ -67,6 +67,11 @@ import Solcore.Frontend.ComputationReturnTreeProperties
 import Solcore.Frontend.ComputationReturnTreeTypingProperties
 import Solcore.Frontend.RecursiveComputationReturnTree
 import Solcore.Frontend.RecursiveComputationReturnTreeEmbeddingProperties
+import Solcore.Frontend.ComputationFunctionCompilation
+import Solcore.Frontend.ComputationFunctionEntry
+import Solcore.Frontend.ComputationFunctionProperties
+import Solcore.Frontend.ComputationFunctionFactorizationProperties
+import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.LocalFragmentProperties
 import Solcore.Frontend.LocalExpressionEvaluationRules
 import Solcore.Frontend.LocalExpressionEvaluation

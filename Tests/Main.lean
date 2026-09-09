@@ -222,6 +222,9 @@ import Solcore.Test.FrontendParsedRecursiveComputationEntries
 import Solcore.Test.FrontendRecursiveComputationBodyProperties
 import Solcore.Test.FrontendParsedRecursiveComputationBodies
 import Solcore.Test.FrontendParsedRecursiveComputationBodyEffects
+import Solcore.Test.FrontendRecursiveComputationFunctionProperties
+import Solcore.Test.FrontendParsedRecursiveComputationCompilation
+import Solcore.Test.FrontendParsedRecursiveComputationFunctionEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5845,6 +5848,8 @@ def run : IO Unit := do
   frontendParsedRecursiveComputationEntryTests
   frontendParsedRecursiveComputationBodyTests
   frontendParsedRecursiveComputationBodyEffectsTests
+  frontendParsedRecursiveComputationCompilationTests
+  frontendParsedRecursiveComputationFunctionEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

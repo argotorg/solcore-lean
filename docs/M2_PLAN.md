@@ -464,11 +464,19 @@ recursive body, and two old-body elaboration/cost embeddings retain all indices.
 The whole unit/leaf/let/if fragment handles hidden discard slots and actual
 intermediate stores without runtime typing or world premises.
 
-Next connect this shared body to explicit compilation/preparation/running with
-the original header and ordered argument gates. Existing endpoints remain
-unchanged. Recursion under other expression operators, expected-type source
-lambdas and global function resolution remain separate; the old stronger pure
-store/source-bound guarantees do not transfer.
+Shared explicit compilation/preparation/running now selects this body
+(ADR-0255). Independent whole-record provenance uses child elaboration, while
+operations use only the child checker. Two success-iff kernels need its checking
+correspondence; preparation and actual-running factorization hold for arbitrary
+checkers without semantic premises. The original header/return gates, ordered
+argument count/types and actual values reversed once remain explicit, with full
+fault/checkpoint outcomes and the separately supplied store. Five concrete
+specializations reuse the four laws; old entry endpoints remain unchanged.
+
+Next broaden recursive expression semantics beyond call/group roots using the
+shared body and entry contracts. Expected-type source lambdas and global
+function resolution remain separate; the old stronger pure store/source-bound
+guarantees do not transfer, and structural arguments alone do not validate stores.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

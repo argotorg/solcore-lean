@@ -666,9 +666,29 @@ child predicates to contain bare return. Paired paths retain actual captures,
 bound values and stores, with one cost chosen before every continuation.
 Old mixed elaborations and costs embed unchanged; static checking still inspects
 unselected written branches even when raw evaluation can skip them. Existing
-whole-function endpoints remain unchanged: connecting the new body to explicit
-header/argument gates is the next unit. No source-only bound, source closure construction,
+whole-function endpoints remain unchanged; a separate shared entry connects the
+new body below. No source-only bound, source closure construction,
 general early return or arbitrary-store safety follows from this integration.
+
+A shared explicit entry now compiles, prepares and runs recursive computation
+bodies (ADR-0255). Its operations receive only the child checker; independent
+whole compilation/preparation evidence receives only child elaboration. Original
+header policy, parameter declaration or actual binding, body provenance and the
+declared-return gate are retained. Five concrete specializations select the
+recursive child without adding a parallel wrapper-theorem family.
+
+Two exact-record success laws use the child's checking correspondence. Two
+full-Option factorization laws hold for any child checker, independently of
+semantic correctness: compilation and the original ordered argument types
+account for preparation rejection. A private checker graph supports only those
+operational equations, not independent source semantics. Actual running uses
+the original supplied values reversed once and the separately supplied store.
+Same-typed argument/capture swaps can change values and effects despite equal
+compiled projections; declared tags, faults and genuine checkpoints are kept.
+Existing pure/application/nonrecursive-computation endpoints remain unchanged.
+Structural argument evidence alone supplies neither store validation nor safety.
+Source closure construction, global source-function resolution and recursion
+under other expression roots remain separate.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
