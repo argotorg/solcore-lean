@@ -25,7 +25,8 @@ private theorem literal_not_wildcard {pattern : Syntax.Pattern} {word : Core.Wor
   cases literalShape
 
 theorem WordMatchChooses.deterministic
-    {value : Core.Value} {cases : List Syntax.MatchCase} {defaultBody left right : Syntax.Block}
+    {value : Core.Value} {cases : List Syntax.MatchCase} {defaultBody : Option Syntax.Block}
+    {left right : Syntax.Block}
     {leftTests rightTests : Nat}
     (first : WordMatchChooses value cases defaultBody left leftTests)
     (second : WordMatchChooses value cases defaultBody right rightTests) :
