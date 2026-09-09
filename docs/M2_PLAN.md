@@ -431,9 +431,21 @@ insertion under nested hidden binders without changing actual closure captures.
 Checker/typing correspondence, Core typing, raw/Core equivalence, exact costs
 and uniform continuation paths are proved independently. The old pure tree
 embeds with unchanged Core/type, not its stronger store or source-bound laws.
-Next connect this body to a separate original-header/actual-argument entry;
+This body feeds the separate original-header/actual-argument entry below;
 existing pure/application entries stay unchanged. General nested call syntax,
 source functions and arbitrary-store safety are outside this body profile.
+
+Explicit mixed-computation function compilation, preparation and running are
+available (ADR-0252). They preserve the original header/parameter policy and
+declared-return gate, reuse data-only records and retain independent new whole
+provenance. Four kernels cover exact-record Some iff and full-Option factoring
+through compilation and the ordered argument-type guard. Actual running uses
+the original arguments' values reversed once, not values inferred from erasure;
+same-typed swaps, all faults and genuine checkpoints remain observable. Old pure
+and singleton-application successes embed without changing their endpoints.
+Body typing/cost and generic Core runtime-world safety/resumption are reused
+directly instead of adding parallel wrapper families. Source-function resolution
+and recursive expression calls remain subsequent language extensions.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

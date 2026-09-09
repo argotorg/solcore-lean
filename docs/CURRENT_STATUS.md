@@ -611,9 +611,26 @@ captures. Original-ID agreement gives bidirectional Core correspondence and
 exact costs before any continuation. The old pure elaboration embeds with the
 same Core and type, but its store/source-bound guarantees are not transferred.
 Call-result lets, effectful discards and call guards are now body-level forms;
-nested expression calls, general early returns and new whole-function entry
-gates remain separate. Old pure/application entries and all runtime records are
+whole-function header and argument gates are handled separately below. Nested
+expression calls and general early returns remain outside the profile.
+Old pure/application entries and all runtime records are
 unchanged. Arbitrary-store safety and a source-only cost bound are not claimed.
+
+A separate explicit function entry now connects that mixed body to the original
+header and ordered parameters (ADR-0252). Independent compilation and preparation
+evidence retain the exact original Core and declared return type. Value-free
+compilation needs no actual inhabitants; preparation uses the same actual bound
+input record for its type-only view and runtime values.
+
+Four shared laws characterize exact-record checking and full-Option preparation
+and execution. Compilation plus the ordered argument-type guard accounts for
+all rejection. Running additionally uses the original argument values, reversed
+once, and the separately supplied store; declared tags, faults and genuine
+checkpoints are retained. Same-typed argument swaps are accepted but may change
+actual results or effects despite the same compiled projection. Old successful
+pure and singleton-application cases embed one way; old endpoints are unchanged.
+Runtime-world/store evidence is still needed for safety, and no new source-only
+bound, unfuelled evaluator or global source-call mechanism is introduced.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
