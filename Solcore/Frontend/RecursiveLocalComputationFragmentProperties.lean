@@ -17,6 +17,9 @@ theorem RecursiveLocalComputationFragment.weakenAt {expr : Core.Expr}
   | application _ _ calleeIH operandIH =>
       simp only [Core.Expr.weakenAt]
       exact .application (calleeIH cutoff) (operandIH cutoff)
+  | pair _ _ leftIH rightIH =>
+      simp only [Core.Expr.weakenAt]
+      exact .pair (leftIH cutoff) (rightIH cutoff)
   | binary _ _ leftIH rightIH =>
       simp only [Core.Expr.weakenAt]
       exact .binary (leftIH cutoff) (rightIH cutoff)
@@ -39,6 +42,7 @@ theorem RecursiveLocalComputationElaborates.core_fragment
   | pure _ lowered _ => exact .pure lowered.localFragment
   | group _ ih => exact ih
   | application _ _ calleeIH operandIH => exact .application calleeIH operandIH
+  | pair _ _ leftIH rightIH | many _ _ leftIH rightIH => exact .pair leftIH rightIH
   | binary _ _ _ leftIH rightIH => exact .binary leftIH rightIH
   | conditional _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
   | logicalNot _ childIH => exact .unary childIH

@@ -29,6 +29,15 @@ theorem RecursiveLocalComputationFragment.evaluates_insert_iff
         cases evaluation with
         | apply functionEvaluation argumentEvaluation bodyEvaluation =>
             exact .apply ((calleeIH leading).mpr functionEvaluation) ((operandIH leading).mpr argumentEvaluation) bodyEvaluation
+  | pair _ _ leftIH rightIH =>
+      simp only [Core.Expr.weakenAt]
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | pair left right => exact .pair ((leftIH leading).mp left) ((rightIH leading).mp right)
+      · intro evaluation
+        cases evaluation with
+        | pair left right => exact .pair ((leftIH leading).mpr left) ((rightIH leading).mpr right)
   | binary _ _ leftIH rightIH =>
       simp only [Core.Expr.weakenAt]
       constructor

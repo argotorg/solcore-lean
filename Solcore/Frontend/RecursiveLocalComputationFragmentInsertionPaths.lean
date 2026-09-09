@@ -37,6 +37,22 @@ theorem RecursiveLocalComputationFragment.insertion_paths
           · exact CostStepComposition.apply (functionPaths _).1 (argumentPaths _).1 bodyPath
           · simp only [Core.Expr.weakenAt]
             exact CostStepComposition.apply (functionPaths _).2 (argumentPaths _).2 bodyPath
+  | pair _ _ leftIH rightIH =>
+      cases evaluation with
+      | pair left right =>
+          obtain ⟨leftCost, leftPaths⟩ := leftIH leading left
+          obtain ⟨rightCost, rightPaths⟩ := rightIH leading right
+          refine ⟨leftCost + rightCost + 3, fun continuation => ?_⟩
+          constructor
+          · have path := Core.Steps.cons (.enterPair (continuation := continuation))
+              ((leftPaths _).1.trans (.cons .enterPairRight
+                ((rightPaths _).1.trans (.cons .applyPair .refl))))
+            simpa only [Nat.add_assoc] using path
+          · simp only [Core.Expr.weakenAt]
+            have path := Core.Steps.cons (.enterPair (continuation := continuation))
+              ((leftPaths _).2.trans (.cons .enterPairRight
+                ((rightPaths _).2.trans (.cons .applyPair .refl))))
+            simpa only [Nat.add_assoc] using path
   | binary _ _ leftIH rightIH =>
       cases evaluation with
       | binary leftEvaluation rightEvaluation applied =>
