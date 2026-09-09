@@ -58,6 +58,11 @@ private def statics (ctx : Resolved.Context) (s : Syntax.Expr) : IO (Static ctx 
   | ⟨span,.group inner⟩ =>
       check (span.contains inner.span) "group span"; let a ← statics ctx inner
       return ⟨a.core,a.type,by rw [shape]; exact .group a.elaboration,by rw [shape]; exact .group a.typing⟩
+  | ⟨_,.unary ⟨_,.bitNot⟩ inner⟩ =>
+      let a ← statics ctx inner
+      if same : a.type=.word then return ⟨.unary .wordNot a.core,.word,
+        by rw [shape]; exact .bitNot (same ▸ a.elaboration),by rw [shape]; exact .bitNot (same ▸ a.typing)⟩
+      else throw (IO.userError "migration Word operand")
   | ⟨span,.call fn ⟨argsSpan,[arg]⟩⟩ =>
       check (span.contains fn.span && span.contains argsSpan && argsSpan.contains arg.span) "original call children"
       let f ← statics ctx fn; let a ← statics ctx arg
@@ -242,7 +247,12 @@ def frontendParsedRecursiveConditionalComputationTests : IO Unit := do
       check (decide (Core.runStateful 7 (.initial core env.values store)=.outOfFuel cp ∧
         Core.runStateful 1 cp=.outOfFuel ⟨.eval (if c then nested else .var 1) env.values,[],store⟩ ∧
         Core.runStateful (if c then 12 else 2) cp=.done (if c then x else y) store)) "actual saved conditional frame/next choice/residual"
-  for text in ["c ? f(x) : c","x ? f(x) : y","c ? f(x) : Missing","c ? Missing : f(x)","c ? f(x) : f(c)","c ? f(x) : f()","(c ? f(x) : y,y)","~(c ? f(x) : y)"] do
+  let unarySource ← parsed "~(c ? f(x) : y)"; let unaryStatic ← statics (context .word) unarySource
+  let unaryCore := Core.Expr.unary .wordNot (.ifE (.var 2) (call 4 0) (.var 1))
+  have _ := elaborateRecursiveLocalComputation?_iff.mpr unaryStatic.elaboration
+  check (decide (unaryStatic.core=unaryCore ∧ unaryStatic.type=.word ∧ elaborateRecursiveLocalComputation? names (context .word) unarySource=some (unaryCore,.word) ∧
+    elaborateLocalExpression? names (context .word) unarySource=none ∧ elaborateLocalComputation? names (context .word) unarySource=none)) "original unary conditional exact success and old rejection"
+  for text in ["c ? f(x) : c","x ? f(x) : y","c ? f(x) : Missing","c ? Missing : f(x)","c ? f(x) : f(c)","c ? f(x) : f()","(c ? f(x) : y,y)"] do
     let s ← parsed text; check ((elaborateRecursiveLocalComputation? names (context .word) s).isNone) "whole branch/guard/profile rejection"
   for text in ["c ? f(x) : Missing","c ? f(x) : c","c ? f(x) : f()"] do
     let s ← parsed text; let r ← actual (environment .word (.word (Core.Word.ofNatModulo 17)) (.word (Core.Word.ofNatModulo 5)) true false) s

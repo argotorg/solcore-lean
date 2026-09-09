@@ -64,6 +64,16 @@ private def statics (ctx : Resolved.Context) (s : Syntax.Expr) : IO (Static ctx 
   | ⟨span,.group inner⟩ =>
       check (span.contains inner.span) "group span"; let a ← statics ctx inner
       return ⟨a.core,a.type,by rw [shape]; exact .group a.elaboration,by rw [shape]; exact .group a.typing⟩
+  | ⟨_,.unary ⟨_,.logicalNot⟩ inner⟩ =>
+      let a ← statics ctx inner
+      if same : a.type=.bool then return ⟨.unary .boolNot a.core,.bool,
+        by rw [shape]; exact .logicalNot (same ▸ a.elaboration),by rw [shape]; exact .logicalNot (same ▸ a.typing)⟩
+      else throw (IO.userError "migration Bool operand")
+  | ⟨_,.unary ⟨_,.bitNot⟩ inner⟩ =>
+      let a ← statics ctx inner
+      if same : a.type=.word then return ⟨.unary .wordNot a.core,.word,
+        by rw [shape]; exact .bitNot (same ▸ a.elaboration),by rw [shape]; exact .bitNot (same ▸ a.typing)⟩
+      else throw (IO.userError "migration Word operand")
   | ⟨span,.call fn ⟨argsSpan,[arg]⟩⟩ =>
       check (span.contains fn.span && span.contains argsSpan && argsSpan.contains arg.span && decide (fn.span.endByte≤argsSpan.startByte)) "call original children"
       let f ← statics ctx fn; let a ← statics ctx arg
@@ -268,11 +278,16 @@ def frontendParsedRecursiveBinaryComputationTests : IO Unit := do
       (CostStepComposition.apply (.cons (.var rfl) .refl) (.cons (.var rfl) .refl) (.cons (.var rfl) .refl)))
   let original ← parsed "c ? f(x) : y"
   check (decide (elaborateLocalExpression? names (context .word) original=none ∧ elaborateLocalComputation? names (context .word) original=none)) "conditional migration retains old rejection"
-  for text in ["f(x) < g(y)","f(x) <= g(y)","f(x) >= g(y)","f(x) != g(y)","(f(x),y)","~f(x)","f()","f(x,y)","f(Missing) + y"] do
+  for (text,type,op) in [("~f(x)",Core.Ty.word,Core.UnaryOp.wordNot),("!f(x)",.bool,.boolNot)] do
+    let s ← parsed text; let c ← statics (context type) s
+    have _ := elaborateRecursiveLocalComputation?_iff.mpr c.elaboration
+    check (decide (c.core=.unary op (call 1 0) ∧ c.type=type ∧ elaborateRecursiveLocalComputation? names (context type) s=some (.unary op (call 1 0),type) ∧
+      elaborateLocalExpression? names (context type) s=none ∧ elaborateLocalComputation? names (context type) s=none)) "original unary exact success and old rejection"
+  for text in ["f(x) < g(y)","f(x) <= g(y)","f(x) >= g(y)","f(x) != g(y)","(f(x),y)","f()","f(x,y)","f(Missing) + y"] do
     let s ← parsed text
     check (decide (elaborateRecursiveLocalComputation? names (context .word) s=none ∧ elaborateLocalComputation? names (context .word) s=none)) "retained nonrecursive root boundary"
-  for text in ["f(x) && g(y)","f(x) || g(y)","!f(x)"] do
+  for text in ["f(x) && g(y)","f(x) || g(y)"] do
     let inner ← parsed "f(x)"; let c ← statics (context .bool) inner
     check (decide (c.type=.bool)) "independent valid Bool child"
-    let s ← parsed text; check ((elaborateRecursiveLocalComputation? names (context .bool) s).isNone) "lazy/unary root still pure-only"
+    let s ← parsed text; check ((elaborateRecursiveLocalComputation? names (context .bool) s).isNone) "lazy root still pure-only"
 end Tests
