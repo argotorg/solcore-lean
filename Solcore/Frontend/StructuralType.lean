@@ -5,8 +5,8 @@ The separate named-only interpreter and its whole-result membership law stay unc
 set_option autoImplicit false
 namespace Solcore.Frontend
 
-/-- Exact named leaves, nullary Unit, singleton identity and right-associated products.
-Explicit child nesting is retained; no extra terminal Unit is introduced. -/
+/-- Exact named leaves, Unit, singleton identity, right-associated products and unary
+function annotations. Original child nesting and source parameter arity are retained. -/
 def interpretStructuralType? (table : TypeNameTable) (source : Syntax.TypeExpr) : Option Core.Ty :=
   match source with
   | ⟨_, .named name none⟩ => table.lookup? (qualifiedTypeNameKey name)
@@ -20,6 +20,13 @@ def interpretStructuralType? (table : TypeNameTable) (source : Syntax.TypeExpr) 
       let headType ← interpretStructuralType? table first
       let tailType ← interpretStructuralType? table ⟨span, .tuple (second :: third :: rest)⟩
       return .product headType tailType
+  | ⟨_, .function _ ⟨_, [parameter]⟩ none⟩ => do
+      let parameterType ← interpretStructuralType? table parameter
+      return .function parameterType .unit
+  | ⟨_, .function _ ⟨_, [parameter]⟩ (some ⟨returnsSpan, results⟩)⟩ => do
+      let parameterType ← interpretStructuralType? table parameter
+      let returnType ← interpretStructuralType? table ⟨returnsSpan, .tuple results⟩
+      return .function parameterType returnType
   | _ => none
 termination_by sizeOf source
 
@@ -42,5 +49,17 @@ inductive StructuralTypeDenotes (table : TypeNameTable) : Syntax.TypeExpr → Co
       (headMeaning : StructuralTypeDenotes table first firstType)
       (tailMeaning : StructuralTypeDenotes table ⟨span, .tuple (second :: third :: rest)⟩ tailType) :
       StructuralTypeDenotes table ⟨span, .tuple (first :: second :: third :: rest)⟩ (.product firstType tailType)
+  | functionDefault {span keyword parametersSpan : Syntax.SourceSpan}
+      {parameter : Syntax.TypeExpr} {parameterType : Core.Ty}
+      (parameterMeaning : StructuralTypeDenotes table parameter parameterType) :
+      StructuralTypeDenotes table ⟨span, .function keyword ⟨parametersSpan, [parameter]⟩ none⟩
+        (.function parameterType .unit)
+  | functionReturns {span keyword parametersSpan returnsSpan : Syntax.SourceSpan}
+      {parameter : Syntax.TypeExpr} {results : List Syntax.TypeExpr} {parameterType returnType : Core.Ty}
+      (parameterMeaning : StructuralTypeDenotes table parameter parameterType)
+      (returnMeaning : StructuralTypeDenotes table ⟨returnsSpan, .tuple results⟩ returnType) :
+      StructuralTypeDenotes table
+        ⟨span, .function keyword ⟨parametersSpan, [parameter]⟩ (some ⟨returnsSpan, results⟩)⟩
+        (.function parameterType returnType)
 
 end Solcore.Frontend
