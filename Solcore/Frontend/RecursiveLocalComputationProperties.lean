@@ -52,18 +52,22 @@ private theorem unary_children {table : LocalNameTable} {context : Resolved.Cont
 private theorem binary_children {table : LocalNameTable} {context : Resolved.Context}
     {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
     {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp} {core : Core.Expr} {type : Core.Ty}
-    (negated : Bool) (operator :
-      (DirectWordBinary sourceOp op ∧ negated = false) ∨
-      (sourceOp = .notEqual ∧ op = .wordEq ∧ negated = true) ∨
-      (sourceOp = .lessEqual ∧ op = .wordGt ∧ negated = true)) :
+    (ordered negated : Bool) (operator :
+      (DirectWordBinary sourceOp op ∧ ordered = false ∧ negated = false) ∨
+      (sourceOp = .notEqual ∧ op = .wordEq ∧ ordered = false ∧ negated = true) ∨
+      (sourceOp = .lessEqual ∧ op = .wordGt ∧ ordered = false ∧ negated = true) ∨
+      (sourceOp = .less ∧ op = .wordGt ∧ ordered = true ∧ negated = false) ∨
+      (sourceOp = .greaterEqual ∧ op = .wordGt ∧ ordered = true ∧ negated = true)) :
     elaborateRecursiveLocalComputation? table context
         ⟨span, .binary left ⟨operatorSpan, sourceOp⟩ right⟩ = some (core, type) ↔
       ∃ leftCore rightCore,
         elaborateRecursiveLocalComputation? table context left = some (leftCore, op.leftType) ∧
         elaborateRecursiveLocalComputation? table context right = some (rightCore, op.rightType) ∧
-        core = (if negated then .unary .boolNot (.binary op leftCore rightCore) else .binary op leftCore rightCore) ∧
+        core = (let body := if ordered then leftCore.wordLt rightCore else .binary op leftCore rightCore
+          if negated then .unary .boolNot body else body) ∧
         type = op.resultType := by
-  rcases operator with ⟨direct, rfl⟩ | ⟨rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl⟩
+  rcases operator with ⟨direct, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ |
+    ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩
   all_goals try cases direct
   all_goals
     simp only [elaborateRecursiveLocalComputation?, directWordBinary?, bind, Option.bind_eq_some_iff,
@@ -72,9 +76,7 @@ private theorem binary_children {table : LocalNameTable} {context : Resolved.Con
     · rintro ⟨⟨leftCore, leftType⟩, leftAccepted, ⟨rightCore, rightType⟩, rightAccepted, result⟩
       dsimp only at result
       split at result
-      next same =>
-        cases result
-        exact ⟨leftCore, rightCore, same.1 ▸ leftAccepted, same.2 ▸ rightAccepted, rfl, rfl⟩
+      next same => cases result; exact ⟨leftCore, rightCore, same.1 ▸ leftAccepted, same.2 ▸ rightAccepted, rfl, rfl⟩
       next => cases result
     · rintro ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩
       exact ⟨_, leftAccepted, _, rightAccepted, by simp⟩
@@ -95,9 +97,7 @@ private theorem conditional_children {table : LocalNameTable} {context : Resolve
       ⟨elseCore, elseType⟩, elseAccepted, result⟩
     dsimp only at result
     split at result
-    next same =>
-      cases result
-      exact ⟨conditionCore, thenCore, elseCore, same.1 ▸ conditionAccepted,
+    next same => cases result; exact ⟨conditionCore, thenCore, elseCore, same.1 ▸ conditionAccepted,
         thenAccepted, same.2 ▸ elseAccepted, rfl⟩
     next => cases result
   · rintro ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩
@@ -140,16 +140,22 @@ private theorem pure_complete {table : LocalNameTable} {context : Resolved.Conte
               cases constant
               exact (short_circuit_children true).mpr ⟨_, _, leftIH leftLowered leftTyped, rightIH rightLowered rightTyped, rfl, rfl⟩
   | notEqual _ _ leftIH rightIH | lessEqual _ _ leftIH rightIH =>
-      cases lowered with
-      | unary comparisonLowered =>
-          cases comparisonLowered with
-          | binary leftLowered rightLowered =>
-              cases typing with
-              | unary comparisonTyped =>
-                  cases comparisonTyped with
-                  | binary leftTyped rightTyped =>
-                      simp [elaborateRecursiveLocalComputation?, leftIH leftLowered leftTyped, rightIH rightLowered rightTyped,
-                        Core.BinaryOp.leftType, Core.BinaryOp.rightType, Core.UnaryOp.resultType]
+      cases lowered with | unary comparisonLowered =>
+        cases comparisonLowered with | binary leftLowered rightLowered =>
+          cases typing with | unary comparisonTyped =>
+            cases comparisonTyped with | binary leftTyped rightTyped =>
+              simp [elaborateRecursiveLocalComputation?, leftIH leftLowered leftTyped, rightIH rightLowered rightTyped,
+                Core.BinaryOp.leftType, Core.BinaryOp.rightType, Core.UnaryOp.resultType]
+  | less _ _ leftIH rightIH =>
+      cases lowered with | wordLt leftLowered rightLowered =>
+        cases typing with | wordLt leftTyped rightTyped =>
+          simp [elaborateRecursiveLocalComputation?, leftIH leftLowered leftTyped, rightIH rightLowered rightTyped]
+  | greaterEqual _ _ leftIH rightIH =>
+      cases lowered with | unary comparison =>
+        cases comparison with | wordLt leftLowered rightLowered =>
+          cases typing with | unary comparison =>
+            cases comparison with | wordLt leftTyped rightTyped =>
+              simp [elaborateRecursiveLocalComputation?, leftIH leftLowered leftTyped, rightIH rightLowered rightTyped, Core.UnaryOp.resultType]
   | add _ _ leftIH rightIH | subtract _ _ leftIH rightIH
   | multiply _ _ leftIH rightIH | divide _ _ leftIH rightIH
   | modulo _ _ leftIH rightIH | greater _ _ leftIH rightIH | equal _ _ leftIH rightIH
@@ -161,7 +167,7 @@ private theorem pure_complete {table : LocalNameTable} {context : Resolved.Conte
               rw [elaborateRecursiveLocalComputation?] <;>
                 simp [directWordBinary?, leftIH leftLowered leftTyped, rightIH rightLowered rightTyped]
   | _ =>
-      rw [elaborateRecursiveLocalComputation?] <;> try simp [directWordBinary?]
+      rw [elaborateRecursiveLocalComputation?] <;> try simp
       exact elaborateLocalExpression?_complete (by constructor <;> assumption) lowered typing
 
 private theorem application_children {table : LocalNameTable} {context : Resolved.Context}
@@ -182,9 +188,7 @@ private theorem application_children {table : LocalNameTable} {context : Resolve
     case function parameterType resultType =>
       dsimp only at result
       split at result
-      next same =>
-        cases result
-        exact ⟨functionCore, argumentCore, parameterType, functionAccepted, same ▸ argumentAccepted, rfl⟩
+      next same => cases result; exact ⟨functionCore, argumentCore, parameterType, functionAccepted, same ▸ argumentAccepted, rfl⟩
       next => cases result
   · rintro ⟨functionCore, argumentCore, parameterType, functionAccepted, argumentAccepted, rfl⟩
     exact ⟨(functionCore, .function parameterType type), functionAccepted,
@@ -201,15 +205,17 @@ private theorem complete {table : LocalNameTable} {context : Resolved.Context}
   | application _ _ functionIH argumentIH =>
       exact application_children.mpr ⟨_, _, _, functionIH, argumentIH, rfl⟩
   | binary operator _ _ leftIH rightIH =>
-      exact (binary_children false (.inl ⟨operator, rfl⟩)).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
+      exact (binary_children false false (.inl ⟨operator, rfl, rfl⟩)).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
   | conditional _ _ _ conditionIH thenIH elseIH =>
       exact conditional_children.mpr ⟨_, _, _, conditionIH, thenIH, elseIH, rfl⟩
   | logicalNot _ ih => exact (unary_children (Or.inl ⟨rfl, rfl⟩)).mpr ⟨_, ih, rfl, rfl⟩
   | bitNot _ ih => exact (unary_children (Or.inr ⟨rfl, rfl⟩)).mpr ⟨_, ih, rfl, rfl⟩
   | logicalAnd _ _ leftIH rightIH => exact (short_circuit_children false).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
   | logicalOr _ _ leftIH rightIH => exact (short_circuit_children true).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
-  | notEqual _ _ leftIH rightIH => exact (binary_children true (.inr (.inl ⟨rfl, rfl, rfl⟩))).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
-  | lessEqual _ _ leftIH rightIH => exact (binary_children true (.inr (.inr ⟨rfl, rfl, rfl⟩))).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
+  | notEqual _ _ leftIH rightIH => exact (binary_children false true (.inr (.inl ⟨rfl, rfl, rfl, rfl⟩))).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
+  | lessEqual _ _ leftIH rightIH => exact (binary_children false true (.inr (.inr (.inl ⟨rfl, rfl, rfl, rfl⟩)))).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
+  | less _ _ leftIH rightIH => exact (binary_children true false (.inr (.inr (.inr (.inl ⟨rfl, rfl, rfl, rfl⟩))))).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
+  | greaterEqual _ _ leftIH rightIH => exact (binary_children true true (.inr (.inr (.inr (.inr ⟨rfl, rfl, rfl, rfl⟩))))).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
 
 private theorem pure_sound {table : LocalNameTable} {context : Resolved.Context}
     {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
@@ -222,64 +228,63 @@ private theorem sound {table : LocalNameTable} {context : Resolved.Context}
     {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
     (accepted : elaborateRecursiveLocalComputation? table context source = some (core, type)) :
     RecursiveLocalComputationElaborates table context source core type := by
-  cases source with
-  | mk span payload =>
-      cases payload
-      case group inner =>
-        exact .group (sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted))
-      case unary operator operand =>
-        cases operator with
-        | mk operatorSpan sourceOp =>
-            cases sourceOp
-            case logicalNot =>
-              obtain ⟨childCore, child, rfl, rfl⟩ := (unary_children (Or.inl ⟨rfl, rfl⟩)).mp accepted
-              exact .logicalNot (sound child)
-            case bitNot =>
-              obtain ⟨childCore, child, rfl, rfl⟩ := (unary_children (Or.inr ⟨rfl, rfl⟩)).mp accepted
-              exact .bitNot (sound child)
-      case conditional condition question thenBranch colon elseBranch =>
-        obtain ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩ :=
-          conditional_children.mp accepted
-        exact .conditional (sound conditionAccepted) (sound thenAccepted) (sound elseAccepted)
-      case binary left operator right =>
-        cases operator with
-        | mk operatorSpan sourceOp =>
-            by_cases isAnd : sourceOp = .logicalAnd
-            · subst sourceOp
+  cases source with | mk span payload =>
+    cases payload
+    case group inner =>
+      exact .group (sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted))
+    case unary operator operand =>
+      cases operator with | mk operatorSpan sourceOp =>
+        cases sourceOp
+        case logicalNot =>
+          obtain ⟨childCore, child, rfl, rfl⟩ := (unary_children (Or.inl ⟨rfl, rfl⟩)).mp accepted
+          exact .logicalNot (sound child)
+        case bitNot =>
+          obtain ⟨childCore, child, rfl, rfl⟩ := (unary_children (Or.inr ⟨rfl, rfl⟩)).mp accepted
+          exact .bitNot (sound child)
+    case conditional condition question thenBranch colon elseBranch =>
+      obtain ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩ :=
+        conditional_children.mp accepted
+      exact .conditional (sound conditionAccepted) (sound thenAccepted) (sound elseAccepted)
+    case binary left operator right =>
+      cases operator with | mk operatorSpan sourceOp =>
+        cases mapped : directWordBinary? sourceOp with
+        | some op =>
+            have operator := directWordBinary?_iff.mp mapped
+            obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ :=
+              (binary_children false false (.inl ⟨operator, rfl, rfl⟩)).mp accepted
+            exact .binary operator (sound leftAccepted) (sound rightAccepted)
+        | none =>
+            cases sourceOp <;> simp [directWordBinary?] at mapped
+            case logicalAnd =>
               obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ := (short_circuit_children false).mp accepted
               exact .logicalAnd (sound leftAccepted) (sound rightAccepted)
-            by_cases isOr : sourceOp = .logicalOr
-            · subst sourceOp
+            case logicalOr =>
               obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ := (short_circuit_children true).mp accepted
               exact .logicalOr (sound leftAccepted) (sound rightAccepted)
-            by_cases isNe : sourceOp = .notEqual
-            · subst sourceOp
-              obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ := (binary_children true (.inr (.inl ⟨rfl, rfl, rfl⟩))).mp accepted
+            case notEqual =>
+              obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ := (binary_children false true (.inr (.inl ⟨rfl, rfl, rfl, rfl⟩))).mp accepted
               exact .notEqual (sound leftAccepted) (sound rightAccepted)
-            by_cases isLe : sourceOp = .lessEqual
-            · subst sourceOp
-              obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ := (binary_children true (.inr (.inr ⟨rfl, rfl, rfl⟩))).mp accepted
+            case lessEqual =>
+              obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ := (binary_children false true (.inr (.inr (.inl ⟨rfl, rfl, rfl, rfl⟩)))).mp accepted
               exact .lessEqual (sound leftAccepted) (sound rightAccepted)
-            cases mapped : directWordBinary? sourceOp with
-            | none => exact pure_sound (by cases sourceOp <;> simp_all [elaborateRecursiveLocalComputation?, directWordBinary?])
-            | some op =>
-                have operator := directWordBinary?_iff.mp mapped
-                obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ :=
-                  (binary_children false (.inl ⟨operator, rfl⟩)).mp accepted
-                exact .binary operator (sound leftAccepted) (sound rightAccepted)
-      case call callee arguments =>
+            case less =>
+              obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ := (binary_children true false (.inr (.inr (.inr (.inl ⟨rfl, rfl, rfl, rfl⟩))))).mp accepted
+              exact .less (sound leftAccepted) (sound rightAccepted)
+            case greaterEqual =>
+              obtain ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩ := (binary_children true true (.inr (.inr (.inr (.inr ⟨rfl, rfl, rfl, rfl⟩))))).mp accepted
+              exact .greaterEqual (sound leftAccepted) (sound rightAccepted)
+    case call callee arguments =>
+      cases arguments with | mk argumentsSpan arguments =>
         cases arguments with
-        | mk argumentsSpan arguments =>
-            cases arguments with
-            | nil => exact pure_sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted)
-            | cons argument rest =>
-                cases rest with
-                | nil =>
-                    obtain ⟨functionCore, argumentCore, parameterType, functionAccepted, argumentAccepted, rfl⟩ :=
-                      application_children.mp accepted
-                    exact .application (sound functionAccepted) (sound argumentAccepted)
-                | cons _ _ => exact pure_sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted)
-      all_goals exact pure_sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted)
+        | nil => exact pure_sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted)
+        | cons argument rest =>
+            cases rest with
+            | nil =>
+                obtain ⟨functionCore, argumentCore, parameterType, functionAccepted, argumentAccepted, rfl⟩ :=
+                  application_children.mp accepted
+                exact .application (sound functionAccepted) (sound argumentAccepted)
+            | cons _ _ => exact pure_sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted)
+    all_goals exact pure_sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted)
 termination_by sizeOf source
 
 theorem elaborateRecursiveLocalComputation?_iff
