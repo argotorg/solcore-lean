@@ -525,8 +525,21 @@ as exact successes. Wrong actual left payloads do not suppress right effects
 before comparison failure; comparison and negation checkpoints remain distinct.
 General named ne/le resolution and Rust execution-cost agreement are not claimed.
 
+Unsigned less and greater-or-equal now recurse through original Word children
+(ADR-0261). Exact Core retains two ordered positional bindings and, for
+greater-or-equal, an outer Bool negation; child costs add nine or eleven.
+Generic recursive-caller letE membership and arbitrary-prefix insertion keep
+actual bound values, captures, stores and one cost before every continuation.
+The right child need not be call-free. Reverse execution removes its generated
+insertion to recover the original source evaluation. Eight source constructors
+and one fragment constructor preserve fourteen signatures. The cost judgment
+is separately defined with its old import preserved; shared body/entry code
+stays unchanged. Original rejection sources and caller tables migrate intact,
+including generated-binding checkpoints and ordered effect/fault resumption.
+This fixed Word profile does not implement general named lt/ge resolution.
+
 Next extend recursive children to the remaining expression forms using these
-shared contracts. Ordered less/greater-equal comparisons, tuples,
+shared contracts. Tuples,
 expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
 transfer, and structural arguments alone do not validate stores.

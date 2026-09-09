@@ -242,6 +242,10 @@ import Solcore.Test.FrontendParsedRecursiveNegatedComparisonMigrations
 import Solcore.Test.FrontendRecursiveNegatedComparisonProperties
 import Solcore.Test.FrontendParsedRecursiveNegatedComparisons
 import Solcore.Test.FrontendParsedRecursiveNegatedComparisonEntries
+import Solcore.Test.FrontendParsedRecursiveOrderedComparisonMigrations
+import Solcore.Test.FrontendRecursiveOrderedComparisonProperties
+import Solcore.Test.FrontendParsedRecursiveOrderedComparisons
+import Solcore.Test.FrontendParsedRecursiveOrderedComparisonEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5879,6 +5883,9 @@ def run : IO Unit := do
   frontendParsedRecursiveNegatedComparisonMigrationTests
   frontendParsedRecursiveNegatedComparisonTests
   frontendParsedRecursiveNegatedComparisonEntryTests
+  frontendParsedRecursiveOrderedComparisonMigrationTests
+  frontendParsedRecursiveOrderedComparisonTests
+  frontendParsedRecursiveOrderedComparisonEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

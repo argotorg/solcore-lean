@@ -635,7 +635,7 @@ bound, unfuelled evaluator or global source-call mechanism is introduced.
 A separate recursive expression profile now admits nested single-argument calls,
 computed callees and arbitrary grouping (ADR-0253). Each original callee and
 argument is checked recursively in the same scope; direct unary, Word binary,
-negated comparison, conditional and fixed lazy roots are extended below.
+ordered/negated comparison, conditional and fixed lazy roots are extended below.
 Other roots retain the old pure interpretation.
 Independent syntax/type/Core evidence and raw/cost rules
 preserve the exact actual closure, captures and callee-to-argument-to-body store
@@ -643,13 +643,13 @@ order. Grouping adds no Core wrapper or transitions, even where pure/group
 derivations overlap. Fourteen shared kernels connect checking, typing, exact
 execution/cost and caller insertion, with unchanged old-success embeddings.
 
-The recursive caller fragment permits applications, direct unary/binary combinations
-and conditionals of recursively admitted children, without source lambda construction.
+The recursive caller fragment permits applications, direct unary/binary combinations,
+conditionals and generated lets of recursively admitted children, without source lambda construction.
 Its paired insertion paths use the same actual
 body path and one cost before every continuation; intermediate caller states
 need not coincide. Old mixed-body/function entries remain unchanged and do not
-accept these nested expressions. Calls under unextended operators or tuples,
-source lambdas and global function resolution remain outside this
+accept these nested expressions. Calls under tuples and other unextended expression
+forms, source lambdas and global function resolution remain outside this
 profile; pure such subtrees remain usable as call children. No source-only fuel
 bound, store-invariance or arbitrary-store safety is inferred.
 
@@ -706,9 +706,9 @@ remain unchanged. Private compatibility proofs reconcile old pure and new binary
 evidence, including raw lazy branches that skip unsupported syntax. Binary caller
 insertion preserves literal values, stores and one cost before every continuation.
 The former recursive addition rejection fixtures now assert independent exact
-success; the older nonrecursive endpoints retain their rejection. Ordered less/
-greater-equal comparisons and tuples do not gain recursive children here;
-recursive conditional, unary, fixed lazy and negated comparison roots are recorded below. Actual wrong
+success; the older nonrecursive endpoints retain their rejection. Tuples do not
+gain recursive children here; recursive conditional, unary, fixed lazy and
+ordered/negated comparison roots are recorded below. Actual wrong
 payloads can fault after a successful right child's effects; neither structural
 typing nor this extension supplies store safety.
 
@@ -797,8 +797,33 @@ rules already cover the expansion; shared body/entry definitions stay unchanged.
 Two original rejection fixtures migrate with identical source and ordered caller
 tables, while older endpoints and wrong operand types remain rejected. Parsed,
 symbolic and actual-entry consumers retain exact values, captures, effects,
-faults, costs and fuel boundaries. Ordered less/greater-equal, recursive tuples,
-general operator resolution, source-only bounds and store safety remain separate.
+faults, costs and fuel boundaries. Ordered less/greater-equal follow below;
+recursive tuples, general operator resolution, source-only bounds and store safety
+remain separate.
+
+Unsigned less and greater-or-equal now admit recursive children (ADR-0261).
+Both original Word operands retain their caller scope. The exact less-than Core
+evaluates and saves the left operand, evaluates the positionally shifted right
+operand once, then compares the saved right and left values. Greater-or-equal
+adds the original outer Bool negation. No source operand is swapped and no
+temporary LocalId is allocated. Exact successful costs add nine or eleven to
+the original child costs.
+
+One generic letE caller-fragment constructor supports both generated bindings.
+Insertion proofs retain the actual bound value ahead of an arbitrary caller
+prefix and choose one paired cost before every continuation. This handles
+recursive calls in the right operand without assuming the smaller call-free
+local fragment. Its actual captures and ordered stores stay literal. Reverse
+execution removes the same insertion to recover the original right source.
+
+Eight source constructors and the fragment constructor preserve all fourteen
+recursive signatures. The cost judgment moves to an independent definition
+module reexported through its old import. Shared body and entry definitions are
+unchanged. Original rejection fixtures migrate with identical source and caller
+tables. Consumers check generated-binding checkpoints, ordered writes, payload
+and child faults, exact fuel and full resumption. Recursive tuples, source
+closures, general lt/ge resolution, source-only bounds and store safety remain
+separate; this is not a claim about Rust's emitted AST or execution costs.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
