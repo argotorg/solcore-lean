@@ -20,6 +20,9 @@ def localExpressionFuelBound (source : Syntax.Expr) : Nat :=
   | ⟨_, .tuple ⟨_, []⟩⟩ => 1
   | ⟨_, .tuple ⟨_, [left, right]⟩⟩ =>
       localExpressionFuelBound left + localExpressionFuelBound right + 3
+  | ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩ =>
+      localExpressionFuelBound first +
+        localExpressionFuelBound ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ + 3
   | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ => localExpressionFuelBound operand + 2
   | ⟨_, .unary ⟨_, .bitNot⟩ operand⟩ => localExpressionFuelBound operand + 2
   | ⟨_, .binary left ⟨_, .add⟩ right⟩ =>
@@ -75,6 +78,7 @@ theorem LocalExpressionEvaluatesWithCost.cost_le_fuelBound
   | group _ ih => simpa only [localExpressionFuelBound] using ih
   | unit => simp only [localExpressionFuelBound, Nat.le_refl]
   | pair _ _ leftIH rightIH => simp only [localExpressionFuelBound]; omega
+  | many _ _ headIH tailIH => rw [localExpressionFuelBound]; omega
   | logicalNot _ ih => simp only [localExpressionFuelBound]; omega
   | bitNot _ ih => simp only [localExpressionFuelBound]; omega
   | add _ _ leftIH rightIH => simp only [localExpressionFuelBound]; omega

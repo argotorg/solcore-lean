@@ -7,9 +7,9 @@ import Solcore.Resolved.EvaluationProperties
 Evaluation requires only the selected branch, not whole-expression resolution.
 Short-circuit forms forward any selected right value at this raw boundary;
 source typing separately requires both operands to be Boolean. Word arithmetic,
-bitwise operations, unsigned comparisons, Word equality/inequality and binary tuples
-evaluate both operands left to right. Binary tuples retain arbitrary actual component
-values; an empty tuple denotes unit without any lookup.
+bitwise operations, unsigned comparisons, Word equality/inequality and tuple elements
+evaluate left to right. Tuples retain arbitrary actual components in right-associated
+pairs; an empty tuple denotes unit without any lookup.
 Both stores are explicit even though every constructor is store-preserving. Strict Word literals
 return their independently denoted value without consulting caller tables. -/
 
@@ -45,6 +45,14 @@ inductive LocalExpressionEvaluates (table : LocalNameTable) (environment : Resol
       (rightEvaluation : LocalExpressionEvaluates table environment middleStore right rightValue finalStore) :
       LocalExpressionEvaluates table environment initialStore
         { span, value := .tuple ⟨tupleSpan, [left, right]⟩ } (.pair leftValue rightValue) finalStore
+  | many {initialStore middleStore finalStore : Core.Store}
+      {span tupleSpan : Syntax.SourceSpan} {first second third : Syntax.Expr}
+      {rest : List Syntax.Expr} {headValue tailValue : Core.Value}
+      (headEvaluation : LocalExpressionEvaluates table environment initialStore first headValue middleStore)
+      (tailEvaluation : LocalExpressionEvaluates table environment middleStore
+        ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ tailValue finalStore) :
+      LocalExpressionEvaluates table environment initialStore
+        ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩ (.pair headValue tailValue) finalStore
   | logicalNot {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
       {operand : Syntax.Expr} {value : Bool}
       (child : LocalExpressionEvaluates table environment initialStore operand (.bool value) finalStore) :
@@ -221,6 +229,7 @@ theorem LocalExpressionEvaluates.store_eq {table : LocalNameTable}
   | ifTrue _ _ conditionIH branchIH | ifFalse _ _ conditionIH branchIH =>
       exact branchIH.trans conditionIH
   | pair _ _ leftIH rightIH
+  | many _ _ leftIH rightIH
   | add _ _ leftIH rightIH | bitAnd _ _ leftIH rightIH | bitOr _ _ leftIH rightIH | bitXor _ _ leftIH rightIH
   | subtract _ _ leftIH rightIH | multiply _ _ leftIH rightIH | greater _ _ leftIH rightIH
   | divide _ _ leftIH rightIH | modulo _ _ leftIH rightIH

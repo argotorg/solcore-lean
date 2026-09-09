@@ -3,7 +3,7 @@ import Solcore.Frontend.WordLiteral
 
 /-! An additive canonical adapter for identifiers, strict Word literals, grouping,
 conditionals, Boolean operators, Word arithmetic/bitwise operators, unsigned
-Word comparisons, equality/inequality and empty/binary tuples. Its explicit name table
+Word comparisons, equality/inequality and empty/right-associated tuples. Its explicit name table
 supplies identities, including any bindings for `true` or `false`; literals do
 not consult that table. This fixed literal interpretation is local to the adapter,
 not a general source conversion or overload policy. Other expression forms,
@@ -26,6 +26,9 @@ def resolveLocalExpression? (table : LocalNameTable) (source : Syntax.Expr) :
   | ⟨_, .tuple ⟨_, []⟩⟩ => some .unit
   | ⟨_, .tuple ⟨_, [left, right]⟩⟩ => do
       return .pair (← resolveLocalExpression? table left) (← resolveLocalExpression? table right)
+  | ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩ => do
+      return .pair (← resolveLocalExpression? table first)
+        (← resolveLocalExpression? table ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩)
   | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ =>
       (resolveLocalExpression? table operand).map (Resolved.Expr.unary .boolNot)
   | ⟨_, .unary ⟨_, .bitNot⟩ operand⟩ =>
@@ -104,6 +107,13 @@ inductive ResolvesLocalExpression (table : LocalNameTable) :
       (rightChild : ResolvesLocalExpression table right resolvedRight) :
       ResolvesLocalExpression table
         { span, value := .tuple ⟨tupleSpan, [left, right]⟩ } (.pair resolvedLeft resolvedRight)
+  | many {span tupleSpan : Syntax.SourceSpan} {first second third : Syntax.Expr}
+      {rest : List Syntax.Expr} {resolvedHead resolvedTail : Resolved.Expr}
+      (headChild : ResolvesLocalExpression table first resolvedHead)
+      (tailChild : ResolvesLocalExpression table
+        ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ resolvedTail) :
+      ResolvesLocalExpression table
+        ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩ (.pair resolvedHead resolvedTail)
   | logicalNot {span operatorSpan : Syntax.SourceSpan}
       {operand : Syntax.Expr} {resolvedOperand : Resolved.Expr}
       (operandChild : ResolvesLocalExpression table operand resolvedOperand) :
