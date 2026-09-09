@@ -193,7 +193,7 @@ private def body (mode : Bool) (r n : Nat) : Syntax.Block := ⟨span,
   [⟨span, .letDecl ⟨span, "r"⟩ none (some (source mode r n))⟩, ⟨span, .returnStmt (some ⟨span, .identifier ⟨span, "r"⟩⟩)⟩]⟩
 private theorem bodyElab (mode : Bool) (r n : Nat) : RecursiveComputationReturnTreeElaborates [] owner (inputs mode)
     (body mode r n) (.letE (core mode r n) (.var 0)) (ty mode) :=
-  .inferred (by change ¬"r" ∈ ["f", "x"]; decide) (elaboration mode r n)
+  .inferred (elaboration mode r n)
     (.expression (.pure (.identifier .head) (.var .head) (.var .head)))
 private theorem bodyCost (mode : Bool) (r n m : Nat) (b : Bool) (w : Core.Word) (captures : Core.Environment) (s : Core.Store) :
     RecursiveComputationReturnTreeEvaluatesWithCost owner (inputs mode).names (env mode m b w captures) s (body mode r n) (result mode r b w) s (charge r n m + 3) := by

@@ -56,6 +56,7 @@ private theorem tailElab (a : Core.Ty) :
     exact .conditional (.pure (.identifier (.tail (by change "r" ≠ "c"; decide) (.tail (by change "x" ≠ "c"; decide) (.tail (by change "f" ≠ "c"; decide) .head))))
       (.var (.tail (by change rid ≠ cid; decide) (.tail (by change xid ≠ cid; decide) (.tail (by change fid ≠ cid; decide) .head))))
       (.var (.tail (by change rid ≠ cid; decide) (.tail (by change xid ≠ cid; decide) (.tail (by change fid ≠ cid; decide) .head)))))
+      (computationBlockPreservesNames_iff.mp (by simp only [returned, computationBlockPreservesNames]))
       (.expression (.pure (.identifier .head) (.var .head) (.var .head)))
       (.expression (.pure (.identifier (.tail (by change "r" ≠ "x"; decide) .head)) (.var (.tail (by change rid ≠ xid; decide) .head))
         (.var (.tail (by change rid ≠ xid; decide) .head))))
@@ -65,8 +66,8 @@ private theorem tailElab (a : Core.Ty) :
 private theorem provenance (annotated : Bool) (n : Nat) (a : Core.Ty) :
     RecursiveComputationReturnTreeElaborates (types a) owner (inputs a) (body annotated n) (core n) a := by
   cases annotated
-  · exact .block (.inferred (by simp [inputs, LocalTypeInputs.names]) (childElab n a) (tailElab a))
-  · exact .block (.binding (.named .head) (by simp [inputs, LocalTypeInputs.names]) (childElab n a) (tailElab a))
+  · exact .block (.inferred (childElab n a) (tailElab a))
+  · exact .block (.binding (.named .head) (childElab n a) (tailElab a))
 private def delay : Nat → Nat → Core.Expr
   | 0, index => .var index
   | n + 1, index => .letE (.var 0) (delay n (index + 1))

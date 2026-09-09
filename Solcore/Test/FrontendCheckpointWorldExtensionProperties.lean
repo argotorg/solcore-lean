@@ -24,7 +24,7 @@ private def invocation : Core.Expr := .apply (.var 1) (.var 0)
 private def core : Core.Expr := .letE invocation (.var 0)
 private theorem elaborated (b : Core.Ty) :
     RecursiveComputationReturnTreeElaborates [] owner (inputs b) source core b :=
-  .inferred (by change "r" ∉ ["x","f"]; decide)
+  .inferred
     (.application (.pure (.identifier (.tail (by change "x" ≠ "f"; decide) .head))
       (.var (.tail (by change (⟨owner,1⟩ : Resolved.LocalId) ≠ ⟨owner,0⟩; decide) .head))
       (.var (.tail (by change (⟨owner,1⟩ : Resolved.LocalId) ≠ ⟨owner,0⟩; decide) .head)))

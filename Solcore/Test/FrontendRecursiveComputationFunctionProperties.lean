@@ -56,7 +56,7 @@ private theorem provenance (n : Nat) (a : Core.Ty) :
     RecursiveComputationReturnTreeElaborates (types a) owner (initial a) (body n) (core n) a := by
   have shift : (Core.Expr.var 0).weakenAt 0 = .var 1 := by simp [Core.Expr.weakenAt]
   simp only [body, core, tailCore, ← shift]
-  refine .inferred (by change "r" ∉ ["y", "x", "f"]; decide) (child n a) ?_
+  refine .inferred (child n a) ?_
   exact .discard (.pure (.identifier .head) (.var .head) (.var .head))
     (.expression (.pure (.identifier .head) (.var .head) (.var .head)))
 private theorem compilation (n : Nat) (a : Core.Ty) : RecursiveComputationFunctionCompiles (types a) owner (entry n) (compiled n a) :=

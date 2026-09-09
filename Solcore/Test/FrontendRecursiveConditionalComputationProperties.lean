@@ -246,7 +246,7 @@ private def body (n k : Nat) : Syntax.Block := ⟨span,
   [⟨span, .letDecl ⟨span, "r"⟩ none (some (source n k))⟩, ⟨span, .returnStmt (some ⟨span, .identifier ⟨span, "r"⟩⟩)⟩]⟩
 private theorem bodyElab (a : Core.Ty) (n k : Nat) : RecursiveComputationReturnTreeElaborates [] owner (inputs a)
     (body n k) (.letE (core n k) (.var 0)) a :=
-  .inferred (by change ¬"r" ∈ ["p", "x", "f", "g", "y", "c"]; decide) (elaboration a n k)
+  .inferred (elaboration a n k)
     (.expression (.pure (.identifier .head) (.var .head) (.var .head)))
 private theorem bodyCosted (a : Core.Ty) (v : Actual) (n k : Nat) (s : Core.Store) :
     RecursiveComputationReturnTreeEvaluatesWithCost owner (inputs a).names (env a v) s (body n k) (result v) s (cost v n k + 3) := by

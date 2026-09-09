@@ -36,7 +36,7 @@ private theorem elaborated (a b : Core.Ty) :
     RecursiveComputationReturnTreeElaborates [] owner (inputs a b) source core b := by
   have shift : (Core.Expr.var 0).weakenAt 0 = .var 1 := by simp [Core.Expr.weakenAt]
   simp only [source,core,tailCore,←shift]
-  exact .inferred (by change "r" ∉ ["x","f"]; decide) (child a b)
+  exact .inferred (child a b)
     (.discard (.pure (.identifier .head) (.var .head) (.var .head))
       (.expression (.pure (.identifier .head) (.var .head) (.var .head))))
 private theorem counted (a b : Core.Ty) (body : Core.Expr) (captured : Core.Environment)

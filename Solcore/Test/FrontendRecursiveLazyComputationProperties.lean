@@ -207,7 +207,7 @@ private def body (isOr : Bool) (n k : Nat) : Syntax.Block := ⟨span,
   [⟨span,.letDecl ⟨span,"r"⟩ none (some (source isOr n k))⟩,⟨span,.returnStmt (some ⟨span,.identifier ⟨span,"r"⟩⟩)⟩]⟩
 private theorem bodyElab (isOr : Bool) (n k : Nat) :
     RecursiveComputationReturnTreeElaborates [] owner inputs (body isOr n k) (.letE (core isOr n k) (.var 0)) .bool :=
-  .inferred (by change ¬"r" ∈ ["f","c","g","x"]; decide) (elaboration isOr n k)
+  .inferred (elaboration isOr n k)
     (.expression (.pure (.identifier .head) (.var .head) (.var .head)))
 private theorem bodyCost (isOr : Bool) (v : Actual) (n k : Nat) (s : Core.Store) :
     RecursiveComputationReturnTreeEvaluatesWithCost owner inputs.names (env v) s (body isOr n k) (result isOr v) s (cost isOr v n k+3) := by

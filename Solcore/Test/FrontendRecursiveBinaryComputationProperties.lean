@@ -65,7 +65,7 @@ private theorem elaboration {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp} (o
   .binary operator (by cases operator <;> exact callsElab false n) (by cases operator <;> exact callsElab true k)
 private theorem bodyElab {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp} (operator : DirectWordBinary sourceOp op) (n k : Nat) :
     RecursiveComputationReturnTreeElaborates [] owner inputs (body sourceOp n k) (bodyCore op n k) op.resultType :=
-  .inferred (by decide) (elaboration operator n k) (.expression (.pure (.identifier .head) (.var .head) (.var .head)))
+  .inferred (elaboration operator n k) (.expression (.pure (.identifier .head) (.var .head) (.var .head)))
 private def delay : Nat → Nat → Core.Expr
   | 0, index => .var index
   | n + 1, index => .letE (.var 0) (delay n (index + 1))

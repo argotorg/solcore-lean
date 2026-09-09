@@ -242,7 +242,7 @@ private def body (isGe : Bool) (n k : Nat) : Syntax.Block := ⟨span,
   [⟨span,.letDecl ⟨span,"r"⟩ none (some (source isGe n k))⟩,⟨span,.returnStmt (some ⟨span,.identifier ⟨span,"r"⟩⟩)⟩]⟩
 private theorem bodyElab (isGe : Bool) (n k : Nat) :
     RecursiveComputationReturnTreeElaborates [] owner inputs (body isGe n k) (.letE (core isGe n k) (.var 0)) .bool :=
-  .inferred (by change ¬"r" ∈ ["f","x","g","y","c"]; decide) (elaboration isGe n k)
+  .inferred (elaboration isGe n k)
     (.expression (.pure (.identifier .head) (.var .head) (.var .head)))
 private theorem bodyCost (isGe : Bool) (a : Actual) (n k : Nat) (s : Core.Store) :
     RecursiveComputationReturnTreeEvaluatesWithCost owner inputs.names (env a) s (body isGe n k) (result isGe a) s (cost isGe a n k+3) := by
