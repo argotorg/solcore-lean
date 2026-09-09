@@ -670,6 +670,24 @@ resumption with explicit same-world evidence. The three old Bool wildcard-only
 rejections migrate with exact original source contexts. Nominal construction,
 broader numeric patterns and global/constructor resolution are not implied.
 
+Unary structural function annotations now extend the shared type interpreter
+and independent meaning rules (ADR-0272). Keep exactly one original parameter;
+an explicit Unit/product parameter is not zero/multiple source arguments.
+Absent/empty returns mean Unit, singleton returns preserve their child, and
+multiple returns use the existing right-associated tuple meaning under their
+original delimiter span. Nested function types are allowed recursively without
+normalizing the original AST or adding whole-function alias requirements.
+
+All thirteen structural interpretation/extension contracts retain their
+signatures. Existing parameter, recursive typed-let and single outer return gates inherit
+the extension; the outer declaration's absent/single policy is unchanged.
+Independent symbolic and parsed consumers retain old fixture contexts, lookup
+priority, strict child failures and wrong actual argument rejection. Supplied
+closure factories/writers exercise actual captures, allocation, writes, returned
+closures, exact costs, all-fuel outcomes and genuine checkpoint/world extension.
+No source lambda, call-arity expansion, global resolution or implicit runtime
+world/inhabitant follows from function type meaning.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

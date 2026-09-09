@@ -1041,6 +1041,32 @@ slots, captured closures, writes and genuine saved-world extension. Only match
 constructors and checker decomposition generalize; shared12, recursive14,
 entry4, strict/grouped pattern laws and older runtime interfaces stay intact.
 
+Explicit function type annotations now have independent structural meanings
+when their original parameter list contains exactly one type (ADR-0272).
+An absent or empty return list means Unit; a singleton keeps its child type,
+and multiple returns form right-associated products without a terminal Unit.
+Nested functions and explicit tuple nesting are retained, as are the original
+keyword, delimiter ranges, list order and absent/present distinction. Named
+leaves use the same caller table and first-match priority; no function alias
+row or runtime inhabitant is required. Existing exactness, uniqueness, span,
+extension and whole-option lookup laws retain their public signatures.
+
+The existing parameter, recursive typed-let and single outer return annotation
+gates inherit this support without changing Core or execution rules. Parsed
+consumers use actual supplied factory/writer closures to allocate, capture,
+write, invoke and return another closure, preserving exact source/Core costs,
+values, stores and genuine resumption. Missing references retain earlier effects;
+corrupt stores can still produce raw values, while opt-in same-world validation
+rejects them. Static annotation meaning is not a runtime-safety assertion.
+
+Source arity remains explicit: function((A,B)) and function(()) are unary,
+whereas zero/multiple-parameter function types and calls remain outside this
+profile. Inner function return lists do not broaden the separate outer
+declaration policy: it still accepts absence or one written annotation only.
+Named-only adapters, source lambdas, global resolution and unsupported type
+constructors remain unchanged. Old rejection fixtures migrate with their exact
+source contexts; wrong Unit/Word arguments still fail actual binding.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
