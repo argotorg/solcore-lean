@@ -29,6 +29,7 @@ theorem elaborateTypedLetReturnTree?_evaluates_iff
       · intro evaluation
         cases evaluation with
         | single evaluated => exact (elaborateReturnBody?_evaluates_iff child.complete sameIds).mp evaluated
+        | block _ => cases child
         | binding _ _ => cases child
         | inferred _ _ => cases child
         | discard _ _ => cases child
@@ -36,6 +37,14 @@ theorem elaborateTypedLetReturnTree?_evaluates_iff
         | ifFalse _ _ => cases child
       · intro evaluated
         exact .single ((elaborateReturnBody?_evaluates_iff child.complete sameIds).mpr evaluated)
+  | block _ ih =>
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | single child => cases child
+        | block evaluated => exact (ih sameIds).mp evaluated
+      · intro evaluated
+        exact .block ((ih sameIds).mpr evaluated)
   | @binding inputs _ _ name _ _ _ declaredType _ _ _ _ _ _ resolution lowered typing _ ih =>
       have initializerAccepted := elaborateLocalExpression?_complete resolution
         (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
@@ -143,11 +152,16 @@ theorem TypedLetReturnTreeEvaluatesWithCost.checked_toStepsWithContinuation
   | single child =>
       cases evaluation with
       | single evaluated => exact evaluated.checked_toStepsWithContinuation child.complete sameIds continuation
+      | block _ => cases child
       | binding _ _ => cases child
       | inferred _ _ => cases child
       | discard _ _ => cases child
       | ifTrue _ _ => cases child
       | ifFalse _ _ => cases child
+  | block _ ih =>
+      cases evaluation with
+      | single child => cases child
+      | block evaluated => exact ih evaluated sameIds continuation
   | @binding inputs _ _ _ _ _ _ _ _ _ _ _ _ _ resolution lowered _ _ ih =>
       cases evaluation with
       | single child => cases child

@@ -16,6 +16,7 @@ theorem TypedLetReturnTreeEvaluates.store_eq
     finalStore = initialStore := by
   induction evaluation with
   | single child => exact child.store_eq
+  | block _ ih => exact ih
   | binding child _ ih | inferred child _ ih | discard child _ ih | ifTrue child _ ih | ifFalse child _ ih =>
       exact ih.trans child.store_eq
 
@@ -30,7 +31,11 @@ theorem TypedLetReturnTreeEvaluates.deterministic
   | single child =>
       cases second with
       | single other => exact child.deterministic other
-      | binding _ _ | inferred _ _ | discard _ _ | ifTrue _ _ | ifFalse _ _ => cases child
+      | block _ | binding _ _ | inferred _ _ | discard _ _ | ifTrue _ _ | ifFalse _ _ => cases child
+  | block _ ih =>
+      cases second with
+      | single other => cases other
+      | block other => exact ih other
   | binding initializer _ ih =>
       cases second with
       | single other => cases other
@@ -77,6 +82,9 @@ theorem TypedLetReturnTreeHasType.evaluates
   | single child =>
       obtain ⟨value, evaluation, typed⟩ := child.evaluates sameIds environmentTyped store
       exact ⟨value, .single evaluation, typed⟩
+  | block _ ih =>
+      obtain ⟨value, evaluation, typed⟩ := ih sameIds environmentTyped
+      exact ⟨value, .block evaluation, typed⟩
   | @binding inputs blockSpan letSpan name annotation initializer rest declaredType returnType
       _ _ initializerTyping _ ih =>
       obtain ⟨boundValue, initializerEvaluation, boundTyped⟩ :=
@@ -146,6 +154,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.erase
     TypedLetReturnTreeEvaluates owner table environment initialStore body value finalStore := by
   induction evaluation with
   | single child => exact .single child.erase
+  | block _ ih => exact .block ih
   | binding initializer _ ih => exact .binding initializer.erase ih
   | inferred initializer _ ih => exact .inferred initializer.erase ih
   | discard expression _ ih => exact .discard expression.erase ih
@@ -161,6 +170,9 @@ theorem TypedLetReturnTreeEvaluates.exists_cost
   | single child =>
       obtain ⟨cost, costed⟩ := child.exists_cost
       exact ⟨cost, .single costed⟩
+  | block _ ih =>
+      obtain ⟨cost, costed⟩ := ih
+      exact ⟨cost, .block costed⟩
   | binding initializer _ ih =>
       obtain ⟨_, initializerCost⟩ := initializer.exists_cost
       obtain ⟨_, tailCost⟩ := ih
@@ -200,9 +212,10 @@ theorem TypedLetReturnTreeEvaluatesWithCost.cost_pos
     {initialStore finalStore : Core.Store} {body : Syntax.Block} {value : Core.Value} {cost : Nat}
     (evaluation : TypedLetReturnTreeEvaluatesWithCost owner table environment initialStore body value finalStore cost) :
     0 < cost := by
-  cases evaluation with
+  induction evaluation with
   | single child => exact child.cost_pos
-  | binding _ _ | inferred _ _ | discard _ _ | ifTrue _ _ | ifFalse _ _ => omega
+  | block _ ih => exact ih
+  | binding _ _ _ | inferred _ _ _ | discard _ _ _ | ifTrue _ _ _ | ifFalse _ _ _ => omega
 
 theorem TypedLetReturnTreeEvaluatesWithCost.deterministic
     {owner : Resolved.DeclarationId} {table : LocalNameTable} {environment : Resolved.Environment}
@@ -215,7 +228,11 @@ theorem TypedLetReturnTreeEvaluatesWithCost.deterministic
   | single child =>
       cases second with
       | single other => exact child.deterministic other
-      | binding _ _ | inferred _ _ | discard _ _ | ifTrue _ _ | ifFalse _ _ => cases child
+      | block _ | binding _ _ | inferred _ _ | discard _ _ | ifTrue _ _ | ifFalse _ _ => cases child
+  | block _ ih =>
+      cases second with
+      | single other => cases other
+      | block other => exact ih other
   | binding initializer _ ih =>
       cases second with
       | single other => cases other

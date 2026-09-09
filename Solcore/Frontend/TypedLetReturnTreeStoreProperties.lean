@@ -17,6 +17,7 @@ theorem TypedLetReturnTreeEvaluates.change_store
     TypedLetReturnTreeEvaluates owner table environment replacement body value replacement := by
   induction evaluation with
   | single child => exact .single (child.change_store replacement)
+  | block _ ih => exact .block ih
   | binding initializer _ ih => exact .binding (initializer.change_store replacement) ih
   | inferred initializer _ ih => exact .inferred (initializer.change_store replacement) ih
   | discard expression _ ih => exact .discard (expression.change_store replacement) ih
@@ -31,6 +32,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.change_store
     TypedLetReturnTreeEvaluatesWithCost owner table environment replacement body value replacement cost := by
   induction evaluation with
   | single child => exact .single (child.change_store replacement)
+  | block _ ih => exact .block ih
   | binding initializer _ ih => exact .binding (initializer.change_store replacement) ih
   | inferred initializer _ ih => exact .inferred (initializer.change_store replacement) ih
   | discard expression _ ih => exact .discard (expression.change_store replacement) ih
