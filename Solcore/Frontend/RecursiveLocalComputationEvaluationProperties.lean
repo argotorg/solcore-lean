@@ -2,7 +2,7 @@ import Solcore.Frontend.RecursiveLocalComputationDeterminismProperties
 import Solcore.Core.Correspondence
 
 /-! Raw success and exact cost agree across overlapping pure and recursive
-groups, direct/ordered/negated comparisons, conditionals and fixed lazy operators.
+groups, tuples, direct/ordered/negated comparisons, conditionals and fixed lazy operators.
 Actual closures, arguments and stores are fixed by evaluation,
 not by a checker, type tags or a global restriction on skipped source syntax. -/
 
@@ -21,6 +21,8 @@ private theorem erase {table : LocalNameTable} {environment : Resolved.Environme
   | group _ ih => exact .group ih
   | application _ _ bodyPath functionIH argumentIH =>
       exact .application functionIH argumentIH (Core.steps_from_initial_sound bodyPath)
+  | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
+  | many _ _ headIH tailIH => exact .many headIH tailIH
   | binary operator _ _ applied leftIH rightIH =>
       exact .binary operator leftIH rightIH applied
   | ifTrue _ _ conditionIH branchIH => exact .ifTrue conditionIH branchIH
@@ -54,6 +56,14 @@ private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Env
       obtain ⟨_, argumentCosted⟩ := argumentIH
       obtain ⟨_, bodyPath⟩ := bodyEvaluation.toSteps
       exact ⟨_, .application functionCosted argumentCosted bodyPath⟩
+  | pair _ _ leftIH rightIH =>
+      obtain ⟨_, leftCosted⟩ := leftIH
+      obtain ⟨_, rightCosted⟩ := rightIH
+      exact ⟨_, .pair leftCosted rightCosted⟩
+  | many _ _ headIH tailIH =>
+      obtain ⟨_, headCosted⟩ := headIH
+      obtain ⟨_, tailCosted⟩ := tailIH
+      exact ⟨_, .many headCosted tailCosted⟩
   | binary operator _ _ applied leftIH rightIH =>
       obtain ⟨_, leftCosted⟩ := leftIH
       obtain ⟨_, rightCosted⟩ := rightIH

@@ -25,6 +25,13 @@ private theorem agrees_with_pure {table : LocalNameTable} {environment : Resolve
       cases pureEvaluation with
       | group child => exact ih child
   | application => cases pureEvaluation
+  | pair _ _ leftIH rightIH | many _ _ leftIH rightIH =>
+      cases pureEvaluation
+      all_goals
+        rename_i pureLeft pureRight
+        obtain ⟨rfl, rfl, rfl⟩ := leftIH pureLeft
+        obtain ⟨rfl, rfl, rfl⟩ := rightIH pureRight
+        exact ⟨rfl, rfl, rfl⟩
   | binary operator _ _ applied leftIH rightIH =>
       cases operator <;> cases pureEvaluation
       all_goals
@@ -146,6 +153,20 @@ theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalN
           obtain ⟨rfl, rfl, rfl⟩ := argumentIH otherArgument
           obtain ⟨rfl, sameValue, sameStore⟩ := bodyPath.final_unique otherPath
           exact ⟨sameValue, sameStore, rfl⟩
+  | pair leftChild rightChild leftIH rightIH =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.pair leftChild rightChild) other
+      | pair otherLeft otherRight =>
+          obtain ⟨rfl, rfl, rfl⟩ := leftIH otherLeft
+          obtain ⟨rfl, rfl, rfl⟩ := rightIH otherRight
+          exact ⟨rfl, rfl, rfl⟩
+  | many headChild tailChild headIH tailIH =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.many headChild tailChild) other
+      | many otherHead otherTail =>
+          obtain ⟨rfl, rfl, rfl⟩ := headIH otherHead
+          obtain ⟨rfl, rfl, rfl⟩ := tailIH otherTail
+          exact ⟨rfl, rfl, rfl⟩
   | binary operator leftChild rightChild applied leftIH rightIH =>
       cases rightEvaluation with
       | pure other => exact agrees_with_pure (.binary operator leftChild rightChild applied) other
