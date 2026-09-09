@@ -126,12 +126,12 @@ private def returned (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (fun 
   match shape : b with
   | ⟨_,[⟨_,.returnStmt (some e)⟩]⟩ => let r ← child i e; if same : r.1=.word then return ⟨r.2.core,by rw [shape]; exact .expression (same ▸ r.2.evidence)⟩ else throw (IO.userError "return type")
   | _ => throw (IO.userError "return body")
-private def pattern (p : Syntax.Pattern) : IO (Σ tag : Option Core.Word, PLift (match tag with | none => ∃ marker, p.value=.wildcard marker | some v => WordMatchPatternDenotes p v)) := do
+private def pattern (p : Syntax.Pattern) : IO (Σ tag : Option Core.Word, PLift (WordMatchPatternClassifies p tag)) := do
   match shape : p.value with
-  | .wildcard marker => return ⟨none,⟨⟨marker,shape⟩⟩⟩
-  | .literal literal => match decoded : interpretWordLiteral? literal with | some v => return ⟨some v,⟨⟨literal,shape,interpretWordLiteral?_sound decoded⟩⟩⟩ | none => throw (IO.userError "strict Word literal")
+  | .wildcard marker => return ⟨none,⟨.wildcard (marker := marker) shape⟩⟩
+  | .literal literal => match decoded : interpretWordLiteral? literal with | some v => return ⟨some v,⟨.literal ⟨literal,shape,interpretWordLiteral?_sound decoded⟩⟩⟩ | none => throw (IO.userError "strict Word literal")
   | _ => throw (IO.userError "literal or exact wildcard pattern")
-private def arms (i : LocalTypeInputs) (cs : List Syntax.MatchCase) : IO (Σ entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)), PLift (entries.map Prod.fst=cs ∧ ∀ entry ∈ entries, (match entry.2.1 with | none => ∃ marker, entry.1.value.pattern.value=.wildcard marker | some v => WordMatchPatternDenotes entry.1.value.pattern v) ∧ RecursiveComputationReturnTreeElaborates types owner i entry.1.value.body entry.2.2 .word)) := do
+private def arms (i : LocalTypeInputs) (cs : List Syntax.MatchCase) : IO (Σ entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)), PLift (entries.map Prod.fst=cs ∧ ∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1 ∧ RecursiveComputationReturnTreeElaborates types owner i entry.1.value.body entry.2.2 .word)) := do
   match shape : cs with
   | [] => return ⟨[],⟨by rw [shape]; exact ⟨rfl,by simp⟩⟩⟩
   | c::rest =>
@@ -198,10 +198,10 @@ private def choose (v : Core.Value) (cs : List Syntax.MatchCase) (d : Option Syn
   | c::rest =>
       let p ← pattern c.value.pattern
       match tag : p.1 with
-      | none => return ⟨(c.value.body,0),⟨by rw [shape]; obtain ⟨marker,wild⟩ := (show ∃ marker, c.value.pattern.value=.wildcard marker from by simpa only [tag] using p.2.down); exact .wildcard wild⟩⟩
+      | none => return ⟨(c.value.body,0),⟨by rw [shape]; exact .wildcard (by simpa only [tag] using p.2.down)⟩⟩
       | some literal => match actual : v with
         | .word w =>
-            have meaning : WordMatchPatternDenotes c.value.pattern literal := by simpa only [tag] using p.2.down
+            have meaning : WordMatchPatternClassifies c.value.pattern (some literal) := by simpa only [tag] using p.2.down
             if same : w=literal then return ⟨(c.value.body,1),⟨by rw [shape,actual]; exact .hit (same.symm ▸ meaning)⟩⟩
             else let tail ← choose (.word w) rest d; return ⟨(tail.1.1,tail.1.2+1),⟨by rw [shape,actual]; exact .miss meaning same tail.2.down⟩⟩
         | _ => throw (IO.userError "actual non-Word comparison before wildcard")

@@ -106,15 +106,18 @@ private theorem elaborated (n : Nat) (marker : Syntax.SourceSpan) (suffix : Suff
     | succ n ih => simpa [tree,rows,guard,Core.Expr.weakenAt] using congrArg (Option.map (Core.Expr.ifE guard (.var 3))) ih
   exact .wordMatch (defaultEntry := some (branch,.apply (.var 1) (.var 2)))
     (.application (calleeElab false) argumentElab) (rowFacts n marker suffix).1
-    (fun entry member => ((rowFacts n marker suffix).2 entry member).1)
+    (fun entry member => by
+      have meaning := ((rowFacts n marker suffix).2 entry member).1; cases tag : entry.2.1 <;> simp only [tag] at meaning
+      · exact .wildcard meaning.choose_spec
+      · exact .literal meaning)
     (fun entry member => ((rowFacts n marker suffix).2 entry member).2)
     rfl (by intro entry member; simp at member; subst entry
             exact .expression (.application (calleeElab true) argumentElab)) folded
 private theorem chosen (n : Nat) (marker : Syntax.SourceSpan) (extra : List Syntax.MatchCase) (fallback : Syntax.Block) :
     WordMatchChooses (.word one) (cases n marker extra) (some fallback) branch n := by
   induction n with
-  | zero => exact .wildcard rfl
-  | succ n ih => exact .miss meaning (by decide : one ≠ .zero) ih
+  | zero => exact .wildcard (.wildcard rfl)
+  | succ n ih => exact .miss (.literal meaning) (by decide : one ≠ .zero) ih
 
 private structure Actual where
   argument : Core.Value

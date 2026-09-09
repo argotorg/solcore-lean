@@ -82,14 +82,17 @@ private theorem elaborated (n : Nat) (hit : Bool) :
     | succ n ih => simpa [tree,rows,guard,Core.Expr.weakenAt] using congrArg (Option.map (Core.Expr.ifE (guard .zero) (.var 3))) ih
   exact .wordMatch (defaultEntry := some (branch,.apply (.var 1) (.var 2)))
     (.application (calleeElab false) argumentElab) (rowFacts n hit).1
-    (fun entry member => ((rowFacts n hit).2 entry member).1)
+    (fun entry member => by
+      have meaning := ((rowFacts n hit).2 entry member).1; cases tag : entry.2.1 <;> simp only [tag] at meaning
+      · exact .wildcard meaning.choose_spec
+      · exact .literal meaning)
     (fun entry member => ((rowFacts n hit).2 entry member).2)
     rfl (by intro entry member; simp at member; subst entry
             exact .expression (.application (calleeElab true) argumentElab)) folded
 private theorem chosen (n : Nat) (hit : Bool) : WordMatchChooses (.word one) (cases n hit) (some branch) branch (tests n hit) := by
   induction n with
-  | zero => cases hit; exact .fallback; exact .hit (meaning true)
-  | succ n ih => simpa [cases,tests,Nat.add_right_comm] using WordMatchChooses.miss (meaning false) (by decide : one ≠ .zero) ih
+  | zero => cases hit; exact .fallback; exact .hit (.literal (meaning true))
+  | succ n ih => simpa [cases,tests,Nat.add_right_comm] using WordMatchChooses.miss (.literal (meaning false)) (by decide : one ≠ .zero) ih
 
 private structure Actual where
   argument : Core.Value
@@ -247,15 +250,15 @@ theorem each_visited_prefix_is_a_genuine_checkpoint (a : Actual) (passed remaini
 theorem first_match_ignores_duplicate_and_malformed_later_rows (extra : List Syntax.MatchCase)
     (defaultBody : Syntax.Block) :
     WordMatchChooses (.word one) (arm true::arm true::⟨span,⟨⟨span,.error⟩,unused⟩⟩::extra) (some defaultBody) branch 1 :=
-  .hit (meaning true)
+  .hit (.literal (meaning true))
 theorem malformed_first_row_cannot_be_skipped (actual : Core.Value) (extra : List Syntax.MatchCase)
     (defaultBody selected : Syntax.Block) (count : Nat) :
     ¬ WordMatchChooses actual (⟨span,⟨⟨span,.error⟩,unused⟩⟩::extra) (some defaultBody) selected count := by
   intro choice
   cases choice with
-  | wildcard shape => cases shape
-  | hit meaning => rcases meaning with ⟨literal,shape,_⟩; cases shape
-  | miss meaning _ _ => rcases meaning with ⟨literal,shape,_⟩; cases shape
+  | wildcard meaning => cases meaning with | wildcard shape => cases shape
+  | hit meaning | miss meaning _ _ =>
+      cases meaning with | literal meaning => rcases meaning with ⟨literal,shape,_⟩; cases shape
 theorem selected_body_and_visited_count_ignore_no_earlier_test (n : Nat) (hit : Bool)
     {selected : Syntax.Block} {count : Nat}
     (choice : WordMatchChooses (.word one) (cases n hit) (some branch) selected count) :

@@ -134,13 +134,13 @@ private def pattern (p : Syntax.Pattern) : IO (Σ v, PLift (WordMatchPatternDeno
     | some v => return ⟨v,⟨⟨literal,shape,interpretWordLiteral?_sound decoded⟩⟩⟩
     | none => throw (IO.userError "strict Word literal")
   | _ => throw (IO.userError "literal pattern")
-private def arms (i : LocalTypeInputs) (cs : List Syntax.MatchCase) : IO (Σ entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)), PLift (entries.map Prod.fst=cs ∧ ∀ entry ∈ entries, (match entry.2.1 with | none => ∃ marker, entry.1.value.pattern.value=.wildcard marker | some v => WordMatchPatternDenotes entry.1.value.pattern v) ∧ RecursiveComputationReturnTreeElaborates types owner i entry.1.value.body entry.2.2 .word)) := do
+private def arms (i : LocalTypeInputs) (cs : List Syntax.MatchCase) : IO (Σ entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)), PLift (entries.map Prod.fst=cs ∧ ∀ entry ∈ entries, WordMatchPatternClassifies entry.1.value.pattern entry.2.1 ∧ RecursiveComputationReturnTreeElaborates types owner i entry.1.value.body entry.2.2 .word)) := do
   match shape : cs with
   | [] => return ⟨[],⟨by rw [shape]; exact ⟨rfl,by simp⟩⟩⟩
   | c::rest =>
       check (c.span.contains c.value.pattern.span && c.span.contains c.value.body.span && decide (c.value.pattern.span.endByte≤c.value.body.span.startByte)) "original pattern/body order"
       let p ← pattern c.value.pattern; let b ← returned i c.value.body; let tail ← arms i rest
-      return ⟨(c,some p.1,b.core)::tail.1,⟨by rw [shape]; refine ⟨by simp [tail.2.down.1],?_⟩; intro entry member; rcases List.mem_cons.mp member with rfl|member; exact ⟨p.2.down,b.evidence⟩; exact tail.2.down.2 entry member⟩⟩
+      return ⟨(c,some p.1,b.core)::tail.1,⟨by rw [shape]; refine ⟨by simp [tail.2.down.1],?_⟩; intro entry member; rcases List.mem_cons.mp member with rfl|member; exact ⟨.literal p.2.down,b.evidence⟩; exact tail.2.down.2 entry member⟩⟩
 private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (fun c => RecursiveComputationReturnTreeElaborates types owner i b c .word)) := do
   match shape : b with
   | ⟨_,[⟨matchSpan,.matchWith ⟨scrutineeSpan,⟨e,[]⟩⟩ ⟨armsSpan,⟨cs,some d⟩⟩⟩]⟩ =>
@@ -200,8 +200,8 @@ private def choose (v : Core.Value) (cs : List Syntax.MatchCase) (d : Syntax.Blo
   | c::rest => match actual : v with
     | .word w =>
         let p ← pattern c.value.pattern
-        if same : w=p.1 then return ⟨(c.value.body,1),⟨by rw [shape,actual]; exact .hit (same.symm ▸ p.2.down)⟩⟩
-        else let tail ← choose (.word w) rest d; return ⟨(tail.1.1,tail.1.2+1),⟨by rw [shape,actual]; exact .miss p.2.down same tail.2.down⟩⟩
+        if same : w=p.1 then return ⟨(c.value.body,1),⟨by rw [shape,actual]; exact .hit (.literal (same.symm ▸ p.2.down))⟩⟩
+        else let tail ← choose (.word w) rest d; return ⟨(tail.1.1,tail.1.2+1),⟨by rw [shape,actual]; exact .miss (.literal p.2.down) same tail.2.down⟩⟩
     | _ => throw (IO.userError "actual non-Word comparison")
 private def rawBody (table : LocalNameTable) (env : Resolved.Environment) (s : Core.Store) (b : Syntax.Block) : IO (Raw (RecursiveComputationReturnTreeEvaluatesWithCost owner table env s b)) := do
   match shape : b with
@@ -292,7 +292,7 @@ def frontendParsedWordMatchEffectTests : IO Unit := do
     let unselected ← parsed text; let ps ← parameters .empty .empty unselected.value.signature.parameters.elements args
     let raw ← rawBody ps.actual.names ps.actual.environment [w 0,w 41,w 99] unselected.value.body
     check (decide (raw.value=w 41 ∧ raw.final=[w 0,w 41,w 99,w 14] ∧ raw.cost=30 ∧ compileRecursiveComputationFunction? types owner unselected=none)) "negative original parameters and raw first hit versus whole all-arm rejection"
-  for text in ["match(f(x)){case 0{return r(x);}}","match(f(x),x){case (0,0){return r(x);}default{return r(x);}}","match(f(x)){case (0){return r(x);}default{return r(x);}}","match(f(x)){case y{return r(x);}default{return r(x);}}","match(f(x)){case "++toString Core.wordModulus++"{return r(x);}default{return r(x);}}","match(f(x)==0){case 0{return r(x);}default{return r(x);}}",sourceBody false++"return x;"] do
+  for text in ["match(f(x)){case 0{return r(x);}}","match(f(x),x){case (0,0){return r(x);}default{return r(x);}}","match(f(x)){case y{return r(x);}default{return r(x);}}","match(f(x)){case "++toString Core.wordModulus++"{return r(x);}default{return r(x);}}","match(f(x)==0){case 0{return r(x);}default{return r(x);}}",sourceBody false++"return x;"] do
     let source ← parsed text
     check (decide (compileRecursiveComputationFunction? types owner source=none)) "whole-arm typing and exact pattern/terminal gates"
 end Tests
