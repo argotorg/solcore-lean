@@ -37,17 +37,21 @@ private theorem emptyElaborates :
   simpa [source,emptyCore,Core.Expr.weakenAt] using
     (ComputationReturnTreeElaborates.wordMatch (types := []) (owner := owner)
       (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
-      (defaultBody := returned) (entries := []) xElaborates rfl (by simp) (by simp)
-      (.expression xElaborates))
+      (defaultBody := some returned) (defaultEntry := some (returned,.var 0))
+      (entries := []) xElaborates rfl (by simp) (by simp) rfl
+      (by intro entry member; simp only [Option.toList_some,List.mem_singleton] at member
+          subst entry; exact .expression xElaborates) rfl)
 private theorem guardedElaborates :
     RecursiveComputationReturnTreeElaborates [] owner inputs (source [arm]) guardedCore .word := by
   simpa [source,guardedCore,Core.Expr.weakenAt] using
     (ComputationReturnTreeElaborates.wordMatch (types := []) (owner := owner)
       (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
-      (defaultBody := returned) (entries := [(arm,some zero,Core.Expr.var 0)]) xElaborates rfl
+      (defaultBody := some returned) (defaultEntry := some (returned,.var 0))
+      (entries := [(arm,some zero,Core.Expr.var 0)]) xElaborates rfl
       (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact zeroMeaning)
       (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact .expression xElaborates)
-      (.expression xElaborates))
+      rfl (by intro entry member; simp only [Option.toList_some,List.mem_singleton] at member
+              subst entry; exact .expression xElaborates) rfl)
 private theorem counted (value : Core.Value) (store : Core.Store) :
     RecursiveComputationReturnTreeEvaluatesWithCost owner inputs.names (environment value)
       store (source []) value store 4 := by
@@ -55,7 +59,7 @@ private theorem counted (value : Core.Value) (store : Core.Store) :
     (ChildCost := RecursiveLocalComputationEvaluatesWithCost) (scrutineeCost := 1) (branchCost := 1)
     (owner := owner) (table := inputs.names) (environment := environment value)
     (initialStore := store) (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
-    (scrutinee := x) (defaultBody := returned) (selected := returned) (scrutineeValue := value)
+    (scrutinee := x) (defaultBody := some returned) (selected := returned) (scrutineeValue := value)
     (.pure (.identifier .head .head)) .fallback (.expression (.pure (.identifier .head .head)))
 private theorem literalPath (value : Core.Value) (store : Core.Store) (pending : List Core.Frame) :
     Core.Steps 4 ⟨.eval emptyCore [value],pending,store⟩ ⟨.ret value,pending,store⟩ :=
@@ -109,18 +113,18 @@ theorem a_nonempty_case_list_faults_instead_of_treating_Bool_as_a_miss
 
 theorem a_Bool_cannot_choose_even_the_default_of_nonempty_literal_cases
     (flag : Bool) (rest : List Syntax.MatchCase) (fallback selected : Syntax.Block) (tests : Nat) :
-    ¬ WordMatchChooses (.bool flag) (arm::rest) fallback selected tests := by
+    ¬ WordMatchChooses (.bool flag) (arm::rest) (some fallback) selected tests := by
   intro choice
   cases choice with
   | wildcard shape => cases shape
 
 theorem malformed_unvisited_pattern_and_body_do_not_change_raw_first_hit
     (badPattern : Syntax.Pattern) (badBody fallback : Syntax.Block) :
-    WordMatchChooses (.word zero) [arm,⟨span,⟨badPattern,badBody⟩⟩] fallback returned 1 ∧
+    WordMatchChooses (.word zero) [arm,⟨span,⟨badPattern,badBody⟩⟩] (some fallback) returned 1 ∧
     (∀ selected tests,
-      WordMatchChooses (.word zero) [arm,⟨span,⟨badPattern,badBody⟩⟩] fallback selected tests →
+      WordMatchChooses (.word zero) [arm,⟨span,⟨badPattern,badBody⟩⟩] (some fallback) selected tests →
       selected = returned ∧ tests = 1) := by
-  have chosen : WordMatchChooses (.word zero) [arm,⟨span,⟨badPattern,badBody⟩⟩] fallback returned 1 :=
+  have chosen : WordMatchChooses (.word zero) [arm,⟨span,⟨badPattern,badBody⟩⟩] (some fallback) returned 1 :=
     .hit zeroMeaning
   exact ⟨chosen,fun _ _ other => other.deterministic chosen⟩
 
@@ -134,11 +138,11 @@ theorem a_malformed_unselected_case_still_blocks_static_typing (store : Core.Sto
       (ChildCost := RecursiveLocalComputationEvaluatesWithCost) (scrutineeCost := 1) (branchCost := 1)
       (owner := owner) (table := inputs.names) (environment := environment (.word zero))
       (initialStore := store) (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
-      (scrutinee := x) (defaultBody := returned) (selected := returned) (scrutineeValue := .word zero)
+      (scrutinee := x) (defaultBody := some returned) (selected := returned) (scrutineeValue := .word zero)
       (.pure (.identifier .head .head)) (.hit zeroMeaning) (.expression (.pure (.identifier .head .head)))
   · intro typing
     cases typing with
-    | wordMatch _ patterns _ _ =>
+    | wordMatch _ patterns _ _ _ =>
         obtain ⟨tag,meaning⟩ := patterns ⟨span,⟨⟨span,.error⟩,returned⟩⟩ (by simp)
         cases tag with
         | none => obtain ⟨_,shape⟩ := meaning; cases shape
