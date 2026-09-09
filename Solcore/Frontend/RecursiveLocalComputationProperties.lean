@@ -2,12 +2,32 @@ import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.LocalExpressionTypingProperties
 import Solcore.Frontend.DirectWordBinaryProperties
 
-/-! Exact static provenance for recursive calls, groups, binaries and conditionals.
+/-! Exact static provenance for recursive calls, groups, unary/binary operations and conditionals.
 Pure overlap is reconciled internally without restricting source or callers. -/
 
 set_option autoImplicit false
 
 namespace Solcore.Frontend
+
+private theorem unary_children {table : LocalNameTable} {context : Resolved.Context}
+    {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr}
+    {sourceOp : Syntax.UnaryOp} {op : Core.UnaryOp} {core : Core.Expr} {type : Core.Ty}
+    (operator : sourceOp = .logicalNot ∧ op = .boolNot ∨ sourceOp = .bitNot ∧ op = .wordNot) :
+    elaborateRecursiveLocalComputation? table context
+        ⟨span, .unary ⟨operatorSpan, sourceOp⟩ operand⟩ = some (core, type) ↔
+      ∃ operandCore,
+        elaborateRecursiveLocalComputation? table context operand = some (operandCore, op.operandType) ∧
+        core = .unary op operandCore ∧ type = op.resultType := by
+  rcases operator with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
+    simp only [elaborateRecursiveLocalComputation?, bind, Option.bind_eq_some_iff] <;> constructor
+  all_goals first
+    | rintro ⟨operandCore, child, rfl, rfl⟩
+      exact ⟨_, child, by simp [Core.UnaryOp.operandType, Core.UnaryOp.resultType]⟩
+    | rintro ⟨⟨operandCore, operandType⟩, child, result⟩
+      dsimp only at result
+      split at result
+      next same => cases result; cases same; exact ⟨operandCore, child, rfl, rfl⟩
+      next => cases result
 
 private theorem binary_children {table : LocalNameTable} {context : Resolved.Context}
     {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
@@ -65,6 +85,12 @@ private theorem pure_complete {table : LocalNameTable} {context : Resolved.Conte
     elaborateRecursiveLocalComputation? table context source = some (core, type) := by
   induction resolution generalizing core type with
   | group _ ih => simpa only [elaborateRecursiveLocalComputation?] using ih lowered typing
+  | logicalNot _ ih | bitNot _ ih =>
+      cases lowered with
+      | unary childLowered =>
+          cases typing with
+          | unary childTyped => simp [elaborateRecursiveLocalComputation?, ih childLowered childTyped,
+              Core.UnaryOp.operandType, Core.UnaryOp.resultType]
   | conditional _ _ _ conditionIH thenIH elseIH =>
       cases lowered with
       | ifE conditionLowered thenLowered elseLowered =>
@@ -126,6 +152,8 @@ private theorem complete {table : LocalNameTable} {context : Resolved.Context}
       exact (binary_children operator).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
   | conditional _ _ _ conditionIH thenIH elseIH =>
       exact conditional_children.mpr ⟨_, _, _, conditionIH, thenIH, elseIH, rfl⟩
+  | logicalNot _ ih => exact (unary_children (Or.inl ⟨rfl, rfl⟩)).mpr ⟨_, ih, rfl, rfl⟩
+  | bitNot _ ih => exact (unary_children (Or.inr ⟨rfl, rfl⟩)).mpr ⟨_, ih, rfl, rfl⟩
 
 private theorem pure_sound {table : LocalNameTable} {context : Resolved.Context}
     {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
@@ -143,6 +171,16 @@ private theorem sound {table : LocalNameTable} {context : Resolved.Context}
       cases payload
       case group inner =>
         exact .group (sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted))
+      case unary operator operand =>
+        cases operator with
+        | mk operatorSpan sourceOp =>
+            cases sourceOp
+            case logicalNot =>
+              obtain ⟨childCore, child, rfl, rfl⟩ := (unary_children (Or.inl ⟨rfl, rfl⟩)).mp accepted
+              exact .logicalNot (sound child)
+            case bitNot =>
+              obtain ⟨childCore, child, rfl, rfl⟩ := (unary_children (Or.inr ⟨rfl, rfl⟩)).mp accepted
+              exact .bitNot (sound child)
       case conditional condition question thenBranch colon elseBranch =>
         obtain ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩ :=
           conditional_children.mp accepted
@@ -206,6 +244,12 @@ theorem recursiveLocalComputationHasType_iff_elaborates
         obtain ⟨thenCore, thenElaborated⟩ := thenIH
         obtain ⟨elseCore, elseElaborated⟩ := elseIH
         exact ⟨.ifE conditionCore thenCore elseCore, .conditional conditionElaborated thenElaborated elseElaborated⟩
+    | logicalNot _ ih =>
+        obtain ⟨core, child⟩ := ih
+        exact ⟨.unary .boolNot core, .logicalNot child⟩
+    | bitNot _ ih =>
+        obtain ⟨core, child⟩ := ih
+        exact ⟨.unary .wordNot core, .bitNot child⟩
   · rintro ⟨core, elaboration⟩
     induction elaboration with
     | pure resolution _ typing => exact .pure (resolution.reflects_type typing)
@@ -213,6 +257,8 @@ theorem recursiveLocalComputationHasType_iff_elaborates
     | application _ _ functionIH argumentIH => exact .application functionIH argumentIH
     | binary operator _ _ leftIH rightIH => exact .binary operator leftIH rightIH
     | conditional _ _ _ conditionIH thenIH elseIH => exact .conditional conditionIH thenIH elseIH
+    | logicalNot _ ih => exact .logicalNot ih
+    | bitNot _ ih => exact .bitNot ih
 
 theorem RecursiveLocalComputationElaborates.core_hasType
     {table : LocalNameTable} {context : Resolved.Context}
@@ -225,5 +271,6 @@ theorem RecursiveLocalComputationElaborates.core_hasType
   | application _ _ functionIH argumentIH => exact .apply functionIH argumentIH
   | binary _ _ _ leftIH rightIH => exact .binary leftIH rightIH
   | conditional _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
+  | logicalNot _ ih | bitNot _ ih => exact .unary ih
 
 end Solcore.Frontend
