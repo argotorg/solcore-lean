@@ -1,10 +1,10 @@
 import Solcore.Frontend.ReturnBodyElaboration
-import Solcore.Frontend.TypeNameProperties
+import Solcore.Frontend.StructuralTypeProperties
 import Solcore.Frontend.LocalTypeInputsProperties
 
 /-! A separate value-free adapter for recursive typed prefixes and terminal
 if/else branches. Siblings start in the same original scope; their local fresh
-IDs need not be globally distinct. Existing body and entry profiles are unchanged. -/
+IDs need not be globally distinct. Structural annotations reuse existing Core and entry records. -/
 
 set_option autoImplicit false
 
@@ -18,7 +18,7 @@ def elaborateTypedLetReturnTree? (types : TypeNameTable) (owner : Resolved.Decla
   | ⟨_, [⟨_, .returnStmt _⟩]⟩ => elaborateReturnBody? inputs.names inputs.context body
   | ⟨blockSpan, ⟨_, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ =>
       if name.value ∉ inputs.names.map Prod.fst then do
-        let declaredType ← interpretTypeName? types annotation
+        let declaredType ← interpretStructuralType? types annotation
         let (initializerCore, initializerType) ← elaborateLocalExpression? inputs.names inputs.context initializer
         if initializerType = declaredType then do
           let (tailCore, returnType) ← elaborateTypedLetReturnTree? types owner
@@ -45,7 +45,7 @@ inductive TypedLetReturnTreeHasType (types : TypeNameTable) (owner : Resolved.De
   | binding {inputs : LocalTypeInputs} {blockSpan letSpan : Syntax.SourceSpan}
       {name : Syntax.Identifier} {annotation : Syntax.TypeExpr} {initializer : Syntax.Expr}
       {rest : List Syntax.Statement} {declaredType returnType : Core.Ty}
-      (meaning : TypeNameDenotes types annotation declaredType)
+      (meaning : StructuralTypeDenotes types annotation declaredType)
       (unused : name.value ∉ inputs.names.map Prod.fst)
       (initializerTyping : LocalExpressionHasType inputs.names inputs.context initializer declaredType)
       (tailTyping : TypedLetReturnTreeHasType types owner
@@ -71,7 +71,7 @@ inductive TypedLetReturnTreeElaborates (types : TypeNameTable) (owner : Resolved
       {name : Syntax.Identifier} {annotation : Syntax.TypeExpr} {initializer : Syntax.Expr}
       {rest : List Syntax.Statement} {declaredType returnType : Core.Ty}
       {initializerResolved : Resolved.Expr} {initializerCore tailCore : Core.Expr}
-      (meaning : TypeNameDenotes types annotation declaredType)
+      (meaning : StructuralTypeDenotes types annotation declaredType)
       (unused : name.value ∉ inputs.names.map Prod.fst)
       (resolution : ResolvesLocalExpression inputs.names initializer initializerResolved)
       (lowered : Resolved.Lowers inputs.ids initializerResolved initializerCore)
