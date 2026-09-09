@@ -1,6 +1,7 @@
 import Solcore.Frontend.RecursiveLocalComputationFragment
 import Solcore.Core.LocalFragmentInsertionPaths
 import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.LocalExpressionCostStepComposition
 
 /-! Each recursive caller pair shares one cost before every continuation.
 An actual invoked body's closed path is chosen once and reused on both sides. -/
@@ -34,5 +35,15 @@ theorem RecursiveLocalComputationFragment.insertion_paths
           · exact CostStepComposition.apply (functionPaths _).1 (argumentPaths _).1 bodyPath
           · simp only [Core.Expr.weakenAt]
             exact CostStepComposition.apply (functionPaths _).2 (argumentPaths _).2 bodyPath
+  | binary _ _ leftIH rightIH =>
+      cases evaluation with
+      | binary leftEvaluation rightEvaluation applied =>
+          obtain ⟨leftCost, leftPaths⟩ := leftIH leftEvaluation
+          obtain ⟨rightCost, rightPaths⟩ := rightIH rightEvaluation
+          refine ⟨leftCost + rightCost + 3, fun continuation => ?_⟩
+          constructor
+          · exact CostStepComposition.binary (leftPaths _).1 (rightPaths _).1 applied
+          · simp only [Core.Expr.weakenAt]
+            exact CostStepComposition.binary (leftPaths _).2 (rightPaths _).2 applied
 
 end Solcore.Frontend

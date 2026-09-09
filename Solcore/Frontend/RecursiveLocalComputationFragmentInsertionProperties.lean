@@ -28,5 +28,16 @@ theorem RecursiveLocalComputationFragment.evaluates_insert_iff
         cases evaluation with
         | apply functionEvaluation argumentEvaluation bodyEvaluation =>
             exact .apply (calleeIH.mpr functionEvaluation) (operandIH.mpr argumentEvaluation) bodyEvaluation
+  | binary _ _ leftIH rightIH =>
+      simp only [Core.Expr.weakenAt]
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | binary leftEvaluation rightEvaluation applied =>
+            exact .binary (leftIH.mp leftEvaluation) (rightIH.mp rightEvaluation) applied
+      · intro evaluation
+        cases evaluation with
+        | binary leftEvaluation rightEvaluation applied =>
+            exact .binary (leftIH.mpr leftEvaluation) (rightIH.mpr rightEvaluation) applied
 
 end Solcore.Frontend
