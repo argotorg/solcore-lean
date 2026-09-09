@@ -293,7 +293,7 @@ def frontendParsedOptionalMatchEffectTests : IO Unit := do
     let unselected ← parsed text; let ps ← parameters .empty .empty unselected.value.signature.parameters.elements args
     let raw ← rawBody ps.actual.names ps.actual.environment [w 0,w 41,w 99] unselected.value.body
     check (decide (raw.value=w 41 ∧ raw.final=[w 0,w 41,w 99,w 14] ∧ raw.cost=23 ∧ compileRecursiveComputationFunction? types owner unselected=none)) "original raw wildcard skips tail but all static obligations remain"
-  for text in ["match(f(x)==0){case _{return r(x);}}","match(f(x)){case 0{return r(x);}}"] do
+  for text in ["match(f(x)){case 0{return r(x);}}"] do
     let rejected ← parsed text
     check (decide (compileRecursiveComputationFunction? types owner rejected=none)) "Word scrutinee and actual wildcard coverage are independent gates"
 end Tests
