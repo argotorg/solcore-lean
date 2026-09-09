@@ -2,6 +2,9 @@ import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.RecursiveLocalComputationEvaluation
 import Solcore.Frontend.LocalExpressionCostCorrespondence
 import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
+import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.WordLessCostStepComposition
 
 /-! Private original-root cost inversions reconcile overlapping pure derivations.
 The existing continuation law preserves actual selected values, stores and costs. -/
@@ -71,153 +74,31 @@ private theorem reflects_pure_cost {table : LocalNameTable} {environment : Resol
       cases resolution with
       | lessEqual left right => exact .lessEqual (leftIH left) (rightIH right)
 
-private theorem reflects_binary_cost {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
-    {left right : Syntax.Expr} {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp}
-    {value : Core.Value} {cost : Nat} (operator : DirectWordBinary sourceOp op)
-    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
-      ⟨span, .binary left ⟨operatorSpan, sourceOp⟩ right⟩ value finalStore cost) :
-    ∃ middleStore leftValue rightValue leftCost rightCost,
-      RecursiveLocalComputationEvaluatesWithCost table environment initialStore left leftValue middleStore leftCost ∧
-      RecursiveLocalComputationEvaluatesWithCost table environment middleStore right rightValue finalStore rightCost ∧
-      op.apply leftValue rightValue = some value ∧ cost = leftCost + rightCost + 3 := by
-  cases evaluation with
-  | pure child =>
-      cases operator <;> cases child
-      all_goals exact ⟨_, _, _, _, _, .pure ‹_›, .pure ‹_›, rfl, rfl⟩
-  | binary otherOperator leftChild rightChild applied =>
-      cases operator <;> cases otherOperator
-      all_goals exact ⟨_, _, _, _, _, leftChild, rightChild, applied, rfl⟩
+  | less _ _ leftIH rightIH =>
+      cases resolution with
+      | less left right => exact .less (leftIH left) (rightIH right)
+  | greaterEqual _ _ leftIH rightIH =>
+      cases resolution with
+      | greaterEqual left right => exact .greaterEqual (leftIH left) (rightIH right)
 
-  | andTrue _ _ => cases operator
-  | andFalse _ => cases operator
-  | orTrue _ => cases operator
-  | orFalse _ _ => cases operator
-  | notEqual _ _ => cases operator
-  | lessEqual _ _ => cases operator
-
-private theorem reflects_conditional_cost {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {span question colon : Syntax.SourceSpan}
-    {condition thenBranch elseBranch : Syntax.Expr} {value : Core.Value} {cost : Nat}
-    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
-      ⟨span, .conditional condition question thenBranch colon elseBranch⟩ value finalStore cost) :
-    (∃ middleStore conditionCost branchCost,
-      RecursiveLocalComputationEvaluatesWithCost table environment initialStore condition (.bool true) middleStore conditionCost ∧
-      RecursiveLocalComputationEvaluatesWithCost table environment middleStore thenBranch value finalStore branchCost ∧
-      cost = conditionCost + branchCost + 2) ∨
-    (∃ middleStore conditionCost branchCost,
-      RecursiveLocalComputationEvaluatesWithCost table environment initialStore condition (.bool false) middleStore conditionCost ∧
-      RecursiveLocalComputationEvaluatesWithCost table environment middleStore elseBranch value finalStore branchCost ∧
-      cost = conditionCost + branchCost + 2) := by
-  cases evaluation with
-  | pure child =>
-      cases child with
-      | ifTrue guard branch => exact .inl ⟨_, _, _, .pure guard, .pure branch, rfl⟩
-      | ifFalse guard branch => exact .inr ⟨_, _, _, .pure guard, .pure branch, rfl⟩
-  | ifTrue guard branch => exact .inl ⟨_, _, _, guard, branch, rfl⟩
-  | ifFalse guard branch => exact .inr ⟨_, _, _, guard, branch, rfl⟩
-
-private theorem reflects_logicalNot_cost {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
-    {operand : Syntax.Expr} {value : Core.Value} {cost : Nat}
-    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
-      ⟨span, .unary ⟨operatorSpan, .logicalNot⟩ operand⟩ value finalStore cost) :
-    ∃ operandValue childCost,
-      RecursiveLocalComputationEvaluatesWithCost table environment initialStore operand (.bool operandValue) finalStore childCost ∧
-      value = .bool (!operandValue) ∧ cost = childCost + 2 := by
-  cases evaluation with
-  | pure child => cases child with | logicalNot operand => exact ⟨_, _, .pure operand, rfl, rfl⟩
-  | logicalNot child => exact ⟨_, _, child, rfl, rfl⟩
-
-private theorem reflects_bitNot_cost {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
-    {operand : Syntax.Expr} {value : Core.Value} {cost : Nat}
-    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
-      ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩ value finalStore cost) :
-    ∃ operandValue childCost,
-      RecursiveLocalComputationEvaluatesWithCost table environment initialStore operand (.word operandValue) finalStore childCost ∧
-      value = .word operandValue.bitNot ∧ cost = childCost + 2 := by
-  cases evaluation with
-  | pure child => cases child with | bitNot operand => exact ⟨_, _, .pure operand, rfl, rfl⟩
-  | bitNot child => exact ⟨_, _, child, rfl, rfl⟩
-
-private theorem reflects_and_cost {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
-    {left right : Syntax.Expr} {value : Core.Value} {cost : Nat}
-    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
-      ⟨span, .binary left ⟨operatorSpan, .logicalAnd⟩ right⟩ value finalStore cost) :
-    (∃ middleStore leftCost rightCost,
-      RecursiveLocalComputationEvaluatesWithCost table environment initialStore left (.bool true) middleStore leftCost ∧
-      RecursiveLocalComputationEvaluatesWithCost table environment middleStore right value finalStore rightCost ∧
-      cost = leftCost + rightCost + 2) ∨
-    (∃ leftCost, RecursiveLocalComputationEvaluatesWithCost table environment initialStore left (.bool false) finalStore leftCost ∧
-      value = .bool false ∧ cost = leftCost + 3) := by
-  cases evaluation with
-  | pure child =>
-      cases child with
-      | andTrue left right => exact .inl ⟨_, _, _, .pure left, .pure right, rfl⟩
-      | andFalse left => exact .inr ⟨_, .pure left, rfl, rfl⟩
-  | binary operator _ _ _ => cases operator
-  | andTrue left right => exact .inl ⟨_, _, _, left, right, rfl⟩
-  | andFalse left => exact .inr ⟨_, left, rfl, rfl⟩
-
-private theorem reflects_or_cost {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
-    {left right : Syntax.Expr} {value : Core.Value} {cost : Nat}
-    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
-      ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩ value finalStore cost) :
-    (∃ leftCost, RecursiveLocalComputationEvaluatesWithCost table environment initialStore left (.bool true) finalStore leftCost ∧
-      value = .bool true ∧ cost = leftCost + 3) ∨
-    (∃ middleStore leftCost rightCost,
-      RecursiveLocalComputationEvaluatesWithCost table environment initialStore left (.bool false) middleStore leftCost ∧
-      RecursiveLocalComputationEvaluatesWithCost table environment middleStore right value finalStore rightCost ∧
-      cost = leftCost + rightCost + 2) := by
-  cases evaluation with
-  | pure child =>
-      cases child with
-      | orTrue left => exact .inl ⟨_, .pure left, rfl, rfl⟩
-      | orFalse left right => exact .inr ⟨_, _, _, .pure left, .pure right, rfl⟩
-  | binary operator _ _ _ => cases operator
-  | orTrue left => exact .inl ⟨_, left, rfl, rfl⟩
-  | orFalse left right => exact .inr ⟨_, _, _, left, right, rfl⟩
-
-private theorem reflects_notEqual_cost {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
-    {left right : Syntax.Expr} {value : Core.Value} {cost : Nat}
-    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
-      ⟨span, .binary left ⟨operatorSpan, .notEqual⟩ right⟩ value finalStore cost) :
-    ∃ middleStore leftWord rightWord leftCost rightCost,
-      RecursiveLocalComputationEvaluatesWithCost table environment initialStore left (.word leftWord) middleStore leftCost ∧
-      RecursiveLocalComputationEvaluatesWithCost table environment middleStore right (.word rightWord) finalStore rightCost ∧
-      value = .bool (!(leftWord == rightWord)) ∧ cost = leftCost + rightCost + 5 := by
-  cases evaluation with
-  | pure child => cases child with | notEqual left right => exact ⟨_, _, _, _, _, .pure left, .pure right, rfl, rfl⟩
-  | binary operator _ _ _ => cases operator
-  | notEqual left right => exact ⟨_, _, _, _, _, left, right, rfl, rfl⟩
-
-private theorem reflects_lessEqual_cost {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
-    {left right : Syntax.Expr} {value : Core.Value} {cost : Nat}
-    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
-      ⟨span, .binary left ⟨operatorSpan, .lessEqual⟩ right⟩ value finalStore cost) :
-    ∃ middleStore leftWord rightWord leftCost rightCost,
-      RecursiveLocalComputationEvaluatesWithCost table environment initialStore left (.word leftWord) middleStore leftCost ∧
-      RecursiveLocalComputationEvaluatesWithCost table environment middleStore right (.word rightWord) finalStore rightCost ∧
-      value = .bool (!(decide (leftWord > rightWord))) ∧ cost = leftCost + rightCost + 5 := by
-  cases evaluation with
-  | pure child => cases child with | lessEqual left right => exact ⟨_, _, _, _, _, .pure left, .pure right, rfl, rfl⟩
-  | binary operator _ _ _ => cases operator
-  | lessEqual left right => exact ⟨_, _, _, _, _, left, right, rfl, rfl⟩
-
-private theorem reflects_group_cost {table : LocalNameTable} {environment : Resolved.Environment}
-    {initialStore finalStore : Core.Store} {span : Syntax.SourceSpan} {inner : Syntax.Expr}
-    {value : Core.Value} {cost : Nat}
-    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
-      ⟨span, .group inner⟩ value finalStore cost) :
-    RecursiveLocalComputationEvaluatesWithCost table environment initialStore inner value finalStore cost := by
-  cases evaluation with
-  | pure child => cases child with | group inner => exact .pure inner
-  | group child => exact child
+private theorem ordered_path {environment : Core.Environment}
+    {initialStore middleStore finalStore : Core.Store} {left right : Core.Expr}
+    {leftWord rightWord : Core.Word} {leftCost rightCost : Nat}
+    (rightFragment : RecursiveLocalComputationFragment right)
+    (leftPath : ∀ continuation, Core.Steps leftCost
+      ⟨.eval left environment, continuation, initialStore⟩
+      ⟨.ret (.word leftWord), continuation, middleStore⟩)
+    (rightPath : ∀ continuation, Core.Steps rightCost
+      ⟨.eval right environment, continuation, middleStore⟩
+      ⟨.ret (.word rightWord), continuation, finalStore⟩)
+    (continuation : List Core.Frame) :
+    Core.Steps (leftCost + rightCost + 9)
+      ⟨.eval (left.wordLt right) environment, continuation, initialStore⟩
+      ⟨.ret (.bool (decide (leftWord < rightWord))), continuation, finalStore⟩ := by
+  obtain ⟨pairedCost, paired⟩ := rightFragment.insertion_paths [] environment (.word leftWord)
+    (Core.steps_from_initial_sound (rightPath []))
+  have sameCost : pairedCost = rightCost := ((paired []).1.final_unique (rightPath [])).1
+  exact CostStepComposition.wordLt leftPath (fun k => sameCost ▸ (paired k).2) continuation
 
 theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
@@ -233,43 +114,97 @@ theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
   | pure resolution lowered _ =>
       rw [← sameIds] at lowered
       exact (reflects_pure_cost evaluation resolution).toStepsWithContinuation resolution lowered continuation
-  | group _ ih => exact ih (reflects_group_cost evaluation) continuation
+  | group _ ih =>
+      cases evaluation with
+      | pure child => cases child with | group inner => exact ih (.pure inner) continuation
+      | group child => exact ih child continuation
   | application _ _ functionIH argumentIH =>
       cases evaluation with
       | pure child => cases child
       | application functionEvaluation argumentEvaluation bodyPath =>
           exact CostStepComposition.apply (functionIH functionEvaluation _) (argumentIH argumentEvaluation _) bodyPath
   | binary operator _ _ leftIH rightIH =>
-      obtain ⟨_, _, _, _, _, leftChild, rightChild, applied, rfl⟩ := reflects_binary_cost operator evaluation
-      exact CostStepComposition.binary (leftIH leftChild _) (rightIH rightChild _) applied
+      cases evaluation with
+      | pure child =>
+          cases operator <;> cases child
+          all_goals exact CostStepComposition.binary (leftIH (.pure ‹_›) _) (rightIH (.pure ‹_›) _) rfl
+      | binary otherOperator left right applied =>
+          cases operator <;> cases otherOperator
+          all_goals exact CostStepComposition.binary (leftIH left _) (rightIH right _) applied
+      | andTrue _ _ | andFalse _ | orTrue _ | orFalse _ _ | notEqual _ _ | lessEqual _ _ | less _ _ | greaterEqual _ _ => cases operator
   | conditional _ _ _ conditionIH thenIH elseIH =>
-      rcases reflects_conditional_cost evaluation with ⟨_, _, _, guard, branch, rfl⟩ | ⟨_, _, _, guard, branch, rfl⟩
-      · exact CostStepComposition.ifTrue (conditionIH guard _) (thenIH branch _)
-      · exact CostStepComposition.ifFalse (conditionIH guard _) (elseIH branch _)
-
+      cases evaluation with
+      | pure child =>
+          cases child with
+          | ifTrue guard branch => exact CostStepComposition.ifTrue (conditionIH (.pure guard) _) (thenIH (.pure branch) _)
+          | ifFalse guard branch => exact CostStepComposition.ifFalse (conditionIH (.pure guard) _) (elseIH (.pure branch) _)
+      | ifTrue guard branch => exact CostStepComposition.ifTrue (conditionIH guard _) (thenIH branch _)
+      | ifFalse guard branch => exact CostStepComposition.ifFalse (conditionIH guard _) (elseIH branch _)
   | logicalNot _ ih =>
-      obtain ⟨_, _, child, rfl, rfl⟩ := reflects_logicalNot_cost evaluation
-      exact CostStepComposition.unary (ih child _) rfl
+      cases evaluation with
+      | pure child => cases child with | logicalNot operand => exact CostStepComposition.unary (ih (.pure operand) _) rfl
+      | logicalNot child => exact CostStepComposition.unary (ih child _) rfl
   | bitNot _ ih =>
-      obtain ⟨_, _, child, rfl, rfl⟩ := reflects_bitNot_cost evaluation
-      exact CostStepComposition.unary (ih child _) rfl
-
+      cases evaluation with
+      | pure child => cases child with | bitNot operand => exact CostStepComposition.unary (ih (.pure operand) _) rfl
+      | bitNot child => exact CostStepComposition.unary (ih child _) rfl
   | logicalAnd _ _ leftIH rightIH =>
-      rcases reflects_and_cost evaluation with ⟨_, _, _, left, right, rfl⟩ | ⟨_, left, rfl, rfl⟩
-      · exact CostStepComposition.ifTrue (leftIH left _) (rightIH right _)
-      · simpa only [Nat.add_assoc] using CostStepComposition.ifFalse (leftIH left _) (.cons .bool .refl)
+      cases evaluation with
+      | pure child =>
+          cases child with
+          | andTrue left right => exact CostStepComposition.ifTrue (leftIH (.pure left) _) (rightIH (.pure right) _)
+          | andFalse left => simpa only [Nat.add_assoc] using CostStepComposition.ifFalse (leftIH (.pure left) _) (.cons .bool .refl)
+      | binary operator _ _ _ => cases operator
+      | andTrue left right => exact CostStepComposition.ifTrue (leftIH left _) (rightIH right _)
+      | andFalse left => simpa only [Nat.add_assoc] using CostStepComposition.ifFalse (leftIH left _) (.cons .bool .refl)
   | logicalOr _ _ leftIH rightIH =>
-      rcases reflects_or_cost evaluation with ⟨_, left, rfl, rfl⟩ | ⟨_, _, _, left, right, rfl⟩
-      · simpa only [Nat.add_assoc] using CostStepComposition.ifTrue (leftIH left _) (.cons .bool .refl)
-      · exact CostStepComposition.ifFalse (leftIH left _) (rightIH right _)
-
+      cases evaluation with
+      | pure child =>
+          cases child with
+          | orTrue left => simpa only [Nat.add_assoc] using CostStepComposition.ifTrue (leftIH (.pure left) _) (.cons .bool .refl)
+          | orFalse left right => exact CostStepComposition.ifFalse (leftIH (.pure left) _) (rightIH (.pure right) _)
+      | binary operator _ _ _ => cases operator
+      | orTrue left => simpa only [Nat.add_assoc] using CostStepComposition.ifTrue (leftIH left _) (.cons .bool .refl)
+      | orFalse left right => exact CostStepComposition.ifFalse (leftIH left _) (rightIH right _)
   | notEqual _ _ leftIH rightIH =>
-      obtain ⟨_, _, _, _, _, left, right, rfl, rfl⟩ := reflects_notEqual_cost evaluation
-      simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
-        (CostStepComposition.binary (op := .wordEq) (leftIH left _) (rightIH right _) rfl) rfl
+      cases evaluation with
+      | pure child =>
+          cases child with
+          | notEqual left right =>
+              simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
+                (CostStepComposition.binary (op := .wordEq) (leftIH (.pure left) _) (rightIH (.pure right) _) rfl) rfl
+      | binary operator _ _ _ => cases operator
+      | notEqual left right =>
+          simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
+            (CostStepComposition.binary (op := .wordEq) (leftIH left _) (rightIH right _) rfl) rfl
   | lessEqual _ _ leftIH rightIH =>
-      obtain ⟨_, _, _, _, _, left, right, rfl, rfl⟩ := reflects_lessEqual_cost evaluation
-      simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
-        (CostStepComposition.binary (op := .wordGt) (leftIH left _) (rightIH right _) rfl) rfl
+      cases evaluation with
+      | pure child =>
+          cases child with
+          | lessEqual left right =>
+              simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
+                (CostStepComposition.binary (op := .wordGt) (leftIH (.pure left) _) (rightIH (.pure right) _) rfl) rfl
+      | binary operator _ _ _ => cases operator
+      | lessEqual left right =>
+          simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
+            (CostStepComposition.binary (op := .wordGt) (leftIH left _) (rightIH right _) rfl) rfl
+  | less _ rightElab leftIH rightIH =>
+      cases evaluation with
+      | pure child =>
+          cases child with
+          | less left right => exact ordered_path rightElab.core_fragment (leftIH (.pure left)) (rightIH (.pure right)) continuation
+      | binary operator _ _ _ => cases operator
+      | less left right => exact ordered_path rightElab.core_fragment (leftIH left) (rightIH right) continuation
+  | greaterEqual _ rightElab leftIH rightIH =>
+      cases evaluation with
+      | pure child =>
+          cases child with
+          | greaterEqual left right =>
+              simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
+                (ordered_path rightElab.core_fragment (leftIH (.pure left)) (rightIH (.pure right)) _) rfl
+      | binary operator _ _ _ => cases operator
+      | greaterEqual left right =>
+          simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
+            (ordered_path rightElab.core_fragment (leftIH left) (rightIH right) _) rfl
 
 end Solcore.Frontend
