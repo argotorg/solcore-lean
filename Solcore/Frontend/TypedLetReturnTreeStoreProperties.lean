@@ -19,6 +19,7 @@ theorem TypedLetReturnTreeEvaluates.change_store
   | single child => exact .single (child.change_store replacement)
   | binding initializer _ ih => exact .binding (initializer.change_store replacement) ih
   | inferred initializer _ ih => exact .inferred (initializer.change_store replacement) ih
+  | discard expression _ ih => exact .discard (expression.change_store replacement) ih
   | ifTrue condition _ ih => exact .ifTrue (condition.change_store replacement) ih
   | ifFalse condition _ ih => exact .ifFalse (condition.change_store replacement) ih
 
@@ -32,6 +33,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.change_store
   | single child => exact .single (child.change_store replacement)
   | binding initializer _ ih => exact .binding (initializer.change_store replacement) ih
   | inferred initializer _ ih => exact .inferred (initializer.change_store replacement) ih
+  | discard expression _ ih => exact .discard (expression.change_store replacement) ih
   | ifTrue condition _ ih => exact .ifTrue (condition.change_store replacement) ih
   | ifFalse condition _ ih => exact .ifFalse (condition.change_store replacement) ih
 

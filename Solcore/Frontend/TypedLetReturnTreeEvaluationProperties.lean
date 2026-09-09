@@ -16,7 +16,7 @@ theorem TypedLetReturnTreeEvaluates.store_eq
     finalStore = initialStore := by
   induction evaluation with
   | single child => exact child.store_eq
-  | binding child _ ih | inferred child _ ih | ifTrue child _ ih | ifFalse child _ ih =>
+  | binding child _ ih | inferred child _ ih | discard child _ ih | ifTrue child _ ih | ifFalse child _ ih =>
       exact ih.trans child.store_eq
 
 theorem TypedLetReturnTreeEvaluates.deterministic
@@ -30,7 +30,7 @@ theorem TypedLetReturnTreeEvaluates.deterministic
   | single child =>
       cases second with
       | single other => exact child.deterministic other
-      | binding _ _ | inferred _ _ | ifTrue _ _ | ifFalse _ _ => cases child
+      | binding _ _ | inferred _ _ | discard _ _ | ifTrue _ _ | ifFalse _ _ => cases child
   | binding initializer _ ih =>
       cases second with
       | single other => cases other
@@ -42,6 +42,12 @@ theorem TypedLetReturnTreeEvaluates.deterministic
       | single other => cases other
       | inferred otherInitializer otherTail =>
           obtain ⟨rfl, rfl⟩ := initializer.deterministic otherInitializer
+          exact ih otherTail
+  | discard expression _ ih =>
+      cases second with
+      | single other => cases other
+      | discard otherExpression otherTail =>
+          obtain ⟨_, rfl⟩ := expression.deterministic otherExpression
           exact ih otherTail
   | ifTrue condition _ ih =>
       cases second with
@@ -103,6 +109,10 @@ theorem TypedLetReturnTreeHasType.evaluates
       obtain ⟨value, tailEvaluation, valueTyped⟩ := ih tailIds tailTyped
       refine ⟨value, .inferred initializerEvaluation ?_, valueTyped⟩
       simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using tailEvaluation
+  | discard expressionTyping _ ih =>
+      obtain ⟨_, expressionEvaluation, _⟩ := expressionTyping.evaluates sameIds environmentTyped store
+      obtain ⟨value, tailEvaluation, valueTyped⟩ := ih sameIds environmentTyped
+      exact ⟨value, .discard expressionEvaluation tailEvaluation, valueTyped⟩
   | conditional conditionTyping _ _ thenIH elseIH =>
       obtain ⟨conditionValue, conditionEvaluation, conditionTyped⟩ :=
         conditionTyping.evaluates sameIds environmentTyped store
@@ -138,6 +148,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.erase
   | single child => exact .single child.erase
   | binding initializer _ ih => exact .binding initializer.erase ih
   | inferred initializer _ ih => exact .inferred initializer.erase ih
+  | discard expression _ ih => exact .discard expression.erase ih
   | ifTrue condition _ ih => exact .ifTrue condition.erase ih
   | ifFalse condition _ ih => exact .ifFalse condition.erase ih
 
@@ -158,6 +169,10 @@ theorem TypedLetReturnTreeEvaluates.exists_cost
       obtain ⟨_, initializerCost⟩ := initializer.exists_cost
       obtain ⟨_, tailCost⟩ := ih
       exact ⟨_, .inferred initializerCost tailCost⟩
+  | discard expression _ ih =>
+      obtain ⟨_, expressionCost⟩ := expression.exists_cost
+      obtain ⟨_, tailCost⟩ := ih
+      exact ⟨_, .discard expressionCost tailCost⟩
   | ifTrue condition _ ih =>
       obtain ⟨_, conditionCost⟩ := condition.exists_cost
       obtain ⟨_, branchCost⟩ := ih
@@ -187,7 +202,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.cost_pos
     0 < cost := by
   cases evaluation with
   | single child => exact child.cost_pos
-  | binding _ _ | inferred _ _ | ifTrue _ _ | ifFalse _ _ => omega
+  | binding _ _ | inferred _ _ | discard _ _ | ifTrue _ _ | ifFalse _ _ => omega
 
 theorem TypedLetReturnTreeEvaluatesWithCost.deterministic
     {owner : Resolved.DeclarationId} {table : LocalNameTable} {environment : Resolved.Environment}
@@ -200,7 +215,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.deterministic
   | single child =>
       cases second with
       | single other => exact child.deterministic other
-      | binding _ _ | inferred _ _ | ifTrue _ _ | ifFalse _ _ => cases child
+      | binding _ _ | inferred _ _ | discard _ _ | ifTrue _ _ | ifFalse _ _ => cases child
   | binding initializer _ ih =>
       cases second with
       | single other => cases other
@@ -213,6 +228,13 @@ theorem TypedLetReturnTreeEvaluatesWithCost.deterministic
       | single other => cases other
       | inferred otherInitializer otherTail =>
           obtain ⟨rfl, rfl, rfl⟩ := initializer.deterministic otherInitializer
+          obtain ⟨rfl, rfl, rfl⟩ := ih otherTail
+          exact ⟨rfl, rfl, rfl⟩
+  | discard expression _ ih =>
+      cases second with
+      | single other => cases other
+      | discard otherExpression otherTail =>
+          obtain ⟨_, rfl, rfl⟩ := expression.deterministic otherExpression
           obtain ⟨rfl, rfl, rfl⟩ := ih otherTail
           exact ⟨rfl, rfl, rfl⟩
   | ifTrue condition _ ih =>

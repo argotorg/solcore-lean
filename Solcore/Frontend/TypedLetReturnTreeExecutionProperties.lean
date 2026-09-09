@@ -2,6 +2,8 @@ import Solcore.Frontend.TypedLetReturnTreeProperties
 import Solcore.Frontend.TypedLetReturnTreeEvaluationProperties
 import Solcore.Frontend.ReturnBodyContinuationProperties
 import Solcore.Frontend.WordLessCostStepComposition
+import Solcore.Frontend.LocalFragmentProperties
+import Solcore.Core.LocalFragmentExactInsertionProperties
 
 /-! Whole checked trees follow old-scope initializers and the selected arm.
 Aligned IDs suffice for correspondence, without runtime typing. Exact-cost
@@ -29,6 +31,7 @@ theorem elaborateTypedLetReturnTree?_evaluates_iff
         | single evaluated => exact (elaborateReturnBody?_evaluates_iff child.complete sameIds).mp evaluated
         | binding _ _ => cases child
         | inferred _ _ => cases child
+        | discard _ _ => cases child
         | ifTrue _ _ => cases child
         | ifFalse _ _ => cases child
       · intro evaluated
@@ -83,6 +86,22 @@ theorem elaborateTypedLetReturnTree?_evaluates_iff
             · simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using tailEvaluation
             · simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.ids, List.map_cons]
                 using congrArg (List.cons _) sameIds
+  | discard resolution lowered typing tailElaboration ih =>
+      have expressionAccepted := elaborateLocalExpression?_complete resolution
+        (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | single child => cases child
+        | discard expression tail =>
+            rename_i middleStore discardedValue
+            exact .letE ((elaborateLocalExpression?_evaluates_iff expressionAccepted sameIds).mp expression)
+              (((ih sameIds).mp tail).weakenAt_zero_localFragment tailElaboration.localFragment discardedValue)
+      · intro evaluation
+        cases evaluation with
+        | letE expression tail =>
+            exact .discard ((elaborateLocalExpression?_evaluates_iff expressionAccepted sameIds).mpr expression)
+              ((ih sameIds).mpr (tail.reflect_weakenAt_zero_localFragment tailElaboration.localFragment))
   | conditional resolution lowered typing _ _ thenIH elseIH =>
       have conditionAccepted := elaborateLocalExpression?_complete resolution
         (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
@@ -126,6 +145,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.checked_toStepsWithContinuation
       | single evaluated => exact evaluated.checked_toStepsWithContinuation child.complete sameIds continuation
       | binding _ _ => cases child
       | inferred _ _ => cases child
+      | discard _ _ => cases child
       | ifTrue _ _ => cases child
       | ifFalse _ _ => cases child
   | @binding inputs _ _ _ _ _ _ _ _ _ _ _ _ _ resolution lowered _ _ ih =>
@@ -152,6 +172,16 @@ theorem TypedLetReturnTreeEvaluatesWithCost.checked_toStepsWithContinuation
           · simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using tail
           · simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.ids, List.map_cons]
               using congrArg (List.cons _) sameIds
+  | discard resolution lowered _ tailElaboration ih =>
+      cases evaluation with
+      | single child => cases child
+      | discard expression tail =>
+          rename_i middleStore discardedValue expressionCost tailCost
+          have runtimeLowered := lowered
+          rw [← LocalTypeInputs.context_ids, ← sameIds] at runtimeLowered
+          have tailPath := ih tail sameIds []
+          exact CostStepComposition.letE (expression.toStepsWithContinuation resolution runtimeLowered _)
+            (tailPath.weakenAt_zero_localFragment tailElaboration.localFragment discardedValue continuation)
   | conditional resolution lowered _ _ _ thenIH elseIH =>
       have runtimeLowered := lowered
       rw [← LocalTypeInputs.context_ids, ← sameIds] at runtimeLowered
