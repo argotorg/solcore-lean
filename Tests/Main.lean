@@ -246,6 +246,10 @@ import Solcore.Test.FrontendParsedRecursiveOrderedComparisonMigrations
 import Solcore.Test.FrontendRecursiveOrderedComparisonProperties
 import Solcore.Test.FrontendParsedRecursiveOrderedComparisons
 import Solcore.Test.FrontendParsedRecursiveOrderedComparisonEntries
+import Solcore.Test.FrontendParsedRecursiveTupleMigrations
+import Solcore.Test.FrontendRecursiveTupleProperties
+import Solcore.Test.FrontendParsedRecursiveTuples
+import Solcore.Test.FrontendParsedRecursiveTupleEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5886,6 +5890,9 @@ def run : IO Unit := do
   frontendParsedRecursiveOrderedComparisonMigrationTests
   frontendParsedRecursiveOrderedComparisonTests
   frontendParsedRecursiveOrderedComparisonEntryTests
+  frontendParsedRecursiveTupleMigrationTests
+  frontendParsedRecursiveTupleTests
+  frontendParsedRecursiveTupleEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

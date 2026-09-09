@@ -538,9 +538,21 @@ stays unchanged. Original rejection sources and caller tables migrate intact,
 including generated-binding checkpoints and ordered effect/fault resumption.
 This fixed Word profile does not implement general named lt/ge resolution.
 
+Canonical tuples now use recursive children (ADR-0262). Original binary and
+longer lists retain their caller scope, spans and right-associated shape, with
+arbitrary component types and actual values. The unchanged synthetic-tail
+decomposition adds no source rewrite or terminal Unit. Empty tuples stay pure;
+canonical singleton parentheses are groups and manual singleton nodes remain
+unsupported. Eight source constructors and generic caller pair membership
+preserve fourteen proof contracts and unchanged shared body/entry definitions.
+Actual stores flow left to right, each pair costs three transitions, and literal
+insertion chooses one paired cost before all continuations. Six original
+rejection fixtures migrate with identical sources and caller layouts; symbolic,
+parsed and entry consumers retain exact pair frames, effects, strict child
+faults and full resumption. No runtime component-typing premise is inferred.
+
 Next extend recursive children to the remaining expression forms using these
-shared contracts. Tuples,
-expected-type source lambdas and global function resolution
+shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
 transfer, and structural arguments alone do not validate stores.
 
