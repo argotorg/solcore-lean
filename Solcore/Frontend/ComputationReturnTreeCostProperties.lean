@@ -33,35 +33,46 @@ private theorem insert_zero_path {F : Core.Expr → Prop}
   exact sameCost.symm ▸ (paths continuation).2
 
 private theorem fold_path
-    (entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))) (defaultCore : Core.Expr)
+    (entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)))
+    (defaultEntry : Option (Syntax.Block × Core.Expr))
     {actual value : Core.Value} {environment : Core.Environment} {initialStore finalStore : Core.Store}
-    {defaultBody selected : Syntax.Block} {tests branchCost : Nat}
+    {selected : Syntax.Block} {tests branchCost : Nat} {core : Core.Expr}
     (patterns : ∀ entry ∈ entries, match entry.2.1 with
       | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
       | some word => WordMatchPatternDenotes entry.1.value.pattern word)
-    (choice : WordMatchChooses actual (entries.map Prod.fst) defaultBody selected tests)
+    (choice : WordMatchChooses actual (entries.map Prod.fst) (defaultEntry.map Prod.fst) selected tests)
     (branches : ∀ entry ∈ entries, entry.1.value.body = selected → ∀ continuation,
       Core.Steps branchCost ⟨.eval (entry.2.2.weakenAt 0) (actual :: environment), continuation, initialStore⟩
         ⟨.ret value, continuation, finalStore⟩)
-    (fallback : defaultBody = selected → ∀ continuation,
-      Core.Steps branchCost ⟨.eval (defaultCore.weakenAt 0) (actual :: environment), continuation, initialStore⟩
+    (fallback : ∀ entry ∈ defaultEntry.toList, entry.1 = selected → ∀ continuation,
+      Core.Steps branchCost ⟨.eval (entry.2.weakenAt 0) (actual :: environment), continuation, initialStore⟩
         ⟨.ret value, continuation, finalStore⟩)
+    (lowered : entries.foldr
+      (fun entry tail => match entry.2.1 with
+        | none => some (entry.2.2.weakenAt 0)
+        | some word => tail.map fun body => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) body)
+      (defaultEntry.map fun entry => entry.2.weakenAt 0) = some core)
     (continuation : List Core.Frame) :
     Core.Steps (branchCost + 7 * tests)
-      ⟨.eval (entries.foldr
-        (fun entry tail => match entry.2.1 with
-          | none => entry.2.2.weakenAt 0
-          | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
-        (defaultCore.weakenAt 0)) (actual :: environment), continuation, initialStore⟩
+      ⟨.eval core (actual :: environment), continuation, initialStore⟩
       ⟨.ret value, continuation, finalStore⟩ := by
-  induction entries generalizing actual selected tests with
-  | nil => cases choice; simpa using fallback rfl continuation
+  induction entries generalizing actual selected tests core with
+  | nil =>
+      cases defaultEntry with
+      | none => simp at lowered
+      | some entry =>
+          simp only [List.foldr_nil, Option.map_some, Option.some.injEq] at lowered
+          subst core
+          cases choice
+          simpa using fallback entry (by simp) rfl continuation
   | cons entry rest ih =>
       rcases entry with ⟨arm, tag, branchCore⟩
       have pattern := patterns ⟨arm, tag, branchCore⟩ (by simp)
       cases tag with
       | none =>
           obtain ⟨marker, shape⟩ := pattern
+          simp only [List.foldr_cons, Option.some.injEq] at lowered
+          subst core
           cases choice with
           | wildcard _ => simpa using branches ⟨arm, none, branchCore⟩ (by simp) rfl continuation
           | hit meaning | miss meaning _ _ =>
@@ -69,6 +80,8 @@ private theorem fold_path
               rw [shape] at literalShape
               cases literalShape
       | some literal =>
+          simp only [List.foldr_cons, Option.map_eq_some_iff] at lowered
+          obtain ⟨tailCore, tailLowered, rfl⟩ := lowered
           cases choice with
           | wildcard shape =>
               obtain ⟨source, literalShape, _⟩ := pattern
@@ -94,7 +107,7 @@ private theorem fold_path
                   ⟨.ret (.bool false), k, initialStore⟩ :=
                 CostStepComposition.binary (.cons (.var rfl) .refl) (.cons .word .refl) (by simp [Core.BinaryOp.apply, different])
               have restPath := ih (fun item member => patterns item (by simp [member])) tail
-                (fun item member => branches item (by simp [member])) fallback
+                (fun item member => branches item (by simp [member])) fallback tailLowered
               have costEq : 5 + (branchCost + 7 * tests) + 2 = branchCost + 7 * (tests + 1) := by omega
               rw [← costEq]
               exact CostStepComposition.ifFalse (guard _) restPath
@@ -170,10 +183,10 @@ theorem ComputationReturnTreeEvaluatesWithCost.toStepsWithContinuation
       | ifFalse condition branch =>
           exact CostStepComposition.ifFalse (childSteps condition guard sameIds _)
             (elseIH branch sameIds continuation)
-  | wordMatch scrutinee ordered patterns branches fallback branchIH defaultIH =>
+  | wordMatch scrutinee ordered patterns branches defaultOrdered fallback lowered branchIH defaultIH =>
       cases evaluation with
       | wordMatch initializer choice branch =>
-          rw [← ordered] at choice
+          rw [← ordered, ← defaultOrdered] at choice
           have selectedPath := fold_path _ _ patterns choice
             (fun entry member selectedEq k => by
               have actual := branch
@@ -181,12 +194,12 @@ theorem ComputationReturnTreeEvaluatesWithCost.toStepsWithContinuation
               exact insert_zero_path (F := F) childPaths
                 (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening (branches entry member))
                 (branchIH entry member actual sameIds []) _ k)
-            (fun selectedEq k => by
+            (fun entry member selectedEq k => by
               have actual := branch
               rw [← selectedEq] at actual
               exact insert_zero_path (F := F) childPaths
-                (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening fallback)
-                (defaultIH actual sameIds []) _ k) continuation
+                (ComputationReturnTreeElaborates.core_fragment (F := F) childMembership childWeakening (fallback entry member))
+                (defaultIH entry member actual sameIds []) _ k) lowered continuation
           have path := CostStepComposition.letE (childSteps initializer scrutinee sameIds _) selectedPath
           simp only [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] at path ⊢
           exact path
