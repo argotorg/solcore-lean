@@ -28,6 +28,7 @@ theorem elaborateTypedLetReturnTree?_evaluates_iff
         cases evaluation with
         | single evaluated => exact (elaborateReturnBody?_evaluates_iff child.complete sameIds).mp evaluated
         | binding _ _ => cases child
+        | inferred _ _ => cases child
         | ifTrue _ _ => cases child
         | ifFalse _ _ => cases child
       · intro evaluated
@@ -51,6 +52,31 @@ theorem elaborateTypedLetReturnTree?_evaluates_iff
         | letE initializer tail =>
             rename_i bodyStore boundValue
             apply TypedLetReturnTreeEvaluates.binding
+              ((elaborateLocalExpression?_evaluates_iff initializerAccepted sameIds).mpr initializer)
+            have tailEvaluation :=
+              (ih (environment := (Resolved.freshLocalId owner inputs.ids, boundValue) :: environment) ?_).mpr tail
+            · simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using tailEvaluation
+            · simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.ids, List.map_cons]
+                using congrArg (List.cons _) sameIds
+  | @inferred inputs _ _ name _ _ inferredType _ _ _ _ _ resolution lowered typing _ ih =>
+      have initializerAccepted := elaborateLocalExpression?_complete resolution
+        (by simpa only [LocalTypeInputs.context_ids] using lowered) typing
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | single child => cases child
+        | inferred initializer tail =>
+            rename_i middleStore boundValue
+            refine .letE ((elaborateLocalExpression?_evaluates_iff initializerAccepted sameIds).mp initializer) ?_
+            apply (ih (environment := (Resolved.freshLocalId owner inputs.ids, boundValue) :: environment) ?_).mp
+            · simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using tail
+            · simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.ids, List.map_cons]
+                using congrArg (List.cons _) sameIds
+      · intro evaluation
+        cases evaluation with
+        | letE initializer tail =>
+            rename_i bodyStore boundValue
+            apply TypedLetReturnTreeEvaluates.inferred
               ((elaborateLocalExpression?_evaluates_iff initializerAccepted sameIds).mpr initializer)
             have tailEvaluation :=
               (ih (environment := (Resolved.freshLocalId owner inputs.ids, boundValue) :: environment) ?_).mpr tail
@@ -99,12 +125,25 @@ theorem TypedLetReturnTreeEvaluatesWithCost.checked_toStepsWithContinuation
       cases evaluation with
       | single evaluated => exact evaluated.checked_toStepsWithContinuation child.complete sameIds continuation
       | binding _ _ => cases child
+      | inferred _ _ => cases child
       | ifTrue _ _ => cases child
       | ifFalse _ _ => cases child
   | @binding inputs _ _ _ _ _ _ _ _ _ _ _ _ _ resolution lowered _ _ ih =>
       cases evaluation with
       | single child => cases child
       | binding initializer tail =>
+          rename_i middleStore boundValue initializerCost tailCost
+          have runtimeLowered := lowered
+          rw [← LocalTypeInputs.context_ids, ← sameIds] at runtimeLowered
+          apply CostStepComposition.letE (initializer.toStepsWithContinuation resolution runtimeLowered _)
+          apply ih (environment := (Resolved.freshLocalId owner inputs.ids, boundValue) :: environment)
+          · simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using tail
+          · simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.ids, List.map_cons]
+              using congrArg (List.cons _) sameIds
+  | @inferred inputs _ _ _ _ _ _ _ _ _ _ _ resolution lowered _ _ ih =>
+      cases evaluation with
+      | single child => cases child
+      | inferred initializer tail =>
           rename_i middleStore boundValue initializerCost tailCost
           have runtimeLowered := lowered
           rw [← LocalTypeInputs.context_ids, ← sameIds] at runtimeLowered

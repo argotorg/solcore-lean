@@ -16,7 +16,8 @@ theorem TypedLetReturnTreeEvaluates.store_eq
     finalStore = initialStore := by
   induction evaluation with
   | single child => exact child.store_eq
-  | binding child _ ih | ifTrue child _ ih | ifFalse child _ ih => exact ih.trans child.store_eq
+  | binding child _ ih | inferred child _ ih | ifTrue child _ ih | ifFalse child _ ih =>
+      exact ih.trans child.store_eq
 
 theorem TypedLetReturnTreeEvaluates.deterministic
     {owner : Resolved.DeclarationId} {table : LocalNameTable} {environment : Resolved.Environment}
@@ -29,11 +30,17 @@ theorem TypedLetReturnTreeEvaluates.deterministic
   | single child =>
       cases second with
       | single other => exact child.deterministic other
-      | binding _ _ | ifTrue _ _ | ifFalse _ _ => cases child
+      | binding _ _ | inferred _ _ | ifTrue _ _ | ifFalse _ _ => cases child
   | binding initializer _ ih =>
       cases second with
       | single other => cases other
       | binding otherInitializer otherTail =>
+          obtain ⟨rfl, rfl⟩ := initializer.deterministic otherInitializer
+          exact ih otherTail
+  | inferred initializer _ ih =>
+      cases second with
+      | single other => cases other
+      | inferred otherInitializer otherTail =>
           obtain ⟨rfl, rfl⟩ := initializer.deterministic otherInitializer
           exact ih otherTail
   | ifTrue condition _ ih =>
@@ -80,6 +87,22 @@ theorem TypedLetReturnTreeHasType.evaluates
       obtain ⟨value, tailEvaluation, valueTyped⟩ := ih tailIds tailTyped
       refine ⟨value, .binding initializerEvaluation ?_, valueTyped⟩
       simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using tailEvaluation
+  | @inferred inputs blockSpan letSpan name initializer rest inferredType returnType
+      _ initializerTyping _ ih =>
+      obtain ⟨boundValue, initializerEvaluation, boundTyped⟩ :=
+        initializerTyping.evaluates sameIds environmentTyped store
+      have tailIds : Resolved.LocalScope.ids
+          ((Resolved.freshLocalId owner inputs.ids, boundValue) :: environment) =
+          Resolved.LocalScope.ids (inputs.bindFresh owner name.value inferredType).context := by
+        simpa only [LocalTypeInputs.bindFresh_context, Resolved.LocalScope.ids, List.map_cons, Prod.fst]
+          using congrArg (Resolved.freshLocalId owner inputs.ids :: ·) sameIds
+      have tailTyped : Core.EnvironmentHasTypes
+          (Resolved.LocalScope.values ((Resolved.freshLocalId owner inputs.ids, boundValue) :: environment))
+          (Resolved.LocalScope.values (inputs.bindFresh owner name.value inferredType).context) :=
+        .cons boundTyped environmentTyped
+      obtain ⟨value, tailEvaluation, valueTyped⟩ := ih tailIds tailTyped
+      refine ⟨value, .inferred initializerEvaluation ?_, valueTyped⟩
+      simpa only [LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using tailEvaluation
   | conditional conditionTyping _ _ thenIH elseIH =>
       obtain ⟨conditionValue, conditionEvaluation, conditionTyped⟩ :=
         conditionTyping.evaluates sameIds environmentTyped store
@@ -114,6 +137,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.erase
   induction evaluation with
   | single child => exact .single child.erase
   | binding initializer _ ih => exact .binding initializer.erase ih
+  | inferred initializer _ ih => exact .inferred initializer.erase ih
   | ifTrue condition _ ih => exact .ifTrue condition.erase ih
   | ifFalse condition _ ih => exact .ifFalse condition.erase ih
 
@@ -130,6 +154,10 @@ theorem TypedLetReturnTreeEvaluates.exists_cost
       obtain ⟨_, initializerCost⟩ := initializer.exists_cost
       obtain ⟨_, tailCost⟩ := ih
       exact ⟨_, .binding initializerCost tailCost⟩
+  | inferred initializer _ ih =>
+      obtain ⟨_, initializerCost⟩ := initializer.exists_cost
+      obtain ⟨_, tailCost⟩ := ih
+      exact ⟨_, .inferred initializerCost tailCost⟩
   | ifTrue condition _ ih =>
       obtain ⟨_, conditionCost⟩ := condition.exists_cost
       obtain ⟨_, branchCost⟩ := ih
@@ -159,7 +187,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.cost_pos
     0 < cost := by
   cases evaluation with
   | single child => exact child.cost_pos
-  | binding _ _ | ifTrue _ _ | ifFalse _ _ => omega
+  | binding _ _ | inferred _ _ | ifTrue _ _ | ifFalse _ _ => omega
 
 theorem TypedLetReturnTreeEvaluatesWithCost.deterministic
     {owner : Resolved.DeclarationId} {table : LocalNameTable} {environment : Resolved.Environment}
@@ -172,11 +200,18 @@ theorem TypedLetReturnTreeEvaluatesWithCost.deterministic
   | single child =>
       cases second with
       | single other => exact child.deterministic other
-      | binding _ _ | ifTrue _ _ | ifFalse _ _ => cases child
+      | binding _ _ | inferred _ _ | ifTrue _ _ | ifFalse _ _ => cases child
   | binding initializer _ ih =>
       cases second with
       | single other => cases other
       | binding otherInitializer otherTail =>
+          obtain ⟨rfl, rfl, rfl⟩ := initializer.deterministic otherInitializer
+          obtain ⟨rfl, rfl, rfl⟩ := ih otherTail
+          exact ⟨rfl, rfl, rfl⟩
+  | inferred initializer _ ih =>
+      cases second with
+      | single other => cases other
+      | inferred otherInitializer otherTail =>
           obtain ⟨rfl, rfl, rfl⟩ := initializer.deterministic otherInitializer
           obtain ⟨rfl, rfl, rfl⟩ := ih otherTail
           exact ⟨rfl, rfl, rfl⟩
