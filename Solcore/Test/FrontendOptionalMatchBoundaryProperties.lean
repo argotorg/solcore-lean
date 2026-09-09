@@ -48,8 +48,8 @@ private theorem originalElaborates (type : Core.Ty) (marker : Syntax.SourceSpan)
   · intro entry member
     simp only [List.mem_cons,List.not_mem_nil,or_false] at member
     rcases member with rfl | rfl
-    · exact ⟨marker,rfl⟩
-    · exact literalMeaning
+    · exact .wildcard rfl
+    · exact .literal literalMeaning
   · intro entry member
     simp only [List.mem_cons,List.not_mem_nil,or_false] at member
     rcases member with rfl | rfl <;> exact .expression (yElaborates type)
@@ -64,7 +64,7 @@ private theorem counted (type : Core.Ty) (marker : Syntax.SourceSpan) (rest : Li
     (initialStore := store) (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
     (scrutinee := ref "x") (cases := wildcard marker::rest) (defaultBody := none)
     (selected := returned) (scrutineeValue := scrutinee)
-    (.pure (.identifier .head .head)) (.wildcard rfl)
+    (.pure (.identifier .head .head)) (.wildcard (.wildcard rfl))
     (.expression (.pure (.identifier (id := id 1) (LocalNameTable.lookup?_iff.mp rfl)
       (Resolved.LocalScope.lookup?_iff.mp rfl))))
 private theorem literalPath (scrutinee result : Core.Value) (store : Core.Store) (pending : List Core.Frame) :
@@ -75,11 +75,11 @@ private theorem noLiteralCoverage (type resultType : Core.Ty) :
   intro typed
   cases typed with
   | wordMatch _ _ covered _ _ =>
-      rcases covered with present | ⟨arm,member,marker,shape⟩
+      rcases covered with present | ⟨arm,member,meaning⟩
       · cases present
       · simp only [List.mem_singleton] at member
         subst arm
-        cases shape
+        cases (WordMatchPatternClassifies.literal literalMeaning).tag_unique meaning
 
 theorem the_original_first_body_determines_an_arbitrary_result_type
     (type : Core.Ty) (marker : Syntax.SourceSpan) :
@@ -135,7 +135,7 @@ theorem an_empty_original_arm_collection_has_no_type_or_compiled_fallback (type 
     intro typed
     cases typed with
     | wordMatch _ _ covered _ _ =>
-        rcases covered with present | ⟨arm,member,_,_⟩
+        rcases covered with present | ⟨arm,member,_⟩
         · cases present
         · cases member
   refine ⟨noType,?_⟩
@@ -158,7 +158,7 @@ theorem a_raw_literal_hit_without_default_does_not_establish_static_coverage
       (initialStore := store) (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
       (scrutinee := ref "x") (cases := [literal]) (defaultBody := none)
       (selected := returned) (scrutineeValue := .word .zero)
-      (.pure (.identifier .head .head)) (.hit literalMeaning)
+      (.pure (.identifier .head .head)) (.hit (.literal literalMeaning))
       (.expression (.pure (.identifier (id := id 1) (LocalNameTable.lookup?_iff.mp rfl)
         (Resolved.LocalScope.lookup?_iff.mp rfl))))
   · exact noLiteralCoverage type type
@@ -186,9 +186,8 @@ theorem a_malformed_unreachable_pattern_still_prevents_static_acceptance
   cases typed with
   | wordMatch _ patterns _ _ _ =>
       obtain ⟨tag,meaning⟩ := patterns ⟨span,⟨⟨span,.error⟩,returned⟩⟩ (by simp)
-      cases tag with
-      | none => obtain ⟨_,shape⟩ := meaning; cases shape
-      | some word => obtain ⟨_,shape,_⟩ := meaning; cases shape
+      have checked := interpretWordMatchPattern?_iff.mpr meaning
+      simp [interpretWordMatchPattern?] at checked
 
 theorem a_pending_frame_is_outside_the_original_four_transition_body
     (scrutinee result : Core.Value) (store : Core.Store) :

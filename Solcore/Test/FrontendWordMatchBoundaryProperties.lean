@@ -48,7 +48,7 @@ private theorem guardedElaborates :
       (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
       (defaultBody := some returned) (defaultEntry := some (returned,.var 0))
       (entries := [(arm,some zero,Core.Expr.var 0)]) xElaborates rfl
-      (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact zeroMeaning)
+      (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact .literal zeroMeaning)
       (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact .expression xElaborates)
       rfl (by intro entry member; simp only [Option.toList_some,List.mem_singleton] at member
               subst entry; exact .expression xElaborates) rfl)
@@ -116,7 +116,7 @@ theorem a_Bool_cannot_choose_even_the_default_of_nonempty_literal_cases
     ¬ WordMatchChooses (.bool flag) (arm::rest) (some fallback) selected tests := by
   intro choice
   cases choice with
-  | wildcard shape => cases shape
+  | wildcard meaning => cases (WordMatchPatternClassifies.literal zeroMeaning).tag_unique meaning
 
 theorem malformed_unvisited_pattern_and_body_do_not_change_raw_first_hit
     (badPattern : Syntax.Pattern) (badBody fallback : Syntax.Block) :
@@ -125,7 +125,7 @@ theorem malformed_unvisited_pattern_and_body_do_not_change_raw_first_hit
       WordMatchChooses (.word zero) [arm,⟨span,⟨badPattern,badBody⟩⟩] (some fallback) selected tests →
       selected = returned ∧ tests = 1) := by
   have chosen : WordMatchChooses (.word zero) [arm,⟨span,⟨badPattern,badBody⟩⟩] (some fallback) returned 1 :=
-    .hit zeroMeaning
+    .hit (.literal zeroMeaning)
   exact ⟨chosen,fun _ _ other => other.deterministic chosen⟩
 
 theorem a_malformed_unselected_case_still_blocks_static_typing (store : Core.Store) :
@@ -139,13 +139,12 @@ theorem a_malformed_unselected_case_still_blocks_static_typing (store : Core.Sto
       (owner := owner) (table := inputs.names) (environment := environment (.word zero))
       (initialStore := store) (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
       (scrutinee := x) (defaultBody := some returned) (selected := returned) (scrutineeValue := .word zero)
-      (.pure (.identifier .head .head)) (.hit zeroMeaning) (.expression (.pure (.identifier .head .head)))
+      (.pure (.identifier .head .head)) (.hit (.literal zeroMeaning)) (.expression (.pure (.identifier .head .head)))
   · intro typing
     cases typing with
     | wordMatch _ patterns _ _ _ =>
         obtain ⟨tag,meaning⟩ := patterns ⟨span,⟨⟨span,.error⟩,returned⟩⟩ (by simp)
-        cases tag with
-        | none => obtain ⟨_,shape⟩ := meaning; cases shape
-        | some word => obtain ⟨_,shape,_⟩ := meaning; cases shape
+        have checked := interpretWordMatchPattern?_iff.mpr meaning
+        simp [interpretWordMatchPattern?] at checked
 
 end Tests.FrontendWordMatchBoundary

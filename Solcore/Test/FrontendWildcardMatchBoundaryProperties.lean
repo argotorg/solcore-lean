@@ -44,9 +44,9 @@ private theorem originalElaborates (marker : Syntax.SourceSpan) :
       xElaborates rfl
       (by intro entry member; simp only [List.mem_cons,List.not_mem_nil,or_false] at member
           rcases member with rfl | rfl | rfl
-          exact ⟨marker,rfl⟩
-          exact literalMeaning
-          exact ⟨marker,rfl⟩)
+          exact .wildcard rfl
+          exact .literal literalMeaning
+          exact .wildcard rfl)
       (by intro entry member; simp only [List.mem_cons,List.not_mem_nil,or_false] at member
           rcases member with rfl | rfl | rfl <;> exact .expression xElaborates)
       rfl (by intro entry member; simp only [Option.toList_some,List.mem_singleton] at member
@@ -60,7 +60,7 @@ private theorem counted (marker : Syntax.SourceSpan) (rest : List Syntax.MatchCa
     (owner := owner) (table := inputs.names) (environment := environment value)
     (initialStore := store) (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
     (scrutinee := x) (cases := wildcard marker::rest) (defaultBody := some returned) (selected := returned) (scrutineeValue := value)
-    (.pure (.identifier .head .head)) (.wildcard rfl) (.expression (.pure (.identifier .head .head)))
+    (.pure (.identifier .head .head)) (.wildcard (.wildcard rfl)) (.expression (.pure (.identifier .head .head)))
 private theorem guardedElaborates (marker : Syntax.SourceSpan) :
     RecursiveComputationReturnTreeElaborates [] owner inputs
       (source [literal,wildcard marker]) guarded .word := by
@@ -71,7 +71,7 @@ private theorem guardedElaborates (marker : Syntax.SourceSpan) :
       (entries := [(literal,some zero,Core.Expr.var 0),(wildcard marker,none,.var 0)])
       xElaborates rfl
       (by intro entry member; simp only [List.mem_cons,List.not_mem_nil,or_false] at member
-          rcases member with rfl | rfl; exact literalMeaning; exact ⟨marker,rfl⟩)
+          rcases member with rfl | rfl; exact .literal literalMeaning; exact .wildcard rfl)
       (by intro entry member; simp only [List.mem_cons,List.not_mem_nil,or_false] at member
           rcases member with rfl | rfl <;> exact .expression xElaborates)
       rfl (by intro entry member; simp only [Option.toList_some,List.mem_singleton] at member
@@ -120,7 +120,7 @@ theorem no_later_original_pattern_or_body_is_dynamically_inspected
       selected=returned ∧ tests=0) ∧
     RecursiveComputationReturnTreeEvaluatesWithCost owner inputs.names (environment value)
       store (source (wildcard marker::rest)) value store 4 := by
-  have choice : WordMatchChooses value (wildcard marker::rest) (some defaultBody) returned 0 := .wildcard rfl
+  have choice : WordMatchChooses value (wildcard marker::rest) (some defaultBody) returned 0 := .wildcard (.wildcard rfl)
   exact ⟨choice,fun _ _ other => other.deterministic choice,counted marker rest value store⟩
 
 theorem an_unselected_malformed_pattern_still_blocks_all_body_typing
@@ -134,9 +134,8 @@ theorem an_unselected_malformed_pattern_still_blocks_all_body_typing
   cases typed with
   | wordMatch _ patterns _ _ _ =>
       obtain ⟨tag,meaning⟩ := patterns ⟨span,⟨⟨span,.error⟩,returned⟩⟩ (by simp)
-      cases tag with
-      | none => obtain ⟨_,shape⟩ := meaning; cases shape
-      | some word => obtain ⟨_,shape,_⟩ := meaning; cases shape
+      have checked := interpretWordMatchPattern?_iff.mpr meaning
+      simp [interpretWordMatchPattern?] at checked
 
 theorem a_literal_before_the_wildcard_still_requires_an_actual_Word
     (marker : Syntax.SourceSpan) (value : Core.Value) (rest : List Syntax.MatchCase)
@@ -144,7 +143,7 @@ theorem a_literal_before_the_wildcard_still_requires_an_actual_Word
     (choice : WordMatchChooses value (literal::wildcard marker::rest) (some defaultBody) selected tests) :
     ∃ word, value=.word word := by
   cases choice with
-  | wildcard shape => cases shape
+  | wildcard meaning => cases (WordMatchPatternClassifies.literal literalMeaning).tag_unique meaning
   | hit _ => exact ⟨_,rfl⟩
   | miss _ _ _ => exact ⟨_,rfl⟩
 
