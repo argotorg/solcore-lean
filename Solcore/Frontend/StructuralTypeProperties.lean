@@ -20,6 +20,10 @@ theorem StructuralTypeDenotes.complete {table : TypeNameTable}
   | many _ _ headIH tailIH =>
       rw [interpretStructuralType?]
       simp only [headIH, tailIH, bind, Option.bind_some, pure]
+  | functionDefault _ parameterIH =>
+      simp only [interpretStructuralType?, parameterIH, bind, Option.bind_some, pure]
+  | functionReturns _ _ parameterIH returnIH =>
+      simp only [interpretStructuralType?, parameterIH, returnIH, bind, Option.bind_some, pure]
 
 theorem interpretStructuralType?_sound {table : TypeNameTable}
     {source : Syntax.TypeExpr} {type : Core.Ty}
@@ -34,6 +38,29 @@ theorem interpretStructuralType?_sound {table : TypeNameTable}
             exact .named (TypeNameTable.lookup?_iff.mp
               (by simpa only [interpretStructuralType?] using result))
         | some arguments => simp only [interpretStructuralType?, reduceCtorEq] at result
+      case function keyword parameters returns =>
+        cases parameters with
+        | mk parametersSpan parameters =>
+          cases parameters with
+          | nil => simp only [interpretStructuralType?, reduceCtorEq] at result
+          | cons parameter rest =>
+              cases rest with
+              | cons next rest => simp only [interpretStructuralType?, reduceCtorEq] at result
+              | nil =>
+                  cases returns with
+                  | none =>
+                      simp only [interpretStructuralType?, bind, Option.bind_eq_some_iff,
+                        pure, Option.some.injEq] at result
+                      obtain ⟨parameterType, parameterResult, rfl⟩ := result
+                      exact .functionDefault (interpretStructuralType?_sound parameterResult)
+                  | some returns =>
+                      cases returns with
+                      | mk returnsSpan results =>
+                        rw [interpretStructuralType?] at result
+                        simp only [bind, Option.bind_eq_some_iff, pure, Option.some.injEq] at result
+                        obtain ⟨parameterType, parameterResult, returnType, returnResult, rfl⟩ := result
+                        exact .functionReturns (interpretStructuralType?_sound parameterResult)
+                          (interpretStructuralType?_sound returnResult)
       case tuple elements =>
         cases elements with
         | nil =>
@@ -94,6 +121,17 @@ theorem interpretStructuralType?_span (table : TypeNameTable) (source : Syntax.T
   | mk sourceSpan payload =>
       cases payload <;> try simp only [interpretStructuralType?]
       case named name arguments => cases arguments <;> simp only [interpretStructuralType?]
+      case function keyword parameters returns =>
+        rcases parameters with ⟨parametersSpan, parameters⟩
+        cases parameters with
+        | nil => simp only [interpretStructuralType?]
+        | cons parameter rest =>
+            cases rest with
+            | cons next rest => simp only [interpretStructuralType?]
+            | nil =>
+                cases returns with
+                | none => simp only [interpretStructuralType?]
+                | some returns => cases returns; simp only [interpretStructuralType?]
       case tuple elements =>
         cases elements with
         | nil => simp only [interpretStructuralType?]
