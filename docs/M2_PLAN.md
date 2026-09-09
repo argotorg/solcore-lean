@@ -739,6 +739,20 @@ shared-body or entry covariance. That next integration needs owner-only maps
 and the existing exact fresh-binding commutation. Non-injective collapse is
 explicitly outside all five laws and can alter first-match positional results.
 
+The shared-body static integration is now proved (ADR-0276): three generic
+owner-only laws preserve independent elaboration and typing iff and the full
+optional checker result under the same child's covariance. Existing fresh
+allocation commutation handles original typed/inferred tails, including sparse
+foreign-owner inputs and repeated spellings. Original scope protection, all
+if/match branches, optional default, structural meanings and literal Core stay
+fixed, with no inverse or surjectivity assumption.
+
+Keep this separate from raw body/cost and function/header owner transport.
+Same-Core execution observations retain actual values/stores and checkpoints,
+but arbitrary covariant child checking need not be semantically correct or
+runtime safe. General binder-index changes still do not commute with fresh
+allocation, and type-name/nominal identities are not being renamed.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

@@ -1142,6 +1142,25 @@ allocator; owner-only body/function integration remains separate. Non-injective
 collapse can change first-match meanings, Core positions and actual results.
 All old executable definitions, contracts and consumer contexts are unchanged.
 
+Shared computation bodies now retain independent elaboration and typing in
+both directions under injective declaration-owner changes (ADR-0276). Three
+additive generic laws keep the original body/ranges, type-name table, result
+type and exact positional Core. The same fixed child interface supplies its
+own covariance; recursive children instantiate it through ADR-0275. Complete
+optional checker equality preserves rejection as well as success, without
+requiring correctness of an arbitrary covariant child checker.
+
+Fresh typed and inferred lets retain binder indices through the existing
+owner-filtered allocation law. Reflection remembers original input scopes;
+it requires neither an inverse nor surjectivity. Repeated spellings, sparse
+indices and foreign-owner rows remain ordered. Name protection, both if arms,
+all match branches and optional defaults retain their independent evidence.
+Actual values/stores and complete execution observations are compared through
+the same original Core, not a new raw-body owner or runtime-safety theorem.
+General binder-index maps, nominal declaration renaming and function/header
+owner integration remain separate. No old executable or semantic contract
+changes, and source admission does not expand.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
