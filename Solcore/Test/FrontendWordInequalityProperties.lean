@@ -248,7 +248,7 @@ theorem declared_word_return_rejects_a_bool_inequality_result :
   intro ⟨candidate, accepted⟩
   have sameInputs : candidate.inputs = compiled.inputs := accepted.parameters.result_unique compilation.parameters
   have expectedHeader : RuntimeFunctionHeader types (declaration "Word").value.signature .word :=
-    ⟨rfl, rfl, rfl, rfl, .single wordAnnotation⟩
+    ⟨rfl, rfl, rfl, rfl, .single wordAnnotation.structural⟩
   have sameReturn : candidate.returnType = .word := accepted.header.type_unique expectedHeader
   have candidateBody := accepted.body
   rw [sameInputs] at candidateBody

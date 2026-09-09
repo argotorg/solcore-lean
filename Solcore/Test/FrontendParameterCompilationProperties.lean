@@ -47,7 +47,7 @@ private theorem declared (id : Resolved.DeclarationId) (payload condition : Core
       (.cons (payloadMeaning payload condition) (by change "f" ∉ ["t", "c"]; decide) .nil))
 private theorem header (payload condition : Core.Ty) (body : Syntax.Block) :
     RuntimeFunctionHeader (types payload condition) (entry parameters "Payload" body).value.signature payload :=
-  ⟨rfl, rfl, rfl, rfl, .single (payloadMeaning payload condition)⟩
+  ⟨rfl, rfl, rfl, rfl, .single (payloadMeaning payload condition).structural⟩
 private theorem compilation (id : Resolved.DeclarationId) (payload : Core.Ty) (conditional : Bool) :
     RuntimeFunctionCompiles (types payload .bool) id (declaration conditional) (compiled id payload conditional) := by
   cases conditional
@@ -168,14 +168,18 @@ theorem a_selected_valid_parameter_does_not_bypass_the_return_contract_or_other_
       (entry [parameter "c" "Cond", parameter "t" "Payload", parameter "t" "Payload"] "Payload" (returned "t")) = none ∧
     compileRuntimeFunction? (types .word .bool) owner
       (entry [parameter "c" "Cond", parameter "t" "Payload", parameter "unused" "Missing"] "Payload" (returned "t")) = none := by
-  refine ⟨rfl, ?_, rfl, rfl⟩
-  apply compileRuntimeFunction?_eq_none_iff.mpr
-  rintro ⟨candidate, accepted⟩
-  have bodyType := (accepted.parameter_return_core (index := 1) rfl (payloadMeaning .word .bool) rfl).2
-  have headerType := accepted.header.type_unique
-    ⟨rfl, rfl, rfl, rfl, .single (conditionMeaning .word .bool)⟩
-  rw [bodyType] at headerType
-  cases headerType
+  refine ⟨rfl, ?_, ?_, ?_⟩
+  · apply compileRuntimeFunction?_eq_none_iff.mpr
+    rintro ⟨candidate, accepted⟩
+    have bodyType := (accepted.parameter_return_core (index := 1) rfl (payloadMeaning .word .bool) rfl).2
+    have headerType := accepted.header.type_unique
+      ⟨rfl, rfl, rfl, rfl, .single (conditionMeaning .word .bool).structural⟩
+    rw [bodyType] at headerType
+    cases headerType
+  all_goals
+    simp only [compileRuntimeFunction?, entry, interpretRuntimeFunctionHeader?,
+      interpretRuntimeReturnType?, annotation, interpretStructuralType?_named_eq_typeName]
+    rfl
 
 theorem owner_relabeling_preserves_whole_compilation_and_positional_core
     (id : Resolved.DeclarationId) (payload : Core.Ty) (conditional : Bool)

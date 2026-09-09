@@ -44,7 +44,7 @@ private theorem declared (id : Resolved.DeclarationId) (payload : Core.Ty) :
       (.cons (payloadMeaning payload) (by change "y" ∉ ["x", "c"]; decide) .nil))
 private theorem header (payload : Core.Ty) (conditional : Bool) :
     RuntimeFunctionHeader (types payload) (entry "Payload" conditional).value.signature payload :=
-  ⟨rfl, rfl, rfl, rfl, .single (payloadMeaning payload)⟩
+  ⟨rfl, rfl, rfl, rfl, .single (payloadMeaning payload).structural⟩
 private theorem compilation (id : Resolved.DeclarationId) (payload : Core.Ty) (conditional : Bool) :
     RuntimeFunctionCompiles (types payload) id (entry "Payload" conditional) (compiled id payload conditional) := by
   cases conditional
@@ -150,7 +150,10 @@ theorem mutually_extending_nonidentical_tables_retain_unknown_header_rejection
     (id : Resolved.DeclarationId) (payload : Core.Ty) (conditional : Bool) :
     compileRuntimeFunction? (types payload) id (entry "Unknown" conditional) = none ∧
     compileRuntimeFunction? (duplicate payload) id (entry "Unknown" conditional) = none := by
-  have rejected : compileRuntimeFunction? (types payload) id (entry "Unknown" conditional) = none := rfl
+  have rejected : compileRuntimeFunction? (types payload) id (entry "Unknown" conditional) = none := by
+    simp only [compileRuntimeFunction?, entry, interpretRuntimeFunctionHeader?,
+      interpretRuntimeReturnType?, annotation, interpretStructuralType?_named_eq_typeName]
+    rfl
   have same := compileRuntimeFunction?_eq_of_mutual_extends
     (duplicates_extend payload).1 (duplicates_extend payload).2 id (entry "Unknown" conditional)
   exact ⟨rejected, same.symm.trans rejected⟩
@@ -164,7 +167,10 @@ theorem adding_an_unknown_nominal_meaning_can_turn_rejection_into_exact_compilat
     ¬ TypeNameTable.Extends (types (.namedData dataType)) [(["Cond"], .bool)] ∧
     ¬ ∃ argument : TypedRuntimeArgument, argument.type = .namedData dataType := by
   refine ⟨TypeNameTable.Extends.cons_fresh _ ["Payload"] (.namedData dataType) (by decide),
-    rfl, (compilation id (.namedData dataType) conditional).complete, ?_, ?_⟩
+    ?_, (compilation id (.namedData dataType) conditional).complete, ?_, ?_⟩
+  · simp only [compileRuntimeFunction?, entry, interpretRuntimeFunctionHeader?,
+      interpretRuntimeReturnType?, annotation, interpretStructuralType?_named_eq_typeName]
+    rfl
   · intro backward
     have found := TypeNameTable.lookup?_iff.mpr (backward (.head : TypeNameTable.Lookup (types (.namedData dataType)) ["Payload"] _))
     change (none : Option Core.Ty) = some (.namedData dataType) at found

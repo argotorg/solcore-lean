@@ -260,6 +260,10 @@ theorem whole_header_and_complete_parameter_policy_still_precede_deep_body_accep
     TerminalReturnTreeElaborates (staticInputs type).names (staticInputs type).context (body depth) (core depth) type ∧
     compileRuntimeFunction? (types type) owner (publicEntry depth) = none ∧
     compileRuntimeFunction? (types type) owner (duplicateEntry depth) = none :=
-  ⟨elaborated depth type, rfl, rfl⟩
+  by
+    refine ⟨elaborated depth type, rfl, ?_⟩
+    simp only [compileRuntimeFunction?, duplicateEntry, declaration, interpretRuntimeFunctionHeader?,
+      interpretRuntimeReturnType?, annotation, interpretStructuralType?_named_eq_typeName]
+    rfl
 
 end Tests.FrontendRecursiveRuntimeEntry
