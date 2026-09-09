@@ -1,0 +1,29 @@
+import Solcore.Frontend.ComputationReturnTree
+import Solcore.Frontend.ComputationBodyFragmentProperties
+
+/-! Exact body provenance closes child membership through all hidden binders.
+Only the child's syntactic membership and weakening laws are required. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend
+
+theorem ComputationReturnTreeElaborates.core_fragment
+    {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}
+    {F : Core.Expr → Prop}
+    (childMembership : ∀ {table context source core type}, ChildElab table context source core type → F core)
+    (childWeakening : ∀ {core}, F core → ∀ cutoff, F (core.weakenAt cutoff))
+    {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
+    {body : Syntax.Block} {core : Core.Expr} {type : Core.Ty}
+    (elaboration : ComputationReturnTreeElaborates ChildElab types owner inputs body core type) :
+    ComputationBodyFragment F core := by
+  induction elaboration with
+  | bare => exact .unit
+  | expression child => exact .leaf (childMembership child)
+  | block _ ih => exact ih
+  | binding _ _ child _ ih => exact .letE (.leaf (childMembership child)) ih
+  | inferred _ child _ ih => exact .letE (.leaf (childMembership child)) ih
+  | discard child _ ih => exact .letE (.leaf (childMembership child)) (ComputationBodyFragment.weakenAt childWeakening ih 0)
+  | conditional guard _ _ yesIH noIH => exact .ifE (.leaf (childMembership guard)) yesIH noIH
+
+end Solcore.Frontend
