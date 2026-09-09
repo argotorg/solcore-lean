@@ -78,7 +78,8 @@ inductive ComputationReturnTreeEvaluates
 
   | wordMatch {table : LocalNameTable} {environment : Resolved.Environment}
       {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
-      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody selected : Syntax.Block}
+      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase}
+      {defaultBody : Option Syntax.Block} {selected : Syntax.Block}
       {initialStore middleStore finalStore : Core.Store} {scrutineeValue value : Core.Value} {tests : Nat}
       (scrutineeEvaluation : ChildEval table environment initialStore scrutinee scrutineeValue middleStore)
       (choice : WordMatchChooses scrutineeValue cases defaultBody selected tests)
@@ -86,7 +87,7 @@ inductive ComputationReturnTreeEvaluates
         middleStore selected value finalStore) :
       ComputationReturnTreeEvaluates ChildEval owner table environment initialStore
         ⟨blockSpan, [⟨matchSpan, .matchWith ⟨scrutineeSpan, ⟨scrutinee, []⟩⟩
-          ⟨armsSpan, ⟨cases, some defaultBody⟩⟩⟩]⟩ value finalStore
+          ⟨armsSpan, ⟨cases, defaultBody⟩⟩⟩]⟩ value finalStore
 
 /-- Selected lets, discards and conditionals each add two existing Core transitions.
 An unused initializer or discarded expression still contributes its complete cost.
@@ -178,7 +179,8 @@ inductive ComputationReturnTreeEvaluatesWithCost
 
   | wordMatch {table : LocalNameTable} {environment : Resolved.Environment}
       {blockSpan matchSpan scrutineeSpan armsSpan : Syntax.SourceSpan}
-      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase} {defaultBody selected : Syntax.Block}
+      {scrutinee : Syntax.Expr} {cases : List Syntax.MatchCase}
+      {defaultBody : Option Syntax.Block} {selected : Syntax.Block}
       {initialStore middleStore finalStore : Core.Store} {scrutineeValue value : Core.Value}
       {scrutineeCost branchCost tests : Nat}
       (scrutineeEvaluation : ChildCost table environment
@@ -188,7 +190,7 @@ inductive ComputationReturnTreeEvaluatesWithCost
         middleStore selected value finalStore branchCost) :
       ComputationReturnTreeEvaluatesWithCost ChildCost owner table environment initialStore
         ⟨blockSpan, [⟨matchSpan, .matchWith ⟨scrutineeSpan, ⟨scrutinee, []⟩⟩
-          ⟨armsSpan, ⟨cases, some defaultBody⟩⟩⟩]⟩
+          ⟨armsSpan, ⟨cases, defaultBody⟩⟩⟩]⟩
         value finalStore (scrutineeCost + branchCost + 2 + 7 * tests)
 
 end Solcore.Frontend

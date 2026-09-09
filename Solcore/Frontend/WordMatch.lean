@@ -12,21 +12,21 @@ def WordMatchPatternDenotes (pattern : Syntax.Pattern) (word : Core.Word) : Prop
   ∃ literal, pattern.value = .literal literal ∧ WordLiteralDenotes literal word
 
 /-- Only literal cases compare actual Words. A wildcard or literal hit ignores
-later cases. Tests count executed literal comparisons, not wildcard visits. -/
+later cases; fallback requires an original default. Tests count literal comparisons. -/
 inductive WordMatchChooses :
-    Core.Value → List Syntax.MatchCase → Syntax.Block → Syntax.Block → Nat → Prop where
+    Core.Value → List Syntax.MatchCase → Option Syntax.Block → Syntax.Block → Nat → Prop where
   | fallback {value : Core.Value} {defaultBody : Syntax.Block} :
-      WordMatchChooses value [] defaultBody defaultBody 0
+      WordMatchChooses value [] (some defaultBody) defaultBody 0
   | wildcard {value : Core.Value} {first : Syntax.MatchCase} {rest : List Syntax.MatchCase}
-      {defaultBody : Syntax.Block} {marker : Syntax.SourceSpan}
+      {defaultBody : Option Syntax.Block} {marker : Syntax.SourceSpan}
       (shape : first.value.pattern.value = .wildcard marker) :
       WordMatchChooses value (first :: rest) defaultBody first.value.body 0
   | hit {word : Core.Word} {first : Syntax.MatchCase} {rest : List Syntax.MatchCase}
-      {defaultBody : Syntax.Block}
+      {defaultBody : Option Syntax.Block}
       (meaning : WordMatchPatternDenotes first.value.pattern word) :
       WordMatchChooses (.word word) (first :: rest) defaultBody first.value.body 1
   | miss {word literal : Core.Word} {first : Syntax.MatchCase} {rest : List Syntax.MatchCase}
-      {defaultBody selected : Syntax.Block} {tests : Nat}
+      {defaultBody : Option Syntax.Block} {selected : Syntax.Block} {tests : Nat}
       (meaning : WordMatchPatternDenotes first.value.pattern literal)
       (different : word ≠ literal)
       (tail : WordMatchChooses (.word word) rest defaultBody selected tests) :
