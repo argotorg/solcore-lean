@@ -40,9 +40,11 @@ private def certify (table : TypeNameTable) (source : Syntax.TypeExpr) : IO (Cer
       let inner ← certify table child
       return ⟨inner.type, by rw [sourceAt]; exact .single inner.meaning⟩
   | ⟨_, .tuple [left, right]⟩ =>
-      let first ← certify table left
-      let second ← certify table right
+      let first ← certify table left; let second ← certify table right
       return ⟨.product first.type second.type, by rw [sourceAt]; exact .pair first.meaning second.meaning⟩
+  | ⟨span, .tuple (first :: second :: third :: rest)⟩ =>
+      let head ← certify table first; let tail ← certify table ⟨span, .tuple (second :: third :: rest)⟩
+      return ⟨.product head.type tail.type, by rw [sourceAt]; exact .many head.meaning tail.meaning⟩
   | _ => throw (IO.userError "outside independent structural certificate")
 termination_by sizeOf source
 private def checked (content : String) (table : TypeNameTable) (expected : Core.Ty) : IO Syntax.TypeExpr := do
@@ -65,8 +67,7 @@ private def checked (content : String) (table : TypeNameTable) (expected : Core.
   have extended := independent.meaning.extend_types (TypeNameTable.Extends.append_right table extras)
   have _ := interpretStructuralType?_some_of_extends (TypeNameTable.Extends.append_right table extras) accepted
   assertTrue (decide (interpretStructuralType? (table ++ extras) source = some expected)) "later duplicates overrode an accepted nested leaf"
-  have _ := extended.complete
-  return source
+  have _ := extended.complete; return source
 private def table : TypeNameTable := [(["Word"], .word), (["Bool"], .bool), (["Unit"], .unit),
   (["PairAlias"], .product .word .bool), (["Pkg", "Flag"], .bool), (["Pkg.Flag"], .word)]
 private def owner : Resolved.DeclarationId := ⟨⟨.main, ⟨[⟨"TypeGate", by decide⟩], by decide⟩⟩, 23⟩
@@ -139,8 +140,7 @@ termination_by sizeOf body
 private structure Declared (initial : LocalTypeInputs) (parameters : List Syntax.FunctionParameter) where
   inputs : LocalTypeInputs
   evidence : RuntimeParametersDeclareFrom table owner initial parameters inputs
-private def declared (initial : LocalTypeInputs) (parameters : List Syntax.FunctionParameter) :
-    IO (Declared initial parameters) := do
+private def declared (initial : LocalTypeInputs) (parameters : List Syntax.FunctionParameter) : IO (Declared initial parameters) := do
   match parametersAt : parameters with
   | [] => return ⟨initial, by rw [parametersAt]; exact .nil⟩
   | ⟨_, .typed none name annotation⟩ :: rest =>
@@ -230,8 +230,7 @@ def frontendParsedStructuralTypeTests : IO Unit := do
     let caller : TypeNameTable := [(["Word"], left), (["Word"], .unit), (["Bool"], right)]
     for text in ["Word", "(Word)", "(Word,)", "((Word,),)"] do let _ ← checked text caller left
     for text in ["()", "(())", "((),)"] do let _ ← checked text caller .unit
-    for text in ["(Word,Bool)", "(Word,Bool,)", "((Word,),(Bool,),)"] do
-      let _ ← checked text caller (.product left right)
+    for text in ["(Word,Bool)", "(Word,Bool,)", "((Word,),(Bool,),)"] do let _ ← checked text caller (.product left right)
     let _ ← checked "(Bool,Word)" caller (.product right left)
     let _ ← checked "((Word,Bool),())" caller (.product (.product left right) .unit)
     let _ ← checked "(Word,(Bool,()))" caller (.product left (.product right .unit))
@@ -255,7 +254,9 @@ def frontendParsedStructuralTypeTests : IO Unit := do
         nested.span.contains leftSpan && leftSpan.contains left.span && leftSpan.contains right.span &&
         nested.span.contains unitSpan && decide (left.span.endByte < right.span.startByte ∧ leftSpan.endByte < unitSpan.startByte)
     | _ => false) "original nested associations or child ranges changed"
-  for text in ["(Word,Bool,Word)", "((),(),(),())", "Word<Bool>", "(Word<Bool>)",
+  let _ ← checked "(Word,Bool,Word)" table (.product .word (.product .bool .word))
+  let _ ← checked "((),(),(),())" table (.product .unit (.product .unit (.product .unit .unit)))
+  for text in ["Word<Bool>", "(Word<Bool>)",
       "mapping(Word => Bool)", "@Word", "function(Word) returns(Bool)", "comptime<Word>",
       "((),@Word)", "(function() returns(),Word)"] do
     let source ← parsed text
