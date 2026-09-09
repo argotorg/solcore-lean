@@ -57,12 +57,18 @@ private theorem hasType
       exact .discard (childTyping.mpr ⟨_, expression⟩) ih
   | conditional condition _ _ thenIH elseIH =>
       exact .conditional (childTyping.mpr ⟨_, condition⟩) thenIH elseIH
-  | wordMatch scrutinee ordered patterns _ defaultOrdered _ lowered branchIH defaultIH =>
-      refine .wordMatch (childTyping.mpr ⟨_, scrutinee⟩) ?_ ?_ ?_ ?_
+  | wordMatch scrutinee ordered patterns compatible _ defaultOrdered _ lowered branchIH defaultIH =>
+      refine .wordMatch (childTyping.mpr ⟨_, scrutinee⟩) ?_ ?_ ?_ ?_ ?_
       · intro arm member
         rw [← ordered] at member
         obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
         exact ⟨entry.2.1, patterns entry entryMember⟩
+      · rcases compatible with word | allNone
+        · exact .inl word
+        · right; intro arm member
+          rw [← ordered] at member
+          obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
+          simpa only [allNone entry entryMember] using patterns entry entryMember
       · rcases (fold_coverage patterns).mp (congrArg Option.isSome lowered) with present | ⟨entry, member, meaning⟩
         · left; rw [← defaultOrdered]; simpa using present
         · exact .inr ⟨entry.1, ordered ▸ List.mem_map.mpr ⟨entry, member, rfl⟩, meaning⟩
@@ -131,11 +137,16 @@ private theorem elaborates
       obtain ⟨thenCore, thenElaboration⟩ := thenIH
       obtain ⟨elseCore, elseElaboration⟩ := elseIH
       exact ⟨.ifE conditionCore thenCore elseCore, .conditional conditionElaboration thenElaboration elseElaboration⟩
-  | @wordMatch inputs _ _ _ _ _ _ defaultBody type scrutinee patterns covered _ _ branchIH defaultIH =>
+  | @wordMatch inputs _ _ _ _ _ _ defaultBody scrutineeType type scrutinee patterns compatible covered _ _ branchIH defaultIH =>
       obtain ⟨scrutineeCore, scrutineeElaboration⟩ := childTyping.mp scrutinee
       obtain ⟨entries, ordered, meanings, elaborations⟩ :=
         entries_exist (P := fun body core => ComputationReturnTreeElaborates ChildElab types owner inputs body core type)
           patterns branchIH
+      have compatibleEntries : scrutineeType = .word ∨ ∀ entry ∈ entries, entry.2.1 = none := by
+        rcases compatible with word | allNone
+        · exact .inl word
+        · exact .inr (fun entry member => (meanings entry member).tag_unique
+            (allNone entry.1 (ordered ▸ List.mem_map.mpr ⟨entry, member, rfl⟩)))
       have defaults : ∃ defaultEntry : Option (Syntax.Block × Core.Expr), defaultEntry.map Prod.fst = defaultBody ∧
           ∀ entry ∈ defaultEntry.toList, ComputationReturnTreeElaborates ChildElab types owner inputs entry.1 entry.2 type := by
         cases defaultBody with
@@ -151,7 +162,7 @@ private theorem elaborates
           obtain ⟨entry, entryMember, rfl⟩ := List.mem_map.mp member
           exact .inr ⟨entry, entryMember, meaning⟩
       obtain ⟨bodyCore, lowered⟩ := Option.isSome_iff_exists.mp ((fold_coverage meanings).mpr coveredFold)
-      exact ⟨_, .wordMatch scrutineeElaboration ordered meanings elaborations defaultOrdered defaults lowered⟩
+      exact ⟨_, .wordMatch scrutineeElaboration ordered meanings compatibleEntries elaborations defaultOrdered defaults lowered⟩
 
 theorem computationReturnTreeHasType_iff_elaborates
     (childTyping : ∀ {table context source type},
@@ -162,30 +173,36 @@ theorem computationReturnTreeHasType_iff_elaborates
       ∃ core, ComputationReturnTreeElaborates ChildElab types owner inputs body core type :=
   ⟨elaborates childTyping, fun ⟨_, elaboration⟩ => hasType childTyping elaboration⟩
 
-private theorem fold_hasType {context : Core.Context} {type : Core.Ty} {bodyCore : Core.Expr}
+private theorem fold_hasType {context : Core.Context} {scrutineeType type : Core.Ty} {bodyCore : Core.Expr}
     {defaultEntry : Option (Syntax.Block × Core.Expr)}
     {entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))}
     (fallback : ∀ entry ∈ defaultEntry.toList, Core.HasType context entry.2 type)
     (branches : ∀ entry ∈ entries, Core.HasType context entry.2.2 type)
+    (compatible : scrutineeType = .word ∨ ∀ entry ∈ entries, entry.2.1 = none)
     (lowered : entries.foldr
       (fun entry tail => match entry.2.1 with
         | none => some (entry.2.2.weakenAt 0)
         | some word => tail.map (fun core => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) core))
       (defaultEntry.map (fun entry => entry.2.weakenAt 0)) = some bodyCore) :
-    Core.HasType (.word :: context) bodyCore type := by
+    Core.HasType (scrutineeType :: context) bodyCore type := by
   induction entries generalizing bodyCore with
   | nil =>
       obtain ⟨entry, member, rfl⟩ := Option.map_eq_some_iff.mp lowered
       simpa only [Core.Context.insertAt] using (fallback entry (Option.mem_toList.mpr member)).weakenAt 0
   | cons entry rest ih =>
-      have head : Core.HasType (.word :: context) (entry.2.2.weakenAt 0) type := by
+      have head : Core.HasType (scrutineeType :: context) (entry.2.2.weakenAt 0) type := by
         simpa only [Core.Context.insertAt] using (branches entry (by simp)).weakenAt 0
       cases tag : entry.2.1 with
       | none => simp only [List.foldr_cons, tag, Option.some.injEq] at lowered; exact lowered ▸ head
       | some word =>
           simp only [List.foldr_cons, tag] at lowered
           obtain ⟨tail, found, rfl⟩ := Option.map_eq_some_iff.mp lowered
-          exact .ifE (.binary (.var rfl) (.word)) head (ih (fun row member => branches row (by simp [member])) found)
+          rcases compatible with rfl | allNone
+          · exact .ifE (.binary (.var rfl) (.word)) head
+              (ih (fun row member => branches row (by simp [member])) (.inl rfl) found)
+          · have impossible := allNone entry (by simp)
+            rw [tag] at impossible
+            cases impossible
 
 theorem ComputationReturnTreeElaborates.core_hasType
     (childCoreType : ∀ {table context source core type},
@@ -204,7 +221,7 @@ theorem ComputationReturnTreeElaborates.core_hasType
   | discard expression _ ih =>
       exact .letE (childCoreType expression) (by simpa only [Core.Context.insertAt] using ih.weakenAt 0)
   | conditional condition _ _ thenIH elseIH => exact .ifE (childCoreType condition) thenIH elseIH
-  | wordMatch scrutinee _ _ _ _ _ lowered branchIH defaultIH =>
-      exact .letE (childCoreType scrutinee) (fold_hasType defaultIH branchIH lowered)
+  | wordMatch scrutinee _ _ compatible _ _ _ lowered branchIH defaultIH =>
+      exact .letE (childCoreType scrutinee) (fold_hasType defaultIH branchIH compatible lowered)
 
 end Solcore.Frontend

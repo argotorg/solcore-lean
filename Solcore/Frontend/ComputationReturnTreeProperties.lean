@@ -86,9 +86,9 @@ private theorem complete
   | conditional condition _ _ thenIH elseIH =>
       rw [elaborateComputationReturnTree?]
       simp [childCorrect.mpr condition, thenIH, elseIH]
-  | wordMatch scrutinee ordered patterns _ defaultOrdered _ lowered branchIH defaultIH =>
+  | wordMatch scrutinee ordered patterns compatible _ defaultOrdered _ lowered branchIH defaultIH =>
       exact ComputationReturnTreeChecking.match_iff.mpr
-        ⟨_, childCorrect.mpr scrutinee, _, _, _, ordered, patterns, branchIH, defaultOrdered, defaultIH, lowered, rfl⟩
+        ⟨_, _, childCorrect.mpr scrutinee, _, _, _, ordered, patterns, compatible, branchIH, defaultOrdered, defaultIH, lowered, rfl⟩
 
 private theorem sound
     (childCorrect : ∀ {table context source core type},
@@ -167,10 +167,10 @@ private theorem sound
                 rw [scrutineeShape, elementsShape, armsShape, valuesShape] at accepted
                 cases rest <;> cases scrutineeRest <;>
                   try (solve | simp only [elaborateComputationReturnTree?, reduceCtorEq] at accepted)
-                obtain ⟨scrutineeCore, scrutineeAccepted, bodyCore, entries, defaults, ordered, patterns,
-                  branches, defaultOrdered, defaultBranches, lowered, rfl⟩ :=
+                obtain ⟨scrutineeCore, scrutineeType, scrutineeAccepted, bodyCore, entries, defaults, ordered, patterns,
+                  compatible, branches, defaultOrdered, defaultBranches, lowered, rfl⟩ :=
                     ComputationReturnTreeChecking.match_iff.mp accepted
-                refine .wordMatch (childCorrect.mp scrutineeAccepted) ordered patterns ?_ defaultOrdered ?_ lowered
+                refine .wordMatch (childCorrect.mp scrutineeAccepted) ordered patterns compatible ?_ defaultOrdered ?_ lowered
                 · intro entry member
                   have originalMember : entry.1 ∈ cases := ordered ▸ List.mem_map.mpr ⟨entry, member, rfl⟩
                   exact sound childCorrect (branches entry member)
