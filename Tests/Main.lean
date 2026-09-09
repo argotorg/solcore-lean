@@ -254,6 +254,9 @@ import Solcore.Test.FrontendComputationRuntimeSafetyProperties
 import Solcore.Test.FrontendComputationRuntimeBoundaryProperties
 import Solcore.Test.FrontendParsedComputationRuntimeSafety
 import Solcore.Test.FrontendParsedComputationRuntimeSafetyEntries
+import Solcore.Test.FrontendRuntimeInputStoreValidationProperties
+import Solcore.Test.FrontendRuntimeInputReferenceValidationProperties
+import Solcore.Test.FrontendParsedRuntimeInputValidationEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5899,6 +5902,7 @@ def run : IO Unit := do
   frontendParsedRecursiveTupleEntryTests
   frontendParsedComputationRuntimeSafetyTests
   frontendParsedComputationRuntimeSafetyEntryTests
+  frontendParsedRuntimeInputValidationEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

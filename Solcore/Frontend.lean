@@ -80,6 +80,7 @@ import Solcore.Frontend.ComputationFunctionEntry
 import Solcore.Frontend.ComputationFunctionProperties
 import Solcore.Frontend.ComputationFunctionFactorizationProperties
 import Solcore.Frontend.ComputationFunctionRuntimeSafetyProperties
+import Solcore.Frontend.RuntimeInputValidation
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.LocalFragmentProperties
 import Solcore.Frontend.LocalExpressionEvaluationRules

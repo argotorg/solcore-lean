@@ -519,8 +519,9 @@ cost and all-fuel fault exclusion. Structural input typing alone does not:
 a missing cell can fault, and a wrong payload can produce a Bool under a checked
 Word tag. Independent original parsed calls and declarations cover these cases,
 delayed closures, writes, allocation and rejected unselected branches. The old
-pure and whole-entry endpoints remain unchanged; a direct source-call evaluator,
-body/entry integration and runtime-world validation are still separate work.
+pure and whole-entry endpoints remain unchanged. A direct source-call evaluator
+remains separate work; later body/entry integration and opt-in runtime-world
+validation are described below.
 
 Original singleton application-return bodies now have a separate opt-in profile
 (ADR-0247). The complete block must contain exactly one return with an original
@@ -863,7 +864,8 @@ same world. Existing reverse-once value/type layout identifies the exact prepare
 environment; structural argument typing alone cannot supply these premises.
 Independent original preparation and child checker correctness retain the full
 prepared record and every complete stateful runner result at the supplied fuel.
-No new validator, runner or per-profile wrapper family is introduced.
+Runtime premise validation is a separate opt-in boundary described below;
+no new runner or per-profile wrapper family is introduced.
 
 The state-only kernel requires a typed actual environment, store and pending
 continuation, but no source-ID alignment or child execution/cost laws. It gives
@@ -882,6 +884,29 @@ The old fourteen recursive, twelve shared body and four shared entry contracts
 remain unchanged. Empty nominal definitions and existing CellPayload limits
 remain in force; there is no unrestricted Solcore termination guarantee,
 arbitrary-store safety, source-only bound or new source syntax support.
+
+Actual typed arguments and a supplied store now have an opt-in executable
+same-world validator (ADR-0264). Its one public iff theorem identifies success
+exactly with runtime typing of every original argument and StoreHasTypes for
+the same supplied world/store. These two facts directly supply the existing
+generic entry safety kernel; original source checking, preparation, argument
+order, values and every full runner result remain unchanged.
+
+The validator checks references in all actual pair components, selected sum
+payloads and closure captures, including nested and unused captures. Existing
+TypedRuntimeArgument structural evidence already checks closure bodies and
+captured types. The validator is not a raw-value, JSON, tag-only or source
+checker, and it does not require extra well-formedness of unused signature or
+sum-alternative types. Each actual reference must match its world location
+and element type.
+
+World and store are checked together to their exact common end. Every cell,
+including unreferenced cells, must have an allowed CellPayload type and matching
+actual value shape. Functions/references/nominal types remain forbidden in cell
+payloads even when they occur only in the unselected side of a sum. Equal
+lengths, a matching prefix or valid referenced cells alone are insufficient.
+The validator only returns a Bool: it does not infer, extend or repair a world,
+change a value/store, reject source preparation or guard an existing runner.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

@@ -366,9 +366,9 @@ actual values and store separately establishes typed completion, a sufficient
 actual cost and all-fuel fault exclusion. Missing/wrong-payload stores, delayed
 closures, effects and unselected-branch rejection retain their distinct meanings.
 Original parsed declarations use this local endpoint without enabling old pure
-or whole-function entries. A direct source-call evaluator, body integration and an
-executable runtime-world validator remain separate work; there is no source-only
-bound or arbitrary-store safety claim.
+or whole-function entries. A direct source-call evaluator remains separate work;
+later body/entry integration and opt-in runtime-world validation are described
+below. There is no source-only bound or arbitrary-store safety claim.
 
 An original singleton application return is now connected as a separate body
 profile (ADR-0247). Independent whole typing, exact elaboration, raw evaluation
@@ -558,7 +558,7 @@ typed final world/value/store, original-source cost, uniform continuation-local
 paths and exact closed fuel thresholds. Original runtime-typed arguments reach
 the exact prepared environment through existing reverse-once layout, retaining
 the full prepared record and every complete runner result. Structural argument
-typing alone remains insufficient; no executable validator or runner is added.
+typing alone remains insufficient; these proof kernels add no validator or runner.
 Typed pending frames separately give all-fuel no-fault and exact saved-state
 typing/safe full resumption, without source-ID or child execution premises.
 Checkpoint worlds remain existential; final evaluation exposes extension.
@@ -566,6 +566,17 @@ Symbolic/parsed/entry consumers retain actual effects, allocation, captures,
 hidden discard slots, same-typed swaps and non-uniform actual callee costs.
 All fourteen recursive, twelve shared body and four shared entry contracts,
 empty nominal definitions, CellPayload limits and source acceptance are unchanged.
+
+The explicit actual-input validator is now available separately (ADR-0264).
+Its Bool result is equivalent to runtime typing of every original structurally
+typed argument and full StoreHasTypes in the same supplied world. Actual
+references in all captures/pairs/selected payloads are checked, while existing
+structural evidence supplies closure body typing. World/store traversal requires
+exact simultaneous exhaustion and checks every CellPayload/type row, including
+unreferenced cells. The iff directly supplies ADR-0263's runtime premises without
+changing original source preparation, actual records or any runner result.
+No raw/JSON validator, inferred world, repair, extra signature well-formedness,
+public helper or automatic entry guard is added.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
