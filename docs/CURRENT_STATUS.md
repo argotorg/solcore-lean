@@ -1222,6 +1222,26 @@ actual source semantics. Original symbolic/parsed consumers reconstruct actual
 rows and retain raw costs, ordered effects and full saved states without a
 runtime-world assumption. Existing operational factorization is unchanged.
 
+Prepared-function checkpoint safety now has two minimal independent entry laws
+(ADR-0280). Original preparation and child Core typing suffice once the literal
+arguments, supplied store and pending caller frames are typed in one runtime
+world. No child checker, source evaluator/cost, fragment/insertion law or source
+ID alignment premise is needed. A private ordered-parameter bridge retains the
+actual values and captures, reversed exactly once in the Core environment.
+
+The first law types the exact initial state and every genuine checkpoint, with
+fault exclusion at all initial and resumed fuel amounts. The caller result type
+may differ from the function's return type. The second law extends the original
+world to the saved store, then extends that same saved world along every further
+finite path, including pending caller allocation and writes. Neither law claims
+termination, source-cost correspondence or acceptance by an arbitrary checker.
+
+Missing allocations, incompatible actual stores, untyped pending work and
+unrelated typed states remain distinct boundaries. Runtime-world premises are
+sufficient for the guarantees, not a necessary condition for every terminating
+run. Earlier stronger execution/source-cost laws and all executable definitions
+remain unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

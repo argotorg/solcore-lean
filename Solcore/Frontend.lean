@@ -92,6 +92,7 @@ import Solcore.Frontend.ComputationFunctionOwnerProperties
 import Solcore.Frontend.ComputationFunctionTypeExtensionProperties
 import Solcore.Frontend.ComputationFunctionFactorizationProperties
 import Solcore.Frontend.ComputationFunctionRuntimeSafetyProperties
+import Solcore.Frontend.ComputationFunctionRuntimeCheckpointProperties
 import Solcore.Frontend.RuntimeInputValidation
 import Solcore.Frontend.RuntimeArgumentConstruction
 import Solcore.Frontend.RecursiveComputationFunction

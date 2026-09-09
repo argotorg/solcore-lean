@@ -792,6 +792,18 @@ may retain the compiled projection while changing actual prepared rows and
 effects. Reconstruction keeps those values literal and does not supply a
 runtime world or establish safety for the separately provided store.
 
+Minimal prepared-function safety is now separate from source-cost execution
+(ADR-0280). Two entry laws need only independent preparation, child Core typing
+and one common runtime world for actual arguments, the store and typed caller
+frames. They preserve exact initial/saved state typing, exclude faults at every
+fuel and resume amount, and extend worlds through genuine checkpoints and all
+further finite paths. Caller result types and pending effects remain explicit.
+
+Do not infer termination, raw source costs, checker acceptance or arbitrary-store
+safety from these smaller laws. Structural preparation and separately typed
+objects cannot replace the common-world and typed-continuation premises. Those
+premises are sufficient, not necessary for each particular terminating run.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
