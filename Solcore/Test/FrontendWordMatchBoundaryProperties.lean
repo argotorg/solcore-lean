@@ -44,7 +44,7 @@ private theorem guardedElaborates :
   simpa [source,guardedCore,Core.Expr.weakenAt] using
     (ComputationReturnTreeElaborates.wordMatch (types := []) (owner := owner)
       (blockSpan := span) (matchSpan := span) (scrutineeSpan := span) (armsSpan := span)
-      (defaultBody := returned) (entries := [(arm,zero,Core.Expr.var 0)]) xElaborates rfl
+      (defaultBody := returned) (entries := [(arm,some zero,Core.Expr.var 0)]) xElaborates rfl
       (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact zeroMeaning)
       (by intro entry member; simp only [List.mem_singleton] at member; subst entry; exact .expression xElaborates)
       (.expression xElaborates))
@@ -111,7 +111,8 @@ theorem a_Bool_cannot_choose_even_the_default_of_nonempty_literal_cases
     (flag : Bool) (rest : List Syntax.MatchCase) (fallback selected : Syntax.Block) (tests : Nat) :
     ¬ WordMatchChooses (.bool flag) (arm::rest) fallback selected tests := by
   intro choice
-  cases choice
+  cases choice with
+  | wildcard shape => cases shape
 
 theorem malformed_unvisited_pattern_and_body_do_not_change_raw_first_hit
     (badPattern : Syntax.Pattern) (badBody fallback : Syntax.Block) :
@@ -138,7 +139,9 @@ theorem a_malformed_unselected_case_still_blocks_static_typing (store : Core.Sto
   · intro typing
     cases typing with
     | wordMatch _ patterns _ _ =>
-        obtain ⟨word,literal,shape,_⟩ := patterns ⟨span,⟨⟨span,.error⟩,returned⟩⟩ (by simp)
-        cases shape
+        obtain ⟨tag,meaning⟩ := patterns ⟨span,⟨⟨span,.error⟩,returned⟩⟩ (by simp)
+        cases tag with
+        | none => obtain ⟨_,shape⟩ := meaning; cases shape
+        | some word => obtain ⟨_,shape,_⟩ := meaning; cases shape
 
 end Tests.FrontendWordMatchBoundary
