@@ -23,6 +23,7 @@ theorem ResolvesLocalExpression.mapIds {table : LocalNameTable}
   | wordLiteral meaning => exact .wordLiteral meaning
   | group _ ih => exact .group ih
   | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
+  | many _ _ headIH tailIH => exact .many headIH tailIH
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
   | add _ _ leftIH rightIH => exact .add leftIH rightIH
@@ -66,6 +67,10 @@ theorem resolvesLocalExpression_mapIds_iff_exists (mapping : Resolved.LocalId �
         obtain ⟨originalLeft, leftChild, rfl⟩ := leftIH
         obtain ⟨originalRight, rightChild, rfl⟩ := rightIH
         exact ⟨.pair originalLeft originalRight, .pair leftChild rightChild, rfl⟩
+    | many _ _ headIH tailIH =>
+        obtain ⟨originalHead, headChild, rfl⟩ := headIH
+        obtain ⟨originalTail, tailChild, rfl⟩ := tailIH
+        exact ⟨.pair originalHead originalTail, .many headChild tailChild, rfl⟩
     | logicalNot _ ih =>
         obtain ⟨original, child, rfl⟩ := ih
         exact ⟨.unary .boolNot original, .logicalNot child, rfl⟩

@@ -22,6 +22,9 @@ theorem ResolvesLocalExpression.complete {table : LocalNameTable}
       simp only [resolveLocalExpression?, interpretWordLiteral?_complete meaning, Option.map_some]
   | group _ ih => simpa only [resolveLocalExpression?] using ih
   | pair _ _ leftIH rightIH => simp [resolveLocalExpression?, leftIH, rightIH]
+  | many _ _ headIH tailIH =>
+      rw [resolveLocalExpression?]
+      simp only [headIH, tailIH, bind, pure, Option.bind_some]
   | logicalNot _ ih | bitNot _ ih => simp only [resolveLocalExpression?, ih, Option.map_some]
   | add _ _ leftIH rightIH | subtract _ _ leftIH rightIH | multiply _ _ leftIH rightIH
   | divide _ _ leftIH rightIH | modulo _ _ leftIH rightIH
@@ -74,7 +77,13 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
                         cases same
                         exact .pair (resolveLocalExpression?_sound leftResult)
                           (resolveLocalExpression?_sound rightResult)
-                    | cons third rest => simp only [resolveLocalExpression?, reduceCtorEq] at result
+                    | cons third rest =>
+                        rw [resolveLocalExpression?] at result
+                        simp only [bind, Option.bind_eq_some_iff, pure] at result
+                        obtain ⟨resolvedHead, headResult, resolvedTail, tailResult, same⟩ := result
+                        cases same
+                        exact .many (resolveLocalExpression?_sound headResult)
+                          (resolveLocalExpression?_sound tailResult)
       case unary operator operand =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue with

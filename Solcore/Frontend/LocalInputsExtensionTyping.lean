@@ -58,6 +58,14 @@ theorem AvoidsLocalName.bindFresh_hasType_iff {name : String} {source : Syntax.E
       · intro typing
         cases typing with
         | pair left right => exact .pair (leftIH.mpr left) (rightIH.mpr right)
+  | many _ _ headIH tailIH =>
+      constructor
+      · intro typing
+        cases typing with
+        | many head tail => exact .many (headIH.mp head) (tailIH.mp tail)
+      · intro typing
+        cases typing with
+        | many head tail => exact .many (headIH.mpr head) (tailIH.mpr tail)
   | logicalNot _ ih =>
       constructor
       · intro typing

@@ -57,6 +57,14 @@ theorem AvoidsLocalName.resolves_cons_iff {name : String} {source : Syntax.Expr}
       · intro resolution
         cases resolution with
         | pair left right => exact .pair (leftIH.mpr left) (rightIH.mpr right)
+  | many _ _ headIH tailIH =>
+      constructor
+      · intro resolution
+        cases resolution with
+        | many head tail => exact .many (headIH.mp head) (tailIH.mp tail)
+      · intro resolution
+        cases resolution with
+        | many head tail => exact .many (headIH.mpr head) (tailIH.mpr tail)
   | logicalNot _ ih =>
       constructor
       · intro resolution

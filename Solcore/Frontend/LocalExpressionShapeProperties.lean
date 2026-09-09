@@ -15,19 +15,33 @@ theorem resolveLocalExpression?_span (table : LocalNameTable) (source : Syntax.E
   | mk sourceSpan payload =>
       cases payload <;> try simp only [resolveLocalExpression?]
       case tuple elements =>
-        rcases elements with ⟨tupleSpan, elements⟩
         cases elements with
-        | nil => simp only [resolveLocalExpression?]
-        | cons left rest =>
-            cases rest with
+        | mk tupleSpan elements =>
+            cases elements with
             | nil => simp only [resolveLocalExpression?]
-            | cons right rest => cases rest <;> simp only [resolveLocalExpression?]
+            | cons first remaining =>
+                cases remaining with
+                | nil => simp only [resolveLocalExpression?]
+                | cons second tail =>
+                    cases tail with
+                    | nil => simp only [resolveLocalExpression?]
+                    | cons third rest =>
+                        have tailSame := resolveLocalExpression?_span table
+                          ⟨sourceSpan, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ span
+                        change resolveLocalExpression? table
+                            ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ =
+                          resolveLocalExpression? table
+                            ⟨sourceSpan, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩ at tailSame
+                        conv => lhs; rw [resolveLocalExpression?]
+                        conv => rhs; rw [resolveLocalExpression?]
+                        rw [tailSame]
       case unary operator operand =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> simp only [resolveLocalExpression?]
       case binary left operator right =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> simp only [resolveLocalExpression?]
+termination_by sizeOf source
 
 /-- Literal spelling is retained, while both literal and outer ranges are ignored. -/
 theorem resolveLocalExpression?_literal_spans (table : LocalNameTable)
