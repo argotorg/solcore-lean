@@ -176,8 +176,8 @@ nominal types, invalid ranges, strict missing leaves and unsupported forms.
 One-way extension may turn rejection into success, so no full-result invariant is claimed
 for it. The prerequisite initially leaves parameter/header/let gates named-only;
 the return/header integration follows separately in ADR-0233, parameters in
-ADR-0234 and recursive lets in ADR-0235 below. Older prefix lets stay named-only. Larger tuples,
-other type forms, expressions, Core/resolved semantics, diagnostics and frozen
+ADR-0234 and recursive lets in ADR-0235 below. Older prefix lets stay named-only.
+Larger tuple types follow in ADR-0236. Other type forms, expressions, Core/resolved semantics, diagnostics and frozen
 wire formats do not change.
 
 Single structural return annotations now reach the existing compilation,
@@ -222,6 +222,22 @@ eight actual vectors become positives; 106 legacy source statements stay unchang
 with one obsolete rejection explicitly moved to the old named-only/prefix boundary.
 Raw evaluation, source bounds, Core transitions and all unrelated syntax, diagnostic
 and wire policies do not change.
+
+Every finite structural tuple-type list now has its original source-order,
+right-associated meaning (ADR-0236). The existing four rules and 13 generic
+contracts stay intact, with one new three-or-more-element rule and decreasing-size
+interpretation/soundness. There is no implicit terminal Unit or flattening of
+explicitly nested children. Original-span transport, caller first-match tables,
+strict missing leaves, successful extension and full mutual-extension equality
+retain their statements.
+Independent arbitrary-length source and complete parsed consumers check exact
+association, byte ranges, nominal static types, one parameter/one actual, and
+existing entry Core, costs, stores and resumptions. Two parsed type rejections
+and one static parameter rejection become positives, while the original Unit
+actual's type mismatch remains. Two obsolete source contracts are explicitly
+renamed and 26 others retained. Expression arity, projections, inference,
+shadowing, old named-only membership, multiple-return clauses and all runtime,
+parser, diagnostic and wire policies remain unchanged.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

@@ -233,7 +233,7 @@ parameter/header/let annotation gates named-only; the shared single-return gate
 is connected separately in ADR-0233 below, followed by parameters in ADR-0234
 and recursive lets in ADR-0235. Original parsed annotations and correct-arity
 actuals distinguish these integrations from the older named-only prefix adapter.
-Larger tuple lists, other type constructors, expressions,
+Larger tuple-type lists follow in ADR-0236. Other type constructors, expressions,
 Core/resolved semantics, diagnostics and frozen wire formats are unchanged.
 
 The existing shared return/header gate now accepts one structural annotation
@@ -273,7 +273,7 @@ same-typed wrong Core cannot substitute for provenance. Four old parsed rejectio
 become independent positives. One obsolete source rejection is explicitly renamed
 and narrowed to the then-unchanged named-only/let boundary; the other 152 affected
 source-test statements remain exact. Recursive lets follow in ADR-0235. Same-name rejection,
-larger tuples, unknown leaves, count/type checks, whole-body/header gates and all
+unknown leaves, count/type checks, whole-body/header gates and all
 runtime, parser, diagnostic and wire policies remain unchanged.
 
 Recursive typed let bodies now interpret structural annotations at the existing
@@ -296,6 +296,28 @@ is explicitly renamed to retain the old named-only/prefix boundary. Product-on-U
 mismatches, unknown leaves, self/forward/sibling references, shadowing and invalid
 unselected arms remain rejected by the whole checker. Raw evaluation, fuel bounds,
 Core transitions, parser, diagnostics and wire formats are unchanged.
+
+Structural tuple types now support every finite element count (ADR-0236), following
+the pinned reference's right-associated product convention: `(A,B,C)` denotes
+`A × (B × C)`, without adding a terminal Unit. Explicit nested children remain
+distinct. The original four rules and all 13 generic theorem statements are
+retained; one independent `many` constructor covers three or more original
+elements. Interpretation and soundness decrease the original source size;
+outer-span independence recurses through the original-span tail. Every leaf
+retains the same caller table and first-match meaning.
+
+Independent arbitrary-length source proofs cover ordered child meanings, strict
+missing leaves at every position, exact association, table/range transport and
+nominal types without actual inhabitants. Complete parsed consumers retain flat
+element counts, exact byte ranges, nested syntax and one row/actual per parameter.
+Whole entries separately specify Core, values, costs, stores and genuine
+resumptions: a strict unused three-element initializer costs 12 transitions.
+Two parsed type negatives and one static parameter negative become independently
+certified positives; the original wrongly typed Unit actual is still rejected.
+Two obsolete source boundaries are explicitly renamed, while the other 26 affected
+source-test statements remain unchanged. Old named-only membership, empty/multiple
+return-clause rejection, expression tuple arity, projections, inference, shadowing,
+Core transitions, fuel bounds, parser, diagnostics and wire formats do not change.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

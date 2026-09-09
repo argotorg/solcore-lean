@@ -321,6 +321,7 @@ example := @Solcore.Frontend.StructuralTypeDenotes.named
 example := @Solcore.Frontend.StructuralTypeDenotes.unit
 example := @Solcore.Frontend.StructuralTypeDenotes.single
 example := @Solcore.Frontend.StructuralTypeDenotes.pair
+example := @Solcore.Frontend.StructuralTypeDenotes.many
 example := @Solcore.Frontend.TypeNameDenotes
 example := @Solcore.Frontend.TypeNameTable.lookup?_iff
 example := @Solcore.Frontend.TypeNameTable.Lookup.type_unique

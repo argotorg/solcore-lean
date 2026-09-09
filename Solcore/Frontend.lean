@@ -209,9 +209,10 @@ import Solcore.Frontend.TypedLetReturnTreeLookupProperties
 Canonical explicit-table frontend adapters for local expressions, type names,
 type-only and runtime parameter inputs, singleton and terminal-conditional return bodies,
 and restricted explicit
-function entries with value-free compilation. A separate opt-in structural type
-adapter interprets named leaves and zero/one/two-element tuple types with independent
-meaning and table-extension proofs. Single return, parameter and recursive let
+function entries with value-free compilation. A structural type adapter interprets
+named leaves and arbitrary finite tuple types as Unit, singleton identity or
+right-associated products with independent meaning and table-extension proofs.
+Explicit nested children are not flattened. Single return, parameter and recursive let
 annotations use it at the existing entry; each parameter retains exactly one
 original argument and position. Older prefix let annotations remain named-only,
 and empty/multiple return clauses remain outside the entry profile.
