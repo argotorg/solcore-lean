@@ -55,6 +55,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
     | wordLiteral meaning => exact .wordLiteral meaning
     | group _ ih => exact .group ih
     | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
+    | many _ _ headIH tailIH => exact .many headIH tailIH
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
     | add _ _ leftIH rightIH => exact .add leftIH rightIH
@@ -86,6 +87,7 @@ theorem localExpressionEvaluates_mapIds_iff (mapping : Resolved.LocalId → Reso
     | wordLiteral meaning => exact .wordLiteral meaning
     | group _ ih => exact .group ih
     | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
+    | many _ _ headIH tailIH => exact .many headIH tailIH
     | logicalNot _ ih => exact .logicalNot ih
     | bitNot _ ih => exact .bitNot ih
     | add _ _ leftIH rightIH => exact .add leftIH rightIH

@@ -38,6 +38,10 @@ theorem LocalExpressionHasType.evaluates
       obtain ⟨left, leftEvaluation, leftTyped⟩ := leftIH
       obtain ⟨right, rightEvaluation, rightTyped⟩ := rightIH
       exact ⟨.pair left right, .pair leftEvaluation rightEvaluation, .pair leftTyped rightTyped⟩
+  | many _ _ headIH tailIH =>
+      obtain ⟨head, headEvaluation, headTyped⟩ := headIH
+      obtain ⟨tail, tailEvaluation, tailTyped⟩ := tailIH
+      exact ⟨.pair head tail, .many headEvaluation tailEvaluation, .pair headTyped tailTyped⟩
   | logicalNot _ ih =>
       obtain ⟨value, evaluation, valueTyped⟩ := ih
       obtain ⟨decision, rfl⟩ := valueTyped.bool_shape

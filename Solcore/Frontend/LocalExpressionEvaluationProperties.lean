@@ -32,6 +32,9 @@ theorem ResolvesLocalExpression.preserves_evaluation {table : LocalNameTable}
   | pair _ _ leftIH rightIH =>
       cases evaluation with
       | pair leftChild rightChild => exact .pair (leftIH leftChild) (rightIH rightChild)
+  | many _ _ headIH tailIH =>
+      cases evaluation with
+      | many headChild tailChild => exact .pair (headIH headChild) (tailIH tailChild)
   | logicalNot _ ih =>
       cases evaluation with
       | logicalNot child => exact .unary (ih child) rfl
@@ -112,6 +115,9 @@ theorem ResolvesLocalExpression.reflects_evaluation {table : LocalNameTable}
   | pair _ _ leftIH rightIH =>
       cases evaluation with
       | pair leftChild rightChild => exact .pair (leftIH leftChild) (rightIH rightChild)
+  | many _ _ headIH tailIH =>
+      cases evaluation with
+      | pair headChild tailChild => exact .many (headIH headChild) (tailIH tailChild)
   | logicalNot _ ih =>
       cases evaluation with
       | @unary _ _ _ _ _ operandValue _ child applied =>
