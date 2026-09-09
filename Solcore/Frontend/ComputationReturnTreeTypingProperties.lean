@@ -43,10 +43,14 @@ private theorem hasType
         exact branchIH entry entryMember
 
 private theorem entries_exist {cases : List Syntax.MatchCase} {P : Syntax.Block → Core.Expr → Prop}
-    (patterns : ∀ arm ∈ cases, ∃ word, WordMatchPatternDenotes arm.value.pattern word)
+    (patterns : ∀ arm ∈ cases, ∃ tag : Option Core.Word, match tag with
+      | none => ∃ marker, arm.value.pattern.value = .wildcard marker
+      | some word => WordMatchPatternDenotes arm.value.pattern word)
     (branches : ∀ arm ∈ cases, ∃ core, P arm.value.body core) :
-    ∃ entries : List (Syntax.MatchCase × (Core.Word × Core.Expr)), entries.map Prod.fst = cases ∧
-      (∀ entry ∈ entries, WordMatchPatternDenotes entry.1.value.pattern entry.2.1) ∧
+    ∃ entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)), entries.map Prod.fst = cases ∧
+      (∀ entry ∈ entries, match entry.2.1 with
+        | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
+        | some word => WordMatchPatternDenotes entry.1.value.pattern word) ∧
       (∀ entry ∈ entries, P entry.1.value.body entry.2.2) := by
   induction cases with
   | nil => exact ⟨[], rfl, by simp, by simp⟩
@@ -116,18 +120,24 @@ theorem computationReturnTreeHasType_iff_elaborates
   ⟨elaborates childTyping, fun ⟨_, elaboration⟩ => hasType childTyping elaboration⟩
 
 private theorem fold_hasType {context : Core.Context} {type : Core.Ty} {defaultCore : Core.Expr}
-    {entries : List (Syntax.MatchCase × (Core.Word × Core.Expr))}
+    {entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr))}
     (fallback : Core.HasType context defaultCore type)
     (branches : ∀ entry ∈ entries, Core.HasType context entry.2.2 type) :
     Core.HasType (.word :: context) (entries.foldr
-      (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1)) (entry.2.2.weakenAt 0) tail)
+      (fun entry tail => match entry.2.1 with
+        | none => entry.2.2.weakenAt 0
+        | some word => .ifE (.binary .wordEq (.var 0) (.word word)) (entry.2.2.weakenAt 0) tail)
       (defaultCore.weakenAt 0)) type := by
   induction entries with
   | nil => simpa only [List.foldr_nil, Core.Context.insertAt] using fallback.weakenAt 0
   | cons entry rest ih =>
-      exact .ifE (.binary (.var rfl) (.word))
-        (by simpa only [Core.Context.insertAt] using (branches entry (by simp)).weakenAt 0)
-        (ih (fun row member => branches row (by simp [member])))
+      have head : Core.HasType (.word :: context) (entry.2.2.weakenAt 0) type := by
+        simpa only [Core.Context.insertAt] using (branches entry (by simp)).weakenAt 0
+      cases tag : entry.2.1 with
+      | none => simpa only [List.foldr_cons, tag] using head
+      | some word => simpa only [List.foldr_cons, tag] using
+          (Core.HasType.ifE (.binary (.var rfl) (.word)) head
+            (ih (fun row member => branches row (by simp [member]))))
 
 theorem ComputationReturnTreeElaborates.core_hasType
     (childCoreType : ∀ {table context source core type},

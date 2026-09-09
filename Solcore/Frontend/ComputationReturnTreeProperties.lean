@@ -14,40 +14,51 @@ variable {checkChild : LocalNameTable → Resolved.Context → Syntax.Expr → O
     {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
 
 private def check_arm (check : Syntax.Block → Option (Core.Expr × Core.Ty)) (type : Core.Ty)
-    (arm : Syntax.MatchCase) : Option (Core.Word × Core.Expr) := do
-  match arm.value.pattern.value with
-  | .literal literal =>
-      let word ← interpretWordLiteral? literal
-      let branch ← check arm.value.body
-      if branch.2 = type then return (word, branch.1) else none
-  | _ => none
+    (arm : Syntax.MatchCase) : Option (Option Core.Word × Core.Expr) := do
+  let tag ← match arm.value.pattern.value with
+    | .literal literal => (interpretWordLiteral? literal).map some
+    | .wildcard _ => some none
+    | _ => none
+  let branch ← check arm.value.body
+  if branch.2 = type then return (tag, branch.1) else none
 
 private theorem check_arm_map {check : Syntax.Block → Option (Core.Expr × Core.Ty)}
     {type : Core.Ty} {arm : Syntax.MatchCase} :
     (check_arm check type arm).map (arm, ·) = (do
-      match arm.value.pattern.value with
-      | .literal literal =>
-          let word ← interpretWordLiteral? literal
-          let branch ← check arm.value.body
-          if branch.2 = type then return (arm, word, branch.1) else none
-      | _ => none) := by
-  unfold check_arm
-  cases arm.value.pattern.value <;> simp [bind, Option.map_bind, Function.comp_def, apply_ite]
+      let tag ← match arm.value.pattern.value with
+        | .literal literal => (interpretWordLiteral? literal).map some
+        | .wildcard _ => some none
+        | _ => none
+      let branch ← check arm.value.body
+      if branch.2 = type then return (arm, tag, branch.1) else none) := by
+  cases shape : arm.value.pattern.value <;>
+    simp [check_arm, shape, bind, Option.map_bind, Function.comp_def, apply_ite]
 
 private theorem check_arm_iff {check : Syntax.Block → Option (Core.Expr × Core.Ty)}
-    {type : Core.Ty} {arm : Syntax.MatchCase} {word : Core.Word} {core : Core.Expr} :
-    check_arm check type arm = some (word, core) ↔
-      WordMatchPatternDenotes arm.value.pattern word ∧ check arm.value.body = some (core, type) := by
-  unfold check_arm WordMatchPatternDenotes
-  cases shape : arm.value.pattern.value <;> simp only [reduceCtorEq, false_and, exists_false] <;> try contradiction
-  case literal literal =>
-    simp only [Syntax.PatternValue.literal.injEq, bind, Option.bind_eq_some_iff]
+    {type : Core.Ty} {arm : Syntax.MatchCase} {tag : Option Core.Word} {core : Core.Expr} :
+    check_arm check type arm = some (tag, core) ↔
+      (match tag with
+        | none => ∃ marker, arm.value.pattern.value = .wildcard marker
+        | some word => WordMatchPatternDenotes arm.value.pattern word) ∧
+      check arm.value.body = some (core, type) := by
+  have branch (found : Option Core.Word) :
+      ((check arm.value.body).bind fun branch =>
+        if branch.2 = type then some (found, branch.1) else none) = some (tag, core) ↔
+      found = tag ∧ check arm.value.body = some (core, type) := by
+    simp only [Option.bind_eq_some_iff]
     constructor
-    · rintro ⟨found, meaning, ⟨branchCore, branchType⟩, accepted, result⟩
-      split at result <;> simp_all [pure, Option.some.injEq, Prod.mk.injEq, interpretWordLiteral?_iff]
-    · rintro ⟨meaning, accepted⟩
-      obtain ⟨_, rfl, meaning⟩ := meaning
-      exact ⟨word, interpretWordLiteral?_complete meaning, (core, type), accepted, by simp⟩
+    · rintro ⟨⟨branchCore, branchType⟩, accepted, result⟩
+      split at result <;> simp_all [Option.some.injEq, Prod.mk.injEq]
+    · rintro ⟨rfl, accepted⟩
+      exact ⟨(core, type), accepted, by simp⟩
+  cases shape : arm.value.pattern.value <;> cases tag <;>
+    simp [check_arm, shape, WordMatchPatternDenotes, bind, branch,
+      Option.bind_eq_some_iff, Option.map_eq_some_iff, interpretWordLiteral?_iff]
+  constructor
+  · rintro ⟨_, ⟨word, meaning, rfl⟩, same, accepted⟩
+    cases same; exact ⟨meaning, accepted⟩
+  · rintro ⟨meaning, accepted⟩
+    exact ⟨_, ⟨_, meaning, rfl⟩, rfl, accepted⟩
 
 private theorem entries_check_iff {α β : Type} {check : α → Option β}
     {cases : List α} {entries : List (α × β)} :
@@ -96,25 +107,6 @@ private theorem binding_children
     next different => cases remaining
   next used => cases accepted
 
-private theorem inferred_children
-    {blockSpan letSpan : Syntax.SourceSpan} {name : Syntax.Identifier}
-    {initializer : Syntax.Expr} {rest : List Syntax.Statement} {core : Core.Expr} {type : Core.Ty}
-    (accepted : elaborateComputationReturnTree? checkChild types owner inputs
-      ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩ = some (core, type)) :
-    ∃ initializerType initializerCore tailCore,
-      name.value ∉ inputs.names.map Prod.fst ∧
-      checkChild inputs.names inputs.context initializer = some (initializerCore, initializerType) ∧
-      elaborateComputationReturnTree? checkChild types owner (inputs.bindFresh owner name.value initializerType)
-        ⟨blockSpan, rest⟩ = some (tailCore, type) ∧ core = .letE initializerCore tailCore := by
-  rw [elaborateComputationReturnTree?] at accepted
-  split at accepted
-  next unused =>
-    simp only [bind, Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at accepted
-    obtain ⟨⟨initializerCore, initializerType⟩, initializerAccepted,
-      ⟨tailCore, returnType⟩, tailAccepted, rfl, rfl⟩ := accepted
-    exact ⟨initializerType, initializerCore, tailCore, unused, initializerAccepted, tailAccepted, rfl⟩
-  next used => cases accepted
-
 private theorem conditional_children
     {blockSpan ifSpan : Syntax.SourceSpan} {condition : Syntax.Expr}
     {thenBody elseBody : Syntax.Block} {core : Core.Expr} {type : Core.Ty}
@@ -141,21 +133,6 @@ private theorem conditional_children
       exact ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩
     next different => cases result
   next notBool => cases remaining
-
-private theorem discard_children
-    {blockSpan statementSpan : Syntax.SourceSpan} {source : Syntax.Expr}
-    {rest : List Syntax.Statement} {core : Core.Expr} {type : Core.Ty}
-    (accepted : elaborateComputationReturnTree? checkChild types owner inputs
-      ⟨blockSpan, ⟨statementSpan, .expression source true⟩ :: rest⟩ = some (core, type)) :
-    ∃ expressionType expressionCore tailCore,
-      checkChild inputs.names inputs.context source = some (expressionCore, expressionType) ∧
-      elaborateComputationReturnTree? checkChild types owner inputs ⟨blockSpan, rest⟩ = some (tailCore, type) ∧
-      core = .letE expressionCore (tailCore.weakenAt 0) := by
-  rw [elaborateComputationReturnTree?] at accepted
-  simp only [bind, Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at accepted
-  obtain ⟨⟨expressionCore, expressionType⟩, expressionAccepted,
-    ⟨tailCore, returnType⟩, tailAccepted, rfl, rfl⟩ := accepted
-  exact ⟨expressionType, expressionCore, tailCore, expressionAccepted, tailAccepted, rfl⟩
 
 private theorem complete
     (childCorrect : ∀ {table context source core type},
@@ -223,10 +200,14 @@ private theorem sound
                 | some initializer =>
                     cases optionalType with
                     | none =>
-                        obtain ⟨initializerType, initializerCore, tailCore, unused,
-                          initializerAccepted, tailAccepted, rfl⟩ := inferred_children accepted
-                        exact .inferred unused (childCorrect.mp initializerAccepted)
-                          (sound childCorrect tailAccepted)
+                        rw [elaborateComputationReturnTree?] at accepted
+                        split at accepted
+                        next unused =>
+                          simp only [bind, Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at accepted
+                          obtain ⟨⟨initializerCore, initializerType⟩, initializerAccepted,
+                            ⟨tailCore, returnType⟩, tailAccepted, rfl, rfl⟩ := accepted
+                          exact .inferred unused (childCorrect.mp initializerAccepted) (sound childCorrect tailAccepted)
+                        next used => cases accepted
                     | some annotation =>
                         obtain ⟨declaredType, initializerCore, tailCore, unused, meaning,
                           initializerAccepted, tailAccepted, rfl⟩ := binding_children accepted
@@ -247,8 +228,10 @@ private theorem sound
                 cases trailingSemicolon with
                 | false => simp only [elaborateComputationReturnTree?, reduceCtorEq] at accepted
                 | true =>
-                    obtain ⟨expressionType, expressionCore, tailCore,
-                      expressionAccepted, tailAccepted, rfl⟩ := discard_children accepted
+                    rw [elaborateComputationReturnTree?] at accepted
+                    simp only [bind, Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at accepted
+                    obtain ⟨⟨expressionCore, expressionType⟩, expressionAccepted,
+                      ⟨tailCore, returnType⟩, tailAccepted, rfl, rfl⟩ := accepted
                     exact .discard (childCorrect.mp expressionAccepted) (sound childCorrect tailAccepted)
               case matchWith scrutinees arms =>
                 rcases scrutineeShape : scrutinees with ⟨scrutineeSpan, elements⟩
