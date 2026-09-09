@@ -1,7 +1,7 @@
 import Solcore.Frontend.RecursiveLocalComputationTypingProperties
 import Solcore.Frontend.DirectWordBinaryProperties
 
-/-! Exact static provenance for recursive calls, groups, unary/binary operations and conditionals.
+/-! Exact static provenance for recursive calls, groups, tuples, operators and conditionals.
 Pure overlap is reconciled internally without restricting source or callers. -/
 
 set_option autoImplicit false
@@ -18,16 +18,9 @@ private theorem short_circuit_children {table : LocalNameTable} {context : Resol
         elaborateRecursiveLocalComputation? table context right = some (rightCore, .bool) ∧
         core = (if isOr then .ifE leftCore (.bool true) rightCore else .ifE leftCore rightCore (.bool false)) ∧
         type = .bool := by
-  cases isOr <;> simp only [Bool.false_eq_true, ↓reduceIte, elaborateRecursiveLocalComputation?,
-    bind, Option.bind_eq_some_iff] <;> constructor
-  all_goals first
-    | rintro ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩
-      exact ⟨_, leftAccepted, _, rightAccepted, by simp⟩
-    | rintro ⟨⟨leftCore, leftType⟩, leftAccepted, ⟨rightCore, rightType⟩, rightAccepted, result⟩
-      dsimp only at result
-      split at result
-      next same => cases result; exact ⟨leftCore, rightCore, same.1 ▸ leftAccepted, same.2 ▸ rightAccepted, rfl, rfl⟩
-      next => cases result
+  cases isOr <;>
+    simp [elaborateRecursiveLocalComputation?, bind, Option.bind_eq_some_iff,
+      Prod.exists, and_assoc, and_left_comm, and_comm] <;> simp only [eq_comm]
 
 private theorem unary_children {table : LocalNameTable} {context : Resolved.Context}
     {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr}
@@ -39,15 +32,8 @@ private theorem unary_children {table : LocalNameTable} {context : Resolved.Cont
         elaborateRecursiveLocalComputation? table context operand = some (operandCore, op.operandType) ∧
         core = .unary op operandCore ∧ type = op.resultType := by
   rcases operator with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
-    simp only [elaborateRecursiveLocalComputation?, bind, Option.bind_eq_some_iff] <;> constructor
-  all_goals first
-    | rintro ⟨operandCore, child, rfl, rfl⟩
-      exact ⟨_, child, by simp [Core.UnaryOp.operandType, Core.UnaryOp.resultType]⟩
-    | rintro ⟨⟨operandCore, operandType⟩, child, result⟩
-      dsimp only at result
-      split at result
-      next same => cases result; cases same; exact ⟨operandCore, child, rfl, rfl⟩
-      next => cases result
+    simp [elaborateRecursiveLocalComputation?, bind, Option.bind_eq_some_iff,
+      Prod.exists, and_left_comm, and_comm, Core.UnaryOp.operandType, Core.UnaryOp.resultType] <;> simp only [eq_comm]
 
 private theorem binary_children {table : LocalNameTable} {context : Resolved.Context}
     {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
@@ -69,17 +55,9 @@ private theorem binary_children {table : LocalNameTable} {context : Resolved.Con
   rcases operator with ⟨direct, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ |
     ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩
   all_goals try cases direct
-  all_goals
-    simp only [elaborateRecursiveLocalComputation?, directWordBinary?, bind, Option.bind_eq_some_iff,
-      Bool.false_eq_true, ↓reduceIte, Core.BinaryOp.leftType, Core.BinaryOp.rightType, Core.BinaryOp.resultType]
-    constructor
-    · rintro ⟨⟨leftCore, leftType⟩, leftAccepted, ⟨rightCore, rightType⟩, rightAccepted, result⟩
-      dsimp only at result
-      split at result
-      next same => cases result; exact ⟨leftCore, rightCore, same.1 ▸ leftAccepted, same.2 ▸ rightAccepted, rfl, rfl⟩
-      next => cases result
-    · rintro ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩
-      exact ⟨_, leftAccepted, _, rightAccepted, by simp⟩
+  all_goals simp [elaborateRecursiveLocalComputation?, bind, Option.bind_eq_some_iff,
+      Prod.exists, and_assoc, and_left_comm, and_comm, directWordBinary?, Core.BinaryOp.leftType,
+    Core.BinaryOp.rightType, Core.BinaryOp.resultType] <;> simp only [eq_comm]
 
 private theorem conditional_children {table : LocalNameTable} {context : Resolved.Context}
     {span question colon : Syntax.SourceSpan} {condition thenBranch elseBranch : Syntax.Expr}
@@ -91,18 +69,8 @@ private theorem conditional_children {table : LocalNameTable} {context : Resolve
         elaborateRecursiveLocalComputation? table context thenBranch = some (thenCore, type) ∧
         elaborateRecursiveLocalComputation? table context elseBranch = some (elseCore, type) ∧
         core = .ifE conditionCore thenCore elseCore := by
-  simp only [elaborateRecursiveLocalComputation?, bind, Option.bind_eq_some_iff]
-  constructor
-  · rintro ⟨⟨conditionCore, conditionType⟩, conditionAccepted, ⟨thenCore, thenType⟩, thenAccepted,
-      ⟨elseCore, elseType⟩, elseAccepted, result⟩
-    dsimp only at result
-    split at result
-    next same => cases result; exact ⟨conditionCore, thenCore, elseCore, same.1 ▸ conditionAccepted,
-        thenAccepted, same.2 ▸ elseAccepted, rfl⟩
-    next => cases result
-  · rintro ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩
-    exact ⟨(conditionCore, .bool), conditionAccepted, (thenCore, type), thenAccepted,
-      (elseCore, type), elseAccepted, by simp⟩
+  simp [elaborateRecursiveLocalComputation?, bind, Option.bind_eq_some_iff,
+      Prod.exists, and_assoc, and_left_comm, and_comm] <;> simp only [eq_comm]
 
 private theorem pure_complete {table : LocalNameTable} {context : Resolved.Context}
     {source : Syntax.Expr} {resolved : Resolved.Expr} {core : Core.Expr} {type : Core.Ty}
@@ -112,6 +80,11 @@ private theorem pure_complete {table : LocalNameTable} {context : Resolved.Conte
     elaborateRecursiveLocalComputation? table context source = some (core, type) := by
   induction resolution generalizing core type with
   | group _ ih => simpa only [elaborateRecursiveLocalComputation?] using ih lowered typing
+  | pair _ _ leftIH rightIH | many _ _ leftIH rightIH =>
+      cases lowered with | pair leftLowered rightLowered =>
+        cases typing with | pair leftTyped rightTyped =>
+          rw [elaborateRecursiveLocalComputation?]
+          simp only [leftIH leftLowered leftTyped, rightIH rightLowered rightTyped, bind, Option.bind_some, pure]
   | logicalNot _ ih | bitNot _ ih =>
       cases lowered with
       | unary childLowered =>
@@ -202,6 +175,9 @@ private theorem complete {table : LocalNameTable} {context : Resolved.Context}
   | pure resolution lowered typing =>
       exact pure_complete resolution lowered typing
   | group _ ih => simpa only [elaborateRecursiveLocalComputation?] using ih
+  | pair _ _ leftIH rightIH | many _ _ leftIH rightIH =>
+      rw [elaborateRecursiveLocalComputation?]
+      simp only [leftIH, rightIH, bind, Option.bind_some, pure]
   | application _ _ functionIH argumentIH =>
       exact application_children.mpr ⟨_, _, _, functionIH, argumentIH, rfl⟩
   | binary operator _ _ leftIH rightIH =>
@@ -232,6 +208,24 @@ private theorem sound {table : LocalNameTable} {context : Resolved.Context}
     cases payload
     case group inner =>
       exact .group (sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted))
+    case tuple elements =>
+      cases elements with | mk tupleSpan elements =>
+        cases elements with
+        | nil => exact pure_sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted)
+        | cons first rest =>
+            cases rest with
+            | nil => exact pure_sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted)
+            | cons second rest =>
+                cases rest with
+                | nil =>
+                    simp only [elaborateRecursiveLocalComputation?, bind, Option.bind_eq_some_iff, pure] at accepted
+                    obtain ⟨⟨leftCore, leftType⟩, leftAccepted, ⟨rightCore, rightType⟩, rightAccepted, same⟩ := accepted
+                    cases same; exact .pair (sound leftAccepted) (sound rightAccepted)
+                | cons third rest =>
+                    rw [elaborateRecursiveLocalComputation?] at accepted
+                    simp only [bind, Option.bind_eq_some_iff, pure] at accepted
+                    obtain ⟨⟨headCore, headType⟩, headAccepted, ⟨tailCore, tailType⟩, tailAccepted, same⟩ := accepted
+                    cases same; exact .many (sound headAccepted) (sound tailAccepted)
     case unary operator operand =>
       cases operator with | mk operatorSpan sourceOp =>
         cases sourceOp

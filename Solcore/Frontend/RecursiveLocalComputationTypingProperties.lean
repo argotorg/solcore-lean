@@ -26,6 +26,14 @@ theorem recursiveLocalComputationHasType_iff_elaborates
         obtain ⟨functionCore, functionElaborated⟩ := functionIH
         obtain ⟨argumentCore, argumentElaborated⟩ := argumentIH
         exact ⟨.apply functionCore argumentCore, .application functionElaborated argumentElaborated⟩
+    | pair _ _ leftIH rightIH =>
+        obtain ⟨leftCore, leftChild⟩ := leftIH
+        obtain ⟨rightCore, rightChild⟩ := rightIH
+        exact ⟨.pair leftCore rightCore, .pair leftChild rightChild⟩
+    | many _ _ headIH tailIH =>
+        obtain ⟨headCore, headChild⟩ := headIH
+        obtain ⟨tailCore, tailChild⟩ := tailIH
+        exact ⟨.pair headCore tailCore, .many headChild tailChild⟩
     | binary operator _ _ leftIH rightIH =>
         obtain ⟨leftCore, leftElaborated⟩ := leftIH
         obtain ⟨rightCore, rightElaborated⟩ := rightIH
@@ -70,6 +78,8 @@ theorem recursiveLocalComputationHasType_iff_elaborates
     | pure resolution _ typing => exact .pure (resolution.reflects_type typing)
     | group _ ih => exact .group ih
     | application _ _ functionIH argumentIH => exact .application functionIH argumentIH
+    | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
+    | many _ _ headIH tailIH => exact .many headIH tailIH
     | binary operator _ _ leftIH rightIH => exact .binary operator leftIH rightIH
     | conditional _ _ _ conditionIH thenIH elseIH => exact .conditional conditionIH thenIH elseIH
     | logicalNot _ ih => exact .logicalNot ih
@@ -90,6 +100,7 @@ theorem RecursiveLocalComputationElaborates.core_hasType
   | pure _ lowered typing => exact lowered.preserves_type typing
   | group _ ih => exact ih
   | application _ _ functionIH argumentIH => exact .apply functionIH argumentIH
+  | pair _ _ leftIH rightIH | many _ _ leftIH rightIH => exact .pair leftIH rightIH
   | binary _ _ _ leftIH rightIH => exact .binary leftIH rightIH
   | conditional _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
   | logicalNot _ ih | bitNot _ ih => exact .unary ih
