@@ -13,7 +13,7 @@ import Solcore.Core.FuelResumptionProperties
 set_option autoImplicit false
 namespace Tests
 open Solcore Solcore.Frontend
-namespace RecursiveNegatedComparisonEntries
+namespace RecursiveOrderedComparisonEntries
 private def check (p : Bool) (label : String) : IO Unit := do unless p do throw (IO.userError label)
 private def owner : Resolved.DeclarationId := ⟨⟨.main,⟨[⟨"RecursiveNegatedComparisonEntries",by decide⟩],by decide⟩⟩,31⟩
 private def w (n : Nat) : Core.Value := .word (Core.Word.ofNatModulo n)
@@ -127,19 +127,19 @@ private def child (s : LocalTypeInputs) (env : Resolved.Environment) (store : Co
       | _,_ => throw (IO.userError "static or actual Function differs")
   | ⟨_,.binary left ⟨opSpan,op⟩ right⟩ =>
       check (source.span.contains left.span && source.span.contains right.span && source.span.contains opSpan &&
-        decide (left.span.endByte≤opSpan.startByte ∧ opSpan.endByte≤right.span.startByte)) "original comparison child/operator order"
+        decide (left.span.endByte≤opSpan.startByte ∧ opSpan.endByte≤right.span.startByte)) "original ordered comparison child/operator order"
       let l ← child s env store left; let r ← child s env l.final right
       if typed : l.type=.word ∧ r.type=.word then
         match lv : l.value, rv : r.value with
         | .word a,.word b =>
             match which : op with
-            | .notEqual => return ⟨.unary .boolNot (.binary .wordEq l.core r.core),.bool,.bool (!(a==b)),r.final,l.cost+r.cost+5,
-                by rw [original,which]; exact .notEqual (typed.1 ▸ l.elaboration) (typed.2 ▸ r.elaboration),
-                by rw [original,which]; exact .notEqual (lv ▸ l.raw) (rv ▸ r.raw)⟩
-            | .lessEqual => return ⟨.unary .boolNot (.binary .wordGt l.core r.core),.bool,.bool (!(decide (a>b))),r.final,l.cost+r.cost+5,
-                by rw [original,which]; exact .lessEqual (typed.1 ▸ l.elaboration) (typed.2 ▸ r.elaboration),
-                by rw [original,which]; exact .lessEqual (lv ▸ l.raw) (rv ▸ r.raw)⟩
-            | _ => throw (IO.userError "outside two negated comparisons")
+            | .less => return ⟨l.core.wordLt r.core,.bool,.bool (decide (a<b)),r.final,l.cost+r.cost+9,
+                by rw [original,which]; exact .less (typed.1 ▸ l.elaboration) (typed.2 ▸ r.elaboration),
+                by rw [original,which]; exact .less (lv ▸ l.raw) (rv ▸ r.raw)⟩
+            | .greaterEqual => return ⟨.unary .boolNot (l.core.wordLt r.core),.bool,.bool (!(decide (a<b))),r.final,l.cost+r.cost+11,
+                by rw [original,which]; exact .greaterEqual (typed.1 ▸ l.elaboration) (typed.2 ▸ r.elaboration),
+                by rw [original,which]; exact .greaterEqual (lv ▸ l.raw) (rv ▸ r.raw)⟩
+            | _ => throw (IO.userError "outside two ordered comparisons")
         | _,_ => throw (IO.userError "actual comparison operands are not Word")
       else throw (IO.userError "original comparison operands are not Word")
   | ⟨_,.identifier name⟩ =>
@@ -215,73 +215,69 @@ private def reader (location : Nat) : TypedRuntimeArgument := ⟨.function .word
 private def writer (location : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word location],
   .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
 private def arg (value : Nat) : TypedRuntimeArgument := ⟨.word,w value,.word⟩
-end RecursiveNegatedComparisonEntries
-open RecursiveNegatedComparisonEntries
-def frontendParsedRecursiveNegatedComparisonEntryTests : IO Unit := do
-  let left := Core.Expr.apply (.var 3) (.var 1); let right := Core.Expr.apply (.var 2) (.var 0)
+end RecursiveOrderedComparisonEntries
+open RecursiveOrderedComparisonEntries
+def frontendParsedRecursiveOrderedComparisonEntryTests : IO Unit := do
+  let left := Core.Expr.apply (.var 3) (.var 1); let shiftedRight := Core.Expr.apply (.var 3) (.var 1)
+  let comparison := Core.Expr.binary .wordGt (.var 0) (.var 1)
+  let inner := Core.Expr.letE shiftedRight comparison; let ordered := Core.Expr.letE left inner
   let f := reader 0; let g := writer 0; let x := arg 11; let y := arg 14
-  for le in [false,true] do
-    let source ← bodySource (if le then "return f(x) <= g(y);" else "return f(x) != g(y);")
-    let op := if le then Core.BinaryOp.wordGt else .wordEq
-    let core := Core.Expr.unary .boolNot (.binary op left right)
+  for ge in [false,true] do
+    let source ← bodySource (if ge then "return f(x) >= g(y);" else "return f(x) < g(y);")
+    let core := if ge then Core.Expr.unary .boolNot ordered else ordered
+    let offset := if ge then 1 else 0; let cost := if ge then 34 else 32
     for (old,rhs) in [(23,14),(14,23),(14,14),(0,2^256-1),(2^256-1,0),(2^255,2^255),(2^256-1,2^255)] do
-      discard <| verify source f g x (arg rhs) .bool core [w old] [w rhs] (.bool (if le then old≤rhs else old≠rhs)) 28
-    discard <| verify source g f x y .bool core [w 23] [w 11] (.bool le) 28
-    discard <| verify source (reader 1) g x y .bool core [w 23,w 7] [w 14,w 7] (.bool true) 28
-    discard <| verify source g (reader 1) y x .bool core [w 23,w 7] [w 14,w 7] (.bool (!le)) 28
-    discard <| verify source f g y x .bool core [w 23] [w 11] (.bool (!le)) 28
-  let source ← bodySource "return f(x) != g(y);"
-  let core := Core.Expr.unary .boolNot (.binary .wordEq left right)
-  let prepared ← verify source f g x y .bool core [w 23] [w 14] (.bool true) 28
-  let env := prepared.inputs.environment.values
-  let types : TypeNameTable := [(["F"],f.type),(["G"],g.type),(["X"],.word),(["Y"],.word),(["R"],.bool),(["Word"],.word)]
-  let run := runRecursiveComputationFunction? types owner source [f,g,x,y]
-  let unary : List Core.Frame := [.unaryApply .boolNot]
-  let between : Core.State := ⟨.ret (w 23),.binaryRight .wordEq right env::unary,[w 23]⟩
-  let last : Core.State := ⟨.ret (w 14),.binaryApply .wordEq (w 23)::unary,[w 14]⟩
-  let negation : Core.State := ⟨.ret (.bool false),unary,[w 14]⟩
-  check (decide (run 10 [w 23]=some (.bool,.outOfFuel between) ∧ run 26 [w 23]=some (.bool,.outOfFuel last) ∧ run 27 [w 23]=some (.bool,.outOfFuel negation) ∧ Core.runStateful 18 between=.done (.bool true) [w 14] ∧ Core.runStateful 2 last=.done (.bool true) [w 14] ∧ Core.runStateful 1 negation=.done (.bool true) [w 14])) "genuine binaryRight/binaryApply/unaryApply with original captures and intermediate store"
-  let badState : Core.State := ⟨.ret (w 14),.binaryApply .wordEq (.bool true)::unary,[w 14]⟩
-  let bad := Core.StatefulRunResult.fault (.invalidBinaryOperands .wordEq (.bool true) (w 14)) badState
-  let badCp : Core.State := ⟨.ret (.cellRef .word 0),.loadCellApply::.binaryApply .wordEq (.bool true)::unary,[w 14]⟩
-  let emptyCp : Core.State := ⟨.eval (.var 1) env,.applyClosure .word .word (.loadCell (.var 1)) [.cellRef .word 0]::.binaryRight .wordEq right env::unary,[]⟩
-  let empty := Core.StatefulRunResult.fault (.invalidCellLocation 0) ⟨.ret (.cellRef .word 0),.loadCellApply::.binaryRight .wordEq right env::unary,[]⟩
-  check (decide (run 25 [.bool true]=some (.bool,.outOfFuel badCp) ∧ run 26 [.bool true]=some (.bool,bad) ∧ Core.runStateful 1 badCp=bad ∧ run 5 []=some (.bool,.outOfFuel emptyCp) ∧ run 9 []=some (.bool,empty) ∧ Core.runStateful 4 emptyCp=empty)) "right write survives invalid left comparison; left child fault prevents right"
-  let leftMissingEnv := [y.value,x.value,g.value,(reader 1).value]
-  let leftMissingRun := runRecursiveComputationFunction? types owner source [reader 1,g,x,y]
-  let leftMissingCp : Core.State := ⟨.eval (.var 1) [x.value,.cellRef .word 1],.loadCellApply::.binaryRight .wordEq right leftMissingEnv::unary,[w 23]⟩
-  let leftMissing := Core.StatefulRunResult.fault (.invalidCellLocation 1) ⟨.ret (.cellRef .word 1),.loadCellApply::.binaryRight .wordEq right leftMissingEnv::unary,[w 23]⟩
-  check (decide (leftMissingRun 8 [w 23]=some (.bool,.outOfFuel leftMissingCp) ∧ leftMissingRun 9 [w 23]=some (.bool,leftMissing) ∧ Core.runStateful 1 leftMissingCp=leftMissing)) "missing left cell leaves writable right cell untouched"
-  let rf := writer 0; let rg := reader 1
-  let changed ← verify source rf rg x y .bool core [w 23,w 14] [w 11,w 14] (.bool true) 28
-  let changedEnv := changed.inputs.environment.values
-  let changedRun := runRecursiveComputationFunction? types owner source [rf,rg,x,y]
-  let missingCp : Core.State := ⟨.eval (.var 1) [y.value,.cellRef .word 1],.loadCellApply::.binaryApply .wordEq (w 11)::unary,[w 11]⟩
-  let missing := Core.StatefulRunResult.fault (.invalidCellLocation 1) ⟨.ret (.cellRef .word 1),.loadCellApply::.binaryApply .wordEq (w 11)::unary,[w 11]⟩
-  check (decide (changedRun 24 [w 23]=some (.bool,.outOfFuel missingCp) ∧ changedRun 25 [w 23]=some (.bool,missing) ∧ Core.runStateful 1 missingCp=missing)) "missing right preserves earlier left write and pending negation"
-  let wrongRightCp : Core.State := ⟨.ret (.cellRef .word 1),.loadCellApply::.binaryApply .wordEq (w 11)::unary,[w 11,.bool false]⟩
-  let wrongRight := Core.StatefulRunResult.fault (.invalidBinaryOperands .wordEq (w 11) (.bool false)) ⟨.ret (.bool false),.binaryApply .wordEq (w 11)::unary,[w 11,.bool false]⟩
-  check (decide (changedRun 25 [w 23,.bool false]=some (.bool,.outOfFuel wrongRightCp) ∧ changedRun 26 [w 23,.bool false]=some (.bool,wrongRight) ∧ Core.runStateful 1 wrongRightCp=wrongRight)) "wrong actual right Word payload retains left write and unapplied negation"
-  for (actualEnv,actualRun) in [(env,run),(changedEnv,changedRun)] do
-    for store in [[w 23],[.bool true],[],[w 23,.bool false],[w 23,w 14]] do
-      for fuel in List.range 30 do
-        check (decide (actualRun fuel store=some (.bool,Core.runStateful fuel (.initial core actualEnv store)))) "same prepared actual values retain arbitrary stores and declared Bool tag"
-        match exhausted : Core.runStateful fuel (.initial core actualEnv store) with
-        | .outOfFuel residual =>
-            have _ := Core.runStateful_resume exhausted 40
-            check (decide (actualRun (fuel+40) store=some (.bool,Core.runStateful 40 residual))) "all genuine checkpoints resume complete success or fault"
-        | _ => pure ()
-  for body in ["return f(x) != missing;","return missing <= g(y);","return f(x) != (x==y);","return (x==y) <= g(y);"] do
-    let rejected ← bodySource body
-    check (decide (compileRecursiveComputationFunction? types owner rejected=none ∧ prepareRecursiveComputationFunction? types owner rejected [f,g,x,y]=none ∧ runRecursiveComputationFunction? types owner rejected [f,g,x,y] 50 [w 23]=none)) "whole Word gates and unknown names"
-  let wrongReturn ← parsed "function comparison(f:F,g:G,x:X,y:Y) returns(Word){return f(x) != g(y);}"
-  check (decide (elaborateRecursiveComputationReturnTree? types owner prepared.inputs.toTypeInputs wrongReturn.value.body=some (core,.bool) ∧ compileRecursiveComputationFunction? types owner wrongReturn=none ∧ prepareRecursiveComputationFunction? types owner wrongReturn [f,g,x,y]=none)) "original Bool comparison body versus declared Word"
-  for body in ["f(x)<=g(y)<=x","f(x)!=g(y)!=x"] do
-    let file : Syntax.SourceFile := ⟨⟨.main,"nonassociative-comparison-entry.sol"⟩,"function comparison(f:F,g:G,x:X,y:Y) returns(R){return "++body++";}"⟩
-    let .ok tokens := Syntax.Lexer.lex file | throw (IO.userError "non-associative fixture lexer")
-    check tokens.diagnostics.isEmpty "original chained comparison lexes"
-    match Syntax.Parser.functionDecl .module (Syntax.Parser.State.initial file tokens) with
-    | .ok _ next => check (!next.diagnostics.isEmpty || !next.atEnd) "comparison grammar remains non-associative"
-    | .reject _ _ => pure ()
-    | .invariant _ => throw (IO.userError "non-associative parser invariant")
+      discard <| verify source f g x (arg rhs) .bool core [w old] [w rhs] (.bool (if ge then old≥rhs else old<rhs)) cost
+    discard <| verify source g f x y .bool core [w 23] [w 11] (.bool ge) cost
+    discard <| verify source (reader 1) g x y .bool core [w 23,w 7] [w 14,w 7] (.bool (!ge)) cost
+    discard <| verify source g (reader 1) y x .bool core [w 23,w 7] [w 14,w 7] (.bool ge) cost
+    discard <| verify source f g y x .bool core [w 23] [w 11] (.bool ge) cost
+    let prepared ← verify source f g x y .bool core [w 23] [w 14] (.bool ge) cost
+    let env := prepared.inputs.environment.values
+    let types : TypeNameTable := [(["F"],f.type),(["G"],g.type),(["X"],.word),(["Y"],.word),(["R"],.bool),(["Word"],.word)]
+    let run := runRecursiveComputationFunction? types owner source [f,g,x,y]
+    let outer : List Core.Frame := if ge then [.unaryApply .boolNot] else []
+    let first : Core.State := ⟨.ret (w 23),.letBody inner env::outer,[w 23]⟩
+    let shifted : Core.State := ⟨.eval shiftedRight (w 23::env),.letBody comparison (w 23::env)::outer,[w 23]⟩
+    let second : Core.State := ⟨.ret (w 14),.letBody comparison (w 23::env)::outer,[w 14]⟩
+    let last : Core.State := ⟨.ret (w 23),.binaryApply .wordGt (w 14)::outer,[w 14]⟩
+    check (decide (run (9+offset) [w 23]=some (.bool,.outOfFuel first) ∧ run (11+offset) [w 23]=some (.bool,.outOfFuel shifted) ∧ run (26+offset) [w 23]=some (.bool,.outOfFuel second) ∧ run (31+offset) [w 23]=some (.bool,.outOfFuel last))) "genuine two lets, shifted original right under saved left, and retained right/left positional operands"
+    for (spent,cp) in [(9+offset,first),(11+offset,shifted),(26+offset,second),(31+offset,last)] do
+      check (decide (Core.runStateful (cost-spent) cp=.done (.bool ge) [w 14])) "each independently fixed checkpoint resumes exact residual cost"
+    if ge then
+      let negation : Core.State := ⟨.ret (.bool false),[.unaryApply .boolNot],[w 14]⟩
+      check (decide (run 33 [w 23]=some (.bool,.outOfFuel negation) ∧ Core.runStateful 1 negation=.done (.bool true) [w 14])) "greater-equal keeps genuine final negation"
+    let badEnv := w 14::.bool true::env
+    let badCp : Core.State := ⟨.eval (.var 1) badEnv,.binaryApply .wordGt (w 14)::outer,[w 14]⟩
+    let bad := Core.StatefulRunResult.fault (.invalidBinaryOperands .wordGt (w 14) (.bool true)) ⟨.ret (.bool true),.binaryApply .wordGt (w 14)::outer,[w 14]⟩
+    check (decide (run (30+offset) [.bool true]=some (.bool,.outOfFuel badCp) ∧ run (31+offset) [.bool true]=some (.bool,bad) ∧ Core.runStateful 1 badCp=bad)) "wrong left still allows right write before reversed actual primitive operands fault"
+    let leftMissingEnv := [y.value,x.value,g.value,(reader 1).value]
+    let leftMissingRun := runRecursiveComputationFunction? types owner source [reader 1,g,x,y]
+    let leftCp : Core.State := ⟨.eval (.var 1) [x.value,.cellRef .word 1],.loadCellApply::.letBody inner leftMissingEnv::outer,[w 23]⟩
+    let leftFault := Core.StatefulRunResult.fault (.invalidCellLocation 1) ⟨.ret (.cellRef .word 1),.loadCellApply::.letBody inner leftMissingEnv::outer,[w 23]⟩
+    check (decide (leftMissingRun (7+offset) [w 23]=some (.bool,.outOfFuel leftCp) ∧ leftMissingRun (8+offset) [w 23]=some (.bool,leftFault) ∧ Core.runStateful 1 leftCp=leftFault)) "left missing cell prevents a possible write to right cell zero"
+    let rf := writer 0; let rg := reader 1
+    let changed ← verify source rf rg x y .bool core [w 23,w 14] [w 11,w 14] (.bool (!ge)) cost
+    let changedEnv := changed.inputs.environment.values; let changedRun := runRecursiveComputationFunction? types owner source [rf,rg,x,y]
+    let missingFrames := Core.Frame.loadCellApply::.letBody comparison (w 11::changedEnv)::outer
+    let missingCp : Core.State := ⟨.eval (.var 1) [y.value,.cellRef .word 1],missingFrames,[w 11]⟩
+    let missing := Core.StatefulRunResult.fault (.invalidCellLocation 1) ⟨.ret (.cellRef .word 1),missingFrames,[w 11]⟩
+    check (decide (changedRun (24+offset) [w 23]=some (.bool,.outOfFuel missingCp) ∧ changedRun (25+offset) [w 23]=some (.bool,missing) ∧ Core.runStateful 1 missingCp=missing)) "missing right retains left write and actual left binding"
+    let wrongRightCp : Core.State := ⟨.eval (.var 1) (.bool false::w 11::changedEnv),.binaryApply .wordGt (.bool false)::outer,[w 11,.bool false]⟩
+    let wrongRight := Core.StatefulRunResult.fault (.invalidBinaryOperands .wordGt (.bool false) (w 11)) ⟨.ret (w 11),.binaryApply .wordGt (.bool false)::outer,[w 11,.bool false]⟩
+    check (decide (changedRun (30+offset) [w 23,.bool false]=some (.bool,.outOfFuel wrongRightCp) ∧ changedRun (31+offset) [w 23,.bool false]=some (.bool,wrongRight) ∧ Core.runStateful 1 wrongRightCp=wrongRight)) "wrong right is first generated gt operand and retains left update"
+    for (actualEnv,actualRun) in [(env,run),(changedEnv,changedRun)] do
+      for store in [[w 23],[.bool true],[],[w 23,.bool false],[w 23,w 14]] do
+        for fuel in List.range 36 do
+          check (decide (actualRun fuel store=some (.bool,Core.runStateful fuel (.initial core actualEnv store)))) "same prepared arbitrary stores retain full outcomes and declared Bool tag"
+          match exhausted : Core.runStateful fuel (.initial core actualEnv store) with
+          | .outOfFuel residual =>
+              have _ := Core.runStateful_resume exhausted 40
+              check (decide (actualRun (fuel+40) store=some (.bool,Core.runStateful 40 residual))) "all genuine checkpoints resume success and faults"
+          | _ => pure ()
+    for body in ["return f(x) < missing;","return missing >= g(y);","return f(x) < (x==y);","return (x==y) >= g(y);"] do
+      let rejected ← bodySource body
+      check (decide (compileRecursiveComputationFunction? types owner rejected=none ∧ prepareRecursiveComputationFunction? types owner rejected [f,g,x,y]=none ∧ runRecursiveComputationFunction? types owner rejected [f,g,x,y] 50 [w 23]=none)) "whole Word and unknown-name gates unchanged"
+    let wrongReturn ← parsed ("function comparison(f:F,g:G,x:X,y:Y) returns(Word){"++(if ge then "return f(x) >= g(y);" else "return f(x) < g(y);")++"}")
+    check (decide (elaborateRecursiveComputationReturnTree? types owner prepared.inputs.toTypeInputs wrongReturn.value.body=some (core,.bool) ∧ compileRecursiveComputationFunction? types owner wrongReturn=none ∧ prepareRecursiveComputationFunction? types owner wrongReturn [f,g,x,y]=none)) "original ordered Bool body versus declared Word"
 end Tests
