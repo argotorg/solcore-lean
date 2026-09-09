@@ -239,6 +239,24 @@ renamed and 26 others retained. Expression arity, projections, inference,
 shadowing, old named-only membership, multiple-return clauses and all runtime,
 parser, diagnostic and wire policies remain unchanged.
 
+Canonical expression tuples now use the same right-associated convention
+(ADR-0237), retaining original flat elements and both outer/delimited spans.
+Five new independent rules cover three or more elements; empty Unit, binary
+pairs and grouping remain unchanged, without implicit Unit tails or flattening.
+All 80 affected generic contracts are preserved across static checking,
+raw/Core semantics, safety, transport, exact costs, direct execution and bounds.
+The typing proof split retains its original import path and theorem names.
+Original-scope head/tail evaluation costs their sum plus three: three/four leaves
+take nine/thirteen steps, and a strict unused four-element initializer plus return
+takes sixteen. Independent arbitrary-length and parsed consumers retain exact
+Core, original byte ranges, first matches, nominal/opaque boundaries, whole versus
+selected checks, both stores and genuine checkpoint/residual execution.
+Five old parsed rejections become positives; the obsolete generic arity boundary
+is explicitly narrowed to manual singleton nodes and renamed, retaining its
+named-only type conclusion and the other ten source statements. Projections,
+inference, shadowing, multiple clauses, older prefix adapters, Core/Resolved,
+parser, diagnostics and wire policies remain unchanged.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

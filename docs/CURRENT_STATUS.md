@@ -319,6 +319,35 @@ source-test statements remain unchanged. Old named-only membership, empty/multip
 return-clause rejection, expression tuple arity, projections, inference, shadowing,
 Core transitions, fuel bounds, parser, diagnostics and wire formats do not change.
 
+Canonical tuple expressions now also support every finite canonical element
+count (ADR-0237). Three or more original elements form right-associated pairs,
+without a terminal Unit or flattening an explicitly nested child. Empty Unit,
+binary pairs and grouping keep their existing meanings. Five independent `many`
+rules extend resolution, typing, name avoidance, raw evaluation and exact cost.
+Head and tail retain the original caller scope, environment and both source
+spans; evaluation visits them in order with actual intermediate stores.
+
+All 80 affected generic theorem statements remain unchanged, including exact
+Core correspondence, safety, renaming, fresh-input reflection, store replay,
+lookup equality, direct evaluation and fuel bounds. One typing proof moves to
+an import-compatible module. Each pair still adds exactly three transitions:
+three/four one-step elements cost nine/thirteen, and an unused four-element
+initializer in a strict let costs sixteen including its return.
+
+Independent arbitrary-length source proofs and complete parsed expression/entry
+consumers retain exact Core, association, original flat syntax and byte ranges,
+first-match duplicates, nominal static types and opaque actual values. Manual
+transition paths check all bounded fuel thresholds and genuine nested-pair/let
+checkpoints with their saved environments, continuations and residual costs.
+Selected raw success remains distinct from whole-expression checking. Five old
+parsed rejection claims become independent positives; the obsolete generic arity
+rejection is explicitly narrowed and renamed to manual singleton nodes, with
+its old named-only type boundary and the ten other source statements preserved.
+Manual singleton tuple nodes, projections/indexing/arrays/calls, inference,
+shadowing, multiple return clauses and old named-only prefix adapters remain
+outside this change. Core/Resolved definitions, parser, diagnostics and frozen
+wire formats are unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

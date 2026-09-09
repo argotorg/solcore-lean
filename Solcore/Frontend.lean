@@ -8,6 +8,7 @@ import Solcore.Frontend.LocalExpression
 import Solcore.Frontend.LocalExpressionShapeProperties
 import Solcore.Frontend.LocalExpressionResolutionProperties
 import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.LocalExpressionTypingResolution
 import Solcore.Frontend.LocalExpressionTypingProperties
 import Solcore.Frontend.LocalExpressionEvaluationRules
 import Solcore.Frontend.LocalExpressionEvaluation
@@ -218,10 +219,11 @@ original argument and position. Older prefix let annotations remain named-only,
 and empty/multiple return clauses remain outside the entry profile.
 Independent source rules
 connect to checked Core execution. A direct original-expression evaluator
-accepts empty canonical tuples as Unit and two-element tuples as ordered binary products, using
-both original child scopes and actual values. Explicit nesting and existing
-grouping/trailing commas need no parser change; other tuple arities, tuple types
-and projections remain outside this adapter. The evaluator
+accepts empty canonical tuples as Unit and arbitrary finite lists of two or more
+elements as right-associated products, using original child scopes and actual
+values without an implicit Unit tail. Explicit nesting and existing grouping/trailing
+commas need no parser change; manual singleton tuple nodes and projections remain
+outside this expression adapter. The evaluator
 returns exactly the independent raw value and transition cost without checking
 or Core execution; whole checking and actual ID alignment separately connect
 successful output to checked Core paths and fuel thresholds. Raw selected success
