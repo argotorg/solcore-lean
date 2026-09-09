@@ -457,6 +457,7 @@ example := @Solcore.Frontend.computationReturnTreeHasType_iff_elaborates
 example := @Solcore.Frontend.ComputationReturnTreeElaborates.core_hasType
 example := @Solcore.Frontend.ComputationReturnTreeElaborates.runtime_typed_execution
 example := @Solcore.Frontend.ComputationReturnTreeElaborates.runtime_checkpoint_safety
+example := @Solcore.Frontend.ComputationReturnTreeElaborates.runtime_checkpoint_world_extension
 example := @Solcore.Frontend.elaborateRecursiveComputationReturnTree?
 example := @Solcore.Frontend.RecursiveComputationReturnTreeHasType
 example := @Solcore.Frontend.RecursiveComputationReturnTreeElaborates

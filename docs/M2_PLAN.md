@@ -589,6 +589,16 @@ accepted, with same-world/store validation still supplied separately by ADR-0264
 Original preparation, execution, actual stores, costs and checkpoints remain
 unchanged; no JSON decoder, source closure profile or automatic guard is added.
 
+Actual checkpoint worlds now extend the original supplied world (ADR-0266).
+A single shared theorem uses original body typing, actual same-world inputs and
+typed pending frames plus a genuine outOfFuel equation. It exposes the saved
+store's extending world and a further extending world for every finite path from
+that same checkpoint. Existing cell locations/types persist, while typed writes
+may alter values and allocation appends types. Private world uniqueness and only
+the allocation/write cases reuse existing state preservation. The old state and
+no-fault kernel, all entry contracts and executable definitions remain unchanged;
+equal-length separately typed stores or unrelated saved states are insufficient.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

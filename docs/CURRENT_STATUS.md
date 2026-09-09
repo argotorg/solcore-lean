@@ -927,6 +927,24 @@ validator checks the supplied world and complete store before its iff can
 supply ADR-0263's safety premises. Neither stage evaluates, repairs or replaces
 the input, decodes JSON, enables source closures, or guards an existing runner.
 
+Genuine computation checkpoints now expose extending store worlds (ADR-0266).
+One additional shared theorem takes the same original body typing, actual
+environment/store and typed pending continuation as the state-only safety kernel,
+plus the actual outOfFuel equation. It returns a saved world extending the
+original supplied world and typing the literal saved store. Every finite Core
+path from that exact saved state has a store typed in a further extension of
+the same saved world, including paths recovered from resumed checkpoints.
+
+The prefix relation preserves every old cell's location and type, not its
+stored value: typed writes may change values, while allocation appends a type.
+Private world uniqueness and the two store-changing transition cases reuse
+existing state preservation, allocation and write proofs. An untyped pending
+write can instead change a cell's type even when both endpoint stores are typed
+and equal in length; a separately typed arbitrary state is not a substitute for
+a genuine checkpoint. The earlier state/no-fault kernel remains unchanged.
+No source-ID alignment, child execution/cost law, new state relation, runner,
+validator or executable definition is added.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
