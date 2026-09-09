@@ -4,7 +4,8 @@ import Solcore.Resolved.FreshIdentity
 /-! Independent recursive paths evaluate strict initializers in the old scope
 and only the selected conditional arm. Raw paths do not imply whole acceptance
 or a source shadowing policy. Fresh IDs are relative to the current name table;
-discard prefixes evaluate their tails without allocating any source identity. -/
+discard prefixes evaluate their tails without allocating any source identity.
+Terminal blocks retain the original inner scope, stores and computation. -/
 
 set_option autoImplicit false
 
@@ -16,6 +17,13 @@ inductive TypedLetReturnTreeEvaluates (owner : Resolved.DeclarationId) :
       {initialStore finalStore : Core.Store} {body : Syntax.Block} {value : Core.Value}
       (child : ReturnBodyEvaluates table environment initialStore body value finalStore) :
       TypedLetReturnTreeEvaluates owner table environment initialStore body value finalStore
+  | block {table : LocalNameTable} {environment : Resolved.Environment}
+      {outerSpan innerSpan : Syntax.SourceSpan} {statements : List Syntax.Statement}
+      {initialStore finalStore : Core.Store} {value : Core.Value}
+      (child : TypedLetReturnTreeEvaluates owner table environment initialStore
+        ⟨innerSpan, statements⟩ value finalStore) :
+      TypedLetReturnTreeEvaluates owner table environment initialStore
+        ⟨outerSpan, [⟨innerSpan, .block statements⟩]⟩ value finalStore
   | binding {table : LocalNameTable} {environment : Resolved.Environment}
       {blockSpan letSpan : Syntax.SourceSpan} {name : Syntax.Identifier}
       {annotation : Syntax.TypeExpr} {initializer : Syntax.Expr} {rest : List Syntax.Statement}
@@ -62,13 +70,21 @@ inductive TypedLetReturnTreeEvaluates (owner : Resolved.DeclarationId) :
         ⟨blockSpan, [⟨statementSpan, .ifThen condition thenBody (some elseBody)⟩]⟩ value finalStore
 
 /-- Selected lets, discards and conditionals each add two existing Core transitions.
-An unused initializer or discarded expression still contributes its complete cost. -/
+An unused initializer or discarded expression still contributes its complete cost.
+A terminal block has the exact cost of its child, with no added transition. -/
 inductive TypedLetReturnTreeEvaluatesWithCost (owner : Resolved.DeclarationId) :
     LocalNameTable → Resolved.Environment → Core.Store → Syntax.Block → Core.Value → Core.Store → Nat → Prop where
   | single {table : LocalNameTable} {environment : Resolved.Environment}
       {initialStore finalStore : Core.Store} {body : Syntax.Block} {value : Core.Value} {cost : Nat}
       (child : ReturnBodyEvaluatesWithCost table environment initialStore body value finalStore cost) :
       TypedLetReturnTreeEvaluatesWithCost owner table environment initialStore body value finalStore cost
+  | block {table : LocalNameTable} {environment : Resolved.Environment}
+      {outerSpan innerSpan : Syntax.SourceSpan} {statements : List Syntax.Statement}
+      {initialStore finalStore : Core.Store} {value : Core.Value} {cost : Nat}
+      (child : TypedLetReturnTreeEvaluatesWithCost owner table environment initialStore
+        ⟨innerSpan, statements⟩ value finalStore cost) :
+      TypedLetReturnTreeEvaluatesWithCost owner table environment initialStore
+        ⟨outerSpan, [⟨innerSpan, .block statements⟩]⟩ value finalStore cost
   | binding {table : LocalNameTable} {environment : Resolved.Environment}
       {blockSpan letSpan : Syntax.SourceSpan} {name : Syntax.Identifier}
       {annotation : Syntax.TypeExpr} {initializer : Syntax.Expr} {rest : List Syntax.Statement}

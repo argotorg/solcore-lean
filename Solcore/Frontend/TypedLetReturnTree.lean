@@ -6,7 +6,8 @@ import Solcore.Frontend.LocalTypeInputsProperties
 if/else branches. Siblings start in the same original scope; their local fresh
 IDs need not be globally distinct. Structural annotations or independently inferred
 initializer types reuse existing Core and entry records. Strict expression
-prefixes discard their values without extending the original source scope. -/
+prefixes discard their values without extending the original source scope.
+Terminal lexical blocks retain their original child scope and exact Core. -/
 
 set_option autoImplicit false
 
@@ -19,6 +20,8 @@ def elaborateTypedLetReturnTree? (types : TypeNameTable) (owner : Resolved.Decla
     (inputs : LocalTypeInputs) (body : Syntax.Block) : Option (Core.Expr × Core.Ty) :=
   match body with
   | ⟨_, [⟨_, .returnStmt _⟩]⟩ => elaborateReturnBody? inputs.names inputs.context body
+  | ⟨_, [⟨innerSpan, .block statements⟩]⟩ =>
+      elaborateTypedLetReturnTree? types owner inputs ⟨innerSpan, statements⟩
   | ⟨blockSpan, ⟨_, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ =>
       if name.value ∉ inputs.names.map Prod.fst then do
         let declaredType ← interpretStructuralType? types annotation
@@ -56,6 +59,11 @@ inductive TypedLetReturnTreeHasType (types : TypeNameTable) (owner : Resolved.De
   | single {inputs : LocalTypeInputs} {body : Syntax.Block} {type : Core.Ty}
       (child : ReturnBodyHasType inputs.names inputs.context body type) :
       TypedLetReturnTreeHasType types owner inputs body type
+  | block {inputs : LocalTypeInputs} {outerSpan innerSpan : Syntax.SourceSpan}
+      {statements : List Syntax.Statement} {type : Core.Ty}
+      (child : TypedLetReturnTreeHasType types owner inputs ⟨innerSpan, statements⟩ type) :
+      TypedLetReturnTreeHasType types owner inputs
+        ⟨outerSpan, [⟨innerSpan, .block statements⟩]⟩ type
   | binding {inputs : LocalTypeInputs} {blockSpan letSpan : Syntax.SourceSpan}
       {name : Syntax.Identifier} {annotation : Syntax.TypeExpr} {initializer : Syntax.Expr}
       {rest : List Syntax.Statement} {declaredType returnType : Core.Ty}
@@ -96,6 +104,11 @@ inductive TypedLetReturnTreeElaborates (types : TypeNameTable) (owner : Resolved
   | single {inputs : LocalTypeInputs} {body : Syntax.Block} {core : Core.Expr} {type : Core.Ty}
       (child : ReturnBodyElaborates inputs.names inputs.context body core type) :
       TypedLetReturnTreeElaborates types owner inputs body core type
+  | block {inputs : LocalTypeInputs} {outerSpan innerSpan : Syntax.SourceSpan}
+      {statements : List Syntax.Statement} {core : Core.Expr} {type : Core.Ty}
+      (child : TypedLetReturnTreeElaborates types owner inputs ⟨innerSpan, statements⟩ core type) :
+      TypedLetReturnTreeElaborates types owner inputs
+        ⟨outerSpan, [⟨innerSpan, .block statements⟩]⟩ core type
   | binding {inputs : LocalTypeInputs} {blockSpan letSpan : Syntax.SourceSpan}
       {name : Syntax.Identifier} {annotation : Syntax.TypeExpr} {initializer : Syntax.Expr}
       {rest : List Syntax.Statement} {declaredType returnType : Core.Ty}
