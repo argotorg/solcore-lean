@@ -72,8 +72,7 @@ private def certify (ctx : Resolved.Context) (environment : Resolved.Environment
         by rw [sourceAt]; exact .unit, by rw [sourceAt]; exact .unit,
         fun _ => .cons .unit .refl⟩
   | ⟨_, .tuple ⟨_, [left, right]⟩⟩ =>
-      let a ← certify ctx environment aligned store left
-      let b ← certify ctx environment aligned store right
+      let a ← certify ctx environment aligned store left; let b ← certify ctx environment aligned store right
       return ⟨.pair a.resolved b.resolved, .pair a.core b.core, .product a.type b.type,
         .pair a.value b.value, a.cost + b.cost + 3,
         by rw [sourceAt]; exact .pair a.resolution b.resolution, .pair a.lowered b.lowered,
@@ -82,10 +81,18 @@ private def certify (ctx : Resolved.Context) (environment : Resolved.Environment
           have path := Core.Steps.cons .enterPair ((a.paths (.pairRight b.core environment.values :: continuation)).trans
             (.cons .enterPairRight ((b.paths _).trans (.cons .applyPair .refl))))
           simpa only [Nat.add_assoc] using path⟩
+  | ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩ =>
+      let a ← certify ctx environment aligned store first
+      let b ← certify ctx environment aligned store ⟨span,.tuple ⟨tupleSpan,second :: third :: rest⟩⟩
+      return ⟨.pair a.resolved b.resolved, .pair a.core b.core, .product a.type b.type, .pair a.value b.value, a.cost + b.cost + 3,
+        by rw [sourceAt]; exact .many a.resolution b.resolution, .pair a.lowered b.lowered,
+        by rw [sourceAt]; exact .many a.typing b.typing, by rw [sourceAt]; exact .many a.raw b.raw, fun k => by
+          have path := Core.Steps.cons .enterPair ((a.paths (.pairRight b.core environment.values :: k)).trans
+            (.cons .enterPairRight ((b.paths _).trans (.cons .applyPair .refl))))
+          simpa only [Nat.add_assoc] using path⟩
   | ⟨_, .conditional guard _ left _ right⟩ =>
       let c ← certify ctx environment aligned store guard
-      let a ← certify ctx environment aligned store left
-      let b ← certify ctx environment aligned store right
+      let a ← certify ctx environment aligned store left; let b ← certify ctx environment aligned store right
       if guardType : c.type = .bool then
         if armType : b.type = a.type then
           let common := fun value cost raw paths =>
@@ -196,8 +203,7 @@ private def rawLogical (source : Syntax.Expr) (c : Bool) (store : Core.Store) : 
 end BinaryTuples
 open BinaryTuples Solcore Solcore.Frontend
 def frontendParsedBinaryTupleTests : IO Unit := do
-  let pair : Core.Expr := .pair (.var 0) (.var 1)
-  let product : Core.Ty := .product .word .word
+  let pair : Core.Expr := .pair (.var 0) (.var 1); let product : Core.Ty := .product .word .word
   for (left, right) in [(w 9, w 2), (.cellRef .word 999, .closure .word .bool (.var 999) [w 12]),
       (.constructed ⟨⟨81⟩, 4⟩ (.pair .unit (w 8)), .unit)] do
     for text in ["(l,r)", "(l, r,)", "((l),(r))", "(((l,r)))"] do
@@ -253,8 +259,11 @@ def frontendParsedBinaryTupleTests : IO Unit := do
         some (value, if forwarded then 8 else 4)) && (elaborateLocalExpression? table (context .word .word) expression).isNone)
         "raw pair forwarding became a whole Bool rule"
       for store in stores do rawLogical expression c store
-  for text in ["(l,r,c)", "(l,r,c,l)", "[l,r]", "(l,r).x", "(l,r)[0]", "(missing,r)", "(l,missing)", "(l,f(r))", "(l,~c)"] do
-    rejected text
+  checked "(l,r,c)" (w 9) (w 2) true .word .word (.pair (.var 0) (.pair (.var 1) (.var 2)))
+    (.product .word (.product .word .bool)) (.pair (w 9) (.pair (w 2) (.bool true))) 9
+  checked "(l,r,c,l)" (w 9) (w 2) true .word .word (.pair (.var 0) (.pair (.var 1) (.pair (.var 2) (.var 0))))
+    (.product .word (.product .word (.product .bool .word))) (.pair (w 9) (.pair (w 2) (.pair (.bool true) (w 9)))) 13
+  for text in ["[l,r]", "(l,r).x", "(l,r)[0]", "(missing,r)", "(l,missing)", "(l,f(r))", "(l,~c)"] do rejected text
   rejected "c ? (l,r) : (l,missing)" (some (.pair (w 9) (w 2), 8))
   rejected "c ? (l,r) : l" (some (.pair (w 9) (w 2), 8))
   let singleton : Syntax.Expr := ⟨source.span, .tuple ⟨source.span, [← parsed "l"]⟩⟩

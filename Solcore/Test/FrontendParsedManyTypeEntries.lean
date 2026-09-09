@@ -57,6 +57,10 @@ private def expression (table : LocalNameTable) (env : Resolved.Environment) (st
       let second ← expression table env store right
       return ⟨.pair first.value second.value, first.cost + second.cost + 3, by
         rw [sourceAt]; exact .pair first.costed second.costed⟩
+  | ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩ =>
+      let head ← expression table env store first
+      let tail ← expression table env store ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩
+      return ⟨.pair head.value tail.value, head.cost + tail.cost + 3, by rw [sourceAt]; exact .many head.costed tail.costed⟩
   | _ => throw (IO.userError "expression outside independent unit script")
 termination_by sizeOf source
 private structure Body (table : LocalNameTable) (env : Resolved.Environment) (store : Core.Store) (source : Syntax.Block) where
@@ -245,8 +249,9 @@ def frontendParsedManyTypeEntryTests : IO Unit := do
       let left := pairArg (pairArg (wordArg n) (boolArg choice)) (wordArg 17)
       let _ ← check types "function nested(p: ((Word,Bool),Word)) returns(((Word,Bool),Word)){return p;}"
         [left] (.var 0) left.type left.value 1 (by intro store k; exact .cons (.var rfl) .refl) []
+      let _ ← check types "function expression(x: Word,c: Bool,z: Word) returns((Word,Bool,Word)){return (x,c,z);}"
+        args core type value 9 (by intro store k; exact .cons .enterPair (.cons (.var rfl) (.cons .enterPairRight (.cons .enterPair (.cons (.var rfl) (.cons .enterPairRight (.cons (.var rfl) (.cons .applyPair (.cons .applyPair .refl))))))))) []
       for content in ["function wrong(x: Word,c: Bool,z: Word) returns((Word,Bool,Word)){return ((x,c),z);}",
-          "function expression(x: Word,c: Bool,z: Word) returns((Word,Bool,Word)){return (x,c,z);}",
           "function clauses(x: Word,c: Bool,z: Word) returns(Word,Bool,Word){return (x,(c,z));}",
           "function first(x: Word,c: Bool,z: Word){let p: (Missing,Bool,Word)=(x,(c,z));return ();}",
           "function middle(x: Word,c: Bool,z: Word){let p: (Word,Missing,Word)=(x,(c,z));return ();}",

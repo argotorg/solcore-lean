@@ -64,6 +64,15 @@ private def certify (table : LocalNameTable) (context : Resolved.Context) (envir
           have path := Core.Steps.cons .enterPair ((a.paths (.pairRight b.core environment.values :: k)).trans
             (.cons .enterPairRight ((b.paths _).trans (.cons .applyPair .refl))))
           simpa only [Nat.add_assoc] using path⟩
+  | ⟨span, .tuple ⟨tupleSpan, first :: second :: third :: rest⟩⟩ =>
+      let a ← certify table context environment store first
+      let b ← certify table context environment store ⟨span,.tuple ⟨tupleSpan,second :: third :: rest⟩⟩
+      return ⟨.pair a.resolved b.resolved, .pair a.core b.core, .product a.type b.type, .pair a.value b.value, a.cost + b.cost + 3,
+        by rw [sourceAt]; exact .many a.resolution b.resolution, .pair a.lowered b.lowered,
+        by rw [sourceAt]; exact .many a.typing b.typing, by rw [sourceAt]; exact .many a.raw b.raw, fun k => by
+          have path := Core.Steps.cons .enterPair ((a.paths (.pairRight b.core environment.values :: k)).trans
+            (.cons .enterPairRight ((b.paths _).trans (.cons .applyPair .refl))))
+          simpa only [Nat.add_assoc] using path⟩
   | _ => throw (IO.userError "outside independent constant certificate grammar")
 termination_by sizeOf source
 private def checked (content : String) (table : LocalNameTable) (context : Resolved.Context)
@@ -234,7 +243,11 @@ def frontendParsedUnitTests : IO Unit := do
   for choice in [false, true] do
     for isAnd in [false, true] do shortCircuit choice isAnd
     conditional choice
-  for text in ["((),(),())", "((),(),(),())", "().x", "()[0]", "[()]", "() ()", "() && ()", "!()", "~()"] do
+  checked "((),(),())" hostileNames hostileContext hostileEnvironment (.pair .unit (.pair .unit .unit))
+    (.product .unit (.product .unit .unit)) (.pair .unit (.pair .unit .unit)) 9
+  checked "((),(),(),())" hostileNames hostileContext hostileEnvironment (.pair .unit (.pair .unit (.pair .unit .unit)))
+    (.product .unit (.product .unit (.product .unit .unit))) (.pair .unit (.pair .unit (.pair .unit .unit))) 13
+  for text in ["().x", "()[0]", "[()]", "() ()", "() && ()", "!()", "~()"] do
     let invalid ← parsed text
     assertTrue ((resolveLocalExpression? [] invalid).isNone || (elaborateLocalExpression? [] [] invalid).isNone) "unsupported syntax became checked"
     assertTrue (evaluateLocalExpressionWithCost? [] [] invalid).isNone "unsupported/ill-shaped raw syntax succeeded"
