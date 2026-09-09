@@ -804,6 +804,19 @@ safety from these smaller laws. Structural preparation and separately typed
 objects cannot replace the common-world and typed-continuation premises. Those
 premises are sufficient, not necessary for each particular terminating run.
 
+Expected-type unary lambda headers now have a standalone type-only foundation
+(ADR-0281): an inferred parameter inherits the supplied domain, explicit runtime
+annotations must agree, and an omitted return annotation retains the expected
+codomain. The fresh inner row shadows but preserves the outer scope. Exact
+independent-header correspondence, absence, uniqueness and provenance are proved.
+
+The result retains the original unchecked body and contains no Core or closure.
+Do not reuse the named-function absent-return Unit policy, require an inhabitant,
+or infer whole-lambda acceptance from header success. Parser recovery is judged
+through its actual AST, not a diagnostic-free premise. Existing recursive-child
+and shared-function lambda rejection remains unchanged pending separate body
+checking, expected-type propagation and capture semantics.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

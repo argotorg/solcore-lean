@@ -317,6 +317,8 @@ import Solcore.Test.FrontendParsedComputationArgumentEffects
 import Solcore.Test.FrontendPreparedCheckpointBoundaryProperties
 import Solcore.Test.FrontendComputationFunctionCheckpointProperties
 import Solcore.Test.FrontendParsedFunctionCheckpointWorlds
+import Solcore.Test.FrontendExpectedLambdaHeaderProperties
+import Solcore.Test.FrontendParsedExpectedLambdaHeaders
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5992,6 +5994,7 @@ def run : IO Unit := do
   frontendParsedComputationFunctionOwnerEffectTests
   frontendParsedComputationArgumentEffectTests
   frontendParsedFunctionCheckpointWorldTests
+  frontendParsedExpectedLambdaHeaderTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

@@ -184,6 +184,7 @@ import Solcore.Frontend.RuntimeParametersOwnerProperties
 import Solcore.Frontend.RuntimeFunctionOwnerProperties
 import Solcore.Frontend.LocalTypeInputs
 import Solcore.Frontend.LocalTypeInputsProperties
+import Solcore.Frontend.ExpectedUnaryLambdaHeader
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RuntimeParameterDeclarationsLayout
 import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties

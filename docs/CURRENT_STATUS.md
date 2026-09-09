@@ -1242,6 +1242,26 @@ sufficient for the guarantees, not a necessary condition for every terminating
 run. Earlier stronger execution/source-cost laws and all executable definitions
 remain unchanged.
 
+Expected-type unary lambda headers now have a separate opt-in declarer
+(ADR-0281). With an explicit function domain and codomain, the original single
+runtime parameter either inherits the domain or checks its structural annotation
+against it. An omitted return annotation keeps the expected codomain, not Unit;
+a present annotation must agree. The original outer type-name table is used
+before one fresh parameter row shadows any outer spelling without deleting it.
+
+The returned header contains only inner type inputs, the exact original body,
+and the expected domain/codomain. Four laws give independent semantic exactness,
+absence, uniqueness and original-header/fresh-row provenance. No runtime values,
+Core expression or closure are constructed, and no body is checked. Header
+success can coexist with a body error or a mismatched actual body return type.
+
+The declarer judges the actual AST, not parser diagnostics or a forbidden name
+string. Explicit error parameter nodes and comptime markers remain outside this
+runtime profile; a recovered inferred node is not rejected just for its recovery history.
+Existing recursive-child/body/function lambda rejection, literal-value insertion
+contracts and all old executable definitions remain unchanged. Expected-type
+propagation, body checking and closure semantics remain separate next work.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
