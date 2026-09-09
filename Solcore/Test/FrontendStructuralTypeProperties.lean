@@ -145,9 +145,9 @@ theorem unsupported_constructors_cannot_be_rescued_by_meaningful_children
   rcases present with rfl | rfl | rfl | rfl | rfl | rfl <;>
     exact ⟨by simp only [interpretStructuralType?], by rintro ⟨result, denoted⟩; cases denoted⟩
 
-theorem larger_arity_and_either_missing_child_are_whole_rejections
+theorem larger_tuples_remain_named_only_rejections_and_missing_children_stay_strict
     (table : TypeNameTable) (a b c : Syntax.TypeExpr) (rest : List Syntax.TypeExpr) :
-    interpretStructuralType? table ⟨span, .tuple (a :: b :: c :: rest)⟩ = none ∧
+    interpretTypeName? table ⟨span, .tuple (a :: b :: c :: rest)⟩ = none ∧
     interpretStructuralType? [] (pair span (unit span) (named span "Missing")) = none ∧
     interpretStructuralType? [] (pair span (named span "Missing") (unit span)) = none ∧
     (¬ ∃ type, StructuralTypeDenotes [] (pair span (unit span) (named span "Missing")) type) ∧
@@ -155,7 +155,7 @@ theorem larger_arity_and_either_missing_child_are_whole_rejections
     interpretStructuralType? aliases (single span (named span "L")) = some .word := by
   have absent : interpretStructuralType? [] (pair span (unit span) (named span "Missing")) = none := by
     simp [interpretStructuralType?, pair, unit, named, TypeNameTable.lookup?]
-  refine ⟨?_, absent, ?_, interpretStructuralType?_eq_none_iff.mp absent, rfl,
+  refine ⟨rfl, absent, ?_, interpretStructuralType?_eq_none_iff.mp absent, rfl,
     (StructuralTypeDenotes.single leftMeaning).complete⟩ <;>
     simp [interpretStructuralType?, pair, unit, named, TypeNameTable.lookup?]
 

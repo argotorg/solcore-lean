@@ -26,7 +26,7 @@ theorem independent_structural_headers_keep_arbitrary_ranges_and_unique_results
     ⟨rfl, rfl, rfl, rfl, .single meaning⟩
   exact ⟨.single meaning, header, interpretRuntimeFunctionHeader?_iff.mpr header, fun _ other => other.type_unique header⟩
 
-theorem absent_and_single_empty_tuple_are_unit_but_clause_lists_stay_distinct
+theorem absent_and_single_empty_tuple_are_unit_but_multiple_return_annotations_stay_rejected
     (s t : Syntax.SourceSpan) (table : TypeNameTable) (left right third : Syntax.TypeExpr) :
     RuntimeReturnTypeDenotes table none .unit ∧
     RuntimeReturnTypeDenotes table (clause s t [⟨s, .tuple []⟩]) .unit ∧
@@ -34,7 +34,7 @@ theorem absent_and_single_empty_tuple_are_unit_but_clause_lists_stay_distinct
     interpretRuntimeReturnType? table (clause s t [⟨s, .tuple []⟩]) = some .unit ∧
     interpretRuntimeReturnType? table (clause s t []) = none ∧
     interpretRuntimeReturnType? table (clause s t [left, right]) = none ∧
-    interpretRuntimeReturnType? table (clause s t [⟨s, .tuple [left, right, third]⟩]) = none := by
+    interpretRuntimeReturnType? table (clause s t [left, right, third]) = none := by
   refine ⟨.absent, .single .unit, rfl, ?_, rfl, rfl, ?_⟩ <;>
     simp [interpretRuntimeReturnType?, interpretStructuralType?, clause]
 
