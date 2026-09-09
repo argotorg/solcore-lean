@@ -4,7 +4,8 @@ import Solcore.Core.Correspondence
 import Solcore.Core.ExactFuelProperties
 
 /-! Raw success and exact cost agree across overlapping pure and recursive
-groups, unary/binary operations and conditionals. Actual closures, arguments and stores are fixed by evaluation,
+groups, unary/binary operations, conditionals and fixed lazy operators.
+Actual closures, arguments and stores are fixed by evaluation,
 not by a checker, type tags or a global restriction on skipped source syntax. -/
 
 set_option autoImplicit false
@@ -28,6 +29,10 @@ private theorem erase {table : LocalNameTable} {environment : Resolved.Environme
   | ifFalse _ _ conditionIH branchIH => exact .ifFalse conditionIH branchIH
   | logicalNot _ ih => exact .logicalNot ih
   | bitNot _ ih => exact .bitNot ih
+  | andTrue _ _ leftIH rightIH => exact .andTrue leftIH rightIH
+  | andFalse _ ih => exact .andFalse ih
+  | orTrue _ ih => exact .orTrue ih
+  | orFalse _ _ leftIH rightIH => exact .orFalse leftIH rightIH
 
 private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value}
@@ -65,6 +70,20 @@ private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Env
   | bitNot _ ih =>
       obtain ⟨_, costed⟩ := ih
       exact ⟨_, .bitNot costed⟩
+  | andTrue _ _ leftIH rightIH =>
+      obtain ⟨_, leftCosted⟩ := leftIH
+      obtain ⟨_, rightCosted⟩ := rightIH
+      exact ⟨_, .andTrue leftCosted rightCosted⟩
+  | andFalse _ ih =>
+      obtain ⟨_, costed⟩ := ih
+      exact ⟨_, .andFalse costed⟩
+  | orTrue _ ih =>
+      obtain ⟨_, costed⟩ := ih
+      exact ⟨_, .orTrue costed⟩
+  | orFalse _ _ leftIH rightIH =>
+      obtain ⟨_, leftCosted⟩ := leftIH
+      obtain ⟨_, rightCosted⟩ := rightIH
+      exact ⟨_, .orFalse leftCosted rightCosted⟩
 
 theorem recursiveLocalComputationEvaluates_iff_exists_cost {table : LocalNameTable}
     {environment : Resolved.Environment} {initialStore finalStore : Core.Store}
@@ -125,6 +144,28 @@ private theorem agrees_with_pure {table : LocalNameTable} {environment : Resolve
           obtain ⟨sameValue, rfl, rfl⟩ := ih child
           cases sameValue
           exact ⟨rfl, rfl, rfl⟩
+  | andTrue _ _ leftIH rightIH =>
+      cases pureEvaluation with
+      | andTrue left right =>
+          obtain ⟨_, rfl, rfl⟩ := leftIH left
+          obtain ⟨rfl, rfl, rfl⟩ := rightIH right
+          exact ⟨rfl, rfl, rfl⟩
+      | andFalse left => cases (leftIH left).1
+  | andFalse _ ih =>
+      cases pureEvaluation with
+      | andTrue left _ => cases (ih left).1
+      | andFalse left => obtain ⟨_, rfl, rfl⟩ := ih left; exact ⟨rfl, rfl, rfl⟩
+  | orTrue _ ih =>
+      cases pureEvaluation with
+      | orTrue left => obtain ⟨_, rfl, rfl⟩ := ih left; exact ⟨rfl, rfl, rfl⟩
+      | orFalse left _ => cases (ih left).1
+  | orFalse _ _ leftIH rightIH =>
+      cases pureEvaluation with
+      | orTrue left => cases (leftIH left).1
+      | orFalse left right =>
+          obtain ⟨_, rfl, rfl⟩ := leftIH left
+          obtain ⟨rfl, rfl, rfl⟩ := rightIH right
+          exact ⟨rfl, rfl, rfl⟩
 
 /-- Successful recursive derivations determine the actual value, final store
 and cost jointly, including overlapping pure derivations and selected branches. -/
@@ -163,6 +204,7 @@ theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalN
           obtain ⟨rfl, rfl, rfl⟩ := rightIH otherRight
           cases operator <;> cases otherOperator
           all_goals exact ⟨Option.some.inj (applied.symm.trans otherApplied), rfl, rfl⟩
+      | andTrue _ _ | andFalse _ | orTrue _ | orFalse _ _ => cases operator
   | ifTrue condition branch conditionIH branchIH =>
       cases rightEvaluation with
       | pure other => exact agrees_with_pure (.ifTrue condition branch) other
@@ -193,6 +235,36 @@ theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalN
       | bitNot other =>
           obtain ⟨sameValue, rfl, rfl⟩ := ih other
           cases sameValue
+          exact ⟨rfl, rfl, rfl⟩
+  | andTrue leftChild rightChild leftIH rightIH =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.andTrue leftChild rightChild) other
+      | binary operator _ _ _ => cases operator
+      | andTrue otherLeft otherRight =>
+          obtain ⟨_, rfl, rfl⟩ := leftIH otherLeft
+          obtain ⟨rfl, rfl, rfl⟩ := rightIH otherRight
+          exact ⟨rfl, rfl, rfl⟩
+      | andFalse otherLeft => cases (leftIH otherLeft).1
+  | andFalse left ih =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.andFalse left) other
+      | binary operator _ _ _ => cases operator
+      | andTrue otherLeft _ => cases (ih otherLeft).1
+      | andFalse otherLeft => obtain ⟨_, rfl, rfl⟩ := ih otherLeft; exact ⟨rfl, rfl, rfl⟩
+  | orTrue left ih =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.orTrue left) other
+      | binary operator _ _ _ => cases operator
+      | orTrue otherLeft => obtain ⟨_, rfl, rfl⟩ := ih otherLeft; exact ⟨rfl, rfl, rfl⟩
+      | orFalse otherLeft _ => cases (ih otherLeft).1
+  | orFalse leftChild rightChild leftIH rightIH =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.orFalse leftChild rightChild) other
+      | binary operator _ _ _ => cases operator
+      | orTrue otherLeft => cases (leftIH otherLeft).1
+      | orFalse otherLeft otherRight =>
+          obtain ⟨_, rfl, rfl⟩ := leftIH otherLeft
+          obtain ⟨rfl, rfl, rfl⟩ := rightIH otherRight
           exact ⟨rfl, rfl, rfl⟩
 
 end Solcore.Frontend

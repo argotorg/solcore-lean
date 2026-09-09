@@ -40,5 +40,7 @@ theorem RecursiveLocalComputationElaborates.core_fragment
   | conditional _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
   | logicalNot _ childIH => exact .unary childIH
   | bitNot _ childIH => exact .unary childIH
+  | logicalAnd _ _ leftIH rightIH => exact .ifE leftIH rightIH (.pure .bool)
+  | logicalOr _ _ leftIH rightIH => exact .ifE leftIH (.pure .bool) rightIH
 
 end Solcore.Frontend
