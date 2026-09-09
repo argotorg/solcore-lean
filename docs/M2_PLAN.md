@@ -514,8 +514,19 @@ the caller fragment and insertion rules need no new constructors. Three original
 rejections migrate with unchanged source and caller tables, while whole checking,
 old endpoints, actual effects/faults and genuine ifBranches resumption stay explicit.
 
+Fixed Word inequality and less-or-equal now recurse through the same child
+(ADR-0260). Original Word children retain ordered equality/greater comparison
+inside Bool negation, with actual left-to-right stores and child costs plus five.
+Eight constructors preserve the fourteen signatures; private cost determinism
+moves with its existing public theorem to a smaller module, retaining the old
+import entry. Existing caller-fragment/insertion and shared body/entry code are
+unchanged. The two original rejection fixtures retain their source and tables
+as exact successes. Wrong actual left payloads do not suppress right effects
+before comparison failure; comparison and negation checkpoints remain distinct.
+General named ne/le resolution and Rust execution-cost agreement are not claimed.
+
 Next extend recursive children to the remaining expression forms using these
-shared contracts. Expanded comparisons, tuples,
+shared contracts. Ordered less/greater-equal comparisons, tuples,
 expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
 transfer, and structural arguments alone do not validate stores.

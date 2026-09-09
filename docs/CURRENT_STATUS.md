@@ -635,7 +635,8 @@ bound, unfuelled evaluator or global source-call mechanism is introduced.
 A separate recursive expression profile now admits nested single-argument calls,
 computed callees and arbitrary grouping (ADR-0253). Each original callee and
 argument is checked recursively in the same scope; direct unary, Word binary,
-conditional and fixed lazy roots are extended below. Other roots retain the old pure interpretation.
+negated comparison, conditional and fixed lazy roots are extended below.
+Other roots retain the old pure interpretation.
 Independent syntax/type/Core evidence and raw/cost rules
 preserve the exact actual closure, captures and callee-to-argument-to-body store
 order. Grouping adds no Core wrapper or transitions, even where pure/group
@@ -705,9 +706,9 @@ remain unchanged. Private compatibility proofs reconcile old pure and new binary
 evidence, including raw lazy branches that skip unsupported syntax. Binary caller
 insertion preserves literal values, stores and one cost before every continuation.
 The former recursive addition rejection fixtures now assert independent exact
-success; the older nonrecursive endpoints retain their rejection. Expanded
-comparisons and tuples do not gain recursive children here;
-recursive conditional, unary and fixed lazy roots are recorded below. Actual wrong
+success; the older nonrecursive endpoints retain their rejection. Ordered less/
+greater-equal comparisons and tuples do not gain recursive children here;
+recursive conditional, unary, fixed lazy and negated comparison roots are recorded below. Actual wrong
 payloads can fault after a successful right child's effects; neither structural
 typing nor this extension supplies store safety.
 
@@ -775,6 +776,29 @@ retain their source and ordered caller tables as independent exact successes.
 Parsed, symbolic and actual-entry consumers exercise selection-dependent costs,
 effects, faults, literal caller insertion and genuine ifBranches resumption.
 No source-only bound, arbitrary-store safety or general overload agreement follows.
+
+Fixed Word inequality and unsigned less-or-equal now support recursive children
+(ADR-0260). Both original children are checked as Word in the same caller scope;
+the exact Core is Bool negation around ordered Word equality or greater-than.
+No source rewrite, operand swap, negation folding or general ne/le resolution
+is introduced. Original operator spans and non-associative precedence stay intact.
+
+Successful raw rules retain the actual left and right Words, intermediate and
+final stores, and negated comparison result at both child costs plus five.
+Both strict child effects occur before primitive application: a wrong actual
+left payload can fault only after the right child's effects, whereas a fault
+inside the left child prevents the right child. Comparison and negation remain
+distinct pending frames with exact checkpoint and resumed outcomes.
+
+Eight constructors retain all fourteen recursive signatures. Cost determinism
+and its private overlap proof move to a smaller module reexported through the
+old evaluation entry point. Existing unary/binary caller-fragment and insertion
+rules already cover the expansion; shared body/entry definitions stay unchanged.
+Two original rejection fixtures migrate with identical source and ordered caller
+tables, while older endpoints and wrong operand types remain rejected. Parsed,
+symbolic and actual-entry consumers retain exact values, captures, effects,
+faults, costs and fuel boundaries. Ordered less/greater-equal, recursive tuples,
+general operator resolution, source-only bounds and store safety remain separate.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
