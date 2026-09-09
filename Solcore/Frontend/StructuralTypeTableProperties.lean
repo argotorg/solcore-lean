@@ -15,6 +15,7 @@ theorem StructuralTypeDenotes.extend_types {old next : TypeNameTable}
   | unit => exact .unit
   | single _ ih => exact .single ih
   | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
+  | many _ _ headIH tailIH => exact .many headIH tailIH
 
 theorem interpretStructuralType?_some_of_extends {old next : TypeNameTable}
     (extension : TypeNameTable.Extends old next) {source : Syntax.TypeExpr} {type : Core.Ty}

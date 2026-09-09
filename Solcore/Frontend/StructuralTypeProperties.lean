@@ -17,6 +17,9 @@ theorem StructuralTypeDenotes.complete {table : TypeNameTable}
   | single _ ih => simpa only [interpretStructuralType?] using ih
   | pair _ _ leftIH rightIH =>
       simp only [interpretStructuralType?, leftIH, rightIH, bind, Option.bind_some, pure]
+  | many _ _ headIH tailIH =>
+      rw [interpretStructuralType?]
+      simp only [headIH, tailIH, bind, Option.bind_some, pure]
 
 theorem interpretStructuralType?_sound {table : TypeNameTable}
     {source : Syntax.TypeExpr} {type : Core.Ty}
@@ -44,7 +47,12 @@ theorem interpretStructuralType?_sound {table : TypeNameTable}
                   (by simpa only [interpretStructuralType?] using result))
             | cons right tail =>
                 cases tail with
-                | cons _ _ => simp only [interpretStructuralType?, reduceCtorEq] at result
+                | cons third rest =>
+                    rw [interpretStructuralType?] at result
+                    simp only [bind, Option.bind_eq_some_iff, pure, Option.some.injEq] at result
+                    obtain ⟨firstType, firstResult, tailType, tailResult, rfl⟩ := result
+                    exact .many (interpretStructuralType?_sound firstResult)
+                      (interpretStructuralType?_sound tailResult)
                 | nil =>
                     simp only [interpretStructuralType?, bind, Option.bind_eq_some_iff,
                       pure, Option.some.injEq] at result
@@ -92,7 +100,18 @@ theorem interpretStructuralType?_span (table : TypeNameTable) (source : Syntax.T
         | cons left remaining =>
             cases remaining with
             | nil => simp only [interpretStructuralType?]
-            | cons right tail => cases tail <;> simp only [interpretStructuralType?]
+            | cons right tail =>
+                cases tail with
+                | nil => simp only [interpretStructuralType?]
+                | cons third rest =>
+                    have tailSame := interpretStructuralType?_span table
+                      ⟨sourceSpan, .tuple (right :: third :: rest)⟩ span
+                    change interpretStructuralType? table ⟨span, .tuple (right :: third :: rest)⟩ =
+                      interpretStructuralType? table ⟨sourceSpan, .tuple (right :: third :: rest)⟩ at tailSame
+                    conv => lhs; rw [interpretStructuralType?]
+                    conv => rhs; rw [interpretStructuralType?]
+                    rw [tailSame]
+termination_by sizeOf source
 
 theorem TypeNameDenotes.structural {table : TypeNameTable}
     {source : Syntax.TypeExpr} {type : Core.Ty} (meaning : TypeNameDenotes table source type) :
