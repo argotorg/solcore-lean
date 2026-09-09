@@ -75,6 +75,12 @@ private def compatibility (owner : Resolved.DeclarationId) (inputs : LocalTypeIn
 private def inspect (owner : Resolved.DeclarationId) (inputs : LocalTypeInputs) (body : Syntax.Block)
     (core : Core.Expr) (type : Core.Ty) (nextIndex : Nat) : IO Unit := do
   match body, core with
+  | ⟨outerSpan, [⟨innerSpan, .block statements⟩]⟩, _ =>
+      have _ := elaborateTypedLetReturnTree?_block types owner inputs outerSpan innerSpan statements
+      assertTrue (outerSpan.contains innerSpan && decide (outerSpan.startByte < innerSpan.startByte ∧
+        innerSpan.endByte < outerSpan.endByte) && statements.all (fun statement => innerSpan.contains statement.span))
+        "terminal block replaced its inner range or original child statements"
+      inspect owner inputs ⟨innerSpan, statements⟩ core type nextIndex
   | ⟨blockSpan, ⟨letSpan, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩, .letE initializerCore tailCore =>
       if checked : elaborateTypedLetReturnTree? types owner inputs
           ⟨blockSpan, ⟨letSpan, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ = some (.letE initializerCore tailCore, type) then
@@ -243,6 +249,9 @@ def frontendParsedTypedLetReturnTreeTests : IO Unit := do
   accepted "function rejected(x: Word,y: Word,c: Bool,q: Opaque,f: Fn) returns (Word){if(c){let z=x;return z;}else{return y;}}"
     [("x", .word), ("y", .word), ("c", .bool), ("q", .namedData ⟨91⟩), ("f", .function .word (.namedData ⟨91⟩))]
     (.ifE (.var 2) (.letE (.var 4) (.var 0)) (.var 3)) .word true
+  accepted "function rejected(x: Word,y: Word,c: Bool,q: Opaque,f: Fn) returns (Word){if(c){{let z: Word=x;return z;}}else{return y;}}"
+    [("x", .word), ("y", .word), ("c", .bool), ("q", .namedData ⟨91⟩), ("f", .function .word (.namedData ⟨91⟩))]
+    (.ifE (.var 2) (.letE (.var 4) (.var 0)) (.var 3)) .word true
   for body in ["{if(c){let z: Word;return x;}else{return y;}}",
       "{if(c){let z;return x;}else{return y;}}", "{if(c){let z: Word=z;return x;}else{return y;}}",
       "{if(c){let a: Word=b;let b: Word=x;return a;}else{return y;}}",
@@ -256,7 +265,7 @@ def frontendParsedTypedLetReturnTreeTests : IO Unit := do
       "{if(c){let z: Word=x;return z;}else{let z: Bool=c;return z;}}", "{if(x){let z: Word=x;return z;}else{return y;}}",
       "{if(c){let z: Word=x;if(z){return z;}else{return y;}}else{return y;}}",
       "{if(c){let z: Word=x;return z;}}", "{if(c){let z: Word=x;return z;}else{return y;}return x;}",
-      "{if(c){{let z: Word=x;return z;}}else{return y;}}", "{if(c){let z: Word=x;z=y;return z;}else{return y;}}",
+      "{if(c){let z: Word=x;z=y;return z;}else{return y;}}",
       "{if(c){let z: Word=x;return z;return y;}else{return y;}}", "{if(c){let z: Word=x;}else{return y;}}",
       "{if(c){return x;}else{let z: Opaque=f(x);return y;}}",
       "{if(0 == 0){return x;}else{let a: Word=y;if(c){let b: Word=a;return b;}else{let b: Word=missing;return a;}}}",

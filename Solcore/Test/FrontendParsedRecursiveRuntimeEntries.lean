@@ -204,7 +204,35 @@ private def reject (content : String) (location : Syntax.Parser.FunctionLocation
         assertTrue ((prepareRuntimeFunction? types owner source arguments).isNone &&
           (runRuntimeFunction? types owner source arguments fuel store).isNone) "whole rejection depended on fuel or selected path"
 
+private def wrappedBare : IO Unit := do
+  let some source ← parsed? "function wrapped(){{return;}}" | throw (IO.userError "original wrapper did not parse")
+  match atBody : source.value.body with
+  | ⟨outer, [⟨inner, .block [⟨returned, .returnStmt none⟩]⟩]⟩ =>
+    assertTrue (outer.contains inner && inner.contains returned && decide (outer ≠ inner)) "original wrapper ranges changed"
+    if shape : source.value.signature.genericParameters = none ∧ source.value.signature.whereClause = none ∧
+        source.value.signature.modifiers.publicMarker = none ∧ source.value.signature.modifiers.payableMarker = none ∧
+        source.value.signature.returnsClause = none ∧ source.value.signature.parameters.elements = [] then
+      have compilation : RuntimeFunctionCompiles types owner source ⟨.empty, .unit, .unit⟩ :=
+        ⟨⟨shape.1, shape.2.1, shape.2.2.1, shape.2.2.2.1, by rw [shape.2.2.2.2.1]; exact .absent⟩,
+          by rw [shape.2.2.2.2.2]; exact .nil,
+          by rw [atBody]; exact .block (.single .bare)⟩
+      have _ := compilation.complete
+      let some prepared := prepareRuntimeFunction? types owner source [] | throw (IO.userError "wrapped bare entry rejected")
+      assertTrue (decide (prepared.core = .unit ∧ prepared.returnType = .unit ∧ prepared.inputs.bindings = [] ∧
+        typedLetReturnTreeFuelBound source.value.body = 1) &&
+        (prepared.inputs.runTerminalReturnTree? 1 source.value.body []).isNone) "wrapper changed Core/rows/bound or old adapter"
+      for store in stores do
+        have path (k : List Core.Frame) : Core.Steps 1 ⟨.eval .unit [], k, store⟩ ⟨.ret .unit, k, store⟩ := .cons .unit .refl
+        have _ := path []
+        for fuel in List.range 4 do
+          assertTrue (decide (runRuntimeFunction? types owner source [] fuel store = some (.unit,
+            if fuel = 0 then .outOfFuel (.initial .unit [] store) else .done .unit store))) "wrapper added a transition"
+        assertTrue (decide (Core.runStateful 1 (.initial .unit [] store) = .done .unit store)) "checkpoint zero failed to resume"
+    else throw (IO.userError "original empty header/parameter fields changed")
+  | _ => throw (IO.userError "original singleton wrapper was rewritten")
+
 def frontendParsedRecursiveRuntimeEntryTests : IO Unit := do
+  wrappedBare
   let content := "{if(c){if(d){return x;}else{return y;}}else{return x;}}"
   let core : Core.Expr := .ifE (.var 3) (.ifE (.var 2) (.var 1) (.var 0)) (.var 1)
   let unit : TypedRuntimeArgument := ⟨.unit, .unit, .unit⟩
@@ -250,7 +278,6 @@ def frontendParsedRecursiveRuntimeEntryTests : IO Unit := do
       "function wrong<T>(c: Bool,d: Bool,x: Word,y: Word) returns (Word)", "function wrong(c: Bool,d: Bool,x: Word,y: Word,c: Bool) returns (Word)",
       "function wrong(c: Bool,d: Bool,comptime x: Word,y: Word) returns (Word)", "function wrong(c: Bool,d: Bool,x: Word,y: Unknown) returns (Word)"] do
     reject (header ++ content)
-  reject "function wrapped(){{return;}}"
   reject "function extra(c: Bool,d: Bool,x: Word,y: Word) returns (Word){if(c){if(d){return x;}else{return y;}}else{return x;}return y;}"
   reject "function publicOnly(c: Bool,d: Bool,x: Word,y: Word) public returns (Word){if(c){if(d){return x;}else{return y;}}else{return x;}}" .contract
   for content in ["", "function f(c){return;}", "function f(){if(c){return;}else{return;}",
