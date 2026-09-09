@@ -4,7 +4,8 @@ import Solcore.Frontend.LocalTypeInputsProperties
 
 /-! A separate value-free adapter for recursive typed prefixes and terminal
 if/else branches. Siblings start in the same original scope; their local fresh
-IDs need not be globally distinct. Structural annotations reuse existing Core and entry records. -/
+IDs need not be globally distinct. Structural annotations or independently inferred
+initializer types reuse existing Core and entry records. -/
 
 set_option autoImplicit false
 
@@ -25,6 +26,13 @@ def elaborateTypedLetReturnTree? (types : TypeNameTable) (owner : Resolved.Decla
             (inputs.bindFresh owner name.value declaredType) ⟨blockSpan, rest⟩
           return (.letE initializerCore tailCore, returnType)
         else none
+      else none
+  | ⟨blockSpan, ⟨_, .letDecl name none (some initializer)⟩ :: rest⟩ =>
+      if name.value ∉ inputs.names.map Prod.fst then do
+        let (initializerCore, initializerType) ← elaborateLocalExpression? inputs.names inputs.context initializer
+        let (tailCore, returnType) ← elaborateTypedLetReturnTree? types owner
+          (inputs.bindFresh owner name.value initializerType) ⟨blockSpan, rest⟩
+        return (.letE initializerCore tailCore, returnType)
       else none
   | ⟨_, [⟨_, .ifThen condition thenBody (some elseBody)⟩]⟩ => do
       let (conditionCore, conditionType) ← elaborateLocalExpression? inputs.names inputs.context condition
@@ -52,6 +60,15 @@ inductive TypedLetReturnTreeHasType (types : TypeNameTable) (owner : Resolved.De
         (inputs.bindFresh owner name.value declaredType) ⟨blockSpan, rest⟩ returnType) :
       TypedLetReturnTreeHasType types owner inputs
         ⟨blockSpan, ⟨letSpan, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ returnType
+  | inferred {inputs : LocalTypeInputs} {blockSpan letSpan : Syntax.SourceSpan}
+      {name : Syntax.Identifier} {initializer : Syntax.Expr} {rest : List Syntax.Statement}
+      {inferredType returnType : Core.Ty}
+      (unused : name.value ∉ inputs.names.map Prod.fst)
+      (initializerTyping : LocalExpressionHasType inputs.names inputs.context initializer inferredType)
+      (tailTyping : TypedLetReturnTreeHasType types owner
+        (inputs.bindFresh owner name.value inferredType) ⟨blockSpan, rest⟩ returnType) :
+      TypedLetReturnTreeHasType types owner inputs
+        ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩ returnType
   | conditional {inputs : LocalTypeInputs} {blockSpan ifSpan : Syntax.SourceSpan}
       {condition : Syntax.Expr} {thenBody elseBody : Syntax.Block} {type : Core.Ty}
       (conditionTyping : LocalExpressionHasType inputs.names inputs.context condition .bool)
@@ -80,6 +97,19 @@ inductive TypedLetReturnTreeElaborates (types : TypeNameTable) (owner : Resolved
         (inputs.bindFresh owner name.value declaredType) ⟨blockSpan, rest⟩ tailCore returnType) :
       TypedLetReturnTreeElaborates types owner inputs
         ⟨blockSpan, ⟨letSpan, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩
+        (.letE initializerCore tailCore) returnType
+  | inferred {inputs : LocalTypeInputs} {blockSpan letSpan : Syntax.SourceSpan}
+      {name : Syntax.Identifier} {initializer : Syntax.Expr} {rest : List Syntax.Statement}
+      {inferredType returnType : Core.Ty} {initializerResolved : Resolved.Expr}
+      {initializerCore tailCore : Core.Expr}
+      (unused : name.value ∉ inputs.names.map Prod.fst)
+      (resolution : ResolvesLocalExpression inputs.names initializer initializerResolved)
+      (lowered : Resolved.Lowers inputs.ids initializerResolved initializerCore)
+      (typing : Resolved.HasType inputs.context initializerResolved inferredType)
+      (tailElaboration : TypedLetReturnTreeElaborates types owner
+        (inputs.bindFresh owner name.value inferredType) ⟨blockSpan, rest⟩ tailCore returnType) :
+      TypedLetReturnTreeElaborates types owner inputs
+        ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩
         (.letE initializerCore tailCore) returnType
   | conditional {inputs : LocalTypeInputs} {blockSpan ifSpan : Syntax.SourceSpan}
       {condition : Syntax.Expr} {thenBody elseBody : Syntax.Block} {conditionResolved : Resolved.Expr}

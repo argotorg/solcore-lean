@@ -26,6 +26,17 @@ inductive TypedLetReturnTreeEvaluates (owner : Resolved.DeclarationId) :
         middleStore ⟨blockSpan, rest⟩ value finalStore) :
       TypedLetReturnTreeEvaluates owner table environment initialStore
         ⟨blockSpan, ⟨letSpan, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ value finalStore
+  | inferred {table : LocalNameTable} {environment : Resolved.Environment}
+      {blockSpan letSpan : Syntax.SourceSpan} {name : Syntax.Identifier}
+      {initializer : Syntax.Expr} {rest : List Syntax.Statement}
+      {initialStore middleStore finalStore : Core.Store} {boundValue value : Core.Value}
+      (initializerEvaluation : LocalExpressionEvaluates table environment initialStore initializer boundValue middleStore)
+      (tailEvaluation : TypedLetReturnTreeEvaluates owner
+        ((name.value, Resolved.freshLocalId owner (table.map Prod.snd)) :: table)
+        ((Resolved.freshLocalId owner (table.map Prod.snd), boundValue) :: environment)
+        middleStore ⟨blockSpan, rest⟩ value finalStore) :
+      TypedLetReturnTreeEvaluates owner table environment initialStore
+        ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩ value finalStore
   | ifTrue {table : LocalNameTable} {environment : Resolved.Environment}
       {blockSpan statementSpan : Syntax.SourceSpan} {condition : Syntax.Expr}
       {thenBody elseBody : Syntax.Block} {initialStore middleStore finalStore : Core.Store} {value : Core.Value}
@@ -62,6 +73,20 @@ inductive TypedLetReturnTreeEvaluatesWithCost (owner : Resolved.DeclarationId) :
         middleStore ⟨blockSpan, rest⟩ value finalStore tailCost) :
       TypedLetReturnTreeEvaluatesWithCost owner table environment initialStore
         ⟨blockSpan, ⟨letSpan, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩
+        value finalStore (initializerCost + tailCost + 2)
+  | inferred {table : LocalNameTable} {environment : Resolved.Environment}
+      {blockSpan letSpan : Syntax.SourceSpan} {name : Syntax.Identifier}
+      {initializer : Syntax.Expr} {rest : List Syntax.Statement}
+      {initialStore middleStore finalStore : Core.Store} {boundValue value : Core.Value}
+      {initializerCost tailCost : Nat}
+      (initializerEvaluation : LocalExpressionEvaluatesWithCost table environment
+        initialStore initializer boundValue middleStore initializerCost)
+      (tailEvaluation : TypedLetReturnTreeEvaluatesWithCost owner
+        ((name.value, Resolved.freshLocalId owner (table.map Prod.snd)) :: table)
+        ((Resolved.freshLocalId owner (table.map Prod.snd), boundValue) :: environment)
+        middleStore ⟨blockSpan, rest⟩ value finalStore tailCost) :
+      TypedLetReturnTreeEvaluatesWithCost owner table environment initialStore
+        ⟨blockSpan, ⟨letSpan, .letDecl name none (some initializer)⟩ :: rest⟩
         value finalStore (initializerCost + tailCost + 2)
   | ifTrue {table : LocalNameTable} {environment : Resolved.Environment}
       {blockSpan statementSpan : Syntax.SourceSpan} {condition : Syntax.Expr}

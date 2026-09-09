@@ -12,7 +12,7 @@ namespace Solcore.Frontend
 def typedLetReturnTreeFuelBound (body : Syntax.Block) : Nat :=
   match body with
   | ⟨_, [⟨_, .returnStmt _⟩]⟩ => returnBodyFuelBound body
-  | ⟨blockSpan, ⟨_, .letDecl _ (some _) (some initializer)⟩ :: rest⟩ =>
+  | ⟨blockSpan, ⟨_, .letDecl _ _ (some initializer)⟩ :: rest⟩ =>
       localExpressionFuelBound initializer + typedLetReturnTreeFuelBound ⟨blockSpan, rest⟩ + 2
   | ⟨_, [⟨_, .ifThen condition thenBody (some elseBody)⟩]⟩ =>
       localExpressionFuelBound condition +
@@ -29,7 +29,7 @@ theorem TypedLetReturnTreeEvaluatesWithCost.cost_le_fuelBound
   | single child =>
       have bounded := child.cost_le_fuelBound
       cases child <;> simpa only [typedLetReturnTreeFuelBound] using bounded
-  | binding initializer _ ih =>
+  | binding initializer _ ih | inferred initializer _ ih =>
       have initializerBound := initializer.cost_le_fuelBound
       simp only [typedLetReturnTreeFuelBound]
       omega

@@ -1,8 +1,8 @@
 import Solcore.Frontend.LocalExpressionEvaluator
 import Solcore.Resolved.FreshIdentity
 
-/-! Direct raw recursive-body evaluation. Annotation presence is a syntax-shape
-requirement, not type checking. Fresh IDs use the name table alone, and strict
+/-! Direct raw recursive-body evaluation. Optional annotations do not affect
+type-free execution. Fresh IDs use the name table alone, and strict
 initializers supply the actual values placed in the extended tail scope. -/
 set_option autoImplicit false
 namespace Solcore.Frontend
@@ -16,7 +16,7 @@ def evaluateTypedLetReturnTreeWithCost? (owner : Resolved.DeclarationId)
   | ⟨_, [⟨_, .returnStmt none⟩]⟩ => some (.unit, 1)
   | ⟨_, [⟨_, .returnStmt (some source)⟩]⟩ =>
       evaluateLocalExpressionWithCost? table environment source
-  | ⟨blockSpan, ⟨_, .letDecl name (some _) (some initializer)⟩ :: rest⟩ => do
+  | ⟨blockSpan, ⟨_, .letDecl name _ (some initializer)⟩ :: rest⟩ => do
       let (boundValue, initializerCost) ← evaluateLocalExpressionWithCost? table environment initializer
       let id := Resolved.freshLocalId owner (table.map Prod.snd)
       let (value, tailCost) ← evaluateTypedLetReturnTreeWithCost? owner
