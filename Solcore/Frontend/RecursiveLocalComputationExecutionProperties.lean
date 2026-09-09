@@ -4,8 +4,8 @@ import Solcore.Frontend.LocalExpressionEvaluationProperties
 import Solcore.Frontend.LocalExpressionCostCorrespondence
 import Solcore.Frontend.LocalFunctionApplicationStepComposition
 
-/-! Exact original provenance connects recursive calls to Core. Pure/group/binary
-overlap changes neither successful observations nor their exact costs. -/
+/-! Exact original provenance connects recursive computations to Core. Pure
+overlap changes neither successful observations nor selected-branch costs. -/
 
 set_option autoImplicit false
 
@@ -48,6 +48,12 @@ private theorem reflects_pure_cost {table : LocalNameTable} {environment : Resol
         | exact .bitXor (leftIH leftResolution) (rightIH rightResolution)
         | exact .greater (leftIH leftResolution) (rightIH rightResolution)
         | exact .equal (leftIH leftResolution) (rightIH rightResolution)
+  | ifTrue _ _ conditionIH branchIH =>
+      cases resolution with
+      | conditional condition yes _ => exact .ifTrue (conditionIH condition) (branchIH yes)
+  | ifFalse _ _ conditionIH branchIH =>
+      cases resolution with
+      | conditional condition _ no => exact .ifFalse (conditionIH condition) (branchIH no)
 
 private theorem reflects_pure {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value}
@@ -74,6 +80,27 @@ private theorem reflects_binary_cost {table : LocalNameTable} {environment : Res
   | binary otherOperator leftChild rightChild applied =>
       cases operator <;> cases otherOperator
       all_goals exact ⟨_, _, _, _, _, leftChild, rightChild, applied, rfl⟩
+
+private theorem reflects_conditional_cost {table : LocalNameTable} {environment : Resolved.Environment}
+    {initialStore finalStore : Core.Store} {span question colon : Syntax.SourceSpan}
+    {condition thenBranch elseBranch : Syntax.Expr} {value : Core.Value} {cost : Nat}
+    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+      ⟨span, .conditional condition question thenBranch colon elseBranch⟩ value finalStore cost) :
+    (∃ middleStore conditionCost branchCost,
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore condition (.bool true) middleStore conditionCost ∧
+      RecursiveLocalComputationEvaluatesWithCost table environment middleStore thenBranch value finalStore branchCost ∧
+      cost = conditionCost + branchCost + 2) ∨
+    (∃ middleStore conditionCost branchCost,
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore condition (.bool false) middleStore conditionCost ∧
+      RecursiveLocalComputationEvaluatesWithCost table environment middleStore elseBranch value finalStore branchCost ∧
+      cost = conditionCost + branchCost + 2) := by
+  cases evaluation with
+  | pure child =>
+      cases child with
+      | ifTrue guard branch => exact .inl ⟨_, _, _, .pure guard, .pure branch, rfl⟩
+      | ifFalse guard branch => exact .inr ⟨_, _, _, .pure guard, .pure branch, rfl⟩
+  | ifTrue guard branch => exact .inl ⟨_, _, _, guard, branch, rfl⟩
+  | ifFalse guard branch => exact .inr ⟨_, _, _, guard, branch, rfl⟩
 
 private theorem reflects_group_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {span : Syntax.SourceSpan} {inner : Syntax.Expr}
@@ -123,6 +150,19 @@ theorem RecursiveLocalComputationElaborates.evaluates_iff
         cases evaluation with
         | binary leftChild rightChild applied =>
             exact .binary operator (leftIH.mpr leftChild) (rightIH.mpr rightChild) applied
+  | conditional _ _ _ conditionIH thenIH elseIH =>
+      constructor
+      · intro evaluation
+        obtain ⟨_, costed⟩ := recursiveLocalComputationEvaluates_iff_exists_cost.mp evaluation
+        rcases reflects_conditional_cost costed with ⟨_, _, _, guard, branch, _⟩ | ⟨_, _, _, guard, branch, _⟩
+        · exact .ifTrue (conditionIH.mp (recursiveLocalComputationEvaluates_iff_exists_cost.mpr ⟨_, guard⟩))
+            (thenIH.mp (recursiveLocalComputationEvaluates_iff_exists_cost.mpr ⟨_, branch⟩))
+        · exact .ifFalse (conditionIH.mp (recursiveLocalComputationEvaluates_iff_exists_cost.mpr ⟨_, guard⟩))
+            (elseIH.mp (recursiveLocalComputationEvaluates_iff_exists_cost.mpr ⟨_, branch⟩))
+      · intro evaluation
+        cases evaluation with
+        | ifTrue guard branch => exact .ifTrue (conditionIH.mpr guard) (thenIH.mpr branch)
+        | ifFalse guard branch => exact .ifFalse (conditionIH.mpr guard) (elseIH.mpr branch)
 
 theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
@@ -147,6 +187,10 @@ theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
   | binary operator _ _ leftIH rightIH =>
       obtain ⟨_, _, _, _, _, leftChild, rightChild, applied, rfl⟩ := reflects_binary_cost operator evaluation
       exact CostStepComposition.binary (leftIH leftChild _) (rightIH rightChild _) applied
+  | conditional _ _ _ conditionIH thenIH elseIH =>
+      rcases reflects_conditional_cost evaluation with ⟨_, _, _, guard, branch, rfl⟩ | ⟨_, _, _, guard, branch, rfl⟩
+      · exact CostStepComposition.ifTrue (conditionIH guard _) (thenIH branch _)
+      · exact CostStepComposition.ifFalse (conditionIH guard _) (elseIH branch _)
 
 theorem RecursiveLocalComputationElaborates.evaluatesWithCost_iff_steps
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}

@@ -3,8 +3,8 @@ import Solcore.Frontend.LocalExpressionCostProperties
 import Solcore.Core.Correspondence
 import Solcore.Core.ExactFuelProperties
 
-/-! Raw success and exact cost agree even when old pure and recursive grouping
-or direct binary evaluation overlap. Actual closures, arguments and stores are fixed by evaluation,
+/-! Raw success and exact cost agree across overlapping pure and recursive
+groups, binaries and conditionals. Actual closures, arguments and stores are fixed by evaluation,
 not by a checker, type tags or a global restriction on skipped source syntax. -/
 
 set_option autoImplicit false
@@ -24,6 +24,8 @@ private theorem erase {table : LocalNameTable} {environment : Resolved.Environme
       exact .application functionIH argumentIH (Core.steps_from_initial_sound bodyPath)
   | binary operator _ _ applied leftIH rightIH =>
       exact .binary operator leftIH rightIH applied
+  | ifTrue _ _ conditionIH branchIH => exact .ifTrue conditionIH branchIH
+  | ifFalse _ _ conditionIH branchIH => exact .ifFalse conditionIH branchIH
 
 private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {source : Syntax.Expr} {value : Core.Value}
@@ -47,6 +49,14 @@ private theorem exists_cost {table : LocalNameTable} {environment : Resolved.Env
       obtain ⟨_, leftCosted⟩ := leftIH
       obtain ⟨_, rightCosted⟩ := rightIH
       exact ⟨_, .binary operator leftCosted rightCosted applied⟩
+  | ifTrue _ _ conditionIH branchIH =>
+      obtain ⟨_, conditionCosted⟩ := conditionIH
+      obtain ⟨_, branchCosted⟩ := branchIH
+      exact ⟨_, .ifTrue conditionCosted branchCosted⟩
+  | ifFalse _ _ conditionIH branchIH =>
+      obtain ⟨_, conditionCosted⟩ := conditionIH
+      obtain ⟨_, branchCosted⟩ := branchIH
+      exact ⟨_, .ifFalse conditionCosted branchCosted⟩
 
 theorem recursiveLocalComputationEvaluates_iff_exists_cost {table : LocalNameTable}
     {environment : Resolved.Environment} {initialStore finalStore : Core.Store}
@@ -80,9 +90,23 @@ private theorem agrees_with_pure {table : LocalNameTable} {environment : Resolve
         obtain ⟨rfl, rfl, rfl⟩ := rightIH pureRight
         cases applied
         exact ⟨rfl, rfl, rfl⟩
+  | ifTrue _ _ conditionIH branchIH =>
+      cases pureEvaluation with
+      | ifTrue condition branch =>
+          obtain ⟨_, rfl, rfl⟩ := conditionIH condition
+          obtain ⟨rfl, rfl, rfl⟩ := branchIH branch
+          exact ⟨rfl, rfl, rfl⟩
+      | ifFalse condition _ => cases (conditionIH condition).1
+  | ifFalse _ _ conditionIH branchIH =>
+      cases pureEvaluation with
+      | ifTrue condition _ => cases (conditionIH condition).1
+      | ifFalse condition branch =>
+          obtain ⟨_, rfl, rfl⟩ := conditionIH condition
+          obtain ⟨rfl, rfl, rfl⟩ := branchIH branch
+          exact ⟨rfl, rfl, rfl⟩
 
 /-- Successful recursive derivations determine the actual value, final store
-and cost jointly, including overlapping pure/group/binary derivations. -/
+and cost jointly, including overlapping pure derivations and selected branches. -/
 theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalNameTable}
     {environment : Resolved.Environment} {initialStore : Core.Store} {source : Syntax.Expr}
     {left right : Core.Value} {leftStore rightStore : Core.Store} {leftCost rightCost : Nat}
@@ -118,5 +142,21 @@ theorem RecursiveLocalComputationEvaluatesWithCost.deterministic {table : LocalN
           obtain ⟨rfl, rfl, rfl⟩ := rightIH otherRight
           cases operator <;> cases otherOperator
           all_goals exact ⟨Option.some.inj (applied.symm.trans otherApplied), rfl, rfl⟩
+  | ifTrue condition branch conditionIH branchIH =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.ifTrue condition branch) other
+      | ifTrue otherCondition otherBranch =>
+          obtain ⟨_, rfl, rfl⟩ := conditionIH otherCondition
+          obtain ⟨rfl, rfl, rfl⟩ := branchIH otherBranch
+          exact ⟨rfl, rfl, rfl⟩
+      | ifFalse otherCondition _ => cases (conditionIH otherCondition).1
+  | ifFalse condition branch conditionIH branchIH =>
+      cases rightEvaluation with
+      | pure other => exact agrees_with_pure (.ifFalse condition branch) other
+      | ifTrue otherCondition _ => cases (conditionIH otherCondition).1
+      | ifFalse otherCondition otherBranch =>
+          obtain ⟨_, rfl, rfl⟩ := conditionIH otherCondition
+          obtain ⟨rfl, rfl, rfl⟩ := branchIH otherBranch
+          exact ⟨rfl, rfl, rfl⟩
 
 end Solcore.Frontend
