@@ -1,5 +1,6 @@
 import Solcore.Frontend.ComputationBodyFragment
 import Solcore.Frontend.WordLessCostStepComposition
+import Solcore.Core.LocalFragmentInsertionPaths
 
 /-! One literal outcome and one cost are shared before every continuation.
 Only the child's paired-path law is required, not its typing or raw insertion. -/
@@ -30,6 +31,8 @@ theorem ComputationBodyFragment.insertion_paths {F : Core.Expr → Prop}
         ⟨.eval (expr.weakenAt leading.length) (leading ++ inserted :: suffix), continuation, initialStore⟩
         ⟨.ret value, continuation, finalStore⟩ := by
   induction fragment generalizing leading initialStore finalStore value with
+  | wordTest =>
+      exact (Core.Expr.LocalFragment.binary .var .word).insertion_paths leading suffix inserted evaluation
   | unit =>
       cases evaluation
       exact ⟨1, fun _ => ⟨.cons .unit .refl, by simpa only [Core.Expr.weakenAt] using (Core.Steps.cons Core.Transition.unit .refl)⟩⟩

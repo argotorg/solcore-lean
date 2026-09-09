@@ -14,6 +14,9 @@ theorem ComputationBodyFragment.weakenAt {F : Core.Expr → Prop}
     ComputationBodyFragment F (expr.weakenAt cutoff) := by
   induction fragment generalizing cutoff with
   | unit => simpa only [Core.Expr.weakenAt] using (ComputationBodyFragment.unit (F := F))
+  | wordTest =>
+      simp only [Core.Expr.weakenAt]
+      split <;> exact .wordTest
   | leaf child => exact .leaf (childWeakens child cutoff)
   | letE _ _ headIH tailIH =>
       simp only [Core.Expr.weakenAt]

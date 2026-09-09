@@ -1,7 +1,7 @@
 import Solcore.Core.Syntax
 
-/-! Whole caller bodies close an arbitrary child predicate under unit, lets
-and conditionals. Membership alone imposes no typing or runtime contract. -/
+/-! Whole caller bodies close an arbitrary child predicate under unit, lets,
+conditionals and generated Word tests. Membership imposes no runtime contract. -/
 
 set_option autoImplicit false
 
@@ -17,5 +17,7 @@ inductive ComputationBodyFragment (F : Core.Expr → Prop) : Core.Expr → Prop 
       (guard : ComputationBodyFragment F condition)
       (yes : ComputationBodyFragment F thenBranch) (no : ComputationBodyFragment F elseBranch) :
       ComputationBodyFragment F (.ifE condition thenBranch elseBranch)
+  | wordTest {index : Nat} {word : Core.Word} :
+      ComputationBodyFragment F (.binary .wordEq (.var index) (.word word))
 
 end Solcore.Frontend

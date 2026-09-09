@@ -1,5 +1,6 @@
 import Solcore.Frontend.ComputationBodyFragment
 import Solcore.Core.Eval
+import Solcore.Core.LocalFragmentInsertionProperties
 
 /-! Literal child insertion lifts through the whole body. Actual bound values
 extend the retained prefix; no typing or closure reconstruction is required. -/
@@ -21,6 +22,8 @@ theorem ComputationBodyFragment.evaluates_insert_iff {F : Core.Expr → Prop}
       (expr.weakenAt leading.length) value finalStore ↔
       Core.Evaluates (leading ++ suffix) initialStore expr value finalStore := by
   induction fragment generalizing leading initialStore finalStore value with
+  | wordTest =>
+      exact (Core.Expr.LocalFragment.binary .var .word).evaluates_insert_iff leading suffix inserted
   | unit =>
       simp only [Core.Expr.weakenAt]
       constructor <;> intro evaluation <;> cases evaluation <;> exact .unit
