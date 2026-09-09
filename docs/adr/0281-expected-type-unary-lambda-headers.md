@@ -60,9 +60,12 @@ there is no annotation or body rewriting and no runtime argument construction.
 Expose only one executable entry point, `declareExpectedUnaryLambdaHeader?`.
 Keep parameter and return checkers private. Prove its exact iff with the
 independent header judgment, exact absence, result uniqueness and original
-header provenance with the fresh-row layout. Recovered/error parameter syntax,
+header provenance with the fresh-row layout. Explicit error parameter nodes,
 comptime parameters, non-unary headers, non-function expected types and
 unsupported or mismatched annotations remain outside this opt-in profile.
+Parser recovery diagnostics are not inputs to this semantic API: a recovered
+inferred/typed node is judged by its actual AST, not a diagnostic-free premise
+or a forbidden-spelling test.
 
 ## Body boundary and consumers
 
