@@ -1,7 +1,7 @@
 import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Frontend.DirectWordBinary
 
-/-! Recursive calls, groups, direct unary/Word binary and conditional expressions.
+/-! Recursive calls, groups, direct unary/Word binary, conditional and fixed lazy expressions.
 Original children keep their scope; this does not change the older profiles. -/
 
 set_option autoImplicit false
@@ -33,6 +33,18 @@ def elaborateRecursiveLocalComputation? (table : LocalNameTable) (context : Reso
       let (elseCore, elseType) ← elaborateRecursiveLocalComputation? table context elseBranch
       if conditionType = .bool ∧ elseType = thenType then
         some (.ifE conditionCore thenCore elseCore, thenType)
+      else none
+  | ⟨_, .binary left ⟨_, .logicalAnd⟩ right⟩ => do
+      let (leftCore, leftType) ← elaborateRecursiveLocalComputation? table context left
+      let (rightCore, rightType) ← elaborateRecursiveLocalComputation? table context right
+      if leftType = .bool ∧ rightType = .bool then
+        some (.ifE leftCore rightCore (.bool false), .bool)
+      else none
+  | ⟨_, .binary left ⟨_, .logicalOr⟩ right⟩ => do
+      let (leftCore, leftType) ← elaborateRecursiveLocalComputation? table context left
+      let (rightCore, rightType) ← elaborateRecursiveLocalComputation? table context right
+      if leftType = .bool ∧ rightType = .bool then
+        some (.ifE leftCore (.bool true) rightCore, .bool)
       else none
   | ⟨_, .binary left ⟨_, sourceOp⟩ right⟩ =>
       match directWordBinary? sourceOp with
@@ -86,6 +98,17 @@ inductive RecursiveLocalComputationHasType (table : LocalNameTable) (context : R
       RecursiveLocalComputationHasType table context
         ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩ .word
 
+  | logicalAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftTyped : RecursiveLocalComputationHasType table context left .bool)
+      (rightTyped : RecursiveLocalComputationHasType table context right .bool) :
+      RecursiveLocalComputationHasType table context
+        ⟨span, .binary left ⟨operatorSpan, .logicalAnd⟩ right⟩ .bool
+  | logicalOr {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftTyped : RecursiveLocalComputationHasType table context left .bool)
+      (rightTyped : RecursiveLocalComputationHasType table context right .bool) :
+      RecursiveLocalComputationHasType table context
+        ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩ .bool
+
 inductive RecursiveLocalComputationElaborates (table : LocalNameTable) (context : Resolved.Context) :
     Syntax.Expr → Core.Expr → Core.Ty → Prop where
   | pure {source : Syntax.Expr} {resolved : Resolved.Expr} {core : Core.Expr} {type : Core.Ty}
@@ -129,5 +152,18 @@ inductive RecursiveLocalComputationElaborates (table : LocalNameTable) (context 
       (child : RecursiveLocalComputationElaborates table context operand core .word) :
       RecursiveLocalComputationElaborates table context
         ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩ (.unary .wordNot core) .word
+
+  | logicalAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftCore rightCore : Core.Expr}
+      (leftElaborated : RecursiveLocalComputationElaborates table context left leftCore .bool)
+      (rightElaborated : RecursiveLocalComputationElaborates table context right rightCore .bool) :
+      RecursiveLocalComputationElaborates table context
+        ⟨span, .binary left ⟨operatorSpan, .logicalAnd⟩ right⟩ (.ifE leftCore rightCore (.bool false)) .bool
+  | logicalOr {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      {leftCore rightCore : Core.Expr}
+      (leftElaborated : RecursiveLocalComputationElaborates table context left leftCore .bool)
+      (rightElaborated : RecursiveLocalComputationElaborates table context right rightCore .bool) :
+      RecursiveLocalComputationElaborates table context
+        ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩ (.ifE leftCore (.bool true) rightCore) .bool
 
 end Solcore.Frontend
