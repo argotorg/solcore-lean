@@ -426,6 +426,28 @@ unknown children and invalid whole contracts are not accepted by this extension.
 Core/Resolved definitions, parameter-only records, parser, diagnostics and wire
 formats do not change.
 
+Singleton terminal lexical blocks now compose at every accepted recursive body
+position (ADR-0241). The original inner statement list uses the inner braces'
+span and the same caller scope. Four independent block rules preserve the
+child's exact Core, type, raw value, initial/final stores and cost without a
+new positional binder, source identity or transition. A full-Option checker
+equality retains both success and rejection, and all 59 directly affected
+generic statements remain unchanged.
+
+Independent source and complete parsed consumers exercise finite wrapper depth
+with mixed lets, strict discards and asymmetric conditional arms. Exact manual
+paths, nominal static types, actual opaque values and original parameter rows
+remain distinct obligations. Since wrapper and child have the same Core and
+environment, their complete machine results and genuine saved states agree at
+every fuel; residual execution does not restart the computation. Six legacy
+parsed consumers migrate their original rejected block fixtures to whole-entry
+successes, including six buried nominal declarations, with sources and callers
+unchanged. Narrower body adapters, neighboring invalid cases and whole-entry
+contracts remain unchanged. Empty or nonterminal blocks, local scope escape,
+shadowing, implicit returns and general early returns are not added. The zero
+additional cost is a Lean Core fact, not a Rust optimizer or emitted-cost claim.
+No Core/Resolved, parser, diagnostic, wire or runtime-record definition changes.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
@@ -1279,10 +1301,12 @@ alternating depth, noncommutative initialization, sibling isolation, original
 parameter positions, first-match annotation meanings and qualified keys.
 This static unit itself adds no runtime-entry integration. Independent
 evaluation/cost and a separate body runner follow in ADR-0217/0218;
-ADR-0222 now connects these recursive bodies to existing function entries. Missing
-annotations/initializers, shadowing, extra statements after a conditional,
-separate block wrappers and general calls remain outside this new adapter;
-no parser/Core/Wire change, inference or global binding policy is implied.
+ADR-0222 now connects these recursive bodies to existing function entries.
+The initial profile excluded absent annotations and separate block wrappers;
+ADR-0238 now supports inferred initialized lets, and ADR-0240/0241 add strict
+discard prefixes and terminal lexical wrappers. Missing initializers, shadowing,
+extra statements after a conditional and general calls remain outside this
+adapter. No parser/Core/Wire change or global binding policy is implied.
 
 ### Recursive typed let/return trees: evaluation and cost
 
@@ -1512,8 +1536,8 @@ Checked execution still requires its own whole provenance and matching IDs.
 
 An explicitly supplied canonical declaration now connects its header, runtime
 parameters and recursive typed let/return tree in one entry
-(ADR-0170, ADR-0198, ADR-0208, ADR-0215, ADR-0222, ADR-0238). Independent exact
-preparation retains both the actual lowered Core and its declared return type,
+(ADR-0170, ADR-0198, ADR-0208, ADR-0215, ADR-0222, ADR-0238, ADR-0240, ADR-0241).
+Independent exact preparation retains both the actual lowered Core and its declared return type,
 not merely some Core of that type. Success and failure correspond to this
 independent relation, and a whole-entry typing contract is distinct from
 body-only typing. A Bool-return declaration with a Word body is rejected here
@@ -1535,11 +1559,14 @@ prepared Core directly and adds no transitions or second value reversal.
 Semicolon-terminated expression prefixes also compose at these positions
 (ADR-0240), retaining the source scope while weakening only the tail Core under
 a strict hidden binder. They add no parameter rows or source identities.
+Singleton terminal lexical blocks recurse on their original inner span and
+statements in the same scope (ADR-0241), preserving the exact child Core and cost.
 
 The three entry fuel-bound theorems now use `typedLetReturnTreeFuelBound`, adding
 each initializer or discarded-expression bound and two, or a condition bound and
-maximum recursive arm bound and two. A selected branch-local let costs seven while the old prefix bound
-is four, so the old formula cannot remain the general entry guarantee. Other generic
+maximum recursive arm bound and two. Terminal wrappers retain the child's bound.
+A selected branch-local let costs seven while the old prefix bound is four, so
+the old formula cannot remain the general entry guarantee. Other generic
 entry theorem statements retain their premises and
 conclusions over the broadened judgments. Value-free compilation still requires
 no actual inhabitants, while safe execution requires real matching typed arguments
@@ -1549,8 +1576,8 @@ Old singleton, terminal-tree and outer-prefix values, costs and complete same-fu
 results remain unchanged. Valid branch-local entry rejection fixtures now become
 exact successes while old body-adapter rejection remains. Invalid headers, parameters,
 declared return mismatches and unselected deep arms still reject. Missing
-annotations/initializers, shadowing, self/forward or sibling references,
-extra returns, missing else and separate nested-block wrappers remain unsupported;
+initializers, shadowing, self/forward or sibling references,
+extra returns, missing else and nonterminal or empty nested blocks remain unsupported;
 this is not a global binding policy. All old body-only adapters and bounds are
 unchanged. Independent arbitrary-depth source proofs retain static nominal
 types without values, exact `10n + 1` costs, original parameter rows and actual
@@ -1562,8 +1589,8 @@ excludes equally typed substituted code; opaque values remain actual arguments.
 
 The restricted header excludes generics, where clauses, and contract modifiers.
 No return clause means Unit; an explicit clause has exactly one supported
-named type with caller-provided meaning. Empty and multiple return lists are
-outside this entry, not classified as invalid source. Parameter arity, exact
+structural type whose named leaves have caller-provided meanings. Empty and
+multiple return lists are outside this entry, not classified as invalid source. Parameter arity, exact
 argument rows, types, names, and owner-relative identities retain the existing
 binding contract. No declaration lookup or global identity allocation is added.
 

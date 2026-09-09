@@ -180,6 +180,9 @@ import Solcore.Test.FrontendParsedLocalFragmentEntries
 import Solcore.Test.FrontendDiscardStatementProperties
 import Solcore.Test.FrontendParsedDiscardStatements
 import Solcore.Test.FrontendParsedDiscardEntries
+import Solcore.Test.FrontendTerminalBlockProperties
+import Solcore.Test.FrontendParsedTerminalBlocks
+import Solcore.Test.FrontendParsedTerminalBlockEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5775,6 +5778,8 @@ def run : IO Unit := do
   frontendParsedLocalFragmentEntryTests
   frontendParsedDiscardStatementTests
   frontendParsedDiscardEntryTests
+  frontendParsedTerminalBlockTests
+  frontendParsedTerminalBlockEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

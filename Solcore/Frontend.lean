@@ -302,6 +302,14 @@ contracts. Costs add head plus tail plus two even when the head is unused.
 Unterminated expressions, missing terminal tails and general early returns are
 not introduced, and narrower body-only adapters keep their original boundaries.
 
+Singleton terminal lexical blocks now preserve the inner statement list and
+its original braces' span, checking it in the same input scope. Four independent
+block rules retain exactly the child's Core, type, runtime value, stores and
+cost. There is no extra Core binder or transition. All earlier generic
+contracts remain intact, and a full-Option equality preserves both acceptance
+and rejection of the inner body. Empty or nonterminal blocks, scope escape,
+implicit returns and general early-return semantics are not introduced.
+
 Exact expression, singleton-return, terminal-tree and recursive-let provenance
 now expose membership in the independent local Core fragment. Compilation and
 preparation project the same structural fact without restricting actual opaque

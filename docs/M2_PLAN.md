@@ -303,6 +303,22 @@ neighboring invalid forms remain. No unterminated prefix, missing terminal tail,
 assignment, source call, general early return, parser or runtime-record policy
 is added.
 
+Terminal lexical wrappers now preserve their inner body's full semantics
+(ADR-0241). An original singleton `.block statements` recurses with the inner
+statement span and the same input scope. Four independent rules retain the
+exact child Core, type, raw value, stores and cost; no hidden binder or extra
+transition is introduced. The wrapper/child checker equality retains full
+Option behavior, and all 59 directly affected generic statements remain intact.
+Independent source/parsed consumers cover arbitrary finite wrapper depth,
+mixed prefixes and both arms, original byte ranges and parameter records,
+nominal/opaque boundaries, exact manual costs and genuine checkpoint residuals.
+Six legacy parsed consumers migrate original block rejection fixtures without
+changing their callers, including six buried nominal declarations. Narrower
+adapters and neighboring rejections remain. Empty or
+nonterminal blocks, implicit or general early returns, scope escape and
+shadowing are not introduced. Core/Resolved, parser, diagnostics and runtime
+records remain unchanged.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
@@ -776,9 +792,10 @@ multi-chunk checkpoints. Valid arm-local rejections become exact successes;
 missing annotations/initializers, shadowing, sibling leakage, mismatched returns,
 bad headers/arguments and invalid unselected children rejected in that initial
 profile. ADR-0238 additionally accepts initialized lets with absent annotations by
-inferring their initializer type; all the other rejection boundaries remain.
-No general inference, defaults, general calls, separate block wrappers or broader
-binding policy is added.
+inferring their initializer type. ADR-0240 adds strict discard prefixes, and
+ADR-0241 preserves the inner computation of singleton terminal block wrappers.
+Other rejection boundaries remain, including nonterminal or empty blocks.
+No general inference, defaults, general calls or broader binding policy is added.
 
 Direct recursive-body evaluation (ADR-0224) now executes the existing raw typed
 let/return-tree grammar on original blocks and actual explicit tables, composing
