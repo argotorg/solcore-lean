@@ -64,6 +64,12 @@ private theorem reflects_pure_cost {table : LocalNameTable} {environment : Resol
   | orFalse _ _ leftIH rightIH =>
       cases resolution with
       | logicalOr left right => exact .orFalse (leftIH left) (rightIH right)
+  | notEqual _ _ leftIH rightIH =>
+      cases resolution with
+      | notEqual left right => exact .notEqual (leftIH left) (rightIH right)
+  | lessEqual _ _ leftIH rightIH =>
+      cases resolution with
+      | lessEqual left right => exact .lessEqual (leftIH left) (rightIH right)
 
 private theorem reflects_binary_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
@@ -87,6 +93,8 @@ private theorem reflects_binary_cost {table : LocalNameTable} {environment : Res
   | andFalse _ => cases operator
   | orTrue _ => cases operator
   | orFalse _ _ => cases operator
+  | notEqual _ _ => cases operator
+  | lessEqual _ _ => cases operator
 
 private theorem reflects_conditional_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {span question colon : Syntax.SourceSpan}
@@ -173,6 +181,34 @@ private theorem reflects_or_cost {table : LocalNameTable} {environment : Resolve
   | orTrue left => exact .inl ⟨_, left, rfl, rfl⟩
   | orFalse left right => exact .inr ⟨_, _, _, left, right, rfl⟩
 
+private theorem reflects_notEqual_cost {table : LocalNameTable} {environment : Resolved.Environment}
+    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+    {left right : Syntax.Expr} {value : Core.Value} {cost : Nat}
+    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+      ⟨span, .binary left ⟨operatorSpan, .notEqual⟩ right⟩ value finalStore cost) :
+    ∃ middleStore leftWord rightWord leftCost rightCost,
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore left (.word leftWord) middleStore leftCost ∧
+      RecursiveLocalComputationEvaluatesWithCost table environment middleStore right (.word rightWord) finalStore rightCost ∧
+      value = .bool (!(leftWord == rightWord)) ∧ cost = leftCost + rightCost + 5 := by
+  cases evaluation with
+  | pure child => cases child with | notEqual left right => exact ⟨_, _, _, _, _, .pure left, .pure right, rfl, rfl⟩
+  | binary operator _ _ _ => cases operator
+  | notEqual left right => exact ⟨_, _, _, _, _, left, right, rfl, rfl⟩
+
+private theorem reflects_lessEqual_cost {table : LocalNameTable} {environment : Resolved.Environment}
+    {initialStore finalStore : Core.Store} {span operatorSpan : Syntax.SourceSpan}
+    {left right : Syntax.Expr} {value : Core.Value} {cost : Nat}
+    (evaluation : RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+      ⟨span, .binary left ⟨operatorSpan, .lessEqual⟩ right⟩ value finalStore cost) :
+    ∃ middleStore leftWord rightWord leftCost rightCost,
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore left (.word leftWord) middleStore leftCost ∧
+      RecursiveLocalComputationEvaluatesWithCost table environment middleStore right (.word rightWord) finalStore rightCost ∧
+      value = .bool (!(decide (leftWord > rightWord))) ∧ cost = leftCost + rightCost + 5 := by
+  cases evaluation with
+  | pure child => cases child with | lessEqual left right => exact ⟨_, _, _, _, _, .pure left, .pure right, rfl, rfl⟩
+  | binary operator _ _ _ => cases operator
+  | lessEqual left right => exact ⟨_, _, _, _, _, left, right, rfl, rfl⟩
+
 private theorem reflects_group_cost {table : LocalNameTable} {environment : Resolved.Environment}
     {initialStore finalStore : Core.Store} {span : Syntax.SourceSpan} {inner : Syntax.Expr}
     {value : Core.Value} {cost : Nat}
@@ -226,5 +262,14 @@ theorem RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
       rcases reflects_or_cost evaluation with ⟨_, left, rfl, rfl⟩ | ⟨_, _, _, left, right, rfl⟩
       · simpa only [Nat.add_assoc] using CostStepComposition.ifTrue (leftIH left _) (.cons .bool .refl)
       · exact CostStepComposition.ifFalse (leftIH left _) (rightIH right _)
+
+  | notEqual _ _ leftIH rightIH =>
+      obtain ⟨_, _, _, _, _, left, right, rfl, rfl⟩ := reflects_notEqual_cost evaluation
+      simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
+        (CostStepComposition.binary (op := .wordEq) (leftIH left _) (rightIH right _) rfl) rfl
+  | lessEqual _ _ leftIH rightIH =>
+      obtain ⟨_, _, _, _, _, left, right, rfl, rfl⟩ := reflects_lessEqual_cost evaluation
+      simpa only [Nat.add_assoc] using CostStepComposition.unary (op := .boolNot)
+        (CostStepComposition.binary (op := .wordGt) (leftIH left _) (rightIH right _) rfl) rfl
 
 end Solcore.Frontend

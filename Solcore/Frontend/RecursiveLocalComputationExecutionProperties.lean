@@ -60,6 +60,20 @@ theorem RecursiveLocalComputationElaborates.evaluates_iff
             cases constant
             exact .orTrue (leftIH left)
         | ifFalse left right => exact .orFalse (leftIH left) (rightIH right)
+    | notEqual _ _ leftIH rightIH =>
+        cases evaluation with
+        | unary comparison negated =>
+            cases comparison with
+            | @binary _ _ _ _ _ _ _ leftValue rightValue _ left right compared =>
+                cases leftValue <;> cases rightValue <;> cases compared <;> cases negated
+                exact .notEqual (leftIH left) (rightIH right)
+    | lessEqual _ _ leftIH rightIH =>
+        cases evaluation with
+        | unary comparison negated =>
+            cases comparison with
+            | @binary _ _ _ _ _ _ _ leftValue rightValue _ left right compared =>
+                cases leftValue <;> cases rightValue <;> cases compared <;> cases negated
+                exact .lessEqual (leftIH left) (rightIH right)
 
 theorem RecursiveLocalComputationElaborates.evaluatesWithCost_iff_steps
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
