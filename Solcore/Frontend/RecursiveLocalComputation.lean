@@ -1,7 +1,7 @@
 import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Frontend.DirectWordBinary
 
-/-! Recursive single-argument calls, groups and direct Word binary operators.
+/-! Recursive calls, groups, direct Word binaries and conditional expressions.
 Original children keep their scope; this does not change the older profiles. -/
 
 set_option autoImplicit false
@@ -21,6 +21,13 @@ def elaborateRecursiveLocalComputation? (table : LocalNameTable) (context : Reso
           else none
       | _ => none
   | ⟨_, .group inner⟩ => elaborateRecursiveLocalComputation? table context inner
+  | ⟨_, .conditional condition _ thenBranch _ elseBranch⟩ => do
+      let (conditionCore, conditionType) ← elaborateRecursiveLocalComputation? table context condition
+      let (thenCore, thenType) ← elaborateRecursiveLocalComputation? table context thenBranch
+      let (elseCore, elseType) ← elaborateRecursiveLocalComputation? table context elseBranch
+      if conditionType = .bool ∧ elseType = thenType then
+        some (.ifE conditionCore thenCore elseCore, thenType)
+      else none
   | ⟨_, .binary left ⟨_, sourceOp⟩ right⟩ =>
       match directWordBinary? sourceOp with
       | some op => do
@@ -56,6 +63,14 @@ inductive RecursiveLocalComputationHasType (table : LocalNameTable) (context : R
       RecursiveLocalComputationHasType table context
         ⟨span, .binary left ⟨operatorSpan, sourceOp⟩ right⟩ op.resultType
 
+  | conditional {span question colon : Syntax.SourceSpan}
+      {condition thenBranch elseBranch : Syntax.Expr} {type : Core.Ty}
+      (conditionTyped : RecursiveLocalComputationHasType table context condition .bool)
+      (thenTyped : RecursiveLocalComputationHasType table context thenBranch type)
+      (elseTyped : RecursiveLocalComputationHasType table context elseBranch type) :
+      RecursiveLocalComputationHasType table context
+        ⟨span, .conditional condition question thenBranch colon elseBranch⟩ type
+
 inductive RecursiveLocalComputationElaborates (table : LocalNameTable) (context : Resolved.Context) :
     Syntax.Expr → Core.Expr → Core.Ty → Prop where
   | pure {source : Syntax.Expr} {resolved : Resolved.Expr} {core : Core.Expr} {type : Core.Ty}
@@ -81,5 +96,14 @@ inductive RecursiveLocalComputationElaborates (table : LocalNameTable) (context 
       (rightElaborated : RecursiveLocalComputationElaborates table context right rightCore op.rightType) :
       RecursiveLocalComputationElaborates table context
         ⟨span, .binary left ⟨operatorSpan, sourceOp⟩ right⟩ (.binary op leftCore rightCore) op.resultType
+
+  | conditional {span question colon : Syntax.SourceSpan}
+      {condition thenBranch elseBranch : Syntax.Expr}
+      {conditionCore thenCore elseCore : Core.Expr} {type : Core.Ty}
+      (conditionElaborated : RecursiveLocalComputationElaborates table context condition conditionCore .bool)
+      (thenElaborated : RecursiveLocalComputationElaborates table context thenBranch thenCore type)
+      (elseElaborated : RecursiveLocalComputationElaborates table context elseBranch elseCore type) :
+      RecursiveLocalComputationElaborates table context
+        ⟨span, .conditional condition question thenBranch colon elseBranch⟩ (.ifE conditionCore thenCore elseCore) type
 
 end Solcore.Frontend

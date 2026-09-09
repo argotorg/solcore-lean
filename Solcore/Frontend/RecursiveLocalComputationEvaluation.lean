@@ -4,6 +4,7 @@ import Solcore.Frontend.DirectWordBinary
 
 /-! Original calls retain actual bodies and captures. Strict binary children
 thread their real stores left to right before applying the actual operator.
+Conditionals evaluate the actual Bool guard and selected branch only.
 Grouping preserves the exact value, stores and cost of its child. -/
 
 set_option autoImplicit false
@@ -43,6 +44,25 @@ inductive RecursiveLocalComputationEvaluates
       (applied : op.apply leftValue rightValue = some result) :
       RecursiveLocalComputationEvaluates table environment initialStore
         ⟨span, .binary left ⟨operatorSpan, sourceOp⟩ right⟩ result finalStore
+
+  | ifTrue {initialStore middleStore finalStore : Core.Store}
+      {span question colon : Syntax.SourceSpan} {condition thenBranch elseBranch : Syntax.Expr}
+      {value : Core.Value}
+      (conditionEvaluation : RecursiveLocalComputationEvaluates table environment
+        initialStore condition (.bool true) middleStore)
+      (branchEvaluation : RecursiveLocalComputationEvaluates table environment
+        middleStore thenBranch value finalStore) :
+      RecursiveLocalComputationEvaluates table environment initialStore
+        ⟨span, .conditional condition question thenBranch colon elseBranch⟩ value finalStore
+  | ifFalse {initialStore middleStore finalStore : Core.Store}
+      {span question colon : Syntax.SourceSpan} {condition thenBranch elseBranch : Syntax.Expr}
+      {value : Core.Value}
+      (conditionEvaluation : RecursiveLocalComputationEvaluates table environment
+        initialStore condition (.bool false) middleStore)
+      (branchEvaluation : RecursiveLocalComputationEvaluates table environment
+        middleStore elseBranch value finalStore) :
+      RecursiveLocalComputationEvaluates table environment initialStore
+        ⟨span, .conditional condition question thenBranch colon elseBranch⟩ value finalStore
 
 inductive RecursiveLocalComputationEvaluatesWithCost
     (table : LocalNameTable) (environment : Resolved.Environment) :
@@ -84,5 +104,26 @@ inductive RecursiveLocalComputationEvaluatesWithCost
       (applied : op.apply leftValue rightValue = some result) :
       RecursiveLocalComputationEvaluatesWithCost table environment initialStore
         ⟨span, .binary left ⟨operatorSpan, sourceOp⟩ right⟩ result finalStore (leftCost + rightCost + 3)
+
+  | ifTrue {initialStore middleStore finalStore : Core.Store}
+      {span question colon : Syntax.SourceSpan} {condition thenBranch elseBranch : Syntax.Expr}
+      {value : Core.Value} {conditionCost branchCost : Nat}
+      (conditionEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        initialStore condition (.bool true) middleStore conditionCost)
+      (branchEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        middleStore thenBranch value finalStore branchCost) :
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+        ⟨span, .conditional condition question thenBranch colon elseBranch⟩ value finalStore
+        (conditionCost + branchCost + 2)
+  | ifFalse {initialStore middleStore finalStore : Core.Store}
+      {span question colon : Syntax.SourceSpan} {condition thenBranch elseBranch : Syntax.Expr}
+      {value : Core.Value} {conditionCost branchCost : Nat}
+      (conditionEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        initialStore condition (.bool false) middleStore conditionCost)
+      (branchEvaluation : RecursiveLocalComputationEvaluatesWithCost table environment
+        middleStore elseBranch value finalStore branchCost) :
+      RecursiveLocalComputationEvaluatesWithCost table environment initialStore
+        ⟨span, .conditional condition question thenBranch colon elseBranch⟩ value finalStore
+        (conditionCost + branchCost + 2)
 
 end Solcore.Frontend
