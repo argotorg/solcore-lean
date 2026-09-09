@@ -243,6 +243,7 @@ def frontendParsedTypedLetReturnBodyTests : IO Unit := do
     [("c", .bool), ("x", .word)] [] (.ifE (.var 1) (.var 0) (.var 0)) .word
   dictionaryBoundary
   for (body, core) in [("{let z = x;return z;}", Core.Expr.letE (.var 4) (.var 0)),
+      ("{let z: Word = x;{return z;}}", .letE (.var 4) (.var 0)),
       ("{let z: Word = x;if(c){let a: Word = z;return a;}else{return z;}}",
         Core.Expr.letE (.var 4) (.ifE (.var 3) (.letE (.var 0) (.var 0)) (.var 0))),
       ("{let z: Word = x;if(0 == 0){return z;}else{let a: Word = z;return a;}}",
@@ -258,7 +259,7 @@ def frontendParsedTypedLetReturnBodyTests : IO Unit := do
       "{let z: Pkg.Token = x;return x;}", "{let z: Opaque = c;return x;}",
       "{let z: Opaque = f(x);return x;}", "{let z: Word = (0 == 0) ? x : missing;return x;}",
       "{let z: Word = x;}", "{let z: Word = x;return z;return x;}",
-      "{let z: Word = x;z = y;return z;}", "{let z: Word = x;{return z;}}",
+      "{let z: Word = x;z = y;return z;}",
       "{let z: Word = x;if(c){return z;}}", "{let z: Word = x;if(x){return z;}else{return y;}}",
       "{let z: Word = x;if(0 == 0){return z;}else{if(c){return y;}else{return missing;}}}",
       "{let z: Word = x;if(0 == 0){return z;}else{return c;}}",

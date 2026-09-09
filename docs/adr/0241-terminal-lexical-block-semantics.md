@@ -71,6 +71,8 @@ and callers: closed bare-return wrappers in runtime, compilation-owner and
 recursive-entry consumers, and the typed-let wrapper in a conditional arm.
 Also retain the six original buried nominal-block declarations in the older
 terminal-tree consumer as whole-compilation successes while its own adapter rejects.
+The older prefix consumer likewise retains its original annotated-let/terminal-block
+fixture at both original owners as an exact whole success with unchanged prefix rejection.
 Keep narrower singleton/terminal-tree/prefix adapters unchanged, along with
 neighboring invalid inputs. Do not weaken common rejection helpers.
 
