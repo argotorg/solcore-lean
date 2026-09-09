@@ -642,6 +642,17 @@ unchanged shared 12, recursive-expression 14 and entry 4 theorem signatures.
 Actual calls/captures/stores, arbitrary prefixes, nested scopes, full fuels and
 genuine saved-state/world resumption are exercised independently of checking.
 
+Grouped Word match patterns now use an independent recursive classification
+(ADR-0270). Only original group nodes are transparent, including the parser's
+singleton trailing-comma form; strict literal and wildcard leaves keep their
+original meaning. All outer/inner spans and original cases/defaults remain
+present. The total interpreter's exact iff, classification uniqueness and
+unchanged Core fold preserve coverage, all-body checking and once-only effects.
+Arbitrary group depth changes neither comparisons nor source/Core costs.
+Parsed effectful and nested-scope consumers retain actual captures, stores and
+genuine checkpoints. Binding/Boolean/constructor, tuple and comptime patterns
+remain separate work; parentheses do not make an unsupported leaf acceptable.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

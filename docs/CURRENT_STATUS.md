@@ -949,7 +949,7 @@ Terminal single-scrutinee Word matches now extend the shared computation body
 engine (ADR-0267). Its initial profile retains original literal case order,
 including duplicates, and requires a default. Every case and default body
 is checked in the original caller scope at one common result type. Literal
-patterns remain strict in-range Words; binders, grouped patterns,
+patterns remain strict in-range Words; binders, constructor patterns,
 and multiple scrutinees remain outside this interface.
 
 Independent source selection evaluates the original scrutinee once, keeps its
@@ -1002,6 +1002,22 @@ decomposition keeps the existing shared 12 theorem signatures unchanged;
 choice and match constructors intentionally generalize the default to Option.
 Arbitrary prefixes, actual effects/captures, nested scopes, precise costs and
 genuine checkpoint/world resumption retain the earlier guarantees.
+
+Original pattern groups now transparently wrap those same literal and wildcard
+meanings (ADR-0270). Arbitrary nesting retains every Lean group and its outer
+span, as well as the original leaf and marker; the reference parser instead
+erases singleton parentheses, including a singleton trailing comma. No syntax
+normalization or agreement on those intermediate spans is claimed.
+
+One total pattern interpreter has an exact independent classification law.
+Grouped wildcard still supplies optional-default coverage, and every original
+unreachable pattern/body remains checked. Group depth adds no comparison or
+Core transition: source costs, actual captures/stores, nested scopes and genuine
+resumption remain unchanged. Classification generalizes the choice/static and
+checker-decomposition pattern premises; the shared 12, recursive 14 and entry 4
+signatures and old strict literal meaning remain unchanged. Grouped binders,
+Boolean/constructor patterns, tuples (including hand-built singleton tuples),
+comptime/error leaves and overflowing literals are not admitted by grouping.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
