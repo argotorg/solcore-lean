@@ -612,7 +612,7 @@ signatures, actual-value insertion, full fuel and genuine resumption contracts
 remain intact. Empty cases deliberately perform no comparison, so raw non-Word
 success there does not justify treating a non-Word comparison as a miss.
 Symbolic arbitrary case counts and parsed effectful bodies protect those
-boundaries. Binding/constructor patterns, optional-default exhaustiveness, source lambdas
+boundaries. Binding/constructor patterns, source lambdas
 and global function resolution remain separate work.
 
 Original wildcard cases now share this same engine (ADR-0268). They preserve
@@ -627,8 +627,20 @@ contribute seven transitions each; wildcard contributes zero. Raw leading
 wildcard success is distinct from a preceding non-Word comparison fault.
 The formerly rejected parsed wildcard example is migrated with its original
 header, owner, types, arguments and source location; independent source costs
-and literal Core paths protect effects and genuine resumption. Required default
-and statically Word scrutinees remain explicit restrictions.
+and literal Core paths protect effects and genuine resumption. Statically Word
+scrutinees remain an explicit restriction; optional defaults extend this below.
+
+Original optional defaults now preserve this same body/entry pipeline (ADR-0269).
+Static coverage requires a present original default or an original wildcard;
+raw literal-hit success without either is not static acceptance. Every original
+body is checked at the default's type, or at the first original case body's
+type when no default exists. Arbitrary branch result types remain independent
+of the scrutinee's Word type. The partial Core fold lets a wildcard recover an
+unlowerable literal-only suffix without suppressing any static obligation or
+inventing a fallback. One narrowly scoped checker decomposition supports the
+unchanged shared 12, recursive-expression 14 and entry 4 theorem signatures.
+Actual calls/captures/stores, arbitrary prefixes, nested scopes, full fuels and
+genuine saved-state/world resumption are exercised independently of checking.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution

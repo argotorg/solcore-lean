@@ -271,6 +271,10 @@ import Solcore.Test.FrontendWildcardMatchBoundaryProperties
 import Solcore.Test.FrontendWildcardMatchCountProperties
 import Solcore.Test.FrontendParsedWildcardMatchEffects
 import Solcore.Test.FrontendParsedWildcardMatchScopes
+import Solcore.Test.FrontendOptionalMatchBoundaryProperties
+import Solcore.Test.FrontendOptionalMatchCountProperties
+import Solcore.Test.FrontendParsedOptionalMatchEffects
+import Solcore.Test.FrontendParsedOptionalMatchScopes
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5923,6 +5927,8 @@ def run : IO Unit := do
   frontendParsedWordMatchScopeTests
   frontendParsedWildcardMatchEffectTests
   frontendParsedWildcardMatchScopeTests
+  frontendParsedOptionalMatchEffectTests
+  frontendParsedOptionalMatchScopeTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

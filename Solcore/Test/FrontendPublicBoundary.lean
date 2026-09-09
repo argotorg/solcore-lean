@@ -415,6 +415,7 @@ example := @Solcore.Frontend.WordMatchChooses.deterministic
 example := @Solcore.Frontend.ComputationBodyFragment.wordTest
 example := @Solcore.Frontend.ComputationReturnTreeHasType.wordMatch
 example := @Solcore.Frontend.ComputationReturnTreeElaborates.wordMatch
+example := @Solcore.Frontend.ComputationReturnTreeChecking.match_iff
 example := @Solcore.Frontend.ComputationReturnTreeEvaluates.wordMatch
 example := @Solcore.Frontend.ComputationReturnTreeEvaluatesWithCost.wordMatch
 example := @Solcore.Frontend.ComputationBodyFragment.unit

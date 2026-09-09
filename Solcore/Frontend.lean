@@ -66,6 +66,7 @@ import Solcore.Frontend.ComputationBodyFragmentInsertionPaths
 import Solcore.Frontend.ComputationBodyFragmentInsertionProperties
 import Solcore.Frontend.ComputationBodyFragmentProperties
 import Solcore.Frontend.ComputationReturnTree
+import Solcore.Frontend.ComputationReturnTreeCheckingProperties
 import Solcore.Frontend.ComputationReturnTreeCostProperties
 import Solcore.Frontend.ComputationReturnTreeEvaluation
 import Solcore.Frontend.ComputationReturnTreeEvaluationProperties

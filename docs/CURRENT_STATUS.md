@@ -946,11 +946,11 @@ No source-ID alignment, child execution/cost law, new state relation, runner,
 validator or executable definition is added.
 
 Terminal single-scrutinee Word matches now extend the shared computation body
-engine (ADR-0267). Original literal cases remain in order, including duplicates,
-and a required default closes the selected profile. Every case and default body
+engine (ADR-0267). Its initial profile retains original literal case order,
+including duplicates, and requires a default. Every case and default body
 is checked in the original caller scope at one common result type. Literal
-patterns remain strict in-range Words; binders and grouped patterns,
-multiple scrutinees and missing default remain outside this interface.
+patterns remain strict in-range Words; binders, grouped patterns,
+and multiple scrutinees remain outside this interface.
 
 Independent source selection evaluates the original scrutinee once, keeps its
 effects, and executes only the first matching body or the default. Static checks
@@ -971,7 +971,7 @@ unchanged; general pattern matching and overflow agreement are not claimed.
 
 Ordered wildcard cases now extend that profile (ADR-0268). An original `case _`
 selects its body immediately when reached, without a comparison or binding.
-Later literal/wildcard cases and the required default remain original static
+Later literal/wildcard cases and any default remain original static
 obligations even when unreachable. The checker distinguishes a successful
 wildcard tag from failure, checks every body, and only then discards the unused
 Core tail. Literal pattern meaning and the existing shared theorem signatures
@@ -983,8 +983,25 @@ still adds two. Leading wildcard can therefore accept an arbitrary actual raw
 value; an earlier literal comparison on a non-Word still faults and retains
 prior effects. Original-source consumers retain captures, stores, selected
 effects and genuine checkpoints, separately consuming the opt-in runtime
-input/safety contracts. Missing default, non-Word static scrutinees, binding
+input/safety contracts. Non-Word static scrutinees, binding
 patterns and general exhaustiveness remain outside the selected interface.
+
+Original defaults are now optional when an original wildcard covers the Word
+cases (ADR-0269). Their absence stays literal in syntax, selection, typing,
+elaboration and raw/cost evaluation. A default body still anchors the common
+result type when present; otherwise the first original case body does so.
+Every original case and any default are checked, including unreachable bodies.
+The branch result type is not restricted to the scrutinee's Word type.
+
+Lowering uses an optional Core tail: a literal needs a successful tail, while
+a wildcard supplies its own original branch even when a later literal-only
+suffix has no Core tail. No source default or Unit/error fallback is fabricated.
+Empty cases without a default and missing-default literal-only cases fail
+static acceptance even when a supplied actual value produces a raw literal hit. A dedicated checker
+decomposition keeps the existing shared 12 theorem signatures unchanged;
+choice and match constructors intentionally generalize the default to Option.
+Arbitrary prefixes, actual effects/captures, nested scopes, precise costs and
+genuine checkpoint/world resumption retain the earlier guarantees.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
