@@ -23,6 +23,9 @@ theorem RecursiveLocalComputationFragment.weakenAt {expr : Core.Expr}
   | ifE _ _ _ conditionIH thenIH elseIH =>
       simp only [Core.Expr.weakenAt]
       exact .ifE conditionIH thenIH elseIH
+  | unary _ childIH =>
+      simp only [Core.Expr.weakenAt]
+      exact .unary childIH
 
 theorem RecursiveLocalComputationElaborates.core_fragment
     {table : LocalNameTable} {context : Resolved.Context} {source : Syntax.Expr}
@@ -35,5 +38,7 @@ theorem RecursiveLocalComputationElaborates.core_fragment
   | application _ _ calleeIH operandIH => exact .application calleeIH operandIH
   | binary _ _ _ leftIH rightIH => exact .binary leftIH rightIH
   | conditional _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
+  | logicalNot _ childIH => exact .unary childIH
+  | bitNot _ childIH => exact .unary childIH
 
 end Solcore.Frontend

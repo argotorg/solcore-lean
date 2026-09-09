@@ -63,5 +63,14 @@ theorem RecursiveLocalComputationFragment.insertion_paths
           · exact CostStepComposition.ifFalse (conditionPaths _).1 (branchPaths _).1
           · simp only [Core.Expr.weakenAt]
             exact CostStepComposition.ifFalse (conditionPaths _).2 (branchPaths _).2
+  | unary _ childIH =>
+      cases evaluation with
+      | unary child applied =>
+          obtain ⟨childCost, childPaths⟩ := childIH child
+          refine ⟨childCost + 2, fun continuation => ?_⟩
+          constructor
+          · exact CostStepComposition.unary (childPaths _).1 applied
+          · simp only [Core.Expr.weakenAt]
+            exact CostStepComposition.unary (childPaths _).2 applied
 
 end Solcore.Frontend

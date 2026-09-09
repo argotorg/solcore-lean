@@ -50,5 +50,14 @@ theorem RecursiveLocalComputationFragment.evaluates_insert_iff
         cases evaluation with
         | ifTrue condition branch => exact .ifTrue (conditionIH.mpr condition) (thenIH.mpr branch)
         | ifFalse condition branch => exact .ifFalse (conditionIH.mpr condition) (elseIH.mpr branch)
+  | unary _ childIH =>
+      simp only [Core.Expr.weakenAt]
+      constructor
+      · intro evaluation
+        cases evaluation with
+        | unary child applied => exact .unary (childIH.mp child) applied
+      · intro evaluation
+        cases evaluation with
+        | unary child applied => exact .unary (childIH.mpr child) applied
 
 end Solcore.Frontend
