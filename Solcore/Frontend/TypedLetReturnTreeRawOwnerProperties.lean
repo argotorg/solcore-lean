@@ -72,32 +72,29 @@ theorem evaluateTypedLetReturnTreeWithCost?_mapOwner
                           expression_mapIds (ownerLocalIdMap mapping)
                             (ownerLocalIdMap_injective mapping injective) table environment source
               case letDecl name optionalType optionalInitializer =>
-                cases optionalType with
+                cases optionalInitializer with
                 | none => simp only [evaluateTypedLetReturnTreeWithCost?]
-                | some annotation =>
-                    cases optionalInitializer with
-                    | none => simp only [evaluateTypedLetReturnTreeWithCost?]
-                    | some initializer =>
-                        have tailSame (boundValue : Core.Value) :
-                            evaluateTypedLetReturnTreeWithCost? (mapping owner)
-                              ((name.value, Resolved.freshLocalId (mapping owner)
-                                ((LocalNameTable.mapIds (ownerLocalIdMap mapping) table).map Prod.snd)) ::
-                                  LocalNameTable.mapIds (ownerLocalIdMap mapping) table)
-                              ((Resolved.freshLocalId (mapping owner)
-                                ((LocalNameTable.mapIds (ownerLocalIdMap mapping) table).map Prod.snd), boundValue) ::
-                                  Resolved.LocalScope.mapIds (ownerLocalIdMap mapping) environment) ⟨blockSpan, rest⟩ =
-                            evaluateTypedLetReturnTreeWithCost? owner
-                              ((name.value, Resolved.freshLocalId owner (table.map Prod.snd)) :: table)
-                              ((Resolved.freshLocalId owner (table.map Prod.snd), boundValue) :: environment) ⟨blockSpan, rest⟩ := by
-                          rw [fresh_mapOwner mapping injective owner table]
-                          simpa only [LocalNameTable.mapIds, Resolved.LocalScope.mapIds, List.map_cons] using
-                            evaluateTypedLetReturnTreeWithCost?_mapOwner mapping injective owner
-                              ((name.value, Resolved.freshLocalId owner (table.map Prod.snd)) :: table)
-                              ((Resolved.freshLocalId owner (table.map Prod.snd), boundValue) :: environment) ⟨blockSpan, rest⟩
-                        rw [evaluateTypedLetReturnTreeWithCost?, evaluateTypedLetReturnTreeWithCost?,
-                          expression_mapIds (ownerLocalIdMap mapping)
-                            (ownerLocalIdMap_injective mapping injective)]
-                        simp only [tailSame]
+                | some initializer =>
+                    have tailSame (boundValue : Core.Value) :
+                        evaluateTypedLetReturnTreeWithCost? (mapping owner)
+                          ((name.value, Resolved.freshLocalId (mapping owner)
+                            ((LocalNameTable.mapIds (ownerLocalIdMap mapping) table).map Prod.snd)) ::
+                              LocalNameTable.mapIds (ownerLocalIdMap mapping) table)
+                          ((Resolved.freshLocalId (mapping owner)
+                            ((LocalNameTable.mapIds (ownerLocalIdMap mapping) table).map Prod.snd), boundValue) ::
+                              Resolved.LocalScope.mapIds (ownerLocalIdMap mapping) environment) ⟨blockSpan, rest⟩ =
+                        evaluateTypedLetReturnTreeWithCost? owner
+                          ((name.value, Resolved.freshLocalId owner (table.map Prod.snd)) :: table)
+                          ((Resolved.freshLocalId owner (table.map Prod.snd), boundValue) :: environment) ⟨blockSpan, rest⟩ := by
+                      rw [fresh_mapOwner mapping injective owner table]
+                      simpa only [LocalNameTable.mapIds, Resolved.LocalScope.mapIds, List.map_cons] using
+                        evaluateTypedLetReturnTreeWithCost?_mapOwner mapping injective owner
+                          ((name.value, Resolved.freshLocalId owner (table.map Prod.snd)) :: table)
+                          ((Resolved.freshLocalId owner (table.map Prod.snd), boundValue) :: environment) ⟨blockSpan, rest⟩
+                    rw [evaluateTypedLetReturnTreeWithCost?, evaluateTypedLetReturnTreeWithCost?,
+                      expression_mapIds (ownerLocalIdMap mapping)
+                        (ownerLocalIdMap_injective mapping injective)]
+                    simp only [tailSame]
               case ifThen condition thenBody optionalElse =>
                 cases rest with
                 | cons _ _ => simp only [evaluateTypedLetReturnTreeWithCost?]

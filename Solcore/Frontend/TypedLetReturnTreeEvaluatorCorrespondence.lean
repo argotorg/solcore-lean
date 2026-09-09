@@ -36,17 +36,19 @@ theorem evaluateTypedLetReturnTreeWithCost?_sound
                         rw [evaluateTypedLetReturnTreeWithCost?] at accepted
                         exact .single (.expression (evaluateLocalExpressionWithCost?_sound accepted store))
               case letDecl name optionalType optionalInitializer =>
-                cases optionalType with
+                cases optionalInitializer with
                 | none => simp only [evaluateTypedLetReturnTreeWithCost?, reduceCtorEq] at accepted
-                | some annotation =>
-                    cases optionalInitializer with
-                    | none => simp only [evaluateTypedLetReturnTreeWithCost?, reduceCtorEq] at accepted
-                    | some initializer =>
-                        simp only [evaluateTypedLetReturnTreeWithCost?, bind, Option.bind_eq_some_iff] at accepted
-                        obtain ⟨⟨boundValue, initializerCost⟩, initializerAccepted,
-                          ⟨actual, tailCost⟩, tailAccepted, result⟩ := accepted
-                        simp only [pure, Option.some.injEq, Prod.mk.injEq] at result
-                        obtain ⟨rfl, rfl⟩ := result
+                | some initializer =>
+                    simp only [evaluateTypedLetReturnTreeWithCost?, bind, Option.bind_eq_some_iff] at accepted
+                    obtain ⟨⟨boundValue, initializerCost⟩, initializerAccepted,
+                      ⟨actual, tailCost⟩, tailAccepted, result⟩ := accepted
+                    simp only [pure, Option.some.injEq, Prod.mk.injEq] at result
+                    obtain ⟨rfl, rfl⟩ := result
+                    cases optionalType with
+                    | none =>
+                        exact .inferred (evaluateLocalExpressionWithCost?_sound initializerAccepted store)
+                          (evaluateTypedLetReturnTreeWithCost?_sound tailAccepted store)
+                    | some annotation =>
                         exact .binding (evaluateLocalExpressionWithCost?_sound initializerAccepted store)
                           (evaluateTypedLetReturnTreeWithCost?_sound tailAccepted store)
               case ifThen condition thenBody optionalElse =>
@@ -84,7 +86,8 @@ theorem evaluateTypedLetReturnTreeWithCost?_complete
       | bare => simp only [evaluateTypedLetReturnTreeWithCost?]
       | expression evaluated =>
           simpa only [evaluateTypedLetReturnTreeWithCost?] using evaluateLocalExpressionWithCost?_complete evaluated
-  | binding initializer _ ih | ifTrue initializer _ ih | ifFalse initializer _ ih =>
+  | binding initializer _ ih | inferred initializer _ ih
+  | ifTrue initializer _ ih | ifFalse initializer _ ih =>
       simp [evaluateTypedLetReturnTreeWithCost?, evaluateLocalExpressionWithCost?_complete initializer, ih]
 
 end Solcore.Frontend

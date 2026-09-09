@@ -68,25 +68,22 @@ theorem evaluateTypedLetReturnTreeWithCost?_congr_lookup
                           evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable
                             leftEnvironment rightEnvironment sameLookup source
               case letDecl name optionalType optionalInitializer =>
-                cases optionalType with
+                cases optionalInitializer with
                 | none => simp only [evaluateTypedLetReturnTreeWithCost?]
-                | some annotation =>
-                    cases optionalInitializer with
-                    | none => simp only [evaluateTypedLetReturnTreeWithCost?]
-                    | some initializer =>
-                        have tailSame (boundValue : Core.Value) :
-                            evaluateTypedLetReturnTreeWithCost? leftOwner
-                              ((name.value, Resolved.freshLocalId leftOwner (leftTable.map Prod.snd)) :: leftTable)
-                              ((Resolved.freshLocalId leftOwner (leftTable.map Prod.snd), boundValue) :: leftEnvironment) ⟨blockSpan, rest⟩ =
-                            evaluateTypedLetReturnTreeWithCost? rightOwner
-                              ((name.value, Resolved.freshLocalId rightOwner (rightTable.map Prod.snd)) :: rightTable)
-                              ((Resolved.freshLocalId rightOwner (rightTable.map Prod.snd), boundValue) :: rightEnvironment) ⟨blockSpan, rest⟩ :=
-                          evaluateTypedLetReturnTreeWithCost?_congr_lookup leftOwner rightOwner _ _ _ _
-                            (lookup_fresh_congr leftOwner rightOwner leftTable rightTable leftEnvironment rightEnvironment
-                              sameLookup name.value boundValue) ⟨blockSpan, rest⟩
-                        rw [evaluateTypedLetReturnTreeWithCost?, evaluateTypedLetReturnTreeWithCost?,
-                          evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable leftEnvironment rightEnvironment sameLookup]
-                        simp only [tailSame]
+                | some initializer =>
+                    have tailSame (boundValue : Core.Value) :
+                        evaluateTypedLetReturnTreeWithCost? leftOwner
+                          ((name.value, Resolved.freshLocalId leftOwner (leftTable.map Prod.snd)) :: leftTable)
+                          ((Resolved.freshLocalId leftOwner (leftTable.map Prod.snd), boundValue) :: leftEnvironment) ⟨blockSpan, rest⟩ =
+                        evaluateTypedLetReturnTreeWithCost? rightOwner
+                          ((name.value, Resolved.freshLocalId rightOwner (rightTable.map Prod.snd)) :: rightTable)
+                          ((Resolved.freshLocalId rightOwner (rightTable.map Prod.snd), boundValue) :: rightEnvironment) ⟨blockSpan, rest⟩ :=
+                      evaluateTypedLetReturnTreeWithCost?_congr_lookup leftOwner rightOwner _ _ _ _
+                        (lookup_fresh_congr leftOwner rightOwner leftTable rightTable leftEnvironment rightEnvironment
+                          sameLookup name.value boundValue) ⟨blockSpan, rest⟩
+                    rw [evaluateTypedLetReturnTreeWithCost?, evaluateTypedLetReturnTreeWithCost?,
+                      evaluateLocalExpressionWithCost?_congr_lookup leftTable rightTable leftEnvironment rightEnvironment sameLookup]
+                    simp only [tailSame]
               case ifThen condition thenBody optionalElse =>
                 cases rest with
                 | cons _ _ => simp only [evaluateTypedLetReturnTreeWithCost?]
