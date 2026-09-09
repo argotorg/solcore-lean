@@ -551,6 +551,22 @@ rejection fixtures migrate with identical sources and caller layouts; symbolic,
 parsed and entry consumers retain exact pair frames, effects, strict child
 faults and full resumption. No runtime component-typing premise is inferred.
 
+Shared bodies and entries now connect to runtime-world safety through exactly
+three generic proof kernels (ADR-0263). Same-world actual environment/store
+typing plus original elaboration and existing child laws yield an extending
+typed final world/value/store, original-source cost, uniform continuation-local
+paths and exact closed fuel thresholds. Original runtime-typed arguments reach
+the exact prepared environment through existing reverse-once layout, retaining
+the full prepared record and every complete runner result. Structural argument
+typing alone remains insufficient; no executable validator or runner is added.
+Typed pending frames separately give all-fuel no-fault and exact saved-state
+typing/safe full resumption, without source-ID or child execution premises.
+Checkpoint worlds remain existential; final evaluation exposes extension.
+Symbolic/parsed/entry consumers retain actual effects, allocation, captures,
+hidden discard slots, same-typed swaps and non-uniform actual callee costs.
+All fourteen recursive, twelve shared body and four shared entry contracts,
+empty nominal definitions, CellPayload limits and source acceptance are unchanged.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

@@ -850,6 +850,39 @@ does not require runtime-typed components. Source closures, global resolution,
 other expression forms, source-only bounds and arbitrary-store safety remain
 separate; the exact cost is for the existing Lean Core machine.
 
+Shared mixed bodies and original function entries now have three generic
+runtime-world safety kernels (ADR-0263), with no executable-definition or
+acceptance change. Exact original body elaboration, child Core typing and the
+existing child execution/cost/insertion laws connect a same-world typed actual
+environment and store to successful evaluation. The result retains an extending
+final world, runtime-typed value/store, original-source cost, one cost before
+all continuation-local paths and both exact closed-run fuel thresholds.
+
+The entry kernel uses each original actual argument's runtime typing in that
+same world. Existing reverse-once value/type layout identifies the exact prepared
+environment; structural argument typing alone cannot supply these premises.
+Independent original preparation and child checker correctness retain the full
+prepared record and every complete stateful runner result at the supplied fuel.
+No new validator, runner or per-profile wrapper family is introduced.
+
+The state-only kernel requires a typed actual environment, store and pending
+continuation, but no source-ID alignment or child execution/cost laws. It gives
+all-fuel no-fault and typing/no-fault for the exact saved out-of-fuel state under
+every resumed fuel. The checkpoint's world remains existential in StateHasType;
+explicit world extension is provided for final body evaluation, not asserted
+for that checkpoint. Untyped pending work may fault after a valid body endpoint.
+
+Independent symbolic and parsed consumers cover typed/inferred bindings,
+blocks, strict discards, conditional returns, actual reader/writer/allocator
+closures, captured-value and same-typed argument swaps, literal saved states
+and full resumption. A fixed original body has unbounded actual costs across
+well-typed delayed callees. Missing/corrupt stores, structural-only references
+and separately incompatible worlds cannot discharge the safety premises.
+The old fourteen recursive, twelve shared body and four shared entry contracts
+remain unchanged. Empty nominal definitions and existing CellPayload limits
+remain in force; there is no unrestricted Solcore termination guarantee,
+arbitrary-store safety, source-only bound or new source syntax support.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

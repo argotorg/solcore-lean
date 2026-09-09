@@ -250,6 +250,10 @@ import Solcore.Test.FrontendParsedRecursiveTupleMigrations
 import Solcore.Test.FrontendRecursiveTupleProperties
 import Solcore.Test.FrontendParsedRecursiveTuples
 import Solcore.Test.FrontendParsedRecursiveTupleEntries
+import Solcore.Test.FrontendComputationRuntimeSafetyProperties
+import Solcore.Test.FrontendComputationRuntimeBoundaryProperties
+import Solcore.Test.FrontendParsedComputationRuntimeSafety
+import Solcore.Test.FrontendParsedComputationRuntimeSafetyEntries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5893,6 +5897,8 @@ def run : IO Unit := do
   frontendParsedRecursiveTupleMigrationTests
   frontendParsedRecursiveTupleTests
   frontendParsedRecursiveTupleEntryTests
+  frontendParsedComputationRuntimeSafetyTests
+  frontendParsedComputationRuntimeSafetyEntryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
