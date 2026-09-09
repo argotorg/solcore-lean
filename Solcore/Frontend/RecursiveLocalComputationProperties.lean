@@ -2,7 +2,7 @@ import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.LocalExpressionTypingProperties
 import Solcore.Frontend.DirectWordBinaryProperties
 
-/-! Exact static provenance for recursive calls, groups and direct binaries.
+/-! Exact static provenance for recursive calls, groups, binaries and conditionals.
 Pure overlap is reconciled internally without restricting source or callers. -/
 
 set_option autoImplicit false
@@ -32,6 +32,31 @@ private theorem binary_children {table : LocalNameTable} {context : Resolved.Con
   · rintro ⟨leftCore, rightCore, leftAccepted, rightAccepted, rfl, rfl⟩
     exact ⟨(leftCore, op.leftType), leftAccepted, (rightCore, op.rightType), rightAccepted, by simp⟩
 
+private theorem conditional_children {table : LocalNameTable} {context : Resolved.Context}
+    {span question colon : Syntax.SourceSpan} {condition thenBranch elseBranch : Syntax.Expr}
+    {core : Core.Expr} {type : Core.Ty} :
+    elaborateRecursiveLocalComputation? table context
+        ⟨span, .conditional condition question thenBranch colon elseBranch⟩ = some (core, type) ↔
+      ∃ conditionCore thenCore elseCore,
+        elaborateRecursiveLocalComputation? table context condition = some (conditionCore, .bool) ∧
+        elaborateRecursiveLocalComputation? table context thenBranch = some (thenCore, type) ∧
+        elaborateRecursiveLocalComputation? table context elseBranch = some (elseCore, type) ∧
+        core = .ifE conditionCore thenCore elseCore := by
+  simp only [elaborateRecursiveLocalComputation?, bind, Option.bind_eq_some_iff]
+  constructor
+  · rintro ⟨⟨conditionCore, conditionType⟩, conditionAccepted, ⟨thenCore, thenType⟩, thenAccepted,
+      ⟨elseCore, elseType⟩, elseAccepted, result⟩
+    dsimp only at result
+    split at result
+    next same =>
+      cases result
+      exact ⟨conditionCore, thenCore, elseCore, same.1 ▸ conditionAccepted,
+        thenAccepted, same.2 ▸ elseAccepted, rfl⟩
+    next => cases result
+  · rintro ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩
+    exact ⟨(conditionCore, .bool), conditionAccepted, (thenCore, type), thenAccepted,
+      (elseCore, type), elseAccepted, by simp⟩
+
 private theorem pure_complete {table : LocalNameTable} {context : Resolved.Context}
     {source : Syntax.Expr} {resolved : Resolved.Expr} {core : Core.Expr} {type : Core.Ty}
     (resolution : ResolvesLocalExpression table source resolved)
@@ -40,6 +65,13 @@ private theorem pure_complete {table : LocalNameTable} {context : Resolved.Conte
     elaborateRecursiveLocalComputation? table context source = some (core, type) := by
   induction resolution generalizing core type with
   | group _ ih => simpa only [elaborateRecursiveLocalComputation?] using ih lowered typing
+  | conditional _ _ _ conditionIH thenIH elseIH =>
+      cases lowered with
+      | ifE conditionLowered thenLowered elseLowered =>
+          cases typing with
+          | ifE conditionTyped thenTyped elseTyped =>
+              exact conditional_children.mpr ⟨_, _, _, conditionIH conditionLowered conditionTyped,
+                thenIH thenLowered thenTyped, elseIH elseLowered elseTyped, rfl⟩
   | add _ _ leftIH rightIH | subtract _ _ leftIH rightIH
   | multiply _ _ leftIH rightIH | divide _ _ leftIH rightIH
   | modulo _ _ leftIH rightIH | greater _ _ leftIH rightIH | equal _ _ leftIH rightIH
@@ -92,6 +124,8 @@ private theorem complete {table : LocalNameTable} {context : Resolved.Context}
       exact application_children.mpr ⟨_, _, _, functionIH, argumentIH, rfl⟩
   | binary operator _ _ leftIH rightIH =>
       exact (binary_children operator).mpr ⟨_, _, leftIH, rightIH, rfl, rfl⟩
+  | conditional _ _ _ conditionIH thenIH elseIH =>
+      exact conditional_children.mpr ⟨_, _, _, conditionIH, thenIH, elseIH, rfl⟩
 
 private theorem pure_sound {table : LocalNameTable} {context : Resolved.Context}
     {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
@@ -109,6 +143,10 @@ private theorem sound {table : LocalNameTable} {context : Resolved.Context}
       cases payload
       case group inner =>
         exact .group (sound (by simpa only [elaborateRecursiveLocalComputation?] using accepted))
+      case conditional condition question thenBranch colon elseBranch =>
+        obtain ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩ :=
+          conditional_children.mp accepted
+        exact .conditional (sound conditionAccepted) (sound thenAccepted) (sound elseAccepted)
       case binary left operator right =>
         cases operator with
         | mk operatorSpan sourceOp =>
@@ -163,12 +201,18 @@ theorem recursiveLocalComputationHasType_iff_elaborates
         obtain ⟨leftCore, leftElaborated⟩ := leftIH
         obtain ⟨rightCore, rightElaborated⟩ := rightIH
         exact ⟨.binary _ leftCore rightCore, .binary operator leftElaborated rightElaborated⟩
+    | conditional _ _ _ conditionIH thenIH elseIH =>
+        obtain ⟨conditionCore, conditionElaborated⟩ := conditionIH
+        obtain ⟨thenCore, thenElaborated⟩ := thenIH
+        obtain ⟨elseCore, elseElaborated⟩ := elseIH
+        exact ⟨.ifE conditionCore thenCore elseCore, .conditional conditionElaborated thenElaborated elseElaborated⟩
   · rintro ⟨core, elaboration⟩
     induction elaboration with
     | pure resolution _ typing => exact .pure (resolution.reflects_type typing)
     | group _ ih => exact .group ih
     | application _ _ functionIH argumentIH => exact .application functionIH argumentIH
     | binary operator _ _ leftIH rightIH => exact .binary operator leftIH rightIH
+    | conditional _ _ _ conditionIH thenIH elseIH => exact .conditional conditionIH thenIH elseIH
 
 theorem RecursiveLocalComputationElaborates.core_hasType
     {table : LocalNameTable} {context : Resolved.Context}
@@ -180,5 +224,6 @@ theorem RecursiveLocalComputationElaborates.core_hasType
   | group _ ih => exact ih
   | application _ _ functionIH argumentIH => exact .apply functionIH argumentIH
   | binary _ _ _ leftIH rightIH => exact .binary leftIH rightIH
+  | conditional _ _ _ conditionIH thenIH elseIH => exact .ifE conditionIH thenIH elseIH
 
 end Solcore.Frontend
