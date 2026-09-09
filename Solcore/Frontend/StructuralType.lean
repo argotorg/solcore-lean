@@ -1,12 +1,12 @@
 import Solcore.Frontend.TypeName
 
-/-! An opt-in structural type fragment over the original canonical syntax.
-Named-only interpretation and existing parameter/header/let gates stay unchanged. -/
+/-! Structural type meanings over original canonical syntax, shared by entry annotations.
+The separate named-only interpreter and its whole-result membership law stay unchanged. -/
 set_option autoImplicit false
 namespace Solcore.Frontend
 
-/-- Exact named leaves, nullary Unit, singleton identity and ordered binary products.
-Larger lists and other type constructors are outside this restricted adapter. -/
+/-- Exact named leaves, nullary Unit, singleton identity and right-associated products.
+Explicit child nesting is retained; no extra terminal Unit is introduced. -/
 def interpretStructuralType? (table : TypeNameTable) (source : Syntax.TypeExpr) : Option Core.Ty :=
   match source with
   | ⟨_, .named name none⟩ => table.lookup? (qualifiedTypeNameKey name)
@@ -16,6 +16,10 @@ def interpretStructuralType? (table : TypeNameTable) (source : Syntax.TypeExpr) 
       let first ← interpretStructuralType? table left
       let second ← interpretStructuralType? table right
       return .product first second
+  | ⟨span, .tuple (first :: second :: third :: rest)⟩ => do
+      let headType ← interpretStructuralType? table first
+      let tailType ← interpretStructuralType? table ⟨span, .tuple (second :: third :: rest)⟩
+      return .product headType tailType
   | _ => none
 termination_by sizeOf source
 
@@ -33,5 +37,10 @@ inductive StructuralTypeDenotes (table : TypeNameTable) : Syntax.TypeExpr → Co
       (first : StructuralTypeDenotes table left leftType)
       (second : StructuralTypeDenotes table right rightType) :
       StructuralTypeDenotes table ⟨span, .tuple [left, right]⟩ (.product leftType rightType)
+  | many {span : Syntax.SourceSpan} {first second third : Syntax.TypeExpr}
+      {rest : List Syntax.TypeExpr} {firstType tailType : Core.Ty}
+      (headMeaning : StructuralTypeDenotes table first firstType)
+      (tailMeaning : StructuralTypeDenotes table ⟨span, .tuple (second :: third :: rest)⟩ tailType) :
+      StructuralTypeDenotes table ⟨span, .tuple (first :: second :: third :: rest)⟩ (.product firstType tailType)
 
 end Solcore.Frontend
