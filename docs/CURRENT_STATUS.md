@@ -634,21 +634,21 @@ bound, unfuelled evaluator or global source-call mechanism is introduced.
 
 A separate recursive expression profile now admits nested single-argument calls,
 computed callees and arbitrary grouping (ADR-0253). Each original callee and
-argument is checked recursively in the same scope; direct Word binary roots are
-extended below, while other roots retain the old pure interpretation.
+argument is checked recursively in the same scope; direct Word binary and
+conditional roots are extended below, while other roots retain the old pure interpretation.
 Independent syntax/type/Core evidence and raw/cost rules
 preserve the exact actual closure, captures and callee-to-argument-to-body store
 order. Grouping adds no Core wrapper or transitions, even where pure/group
 derivations overlap. Fourteen shared kernels connect checking, typing, exact
 execution/cost and caller insertion, with unchanged old-success embeddings.
 
-The recursive caller fragment permits applications and direct binary combinations
-of recursively admitted children, without source lambda construction.
+The recursive caller fragment permits applications, direct binary combinations
+and conditionals of recursively admitted children, without source lambda construction.
 Its paired insertion paths use the same actual
 body path and one cost before every continuation; intermediate caller states
 need not coincide. Old mixed-body/function entries remain unchanged and do not
-accept these nested expressions. Calls under unextended operators, tuples or
-conditional roots, source lambdas and global function resolution remain outside this
+accept these nested expressions. Calls under unextended operators or tuples,
+source lambdas and global function resolution remain outside this
 profile; pure such subtrees remain usable as call children. No source-only fuel
 bound, store-invariance or arbitrary-store safety is inferred.
 
@@ -706,9 +706,30 @@ evidence, including raw lazy branches that skip unsupported syntax. Binary calle
 insertion preserves literal values, stores and one cost before every continuation.
 The former recursive addition rejection fixtures now assert independent exact
 success; the older nonrecursive endpoints retain their rejection. Expanded
-comparisons, lazy Bool operators, tuples, unary and conditional roots do not gain
-recursive children. Actual wrong payloads can fault after a successful right
-child's effects; neither structural typing nor this extension supplies store safety.
+comparisons, lazy Bool operators, tuples and unary roots do not gain recursive
+children here; recursive conditional roots are recorded below. Actual wrong
+payloads can fault after a successful right child's effects; neither structural
+typing nor this extension supplies store safety.
+
+Canonical conditional roots now recurse through the same child (ADR-0257).
+Independent typing and elaboration inspect the original Bool guard and both
+written branches, requiring exactly the same branch type. The original question,
+colon and child spans remain intact; the exact Core is the corresponding ifE.
+Raw and cost rules instead evaluate the actual Bool guard and selected branch
+only, threading their real intermediate store at guard plus branch plus two.
+Unknown or mismatched unselected syntax can still permit raw success while
+preventing whole static success. Wrong actual guard payloads fault before choice.
+
+Seven constructors extend the existing relations and caller fragment; all
+fourteen recursive proof signatures and the shared body/entry code remain
+unchanged. Private pure/conditional compatibility retains old overlapping
+derivations. Literal insertion uses only the actual selected path, with a shared
+cost before every continuation. Original recursive ternary rejection fixtures
+become exact independent successes, while old nonrecursive endpoints still
+reject them. Parsed and symbolic consumers retain unequal branch costs, actual
+guard/selected effects, returned callables, full faults and genuine ifBranches
+checkpoints. No unselected effect, source-only bound or arbitrary-store safety
+is inferred; other unextended expression roots remain separate.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

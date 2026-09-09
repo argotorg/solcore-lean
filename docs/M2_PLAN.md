@@ -483,9 +483,18 @@ and binary caller insertion retains literal observations and a shared cost.
 Three old recursive addition rejection fixtures become exact independent
 positive cases; older nonrecursive endpoints remain unchanged.
 
+Conditional roots now recurse through the same child (ADR-0257). Original Bool
+guard and both branch Cores/types are checked independently, while raw execution
+uses only the actual guard and selected branch with their actual store flow and
+costs plus two. Seven constructors extend the existing static/raw/cost and
+caller-fragment relations without changing the fourteen proof signatures or
+shared body/entry code. Private pure overlap, literal insertion, old rejection
+boundaries and genuine saved branch-choice checkpoints remain explicit.
+Static rejection of an unselected child does not rule out raw selected success.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expanded comparisons, lazy Bool operators, tuples, unary and
-conditional roots, expected-type source lambdas and global function resolution
+expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
 transfer, and structural arguments alone do not validate stores.
 
