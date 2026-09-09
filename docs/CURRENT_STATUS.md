@@ -1121,6 +1121,27 @@ parsed consumers retain actual captured references, allocations, exact costs,
 faults and genuine checkpoints. Same-fuel/store transport does not validate
 stores, reconstruct runtime inhabitants or expand source admission.
 
+Recursive local computations now preserve independent elaboration and typing,
+complete optional checking, raw evaluation and exact costs under simultaneous
+injective local-ID relabeling (ADR-0275). Five additive laws keep the original
+AST/ranges, positional Core, type, every actual value and both stores fixed.
+Name/context/environment row order and duplicate entries are retained. Maps may
+change owners and binder indices and need not be surjective; reflection recovers
+original evidence without introducing an inverse or runtime inhabitants.
+
+The raw laws retain the same actual closure body/captures/argument and its Core
+path. They require no whole-source acceptance, runtime typing, world, aligned
+IDs or unique rows, including skipped unresolved syntax and a selected non-Bool
+lazy RHS. Absence of successful raw evaluation is also reflected, but does not
+classify faults or prove termination. Checked Core execution and checkpoint
+comparisons use their separate original elaboration and actual environments.
+
+This is a child-expression boundary: the profile allocates no named source
+binder. General ID relabeling here does not commute with the shared body's fresh
+allocator; owner-only body/function integration remains separate. Non-injective
+collapse can change first-match meanings, Core positions and actual results.
+All old executable definitions, contracts and consumer contexts are unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

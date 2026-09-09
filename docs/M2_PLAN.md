@@ -726,6 +726,19 @@ Actual capture/effect/fault and checkpoint consumers preserve the same values,
 fuel and store, without an inferred world or runtime-safety claim. Old semantic
 definitions, theorem signatures/bodies and consumer contexts remain unchanged.
 
+The recursive-child prerequisite for later owner covariance is now proved
+(ADR-0275): independent elaboration and typing iff, whole-checker equality,
+raw-cost iff and raw-evaluation iff under an arbitrary injective LocalId map.
+Original AST/Core/type/actual values/captures/stores/costs are retained without
+an inverse, surjectivity, caller-row uniqueness or raw typing assumptions.
+Whole static rejection stays distinct from skipped or untyped raw success.
+
+Keep this child proof separate from fresh allocation. Changing binder indices
+is safe in the existing binder-free recursive child, but does not establish
+shared-body or entry covariance. That next integration needs owner-only maps
+and the existing exact fresh-binding commutation. Non-injective collapse is
+explicitly outside all five laws and can alter first-match positional results.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

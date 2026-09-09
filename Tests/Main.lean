@@ -296,6 +296,9 @@ import Solcore.Test.FrontendComputationTypeTableProperties
 import Solcore.Test.FrontendComputationFunctionTypeTableProperties
 import Solcore.Test.FrontendParsedComputationTypeTableBoundaries
 import Solcore.Test.FrontendParsedComputationTypeTableEffects
+import Solcore.Test.FrontendRecursiveIdentityRenamingProperties
+import Solcore.Test.FrontendRecursiveIdentityRenamingBoundaryProperties
+import Solcore.Test.FrontendParsedRecursiveIdentityEffects
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5962,6 +5965,7 @@ def run : IO Unit := do
   frontendParsedScopedShadowingEffectTests
   frontendParsedComputationTypeTableBoundaryTests
   frontendParsedComputationTypeTableEffectTests
+  frontendParsedRecursiveIdentityEffectTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
