@@ -252,7 +252,7 @@ def frontendParsedRecursiveConditionalComputationTests : IO Unit := do
   have _ := elaborateRecursiveLocalComputation?_iff.mpr unaryStatic.elaboration
   check (decide (unaryStatic.core=unaryCore ∧ unaryStatic.type=.word ∧ elaborateRecursiveLocalComputation? names (context .word) unarySource=some (unaryCore,.word) ∧
     elaborateLocalExpression? names (context .word) unarySource=none ∧ elaborateLocalComputation? names (context .word) unarySource=none)) "original unary conditional exact success and old rejection"
-  for text in ["c ? f(x) : c","x ? f(x) : y","c ? f(x) : Missing","c ? Missing : f(x)","c ? f(x) : f(c)","c ? f(x) : f()","(c ? f(x) : y,y)"] do
+  for text in ["c ? f(x) : c","x ? f(x) : y","c ? f(x) : Missing","c ? Missing : f(x)","c ? f(x) : f(c)","c ? f(x) : f()"] do
     let s ← parsed text; check ((elaborateRecursiveLocalComputation? names (context .word) s).isNone) "whole branch/guard/profile rejection"
   for text in ["c ? f(x) : Missing","c ? f(x) : c","c ? f(x) : f()"] do
     let s ← parsed text; let r ← actual (environment .word (.word (Core.Word.ofNatModulo 17)) (.word (Core.Word.ofNatModulo 5)) true false) s

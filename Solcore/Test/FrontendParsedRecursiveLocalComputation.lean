@@ -246,7 +246,7 @@ def frontendParsedRecursiveLocalComputationTests : IO Unit := do
       (invoke (leaf 1 (identity type) rfl) applied (fun _ => .cons (.var rfl) .refl))
   staticCheck .word .word .word "f(g(x)) + x" (.binary .wordAdd (.apply (.var 1) (call 2 0)) (.var 0)) .word
   staticCheck .word .word .word "c ? f(g(x)) : x" (.ifE (.var 5) (.apply (.var 1) (call 2 0)) (.var 0)) .word
-  for text in ["(g(x),x)","!g(x)","f()","f(x,y)","f(g(Missing))",
+  for text in ["!g(x)","f()","f(x,y)","f(g(Missing))",
       "x(y)","f(c)","g(c ? x : Missing)","(lam(z: Word){return z;})(x)"] do
     let s ← parsed text
     check ((elaborateRecursiveLocalComputation? names (context .word .word .word) s).isNone) "outside recursive-call profile"

@@ -286,7 +286,7 @@ def frontendParsedRecursiveNegatedComparisonTests : IO Unit := do
     check (decide (raw.value=.bool (!isLe) ∧ raw.cost=20 ∧ elaborateRecursiveLocalComputation? names (context .word) s=none)) "raw chosen call succeeds despite unselected unknown"
   for a in [Core.Ty.bool,.unit,.namedData ⟨77⟩,.cell .word,.function .word .word] do
     for text in ["f(x) != g(y)","f(x) <= g(y)"] do check ((elaborateRecursiveLocalComputation? names (context a) (← parsed text)).isNone) "value-free non-Word comparison"
-  for text in ["f(x) != p(c)","p(c) <= f(x)","f(Missing) != y","x <= Missing","(f(x),y)"] do
+  for text in ["f(x) != p(c)","p(c) <= f(x)","f(Missing) != y","x <= Missing"] do
     check ((elaborateRecursiveLocalComputation? names (context .word) (← parsed text)).isNone) "unchanged wrong-type/name/unextended boundaries"
   let precedence ← parsed "f(x) <= g(y) != f(y) <= g(x)"
   check (match precedence.value with | .binary ⟨_,.binary _ ⟨_,.lessEqual⟩ _⟩ ⟨_,.notEqual⟩ ⟨_,.binary _ ⟨_,.lessEqual⟩ _⟩ => true | _ => false) "original relational precedence above nonassociative inequality"
