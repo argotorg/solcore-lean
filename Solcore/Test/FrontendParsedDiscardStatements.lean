@@ -1,0 +1,290 @@
+import Solcore.Syntax.Parser.Term
+import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
+import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.LocalFragmentProperties
+import Solcore.Core.LocalFragmentExactInsertionProperties
+
+/-! Original strict statement prefixes, independent source evidence and manually
+composed Core paths. Discard keeps the source scope; only Core inserts a value. -/
+set_option autoImplicit false
+namespace Tests
+open Solcore Solcore.Frontend
+namespace DiscardStatements
+private def check (p : Bool) (label : String) : IO Unit := do
+  unless p do throw (IO.userError label)
+private def owner : Resolved.DeclarationId := ⟨⟨.main, ⟨[⟨"Discard", by decide⟩], by decide⟩⟩, 17⟩
+private def other : Resolved.DeclarationId := { owner with declarationIndex := 71 }
+private def id (n : Nat) : Resolved.LocalId := ⟨owner, n⟩
+private def w (n : Nat) : Core.Value := .word (Core.Word.ofNatModulo n)
+private def types : TypeNameTable := [(["Word"], .word), (["Bool"], .bool)]
+private def inputs (type : Core.Ty) : LocalTypeInputs := ⟨[
+  ⟨"c", ⟨other, 999⟩, .bool⟩, ⟨"r", id 2, .word⟩, ⟨"x", id 7, type⟩, ⟨"x", id 3, .bool⟩], by
+    change ([⟨other, 999⟩, id 2, id 7, id 3] : List Resolved.LocalId).Nodup; decide⟩
+private def env (value : Core.Value) (choice : Bool) : Resolved.Environment :=
+  [(⟨other, 999⟩, .bool choice), (id 2, w 2), (id 7, value), (id 3, .bool false)]
+private def stores : List Core.Store := [[.unit, w 40], [w 91, .cellRef .word 40, .bool false]]
+private def parsed (content : String) : IO Syntax.Block := do
+  let file : Syntax.SourceFile := ⟨⟨.main, "discard.sol"⟩, content⟩
+  let .ok lexed := Syntax.Lexer.lex file | throw (IO.userError "lexer invariant")
+  let .ok body next := Syntax.Parser.block .allow (Syntax.Parser.State.initial file lexed)
+    | throw (IO.userError s!"complete block rejected: {content}")
+  check (lexed.diagnostics.isEmpty && next.diagnostics.isEmpty && next.atEnd &&
+    decide (body.span = ⟨file.id, 0, content.utf8ByteSize⟩)) s!"{content}: original block/range changed"
+  return body
+private structure Expression (s : LocalTypeInputs) (e : Resolved.Environment) (store : Core.Store) (source : Syntax.Expr) where
+  resolved : Resolved.Expr
+  core : Core.Expr
+  type : Core.Ty
+  value : Core.Value
+  cost : Nat
+  resolution : ResolvesLocalExpression s.names source resolved
+  lowered : Resolved.Lowers s.ids resolved core
+  typing : Resolved.HasType s.context resolved type
+  raw : LocalExpressionEvaluatesWithCost s.names e store source value store cost
+  paths : ∀ k, Core.Steps cost ⟨.eval core e.values, k, store⟩ ⟨.ret value, k, store⟩
+private def expression (s : LocalTypeInputs) (e : Resolved.Environment) (aligned : e.ids = s.ids)
+    (store : Core.Store) (source : Syntax.Expr) : IO (Expression s e store source) := do
+  match atSource : source with
+  | ⟨_, .identifier name⟩ =>
+      match named : s.names.lookup? name.value with
+      | none => throw (IO.userError "independent name absent")
+      | some binder =>
+          match typed : s.context.lookup? binder, found : e.lookup? binder, indexed : Resolved.LocalScope.index? s.ids binder with
+          | some type, some value, some index =>
+              let position := Resolved.LocalScope.index?_iff.mp indexed
+              return ⟨.var binder, .var index, type, value, 1,
+                by rw [atSource]; exact .identifier (LocalNameTable.lookup?_iff.mp named), .var position,
+                .var (Resolved.LocalScope.lookup?_iff.mp typed),
+                by rw [atSource]; exact .identifier (LocalNameTable.lookup?_iff.mp named) (Resolved.LocalScope.lookup?_iff.mp found),
+                fun _ => .cons (.var ((Resolved.LocalScope.lookup_iff_getElem? (aligned.symm ▸ position)).mp
+                  (Resolved.LocalScope.lookup?_iff.mp found))) .refl⟩
+          | _, _, _ => throw (IO.userError "independent row absent")
+  | ⟨_, .tuple ⟨_, []⟩⟩ => return ⟨.unit, .unit, .unit, .unit, 1,
+      by rw [atSource]; exact .unit, .unit, .unit, by rw [atSource]; exact .unit, fun _ => .cons .unit .refl⟩
+  | ⟨_, .tuple ⟨_, [left, right]⟩⟩ =>
+      let a ← expression s e aligned store left; let b ← expression s e aligned store right
+      return ⟨.pair a.resolved b.resolved, .pair a.core b.core, .product a.type b.type, .pair a.value b.value, a.cost + b.cost + 3,
+        by rw [atSource]; exact .pair a.resolution b.resolution, .pair a.lowered b.lowered, .pair a.typing b.typing,
+        by rw [atSource]; exact .pair a.raw b.raw, fun k => by
+          have path := Core.Steps.cons .enterPair ((a.paths (.pairRight b.core e.values :: k)).trans
+            (.cons .enterPairRight ((b.paths _).trans (.cons .applyPair .refl))))
+          simpa only [Nat.add_assoc] using path⟩
+  | ⟨_, .binary left ⟨_, .subtract⟩ right⟩ =>
+      let a ← expression s e aligned store left; let b ← expression s e aligned store right
+      match av : a.value, bv : b.value with
+      | .word x, .word y =>
+          if leftType : a.type = .word then
+            if rightType : b.type = .word then
+            return ⟨.binary .wordSub a.resolved b.resolved, .binary .wordSub a.core b.core, .word, .word (x.sub y), a.cost + b.cost + 3,
+              by rw [atSource]; exact .subtract a.resolution b.resolution, .binary a.lowered b.lowered,
+              .binary (show Resolved.HasType s.context a.resolved .word from leftType ▸ a.typing)
+                (show Resolved.HasType s.context b.resolved .word from rightType ▸ b.typing),
+              by rw [atSource]; exact .subtract (av ▸ a.raw) (bv ▸ b.raw), fun k => by
+                have path := Core.Steps.cons .enterBinary ((av ▸ a.paths (.binaryRight .wordSub b.core e.values :: k)).trans
+                  (.cons .enterBinaryRight ((bv ▸ b.paths _).trans (.cons (.applyBinary rfl) .refl))))
+                simpa only [Nat.add_assoc] using path⟩
+            else throw (IO.userError "right is not Word")
+          else throw (IO.userError "left is not Word")
+      | _, _ => throw (IO.userError "actual operand not Word")
+  | _ => throw (IO.userError "outside independent expression script")
+termination_by sizeOf source
+private structure Certificate (s : LocalTypeInputs) (e : Resolved.Environment) (store : Core.Store) (body : Syntax.Block) where
+  core : Core.Expr
+  type : Core.Ty
+  value : Core.Value
+  cost : Nat
+  elaboration : TypedLetReturnTreeElaborates types owner s body core type
+  raw : TypedLetReturnTreeEvaluatesWithCost owner s.names e store body value store cost
+  paths : ∀ k, Core.Steps cost ⟨.eval core e.values, k, store⟩ ⟨.ret value, k, store⟩
+private def certify (s : LocalTypeInputs) (e : Resolved.Environment) (aligned : e.ids = s.ids)
+    (store : Core.Store) (body : Syntax.Block) : IO (Certificate s e store body) := do
+  match atBody : body with
+  | ⟨_, [⟨_, .returnStmt (some source)⟩]⟩ =>
+      let a ← expression s e aligned store source
+      return ⟨a.core, a.type, a.value, a.cost,
+        by rw [atBody]; exact .single (.expression a.resolution (by simpa only [LocalTypeInputs.context_ids] using a.lowered) a.typing),
+        by rw [atBody]; exact .single (.expression a.raw), a.paths⟩
+  | ⟨span, ⟨_, .expression source true⟩ :: rest⟩ =>
+      let a ← expression s e aligned store source
+      let b ← certify s e aligned store ⟨span, rest⟩
+      return ⟨.letE a.core (b.core.weakenAt 0), b.type, b.value, a.cost + b.cost + 2,
+        by rw [atBody]; exact .discard a.resolution a.lowered a.typing b.elaboration,
+        by rw [atBody]; exact .discard a.raw b.raw, fun k => by
+          have shifted := (b.paths []).weakenAt_zero_localFragment b.elaboration.localFragment a.value k
+          have path := Core.Steps.cons .enterLet
+            ((a.paths (.letBody (b.core.weakenAt 0) e.values :: k)).trans (.cons .bindLet shifted))
+          simpa only [Nat.add_assoc] using path⟩
+  | ⟨span, ⟨_, .letDecl name annotation (some initializer)⟩ :: rest⟩ =>
+      if unused : name.value ∉ s.names.map Prod.fst then
+        let a ← expression s e aligned store initializer
+        let next := s.bindFresh owner name.value a.type
+        let b ← certify next ((Resolved.freshLocalId owner s.ids, a.value) :: e)
+          (by simpa only [next, LocalTypeInputs.bindFresh_ids, Resolved.LocalScope.ids, List.map_cons]
+            using congrArg (List.cons _) aligned) store ⟨span, rest⟩
+        let rawTail := by simpa only [next, LocalTypeInputs.bindFresh_names, LocalTypeInputs.names_ids] using b.raw
+        let common := fun elaboration raw => (⟨.letE a.core b.core, b.type, b.value, a.cost + b.cost + 2, elaboration, raw, fun k => by
+          have path := Core.Steps.cons .enterLet ((a.paths (.letBody b.core e.values :: k)).trans (.cons .bindLet (b.paths k)))
+          simpa only [Resolved.LocalScope.values, List.map_cons, Nat.add_assoc] using path⟩ : Certificate s e store body)
+        match atAnnotation : annotation with
+        | none => return (common (by rw [atBody, atAnnotation]; exact .inferred unused a.resolution a.lowered a.typing b.elaboration)
+            (by rw [atBody, atAnnotation]; exact .inferred a.raw (by simpa only [LocalTypeInputs.names_ids] using rawTail)))
+        | some written =>
+            match atWritten : written with
+            | ⟨_, .named name none⟩ =>
+                if meaning : types.lookup? (qualifiedTypeNameKey name) = some a.type then
+                  return (common (by rw [atBody, atAnnotation, atWritten]; exact .binding (.named (TypeNameTable.lookup?_iff.mp meaning)) unused a.resolution a.lowered a.typing b.elaboration)
+                    (by rw [atBody, atAnnotation]; exact .binding a.raw (by simpa only [LocalTypeInputs.names_ids] using rawTail)))
+                else throw (IO.userError "written annotation disagrees")
+            | _ => throw (IO.userError "outside independent annotation script")
+      else throw (IO.userError "written name is already used")
+  | ⟨_, [⟨_, .ifThen guard yes (some no)⟩]⟩ =>
+      let c ← expression s e aligned store guard
+      let a ← certify s e aligned store yes; let b ← certify s e aligned store no
+      if ct : c.type = .bool then
+        if bt : b.type = a.type then
+        have elaboration : TypedLetReturnTreeElaborates types owner s body (.ifE c.core a.core b.core) a.type := by
+          rw [atBody]; exact .conditional c.resolution c.lowered (ct ▸ c.typing) a.elaboration (bt ▸ b.elaboration)
+        match cv : c.value with
+        | .bool true => return ⟨.ifE c.core a.core b.core, a.type, a.value, c.cost + a.cost + 2, elaboration,
+            by rw [atBody]; exact .ifTrue (cv ▸ c.raw) a.raw, fun k => by
+              have path := Core.Steps.cons .enterIf ((cv ▸ c.paths (.ifBranches a.core b.core e.values :: k)).trans (.cons .chooseTrue (a.paths k)))
+              simpa only [Nat.add_assoc] using path⟩
+        | .bool false => return ⟨.ifE c.core a.core b.core, a.type, b.value, c.cost + b.cost + 2, elaboration,
+            by rw [atBody]; exact .ifFalse (cv ▸ c.raw) b.raw, fun k => by
+              have path := Core.Steps.cons .enterIf ((cv ▸ c.paths (.ifBranches a.core b.core e.values :: k)).trans (.cons .chooseFalse (b.paths k)))
+              simpa only [Nat.add_assoc] using path⟩
+        | _ => throw (IO.userError "actual guard not Bool")
+        else throw (IO.userError "arm types differ")
+      else throw (IO.userError "guard type not Bool")
+  | _ => throw (IO.userError "outside independent body script")
+termination_by sizeOf body
+private structure Actual where
+  type : Core.Ty
+  value : Core.Value
+  typed : Core.ValueHasType value type
+private def supplied (a : Actual) (choice : Bool) : LocalInputs := ⟨[
+  ⟨"c", ⟨other, 999⟩, .bool, .bool choice, .bool⟩, ⟨"r", id 2, .word, w 2, .word⟩,
+  ⟨"x", id 7, a.type, a.value, a.typed⟩, ⟨"x", id 3, .bool, .bool false, .bool⟩], by
+    change ([⟨other, 999⟩, id 2, id 7, id 3] : List Resolved.LocalId).Nodup; decide⟩
+private def checked (content : String) (a : Actual) (choice : Bool) (core : Core.Expr)
+    (type : Core.Ty) (value : Core.Value) (cost bound : Nat) : IO Unit := do
+  let body ← parsed content; let actual := supplied a choice
+  let s := actual.toTypeInputs; let e := actual.environment
+  have _ : s = inputs a.type := rfl
+  check (decide (e = env a.value choice ∧ actual.bindings.length = 4)) "original supplied rows changed"
+  for store in stores do
+    let cert ← certify s e rfl store body
+    check (decide (cert.core = core ∧ cert.type = type ∧ cert.value = value ∧ cert.cost = cost)) "independent expectations changed"
+    let accepted := cert.elaboration.complete
+    match atShape : body with
+    | ⟨_, ⟨_, .expression _ true⟩ :: _⟩ =>
+        have _ := elaborateTypedLetReturnTree?_discard_children (by rw [← atShape]; exact accepted)
+        pure ()
+    | _ => pure ()
+    check (decide (actual.checkTypedLetReturnTree? types owner body = some (core, type) ∧
+      evaluateTypedLetReturnTreeWithCost? owner s.names e body = some (value, cost) ∧
+      Core.infer? s.context.values core = some type ∧ typedLetReturnTreeFuelBound body = bound ∧ cost ≤ bound))
+      "independent Core/type/value/cost/bound disagreed with the public APIs"
+    check ((elaborateTypedLetReturnBody? types owner s body).isNone) "old prefix adapter widened"
+    let start := Core.State.initial cert.core e.values store
+    let run := fun fuel => actual.runTypedLetReturnTree? types owner fuel body store
+    for k in [[], [.letBody (.var 0) [w 17]], [.unaryApply .wordNot]] do
+      have _ := cert.paths k
+      have _ := cert.raw.checked_toStepsWithContinuation accepted rfl k
+      pure ()
+    for fuel in List.range (bound + 3) do
+      check (decide (run fuel = some (type, Core.runStateful fuel start))) "body wrapper changed the full machine result"
+      check (match run fuel with
+        | some (_, .done v st) => decide (cost ≤ fuel ∧ v = value ∧ st = store)
+        | some (_, .outOfFuel cp) => decide (fuel < cost ∧ cp.store = store)
+        | _ => false) "exact threshold or own store changed"
+    for spent in List.range cost do
+      match exhausted : run spent with
+      | some (_, .outOfFuel cp) =>
+          have _ := actual.runTypedLetReturnTree?_resume exhausted (cost - spent)
+          for remaining in [0, 1, cost - spent, cost - spent + 2] do
+            check (decide (run (spent + remaining) = some (type, Core.runStateful remaining cp))) "genuine checkpoint replay changed"
+          check (decide (Core.runStateful (cost - spent) cp = .done value store)) "exact residual cost changed"
+          if cost - spent > 1 then
+            let .outOfFuel next := Core.runStateful 1 cp | throw (IO.userError "second chunk missing")
+            check (decide (Core.runStateful (cost - spent - 1) next = .done value store)) "third chunk lost its continuation"
+          if spent > 0 then check (Core.runStateful (cost - spent) start != .done value store) "restart impersonated resume"
+      | _ => throw (IO.userError "checkpoint missing")
+private def spine : Nat → String × Core.Expr
+  | 0 => ("return x;", .var 2)
+  | n + 1 => let (tail, core) := spine n; ("x;" ++ tail, .letE (.var 2) (core.weakenAt 0))
+private def nominal (body : Syntax.Block) : IO Unit := do
+  match atBody : body with
+  | ⟨_, [⟨_, .expression ⟨_, .identifier name⟩ true⟩, ⟨_, .returnStmt (some ⟨_, .identifier result⟩)⟩]⟩ =>
+      if hn : name.value = "x" then
+        if hr : result.value = "x" then
+          for type in [Core.Ty.namedData ⟨99⟩, .product (.namedData ⟨99⟩) (.cell (.namedData ⟨13⟩))] do
+            have named : LocalNameTable.Lookup (inputs type).names "x" (id 7) :=
+              .tail (by decide) (.tail (by decide) .head)
+            have typed : Resolved.HasType (inputs type).context (.var (id 7)) type :=
+              .var (.tail (by decide) (.tail (by decide) .head))
+            have lowered : Resolved.Lowers (inputs type).ids (.var (id 7)) (.var 2) :=
+              .var (.tail (by decide) (.tail (by decide) .head))
+            have evidence : TypedLetReturnTreeElaborates types owner (inputs type) body (.letE (.var 2) (.var 3)) type := by
+              rw [atBody]; simpa [Core.Expr.weakenAt] using
+                (TypedLetReturnTreeElaborates.discard (types := types) (owner := owner)
+                  (.identifier (hn ▸ named)) lowered typed (.single (.expression (.identifier (hr ▸ named)) lowered typed)))
+            have _ (definitions : Core.DataEnvironment) :
+                Core.HasType (inputs type).context.values (.letE (.var 2) (.var 3)) type definitions :=
+              .letE (.var rfl) (.var rfl)
+            have _ : ¬ TypedLetReturnTreeElaborates types owner (inputs type) body (.var 2) type := by
+              intro wrong; have impossible := evidence.result_unique wrong; cases impossible.1
+            check (decide (elaborateTypedLetReturnTree? types owner (inputs type) body =
+              some (.letE (.var 2) (.var 3), type))) "value-free nominal discard changed"
+        else throw (IO.userError "return spelling changed")
+      else throw (IO.userError "discard spelling changed")
+  | _ => throw (IO.userError "original nominal body shape changed")
+end DiscardStatements
+open DiscardStatements
+def frontendParsedDiscardStatementTests : IO Unit := do
+  let wordActual : Actual := ⟨.word, w 9, .word⟩
+  for depth in [1, 2, 5, 15] do
+    let (content, core) := spine depth
+    checked ("{" ++ content ++ "}") wordActual true core .word (w 9) (3 * depth + 1) (3 * depth + 1)
+  checked "{x - r;return r;}" wordActual true (.letE (.binary .wordSub (.var 2) (.var 1)) (.var 2)) .word (w 2) 8 8
+  checked "{(x,r);return x;}" wordActual true (.letE (.pair (.var 2) (.var 1)) (.var 3)) .word (w 9) 8 8
+  checked "{();return ();}" wordActual false (.letE .unit .unit) .unit .unit 4 4
+  checked "{x;let z=x - r;z;let q: Word=z;return q;}" wordActual true
+    (.letE (.var 2) (.letE (.binary .wordSub (.var 3) (.var 2)) (.letE (.var 0) (.letE (.var 1) (.var 0))))) .word (w 7) 17 17
+  for choice in [false, true] do
+    checked "{if(c){x - r;return x;}else{return r;}}" wordActual choice
+      (.ifE (.var 0) (.letE (.binary .wordSub (.var 2) (.var 1)) (.var 3)) (.var 1))
+      .word (if choice then w 9 else w 2) (if choice then 11 else 4) 11
+  for a in [⟨.cell .word, .cellRef .word 999, .cellRef⟩,
+      ⟨.function .word .word, .closure .word .word (.var 1) [w 7], .closure (.cons .word .nil) (.var rfl)⟩,
+      ⟨.unit, .unit, .unit⟩, ⟨.product .unit (.cell .word), .pair .unit (.cellRef .word 19), .pair .unit .cellRef⟩] do
+    checked "{x;return x;}" a true (.letE (.var 2) (.var 3)) a.type a.value 4 4
+  let body ← parsed "{x;return x;}"; nominal body
+  match body.value with
+  | [⟨statementSpan, .expression source true⟩, returned] =>
+      check (decide (statementSpan.startByte = 1 ∧ statementSpan.endByte = 3 ∧
+        source.span.startByte = 1 ∧ source.span.endByte = 2 ∧ returned.span.startByte = 3))
+        "original expression/semicolon/tail byte positions changed"
+  | _ => throw (IO.userError "original strict statement shape changed")
+  check (decide (Resolved.freshLocalId owner (inputs .word).ids = DiscardStatements.id 8)) "discard introduced a source identity"
+  for store in stores do
+    let e := (supplied wordActual true).environment.values
+    let start := Core.State.initial (.letE (.binary .wordSub (.var 2) (.var 1)) (.var 2)) e store
+    let cp : Core.State := ⟨.ret (w 7), [.letBody (.var 2) e], store⟩
+    check (decide (Core.runStateful 6 start = .outOfFuel cp ∧
+      Core.runStateful 7 start = .outOfFuel ⟨.eval (.var 2) (w 7 :: e), [], store⟩ ∧
+      Core.runStateful 2 cp = .done (w 2) store ∧
+      Core.runStateful 0 { cp with continuation := [] } = .done (w 7) store)) "discard's actual hidden value/frame was erased"
+  for content in ["{x}", "{x;}", "{missing;return x;}", "{~c;return x;}", "{f(x);return x;}",
+      "{x=r;return x;}", "{return x;x;}", "{x;let x=r;return x;}", "{x;let z: Unknown=x;return z;}"] do
+    let rejected ← parsed content
+    check ((elaborateTypedLetReturnTree? types owner (inputs .word) rejected).isNone) "unsupported or invalid statement accepted"
+  for content in ["{missing;return x;}", "{~c;return x;}", "{f(x);return x;}"] do
+    check ((evaluateTypedLetReturnTreeWithCost? owner (inputs .word).names (env (w 9) true) (← parsed content)).isNone)
+      "an unused invalid expression was skipped by raw execution"
+  let skipped ← parsed "{if(c){x;return x;}else{missing;return x;}}"
+  check (decide (evaluateTypedLetReturnTreeWithCost? owner (inputs .word).names (env (w 9) true) skipped = some (w 9, 7) ∧
+    elaborateTypedLetReturnTree? types owner (inputs .word) skipped = none)) "raw selected path bypassed whole checking"
+end Tests
