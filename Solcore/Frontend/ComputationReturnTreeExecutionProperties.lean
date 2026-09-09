@@ -30,18 +30,22 @@ private theorem word_test_iff {environment : Core.Environment} {actual : Core.Va
     exact .binary (.var rfl) .word rfl
 
 private theorem fold_evaluates_iff
-    (entries : List (Syntax.MatchCase × (Core.Word × Core.Expr)))
+    (entries : List (Syntax.MatchCase × (Option Core.Word × Core.Expr)))
     {environment : Core.Environment} {actual value : Core.Value}
     {initialStore finalStore : Core.Store} {defaultBody : Syntax.Block} {defaultCore : Core.Expr}
     {E : Syntax.Block → Prop}
-    (patterns : ∀ entry ∈ entries, WordMatchPatternDenotes entry.1.value.pattern entry.2.1)
+    (patterns : ∀ entry ∈ entries, match entry.2.1 with
+      | none => ∃ marker, entry.1.value.pattern.value = .wildcard marker
+      | some word => WordMatchPatternDenotes entry.1.value.pattern word)
     (branches : ∀ entry ∈ entries, Core.Evaluates (actual :: environment) initialStore
       (entry.2.2.weakenAt 0) value finalStore ↔ E entry.1.value.body)
     (fallback : Core.Evaluates (actual :: environment) initialStore
       (defaultCore.weakenAt 0) value finalStore ↔ E defaultBody) :
     Core.Evaluates (actual :: environment) initialStore
-      (entries.foldr (fun entry tail => .ifE (.binary .wordEq (.var 0) (.word entry.2.1))
-        (entry.2.2.weakenAt 0) tail) (defaultCore.weakenAt 0)) value finalStore ↔
+      (entries.foldr (fun entry tail => match entry.2.1 with
+        | none => entry.2.2.weakenAt 0
+        | some word => .ifE (.binary .wordEq (.var 0) (.word word))
+            (entry.2.2.weakenAt 0) tail) (defaultCore.weakenAt 0)) value finalStore ↔
       ∃ selected tests, WordMatchChooses actual (entries.map Prod.fst) defaultBody selected tests ∧ E selected := by
   revert patterns branches
   induction entries with
@@ -56,30 +60,46 @@ private theorem fold_evaluates_iff
         (fun item member => branches item (List.mem_cons_of_mem entry member))
       have meaning := patterns entry (List.mem_cons_self)
       have branch := branches entry (List.mem_cons_self)
-      constructor
-      · intro evaluation
-        cases evaluation with
-        | ifTrue guard evaluated =>
-            obtain ⟨word, rfl, equal, rfl⟩ := word_test_iff.mp guard
-            have same : word = entry.2.1 := by simpa using equal
-            subst word
-            exact ⟨_, 1, .hit meaning, branch.mp evaluated⟩
-        | ifFalse guard evaluated =>
-            obtain ⟨word, rfl, different, rfl⟩ := word_test_iff.mp guard
-            have unequal : word ≠ entry.2.1 := by simpa using different
-            obtain ⟨selected, tests, choice, selectedBranch⟩ := tail.mp evaluated
-            exact ⟨selected, tests + 1, .miss meaning unequal choice, selectedBranch⟩
-      · rintro ⟨selected, tests, choice, evaluated⟩
-        cases choice with
-        | hit actualMeaning =>
-            have same := actualMeaning.value_unique meaning
-            subst same
-            exact .ifTrue (word_test_iff.mpr ⟨_, rfl, by simp, rfl⟩) (branch.mpr evaluated)
-        | miss otherMeaning different choice =>
-            have same := otherMeaning.value_unique meaning
-            subst same
-            exact .ifFalse (word_test_iff.mpr ⟨_, rfl, by simpa using different, rfl⟩)
-              (tail.mpr ⟨_, _, choice, evaluated⟩)
+      cases tag : entry.2.1 with
+      | none =>
+          simp only [tag] at meaning
+          simp only [List.foldr_cons, tag]
+          obtain ⟨marker, shape⟩ := meaning
+          constructor
+          · intro evaluation; exact ⟨_, 0, .wildcard shape, branch.mp evaluation⟩
+          · rintro ⟨selected, tests, choice, evaluated⟩
+            cases choice with
+            | wildcard _ => exact branch.mpr evaluated
+            | hit other => obtain ⟨_, wrong, _⟩ := other; simp [shape] at wrong
+            | miss other _ _ => obtain ⟨_, wrong, _⟩ := other; simp [shape] at wrong
+      | some literal =>
+          simp only [tag] at meaning
+          simp only [List.foldr_cons, tag]
+          constructor
+          · intro evaluation
+            cases evaluation with
+            | ifTrue guard evaluated =>
+                obtain ⟨word, rfl, equal, rfl⟩ := word_test_iff.mp guard
+                have same : word = literal := by simpa using equal
+                subst word
+                exact ⟨_, 1, .hit meaning, branch.mp evaluated⟩
+            | ifFalse guard evaluated =>
+                obtain ⟨word, rfl, different, rfl⟩ := word_test_iff.mp guard
+                have unequal : word ≠ literal := by simpa using different
+                obtain ⟨selected, tests, choice, selectedBranch⟩ := tail.mp evaluated
+                exact ⟨selected, tests + 1, .miss meaning unequal choice, selectedBranch⟩
+          · rintro ⟨selected, tests, choice, evaluated⟩
+            cases choice with
+            | wildcard shape => obtain ⟨_, wrong, _⟩ := meaning; simp [shape] at wrong
+            | hit actualMeaning =>
+                have same := actualMeaning.value_unique meaning
+                subst same
+                exact .ifTrue (word_test_iff.mpr ⟨_, rfl, by simp, rfl⟩) (branch.mpr evaluated)
+            | miss otherMeaning different choice =>
+                have same := otherMeaning.value_unique meaning
+                subst same
+                exact .ifFalse (word_test_iff.mpr ⟨_, rfl, by simpa using different, rfl⟩)
+                  (tail.mpr ⟨_, _, choice, evaluated⟩)
 
 theorem ComputationReturnTreeElaborates.evaluates_iff
     {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}
