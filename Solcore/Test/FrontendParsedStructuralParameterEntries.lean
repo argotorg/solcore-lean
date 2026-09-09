@@ -235,11 +235,19 @@ def frontendParsedStructuralParameterEntryTests : IO Unit := do
           | exact .cons .enterIf (.cons (.var rfl) (.cons .chooseTrue (.cons (.var rfl) .refl)))
           | exact .cons .enterIf (.cons (.var rfl) (.cons .chooseFalse (.cons .enterLet
               (.cons (.var rfl) (.cons .bindLet (.cons (.var rfl) .refl)))))))
+      let migrated ← check types "function stillLet(p: (Word,Bool),c: (Bool)){let x: (Word,Bool)=p;return ();}"
+        [pair, boolArg choice] (.letE (.var 1) .unit) .unit .unit 4
+        (by intro store k; exact .cons .enterLet (.cons (.var rfl) (.cons .bindLet (.cons .unit .refl))))
+      match migrated.value.body.value with
+      | ⟨_, .letDecl _ (some original) (some _)⟩ :: _ =>
+          let independent ← annotation types original
+          assertTrue (decide (independent.type = pair.type)) "migrated original let annotation changed meaning"
+          assertTrue (interpretTypeName? types original).isNone "old named-only annotation boundary changed"
+      | _ => throw (IO.userError "migrated original structural let disappeared")
       for declaration in ["function unselected(p: (Word,Bool),c: (Bool)) returns((Word,Bool)){if(c){return p;}else{return missing;}}",
           "function unknown(p: (Word,Unknown),c: (Bool)){return ();}",
           "function unsupported(p: (Word,Bool,Word),c: (Bool)){return ();}",
           "function wrongOrder(p: (Bool,Word),c: (Bool)){return ();}",
-          "function stillLet(p: (Word,Bool),c: (Bool)){let x: (Word,Bool)=p;return ();}",
           "function shadow(p: (Word,Bool),c: (Bool)){let p: Pair=p;return ();}",
           "function multiple(p: (Word,Bool),c: (Bool)) returns(Word,Bool){return p;}"] do
         rejected types (← parsed declaration) [pair, boolArg choice]

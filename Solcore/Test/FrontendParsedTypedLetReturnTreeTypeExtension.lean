@@ -104,7 +104,7 @@ private def certify (types : TypeNameTable) (inputs : LocalTypeInputs) (body : S
             let childTail ← certify types (inputs.bindFresh owner name.value declaredType) ⟨blockSpan, rest⟩ tail type
             return ⟨by
               rw [sourceAt, coreAt, typeAt]
-              exact .binding (interpretTypeName?_sound meaning) unused child.resolution child.lowered child.typing childTail.elaboration⟩
+              exact .binding (interpretTypeName?_sound meaning).structural unused child.resolution child.lowered child.typing childTail.elaboration⟩
           else throw (IO.userError "independent binding reused a name")
   | ⟨_, [⟨_, .ifThen condition left (some right)⟩]⟩, .ifE guard first second, type =>
       let child ← expression inputs condition guard .bool

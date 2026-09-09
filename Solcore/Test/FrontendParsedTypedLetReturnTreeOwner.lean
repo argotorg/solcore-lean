@@ -111,7 +111,7 @@ private def certify (inputs : LocalTypeInputs) (body : Syntax.Block) (core : Cor
             let childTail ← certify extended ⟨blockSpan, rest⟩ tail type (nextIndex + 1)
             return ⟨by
               rw [sourceAt, coreAt, typeAt]
-              exact .binding (interpretTypeName?_sound meaning) unused
+              exact .binding (interpretTypeName?_sound meaning).structural unused
                 child.resolution child.lowered child.typing childTail.elaboration⟩
           else throw (IO.userError "independent binding reused a name")
   | ⟨_, [⟨_, .ifThen condition left (some right)⟩]⟩, .ifE guard first second, type =>

@@ -3,9 +3,9 @@ import Solcore.Frontend.StructuralTypeTableProperties
 import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
 import Solcore.Frontend.RuntimeFunctionCompilation
 import Solcore.Frontend.RuntimeFunctionResumptionProperties
-
+import Solcore.Frontend.TypedLetReturnBodyRunner
 /-! Complete types carry independent meaning. One structural return annotation
-and parameters now execute; initialized-let annotations remain named-only. -/
+parameters and recursive lets execute; old named-only and prefix adapters remain unchanged. -/
 set_option autoImplicit false
 namespace Tests
 open Solcore Solcore.Frontend
@@ -81,51 +81,61 @@ private def declaration (content : String) : IO Syntax.FunctionDecl := do
   assertTrue (next.atEnd && next.diagnostics.isEmpty && lexed.diagnostics.isEmpty &&
     decide (source.span = ⟨(file content).id, 0, content.utf8ByteSize⟩)) "gate source lost original completion or range"
   return source
-private def oldGateRejected (content : String) (arguments : List TypedRuntimeArgument)
-    (expected : Core.Ty) : IO Unit := do
-  let source ← declaration content
-  let annotations := source.value.signature.parameters.elements.filterMap (fun parameter =>
-    match parameter.value with | .typed none _ annotation => some annotation | _ => none)
-  let annotations := annotations ++ (source.value.signature.returnsClause.map (·.types.elements)).getD []
-  let annotations := annotations ++ source.value.body.value.filterMap (fun statement =>
-    match statement.value with | .letDecl _ (some annotation) _ => some annotation | _ => none)
-  let structural := annotations.filter fun annotation => match annotation.value with | .tuple _ => true | _ => false
-  let [annotation] := structural | throw (IO.userError "expected one original structural annotation")
-  let independent ← certify table annotation
-  assertTrue (decide (independent.type = expected ∧ interpretStructuralType? table annotation = some expected))
-    "new structural meaning did not come from the original declaration annotation"
-  have _ := independent.meaning.complete
-  assertTrue (interpretTypeName? table annotation).isNone "old annotation adapter broadened"
-  assertTrue (compileRuntimeFunction? table owner source).isNone "old static declaration gate broadened"
-  assertTrue (prepareRuntimeFunction? table owner source arguments).isNone "old argument gate broadened"
-  assertTrue (evaluateRuntimeFunctionWithCost? table owner source arguments).isNone "old direct entry gate broadened"
-  for store in [[], [w.value, .cellRef .word 99]] do
-    for fuel in [0, 1, 40] do
-      assertTrue (runRuntimeFunction? table owner source arguments fuel store).isNone "rejected gate exposed execution"
-private structure Raw (names : LocalNameTable) (env : Resolved.Environment) (store : Core.Store) (source : Syntax.Expr) where
+private structure Raw (inputs : LocalInputs) (store : Core.Store) (source : Syntax.Expr) where
+  type : Core.Ty
   value : Core.Value
   cost : Nat
-  costed : LocalExpressionEvaluatesWithCost names env store source value store cost
-private def raw (names : LocalNameTable) (env : Resolved.Environment) (store : Core.Store)
-    (source : Syntax.Expr) : IO (Raw names env store source) := do
+  typing : LocalExpressionHasType inputs.names inputs.context source type
+  costed : LocalExpressionEvaluatesWithCost inputs.names inputs.environment store source value store cost
+private def raw (inputs : LocalInputs) (store : Core.Store) (source : Syntax.Expr) : IO (Raw inputs store source) := do
   match sourceAt : source with
-  | ⟨_, .tuple ⟨_, []⟩⟩ => return ⟨.unit, 1, by rw [sourceAt]; exact .unit⟩
+  | ⟨_, .tuple ⟨_, []⟩⟩ => return ⟨.unit, .unit, 1, by rw [sourceAt]; exact .unit, by rw [sourceAt]; exact .unit⟩
   | ⟨_, .identifier name⟩ =>
-      match named : names.lookup? name.value with
+      match named : inputs.names.lookup? name.value with
       | none => throw (IO.userError "independent source name missing")
       | some id =>
-          match found : env.lookup? id with
-          | none => throw (IO.userError "independent actual value missing")
-          | some value => return ⟨value, 1, by
-              rw [sourceAt]
-              exact .identifier (LocalNameTable.lookup?_iff.mp named) (Resolved.LocalScope.lookup?_iff.mp found)⟩
+          match found : inputs.environment.lookup? id, typed : inputs.context.lookup? id with
+          | some value, some type => return ⟨type, value, 1,
+              by rw [sourceAt]; exact .identifier (LocalNameTable.lookup?_iff.mp named) (Resolved.LocalScope.lookup?_iff.mp typed),
+              by rw [sourceAt]; exact .identifier (LocalNameTable.lookup?_iff.mp named) (Resolved.LocalScope.lookup?_iff.mp found)⟩
+          | _, _ => throw (IO.userError "independent actual value/type missing")
   | ⟨_, .tuple ⟨_, [left, right]⟩⟩ =>
-      let first ← raw names env store left
-      let second ← raw names env store right
-      return ⟨.pair first.value second.value, first.cost + second.cost + 3, by
-        rw [sourceAt]; exact .pair first.costed second.costed⟩
-  | _ => throw (IO.userError "outside independent migrated return script")
+      let first ← raw inputs store left; let second ← raw inputs store right
+      return ⟨.product first.type second.type, .pair first.value second.value, first.cost + second.cost + 3,
+        by rw [sourceAt]; exact .pair first.typing second.typing,
+        by rw [sourceAt]; exact .pair first.costed second.costed⟩
+  | _ => throw (IO.userError "outside independent migrated expression script")
 termination_by sizeOf source
+private structure Script (inputs : LocalInputs) (store : Core.Store) (body : Syntax.Block) where
+  type : Core.Ty
+  value : Core.Value
+  cost : Nat
+  typing : TypedLetReturnTreeHasType table owner inputs.toTypeInputs body type
+  costed : TypedLetReturnTreeEvaluatesWithCost owner inputs.names inputs.environment store body value store cost
+private def script (inputs : LocalInputs) (store : Core.Store) (body : Syntax.Block) : IO (Script inputs store body) := do
+  match bodyAt : body with
+  | ⟨_, [⟨_, .returnStmt (some operand)⟩]⟩ =>
+      let child ← raw inputs store operand
+      return ⟨child.type, child.value, child.cost, by rw [bodyAt]; exact .single (.expression (by simpa only [LocalInputs.toTypeInputs_names, LocalInputs.toTypeInputs_context] using child.typing)),
+        by rw [bodyAt]; exact .single (.expression child.costed)⟩
+  | ⟨blockSpan, ⟨_, .letDecl name (some annotation) (some initializer)⟩ :: rest⟩ =>
+      let declared ← certify table annotation
+      assertTrue (interpretTypeName? table annotation).isNone "old named-only let annotation gained meaning"
+      let child ← raw inputs store initializer
+      if same : child.type = declared.type then
+        if unused : name.value ∉ inputs.names.map Prod.fst then
+          let valueTyped := (child.costed.erase.preserves_type child.typing inputs.sameIds inputs.environmentTyped).1
+          let tail ← script (inputs.bindFresh owner name.value child.type child.value valueTyped) store ⟨blockSpan, rest⟩
+          return ⟨tail.type, tail.value, child.cost + tail.cost + 2, by
+            rw [bodyAt]; exact .binding (same.symm ▸ declared.meaning) (by simpa only [LocalInputs.toTypeInputs_names] using unused) (by simpa only [LocalInputs.toTypeInputs_names, LocalInputs.toTypeInputs_context] using child.typing)
+              (by simpa only [LocalInputs.toTypeInputs_bindFresh] using tail.typing), by
+            rw [bodyAt]; apply TypedLetReturnTreeEvaluatesWithCost.binding child.costed
+            simpa only [LocalInputs.bindFresh_names, LocalInputs.bindFresh_environment,
+              LocalInputs.names, LocalInputs.ids, LocalInputs.bindFresh_bindings, List.map_cons, List.map_map, Function.comp_def] using tail.costed⟩
+        else throw (IO.userError "independent let reused an existing spelling")
+      else throw (IO.userError "independent initializer type disagrees with its written annotation")
+  | _ => throw (IO.userError "outside independent migrated body script")
+termination_by sizeOf body
 private structure Declared (initial : LocalTypeInputs) (parameters : List Syntax.FunctionParameter) where
   inputs : LocalTypeInputs
   evidence : RuntimeParametersDeclareFrom table owner initial parameters inputs
@@ -143,7 +153,7 @@ private def declared (initial : LocalTypeInputs) (parameters : List Syntax.Funct
 private def checkedReturn (content : String) (arguments : List TypedRuntimeArgument)
     (core : Core.Expr) (type : Core.Ty) (value : Core.Value) (cost : Nat)
     (path : ∀ store k, Core.Steps cost ⟨.eval core (arguments.reverse.map (·.value)), k, store⟩
-      ⟨.ret value, k, store⟩) (structuralReturn : Bool := true) : IO Unit := do
+      ⟨.ret value, k, store⟩) (structuralReturn : Bool := true) (structuralLet : Bool := false) : IO Unit := do
   let source ← declaration content
   let returnsMeaning : PLift (RuntimeReturnTypeDenotes table source.value.signature.returnsClause type) ←
     match returnsAt : source.value.signature.returnsClause with
@@ -166,7 +176,7 @@ private def checkedReturn (content : String) (arguments : List TypedRuntimeArgum
   else throw (IO.userError "independent header policy not satisfied")
   let independent ← declared .empty source.value.signature.parameters.elements
   have _ := RuntimeParametersDeclare.complete independent.evidence
-  if !structuralReturn then
+  if !structuralReturn && !structuralLet then
     for parameter in source.value.signature.parameters.elements do
       let .typed none _ annotation := parameter.value | throw (IO.userError "parameter shape changed")
       assertTrue (interpretTypeName? table annotation).isNone "old named-only parameter meaning broadened"
@@ -188,36 +198,32 @@ private def checkedReturn (content : String) (arguments : List TypedRuntimeArgum
         prepared.inputs.names = compiled.inputs.names ∧ prepared.inputs.context = compiled.inputs.context ∧
         prepared.inputs.bindings.length = source.value.signature.parameters.elements.length ∧
         prepared.inputs.environment.values = arguments.reverse.map (·.value))) "original argument layout changed"
-      match bodyAt : source.value.body with
-      | ⟨_, [⟨_, .returnStmt (some operand)⟩]⟩ =>
-          for store in [[], [w.value, .cellRef .word 99]] do
-            let original ← raw prepared.inputs.names prepared.inputs.environment store operand
-            assertTrue (decide (original.value = value ∧ original.cost = cost)) "independent source value/cost changed"
-            have bodyCost : TypedLetReturnTreeEvaluatesWithCost owner prepared.inputs.names prepared.inputs.environment
-                store source.value.body original.value store original.cost := by
-              rw [bodyAt]; exact .single (.expression original.costed)
-            let costed := RuntimeFunctionEvaluatesWithCost.intro preparation bodyCost
-            have _ := (runtimeFunctionEvaluatesWithCost_iff_evaluate.mp costed).2
-            have _ := (path store []).runStateful_done_iff (fuel := cost)
-            assertTrue (decide (evaluateRuntimeFunctionWithCost? table owner source arguments = some (type, value, cost)))
-              "whole direct return differs from independent fixture"
-            for fuel in List.range (cost + 3) do
-              have _ := costed.run_done_iff (fuel := fuel)
-              assertTrue (match runRuntimeFunction? table owner source arguments fuel store with
-                | some (t, .done v s) => decide (cost ≤ fuel ∧ t = type ∧ v = value ∧ s = store)
-                | some (t, .outOfFuel checkpoint) => decide (fuel < cost ∧ t = type ∧ checkpoint.store = store)
-                | _ => false) "migrated return changed threshold or own store"
-            for spent in List.range cost do
-              match exhausted : runRuntimeFunction? table owner source arguments spent store with
-              | some (t, .outOfFuel checkpoint) =>
-                  have _ := runRuntimeFunction?_resume exhausted (cost - spent)
-                  assertTrue (decide (t = type ∧ Core.runStateful (cost - spent) checkpoint = .done value store))
-                    "migrated return lost its genuine remaining path"
-              | _ => throw (IO.userError "migrated return checkpoint missing")
-      | _ => throw (IO.userError "original migrated body shape changed")
+      if structuralLet then
+        assertTrue (prepared.inputs.checkTypedLetReturnBody? table owner source.value.body).isNone "old prefix adapter gained structural lets"
+      for store in [[], [w.value, .cellRef .word 99]] do
+        let original ← script prepared.inputs store source.value.body
+        assertTrue (decide (original.type = type ∧ original.value = value ∧ original.cost = cost)) "independent source type/value/cost changed"
+        let costed := RuntimeFunctionEvaluatesWithCost.intro preparation original.costed
+        have _ := (runtimeFunctionEvaluatesWithCost_iff_evaluate.mp costed).2
+        have _ := (path store []).runStateful_done_iff (fuel := cost)
+        assertTrue (decide (evaluateRuntimeFunctionWithCost? table owner source arguments = some (type, value, cost)))
+          "whole direct return differs from independent fixture"
+        for fuel in List.range (cost + 3) do
+          if structuralLet then assertTrue (prepared.inputs.runTypedLetReturnBody? table owner fuel source.value.body store).isNone "old prefix runner gained structural lets"
+          have _ := costed.run_done_iff (fuel := fuel)
+          assertTrue (match runRuntimeFunction? table owner source arguments fuel store with
+            | some (t, .done v s) => decide (cost ≤ fuel ∧ t = type ∧ v = value ∧ s = store)
+            | some (t, .outOfFuel checkpoint) => decide (fuel < cost ∧ t = type ∧ checkpoint.store = store)
+            | _ => false) "migrated return changed threshold or own store"
+        for spent in List.range cost do
+          match exhausted : runRuntimeFunction? table owner source arguments spent store with
+          | some (t, .outOfFuel checkpoint) =>
+              have _ := runRuntimeFunction?_resume exhausted (cost - spent)
+              assertTrue (decide (t = type ∧ Core.runStateful (cost - spent) checkpoint = .done value store))
+                "migrated return lost its genuine remaining path"
+          | _ => throw (IO.userError "migrated return checkpoint missing")
 end ParsedStructuralTypes
 open ParsedStructuralTypes
-
 def frontendParsedStructuralTypeTests : IO Unit := do
   for (left, right) in [(Core.Ty.word, Core.Ty.bool), (.namedData ⟨83⟩, .cell .word),
       (.function .word .bool, .product .unit .bool)] do
@@ -281,8 +287,12 @@ def frontendParsedStructuralTypeTests : IO Unit := do
       (.cons .enterPairRight (.cons (.var rfl) (.cons .applyPair .refl)))))
   checkedReturn "function singleReturn(x: Word) returns((Word)){return x;}" [w] (.var 0) .word w.value 1
     (by intro store k; exact .cons (.var rfl) .refl)
-  oldGateRejected "function unitLet(){let x: ()=();return x;}" [] .unit
-  oldGateRejected "function pairLet(x: Word,c: Bool) returns(PairAlias){let p: (Word,Bool)=(x,c);return p;}" [w,b] (.product .word .bool)
+  checkedReturn "function unitLet(){let x: ()=();return x;}" [] (.letE .unit (.var 0)) .unit .unit 4
+    (by intro store k; exact .cons .enterLet (.cons .unit (.cons .bindLet (.cons (.var rfl) .refl)))) false true
+  checkedReturn "function pairLet(x: Word,c: Bool) returns(PairAlias){let p: (Word,Bool)=(x,c);return p;}" [w,b]
+    (.letE (.pair (.var 1) (.var 0)) (.var 0)) (.product .word .bool) (.pair w.value b.value) 8
+    (by intro store k; exact .cons .enterLet (.cons .enterPair (.cons (.var rfl) (.cons .enterPairRight
+      (.cons (.var rfl) (.cons .applyPair (.cons .bindLet (.cons (.var rfl) .refl)))))))) false true
   for text in ["", "(", "Word Bool", "(Word,,Bool)", "(Word,Bool))", "(,)", "Word<>"] do
     assertTrue (← parsed? text).isNone s!"incomplete or malformed type accepted: {text}"
 end Tests
