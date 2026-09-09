@@ -2,9 +2,11 @@ import Solcore.Frontend.RecursiveLocalComputationFragment
 import Solcore.Core.LocalFragmentInsertionPaths
 import Solcore.Frontend.LocalFunctionApplicationStepComposition
 import Solcore.Frontend.LocalExpressionCostStepComposition
+import Solcore.Frontend.WordLessCostStepComposition
 
 /-! Each recursive caller pair shares one cost before every continuation.
-An actual invoked body's closed path is chosen once and reused on both sides. -/
+An actual invoked body's closed path is chosen once and reused on both sides.
+Let-body paths retain the same actual bound value before the caller prefix. -/
 
 set_option autoImplicit false
 
@@ -22,13 +24,13 @@ theorem RecursiveLocalComputationFragment.insertion_paths
       Core.Steps cost
         ⟨.eval (expr.weakenAt leading.length) (leading ++ inserted :: suffix), continuation, initialStore⟩
         ⟨.ret value, continuation, finalStore⟩ := by
-  induction fragment generalizing initialStore finalStore value with
+  induction fragment generalizing leading initialStore finalStore value with
   | pure child => exact child.insertion_paths leading suffix inserted evaluation
   | application _ _ calleeIH operandIH =>
       cases evaluation with
       | apply functionEvaluation argumentEvaluation bodyEvaluation =>
-          obtain ⟨functionCost, functionPaths⟩ := calleeIH functionEvaluation
-          obtain ⟨argumentCost, argumentPaths⟩ := operandIH argumentEvaluation
+          obtain ⟨functionCost, functionPaths⟩ := calleeIH leading functionEvaluation
+          obtain ⟨argumentCost, argumentPaths⟩ := operandIH leading argumentEvaluation
           obtain ⟨bodyCost, bodyPath⟩ := bodyEvaluation.toSteps
           refine ⟨functionCost + argumentCost + bodyCost + 3, fun continuation => ?_⟩
           constructor
@@ -38,8 +40,8 @@ theorem RecursiveLocalComputationFragment.insertion_paths
   | binary _ _ leftIH rightIH =>
       cases evaluation with
       | binary leftEvaluation rightEvaluation applied =>
-          obtain ⟨leftCost, leftPaths⟩ := leftIH leftEvaluation
-          obtain ⟨rightCost, rightPaths⟩ := rightIH rightEvaluation
+          obtain ⟨leftCost, leftPaths⟩ := leftIH leading leftEvaluation
+          obtain ⟨rightCost, rightPaths⟩ := rightIH leading rightEvaluation
           refine ⟨leftCost + rightCost + 3, fun continuation => ?_⟩
           constructor
           · exact CostStepComposition.binary (leftPaths _).1 (rightPaths _).1 applied
@@ -48,16 +50,16 @@ theorem RecursiveLocalComputationFragment.insertion_paths
   | ifE _ _ _ conditionIH thenIH elseIH =>
       cases evaluation with
       | ifTrue condition branch =>
-          obtain ⟨conditionCost, conditionPaths⟩ := conditionIH condition
-          obtain ⟨branchCost, branchPaths⟩ := thenIH branch
+          obtain ⟨conditionCost, conditionPaths⟩ := conditionIH leading condition
+          obtain ⟨branchCost, branchPaths⟩ := thenIH leading branch
           refine ⟨conditionCost + branchCost + 2, fun continuation => ?_⟩
           constructor
           · exact CostStepComposition.ifTrue (conditionPaths _).1 (branchPaths _).1
           · simp only [Core.Expr.weakenAt]
             exact CostStepComposition.ifTrue (conditionPaths _).2 (branchPaths _).2
       | ifFalse condition branch =>
-          obtain ⟨conditionCost, conditionPaths⟩ := conditionIH condition
-          obtain ⟨branchCost, branchPaths⟩ := elseIH branch
+          obtain ⟨conditionCost, conditionPaths⟩ := conditionIH leading condition
+          obtain ⟨branchCost, branchPaths⟩ := elseIH leading branch
           refine ⟨conditionCost + branchCost + 2, fun continuation => ?_⟩
           constructor
           · exact CostStepComposition.ifFalse (conditionPaths _).1 (branchPaths _).1
@@ -66,11 +68,21 @@ theorem RecursiveLocalComputationFragment.insertion_paths
   | unary _ childIH =>
       cases evaluation with
       | unary child applied =>
-          obtain ⟨childCost, childPaths⟩ := childIH child
+          obtain ⟨childCost, childPaths⟩ := childIH leading child
           refine ⟨childCost + 2, fun continuation => ?_⟩
           constructor
           · exact CostStepComposition.unary (childPaths _).1 applied
           · simp only [Core.Expr.weakenAt]
             exact CostStepComposition.unary (childPaths _).2 applied
+  | letE _ _ initializerIH bodyIH =>
+      cases evaluation with
+      | @letE _ _ _ _ _ _ boundValue _ initializer body =>
+          obtain ⟨initializerCost, initializerPaths⟩ := initializerIH leading initializer
+          obtain ⟨bodyCost, bodyPaths⟩ := bodyIH (boundValue :: leading) body
+          refine ⟨initializerCost + bodyCost + 2, fun continuation => ?_⟩
+          constructor
+          · exact CostStepComposition.letE (initializerPaths _).1 (bodyPaths _).1
+          · simp only [Core.Expr.weakenAt]
+            exact CostStepComposition.letE (initializerPaths _).2 (bodyPaths _).2
 
 end Solcore.Frontend

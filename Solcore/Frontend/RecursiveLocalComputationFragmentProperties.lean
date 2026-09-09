@@ -12,20 +12,23 @@ namespace Solcore.Frontend
 theorem RecursiveLocalComputationFragment.weakenAt {expr : Core.Expr}
     (fragment : RecursiveLocalComputationFragment expr) (cutoff : Nat) :
     RecursiveLocalComputationFragment (expr.weakenAt cutoff) := by
-  induction fragment with
+  induction fragment generalizing cutoff with
   | pure child => exact .pure (child.weakenAt cutoff)
   | application _ _ calleeIH operandIH =>
       simp only [Core.Expr.weakenAt]
-      exact .application calleeIH operandIH
+      exact .application (calleeIH cutoff) (operandIH cutoff)
   | binary _ _ leftIH rightIH =>
       simp only [Core.Expr.weakenAt]
-      exact .binary leftIH rightIH
+      exact .binary (leftIH cutoff) (rightIH cutoff)
   | ifE _ _ _ conditionIH thenIH elseIH =>
       simp only [Core.Expr.weakenAt]
-      exact .ifE conditionIH thenIH elseIH
+      exact .ifE (conditionIH cutoff) (thenIH cutoff) (elseIH cutoff)
   | unary _ childIH =>
       simp only [Core.Expr.weakenAt]
-      exact .unary childIH
+      exact .unary (childIH cutoff)
+  | letE _ _ initializerIH bodyIH =>
+      simp only [Core.Expr.weakenAt]
+      exact .letE (initializerIH cutoff) (bodyIH (cutoff + 1))
 
 theorem RecursiveLocalComputationElaborates.core_fragment
     {table : LocalNameTable} {context : Resolved.Context} {source : Syntax.Expr}
@@ -44,5 +47,9 @@ theorem RecursiveLocalComputationElaborates.core_fragment
   | logicalOr _ _ leftIH rightIH => exact .ifE leftIH (.pure .bool) rightIH
   | notEqual _ _ leftIH rightIH => exact .unary (.binary leftIH rightIH)
   | lessEqual _ _ leftIH rightIH => exact .unary (.binary leftIH rightIH)
+  | less _ _ leftIH rightIH =>
+      exact .letE leftIH (.letE (rightIH.weakenAt 0) (.pure (.binary .var .var)))
+  | greaterEqual _ _ leftIH rightIH =>
+      exact .unary (.letE leftIH (.letE (rightIH.weakenAt 0) (.pure (.binary .var .var))))
 
 end Solcore.Frontend
