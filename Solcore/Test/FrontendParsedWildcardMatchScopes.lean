@@ -154,9 +154,9 @@ private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (fun c =>
       | .wildcard marker =>
           check (wildArm.span.contains wildArm.value.pattern.span && wildArm.span.contains wildArm.value.body.span && decide (marker=wildArm.value.pattern.span ∧ marker.endByte=marker.startByte+1)) "original one-byte wildcard marker and branch ranges"
           if same : sc.1=.word then return ⟨.letE sc.2.core (.ifE (.binary .wordEq (.var 0) (.word p.1)) (a.core.weakenAt 0) (b.core.weakenAt 0)),by
-            rw [shape]; exact .wordMatch (entries := [(arm,some p.1,a.core),(wildArm,none,b.core)]) (same ▸ sc.2.evidence) rfl
+            rw [shape]; exact .wordMatch (defaultEntry := some (d,dc.core)) (entries := [(arm,some p.1,a.core),(wildArm,none,b.core)]) (same ▸ sc.2.evidence) rfl
               (by intro entry h; simp only [List.mem_cons,List.not_mem_nil,or_false] at h; rcases h with rfl|rfl; exact p.2.down; exact ⟨marker,wild⟩)
-              (by intro entry h; simp only [List.mem_cons,List.not_mem_nil,or_false] at h; rcases h with rfl|rfl; exact a.evidence; exact b.evidence) dc.evidence⟩
+              (by intro entry h; simp only [List.mem_cons,List.not_mem_nil,or_false] at h; rcases h with rfl|rfl; exact a.evidence; exact b.evidence) rfl (by intro entry h; cases List.mem_singleton.mp h; exact dc.evidence) rfl⟩
           else throw (IO.userError "scrutinee type")
       | _ => throw (IO.userError "original wildcard")
   | _ => throw (IO.userError "fixed original body shape")
@@ -211,8 +211,8 @@ private def rawBody (table : LocalNameTable) (env : Resolved.Environment) (s : C
       match wild : wildArm.value.pattern.value with
       | .wildcard marker => match actual : sc.value with
         | .word v =>
-            if same : v=p.1 then let r ← rawBody table env sc.final arm.value.body; return ⟨r.value,r.final,sc.cost+r.cost+2+7,by rw [shape]; exact .wordMatch (cases := [arm,wildArm]) (defaultBody := d) sc.evidence (by rw [actual]; exact .hit (same.symm ▸ p.2.down)) r.evidence⟩
-            else let r ← rawBody table env sc.final wildArm.value.body; return ⟨r.value,r.final,sc.cost+r.cost+2+7,by rw [shape]; exact .wordMatch (cases := [arm,wildArm]) (defaultBody := d) sc.evidence (by rw [actual]; exact .miss p.2.down same (.wildcard wild)) r.evidence⟩
+            if same : v=p.1 then let r ← rawBody table env sc.final arm.value.body; return ⟨r.value,r.final,sc.cost+r.cost+2+7,by rw [shape]; exact .wordMatch (cases := [arm,wildArm]) (defaultBody := some d) sc.evidence (by rw [actual]; exact .hit (same.symm ▸ p.2.down)) r.evidence⟩
+            else let r ← rawBody table env sc.final wildArm.value.body; return ⟨r.value,r.final,sc.cost+r.cost+2+7,by rw [shape]; exact .wordMatch (cases := [arm,wildArm]) (defaultBody := some d) sc.evidence (by rw [actual]; exact .miss p.2.down same (.wildcard wild)) r.evidence⟩
         | _ => throw (IO.userError "raw actual Word before wildcard")
       | _ => throw (IO.userError "raw wildcard")
   | _ => throw (IO.userError "raw fixed body shape")
