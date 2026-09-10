@@ -356,6 +356,9 @@ import Solcore.Test.FrontendParsedClosedSourceConditionals
 import Solcore.Test.FrontendClosedSourceDepthBoundaryProperties
 import Solcore.Test.FrontendClosedSourceBodyDepthProperties
 import Solcore.Test.FrontendParsedClosedSourceDepth
+import Solcore.Test.FrontendClosedSourceDataImageProperties
+import Solcore.Test.FrontendClosedSourceDataBoundaryProperties
+import Solcore.Test.FrontendParsedClosedSourceCoreImage
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6043,6 +6046,7 @@ def run : IO Unit := do
   frontendParsedClosedSourceEvaluationTests
   frontendParsedClosedSourceConditionalTests
   frontendParsedClosedSourceDepthTests
+  frontendParsedClosedSourceCoreImageTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

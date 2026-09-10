@@ -929,6 +929,14 @@ executable minimum finder. Independent original witnesses and separate direct
 boundary computations validate these laws. No existing evaluator, judgment,
 constructor, generated recursor or older proof contract is modified.
 
+Exact original data/conditional correspondence now connects the closed and older
+local expression semantics (ADR-0293), identifying all actual mixed outputs and
+whole stores from embedded Core inputs. Its independent syntax gate retains every
+written child; raw success does not imply whole resolution or lowering. The Core
+bridge separately requires whole resolution and exact runtime identities, without
+typing or store validity assumptions. No evaluator or old contract is changed;
+source closures/calls, operators and body-wide correspondence remain separate.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

@@ -1441,6 +1441,17 @@ providing a total minimum finder, execution cost or whole-fragment termination.
 Only two proof modules and six public laws are added; all earlier implementation,
 ordinary headers, constructor clauses and generated recursors remain unchanged.
 
+The common original data/conditional syntax now has exact closed-to-local and
+closed-to-Core image correspondence (ADR-0293). A separate seven-form syntax gate
+covers references, literal shapes, groups, empty/right-associated tuples and all
+three written conditional children. From fully embedded Core inputs, every actual
+mixed result and whole final store is exactly an old local evaluation's image.
+Arbitrary Core payloads, duplicate/foreign rows and raw stores remain unrestricted.
+The Core equivalence additionally requires whole resolution and lowering against
+the exact runtime identity order. The gate neither guarantees success nor describes
+all dynamic overlap. Operators, source creation/calls and bodies remain outside
+this bridge; all earlier execution and proof contracts stay unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
