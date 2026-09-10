@@ -861,6 +861,16 @@ pre-binder captures and fresh tail scopes. The old one-head adapter embeds under
 a suitable terminal-tail condition, not for arbitrary child relations without it.
 Old admissions and raw source closure evaluation remain separate work.
 
+The mixed value foundation is now available (ADR-0286): recursive Core-shaped
+values and source closures retain all actual code, tags, captures and ordered
+lexical metadata. Exact Core embedding/retraction laws require no semantic
+premises. Structural projection rejects source-closure subterms, including unused
+captures and arbitrary raw store slots, but never dereferences locations.
+This is inert representation, not source admission or execution. Next connect
+independent raw closure rules and a mixed Core-body evaluator without requiring
+elaboration in source calls or projecting an entire environment/store to apply
+a scalar primitive. Simulation and runtime safety need their own later proofs.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

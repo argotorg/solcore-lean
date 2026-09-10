@@ -1330,6 +1330,21 @@ adapter does not embed unconditionally; a non-head tail is a sufficient boundary
 Grouped lambdas and ordinary lets remain terminal shapes, not normalized heads.
 Old entry points and raw source/runtime contracts remain unchanged.
 
+A separate mixed frontend value representation now retains source closures as
+original code-and-capture data (ADR-0286). All ten Core value forms are mirrored
+recursively, including Core closures with mixed captures. Source closures retain
+the complete original expression, owner and ordered name/ID/value rows without
+typing, uniqueness or alignment assumptions. Even unsupported or nonlambda
+syntax can be represented as inert data; this does not admit or execute it.
+
+Total Core embedding, exact roundtrip, successful-image characterization and
+injectivity preserve every old value, including arbitrary tags, code and captures.
+Structural projection fails on any finite source-closure subterm, including an
+unused Core capture or raw store slot. Cell references project without following
+the ambient store. No type inference, elaboration, store snapshot or validation
+is hidden in conversion. A mixed evaluator and independent raw source creation/
+application rules, operational correspondence and safety remain separate work.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
