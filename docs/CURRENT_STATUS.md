@@ -1342,8 +1342,24 @@ injectivity preserve every old value, including arbitrary tags, code and capture
 Structural projection fails on any finite source-closure subterm, including an
 unused Core capture or raw store slot. Cell references project without following
 the ambient store. No type inference, elaboration, store snapshot or validation
-is hidden in conversion. A mixed evaluator and independent raw source creation/
-application rules, operational correspondence and safety remain separate work.
+is hidden in conversion. Independent raw source creation/application rules form
+a separate layer below; a mixed evaluator, correspondence and safety remain open.
+
+An independent raw source-closure layer now defines original unary creation and
+call sequencing over mixed values (ADR-0287). Its shape judgment and exact decoder
+retain one original inferred or unmarked typed parameter and the original body.
+Annotations are uninterpreted: unmarked syntax does not establish canonical
+runtime staging, even with comptime type syntax or parser diagnostics.
+Creation preserves the entire source, lexical rows and store without running the body.
+
+Calls evaluate callee then argument in the caller scope, then the saved original
+body in the captured scope using the argument's final store. The saved owner and
+saved name IDs alone choose the prepended parameter row; arbitrary old captures,
+duplicate/foreign rows and environment-only ID collisions remain intact.
+Exact creation/call decomposition and separately conditional callback determinism
+are proved. This success-only parametric layer does not close its callbacks into
+a general evaluator, dispatch Core/host closures, classify unsuccessful effects,
+or imply typing, staging, source/Core correspondence, termination or safety.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

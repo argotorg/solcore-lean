@@ -193,6 +193,8 @@ import Solcore.Frontend.ExpectedLambdaLetSpine
 import Solcore.Frontend.ExpectedLambdaLetSpineTyping
 import Solcore.Frontend.RuntimeValue
 import Solcore.Frontend.RuntimeValueProperties
+import Solcore.Frontend.SourceLambdaEvaluation
+import Solcore.Frontend.SourceLambdaEvaluationProperties
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RuntimeParameterDeclarationsLayout
 import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties

@@ -871,6 +871,16 @@ independent raw closure rules and a mixed Core-body evaluator without requiring
 elaboration in source calls or projecting an entire environment/store to apply
 a scalar primitive. Simulation and runtime safety need their own later proofs.
 
+Independent original source closure rules are now implemented (ADR-0287).
+Shape-only unary creation keeps complete captures and the actual store; original
+calls thread callee/argument/body stores and switch to the saved lexical owner
+only for the body. Fresh parameter IDs depend solely on saved name rows, not the
+caller or environment-only IDs. Exact decomposition and conditional determinism
+keep both callback premises separate and add no type/staging/checker requirements.
+Unmarked syntax alone is not canonical runtime staging. Next close mixed source
+body/expression semantics and supply Core-body interoperability; no general raw
+evaluator, failing-effect prefixes or source/Core execution bridge is inferred here.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
