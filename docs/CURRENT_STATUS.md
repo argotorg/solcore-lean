@@ -1298,6 +1298,22 @@ why elaboration existence does not require an exact optional checker or imply
 uniqueness. Original scopes and body guards remain in force, and no new executable
 entry point, old source admission branch or source runtime judgment is added.
 
+An opt-in body adapter now connects an original leading explicitly typed let to
+its expected lambda initializer (ADR-0284). The original annotation supplies the
+expected function type, including first-match named aliases. The initializer uses
+the unchanged outer inputs; only the original tail receives the fresh let row.
+Independent source-only typing, elaboration, exact checking and Core typing are
+proved with their separate child assumptions. Provenance retains the original
+head, annotation, initializer, tail and exact fresh-row layout.
+
+The lambda parameter and outer let may reuse one fresh number in disjoint scopes.
+An initializer reference may resolve to an existing outer binding, never the new
+let row; lambda parameters retain their own inner shadowing scope.
+Original tail calls and closure returns are covered, with Core-only actual-capture,
+store-write, allocation and checkpoint consumers. This handles one typed lambda
+head followed by the unchanged shared body, not inferred-let nominal closure
+inference, further lambda heads, new old-entry admission or raw source evaluation.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

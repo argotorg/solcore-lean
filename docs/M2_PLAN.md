@@ -841,6 +841,16 @@ the same inferred identity supports different supplied expected function types.
 This is a declarative interface for the existing opt-in profile, not a new
 admission branch or a source-lambda evaluator.
 
+Explicit expected-type propagation is now connected at one original leading
+typed lambda-let (ADR-0284). The initializer is checked and independently typed
+in the pre-binder scope; the unchanged shared tail alone gets the new fresh row.
+Named function annotations, same-name captures, disjoint-scope fresh-ID reuse,
+tail calls and closure returns have dedicated consumers. Checker exactness,
+source-typing correspondence and Core preservation keep separate child premises.
+This opt-in adapter does not extend old entries, infer nominal closure types,
+recursively accept later lambda initializers or supply raw source evaluation;
+generated-Core capture/effect/checkpoint facts remain separate consumers.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

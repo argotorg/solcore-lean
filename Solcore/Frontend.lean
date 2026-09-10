@@ -187,6 +187,8 @@ import Solcore.Frontend.LocalTypeInputsProperties
 import Solcore.Frontend.ExpectedUnaryLambdaHeader
 import Solcore.Frontend.ExpectedComputationLambda
 import Solcore.Frontend.ExpectedComputationLambdaTyping
+import Solcore.Frontend.ExpectedLambdaLetBody
+import Solcore.Frontend.ExpectedLambdaLetBodyTyping
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RuntimeParameterDeclarationsLayout
 import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties
