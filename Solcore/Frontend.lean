@@ -189,6 +189,8 @@ import Solcore.Frontend.ExpectedComputationLambda
 import Solcore.Frontend.ExpectedComputationLambdaTyping
 import Solcore.Frontend.ExpectedLambdaLetBody
 import Solcore.Frontend.ExpectedLambdaLetBodyTyping
+import Solcore.Frontend.ExpectedLambdaLetSpine
+import Solcore.Frontend.ExpectedLambdaLetSpineTyping
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RuntimeParameterDeclarationsLayout
 import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties

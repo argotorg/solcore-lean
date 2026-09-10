@@ -1314,6 +1314,22 @@ store-write, allocation and checkpoint consumers. This handles one typed lambda
 head followed by the unchanged shared body, not inferred-let nominal closure
 inference, further lambda heads, new old-entry admission or raw source evaluation.
 
+The separate maximal-prefix adapter now supports consecutive original explicitly
+typed lambda lets (ADR-0285). A source-only classifier recognizes direct lambda
+initializers without inspecting annotation meaning, arity, markers or body typing.
+Recognized heads use their current pre-binder inputs and recurse only into the
+fresh-bound original tail. Failure at such a head never falls back to old shared
+checking. The first non-head delegates the whole remaining original block to the
+unchanged shared body, without restarting prefix handling later in that block.
+
+Disjoint terminal/head elaboration and independent source typing have exact
+checker/existence laws with separate child assumptions, Core preservation and
+one-layer original provenance. Arbitrary prefix lengths and captures of previous
+bindings are covered. Artificial exact children demonstrate why the old one-head
+adapter does not embed unconditionally; a non-head tail is a sufficient boundary.
+Grouped lambdas and ordinary lets remain terminal shapes, not normalized heads.
+Old entry points and raw source/runtime contracts remain unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

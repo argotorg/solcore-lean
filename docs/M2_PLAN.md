@@ -851,6 +851,16 @@ This opt-in adapter does not extend old entries, infer nominal closure types,
 recursively accept later lambda initializers or supply raw source evaluation;
 generated-Core capture/effect/checkpoint facts remain separate consumers.
 
+Consecutive explicitly typed lambda lets now have a separate maximal-prefix
+adapter (ADR-0285). A pure original-AST gate makes terminal/head cases disjoint:
+true heads never fall back on typing failure, while the first non-head delegates
+the complete remaining block to the unchanged shared body with no later restart.
+Independent source typing, exact checking, Core preservation and provenance keep
+their child assumptions separate. Arbitrary-length prefixes retain sequential
+pre-binder captures and fresh tail scopes. The old one-head adapter embeds under
+a suitable terminal-tail condition, not for arbitrary child relations without it.
+Old admissions and raw source closure evaluation remain separate work.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
