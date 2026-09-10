@@ -1452,6 +1452,19 @@ the exact runtime identity order. The gate neither guarantees success nor descri
 all dynamic overlap. Operators, source creation/calls and bodies remain outside
 this bridge; all earlier execution and proof contracts stay unchanged.
 
+The original terminal data-body profile now has the same exact image correspondence
+(ADR-0294): bare/expression returns, explicit blocks, initialized typed/inferred
+bindings, strict discards, both if arms and all ordered match/default bodies share
+an independent seven-form syntax gate. From fully embedded Core inputs, each
+actual closed value and complete final store reflects the old generic-local body
+relation, with arbitrary raw rows, opaque Core payloads and names-only fresh
+binding after initializer evaluation.
+The separate Core iff requires actual shared whole-body checking and exact unique
+ordered runtime/context IDs; it adds no runtime typing or store-validity premise.
+All old body rules, selectors, checking and proofs remain unchanged. Unknown
+annotations, unselected unsupported syntax and discarded source closures retain
+separate boundaries; endpoint agreement alone does not justify this bridge.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

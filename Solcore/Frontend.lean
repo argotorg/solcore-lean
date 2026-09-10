@@ -211,6 +211,8 @@ import Solcore.Frontend.ClosedSourceEvaluatorMonotonicityProperties
 import Solcore.Frontend.ClosedSourceEvaluatorThresholdProperties
 import Solcore.Frontend.ClosedSourceDataExpression
 import Solcore.Frontend.ClosedSourceDataExpressionProperties
+import Solcore.Frontend.ClosedSourceDataBody
+import Solcore.Frontend.ClosedSourceDataBodyProperties
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RuntimeParameterDeclarationsLayout
 import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties

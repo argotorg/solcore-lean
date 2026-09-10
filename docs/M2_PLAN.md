@@ -937,6 +937,15 @@ bridge separately requires whole resolution and exact runtime identities, withou
 typing or store validity assumptions. No evaluator or old contract is changed;
 source closures/calls, operators and body-wide correspondence remain separate.
 
+Exact image correspondence extends to original terminal data bodies (ADR-0294).
+A pure seven-form gate retains both if arms and all match/default bodies; private
+child conjunctions reuse the unchanged full-actual-image bridge. Raw equivalence
+keeps duplicate/foreign rows, pre-shadow initialization and whole opaque stores.
+Core equivalence separately needs actual shared checking and full unique ordered
+ID alignment, preserving then-only name protection and whole-arm checking.
+Original symbolic and parsed endpoint consumers keep closed depth distinct from
+Core transition cost. No evaluator, old rule, selector or proof is changed.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
