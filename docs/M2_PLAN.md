@@ -912,6 +912,15 @@ The exact self-application boundary has no successful finite derivation, so no
 whole-fragment termination or source-size execution bound follows. Extend effects
 and mixed Core execution without weakening these original-value contracts.
 
+Original conditional expressions are now included in that same closed family
+(ADR-0291): actual Bool selection, original branch/marker preservation, and exact
+guard-to-branch store threading. The two new rules retain existing ordinary public
+headers, nine body rules and all generic proof contracts; generated mutual recursors
+gain the corresponding cases. Independent nested-depth, saved-capture and parsed
+returned-closure consumers precede search and reuse actual computed endpoints.
+The explicit extension adds no general old-none preservation, canonical typing,
+effects, termination classifier or source-size bound for arbitrary calls.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

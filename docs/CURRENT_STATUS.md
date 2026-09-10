@@ -1415,6 +1415,21 @@ consumer proves all-depth absence and no finite successful derivation for its ex
 source, without providing a general divergence classifier. Core/host execution,
 canonical name/staging alignment, effects, costs and runtime safety remain open.
 
+Original conditional expressions now extend the same closed judgments and runner
+(ADR-0291). The guard must return an actual Bool; only its selected original branch
+executes, at the guard's returned store and in the same lexical rows. Outer, question
+and colon ranges remain independent. Both children receive the same predecessor
+depth. Unconditional determinism, exact body/call compatibility, soundness and
+all-larger-depth eventual completeness cover the two new expression rules.
+
+The old ordinary public headers, seventeen constructor clauses and nine body rules
+are retained; generated mutual recursors necessarily gain two cases. Exact original
+conditional decomposition and executable equations are public. Independent consumers
+cover arbitrary nested choices with exact depth n+1, non-Bool guards, ignored branches,
+pre-shadow captures and different-owner calls. Parsed consumers reuse the actual
+returned source closure and final mixed store. This is an explicit extension, not
+preservation of every earlier none result, canonical typing or a total interpreter.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

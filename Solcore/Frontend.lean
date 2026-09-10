@@ -206,6 +206,7 @@ import Solcore.Frontend.RuntimeWordMatchSelection
 import Solcore.Frontend.ClosedSourceEvaluator
 import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
 import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
+import Solcore.Frontend.ClosedSourceConditionalProperties
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RuntimeParameterDeclarationsLayout
 import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties
