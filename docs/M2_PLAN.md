@@ -921,6 +921,14 @@ returned-closure consumers precede search and reuse actual computed endpoints.
 The explicit extension adds no general old-none preservation, canonical typing,
 effects, termination classifier or source-size bound for arbitrary calls.
 
+Successful depth monotonicity now covers the entire unchanged closed evaluator
+(ADR-0292). Actual success at a given depth persists at every larger depth with
+the identical endpoint; larger-depth none propagates only downward. Finite original
+derivations have a positive exact all-budget Option threshold, proved without an
+executable minimum finder. Independent original witnesses and separate direct
+boundary computations validate these laws. No existing evaluator, judgment,
+constructor, generated recursor or older proof contract is modified.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

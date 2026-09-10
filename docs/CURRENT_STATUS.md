@@ -1430,6 +1430,17 @@ pre-shadow captures and different-owner calls. Parsed consumers reuse the actual
 returned source closure and final mixed store. This is an explicit extension, not
 preservation of every earlier none result, canonical typing or a total interpreter.
 
+Successful closed evaluation now persists at every larger depth (ADR-0292), with
+the identical actual value, final store, original source and lexical inputs.
+A private simultaneous successor induction proves this directly from the unchanged
+expression/body runners. Consequently, none at a larger depth implies none at every
+smaller depth; the reverse direction is false. Every independent finite E/B derivation
+has a positive exact threshold: the whole Option is none below it and the same some
+endpoint at and above it. This excludes holes before eventual stability, without
+providing a total minimum finder, execution cost or whole-fragment termination.
+Only two proof modules and six public laws are added; all earlier implementation,
+ordinary headers, constructor clauses and generated recursors remain unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
