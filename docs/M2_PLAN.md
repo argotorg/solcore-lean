@@ -881,6 +881,16 @@ Unmarked syntax alone is not canonical runtime staging. Next close mixed source
 body/expression semantics and supply Core-body interoperability; no general raw
 evaluator, failing-effect prefixes or source/Core execution bridge is inferred here.
 
+The original mixed body callback is now available (ADR-0288), preserving all nine
+raw body forms and original ordered Word choices without a Core projection gate.
+Its child-dependent determinism and old-to-mixed embedding are proved separately
+from exact reflection, whose stronger premise covers all actual intermediate
+child values/stores. A deterministic real-lambda discard counterexample and the
+return-expression necessity law prevent weakening this premise to endpoint images.
+Use this body relation directly in source call callbacks. Closing expression
+callbacks, mixed Core dispatch and canonical name/operational correspondence still
+need separate work; no general interpreter, execution-cost or safety claim follows.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

@@ -337,6 +337,10 @@ import Solcore.Test.FrontendParsedRuntimeClosureValues
 import Solcore.Test.FrontendSourceLambdaBoundaryProperties
 import Solcore.Test.FrontendSourceLambdaEvaluationProperties
 import Solcore.Test.FrontendParsedSourceLambdaEffects
+import Solcore.Test.FrontendSourceComputationBodyBoundaryProperties
+import Solcore.Test.FrontendSourceComputationBodyProperties
+import Solcore.Test.FrontendSourceComputationBodyImageProperties
+import Solcore.Test.FrontendParsedSourceComputationBodyEffects
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6019,6 +6023,7 @@ def run : IO Unit := do
   frontendParsedExpectedLambdaLetSpineTests
   frontendParsedRuntimeClosureValueTests
   frontendParsedSourceLambdaEffectTests
+  frontendParsedSourceComputationBodyEffectTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

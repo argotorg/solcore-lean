@@ -1361,6 +1361,25 @@ are proved. This success-only parametric layer does not close its callbacks into
 a general evaluator, dispatch Core/host closures, classify unsuccessful effects,
 or imply typing, staging, source/Core correspondence, termination or safety.
 
+Original computation bodies now have a separate mixed-value evaluation family
+(ADR-0288). It retains the nine raw forms: bare/expression return, terminal block,
+typed/inferred let, semicolon discard, the two selected Bool branches and ordered
+single-scrutinee Word match. Initializers run before binding; exact names-only
+fresh rows and actual stores pass to unchanged original tails. A leading wildcard or
+empty-case default accepts source closures, while a visited literal requires a Word.
+No unselected branch, annotation meaning or additional scope guard is inspected.
+
+Original choice/count and body value/store determinism are proved, the latter
+conditional only on child determinism at the fixed owner. Old body derivations
+embed under a one-way child law. On embedded old inputs, exact reflection requires
+every actual child result and final store to factor through old values and evaluation.
+Real source creation followed by discard refutes weaker endpoint-only agreement,
+even with deterministic children. Uniform exact body images also force the strong
+child condition through original expression returns. The strong law is conditional,
+not full conservativity of a source-lambda extension. This body callback composes
+with raw source calls; expression callback closing, mixed Core interoperability,
+canonical name correspondence, failed effects, executable fuel and safety remain open.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
