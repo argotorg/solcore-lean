@@ -831,6 +831,16 @@ not a source-lambda evaluator or canonical backend execution proof. Keep this
 opt-in entry separate from recursive children and named-function admission until
 expected-type propagation and capture/insertion semantics are proved.
 
+Independent source-only expected lambda typing is now available (ADR-0283),
+defined by the original header, fixed component guards and original shared body
+typing rather than by Core output or checker success. Two laws relate it to
+elaboration existence and, with exact child checking, checker-result existence.
+Keep the child's source-typing bridge distinct from its checker and Core-typing
+laws. No determinism, runtime inhabitant or source-only type uniqueness follows;
+the same inferred identity supports different supplied expected function types.
+This is a declarative interface for the existing opt-in profile, not a new
+admission branch or a source-lambda evaluator.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

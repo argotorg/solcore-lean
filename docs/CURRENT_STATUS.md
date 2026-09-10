@@ -1284,6 +1284,20 @@ canonical backend closure execution. Existing recursive-child/body/function
 entry points still reject source lambdas, and literal insertion contracts remain
 unchanged; automatic expected-type propagation and capture semantics are pending.
 
+Expected computation lambdas now also have an independent source-only typing
+judgment (ADR-0283). Its definition retains the original header, both component
+guards and the original shared body typing, without a Core expression, an
+existential elaboration or a checker graph. Source typing corresponds to existence
+of a lambda elaboration using only the child's typing/elaboration correspondence;
+the child's exact checker law additionally yields successful checking.
+
+These laws need no child Core-typing law, determinism or actual runtime values.
+The expected type remains an input: one original inferred identity can be typed
+at both Word-to-Word and Bool-to-Bool. Artificial nondeterministic children expose
+why elaboration existence does not require an exact optional checker or imply
+uniqueness. Original scopes and body guards remain in force, and no new executable
+entry point, old source admission branch or source runtime judgment is added.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

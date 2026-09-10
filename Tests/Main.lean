@@ -322,6 +322,9 @@ import Solcore.Test.FrontendParsedExpectedLambdaHeaders
 import Solcore.Test.FrontendExpectedComputationLambdaBoundaryProperties
 import Solcore.Test.FrontendExpectedComputationLambdaProperties
 import Solcore.Test.FrontendParsedExpectedComputationLambdas
+import Solcore.Test.FrontendExpectedLambdaTypingBoundaryProperties
+import Solcore.Test.FrontendExpectedComputationLambdaTypingProperties
+import Solcore.Test.FrontendParsedExpectedLambdaTyping
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -5999,6 +6002,7 @@ def run : IO Unit := do
   frontendParsedFunctionCheckpointWorldTests
   frontendParsedExpectedLambdaHeaderTests
   frontendParsedExpectedComputationLambdaTests
+  frontendParsedExpectedLambdaTypingTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
