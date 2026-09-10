@@ -814,8 +814,22 @@ The result retains the original unchecked body and contains no Core or closure.
 Do not reuse the named-function absent-return Unit policy, require an inhabitant,
 or infer whole-lambda acceptance from header success. Parser recovery is judged
 through its actual AST, not a diagnostic-free premise. Existing recursive-child
-and shared-function lambda rejection remains unchanged pending separate body
-checking, expected-type propagation and capture semantics.
+and shared-function lambda rejection remains unchanged pending expected-type
+propagation and capture semantics.
+
+Standalone expected unary computation lambda elaboration now joins that original
+header to the unchanged shared body checker (ADR-0282). Both component types must
+be well formed in the fixed empty Core data environment, and the original body
+must elaborate at the expected codomain. Exactness/absence uses only the child's
+checker correspondence; independent Core typing uses only child Core typing.
+Original header/body provenance and exact inner scope remain available without
+runtime inhabitants or a new blanket well-formedness requirement on outer rows.
+
+Do not infer child Core safety from checker exactness, or use header/body success
+to omit either component guard. Existing Core capture/application consumers are
+not a source-lambda evaluator or canonical backend execution proof. Keep this
+opt-in entry separate from recursive children and named-function admission until
+expected-type propagation and capture/insertion semantics are proved.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution

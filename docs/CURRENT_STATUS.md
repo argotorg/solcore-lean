@@ -1260,7 +1260,29 @@ string. Explicit error parameter nodes and comptime markers remain outside this
 runtime profile; a recovered inferred node is not rejected just for its recovery history.
 Existing recursive-child/body/function lambda rejection, literal-value insertion
 contracts and all old executable definitions remain unchanged. Expected-type
-propagation, body checking and closure semantics remain separate next work.
+propagation into recursive children and closure semantics remain separate; the
+standalone body-checking step is described below.
+
+Expected unary computation lambdas now connect the original header to the
+original shared computation body (ADR-0282). The opt-in elaborator checks both
+component types in the fixed empty Core data environment and requires the body's
+inferred type to equal the expected codomain. It produces a literal Core lambda,
+without changing the original syntax, outer rows or fresh parameter scope.
+
+Independent elaboration, exact checking and absence, Core typing, and retained
+header/body provenance are available generically. Checker exactness requires
+only the child's exact checker law; Core typing separately requires the child's
+Core-typing law. Neither actual inhabitants nor blanket outer-context type
+well-formedness are required. Unregistered nominal component types remain outside
+this fixed Core profile even when the wider header and a variable body succeed.
+
+Symbolic and parsed consumers retain captured-variable positions and typed and
+inferred shadowing. Existing Core transitions verify full-environment capture
+without body effects at creation, and allocation/writes only on later application.
+These are Core consumers, not source-lambda operational correspondence or general
+canonical backend closure execution. Existing recursive-child/body/function
+entry points still reject source lambdas, and literal insertion contracts remain
+unchanged; automatic expected-type propagation and capture semantics are pending.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
