@@ -1377,8 +1377,26 @@ Real source creation followed by discard refutes weaker endpoint-only agreement,
 even with deterministic children. Uniform exact body images also force the strong
 child condition through original expression returns. The strong law is conditional,
 not full conservativity of a source-lambda extension. This body callback composes
-with raw source calls; expression callback closing, mixed Core interoperability,
+with raw source calls; general expression callback closing, mixed Core interoperability,
 canonical name correspondence, failed effects, executable fuel and safety remain open.
+
+Original source expression/body evaluation is now recursively closed for a
+syntax-bounded fragment (ADR-0289). Eight expression forms cover first-match
+references, empty tuples, strict Words, groups, pairs, larger original tuples,
+source creation and unary source calls. Nine original body forms recurse through
+these children without externally supplied evaluation callbacks. Calls keep the
+callee and argument in caller scope, then use the saved owner's literal rows and
+names-only fresh parameter for the original body. Mixed captures remain unrestricted.
+
+Exact body compatibility and original-unary-call compatibility are proved against
+the existing open relations. One joint expression/body induction establishes
+value/store determinism without child-law premises; body determinism is then derived
+through compatibility. Independent consumers prove successful store invariance and
+the absence of success for excluded call/tuple shapes and Core/host call targets.
+Here closed means recursive judgments, not empty lexical terms or a total runner.
+The fragment has no mutating primitives or Core/host dispatch, and untyped higher-order
+calls are not guaranteed to terminate. Canonical name/staging correspondence, mixed
+Core execution, executable fuel, failure classification, costs and safety remain open.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

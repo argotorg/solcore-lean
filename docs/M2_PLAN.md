@@ -887,9 +887,19 @@ Its child-dependent determinism and old-to-mixed embedding are proved separately
 from exact reflection, whose stronger premise covers all actual intermediate
 child values/stores. A deterministic real-lambda discard counterexample and the
 return-expression necessity law prevent weakening this premise to endpoint images.
-Use this body relation directly in source call callbacks. Closing expression
+Use this body relation directly in source call callbacks. Closing general expression
 callbacks, mixed Core dispatch and canonical name/operational correspondence still
 need separate work; no general interpreter, execution-cost or safety claim follows.
+
+The first callback-free original source fragment is now closed by explicit mutual
+expression/body judgments (ADR-0289), with owner and lexical inputs as indices.
+Original references, Words, groups, tuples and unary source closures compose with
+all nine raw body rules. Exact body/call compatibility and unconditional closed
+determinism preserve saved captures and original syntax without elaboration premises.
+Successful stores are invariant in this non-mutating subset; higher-order recursion
+does not imply termination or a bounded executable interpreter. Extend this closed
+foundation toward effects and mixed Core execution separately, with source/Core value
+and name correspondence rather than silently widening the existing raw contracts.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution

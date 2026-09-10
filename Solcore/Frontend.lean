@@ -199,6 +199,9 @@ import Solcore.Frontend.RuntimeWordMatch
 import Solcore.Frontend.SourceComputationBodyEvaluation
 import Solcore.Frontend.SourceComputationBodyEvaluationProperties
 import Solcore.Frontend.SourceComputationBodyEmbeddingProperties
+import Solcore.Frontend.ClosedSourceEvaluation
+import Solcore.Frontend.ClosedSourceEvaluationCompatibility
+import Solcore.Frontend.ClosedSourceEvaluationProperties
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RuntimeParameterDeclarationsLayout
 import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties
