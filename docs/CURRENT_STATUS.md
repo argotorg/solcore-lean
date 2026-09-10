@@ -1398,6 +1398,23 @@ The fragment has no mutating primitives or Core/host dispatch, and untyped highe
 calls are not guaranteed to terminate. Canonical name/staging correspondence, mixed
 Core execution, executable fuel, failure classification, costs and safety remain open.
 
+Depth-bounded executable search now implements exactly that closed fragment
+(ADR-0290). Separate expression and body functions thread literal actual values,
+captures and stores through the original source. An independent ordered selector
+returns the original selected body and exact literal-comparison count, with an iff
+against the existing selection judgment. Unsupported visited patterns and non-Word
+literal scrutinees are not skipped to later branches.
+
+Both functions are sound for the independent closed judgments. Every finite
+successful derivation is found at all sufficiently large depths, with the same
+actual value and final store. All recursive children receive the same predecessor
+bound; this measures derivation depth, not consumed steps or literal comparisons.
+Zero returns none even for leaves. None does not distinguish insufficient depth,
+unsupported paths, missing values or lack of finite success. A separate self-application
+consumer proves all-depth absence and no finite successful derivation for its exact
+source, without providing a general divergence classifier. Core/host execution,
+canonical name/staging alignment, effects, costs and runtime safety remain open.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

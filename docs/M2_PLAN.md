@@ -901,6 +901,17 @@ does not imply termination or a bounded executable interpreter. Extend this clos
 foundation toward effects and mixed Core execution separately, with source/Core value
 and name correspondence rather than silently widening the existing raw contracts.
 
+Depth-bounded executable expression/body search now realizes exactly those closed
+judgments (ADR-0290), with soundness and eventual completeness for every independent
+finite successful derivation. Original ordered selection has a separate executable
+body/count iff. Callee, argument and saved body retain their actual lexical/store
+inputs; the same predecessor budget is reused for sequential children.
+This bound is derivation depth, not comparison count, consumed Core fuel or a
+resumable checkpoint. A none result does not classify faults or divergence.
+The exact self-application boundary has no successful finite derivation, so no
+whole-fragment termination or source-size execution bound follows. Extend effects
+and mixed Core execution without weakening these original-value contracts.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. Expected-type source lambdas and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

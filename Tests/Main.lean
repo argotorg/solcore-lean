@@ -345,6 +345,10 @@ import Solcore.Test.FrontendClosedSourceBoundaryProperties
 import Solcore.Test.FrontendClosedSourceCallProperties
 import Solcore.Test.FrontendClosedSourceBodyProperties
 import Solcore.Test.FrontendParsedClosedSourceClosures
+import Solcore.Test.FrontendClosedSourceRunnerBoundaryProperties
+import Solcore.Test.FrontendClosedSourceCallRunnerProperties
+import Solcore.Test.FrontendClosedSourceBodyRunnerProperties
+import Solcore.Test.FrontendParsedClosedSourceEvaluation
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6029,6 +6033,7 @@ def run : IO Unit := do
   frontendParsedSourceLambdaEffectTests
   frontendParsedSourceComputationBodyEffectTests
   frontendParsedClosedSourceClosureTests
+  frontendParsedClosedSourceEvaluationTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
