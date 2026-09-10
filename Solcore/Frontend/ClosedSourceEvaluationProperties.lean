@@ -70,6 +70,20 @@ theorem ClosedSourceExpressionEvaluates.deterministic
               (sourceUnaryLambdaShape?_iff.mpr otherShape)))
           obtain ⟨rfl, rfl⟩ := sameShape
           exact bodyIH otherBody
+  | conditionalTrue _ _ conditionIH branchIH =>
+      cases second with
+      | creation shape => cases shape
+      | conditionalTrue otherCondition otherBranch =>
+          obtain ⟨_, rfl⟩ := conditionIH otherCondition
+          exact branchIH otherBranch
+      | conditionalFalse otherCondition _ => cases (conditionIH otherCondition).1
+  | conditionalFalse _ _ conditionIH branchIH =>
+      cases second with
+      | creation shape => cases shape
+      | conditionalTrue otherCondition _ => cases (conditionIH otherCondition).1
+      | conditionalFalse otherCondition otherBranch =>
+          obtain ⟨_, rfl⟩ := conditionIH otherCondition
+          exact branchIH otherBranch
   | bare =>
       rename_i right rightStore other
       cases other

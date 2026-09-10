@@ -71,6 +71,15 @@ theorem evaluateClosedSourceExpression?_eventually_complete
       have body := bodyIH n (by omega)
       simpa only [evaluateClosedSourceExpression?, callee, argument,
         sourceUnaryLambdaShape?_iff.mpr shape, bind, Option.bind_some] using body
+  | conditionalTrue _ _ conditionIH branchIH | conditionalFalse _ _ conditionIH branchIH =>
+      obtain ⟨c, conditionIH⟩ := conditionIH
+      obtain ⟨b, branchIH⟩ := branchIH
+      apply eventually_step (max c b)
+      intro n large
+      have condition := conditionIH n (by omega)
+      have branch := branchIH n (by omega)
+      simpa only [evaluateClosedSourceExpression?, condition, bind, Option.bind_some,
+        Bool.false_eq_true, ↓reduceIte] using branch
   | bare =>
       apply eventually_step 0
       intro n _

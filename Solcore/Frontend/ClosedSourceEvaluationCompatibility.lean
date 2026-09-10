@@ -19,6 +19,8 @@ private theorem body_forward {owner names captured initialStore body value final
   | many => trivial
   | creation => trivial
   | call => trivial
+  | conditionalTrue => trivial
+  | conditionalFalse => trivial
   | bare => exact .bare
   | expression child _ => exact .expression child
   | block _ ih => exact .block ih

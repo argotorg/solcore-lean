@@ -2,7 +2,7 @@ import Solcore.Frontend.RuntimeWordMatchSelection
 import Solcore.Frontend.SourceLambdaEvaluation
 import Solcore.Frontend.LocalReference
 
-/- Depth-bounded exact old closed fragment. Zero rejects even leaves; each child
+/- Depth-bounded closed original fragment. Zero rejects even leaves; each child
 gets the same predecessor. None does not distinguish unsupported paths, missing
 values or exhausted depth. Stores and saved lexical fields remain literal. -/
 
@@ -37,6 +37,10 @@ def evaluateClosedSourceExpression? (budget : Nat) (owner : Resolved.Declaration
           let (tailValue, finalStore) ← evaluateClosedSourceExpression? n owner names captured middleStore
             ⟨span, .tuple ⟨tupleSpan, second :: third :: rest⟩⟩
           return (.pair headValue tailValue, finalStore)
+      | ⟨_, .conditional condition _ thenBranch _ elseBranch⟩ => do
+          let (.bool choice, middleStore) ← evaluateClosedSourceExpression? n owner names captured store condition | none
+          evaluateClosedSourceExpression? n owner names captured middleStore
+            (if choice then thenBranch else elseBranch)
       | ⟨_, .call callee ⟨_, [argument]⟩⟩ => do
           let (function, calleeStore) ← evaluateClosedSourceExpression? n owner names captured store callee
           let (argumentValue, argumentStore) ← evaluateClosedSourceExpression? n owner names captured calleeStore argument

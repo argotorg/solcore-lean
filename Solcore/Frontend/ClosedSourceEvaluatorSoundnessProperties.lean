@@ -5,7 +5,7 @@ import Solcore.Frontend.LocalReferenceProperties
 import Solcore.Frontend.WordLiteralProperties
 import Solcore.Resolved.LocalScopeProperties
 
-/- One private simultaneous budget induction constructs the unchanged source
+/- One private simultaneous budget induction constructs the independent source
 judgments at exact actual endpoints, without callback or checking premises. -/
 
 set_option autoImplicit false
@@ -89,6 +89,14 @@ private theorem simultaneous_sound (budget : Nat) :
                   exact .call (sourceUnaryLambdaShape?_iff.mp shape)
                     (ih.1 _ _ _ _ _ _ _ calleeResult) (ih.1 _ _ _ _ _ _ _ argumentResult)
                     (ih.2 _ _ _ _ _ _ _ bodyResult)
+        case conditional condition question thenBranch colon elseBranch =>
+          simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
+          obtain ⟨⟨actual, middleStore⟩, conditionResult, result⟩ := accepted
+          cases actual <;> simp only [reduceCtorEq] at result
+          rename_i choice
+          cases choice <;> simp only [Bool.false_eq_true, ↓reduceIte] at result
+          · exact .conditionalFalse (ih.1 _ _ _ _ _ _ _ conditionResult) (ih.1 _ _ _ _ _ _ _ result)
+          · exact .conditionalTrue (ih.1 _ _ _ _ _ _ _ conditionResult) (ih.1 _ _ _ _ _ _ _ result)
         case lambda keyword parameters returns body =>
           simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff,
             pure, Option.some.injEq, Prod.mk.injEq] at accepted

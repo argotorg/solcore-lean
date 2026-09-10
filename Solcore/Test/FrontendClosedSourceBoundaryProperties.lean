@@ -22,6 +22,8 @@ theorem expression_success_keeps_the_actual_store
   | creation _ => rfl
   | call _ _ _ _ calleeIH argumentIH bodyIH =>
       exact bodyIH.trans (argumentIH.trans calleeIH)
+  | conditionalTrue _ _ conditionIH branchIH => exact branchIH.trans conditionIH
+  | conditionalFalse _ _ conditionIH branchIH => exact branchIH.trans conditionIH
   | bare => rfl
   | expression _ ih => exact ih
   | block _ ih => exact ih
