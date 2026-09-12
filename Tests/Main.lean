@@ -369,6 +369,12 @@ import Solcore.Test.FrontendExpectedDataLambdaAdmissionBoundaryProperties
 import Solcore.Test.FrontendParsedExpectedDataLambdaApplications
 import Solcore.Test.FrontendParsedExpectedDataLambdaInvocations
 import Solcore.Test.FrontendParsedExpectedDataLambdaBoundaries
+import Solcore.Test.FrontendClosedSourceUnaryProperties
+import Solcore.Test.FrontendClosedSourceUnaryBoundaryProperties
+import Solcore.Test.FrontendParsedClosedSourceUnary
+import Solcore.Test.FrontendParsedClosedSourceLogicalNotClosures
+import Solcore.Test.FrontendParsedClosedSourceBitNotClosures
+import Solcore.Test.FrontendParsedClosedSourceUnaryBoundaries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6062,6 +6068,10 @@ def run : IO Unit := do
   frontendParsedExpectedDataLambdaApplicationTests
   frontendParsedExpectedDataLambdaInvocationTests
   frontendParsedExpectedDataLambdaBoundaryTests
+  frontendParsedClosedSourceUnaryTests
+  frontendParsedClosedSourceLogicalNotClosureTests
+  frontendParsedClosedSourceBitNotClosureTests
+  frontendParsedClosedSourceUnaryBoundaryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

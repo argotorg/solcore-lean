@@ -1480,6 +1480,27 @@ Checked Word identity can return actual Unit without typing the whole call.
 Unary gates, whole-written checking and non-Core source closures retain explicit
 boundaries; no old evaluator, checking rule or proof is changed.
 
+Original closed Bool logical-not and Word bit-not now execute in the same
+expression/body judgment and depth-bounded runner (ADR-0296). Original outer and
+operator spans, operand, saved owner, ordered names/captures and complete actual
+stores are retained. Four laws expose operand decomposition and successor-budget
+equations. Wrong actual payloads and missing lookups still return none; that
+result does not classify faults or establish divergence.
+The seven affected implementation files now cover both new expression cases.
+The nineteen old constructor clauses and sixteen ordinary production headers
+remain literal; mutual eliminator types intentionally change. Independent
+symbolic consumers keep arbitrary mixed rows/stores and distinguish closed depth
+n+1 from separate local/Core cost 2*n+1. Parsed consumers retain complete original
+syntax/ranges and reuse actual returned source closures and call-entry stores,
+including both operators in saved bodies and conflicting caller rows.
+Only the former raw unary-impossibility conclusions in ADR-0293/0295 consumers
+are superseded by original success witnesses. Both seven-form data gates and
+their correspondence/checking boundaries remain unchanged.
+This is the fixed Lean Bool/Word primitive profile, not pinned Rust name not /
+BitNot.bnot dispatch, instance selection, staging or execution agreement.
+No Core/host call, effect, coercion, typing/store-validity premise, general closure
+conversion, totality or fault classifier is added.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

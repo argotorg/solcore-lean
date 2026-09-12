@@ -956,6 +956,21 @@ Independent original derivations and parsed actual outputs consume both iff
 directions. No whole-call typing, general closure conversion, broader gate,
 effects, totality or old implementation change is claimed.
 
+Original unary recursion now covers Bool logical-not and Word bit-not (ADR-0296).
+Exact operand decomposition and successor-budget laws retain the original source,
+operator/operand ranges, saved lexical rows and whole actual stores. Generic
+compatibility, determinism, soundness, completeness and monotonicity are extended
+with exactly the two new cases; old ordinary headers and nineteen constructor
+clauses remain literal while the mutual eliminator types change.
+Independent symbolic and parsed consumers construct original witnesses before
+runner answers, retain non-Core rows/stores and actual returned closures, and
+exercise both operators in saved bodies, wrong payloads and missing lookups.
+Closed depth n+1 remains distinct from independently established Core cost 2*n+1.
+ADR-0293/0295 raw unary-impossibility fixtures are superseded, not their unchanged
+seven-form data gates or checking/correspondence boundaries.
+The fixed Lean primitive profile does not implement pinned Rust named not /
+BitNot.bnot dispatch, instance selection, staging, effects or totality.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

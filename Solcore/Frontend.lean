@@ -207,6 +207,7 @@ import Solcore.Frontend.ClosedSourceEvaluator
 import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
 import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
 import Solcore.Frontend.ClosedSourceConditionalProperties
+import Solcore.Frontend.ClosedSourceUnaryProperties
 import Solcore.Frontend.ClosedSourceEvaluatorMonotonicityProperties
 import Solcore.Frontend.ClosedSourceEvaluatorThresholdProperties
 import Solcore.Frontend.ClosedSourceDataExpression
