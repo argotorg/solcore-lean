@@ -84,6 +84,22 @@ theorem ClosedSourceExpressionEvaluates.deterministic
       | conditionalFalse otherCondition otherBranch =>
           obtain ⟨_, rfl⟩ := conditionIH otherCondition
           exact branchIH otherBranch
+  | logicalNot _ ih =>
+      cases second with
+      | creation shape => cases shape
+      | logicalNot child =>
+          obtain ⟨same, sameStore⟩ := ih child
+          cases RuntimeValue.bool.inj same
+          cases sameStore
+          exact ⟨rfl, rfl⟩
+  | bitNot _ ih =>
+      cases second with
+      | creation shape => cases shape
+      | bitNot child =>
+          obtain ⟨same, sameStore⟩ := ih child
+          cases RuntimeValue.word.inj same
+          cases sameStore
+          exact ⟨rfl, rfl⟩
   | bare =>
       rename_i right rightStore other
       cases other

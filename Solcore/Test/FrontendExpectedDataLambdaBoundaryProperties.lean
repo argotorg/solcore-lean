@@ -63,15 +63,17 @@ theorem checked_word_identity_accepts_actual_unit :
   · rintro ⟨rfl, rfl⟩
     exact image.mpr ⟨.unit, store, by simp only [RuntimeValue.ofCore], rfl, core⟩
 
-/-- The original unary body checks successfully but has no closed source body rule. -/
+/-- The original unary body checks and evaluates successfully but remains outside the data gate. -/
 theorem checked_unary_body_is_outside_closed_gate :
     let b := output s (neg s (ref s))
     let f := lambda s b
     elaborateExpectedComputationLambda? elaborateLocalExpression? [] owner .empty
       f (.function .bool .bool) = some (.lambda .bool .bool (.unary .boolNot (.var 0))) ∧
     (¬ ClosedSourceDataBody b) ∧
-    (∀ names captured initial actual final,
-      ¬ ClosedSourceBodyEvaluates owner names captured initial b actual final) ∧
+    (∀ (choice : Bool) (initial : List RuntimeValue),
+      ClosedSourceBodyEvaluates owner [("p", Resolved.freshLocalId owner [])]
+        [(Resolved.freshLocalId owner [], .bool choice)] initial b
+        (.bool (!choice)) initial) ∧
     Core.Evaluates [] store
       (.apply (.lambda .bool .bool (.unary .boolNot (.var 0))) (.bool true)) (.bool false) store := by
   have checked : elaborateExpectedComputationLambda? elaborateLocalExpression? [] owner .empty
@@ -85,12 +87,10 @@ theorem checked_unary_body_is_outside_closed_gate :
   · intro gate
     cases gate with
     | expression child => cases child
-  · intro names captured initial actual final evaluated
-    cases evaluated with
-    | expression child => cases child with
-      | creation impossible => cases impossible
+  · intro choice initial
+    exact .expression (.logicalNot (.reference .head .head))
 
-/-- Checking and lowering an original unary argument does not supply a closed evaluation. -/
+/-- An original unary argument checks, lowers and evaluates but remains outside the data gate. -/
 theorem checked_unary_argument_is_outside_closed_gate :
     let inputs := LocalTypeInputs.empty.bindFresh owner "p" .bool
     let id := Resolved.freshLocalId owner []
@@ -101,8 +101,9 @@ theorem checked_unary_argument_is_outside_closed_gate :
     ResolvesLocalExpression inputs.names (neg s (ref s)) (.unary .boolNot (.var id)) ∧
     Resolved.Lowers [id] (.unary .boolNot (.var id)) (.unary .boolNot (.var 0)) ∧
     (¬ ClosedSourceDataExpression (neg s (ref s))) ∧
-    (∀ names captured initial actual final,
-      ¬ ClosedSourceExpressionEvaluates owner names captured initial (neg s (ref s)) actual final) ∧
+    (∀ (choice : Bool) (initial : List RuntimeValue),
+      ClosedSourceExpressionEvaluates owner inputs.names [(id, .bool choice)]
+        initial (neg s (ref s)) (.bool (!choice)) initial) ∧
     Core.Evaluates [.bool true] store
       (.apply (.lambda .bool .bool (.var 0)) (.unary .boolNot (.var 0))) (.bool false) store := by
   have resolution : ResolvesLocalExpression
@@ -116,9 +117,8 @@ theorem checked_unary_argument_is_outside_closed_gate :
   refine ⟨identity_checked s _ .bool .bool, elaborateLocalExpression?_complete resolution lowering typed,
     resolution, lowering, ?_, ?_, .apply .lambda (.unary (.var rfl) rfl) (.var rfl)⟩
   · intro gate; cases gate
-  · intro names captured initial actual final evaluated
-    cases evaluated with
-    | creation impossible => cases impossible
+  · intro choice initial
+    exact .logicalNot (.reference .head .head)
 
 /-- Marked and multiple parameters supply neither the shape premise nor expected checking. -/
 theorem marked_and_multiple_parameters_are_not_admitted (type : Core.Ty) :

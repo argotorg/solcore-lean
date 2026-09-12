@@ -12,7 +12,7 @@ namespace Solcore.Frontend
 
 mutual
 
-/-- Ten original expression forms, recursively closed with original body evaluation.
+/-- Twelve original expression forms, recursively closed with original body evaluation.
 Owner is an index so calls can switch to the closure's saved lexical scope. -/
 inductive ClosedSourceExpressionEvaluates :
     Resolved.DeclarationId → List (String × Resolved.LocalId) →
@@ -86,6 +86,19 @@ inductive ClosedSourceExpressionEvaluates :
         middleStore elseBranch value finalStore) :
       ClosedSourceExpressionEvaluates owner names captured initialStore
         ⟨span, .conditional condition question thenBranch colon elseBranch⟩ value finalStore
+
+  | logicalNot {owner names captured initialStore finalStore}
+      {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr} {value : Bool}
+      (child : ClosedSourceExpressionEvaluates owner names captured
+        initialStore operand (.bool value) finalStore) :
+      ClosedSourceExpressionEvaluates owner names captured initialStore
+        ⟨span, .unary ⟨operatorSpan, .logicalNot⟩ operand⟩ (.bool (!value)) finalStore
+  | bitNot {owner names captured initialStore finalStore}
+      {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr} {value : Core.Word}
+      (child : ClosedSourceExpressionEvaluates owner names captured
+        initialStore operand (.word value) finalStore) :
+      ClosedSourceExpressionEvaluates owner names captured initialStore
+        ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩ (.word value.bitNot) finalStore
 
 /-- The nine original body forms with recursively closed expression children.
 Initializers precede fresh binding; annotations and unselected branches are inert. -/

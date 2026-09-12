@@ -80,6 +80,11 @@ theorem evaluateClosedSourceExpression?_eventually_complete
       have branch := branchIH n (by omega)
       simpa only [evaluateClosedSourceExpression?, condition, bind, Option.bind_some,
         Bool.false_eq_true, ↓reduceIte] using branch
+  | logicalNot _ ih | bitNot _ ih =>
+      obtain ⟨k, ih⟩ := ih
+      apply eventually_step k
+      intro n large
+      simp only [evaluateClosedSourceExpression?, ih n large, bind, Option.bind_some, pure]
   | bare =>
       apply eventually_step 0
       intro n _

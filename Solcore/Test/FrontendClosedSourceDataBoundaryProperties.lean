@@ -57,14 +57,14 @@ theorem singleton_and_negation_are_outside_data (id : Resolved.LocalId) (choice 
     ResolvesLocalExpression [("c", id)] (negated span) (.unary .boolNot (.var id)) ∧
     LocalExpressionEvaluates [("c", id)] [(id, .bool choice)] store
       (negated span) (.bool (!choice)) store ∧
-    (∀ actual final, ¬ ClosedSourceExpressionEvaluates owner [("c", id)]
-      (embedded [(id, .bool choice)]) (store.map RuntimeValue.ofCore) (negated span) actual final) := by
+    ClosedSourceExpressionEvaluates owner [("c", id)]
+      (embedded [(id, .bool choice)]) (store.map RuntimeValue.ofCore) (negated span)
+      (.bool (!choice)) (store.map RuntimeValue.ofCore) := by
   refine ⟨?_, ?_, .logicalNot (.identifier .head), .logicalNot (.identifier .head .head), ?_⟩
   · intro fragment; cases fragment
   · intro fragment; cases fragment
-  · intro actual final evaluated
-    cases evaluated with
-    | creation shape => cases shape
+  · simp only [embedded, List.map_cons, List.map_nil, RuntimeValue.ofCore]
+    exact .logicalNot (.reference .head .head)
 
 /-- A directly created original closure from embedded inputs has no Core-value preimage. -/
 theorem creation_from_core_inputs_is_not_core_data :

@@ -56,6 +56,25 @@ private theorem simultaneous_step (budget : Nat) :
           rw [evaluateClosedSourceExpression?]
           simp only [ih.1 _ _ _ _ _ _ _ conditionResult, bind, Option.bind_some]
           exact ih.1 _ _ _ _ _ _ _ selectedResult
+        case unary operator operand =>
+          rcases operator with ⟨operatorSpan, operator⟩
+          cases operator with
+          | logicalNot =>
+              simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
+              obtain ⟨⟨actual, finalStore⟩, child, result⟩ := accepted
+              cases actual <;>
+                simp only [reduceCtorEq, pure, Option.some.injEq, Prod.mk.injEq] at result
+              obtain ⟨rfl, rfl⟩ := result
+              rw [evaluateClosedSourceExpression?]
+              simp only [ih.1 _ _ _ _ _ _ _ child, bind, Option.bind_some, pure]
+          | bitNot =>
+              simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
+              obtain ⟨⟨actual, finalStore⟩, child, result⟩ := accepted
+              cases actual <;>
+                simp only [reduceCtorEq, pure, Option.some.injEq, Prod.mk.injEq] at result
+              obtain ⟨rfl, rfl⟩ := result
+              rw [evaluateClosedSourceExpression?]
+              simp only [ih.1 _ _ _ _ _ _ _ child, bind, Option.bind_some, pure]
         case call callee arguments =>
           rcases arguments with ⟨argumentsSpan, arguments⟩
           cases arguments with

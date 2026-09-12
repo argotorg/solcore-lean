@@ -49,6 +49,14 @@ def evaluateClosedSourceExpression? (budget : Nat) (owner : Resolved.Declaration
           let id := Resolved.freshLocalId savedOwner (savedNames.map Prod.snd)
           evaluateClosedSourceBody? n savedOwner ((name.value, id) :: savedNames)
             ((id, argumentValue) :: savedCaptured) argumentStore body
+      | ⟨_, .unary ⟨_, .logicalNot⟩ operand⟩ => do
+          let (.bool value, finalStore) ←
+            evaluateClosedSourceExpression? n owner names captured store operand | none
+          return (.bool (!value), finalStore)
+      | ⟨_, .unary ⟨_, .bitNot⟩ operand⟩ => do
+          let (.word value, finalStore) ←
+            evaluateClosedSourceExpression? n owner names captured store operand | none
+          return (.word value.bitNot, finalStore)
       | _ => do
           let _ ← sourceUnaryLambdaShape? source
           return (.sourceClosure source owner names captured, store)

@@ -97,6 +97,23 @@ private theorem simultaneous_sound (budget : Nat) :
           cases choice <;> simp only [Bool.false_eq_true, ↓reduceIte] at result
           · exact .conditionalFalse (ih.1 _ _ _ _ _ _ _ conditionResult) (ih.1 _ _ _ _ _ _ _ result)
           · exact .conditionalTrue (ih.1 _ _ _ _ _ _ _ conditionResult) (ih.1 _ _ _ _ _ _ _ result)
+        case unary operator operand =>
+          rcases operator with ⟨operatorSpan, operator⟩
+          cases operator with
+          | logicalNot =>
+              simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
+              obtain ⟨⟨actual, finalStore⟩, child, result⟩ := accepted
+              cases actual <;>
+                simp only [reduceCtorEq, pure, Option.some.injEq, Prod.mk.injEq] at result
+              obtain ⟨rfl, rfl⟩ := result
+              exact .logicalNot (ih.1 _ _ _ _ _ _ _ child)
+          | bitNot =>
+              simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
+              obtain ⟨⟨actual, finalStore⟩, child, result⟩ := accepted
+              cases actual <;>
+                simp only [reduceCtorEq, pure, Option.some.injEq, Prod.mk.injEq] at result
+              obtain ⟨rfl, rfl⟩ := result
+              exact .bitNot (ih.1 _ _ _ _ _ _ _ child)
         case lambda keyword parameters returns body =>
           simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff,
             pure, Option.some.injEq, Prod.mk.injEq] at accepted

@@ -24,6 +24,8 @@ theorem expression_success_keeps_the_actual_store
       exact bodyIH.trans (argumentIH.trans calleeIH)
   | conditionalTrue _ _ conditionIH branchIH => exact branchIH.trans conditionIH
   | conditionalFalse _ _ conditionIH branchIH => exact branchIH.trans conditionIH
+  | logicalNot _ ih => exact ih
+  | bitNot _ ih => exact ih
   | bare => rfl
   | expression _ ih => exact ih
   | block _ ih => exact ih
