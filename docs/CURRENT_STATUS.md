@@ -1465,6 +1465,21 @@ All old body rules, selectors, checking and proofs remain unchanged. Unknown
 annotations, unselected unsupported syntax and discarded source closures retain
 separate boundaries; endpoint agreement alone does not justify this bridge.
 
+Checked expected-type unary lambdas now connect original calls to Core execution
+(ADR-0295). Invocation retains actual caller-side callee and argument derivations,
+while the checked data body runs with the original saved owner, all captured rows
+and the actual argument-entry store. Exact ordered runtime/context IDs align the
+saved environment; mixed caller rows remain unrestricted. A second iff connects
+direct original creation and a whole-resolved/lowered gated argument to Core
+application.
+Both laws reflect every actual mixed value and complete final store, without
+runtime argument typing, store validity or a source/Core closure identification.
+Independent symbolic and parsed consumers retain original grouped callees, reuse
+actual returned closures, and separate closed depth from Core transition cost.
+Checked Word identity can return actual Unit without typing the whole call.
+Unary gates, whole-written checking and non-Core source closures retain explicit
+boundaries; no old evaluator, checking rule or proof is changed.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

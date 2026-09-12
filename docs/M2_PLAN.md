@@ -946,8 +946,18 @@ ID alignment, preserving then-only name protection and whole-arm checking.
 Original symbolic and parsed endpoint consumers keep closed depth distinct from
 Core transition cost. No evaluator, old rule, selector or proof is changed.
 
+Expected-type unary lambda invocation now bridges to exact Core execution
+(ADR-0295), using the unchanged expected checker and original data-body gate.
+Actual caller prefixes remain separate from the complete saved lexical rows;
+the body image keeps the entire actual argument and entry/final stores.
+Direct original application additionally uses whole argument resolution/lowering
+and its unchanged data gate, producing the literal checked Core application.
+Independent original derivations and parsed actual outputs consume both iff
+directions. No whole-call typing, general closure conversion, broader gate,
+effects, totality or old implementation change is claimed.
+
 Next extend recursive children to the remaining expression forms using these
-shared contracts. Expected-type source lambdas and global function resolution
+shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
 transfer, and structural arguments alone do not validate stores.
 

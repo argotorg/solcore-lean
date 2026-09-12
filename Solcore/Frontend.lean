@@ -213,6 +213,8 @@ import Solcore.Frontend.ClosedSourceDataExpression
 import Solcore.Frontend.ClosedSourceDataExpressionProperties
 import Solcore.Frontend.ClosedSourceDataBody
 import Solcore.Frontend.ClosedSourceDataBodyProperties
+import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
+import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RuntimeParameterDeclarationsLayout
 import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties

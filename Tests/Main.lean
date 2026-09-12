@@ -363,6 +363,12 @@ import Solcore.Test.FrontendClosedSourceDataBodyImageProperties
 import Solcore.Test.FrontendClosedSourceDataBodyBoundaryProperties
 import Solcore.Test.FrontendParsedClosedSourceDataBodies
 import Solcore.Test.FrontendParsedClosedSourceDataMatches
+import Solcore.Test.FrontendExpectedDataLambdaImageProperties
+import Solcore.Test.FrontendExpectedDataLambdaBoundaryProperties
+import Solcore.Test.FrontendExpectedDataLambdaAdmissionBoundaryProperties
+import Solcore.Test.FrontendParsedExpectedDataLambdaApplications
+import Solcore.Test.FrontendParsedExpectedDataLambdaInvocations
+import Solcore.Test.FrontendParsedExpectedDataLambdaBoundaries
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6053,6 +6059,9 @@ def run : IO Unit := do
   frontendParsedClosedSourceCoreImageTests
   frontendParsedClosedSourceDataBodyTests
   frontendParsedClosedSourceDataMatchTests
+  frontendParsedExpectedDataLambdaApplicationTests
+  frontendParsedExpectedDataLambdaInvocationTests
+  frontendParsedExpectedDataLambdaBoundaryTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
