@@ -57,6 +57,14 @@ def evaluateClosedSourceExpression? (budget : Nat) (owner : Resolved.Declaration
           let (.word value, finalStore) ←
             evaluateClosedSourceExpression? n owner names captured store operand | none
           return (.word value.bitNot, finalStore)
+      | ⟨_, .binary left ⟨_, .logicalAnd⟩ right⟩ => do
+          let (.bool choice, middleStore) ← evaluateClosedSourceExpression? n owner names captured store left | none
+          if choice then evaluateClosedSourceExpression? n owner names captured middleStore right
+          else return (.bool false, middleStore)
+      | ⟨_, .binary left ⟨_, .logicalOr⟩ right⟩ => do
+          let (.bool choice, middleStore) ← evaluateClosedSourceExpression? n owner names captured store left | none
+          if choice then return (.bool true, middleStore)
+          else evaluateClosedSourceExpression? n owner names captured middleStore right
       | _ => do
           let _ ← sourceUnaryLambdaShape? source
           return (.sourceClosure source owner names captured, store)
