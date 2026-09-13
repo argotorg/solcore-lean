@@ -234,6 +234,8 @@ import Solcore.Frontend.BoundedInputsLambdaDepth
 import Solcore.Frontend.BoundedInputsLambdaDepthDecisionProperties
 import Solcore.Frontend.ClosedSourceStoreProperties
 import Solcore.Frontend.ClosedSourceEvaluatorStoreProperties
+import Solcore.Frontend.SelfApplicationNonreturnProperties
+import Solcore.Frontend.SelfApplicationCallNonreturnProperties
 import Solcore.Frontend.ClosedSourceDataBody
 import Solcore.Frontend.ClosedSourceDataBodyProperties
 import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
