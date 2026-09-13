@@ -1033,7 +1033,16 @@ Groups and reconstructed tuple tails count separately, and maxima include both
 potential branches. The bound need not be minimal. Independent symbolic, negative
 and parsed consumers retain actual mixed values/stores, duplicate first matches
 and skipped-versus-selected failure. No existing evaluator, gate or image law is
-changed. Body/source-call bounds and fault classification remain separate.
+changed. Source-call bounds and fault classification remain separate.
+
+The seven existing closed data-body forms now have a computable source-depth
+bound (ADR-0303). Direct gate induction covers actual fresh lexical extensions
+and ordered selected bodies; sufficient success iff, whole Option stability and
+bound None iff all-budget failure follow without changing the source evaluator
+or image laws. All written branches contribute, but pattern comparisons do not
+add search depth. Arbitrary shadowing/miss families, selected negative cases and
+forty parsed mixed-context lanes independently exercise the new laws. Source-call
+and saved-invocation bounds remain a later slice.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution

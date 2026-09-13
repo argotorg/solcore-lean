@@ -1595,8 +1595,21 @@ match rows, invalid literals and mixed payloads have independent consumers.
 Two parsed trees cover thirty-two context/outcome lanes with whole AST/ranges,
 EOF and zero diagnostics. Gate-external creation/call examples show why the gate
 premise is essential. No original evaluator, gate, image contract or Core cost
-changes; body/call bounds, fault classification and whole-language totality remain
+changes; call bounds, fault classification and whole-language totality remain
 separate.
+
+The existing seven-form data-body gate now has its own computable depth bound
+(ADR-0303), reusing the expression bound. Direct original-evaluation induction
+preserves actual fresh lexical extensions, mixed results and complete stores.
+The bound supports exact success iff, whole Option stability and absence of
+original success iff all-budget failure. It includes every written branch and
+default; ordered pattern comparisons do not add recursive search depth.
+Independent consumers cover arbitrary fresh-shadowing chains, conditional
+depth differences, arbitrarily many misses at depth two, selected failures and
+early matches that skip deep bad arms. Three whole parsed bodies exercise forty
+mixed-context success lanes. The evaluator, seven-form gate, ordered selector
+and six image laws are unchanged. Source-call and saved-invocation bounds remain
+separate work; this is not a Core transition-cost bound or a fault classifier.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
