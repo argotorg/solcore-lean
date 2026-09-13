@@ -1645,6 +1645,16 @@ cases, selected-body failures and 32 whole parsed group/conditional/logical call
 cases consume the laws. This does not decide callee selection or claim an
 unconditional general-call bound, runtime typing, Core costs or fault classes.
 
+Higher-order outer calls now compose a sufficient depth from an independently
+known finite successful callee run (ADR-0307). The supplied budget and exact
+selected closure/store equation remain explicit; the callee needs no data gate.
+Separate outer data argument and actual saved data body gates require no child
+success. Arbitrary identity-call chains have independently proved sharp n+3
+depths; larger supplied budgets need not be minimal. Selected outer failures and
+32 whole parsed f(x)(y) cases retain distinct saved/caller environments and full
+values/stores. This does not search for callee budgets or establish unconditional
+general-call termination, runtime typing, Core costs or fault classification.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

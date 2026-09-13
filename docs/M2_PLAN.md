@@ -1069,6 +1069,14 @@ selection premise. Symbolic and parsed grouped/conditional/logical callees and
 selected-body failures verify the boundary; no unconditional callee decision,
 new source gate, image-law change or general nested-call bound is claimed.
 
+A supplied successful finite callee run now composes with outer data argument
+and actual saved data body bounds (ADR-0307), including inner application
+callees outside the data gate. Every decision law retains that exact finite
+selection premise. Independent sharp higher-order chains, nonminimal supplied
+budgets, outer failure boundaries and 32 parsed cases preserve actual closures
+and stores. No evaluator, source gate or image law changes; finding a callee
+budget and unconditional general-call termination remain outside this result.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
