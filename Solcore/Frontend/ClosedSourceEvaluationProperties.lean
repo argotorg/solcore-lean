@@ -1,4 +1,5 @@
 import Solcore.Frontend.ClosedSourceEvaluationCompatibility
+import Solcore.Frontend.StrictWordBinaryProperties
 import Solcore.Frontend.SourceLambdaEvaluationProperties
 import Solcore.Frontend.SourceComputationBodyEvaluationProperties
 import Solcore.Frontend.LocalReferenceProperties
@@ -107,16 +108,19 @@ theorem ClosedSourceExpressionEvaluates.deterministic
           obtain ⟨_, rfl⟩ := leftIH otherLeft
           exact rightIH otherRight
       | andFalse otherLeft => cases (leftIH otherLeft).1
+      | strictWordBinary otherLeft _ _ => cases (leftIH otherLeft).1
   | andFalse _ leftIH =>
       cases second with
       | creation shape => cases shape
       | andTrue otherLeft _ => cases (leftIH otherLeft).1
       | andFalse otherLeft => exact leftIH otherLeft
+      | strictWordBinary otherLeft _ _ => cases (leftIH otherLeft).1
   | orTrue _ leftIH =>
       cases second with
       | creation shape => cases shape
       | orTrue otherLeft => exact leftIH otherLeft
       | orFalse otherLeft _ => cases (leftIH otherLeft).1
+      | strictWordBinary otherLeft _ _ => cases (leftIH otherLeft).1
   | orFalse _ _ leftIH rightIH =>
       cases second with
       | creation shape => cases shape
@@ -124,6 +128,21 @@ theorem ClosedSourceExpressionEvaluates.deterministic
       | orFalse otherLeft otherRight =>
           obtain ⟨_, rfl⟩ := leftIH otherLeft
           exact rightIH otherRight
+      | strictWordBinary otherLeft _ _ => cases (leftIH otherLeft).1
+  | strictWordBinary _ _ meaning leftIH rightIH =>
+      cases second with
+      | creation shape => cases shape
+      | andTrue otherLeft _ => cases (leftIH otherLeft).1
+      | andFalse otherLeft => cases (leftIH otherLeft).1
+      | orTrue otherLeft => cases (leftIH otherLeft).1
+      | orFalse otherLeft _ => cases (leftIH otherLeft).1
+      | strictWordBinary otherLeft otherRight otherMeaning =>
+          obtain ⟨sameLeft, rfl⟩ := leftIH otherLeft
+          cases RuntimeValue.word.inj sameLeft
+          obtain ⟨sameRight, rfl⟩ := rightIH otherRight
+          cases RuntimeValue.word.inj sameRight
+          cases meaning.value_unique otherMeaning
+          exact ⟨rfl, rfl⟩
   | bare =>
       rename_i right rightStore other
       cases other
