@@ -1003,6 +1003,18 @@ forty-eight Word parsed cases keep exact AST/ranges and closed depth separate
 from Core cost; fixture depth annotations are not universal cutoff certificates.
 This does not add runtime typing, canonical dispatch, effects or closure identity.
 
+All fourteen strict Word binary forms now have independent primitive meanings
+and original closed evaluation (ADR-0300). A single rule and runner branch retain
+left-to-right actual Word operands, complete stores and exact ranges; zero cannot
+hide a missing operand. Generic correctness and threshold headers, data gates
+and six image statements/public proofs remain unchanged. Two exact public laws
+support an all-budget max-child-depth-plus-one consumer; Local/Core costs keep
+their separate 3/5/9/11 overheads. Independent symbolic, negative and saved-call
+proofs plus 196 parsed cases retain actual closures, opaque rows, full output
+stores and adjacent source-depth/Core-cost boundaries. Strict raw success remains
+outside the expression data gate. No canonical dispatch, effects, general runtime
+typing, closure conversion, fault classification or whole-language totality follows.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

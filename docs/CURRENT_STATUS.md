@@ -1549,6 +1549,23 @@ closed-depth/Core-cost checks. Their depth annotations are not universal cutoff
 theorems. Admission adds no runtime-typing assumption, canonical dispatch,
 source/Core closure identity, effects or totality.
 
+Original closed evaluation now covers all fourteen strict Word binary operators
+(ADR-0300), using independent primitive meanings and one generic original rule.
+Both actual Word operands evaluate left-to-right through the complete middle
+store; zero never skips the opposite operand. Eight operators return Words and
+six return Booleans under the fixed wrapping/unsigned/zero-divisor profile.
+The original expression/body rules now number seventeen/nine. Generic public
+correctness headers, eleven/seven data gates and all six image statements/public
+proofs remain unchanged; raw strict success is still outside that data gate.
+Exact decomposition and runner laws support an all-budget max-child-depth-plus-one
+consumer. Independent Local/Core costs retain their distinct 3/5/9/11 overheads.
+Symbolic exclusions and saved-call proofs preserve actual closures, ordered mixed
+rows and full stores. Parsed tests cover 140 grouped-reference and 56 saved-call
+cases with original AST/ranges, adjacent source-depth and separate Core-cost
+checks. Saved-call depth annotations are not universal cutoff theorems.
+This adds no canonical named dispatch, effects, runtime typing, fault classifier,
+source/Core closure identity or whole-frontend totality.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
