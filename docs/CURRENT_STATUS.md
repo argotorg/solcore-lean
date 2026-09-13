@@ -1515,6 +1515,26 @@ remain outside the data gate. This supersedes the earlier seven-form expression
 exclusion, not the unchanged body shape, checking or fixed primitive boundaries.
 No canonical overload dispatch, source/Core closure identity or totality is added.
 
+Original closed conjunction and disjunction now use four independent evaluation
+rules and two depth-bounded runner branches (ADR-0298). Only an actual Bool left
+chooses a branch. Skipping does not inspect or evaluate the right operand;
+selection forwards its unrestricted actual RuntimeValue and whole final store.
+Compatibility, determinism, soundness, eventual completeness and monotonicity
+retain their ordinary public statements, while mutual eliminators gain new cases.
+Four public laws expose exact skip/selected endpoints and predecessor budgets.
+Independent consumers prove all-budget cutoffs: skipped depth is DL+1 and selected
+depth is max(DL,DR)+1, under exact child cutoffs. Non-Bool left and selected missing
+right exclude every successful endpoint before deriving all-budget failure.
+Returned closures keep actual saved fields and stores through a foreign caller
+and fresh-parameter shadowing. Parsed regressions check original AST/ranges and
+keep closed search depth separate from Local/Core transition cost. Their boundary
+fixture depth annotations are not themselves universal cutoff certificates.
+The nine-form expression data gate, seven-form body gate and six image contracts
+remain unchanged: logical binary syntax is still outside that data-image bridge.
+Whole resolution/checking still inspects both operands; raw selected success need
+not be Boolean-typed. No canonical overload dispatch, effects, fault classifier,
+general closure conversion or totality is added.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

@@ -981,6 +981,18 @@ and whole actual-output equalities in both directions, with separate depth/cost 
 The gate is intentionally broader than its earlier seven-form expression profile,
 not a success guarantee, runtime typing rule, canonical dispatch or closure conversion.
 
+Original closed short-circuit evaluation now covers conjunction and disjunction
+(ADR-0298), retaining all original spans, actual lexical rows and full stores.
+Four original rules, two runner branches and four exact public laws extend the
+existing mutual proof engine without strengthening its ordinary headers.
+Independent symbolic and parsed consumers separate all-budget closed cutoffs from
+Local/Core transition costs, prove non-Bool/missing-right semantic exclusions,
+and reuse actual selected closures through foreign saved calls and shadowing.
+Skipped syntax remains unchecked by raw execution; whole static checking still
+requires both operands. The nine/seven-form data gates and six image laws remain
+unchanged, so a logical-binary data-image extension is the next separate boundary.
+No canonical named-operator dispatch, effects or whole-frontend totality follows.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
