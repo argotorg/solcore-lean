@@ -49,4 +49,11 @@ inductive ClosedSourceDataExpression : Syntax.Expr → Prop where
       (rightSyntax : ClosedSourceDataExpression right) :
       ClosedSourceDataExpression ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩
 
+  | strictWordBinary {span operatorSpan : Syntax.SourceSpan} {operator : Syntax.BinaryOp}
+      {left right : Syntax.Expr}
+      (leftSyntax : ClosedSourceDataExpression left)
+      (rightSyntax : ClosedSourceDataExpression right)
+      (notAnd : operator ≠ .logicalAnd) (notOr : operator ≠ .logicalOr) :
+      ClosedSourceDataExpression ⟨span, .binary left ⟨operatorSpan, operator⟩ right⟩
+
 end Solcore.Frontend
