@@ -971,6 +971,16 @@ seven-form data gates or checking/correspondence boundaries.
 The fixed Lean primitive profile does not implement pinned Rust named not /
 BitNot.bnot dispatch, instance selection, staging, effects or totality.
 
+Recursive unary data admission now reuses all six exact image contracts (ADR-0297).
+Two new expression-gate clauses and four private bridge cases admit Bool logical-not
+and Word bit-not recursively without changing public statements or the seven body
+forms. Three old gate-only negatives migrate while their independent evaluation
+successes and arbitrary raw-store quantifiers remain unchanged. Symbolic and parsed
+consumers retain exact original syntax, saved lexical rows, actual returned closures
+and whole actual-output equalities in both directions, with separate depth/cost checks.
+The gate is intentionally broader than its earlier seven-form expression profile,
+not a success guarantee, runtime typing rule, canonical dispatch or closure conversion.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

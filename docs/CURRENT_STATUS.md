@@ -1501,6 +1501,20 @@ BitNot.bnot dispatch, instance selection, staging or execution agreement.
 No Core/host call, effect, coercion, typing/store-validity premise, general closure
 conversion, totality or fault classifier is added.
 
+Recursive Bool logical-not and Word bit-not now enter the existing exact data-image
+bridges (ADR-0297). The expression gate grows from seven to nine forms; the body's
+seven forms recursively admit the new children. Six public image contracts retain
+their complete statements and all old proofs outside the four private unary cases.
+The three historical unary-gate negatives become positive admission witnesses;
+existing arbitrary Bool and whole-runtime-store evaluation examples are retained.
+Independent symbolic and parsed consumers preserve original unary syntax, actual
+saved closures, lexical owner/captures and both full result/store equalities.
+They distinguish source search depth from Core transition cost. Admission still
+neither guarantees evaluation nor types runtime payloads; source creation/calls
+remain outside the data gate. This supersedes the earlier seven-form expression
+exclusion, not the unchanged body shape, checking or fixed primitive boundaries.
+No canonical overload dispatch, source/Core closure identity or totality is added.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
