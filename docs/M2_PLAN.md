@@ -989,9 +989,19 @@ Independent symbolic and parsed consumers separate all-budget closed cutoffs fro
 Local/Core transition costs, prove non-Bool/missing-right semantic exclusions,
 and reuse actual selected closures through foreign saved calls and shadowing.
 Skipped syntax remains unchecked by raw execution; whole static checking still
-requires both operands. The nine/seven-form data gates and six image laws remain
-unchanged, so a logical-binary data-image extension is the next separate boundary.
+requires both operands. That raw extension kept the data gates and six image laws
+unchanged; recursive data-image admission is the separate extension below.
 No canonical named-operator dispatch, effects or whole-frontend totality follows.
+
+Recursive logicalAnd/logicalOr now extend the expression data gate from nine to
+eleven forms (ADR-0299), requiring both original children. Private reflect/embed
+cases reuse actual selected values and full stores without changing the seven
+body forms or any of the six public image statements and proofs. Independent
+raw, boundary, expected-Bool/Word and parsed consumers exercise both directions
+through body, direct application and actual saved invocation. Eight Bool and
+forty-eight Word parsed cases keep exact AST/ranges and closed depth separate
+from Core cost; fixture depth annotations are not universal cutoff certificates.
+This does not add runtime typing, canonical dispatch, effects or closure identity.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution

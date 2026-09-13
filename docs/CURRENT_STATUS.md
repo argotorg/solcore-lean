@@ -1529,11 +1529,25 @@ Returned closures keep actual saved fields and stores through a foreign caller
 and fresh-parameter shadowing. Parsed regressions check original AST/ranges and
 keep closed search depth separate from Local/Core transition cost. Their boundary
 fixture depth annotations are not themselves universal cutoff certificates.
-The nine-form expression data gate, seven-form body gate and six image contracts
-remain unchanged: logical binary syntax is still outside that data-image bridge.
+That raw-evaluation extension retained the data gates and six image contracts;
+the recursive data-image extension is described below.
 Whole resolution/checking still inspects both operands; raw selected success need
 not be Boolean-typed. No canonical overload dispatch, effects, fault classifier,
 general closure conversion or totality is added.
+
+Recursive conjunction and disjunction now enter the exact data-image bridges
+(ADR-0299). The expression gate admits eleven forms and requires both written
+children, including a skipped right. The seven body forms and six public image
+contracts, including their public proofs, are unchanged. Private reflection
+follows the actual left Boolean and whole middle store; a selected right may
+return arbitrary Core data. Independent expression and boundary proofs separate
+admission, whole resolution and successful execution. Bool/Word body, direct-call
+and saved-call consumers use original evaluations before both image directions,
+preserving actual returned closures and whole output stores. Parsed tests cover
+eight Bool and forty-eight Word cases with exact syntax/ranges and distinct
+closed-depth/Core-cost checks. Their depth annotations are not universal cutoff
+theorems. Admission adds no runtime-typing assumption, canonical dispatch,
+source/Core closure identity, effects or totality.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
