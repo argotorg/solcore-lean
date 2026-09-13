@@ -1623,6 +1623,18 @@ three, while its extracted direct call needs depth two. No existing evaluator,
 data gate or image law changes; saved invocation and general calls remain outside
 this bound, as do Core costs, fault classification and whole-language totality.
 
+Lookup-known saved unary calls now have a computable depth bound (ADR-0305)
+using the actual saved body, not only caller syntax. Independent first-match
+lookup fixes all saved fields; argument evaluation uses caller rows and the body
+uses freshly extended saved rows with the current invocation store. Full-output
+success iff, whole Option stability and all-budget failure decisions require no
+child-success premise. An arbitrary saved nesting family has sharp depth n+3;
+a fixed f(x) refutes every caller-syntax-only bound as its saved body varies.
+Original lexical failure proofs and 32 whole parsed mixed-context cases preserve
+actual creation fields and separate creation/invocation owners and stores. No
+existing evaluator, gate or image law changes; general callees, runtime typing,
+Core costs, fault classification and whole-language totality remain outside scope.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

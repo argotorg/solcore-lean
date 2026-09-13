@@ -1053,6 +1053,14 @@ parsed consumers distinguish direct from grouped callees and preserve full mixed
 outputs. No gate or image law changes; saved invocation/general-call bounds and
 fault classification remain separate.
 
+Lookup-known saved unary calls now use the actual saved body for a sufficient
+depth bound (ADR-0305), with independent first-match caller pickup and separate
+shape/data premises. Exact full-output success and failure decisions preserve
+caller argument evaluation, fresh saved body inputs and current invocation
+stores. Independent sharp-depth, caller-syntax-only counterexample, lexical
+failure and whole parsed consumers cover the distinction. No evaluator, gate or
+image changes; arbitrary callees and missing-callee classification remain separate.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
