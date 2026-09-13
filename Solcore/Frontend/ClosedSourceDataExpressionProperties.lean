@@ -140,6 +140,7 @@ private theorem reflect {source : Syntax.Expr} (fragment : ClosedSourceDataExpre
           exact ⟨.bool false, finalStore,
             by simp only [RuntimeValue.ofCore], finalSame, .andFalse oldLeft⟩
       | creation shape => cases shape
+      | strictWordBinary _ _ meaning => cases meaning
   | logicalOr _ _ leftIH rightIH =>
       cases evaluated with
       | orTrue left =>
@@ -158,6 +159,7 @@ private theorem reflect {source : Syntax.Expr} (fragment : ClosedSourceDataExpre
           obtain ⟨value, finalStore, same, finalSame, oldRight⟩ := rightIH right
           exact ⟨value, finalStore, same, finalSame, .orFalse oldLeft oldRight⟩
       | creation shape => cases shape
+      | strictWordBinary _ _ meaning => cases meaning
 
 private theorem embed {source : Syntax.Expr} (fragment : ClosedSourceDataExpression source)
     {owner : Resolved.DeclarationId} {names : LocalNameTable}

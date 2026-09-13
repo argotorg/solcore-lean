@@ -26,6 +26,7 @@ theorem closedSourceExpressionEvaluates_logicalAnd_iff
   · intro evaluated
     cases evaluated with
     | creation shape => cases shape
+    | strictWordBinary _ _ meaning => cases meaning
     | andTrue leftEvaluation rightEvaluation => exact .inr ⟨_, leftEvaluation, rightEvaluation⟩
     | andFalse leftEvaluation => exact .inl ⟨rfl, leftEvaluation⟩
   · rintro (⟨rfl, leftEvaluation⟩ | ⟨middleStore, leftEvaluation, rightEvaluation⟩)
@@ -52,6 +53,7 @@ theorem closedSourceExpressionEvaluates_logicalOr_iff
   · intro evaluated
     cases evaluated with
     | creation shape => cases shape
+    | strictWordBinary _ _ meaning => cases meaning
     | orTrue leftEvaluation => exact .inl ⟨rfl, leftEvaluation⟩
     | orFalse leftEvaluation rightEvaluation => exact .inr ⟨_, leftEvaluation, rightEvaluation⟩
   · rintro (⟨rfl, leftEvaluation⟩ | ⟨middleStore, leftEvaluation, rightEvaluation⟩)
