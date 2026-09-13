@@ -407,6 +407,9 @@ import Solcore.Test.FrontendExpectedBoolStrictDataImageProperties
 import Solcore.Test.FrontendParsedExpectedBoolStrictDataBridge
 import Solcore.Test.FrontendExpectedWordStrictDataImageProperties
 import Solcore.Test.FrontendParsedExpectedWordStrictDataBridge
+import Solcore.Test.FrontendDataDepthSymbolicProperties
+import Solcore.Test.FrontendDataDepthBoundaryProperties
+import Solcore.Test.FrontendParsedDataDepthBridge
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6115,6 +6118,7 @@ def run : IO Unit := do
   frontendParsedClosedStrictWordBinaryDataImageTests
   frontendParsedExpectedBoolStrictDataBridgeTests
   frontendParsedExpectedWordStrictDataBridgeTests
+  frontendParsedDataDepthBridgeTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
