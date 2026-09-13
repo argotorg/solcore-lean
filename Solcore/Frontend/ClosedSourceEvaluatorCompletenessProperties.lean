@@ -1,5 +1,6 @@
 import Solcore.Frontend.ClosedSourceEvaluator
 import Solcore.Frontend.ClosedSourceEvaluationCompatibility
+import Solcore.Frontend.StrictWordBinaryProperties
 import Solcore.Frontend.SourceLambdaEvaluationProperties
 import Solcore.Frontend.LocalReferenceProperties
 import Solcore.Frontend.WordLiteralProperties
@@ -100,6 +101,16 @@ theorem evaluateClosedSourceExpression?_eventually_complete
       intro n large
       simp only [evaluateClosedSourceExpression?, leftIH n large, bind, Option.bind_some,
         Bool.false_eq_true, ↓reduceIte, pure]
+  | strictWordBinary _ _ meaning leftIH rightIH =>
+      obtain ⟨l, leftIH⟩ := leftIH
+      obtain ⟨r, rightIH⟩ := rightIH
+      apply eventually_step (max l r)
+      intro n large
+      have left := leftIH n (by omega)
+      have right := rightIH n (by omega)
+      cases meaning <;>
+        simp only [evaluateClosedSourceExpression?, left, right, evaluateStrictWordBinary?,
+          bind, Option.bind_some, pure]
   | bare =>
       apply eventually_step 0
       intro n _
