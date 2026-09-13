@@ -209,6 +209,9 @@ import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
 import Solcore.Frontend.ClosedSourceConditionalProperties
 import Solcore.Frontend.ClosedSourceUnaryProperties
 import Solcore.Frontend.ClosedSourceShortCircuitProperties
+import Solcore.Frontend.StrictWordBinary
+import Solcore.Frontend.StrictWordBinaryProperties
+import Solcore.Frontend.ClosedSourceStrictWordBinaryProperties
 import Solcore.Frontend.ClosedSourceEvaluatorMonotonicityProperties
 import Solcore.Frontend.ClosedSourceEvaluatorThresholdProperties
 import Solcore.Frontend.ClosedSourceDataExpression
