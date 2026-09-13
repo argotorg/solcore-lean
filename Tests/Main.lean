@@ -429,6 +429,9 @@ import Solcore.Test.FrontendParsedBoundedCalleeDepthBridge
 import Solcore.Test.FrontendNestedArgumentChainSymbolicProperties
 import Solcore.Test.FrontendBoundedInputsDepthBoundaryProperties
 import Solcore.Test.FrontendParsedBoundedInputsDepthBridge
+import Solcore.Test.FrontendClosedSourceStoreSymbolicProperties
+import Solcore.Test.FrontendClosedSourceStoreBoundaryProperties
+import Solcore.Test.FrontendParsedClosedSourceStoreReplay
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6144,6 +6147,7 @@ def run : IO Unit := do
   frontendParsedDataCalleeDepthTests
   frontendParsedBoundedCalleeDepthTests
   frontendParsedBoundedInputsDepthTests
+  frontendParsedClosedSourceStoreReplayTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
