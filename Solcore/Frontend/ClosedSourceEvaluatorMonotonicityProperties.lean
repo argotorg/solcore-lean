@@ -77,7 +77,7 @@ private theorem simultaneous_step (budget : Nat) :
               simp only [ih.1 _ _ _ _ _ _ _ child, bind, Option.bind_some, pure]
         case binary left operator right =>
           rcases operator with ⟨operatorSpan, operator⟩
-          cases operator <;> try (solve | simpa only [evaluateClosedSourceExpression?] using accepted)
+          cases operator
           case logicalAnd =>
             simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
             obtain ⟨⟨actual, middleStore⟩, leftResult, result⟩ := accepted
@@ -98,6 +98,17 @@ private theorem simultaneous_step (budget : Nat) :
             cases choice <;> simp only [Bool.false_eq_true, ↓reduceIte] at result ⊢
             · exact ih.1 _ _ _ _ _ _ _ result
             · exact result
+          all_goals
+            simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
+            obtain ⟨⟨leftActual, middleStore⟩, leftResult, result⟩ := accepted
+            cases leftActual <;> simp only [reduceCtorEq, Option.bind_eq_some_iff] at result
+            obtain ⟨⟨rightActual, finalStore⟩, rightResult, result⟩ := result
+            cases rightActual <;>
+              simp only [reduceCtorEq, Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at result
+            obtain ⟨coreValue, meaning, rfl, rfl⟩ := result
+            simp only [evaluateClosedSourceExpression?,
+              ih.1 _ _ _ _ _ _ _ leftResult, ih.1 _ _ _ _ _ _ _ rightResult,
+              meaning, bind, Option.bind_some, pure]
         case call callee arguments =>
           rcases arguments with ⟨argumentsSpan, arguments⟩
           cases arguments with
