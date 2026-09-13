@@ -435,6 +435,9 @@ import Solcore.Test.FrontendParsedClosedSourceStoreReplay
 import Solcore.Test.FrontendSelfApplicationSymbolicProperties
 import Solcore.Test.FrontendSelfApplicationBoundaryProperties
 import Solcore.Test.FrontendParsedSelfApplication
+import Solcore.Test.FrontendRuntimeValueOwnerProperties
+import Solcore.Test.FrontendRuntimeCapturedOwnerBoundaryProperties
+import Solcore.Test.FrontendParsedClosedSourceOwner
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6152,6 +6155,7 @@ def run : IO Unit := do
   frontendParsedBoundedInputsDepthTests
   frontendParsedClosedSourceStoreReplayTests
   frontendParsedSelfApplicationTests
+  frontendParsedClosedSourceOwnerTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
