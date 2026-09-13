@@ -101,6 +101,27 @@ private theorem reflect {source : Syntax.Expr} (fragment : ClosedSourceDataExpre
           exact ⟨value, finalStore, same, finalSame, .ifFalse oldCondition oldBranch⟩
       | creation shape => cases shape
 
+  | logicalNot _ ih =>
+      cases evaluated with
+      | @logicalNot _ _ _ _ _ _ _ _ operandBool child =>
+          obtain ⟨value, finalStore, same, finalSame, previous⟩ := ih child
+          have actualBool : Core.Value.bool operandBool = value := RuntimeValue.ofCore_injective
+            (by simpa only [RuntimeValue.ofCore] using same)
+          cases actualBool
+          exact ⟨.bool (!operandBool), finalStore,
+            by simp only [RuntimeValue.ofCore], finalSame, .logicalNot previous⟩
+      | creation shape => cases shape
+  | bitNot _ ih =>
+      cases evaluated with
+      | @bitNot _ _ _ _ _ _ _ _ operandWord child =>
+          obtain ⟨value, finalStore, same, finalSame, previous⟩ := ih child
+          have actualWord : Core.Value.word operandWord = value := RuntimeValue.ofCore_injective
+            (by simpa only [RuntimeValue.ofCore] using same)
+          cases actualWord
+          exact ⟨.word operandWord.bitNot, finalStore,
+            by simp only [RuntimeValue.ofCore], finalSame, .bitNot previous⟩
+      | creation shape => cases shape
+
 private theorem embed {source : Syntax.Expr} (fragment : ClosedSourceDataExpression source)
     {owner : Resolved.DeclarationId} {names : LocalNameTable}
     {environment : Resolved.Environment} {initialStore finalStore : Core.Store} {value : Core.Value}
@@ -134,6 +155,17 @@ private theorem embed {source : Syntax.Expr} (fragment : ClosedSourceDataExpress
       | ifFalse condition branch =>
           exact .conditionalFalse (by simpa only [RuntimeValue.ofCore] using conditionIH condition)
             (elseIH branch)
+
+  | logicalNot _ ih =>
+      cases evaluated with
+      | logicalNot child =>
+          simp only [RuntimeValue.ofCore]
+          exact .logicalNot (by simpa only [RuntimeValue.ofCore] using ih child)
+  | bitNot _ ih =>
+      cases evaluated with
+      | bitNot child =>
+          simp only [RuntimeValue.ofCore]
+          exact .bitNot (by simpa only [RuntimeValue.ofCore] using ih child)
 
 /-- Every actual mixed result and whole final store is exactly an old local result's image. -/
 theorem ClosedSourceDataExpression.local_evaluates_iff
