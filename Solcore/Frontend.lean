@@ -240,6 +240,8 @@ import Solcore.Frontend.RuntimeValueOwner
 import Solcore.Frontend.RuntimeValueOwnerProperties
 import Solcore.Frontend.RuntimeCapturedOwnerProperties
 import Solcore.Frontend.ClosedSourceOwnerProperties
+import Solcore.Frontend.ClosedSourceEvaluatorOwnerStepProperties
+import Solcore.Frontend.ClosedSourceEvaluatorOwnerProperties
 import Solcore.Frontend.ClosedSourceDataBody
 import Solcore.Frontend.ClosedSourceDataBodyProperties
 import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
