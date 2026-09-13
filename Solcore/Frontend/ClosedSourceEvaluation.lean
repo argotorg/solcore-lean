@@ -12,7 +12,7 @@ namespace Solcore.Frontend
 
 mutual
 
-/-- Twelve original expression forms, recursively closed with original body evaluation.
+/-- Sixteen original expression evaluation rules, recursively closed with original body evaluation.
 Owner is an index so calls can switch to the closure's saved lexical scope. -/
 inductive ClosedSourceExpressionEvaluates :
     Resolved.DeclarationId → List (String × Resolved.LocalId) →
@@ -99,6 +99,35 @@ inductive ClosedSourceExpressionEvaluates :
         initialStore operand (.word value) finalStore) :
       ClosedSourceExpressionEvaluates owner names captured initialStore
         ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩ (.word value.bitNot) finalStore
+
+  | andTrue {owner names captured initialStore middleStore finalStore}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr} {value : RuntimeValue}
+      (leftEvaluation : ClosedSourceExpressionEvaluates owner names captured
+        initialStore left (.bool true) middleStore)
+      (rightEvaluation : ClosedSourceExpressionEvaluates owner names captured
+        middleStore right value finalStore) :
+      ClosedSourceExpressionEvaluates owner names captured initialStore
+        ⟨span, .binary left ⟨operatorSpan, .logicalAnd⟩ right⟩ value finalStore
+  | andFalse {owner names captured initialStore finalStore}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftEvaluation : ClosedSourceExpressionEvaluates owner names captured
+        initialStore left (.bool false) finalStore) :
+      ClosedSourceExpressionEvaluates owner names captured initialStore
+        ⟨span, .binary left ⟨operatorSpan, .logicalAnd⟩ right⟩ (.bool false) finalStore
+  | orTrue {owner names captured initialStore finalStore}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftEvaluation : ClosedSourceExpressionEvaluates owner names captured
+        initialStore left (.bool true) finalStore) :
+      ClosedSourceExpressionEvaluates owner names captured initialStore
+        ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩ (.bool true) finalStore
+  | orFalse {owner names captured initialStore middleStore finalStore}
+      {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr} {value : RuntimeValue}
+      (leftEvaluation : ClosedSourceExpressionEvaluates owner names captured
+        initialStore left (.bool false) middleStore)
+      (rightEvaluation : ClosedSourceExpressionEvaluates owner names captured
+        middleStore right value finalStore) :
+      ClosedSourceExpressionEvaluates owner names captured initialStore
+        ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩ value finalStore
 
 /-- The nine original body forms with recursively closed expression children.
 Initializers precede fresh binding; annotations and unselected branches are inert. -/
