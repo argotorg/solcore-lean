@@ -423,6 +423,9 @@ import Solcore.Test.FrontendParsedSavedDataLambdaDepthBridge
 import Solcore.Test.FrontendDataCalleeLambdaDepthSymbolicProperties
 import Solcore.Test.FrontendDataCalleeLambdaDepthBoundaryProperties
 import Solcore.Test.FrontendParsedDataCalleeDepthBridge
+import Solcore.Test.FrontendBoundedCalleeChainSymbolicProperties
+import Solcore.Test.FrontendBoundedCalleeLambdaDepthBoundaryProperties
+import Solcore.Test.FrontendParsedBoundedCalleeDepthBridge
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6136,6 +6139,7 @@ def run : IO Unit := do
   frontendParsedDirectDataLambdaDepthTests
   frontendParsedSavedDataLambdaDepthTests
   frontendParsedDataCalleeDepthTests
+  frontendParsedBoundedCalleeDepthTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation

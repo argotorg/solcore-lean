@@ -228,6 +228,8 @@ import Solcore.Frontend.SavedDataLambdaDepth
 import Solcore.Frontend.SavedDataLambdaDepthDecisionProperties
 import Solcore.Frontend.DataCalleeLambdaDepth
 import Solcore.Frontend.DataCalleeLambdaDepthDecisionProperties
+import Solcore.Frontend.BoundedCalleeLambdaDepth
+import Solcore.Frontend.BoundedCalleeLambdaDepthDecisionProperties
 import Solcore.Frontend.ClosedSourceDataBody
 import Solcore.Frontend.ClosedSourceDataBodyProperties
 import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
