@@ -1635,6 +1635,16 @@ actual creation fields and separate creation/invocation owners and stores. No
 existing evaluator, gate or image law changes; general callees, runtime typing,
 Core costs, fault classification and whole-language totality remain outside scope.
 
+Independently selected data-expression callees now have a compositional depth
+bound (ADR-0306): the maximum of callee, argument and actual saved-body bounds
+plus one. Every decision law explicitly retains an original successful callee
+selection, shape and three data gates; none assumes argument/body success.
+Actual selected fields, fresh saved scope and intermediate/full stores are
+preserved. Independent grouped-callee/body sharp depths, skipped deep candidate
+cases, selected-body failures and 32 whole parsed group/conditional/logical call
+cases consume the laws. This does not decide callee selection or claim an
+unconditional general-call bound, runtime typing, Core costs or fault classes.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

@@ -1061,6 +1061,14 @@ stores. Independent sharp-depth, caller-syntax-only counterexample, lexical
 failure and whole parsed consumers cover the distinction. No evaluator, gate or
 image changes; arbitrary callees and missing-callee classification remain separate.
 
+Independent successful data-callee selection now supports sufficient call depth
+from three child maxima plus one (ADR-0306). The callee, argument and selected
+body keep separate data gates, original selected closure fields and actual
+intermediate stores. Exact success and failure decisions retain that explicit
+selection premise. Symbolic and parsed grouped/conditional/logical callees and
+selected-body failures verify the boundary; no unconditional callee decision,
+new source gate, image-law change or general nested-call bound is claimed.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
