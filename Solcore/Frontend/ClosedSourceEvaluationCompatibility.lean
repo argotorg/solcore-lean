@@ -23,6 +23,10 @@ private theorem body_forward {owner names captured initialStore body value final
   | conditionalFalse => trivial
   | logicalNot => trivial
   | bitNot => trivial
+  | andTrue => trivial
+  | andFalse => trivial
+  | orTrue => trivial
+  | orFalse => trivial
   | bare => exact .bare
   | expression child _ => exact .expression child
   | block _ ih => exact .block ih

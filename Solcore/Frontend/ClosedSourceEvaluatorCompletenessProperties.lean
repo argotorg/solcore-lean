@@ -85,6 +85,21 @@ theorem evaluateClosedSourceExpression?_eventually_complete
       apply eventually_step k
       intro n large
       simp only [evaluateClosedSourceExpression?, ih n large, bind, Option.bind_some, pure]
+  | andTrue _ _ leftIH rightIH | orFalse _ _ leftIH rightIH =>
+      obtain ⟨l, leftIH⟩ := leftIH
+      obtain ⟨r, rightIH⟩ := rightIH
+      apply eventually_step (max l r)
+      intro n large
+      have left := leftIH n (by omega)
+      have right := rightIH n (by omega)
+      simpa only [evaluateClosedSourceExpression?, left, bind, Option.bind_some,
+        Bool.false_eq_true, ↓reduceIte] using right
+  | andFalse _ leftIH | orTrue _ leftIH =>
+      obtain ⟨l, leftIH⟩ := leftIH
+      apply eventually_step l
+      intro n large
+      simp only [evaluateClosedSourceExpression?, leftIH n large, bind, Option.bind_some,
+        Bool.false_eq_true, ↓reduceIte, pure]
   | bare =>
       apply eventually_step 0
       intro n _

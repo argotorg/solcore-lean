@@ -114,6 +114,31 @@ private theorem simultaneous_sound (budget : Nat) :
                 simp only [reduceCtorEq, pure, Option.some.injEq, Prod.mk.injEq] at result
               obtain ⟨rfl, rfl⟩ := result
               exact .bitNot (ih.1 _ _ _ _ _ _ _ child)
+        case binary left operator right =>
+          rcases operator with ⟨operatorSpan, operator⟩
+          cases operator <;> try (solve |
+            simp only [evaluateClosedSourceExpression?, sourceUnaryLambdaShape?,
+              bind, Option.bind_none, reduceCtorEq] at accepted)
+          case logicalAnd =>
+            simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
+            obtain ⟨⟨actual, middleStore⟩, leftResult, result⟩ := accepted
+            cases actual <;> simp only [reduceCtorEq] at result
+            rename_i choice
+            cases choice <;> simp only [Bool.false_eq_true, ↓reduceIte] at result
+            · simp only [pure, Option.some.injEq, Prod.mk.injEq] at result
+              obtain ⟨rfl, rfl⟩ := result
+              exact .andFalse (ih.1 _ _ _ _ _ _ _ leftResult)
+            · exact .andTrue (ih.1 _ _ _ _ _ _ _ leftResult) (ih.1 _ _ _ _ _ _ _ result)
+          case logicalOr =>
+            simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
+            obtain ⟨⟨actual, middleStore⟩, leftResult, result⟩ := accepted
+            cases actual <;> simp only [reduceCtorEq] at result
+            rename_i choice
+            cases choice <;> simp only [Bool.false_eq_true, ↓reduceIte] at result
+            · exact .orFalse (ih.1 _ _ _ _ _ _ _ leftResult) (ih.1 _ _ _ _ _ _ _ result)
+            · simp only [pure, Option.some.injEq, Prod.mk.injEq] at result
+              obtain ⟨rfl, rfl⟩ := result
+              exact .orTrue (ih.1 _ _ _ _ _ _ _ leftResult)
         case lambda keyword parameters returns body =>
           simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff,
             pure, Option.some.injEq, Prod.mk.injEq] at accepted

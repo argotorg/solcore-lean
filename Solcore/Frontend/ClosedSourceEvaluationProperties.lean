@@ -100,6 +100,30 @@ theorem ClosedSourceExpressionEvaluates.deterministic
           cases RuntimeValue.word.inj same
           cases sameStore
           exact ⟨rfl, rfl⟩
+  | andTrue _ _ leftIH rightIH =>
+      cases second with
+      | creation shape => cases shape
+      | andTrue otherLeft otherRight =>
+          obtain ⟨_, rfl⟩ := leftIH otherLeft
+          exact rightIH otherRight
+      | andFalse otherLeft => cases (leftIH otherLeft).1
+  | andFalse _ leftIH =>
+      cases second with
+      | creation shape => cases shape
+      | andTrue otherLeft _ => cases (leftIH otherLeft).1
+      | andFalse otherLeft => exact leftIH otherLeft
+  | orTrue _ leftIH =>
+      cases second with
+      | creation shape => cases shape
+      | orTrue otherLeft => exact leftIH otherLeft
+      | orFalse otherLeft _ => cases (leftIH otherLeft).1
+  | orFalse _ _ leftIH rightIH =>
+      cases second with
+      | creation shape => cases shape
+      | orTrue otherLeft => cases (leftIH otherLeft).1
+      | orFalse otherLeft otherRight =>
+          obtain ⟨_, rfl⟩ := leftIH otherLeft
+          exact rightIH otherRight
   | bare =>
       rename_i right rightStore other
       cases other
