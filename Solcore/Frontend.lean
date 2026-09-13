@@ -222,6 +222,8 @@ import Solcore.Frontend.ClosedSourceDataDepthDecisionProperties
 import Solcore.Frontend.ClosedSourceDataBodyDepthBound
 import Solcore.Frontend.ClosedSourceDataBodyDepthProperties
 import Solcore.Frontend.ClosedSourceDataBodyDepthDecisionProperties
+import Solcore.Frontend.DirectDataLambdaDepth
+import Solcore.Frontend.DirectDataLambdaDepthDecisionProperties
 import Solcore.Frontend.ClosedSourceDataBody
 import Solcore.Frontend.ClosedSourceDataBodyProperties
 import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
