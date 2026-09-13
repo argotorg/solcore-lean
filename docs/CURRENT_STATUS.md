@@ -1671,6 +1671,14 @@ Nested saved calls, fresh bindings, ordered matches, short circuits and parsed
 consumers verify the laws. Opaque cell references remain literal data; validity
 in a replacement store and host execution are not asserted.
 
+Exact raw unary self-application now has a proved non-return boundary (ADR-0310).
+Both inputs succeed, but the saved body re-enters the same fresh saved scope;
+a direct depth recurrence proves None at every finite budget and excludes every
+finite original success. Distinct source occurrences, saved-reference calls and
+strict wrappers are covered. Identity and short-circuit controls still succeed.
+Sixteen parsed contexts retain actual fields and stores. This is not a theorem
+about well-typed whole programs, small-step infinite runs or arbitrary None.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

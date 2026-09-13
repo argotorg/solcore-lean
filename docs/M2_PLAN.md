@@ -1090,6 +1090,12 @@ replay, with direct same-budget finite Option equality (ADR-0309). This covers
 success and None independently of the data gates. Runtime-world preservation,
 host effects, dereferencing and unconditional termination remain outside scope.
 
+Raw self-application now demonstrates why successful inputs alone imply no
+unconditional call termination (ADR-0310). Exact saved-body re-entry proves
+all-budget None and no finite original success; the old data-body gate excludes
+these bodies independently. Distinct parsed occurrences and successful identity
+and short-circuit controls preserve the boundary without changing evaluators.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
