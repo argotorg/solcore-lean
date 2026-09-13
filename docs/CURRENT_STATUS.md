@@ -1655,6 +1655,15 @@ depths; larger supplied budgets need not be minimal. Selected outer failures and
 values/stores. This does not search for callee budgets or establish unconditional
 general-call termination, runtime typing, Core costs or fault classification.
 
+Calls with nested argument applications now compose sufficient depth from two
+independently supplied finite successful inputs (ADR-0308). The actual callee
+store feeds the argument; its actual mixed value/store feed the fresh saved
+data body. Both input equations are explicit in every decision law; no body
+success is assumed. Sharp arbitrary nested arguments, nonminimal input budgets,
+selected body failures and 32 whole parsed f(g(x)) cases verify the boundary.
+Replacing the argument gate by successful evaluation is a separate conditional
+contract, not a stronger argument-failure decision or an input-budget search.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

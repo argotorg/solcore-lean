@@ -1077,6 +1077,14 @@ budgets, outer failure boundaries and 32 parsed cases preserve actual closures
 and stores. No evaluator, source gate or image law changes; finding a callee
 budget and unconditional general-call termination remain outside this result.
 
+Independent finite successful callee and argument equations now compose outer
+call depth without either input data gate (ADR-0308). Only the actual saved body
+remains data-gated; its success is not required. Actual ordered stores and mixed
+values flow through both inputs and the fresh saved body. Symbolic nested
+arguments, independent saved-capture failure and 32 parsed f(g(x)) cases consume
+the laws. Input failures, budget discovery and unconditional termination remain
+outside this separate contract; existing APIs and data gates are unchanged.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
