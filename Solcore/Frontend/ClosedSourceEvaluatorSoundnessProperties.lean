@@ -1,5 +1,6 @@
 import Solcore.Frontend.ClosedSourceEvaluator
 import Solcore.Frontend.ClosedSourceEvaluation
+import Solcore.Frontend.StrictWordBinaryProperties
 import Solcore.Frontend.SourceLambdaEvaluationProperties
 import Solcore.Frontend.LocalReferenceProperties
 import Solcore.Frontend.WordLiteralProperties
@@ -116,9 +117,7 @@ private theorem simultaneous_sound (budget : Nat) :
               exact .bitNot (ih.1 _ _ _ _ _ _ _ child)
         case binary left operator right =>
           rcases operator with ⟨operatorSpan, operator⟩
-          cases operator <;> try (solve |
-            simp only [evaluateClosedSourceExpression?, sourceUnaryLambdaShape?,
-              bind, Option.bind_none, reduceCtorEq] at accepted)
+          cases operator
           case logicalAnd =>
             simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
             obtain ⟨⟨actual, middleStore⟩, leftResult, result⟩ := accepted
@@ -139,6 +138,16 @@ private theorem simultaneous_sound (budget : Nat) :
             · simp only [pure, Option.some.injEq, Prod.mk.injEq] at result
               obtain ⟨rfl, rfl⟩ := result
               exact .orTrue (ih.1 _ _ _ _ _ _ _ leftResult)
+          all_goals
+            simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff] at accepted
+            obtain ⟨⟨leftActual, middleStore⟩, leftResult, result⟩ := accepted
+            cases leftActual <;> simp only [reduceCtorEq, Option.bind_eq_some_iff] at result
+            obtain ⟨⟨rightActual, finalStore⟩, rightResult, result⟩ := result
+            cases rightActual <;>
+              simp only [reduceCtorEq, Option.bind_eq_some_iff, pure, Option.some.injEq, Prod.mk.injEq] at result
+            obtain ⟨coreValue, meaning, rfl, rfl⟩ := result
+            exact .strictWordBinary (ih.1 _ _ _ _ _ _ _ leftResult)
+              (ih.1 _ _ _ _ _ _ _ rightResult) (evaluateStrictWordBinary?_iff.mp meaning)
         case lambda keyword parameters returns body =>
           simp only [evaluateClosedSourceExpression?, bind, Option.bind_eq_some_iff,
             pure, Option.some.injEq, Prod.mk.injEq] at accepted
