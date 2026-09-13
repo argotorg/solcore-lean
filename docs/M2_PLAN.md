@@ -1103,6 +1103,12 @@ collision controls and parsed calls retain complete actual endpoints. Next prove
 same-budget executable Option covariance separately, without inferring failure
 preservation from forward original successes or claiming heap validity.
 
+Same-budget executable owner covariance is now proved directly for expression
+and body runners (ADR-0312), including complete Some endpoints and None. Independent
+original runs and 224 parsed comparisons precede use of the new law. Next recover
+original endpoint preimages from mapped successes and derive a converse separately;
+retain injectivity without imposing surjectivity or an already-mapped endpoint.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

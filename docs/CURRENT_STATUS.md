@@ -1687,6 +1687,12 @@ Independent collisions show why injectivity matters, and eight parsed contexts
 retain actual saved closures and fresh shadowing. This is forward original-success
 transport, not a same-budget Option law, converse or runtime-world invariant.
 
+Both finite closed source runners now preserve complete Option results under
+injective owner relabeling at the same budget (ADR-0312). Direct joint induction
+retains actual saved calls, fresh rows, strict tags and ordered selection; success
+and absence are both covered. Independent old-run controls and 224 parsed result
+comparisons pass. This is not an original converse, cost or failure classifier.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
