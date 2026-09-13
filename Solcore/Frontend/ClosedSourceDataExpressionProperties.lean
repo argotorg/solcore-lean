@@ -122,6 +122,43 @@ private theorem reflect {source : Syntax.Expr} (fragment : ClosedSourceDataExpre
             by simp only [RuntimeValue.ofCore], finalSame, .bitNot previous⟩
       | creation shape => cases shape
 
+  | logicalAnd _ _ leftIH rightIH =>
+      cases evaluated with
+      | andTrue left right =>
+          obtain ⟨decision, middleStore, decisionSame, middleSame, oldLeft⟩ := leftIH left
+          have actualBool : Core.Value.bool true = decision := RuntimeValue.ofCore_injective
+            (by simpa only [RuntimeValue.ofCore] using decisionSame)
+          cases actualBool
+          rw [middleSame] at right
+          obtain ⟨value, finalStore, same, finalSame, oldRight⟩ := rightIH right
+          exact ⟨value, finalStore, same, finalSame, .andTrue oldLeft oldRight⟩
+      | andFalse left =>
+          obtain ⟨decision, finalStore, decisionSame, finalSame, oldLeft⟩ := leftIH left
+          have actualBool : Core.Value.bool false = decision := RuntimeValue.ofCore_injective
+            (by simpa only [RuntimeValue.ofCore] using decisionSame)
+          cases actualBool
+          exact ⟨.bool false, finalStore,
+            by simp only [RuntimeValue.ofCore], finalSame, .andFalse oldLeft⟩
+      | creation shape => cases shape
+  | logicalOr _ _ leftIH rightIH =>
+      cases evaluated with
+      | orTrue left =>
+          obtain ⟨decision, finalStore, decisionSame, finalSame, oldLeft⟩ := leftIH left
+          have actualBool : Core.Value.bool true = decision := RuntimeValue.ofCore_injective
+            (by simpa only [RuntimeValue.ofCore] using decisionSame)
+          cases actualBool
+          exact ⟨.bool true, finalStore,
+            by simp only [RuntimeValue.ofCore], finalSame, .orTrue oldLeft⟩
+      | orFalse left right =>
+          obtain ⟨decision, middleStore, decisionSame, middleSame, oldLeft⟩ := leftIH left
+          have actualBool : Core.Value.bool false = decision := RuntimeValue.ofCore_injective
+            (by simpa only [RuntimeValue.ofCore] using decisionSame)
+          cases actualBool
+          rw [middleSame] at right
+          obtain ⟨value, finalStore, same, finalSame, oldRight⟩ := rightIH right
+          exact ⟨value, finalStore, same, finalSame, .orFalse oldLeft oldRight⟩
+      | creation shape => cases shape
+
 private theorem embed {source : Syntax.Expr} (fragment : ClosedSourceDataExpression source)
     {owner : Resolved.DeclarationId} {names : LocalNameTable}
     {environment : Resolved.Environment} {initialStore finalStore : Core.Store} {value : Core.Value}
@@ -166,6 +203,21 @@ private theorem embed {source : Syntax.Expr} (fragment : ClosedSourceDataExpress
       | bitNot child =>
           simp only [RuntimeValue.ofCore]
           exact .bitNot (by simpa only [RuntimeValue.ofCore] using ih child)
+
+  | logicalAnd _ _ leftIH rightIH =>
+      cases evaluated with
+      | andTrue left right =>
+          exact .andTrue (by simpa only [RuntimeValue.ofCore] using leftIH left) (rightIH right)
+      | andFalse left =>
+          simp only [RuntimeValue.ofCore]
+          exact .andFalse (by simpa only [RuntimeValue.ofCore] using leftIH left)
+  | logicalOr _ _ leftIH rightIH =>
+      cases evaluated with
+      | orTrue left =>
+          simp only [RuntimeValue.ofCore]
+          exact .orTrue (by simpa only [RuntimeValue.ofCore] using leftIH left)
+      | orFalse left right =>
+          exact .orFalse (by simpa only [RuntimeValue.ofCore] using leftIH left) (rightIH right)
 
 /-- Every actual mixed result and whole final store is exactly an old local result's image. -/
 theorem ClosedSourceDataExpression.local_evaluates_iff
