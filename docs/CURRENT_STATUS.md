@@ -1664,6 +1664,13 @@ selected body failures and 32 whole parsed f(g(x)) cases verify the boundary.
 Replacing the argument gate by successful evaluation is a separate conditional
 contract, not a stronger argument-failure decision or an input-budget search.
 
+Closed source expression/body evaluation now preserves its exact external store
+and replays from any replacement store (ADR-0309). Same-budget Option equality
+preserves full mixed values and failures without gates or success assumptions.
+Nested saved calls, fresh bindings, ordered matches, short circuits and parsed
+consumers verify the laws. Opaque cell references remain literal data; validity
+in a replacement store and host execution are not asserted.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

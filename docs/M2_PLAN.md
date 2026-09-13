@@ -1085,6 +1085,11 @@ arguments, independent saved-capture failure and 32 parsed f(g(x)) cases consume
 the laws. Input failures, budget discovery and unconditional termination remain
 outside this separate contract; existing APIs and data gates are unchanged.
 
+All existing closed expression/body rules now have exact store preservation and
+replay, with direct same-budget finite Option equality (ADR-0309). This covers
+success and None independently of the data gates. Runtime-world preservation,
+host effects, dereferencing and unconditional termination remain outside scope.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
