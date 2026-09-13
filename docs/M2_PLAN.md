@@ -1044,6 +1044,15 @@ add search depth. Arbitrary shadowing/miss families, selected negative cases and
 forty parsed mixed-context lanes independently exercise the new laws. Source-call
 and saved-invocation bounds remain a later slice.
 
+Direct original unary lambda applications now have a syntax-only sufficient
+depth from creation one and the data argument/body bounds (ADR-0304). Original
+callee/shape uniqueness preserves the actual saved lexical fields and fresh
+body inputs. Exact success iff, whole Option stability and all-budget failure
+decisions require no argument/body success premise. Independent symbolic and
+parsed consumers distinguish direct from grouped callees and preserve full mixed
+outputs. No gate or image law changes; saved invocation/general-call bounds and
+fault classification remain separate.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

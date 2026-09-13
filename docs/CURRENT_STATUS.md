@@ -1611,6 +1611,18 @@ mixed-context success lanes. The evaluator, seven-form gate, ordered selector
 and six image laws are unchanged. Source-call and saved-invocation bounds remain
 separate work; this is not a Core transition-cost bound or a fault classifier.
 
+Direct unmarked unary lambda applications now have a computable depth bound
+(ADR-0304), combining creation depth one with the data argument/body bounds.
+Original callee determinism fixes every saved lexical field; the actual fresh
+extension, mixed result and complete final store are preserved. Exact success
+iff, whole Option stability and bound None iff all-budget failure need no
+argument/body success premise. Independent arbitrary-depth consumers, missing
+argument and selected bad-body cases, and actual parsed direct/grouped calls
+exercise the separate scope premises. A grouped bare-return call needs depth
+three, while its extracted direct call needs depth two. No existing evaluator,
+data gate or image law changes; saved invocation and general calls remain outside
+this bound, as do Core costs, fault classification and whole-language totality.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
