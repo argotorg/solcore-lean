@@ -1,3 +1,4 @@
+import Solcore.Frontend.StrictWordBinary
 import Solcore.Frontend.RuntimeWordMatchSelection
 import Solcore.Frontend.SourceLambdaEvaluation
 import Solcore.Frontend.LocalReference
@@ -65,6 +66,13 @@ def evaluateClosedSourceExpression? (budget : Nat) (owner : Resolved.Declaration
           let (.bool choice, middleStore) ← evaluateClosedSourceExpression? n owner names captured store left | none
           if choice then return (.bool true, middleStore)
           else evaluateClosedSourceExpression? n owner names captured middleStore right
+      | ⟨_, .binary left ⟨_, operator⟩ right⟩ => do
+          let (.word leftWord, middleStore) ←
+            evaluateClosedSourceExpression? n owner names captured store left | none
+          let (.word rightWord, finalStore) ←
+            evaluateClosedSourceExpression? n owner names captured middleStore right | none
+          let result ← evaluateStrictWordBinary? operator leftWord rightWord
+          return (RuntimeValue.ofCore result, finalStore)
       | _ => do
           let _ ← sourceUnaryLambdaShape? source
           return (.sourceClosure source owner names captured, store)
