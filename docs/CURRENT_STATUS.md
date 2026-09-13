@@ -1582,6 +1582,22 @@ complete handwritten AST/ranges, EOF, diagnostics and separate source-depth/Core
 cost checks. Lambda depth annotations are finite checks, not universal cutoffs.
 No canonical dispatch, effects, closure identity or whole-language totality follows.
 
+The recursive data-expression gate now has a computable source-depth bound
+(ADR-0302). Direct syntax induction finds every original successful evaluation
+at every sufficient budget, retaining its actual mixed value and whole final
+store. Exact success correspondence and whole Option stability follow, including
+failure: None at the bound excludes every original successful endpoint and
+implies None at every budget. Groups and reconstructed many-tuple tails each pay
+a level; all potential branches contribute through a maximum. This is sufficient,
+not minimal: a deeply grouped missing branch can be skipped at depth two.
+Symbolic arbitrary-depth/arity, all fourteen strict operators, duplicate first-
+match rows, invalid literals and mixed payloads have independent consumers.
+Two parsed trees cover thirty-two context/outcome lanes with whole AST/ranges,
+EOF and zero diagnostics. Gate-external creation/call examples show why the gate
+premise is essential. No original evaluator, gate, image contract or Core cost
+changes; body/call bounds, fault classification and whole-language totality remain
+separate.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

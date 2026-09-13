@@ -1025,6 +1025,16 @@ fixtures check exact AST/ranges and separate source depth from Core cost. Missin
 or non-Word admitted operands still fail; successful raw call operands remain
 outside this syntax gate. No runtime typing, effects or closure identity is added.
 
+A computable syntax-only source-depth bound now covers the existing recursive
+data-expression gate (ADR-0302). A direct original-evaluation proof supports exact
+success correspondence and whole Option stability above the bound; bound None
+equates to no original successful endpoint and failure at every search budget.
+Groups and reconstructed tuple tails count separately, and maxima include both
+potential branches. The bound need not be minimal. Independent symbolic, negative
+and parsed consumers retain actual mixed values/stores, duplicate first matches
+and skipped-versus-selected failure. No existing evaluator, gate or image law is
+changed. Body/source-call bounds and fault classification remain separate.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not
