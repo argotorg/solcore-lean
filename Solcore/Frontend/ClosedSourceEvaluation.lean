@@ -1,3 +1,4 @@
+import Solcore.Frontend.StrictWordBinary
 import Solcore.Frontend.SourceLambdaEvaluation
 import Solcore.Frontend.SourceComputationBodyEvaluation
 import Solcore.Frontend.LocalReference
@@ -12,7 +13,7 @@ namespace Solcore.Frontend
 
 mutual
 
-/-- Sixteen original expression evaluation rules, recursively closed with original body evaluation.
+/-- Seventeen original expression evaluation rules, recursively closed with original body evaluation.
 Owner is an index so calls can switch to the closure's saved lexical scope. -/
 inductive ClosedSourceExpressionEvaluates :
     Resolved.DeclarationId → List (String × Resolved.LocalId) →
@@ -128,6 +129,18 @@ inductive ClosedSourceExpressionEvaluates :
         middleStore right value finalStore) :
       ClosedSourceExpressionEvaluates owner names captured initialStore
         ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩ value finalStore
+
+  | strictWordBinary {owner names captured initialStore middleStore finalStore}
+      {span operatorSpan : Syntax.SourceSpan} {operator : Syntax.BinaryOp}
+      {left right : Syntax.Expr} {leftWord rightWord : Core.Word} {result : Core.Value}
+      (leftEvaluation : ClosedSourceExpressionEvaluates owner names captured
+        initialStore left (.word leftWord) middleStore)
+      (rightEvaluation : ClosedSourceExpressionEvaluates owner names captured
+        middleStore right (.word rightWord) finalStore)
+      (meaning : StrictWordBinaryDenotes operator leftWord rightWord result) :
+      ClosedSourceExpressionEvaluates owner names captured initialStore
+        ⟨span, .binary left ⟨operatorSpan, operator⟩ right⟩
+        (RuntimeValue.ofCore result) finalStore
 
 /-- The nine original body forms with recursively closed expression children.
 Initializers precede fresh binding; annotations and unselected branches are inert. -/
