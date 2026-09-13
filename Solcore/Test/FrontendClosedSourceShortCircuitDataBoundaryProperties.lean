@@ -36,9 +36,11 @@ private theorem outside (span : Syntax.SourceSpan) (isOr : Bool) (left right : S
   · intro admitted
     cases admitted with
     | logicalAnd _ child => exact excluded child
+    | strictWordBinary _ _ notAnd _ => exact notAnd rfl
   · intro admitted
     cases admitted with
     | logicalOr _ child => exact excluded child
+    | strictWordBinary _ _ _ notOr => exact notOr rfl
 
 /-- A short-circuit expression can succeed outside the gate from opaque mixed inputs. -/
 theorem skipped_lambda_and_call_remain_outside

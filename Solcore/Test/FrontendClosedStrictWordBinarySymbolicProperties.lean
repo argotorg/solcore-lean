@@ -46,7 +46,7 @@ theorem all_fourteen_original_and_exact_actual_results
       (∀ actual final, ClosedSourceExpressionEvaluates owner names captured store
         (source spans leftName rightName operator) actual final ↔
         actual = RuntimeValue.ofCore result ∧ final = store) ∧
-      ¬ ClosedSourceDataExpression (source spans leftName rightName operator) := by
+      ClosedSourceDataExpression (source spans leftName rightName operator) := by
   intro operator result member
   have meaning := original_meaning member
   have leftOriginal : ClosedSourceExpressionEvaluates owner names captured store
@@ -77,9 +77,6 @@ theorem all_fourteen_original_and_exact_actual_results
     · intro endpoints
       exact decomposition.mpr ⟨leftWord, rightWord, result, store, endpoints.1,
         leftOriginal, by simpa only [endpoints.2] using rightOriginal, meaning⟩
-  · intro admitted
-    cases admitted with
-    | logicalAnd _ _ => exact notAnd rfl
-    | logicalOr _ _ => exact notOr rfl
+  · exact .strictWordBinary .reference .reference notAnd notOr
 
 end Tests.ClosedStrictWordBinarySymbolic
