@@ -40,4 +40,13 @@ inductive ClosedSourceDataExpression : Syntax.Expr → Prop where
       (child : ClosedSourceDataExpression operand) :
       ClosedSourceDataExpression ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩
 
+  | logicalAnd {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftSyntax : ClosedSourceDataExpression left)
+      (rightSyntax : ClosedSourceDataExpression right) :
+      ClosedSourceDataExpression ⟨span, .binary left ⟨operatorSpan, .logicalAnd⟩ right⟩
+  | logicalOr {span operatorSpan : Syntax.SourceSpan} {left right : Syntax.Expr}
+      (leftSyntax : ClosedSourceDataExpression left)
+      (rightSyntax : ClosedSourceDataExpression right) :
+      ClosedSourceDataExpression ⟨span, .binary left ⟨operatorSpan, .logicalOr⟩ right⟩
+
 end Solcore.Frontend
