@@ -1096,6 +1096,13 @@ all-budget None and no finite original success; the old data-body gate excludes
 these bodies independently. Distinct parsed occurrences and successful identity
 and short-circuit controls preserve the boundary without changing evaluators.
 
+Complete runtime owner relabeling now supports forward original evaluation
+transport (ADR-0311), including nested saved captures and exact fresh bindings.
+Injectivity is required for lookup/fresh but not ordered Word selection; independent
+collision controls and parsed calls retain complete actual endpoints. Next prove
+same-budget executable Option covariance separately, without inferring failure
+preservation from forward original successes or claiming heap validity.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

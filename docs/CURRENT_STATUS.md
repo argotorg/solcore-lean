@@ -1679,6 +1679,14 @@ strict wrappers are covered. Identity and short-circuit controls still succeed.
 Sixteen parsed contexts retain actual fields and stores. This is not a theorem
 about well-typed whole programs, small-step infinite runs or arbitrary None.
 
+Owner relabeling now reaches complete nested runtime values and original successes
+(ADR-0311). Injective maps preserve first-match lookup and exact fresh IDs; value
+identity/composition, Core projection and full capture/store fields are proved.
+All seventeen expression and nine body rules transport with unchanged source syntax.
+Independent collisions show why injectivity matters, and eight parsed contexts
+retain actual saved closures and fresh shadowing. This is forward original-success
+transport, not a same-budget Option law, converse or runtime-world invariant.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
