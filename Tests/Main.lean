@@ -400,6 +400,13 @@ import Solcore.Test.FrontendClosedStrictWordBinarySavedCallProperties
 import Solcore.Test.FrontendClosedStrictWordBinaryCostProperties
 import Solcore.Test.FrontendParsedClosedStrictWordBinary
 import Solcore.Test.FrontendParsedClosedStrictWordSavedCalls
+import Solcore.Test.FrontendStrictWordDataImageProperties
+import Solcore.Test.FrontendStrictWordDataBoundaryProperties
+import Solcore.Test.FrontendParsedClosedStrictWordBinaryDataImage
+import Solcore.Test.FrontendExpectedBoolStrictDataImageProperties
+import Solcore.Test.FrontendParsedExpectedBoolStrictDataBridge
+import Solcore.Test.FrontendExpectedWordStrictDataImageProperties
+import Solcore.Test.FrontendParsedExpectedWordStrictDataBridge
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6105,6 +6112,9 @@ def run : IO Unit := do
   frontendParsedExpectedWordShortCircuitDataBridgeTests
   frontendParsedClosedStrictWordBinaryTests
   frontendParsedClosedStrictWordSavedCallsTests
+  frontendParsedClosedStrictWordBinaryDataImageTests
+  frontendParsedExpectedBoolStrictDataBridgeTests
+  frontendParsedExpectedWordStrictDataBridgeTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
