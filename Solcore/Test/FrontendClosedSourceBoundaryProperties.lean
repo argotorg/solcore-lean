@@ -30,6 +30,7 @@ theorem expression_success_keeps_the_actual_store
   | andFalse _ leftIH => exact leftIH
   | orTrue _ leftIH => exact leftIH
   | orFalse _ _ leftIH rightIH => exact rightIH.trans leftIH
+  | strictWordBinary _ _ _ leftIH rightIH => exact rightIH.trans leftIH
   | bare => rfl
   | expression _ ih => exact ih
   | block _ ih => exact ih

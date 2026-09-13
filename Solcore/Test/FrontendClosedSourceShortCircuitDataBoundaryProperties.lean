@@ -111,9 +111,11 @@ theorem admitted_unit_left_has_no_success
       | andTrue left _ => cases left
       | andFalse left => cases left
       | creation shape => cases shape
+      | strictWordBinary _ _ meaning => cases meaning
     · cases evaluated with
       | orTrue left => cases left
       | orFalse left _ => cases left
       | creation shape => cases shape
+      | strictWordBinary _ _ meaning => cases meaning
 
 end Tests.ClosedSourceShortCircuitDataBoundaries
