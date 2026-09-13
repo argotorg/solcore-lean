@@ -410,6 +410,10 @@ import Solcore.Test.FrontendParsedExpectedWordStrictDataBridge
 import Solcore.Test.FrontendDataDepthSymbolicProperties
 import Solcore.Test.FrontendDataDepthBoundaryProperties
 import Solcore.Test.FrontendParsedDataDepthBridge
+import Solcore.Test.FrontendDataBodyDepthShadowingProperties
+import Solcore.Test.FrontendDataBodyDepthControlFlowProperties
+import Solcore.Test.FrontendDataBodyDepthBoundaryProperties
+import Solcore.Test.FrontendParsedDataBodyDepthBridge
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6119,6 +6123,7 @@ def run : IO Unit := do
   frontendParsedExpectedBoolStrictDataBridgeTests
   frontendParsedExpectedWordStrictDataBridgeTests
   frontendParsedDataDepthBridgeTests
+  frontendParsedDataBodyDepthBridgeTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
