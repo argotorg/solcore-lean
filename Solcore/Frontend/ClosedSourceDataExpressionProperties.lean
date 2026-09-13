@@ -161,6 +161,25 @@ private theorem reflect {source : Syntax.Expr} (fragment : ClosedSourceDataExpre
       | creation shape => cases shape
       | strictWordBinary _ _ meaning => cases meaning
 
+  | strictWordBinary _ _ notAnd notOr leftIH rightIH =>
+      cases evaluated with
+      | creation shape => cases shape
+      | andTrue _ _ => exact False.elim (notAnd rfl)
+      | andFalse _ => exact False.elim (notAnd rfl)
+      | orTrue _ => exact False.elim (notOr rfl)
+      | orFalse _ _ => exact False.elim (notOr rfl)
+      | @strictWordBinary _ _ _ _ _ _ _ _ _ _ _ leftWord rightWord result left right meaning =>
+          obtain ⟨leftValue, middleStore, leftSame, middleSame, oldLeft⟩ := leftIH left
+          have actualLeft : Core.Value.word leftWord = leftValue := RuntimeValue.ofCore_injective
+            (by simpa only [RuntimeValue.ofCore] using leftSame)
+          cases actualLeft
+          rw [middleSame] at right
+          obtain ⟨rightValue, finalStore, rightSame, finalSame, oldRight⟩ := rightIH right
+          have actualRight : Core.Value.word rightWord = rightValue := RuntimeValue.ofCore_injective
+            (by simpa only [RuntimeValue.ofCore] using rightSame)
+          cases actualRight
+          cases meaning <;> refine ⟨_, finalStore, rfl, finalSame, ?_⟩ <;> constructor <;> assumption
+
 private theorem embed {source : Syntax.Expr} (fragment : ClosedSourceDataExpression source)
     {owner : Resolved.DeclarationId} {names : LocalNameTable}
     {environment : Resolved.Environment} {initialStore finalStore : Core.Store} {value : Core.Value}
@@ -220,6 +239,16 @@ private theorem embed {source : Syntax.Expr} (fragment : ClosedSourceDataExpress
           exact .orTrue (by simpa only [RuntimeValue.ofCore] using leftIH left)
       | orFalse left right =>
           exact .orFalse (by simpa only [RuntimeValue.ofCore] using leftIH left) (rightIH right)
+
+  | strictWordBinary _ _ notAnd notOr leftIH rightIH =>
+      cases evaluated <;> first
+      | exact False.elim (notAnd rfl)
+      | exact False.elim (notOr rfl)
+      | rename_i middle leftWord rightWord left right
+        have l := leftIH left
+        have r := rightIH right
+        simp only [RuntimeValue.ofCore] at l r
+        exact .strictWordBinary l r (by constructor)
 
 /-- Every actual mixed result and whole final store is exactly an old local result's image. -/
 theorem ClosedSourceDataExpression.local_evaluates_iff
