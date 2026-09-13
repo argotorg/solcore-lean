@@ -33,4 +33,11 @@ inductive ClosedSourceDataExpression : Syntax.Expr → Prop where
       ClosedSourceDataExpression
         ⟨span, .conditional condition question thenBranch colon elseBranch⟩
 
+  | logicalNot {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr}
+      (child : ClosedSourceDataExpression operand) :
+      ClosedSourceDataExpression ⟨span, .unary ⟨operatorSpan, .logicalNot⟩ operand⟩
+  | bitNot {span operatorSpan : Syntax.SourceSpan} {operand : Syntax.Expr}
+      (child : ClosedSourceDataExpression operand) :
+      ClosedSourceDataExpression ⟨span, .unary ⟨operatorSpan, .bitNot⟩ operand⟩
+
 end Solcore.Frontend
