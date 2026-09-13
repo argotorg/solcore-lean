@@ -63,13 +63,13 @@ theorem checked_word_identity_accepts_actual_unit :
   · rintro ⟨rfl, rfl⟩
     exact image.mpr ⟨.unit, store, by simp only [RuntimeValue.ofCore], rfl, core⟩
 
-/-- The original unary body checks and evaluates successfully but remains outside the data gate. -/
+/-- The original unary body checks and evaluates successfully and is admitted by the data gate. -/
 theorem checked_unary_body_is_outside_closed_gate :
     let b := output s (neg s (ref s))
     let f := lambda s b
     elaborateExpectedComputationLambda? elaborateLocalExpression? [] owner .empty
       f (.function .bool .bool) = some (.lambda .bool .bool (.unary .boolNot (.var 0))) ∧
-    (¬ ClosedSourceDataBody b) ∧
+    (ClosedSourceDataBody b) ∧
     (∀ (choice : Bool) (initial : List RuntimeValue),
       ClosedSourceBodyEvaluates owner [("p", Resolved.freshLocalId owner [])]
         [(Resolved.freshLocalId owner [], .bool choice)] initial b
@@ -84,13 +84,11 @@ theorem checked_unary_body_is_outside_closed_gate :
         (.expression (elaborateLocalExpression?_complete (.logicalNot (.identifier .head))
           (.unary (.var .head)) (.unary (.var .head)))))
   refine ⟨checked, ?_, ?_, .apply .lambda .bool (.unary (.var rfl) rfl)⟩
-  · intro gate
-    cases gate with
-    | expression child => cases child
+  · exact .expression (.logicalNot .reference)
   · intro choice initial
     exact .expression (.logicalNot (.reference .head .head))
 
-/-- An original unary argument checks, lowers and evaluates but remains outside the data gate. -/
+/-- An original unary argument checks, lowers and evaluates and is admitted by the data gate. -/
 theorem checked_unary_argument_is_outside_closed_gate :
     let inputs := LocalTypeInputs.empty.bindFresh owner "p" .bool
     let id := Resolved.freshLocalId owner []
@@ -100,7 +98,7 @@ theorem checked_unary_argument_is_outside_closed_gate :
       some (.unary .boolNot (.var 0), .bool) ∧
     ResolvesLocalExpression inputs.names (neg s (ref s)) (.unary .boolNot (.var id)) ∧
     Resolved.Lowers [id] (.unary .boolNot (.var id)) (.unary .boolNot (.var 0)) ∧
-    (¬ ClosedSourceDataExpression (neg s (ref s))) ∧
+    (ClosedSourceDataExpression (neg s (ref s))) ∧
     (∀ (choice : Bool) (initial : List RuntimeValue),
       ClosedSourceExpressionEvaluates owner inputs.names [(id, .bool choice)]
         initial (neg s (ref s)) (.bool (!choice)) initial) ∧
@@ -116,7 +114,7 @@ theorem checked_unary_argument_is_outside_closed_gate :
       (.unary .boolNot (.var (Resolved.freshLocalId owner []))) .bool := .unary (.var .head)
   refine ⟨identity_checked s _ .bool .bool, elaborateLocalExpression?_complete resolution lowering typed,
     resolution, lowering, ?_, ?_, .apply .lambda (.unary (.var rfl) rfl) (.var rfl)⟩
-  · intro gate; cases gate
+  · exact .logicalNot .reference
   · intro choice initial
     exact .logicalNot (.reference .head .head)
 
