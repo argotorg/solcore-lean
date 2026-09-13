@@ -1011,9 +1011,19 @@ and six image statements/public proofs remain unchanged. Two exact public laws
 support an all-budget max-child-depth-plus-one consumer; Local/Core costs keep
 their separate 3/5/9/11 overheads. Independent symbolic, negative and saved-call
 proofs plus 196 parsed cases retain actual closures, opaque rows, full output
-stores and adjacent source-depth/Core-cost boundaries. Strict raw success remains
-outside the expression data gate. No canonical dispatch, effects, general runtime
+stores and adjacent source-depth/Core-cost boundaries. That slice left the data
+gate unchanged. No canonical dispatch, effects, general runtime
 typing, closure conversion, fault classification or whole-language totality follows.
+
+Recursive strict Word binary data images now follow (ADR-0301): twelve expression
+gate forms, seven body forms, and all six public image statements/proofs unchanged.
+Private reflection/embedding covers all fourteen meanings with actual ordered Word
+operands and complete stores. Independent nested-expression and expected-Bool/Word
+body/direct/saved-call witnesses precede both image directions. Actual returned
+closures and body outputs are retained; 140 operator and twenty lambda/store
+fixtures check exact AST/ranges and separate source depth from Core cost. Missing
+or non-Word admitted operands still fail; successful raw call operands remain
+outside this syntax gate. No runtime typing, effects or closure identity is added.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution

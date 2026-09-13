@@ -1555,8 +1555,8 @@ Both actual Word operands evaluate left-to-right through the complete middle
 store; zero never skips the opposite operand. Eight operators return Words and
 six return Booleans under the fixed wrapping/unsigned/zero-divisor profile.
 The original expression/body rules now number seventeen/nine. Generic public
-correctness headers, eleven/seven data gates and all six image statements/public
-proofs remain unchanged; raw strict success is still outside that data gate.
+correctness headers and all six image statements/public proofs remain unchanged.
+That slice retained the eleven/seven data gates; ADR-0301 below extends admission.
 Exact decomposition and runner laws support an all-budget max-child-depth-plus-one
 consumer. Independent Local/Core costs retain their distinct 3/5/9/11 overheads.
 Symbolic exclusions and saved-call proofs preserve actual closures, ordered mixed
@@ -1565,6 +1565,22 @@ cases with original AST/ranges, adjacent source-depth and separate Core-cost
 checks. Saved-call depth annotations are not universal cutoff theorems.
 This adds no canonical named dispatch, effects, runtime typing, fault classifier,
 source/Core closure identity or whole-frontend totality.
+
+Recursive strict Word binary forms now join the data-image gate (ADR-0301).
+One syntax-only constructor requires both children and excludes logical operators,
+growing the expression gate to twelve while the body gate stays seven forms.
+Only private expression reflection/embedding changes; all six public image
+statements and public proofs, the original evaluator and Local/Core costs remain
+literal. Independent nested-expression, Bool/Word body, direct-application and
+actual saved-invocation proofs preserve every actual value and whole final store.
+Core-image inputs are explicit; arbitrary opaque payloads need no runtime typing.
+Fresh shadowing retains saved lexical fields through actual callee/argument/body
+results. Admission still implies neither success nor resolution: non-Word/missing
+operands fail even beside zero, while successful raw call operands remain outside
+the gate. Parsed checks cover 140 operator and twenty lambda/store fixtures, with
+complete handwritten AST/ranges, EOF, diagnostics and separate source-depth/Core
+cost checks. Lambda depth annotations are finite checks, not universal cutoffs.
+No canonical dispatch, effects, closure identity or whole-language totality follows.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
