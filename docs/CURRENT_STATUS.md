@@ -1790,8 +1790,25 @@ the latter fixes four exact AST/span representatives, multi-group controls and
 the existing fuel 10/11 store-preserving execution. No prior entry, checker or
 source union changes. A second or arbitrary group around a lambda, nested-call,
 tuple, conditional, return, inferred-let, typed-body, multiple-argument and
-global expected propagation remain separate, while parser and diagnostic proofs
-remain paused.
+global expected propagation remain outside this entry, while parser and
+diagnostic proofs remain paused.
+
+Expected types now cross exactly two source groups at the same application
+boundary through a new standalone opt-in adapter (ADR-0321). It accepts only an
+exact singleton call whose sole argument is two groups with a direct lambda as
+the immediate child of the inner group. The original local callee supplies its
+literal parameter type to the unchanged expected checker; the call,
+argument-list and both group spans remain in the evidence while both groups are
+transparent in the exact Core application. Exact success/absence, Core typing
+and provenance are exercised by independent symbolic and fully parsed consumers,
+including the unchanged opaque-store execution at Core fuel 10/11. ADR-0320 is
+not widened: its direct and one-group lambda results and its ordinary argument
+results at group depths zero through three remain exact controls. A three-group
+lambda remains unsupported. A generic two-or-more group-spine design was
+compiled only as a prototype; its recursive extractor exposes a compiler-
+generated public partial implementation helper, so that broader policy is
+deferred rather than implemented by ADR-0321. Parser and diagnostic proof work
+remains paused.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

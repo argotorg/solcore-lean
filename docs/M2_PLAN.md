@@ -1186,10 +1186,25 @@ recognized branches, multi-group controls, duplicate/foreign rows, opaque
 values, a nonempty store and exact Core execution. No earlier checker, entry or
 canonical union is widened.
 
-Expected types still need separate propagation through a second or arbitrary
-group layer around a lambda, nested calls, tuples, conditionals, returns, inferred-let bindings
-and typed body sites. These remain adapter-local absences, not language-wide
-rejection claims. Global function resolution remains deferred until a
+Exactly two groups around the expected lambda now have their own standalone
+adapter (ADR-0321). It requires an exact singleton call and checks the immediate
+child of the second group with the literal parameter type inferred from the
+unchanged original local callee. Its evidence retains the call, argument-list
+and both group spans while both groups disappear only from the exact Core apply.
+Exact success/absence, typing and provenance are consumed independently by
+symbolic and fully parsed tests with the same fuel 10/11 nonempty-store endpoint.
+The existing ADR-0320 entry is unchanged: direct and depth-one lambdas plus
+ordinary arguments at group depths zero through three retain their prior exact
+results, while a depth-three lambda remains absent.
+
+A generic two-or-more group spine is not implemented. Its compiled recursive
+prototype produced a public compiler-generated partial implementation helper;
+although that helper was outside the logical public-root closure, the broader
+infinite-depth policy and API are deferred. Expected types still need separate
+propagation through a third or arbitrary deeper group layer around a lambda,
+nested calls, tuples, conditionals, returns, inferred-let bindings and typed
+body sites. These remain adapter-local absences, not language-wide rejection
+claims. Global function resolution remains deferred until a
 catalog/lookup relation, local/global precedence, declaration-owner policy,
 arity lowering and recursive closure environment are fixed; none is manufactured
 by these local application adapters.
