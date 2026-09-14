@@ -187,6 +187,7 @@ import Solcore.Frontend.LocalTypeInputsProperties
 import Solcore.Frontend.ExpectedUnaryLambdaHeader
 import Solcore.Frontend.ExpectedComputationLambda
 import Solcore.Frontend.ExpectedComputationLambdaTyping
+import Solcore.Frontend.ExpectedComputationLambdaOwnerProperties
 import Solcore.Frontend.ExpectedLambdaLetBody
 import Solcore.Frontend.ExpectedLambdaLetBodyTyping
 import Solcore.Frontend.ExpectedLambdaLetSpine
@@ -249,7 +250,9 @@ import Solcore.Frontend.ClosedSourceDataBodyProperties
 import Solcore.Frontend.ClosedSourceOwnerCoreExpressionProperties
 import Solcore.Frontend.ClosedSourceOwnerCoreBodyProperties
 import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
+import Solcore.Frontend.ExpectedDataLambdaInvocationOwnerProperties
 import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
+import Solcore.Frontend.ExpectedDataLambdaApplicationOwnerProperties
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RuntimeParameterDeclarationsLayout
 import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties
