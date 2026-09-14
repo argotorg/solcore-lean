@@ -1122,10 +1122,20 @@ term and type, while every arbitrary actual mapped endpoint is a complete Core
 image iff that Core evaluates. The original whole-stage premises remain explicit;
 raw success, missing IDs and nonimage payloads do not acquire them by relabeling.
 
-Next extend recursive children to the remaining expression forms using these
-shared contracts. General expected-type propagation and global function resolution
-remain separate. The old stronger pure store/source-bound guarantees do not
-transfer, and structural arguments alone do not validate stores.
+Expected unary data-lambda checking and its two checked application images now
+transport through the same owner boundary (ADR-0315). Complete checker equality
+covers both success and rejection. Actual mapped saved-call prefixes expose mapped
+checking and ID alignment before arbitrary mapped endpoints are related to the
+old Core body; direct applications additionally retain mapped argument resolution
+and the literal old lowering/Core application. Independent symbolic and parsed
+consumers keep nonsurjective shifts, duplicate/foreign rows, nonempty stores and
+opaque payloads without adding runtime typing or source-closure conversion.
+
+Next compose owner transport with the remaining checked unary and binary data
+image adapters using these shared contracts. General expected-type propagation
+and global function resolution remain separate. The old stronger pure
+store/source-bound guarantees do not transfer, and structural arguments alone do
+not validate stores.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

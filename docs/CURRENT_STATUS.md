@@ -1710,6 +1710,17 @@ parsed consumers retain nonempty stores, opaque Core payloads, typed/inferred
 fresh IDs, ordered matches, duplicate/foreign owners and nonsurjective shifts.
 No raw success supplies missing compilation premises, runtime typing or validity.
 
+Expected unary data-lambda checking and both checked application images now
+compose with injective owner relabeling (ADR-0315). The complete expected checker,
+including rejection, returns the literal old Core lambda after owner-only input
+mapping. Saved invocation accepts actual mapped callee and argument prefixes and
+returns mapped checker/ID facts plus an iff from every mapped call endpoint to the
+same Core body evaluation. Direct application additionally transports argument
+resolution and lowering and retains the identical full Core application. Symbolic
+and parsed consumers construct old, mapped and Core paths independently under a
+nonsurjective shift, duplicate/foreign rows, nonempty stores and opaque payloads.
+Raw success still supplies none of checking, alignment, data gates or Core images.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
