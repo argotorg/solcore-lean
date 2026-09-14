@@ -83,9 +83,15 @@ private theorem independentElaboration (file : Syntax.SourceFile) :
 
 private theorem oldCheckerRejects (file : Syntax.SourceFile) :
     elaborateRecursiveLocalComputation? inputs.names inputs.context (source file) = none := by
+  change elaborateRecursiveLocalComputation?
+    [("apply", applyId), ("opaque", opaqueId), ("apply", duplicateId),
+      ("flag", flagId), ("ordinary", ordinaryId)]
+    [(applyId, .function functionType .word), (opaqueId, .cell .word),
+      (duplicateId, .unit), (flagId, .bool), (ordinaryId, functionType)]
+    (source file) = none
   simp [source, argument, body, reference, elaborateRecursiveLocalComputation?,
-    elaborateLocalExpression?, resolveLocalExpression?, inputs, functionType,
-    LocalTypeInputs.names, LocalTypeInputs.context, LocalNameTable.lookup?]
+    elaborateLocalExpression?, resolveLocalExpression?, functionType,
+    LocalNameTable.lookup?]
 
 /-- Static evidence is written independently; only then is the adapter iff used
 to recover its exact executable result and Core type. -/
