@@ -1210,6 +1210,22 @@ arity lowering and recursive closure environment are fixed; none is manufactured
 by these local application adapters.
 The parser/diagnostic proof frontier remains paused.
 
+The exact two-group leaf now also precedes all established local singleton paths
+in one additive wrapper (ADR-0322). A total source classifier recognizes exactly
+one call argument with exactly two groups and an immediate direct lambda inside
+the inner group. True delegates the complete result to standalone ADR-0321 and
+makes every recognized failure final without fallback; false delegates the
+complete result for every source to frozen ADR-0320. Independent symbolic and
+fully parsed consumers prove exact success/absence, Core typing and nested
+provenance while retaining duplicate and foreign rows, opaque values, a nonempty
+store and the exact Core fuel 10/11 boundary. Direct, depth-one and depth-two
+lambdas succeed alongside ordinary arguments at group depths zero through three;
+a depth-three lambda remains unsupported. ADR-0317 through ADR-0321, the
+recursive checker, canonical source union and existing entries are unchanged.
+Third or arbitrary group spines, nested calls, tuples, conditionals, returns,
+inferred lets, typed bodies, multiple arguments and global expected-type
+propagation remain separate, and parser/diagnostic proof work remains paused.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

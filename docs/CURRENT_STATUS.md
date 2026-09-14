@@ -1810,6 +1810,23 @@ generated public partial implementation helper, so that broader policy is
 deferred rather than implemented by ADR-0321. Parser and diagnostic proof work
 remains paused.
 
+The direct, one-group and exact two-group expected-lambda paths now share one
+additive exact-depth-two-first entry (ADR-0322). Its total source classifier is
+true only for an exact singleton call whose sole argument has exactly two groups
+and an immediate direct lambda inside the inner group. True returns the complete
+ADR-0321 `Option` result, including recognized failure without fallback; false
+returns the complete frozen ADR-0320 result for every source. Exact branch
+equations, success/absence, Core typing and nested provenance are exercised by
+independent symbolic and fully parsed consumers with duplicate and foreign rows,
+opaque values, a nonempty store and the unchanged Core fuel 10/11 boundary.
+Direct, depth-one and depth-two lambda successes coexist with ordinary arguments
+at group depths zero through three; a depth-three lambda remains unsupported.
+ADR-0317 through ADR-0321, the recursive checker, canonical source union and all
+existing entry points remain unchanged. No third or arbitrary group spine,
+nested-call, tuple, conditional, return, inferred-let, typed-body,
+multiple-argument or global expected-type propagation is added, and parser and
+diagnostic proof work remains paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
