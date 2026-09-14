@@ -1109,6 +1109,12 @@ original runs and 224 parsed comparisons precede use of the new law. Next recove
 original endpoint preimages from mapped successes and derive a converse separately;
 retain injectivity without imposing surjectivity or an already-mapped endpoint.
 
+Owner reflection now recovers arbitrary actual mapped endpoints and proves original
+equivalence (ADR-0313), with no surjectivity or endpoint-image premise. Finite
+success/absence and one exact positive cutoff for successful originals are linked
+to independent saved-call and parsed observations. Cost preservation and transport
+of source/Core image witnesses remain separate from these runtime owner laws.
+
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution
 remain separate. The old stronger pure store/source-bound guarantees do not

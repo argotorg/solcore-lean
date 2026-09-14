@@ -1693,6 +1693,13 @@ retains actual saved calls, fresh rows, strict tags and ordered selection; succe
 and absence are both covered. Independent old-run controls and 224 parsed result
 comparisons pass. This is not an original converse, cost or failure classifier.
 
+Owner-mapped original and finite successes now recover complete original endpoint
+preimages (ADR-0313), without assuming that the observed result is already mapped.
+Explicit original equivalence, same-budget absence equivalence and one shared
+positive cutoff for successful originals are proved. Symbolic saved calls and
+160 mapped-first plus 80 adjacent parsed observations check the independent
+endpoints and depth boundary. No cost, world validity or universal termination follows.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
