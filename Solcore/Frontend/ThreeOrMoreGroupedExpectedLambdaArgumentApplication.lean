@@ -24,7 +24,6 @@ inductive DirectLambdaGroupSpine :
       {spans : List Syntax.SourceSpan}
       (child : DirectLambdaGroupSpine inner spans terminal) :
       DirectLambdaGroupSpine ⟨span, .group inner⟩ (span :: spans) terminal
-
 /-- Collect every original group span and return the original terminal lambda. -/
 private def peelDirectLambdaGroupSpine?
     : (source : Syntax.Expr) → Option (List Syntax.SourceSpan × Syntax.Expr) :=
@@ -35,7 +34,6 @@ private def peelDirectLambdaGroupSpine?
         let (spans, terminal) ← recurse inner (by decreasing_tactic)
         some (span :: spans, terminal)
     | _ => none
-
 @[simp] private theorem peelDirectLambdaGroupSpine?_lambda
     (span keyword : Syntax.SourceSpan)
     (parameters : Syntax.DelimitedList Syntax.LambdaParameter)
@@ -44,14 +42,12 @@ private def peelDirectLambdaGroupSpine?
       ⟨span, .lambda keyword parameters returnType body⟩ =
         some ([], ⟨span, .lambda keyword parameters returnType body⟩) := by
   rw [peelDirectLambdaGroupSpine?, WellFounded.fix_eq]
-
 @[simp] private theorem peelDirectLambdaGroupSpine?_group
     (span : Syntax.SourceSpan) (inner : Syntax.Expr) :
     peelDirectLambdaGroupSpine? ⟨span, .group inner⟩ = (do
       let (spans, terminal) ← peelDirectLambdaGroupSpine? inner
       some (span :: spans, terminal)) := by
   rw [peelDirectLambdaGroupSpine?, WellFounded.fix_eq]
-
 private theorem peelDirectLambdaGroupSpine?_sound
     {source terminal : Syntax.Expr} {spans : List Syntax.SourceSpan}
     (accepted : peelDirectLambdaGroupSpine? source = some (spans, terminal)) :
@@ -76,7 +72,6 @@ private theorem peelDirectLambdaGroupSpine?_sound
         simp [peelDirectLambdaGroupSpine?_group, checked] at accepted
         rcases accepted with ⟨rfl, rfl⟩
         exact .group (ih inner (by simp_wf; omega) checked)
-
 private theorem peelDirectLambdaGroupSpine?_complete
     {source terminal : Syntax.Expr} {spans : List Syntax.SourceSpan}
     (spine : DirectLambdaGroupSpine source spans terminal) :
@@ -84,13 +79,11 @@ private theorem peelDirectLambdaGroupSpine?_complete
   induction spine with
   | lambda => simp only [peelDirectLambdaGroupSpine?_lambda]
   | group child ih => simp [peelDirectLambdaGroupSpine?_group, ih]
-
 private theorem peelDirectLambdaGroupSpine?_iff
     {source terminal : Syntax.Expr} {spans : List Syntax.SourceSpan} :
     peelDirectLambdaGroupSpine? source = some (spans, terminal) ↔
       DirectLambdaGroupSpine source spans terminal :=
   ⟨peelDirectLambdaGroupSpine?_sound, peelDirectLambdaGroupSpine?_complete⟩
-
 /-- Recognize a singleton call whose argument has at least three groups and ends
 at a direct lambda.  Header and body validity are deliberately not inspected. -/
 def isThreeOrMoreGroupedExpectedLambdaArgumentApplication : Syntax.Expr → Bool
@@ -99,7 +92,25 @@ def isThreeOrMoreGroupedExpectedLambdaArgumentApplication : Syntax.Expr → Bool
       | some (_ :: _ :: _ :: _, _) => true
       | _ => false
   | _ => false
-
+/-- Selection is exactly a qualifying spine, independently of child validity. -/
+theorem isThreeOrMoreGroupedExpectedLambdaArgumentApplication_iff
+    {span argumentsSpan : Syntax.SourceSpan} {callee grouped : Syntax.Expr} :
+    isThreeOrMoreGroupedExpectedLambdaArgumentApplication
+        ⟨span, .call callee ⟨argumentsSpan, [grouped]⟩⟩ = true ↔
+      ∃ first second third rest terminal, DirectLambdaGroupSpine grouped
+        (first :: second :: third :: rest) terminal := by
+  constructor
+  · intro selected
+    cases checked : peelDirectLambdaGroupSpine? grouped with
+    | none => simp [isThreeOrMoreGroupedExpectedLambdaArgumentApplication, checked] at selected
+    | some result =>
+      rcases result with ⟨spans, terminal⟩
+      rcases spans with _ | ⟨first, _ | ⟨second, _ | ⟨third, rest⟩⟩⟩
+      <;> try { simp [isThreeOrMoreGroupedExpectedLambdaArgumentApplication, checked] at selected }
+      exact ⟨first, second, third, rest, terminal, peelDirectLambdaGroupSpine?_iff.mp checked⟩
+  · rintro ⟨first, second, third, rest, terminal, spine⟩
+    simp [isThreeOrMoreGroupedExpectedLambdaArgumentApplication,
+      peelDirectLambdaGroupSpine?_complete spine]
 /-- Exact source evidence for three-or-more transparent groups around the expected
 lambda.  All group spans remain in the spine evidence. -/
 inductive ThreeOrMoreGroupedExpectedLambdaArgumentApplicationElaborates
@@ -116,7 +127,6 @@ inductive ThreeOrMoreGroupedExpectedLambdaArgumentApplicationElaborates
       ThreeOrMoreGroupedExpectedLambdaArgumentApplicationElaborates types owner inputs
         ⟨span, .call callee ⟨argumentsSpan, [grouped]⟩⟩
         (.apply functionCore argumentCore) resultType
-
 /-- Unwrap the finite spine, require at least three groups, infer the original
 callee, and check the original terminal lambda at its parameter type. -/
 def elaborateThreeOrMoreGroupedExpectedLambdaArgumentApplication?
