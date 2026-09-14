@@ -1112,8 +1112,15 @@ retain injectivity without imposing surjectivity or an already-mapped endpoint.
 Owner reflection now recovers arbitrary actual mapped endpoints and proves original
 equivalence (ADR-0313), with no surjectivity or endpoint-image premise. Finite
 success/absence and one exact positive cutoff for successful originals are linked
-to independent saved-call and parsed observations. Cost preservation and transport
-of source/Core image witnesses remain separate from these runtime owner laws.
+to independent saved-call and parsed observations. Cost preservation remains
+separate from these runtime owner laws.
+
+Owner transport now composes those reflected endpoints with the existing complete
+closed data expression/body Core-image bridges (ADR-0314). Mapped resolution,
+lowering, checking and exact input-ID alignment retain the same positional Core
+term and type, while every arbitrary actual mapped endpoint is a complete Core
+image iff that Core evaluates. The original whole-stage premises remain explicit;
+raw success, missing IDs and nonimage payloads do not acquire them by relabeling.
 
 Next extend recursive children to the remaining expression forms using these
 shared contracts. General expected-type propagation and global function resolution

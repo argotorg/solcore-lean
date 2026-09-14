@@ -1700,6 +1700,16 @@ positive cutoff for successful originals are proved. Symbolic saved calls and
 160 mapped-first plus 80 adjacent parsed observations check the independent
 endpoints and depth boundary. No cost, world validity or universal termination follows.
 
+Injective owner relabeling now composes with the complete closed data expression
+and body Core-image boundaries (ADR-0314). Embedded Core environments map only
+their local keys and embedded Core stores remain literal. Original whole
+resolution/lowering or shared checking plus exact runtime/context IDs produce
+the mapped whole-stage facts, the identical positional Core term/type, and an iff
+for every arbitrary mapped raw endpoint. Independent symbolic, body-boundary and
+parsed consumers retain nonempty stores, opaque Core payloads, typed/inferred
+fresh IDs, ordered matches, duplicate/foreign owners and nonsurjective shifts.
+No raw success supplies missing compilation premises, runtime typing or validity.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
