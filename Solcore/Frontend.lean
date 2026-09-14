@@ -246,6 +246,8 @@ import Solcore.Frontend.ClosedSourceOwnerReflectionProperties
 import Solcore.Frontend.ClosedSourceOwnerBudgetProperties
 import Solcore.Frontend.ClosedSourceDataBody
 import Solcore.Frontend.ClosedSourceDataBodyProperties
+import Solcore.Frontend.ClosedSourceOwnerCoreExpressionProperties
+import Solcore.Frontend.ClosedSourceOwnerCoreBodyProperties
 import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
 import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
 import Solcore.Frontend.RuntimeParameterDeclarations

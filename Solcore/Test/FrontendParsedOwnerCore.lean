@@ -268,5 +268,3 @@ def Tests.adr0314ParsedOwnerCoreConsumer : IO Unit := do
   exerciseExpression expression.source expression.gate
   for word in [zero,one] do exerciseBody body.source body.gate word
   IO.println "ADR0314 parsed old/mapped raw endpoints and owner/Core bridges GREEN"
-
-#print axioms Tests.adr0314ParsedOwnerCoreConsumer

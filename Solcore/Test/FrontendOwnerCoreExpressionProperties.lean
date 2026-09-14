@@ -241,8 +241,5 @@ theorem arbitrary_mapped_endpoint_iff {actualValue : RuntimeValue}
     resolves lowers
   exact ⟨mapped,transported.1,transported.2.1,transported.2.2⟩
 
-#print axioms fixture_controls
-#print axioms independent_paths
-#print axioms arbitrary_mapped_endpoint_iff
 
 end Tests.OwnerCoreExpressionConsumer

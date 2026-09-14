@@ -289,9 +289,5 @@ theorem raw_success_does_not_recover_missing_boundary_premises :
     have projected := congrArg RuntimeValue.toCore? same
     simp only [nonimage, RuntimeValue.toCore?, RuntimeValue.toCore?_ofCore, reduceCtorEq] at projected
 
-set_option pp.universes true in #check @typed_inferred_ordered_match_complete_boundary
-set_option pp.universes true in #check @raw_success_does_not_recover_missing_boundary_premises
-#print axioms typed_inferred_ordered_match_complete_boundary
-#print axioms raw_success_does_not_recover_missing_boundary_premises
 
 end Tests.ADR0314OwnerCoreBodyConsumerIndependent
