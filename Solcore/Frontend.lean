@@ -248,6 +248,7 @@ import Solcore.Frontend.ClosedSourceOwnerBudgetProperties
 import Solcore.Frontend.ClosedSourceDataBody
 import Solcore.Frontend.ClosedSourceDataBodyProperties
 import Solcore.Frontend.ClosedSourceOwnerCoreExpressionProperties
+import Solcore.Frontend.CheckedDataExpressionOwnerProperties
 import Solcore.Frontend.ClosedSourceOwnerCoreBodyProperties
 import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
 import Solcore.Frontend.ExpectedDataLambdaInvocationOwnerProperties

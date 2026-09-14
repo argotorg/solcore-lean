@@ -450,6 +450,9 @@ import Solcore.Test.FrontendParsedOwnerCore
 import Solcore.Test.FrontendOwnerExpectedDataLambdaCoreProperties
 import Solcore.Test.FrontendParsedOwnerExpectedDataLambdaApplications
 import Solcore.Test.FrontendParsedOwnerExpectedDataLambdaInvocations
+import Solcore.Test.FrontendOwnerCheckedDataExpressionProperties
+import Solcore.Test.FrontendOwnerCheckedBinaryDataExpressionProperties
+import Solcore.Test.FrontendParsedOwnerCheckedDataExpression
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 import Solcore.Oracle.V2.Handler
@@ -6173,6 +6176,7 @@ def run : IO Unit := do
   adr0314ParsedOwnerCoreConsumer
   adr0315ParsedOwnerExpectedDataLambdaApplicationTests
   adr0315ParsedOwnerExpectedDataLambdaInvocationTests
+  adr0316ParsedCheckedDataOwnerTests
   testSyntaxIdentifier
   testSyntaxLexer
   testSyntaxParserBodyIsolation
