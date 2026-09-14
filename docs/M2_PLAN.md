@@ -1151,12 +1151,23 @@ ordinary-argument acceptance remain observable side by side. Parsed consumers
 retain all nested spans and independently execute the result at the exact Core
 fuel boundary with duplicate/foreign rows and an opaque store.
 
-Do not generalize this law into a fallback checker without a disjoint dispatch
-contract. Expected types still need separate propagation through grouping,
-nested calls, tuples, conditionals, returns and typed body sites. Global function
-resolution remains deferred until a catalog/lookup relation, local/global
+Those two established singleton-application paths now also share one opt-in
+source-disjoint entry (ADR-0318). It first requires an exact singleton call and
+classifies only whether the sole argument payload is a direct lambda. True
+invokes ADR-0317; false invokes the unchanged recursive checker on the whole
+original call. Dispatch never observes checker success, and recognized direct-
+lambda failure is final rather than an ordinary-path fallback. Exact absence,
+Core typing and provenance, plus independent symbolic and parsed consumers,
+cover both branches without adding an accepted source-union member or changing
+either child checker.
+
+Expected types still need separate propagation through grouping, nested calls,
+tuples, conditionals, returns, inferred-let bindings and typed body sites. These
+remain adapter-local absences, not language-wide rejection claims. Global
+function resolution remains deferred until a catalog/lookup relation, local/global
 precedence, declaration-owner policy, arity lowering and recursive closure
-environment are fixed; none is manufactured by this local application adapter.
+environment are fixed; none is manufactured by this local application entry.
+The parser/diagnostic proof frontier remains paused.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

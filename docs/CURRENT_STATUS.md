@@ -1748,6 +1748,21 @@ Grouped or nested lambda arguments, tuple/conditional/return propagation and
 global source-function resolution remain separate; static acceptance creates no
 source closure, runtime inhabitant, safety, cost or backend guarantee.
 
+The two already accepted singleton-call paths now share one source-disjoint
+opt-in entry (ADR-0318). A total classifier first requires an exact singleton
+call and then examines only whether its sole argument payload is a direct
+lambda. The true branch invokes the ADR-0317 expected adapter; the false branch
+invokes the unchanged recursive checker on the original whole call. Dispatch
+never depends on checker success, so a recognized direct-lambda failure is
+final and cannot fall back. Exact success/absence, Core typing and provenance
+expose the selected child. Independent symbolic and parsed consumers construct
+both children first and retain exact spans, duplicate/foreign rows, opaque
+values and a nonempty store; malformed direct lambdas and unsupported grouped,
+nested, tuple, conditional, return and inferred-let cases remain absent. This
+adapter adds no accepted source-union member and changes neither child checker
+nor existing entry point. Global resolution and multi-argument propagation
+remain separate, and the paused parser/diagnostic proof frontier is unchanged.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
