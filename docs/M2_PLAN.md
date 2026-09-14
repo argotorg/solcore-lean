@@ -1294,6 +1294,26 @@ typed-body expected propagation, multiple arguments, global resolution, source
 closures, runtime-world safety, cost theorems and backend guarantees remain
 separate. Parser and diagnostic proof work remains paused.
 
+One whole-conditional group now has a standalone exact-singleton adapter
+(ADR-0326). The classifier recognizes exactly one outer group whose immediate child
+is a conditional with at least one immediate ungrouped direct computation lambda.
+The checker reads the original callee, condition and branches, requires the inferred
+callee parameter and Bool condition types, and reuses the exact ADR-0324 branch
+checker without constructing an ungrouped source. The group is transparent only in
+Core; declarative evidence retains every original span and complete child. Any
+recognized failure is final.
+
+The new classifier is structurally false for ADR-0325's immediate-conditional and
+finite direct-lambda-spine selectors, so the complete frozen ADR-0325/ADR-0322 result
+does not change. Three symbolic and parsed branch partitions, recognized failures,
+neighboring Options, exact AST spans and the nonempty-store fuel 13/14 boundary are
+independently consumed. ADR-0326 adds no wrapper: selecting it before the exact
+ADR-0325 result is the next additive integration step. Two or more whole-conditional
+groups and grouped branch lambdas remain separate because the latter overlaps the
+existing ADR-0324 recognized-failure boundary. Nested calls/conditionals, tuple,
+return, inferred-let, typed-body, multiple-argument and global expected propagation
+also remain later work. Parser and diagnostic proofs remain paused.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

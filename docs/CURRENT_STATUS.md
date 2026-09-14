@@ -1898,6 +1898,31 @@ inferred-let and typed-body expected propagation, multiple arguments, global
 resolution, source closures, runtime-world safety, cost theorems and backend
 guarantees remain separate. Parser and diagnostic proof work remains paused.
 
+Expected types now cross exactly one transparent source group around an immediate
+conditional through a standalone exact-singleton adapter (ADR-0326). Its total
+source-only classifier requires the sole argument to be one group whose immediate
+child is a conditional with at least one immediate ungrouped direct computation
+lambda branch. The original callee and Bool condition are checked recursively;
+both original branches reuse the unchanged ADR-0324 branch relation and checker at
+the literal callee parameter type. The group disappears only from the exact Core
+application, while every call, list, group, conditional, marker and child span stays
+in declarative provenance. Once recognized, any callee, condition, type, header,
+body or branch failure is final without AST reconstruction or fallback.
+
+This source shape is disjoint from both ADR-0325 selectors: the immediate argument
+is a group rather than a conditional, and its group spine ends at a conditional
+rather than a direct lambda. ADR-0325 therefore retains its exact complete ADR-0322
+result for every new candidate; ADR-0326 itself adds no wrapper. Independent
+symbolic and fully parsed consumers cover all three direct-lambda branch partitions,
+recognized failures, exact equality on frozen neighboring paths, proof-producing
+AST/span equality and both Boolean choices. Fuel 13 is exactly exhausted and fuel
+14 returns Word 7 with the literal opaque/cell/host-function store unchanged.
+ADR-0317 through ADR-0325, their classifiers, relations and checkers, the recursive
+checker and canonical source unions remain unchanged. A selecting wrapper, two or
+more groups around a conditional, grouped branch lambdas and broader nested, tuple,
+return, inferred-let, typed-body, multi-argument or global propagation remain
+separate. Parser and diagnostic proof work remains paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
