@@ -1141,6 +1141,23 @@ General expected-type propagation and global function resolution remain the next
 separate integrations. Raw success still cannot manufacture static premises,
 runtime validity, cost or dispatch.
 
+The first expected-type application site is now explicit (ADR-0317). A locally
+inferable singleton callee supplies its exact parameter type to a direct unary
+lambda argument through a separate adapter. Independent callee and lambda
+elaborations determine the literal Core application; exact checker success and
+absence, Core typing and provenance reuse the existing contracts. The recursive
+inference checker is unchanged, so its historical direct-lambda rejection and
+ordinary-argument acceptance remain observable side by side. Parsed consumers
+retain all nested spans and independently execute the result at the exact Core
+fuel boundary with duplicate/foreign rows and an opaque store.
+
+Do not generalize this law into a fallback checker without a disjoint dispatch
+contract. Expected types still need separate propagation through grouping,
+nested calls, tuples, conditionals, returns and typed body sites. Global function
+resolution remains deferred until a catalog/lookup relation, local/global
+precedence, declaration-owner policy, arity lowering and recursive closure
+environment are fixed; none is manufactured by this local application adapter.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

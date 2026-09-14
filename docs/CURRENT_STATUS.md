@@ -1733,6 +1733,21 @@ nonsurjective shifts, duplicate/foreign rows, opaque stores, checker rejection,
 misalignment and gate exclusions. No raw success supplies the missing premises,
 runtime typing, validity, cost, dispatch or totality.
 
+Expected types now cross the first application-argument boundary (ADR-0317).
+One opt-in singleton-call adapter infers the original local callee, requires its
+function type, and passes that literal parameter type to the unchanged expected
+unary-lambda checker. Its independent judgment retains both original children,
+all spans and the literal Core application; exact success/absence, Core typing
+and provenance are proved without changing the recursive inference checker.
+Symbolic and parsed consumers build both component elaborations before using the
+new iff, preserve duplicate and foreign-owner rows, and independently execute
+the resulting higher-order Core application over opaque values and a nonempty
+store at its exact fuel 10/11 boundary. The old checker still rejects the direct
+lambda argument, while its ordinary same-typed argument path remains unchanged.
+Grouped or nested lambda arguments, tuple/conditional/return propagation and
+global source-function resolution remain separate; static acceptance creates no
+source closure, runtime inhabitant, safety, cost or backend guarantee.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
