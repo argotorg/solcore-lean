@@ -189,6 +189,7 @@ import Solcore.Frontend.ExpectedComputationLambda
 import Solcore.Frontend.ExpectedComputationLambdaTyping
 import Solcore.Frontend.ExpectedComputationLambdaOwnerProperties
 import Solcore.Frontend.ExpectedLambdaArgumentApplication
+import Solcore.Frontend.LocalApplicationWithExpectedLambda
 import Solcore.Frontend.ExpectedLambdaLetBody
 import Solcore.Frontend.ExpectedLambdaLetBodyTyping
 import Solcore.Frontend.ExpectedLambdaLetSpine
