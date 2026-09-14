@@ -1243,11 +1243,11 @@ Independent symbolic and fully parsed consumers cover depths three, four and a
 deeper finite spine, every ordered exact span and the unchanged nonempty-store
 Core fuel 10/11 boundary. Depths zero through two remain with ADR-0322/ADR-0321;
 ADR-0317 through ADR-0322, the recursive checker, canonical source union and all
-existing entry points remain unchanged. ADR-0323 adds no wrapper. A future
-wrapper may classify this shape first, return ADR-0323 exactly when true and
-ADR-0322 exactly when false, with recognized failure final. At that boundary,
-expected-type propagation through conditionals remained the next viable
-frontend semantics frontier; ADR-0324 below now implements that standalone
+existing entry points remain unchanged. ADR-0323 itself adds no wrapper;
+ADR-0325 below now selects it only when the conditional classifier is false and
+its own finite-group-spine classifier is true, retaining recognized failure as
+final. Expected-type propagation through conditionals remained the next viable
+frontend semantics frontier there; ADR-0324 below implements that standalone
 step. Parser and diagnostic proof work remains paused.
 
 One immediate conditional argument now has its own standalone expected-lambda
@@ -1269,11 +1269,30 @@ lambda/ordinary, ordinary/lambda and lambda/lambda partitions. The three parsed
 forms retain every original span and exercise both Boolean choices: fuel 13 is
 exactly exhausted, while fuel 14 returns Word 7 with the exact nonempty initial
 store. ADR-0317 through ADR-0323, their public entries, both child checkers and
-the canonical source union remain unchanged. ADR-0324 adds no wrapper. A future
-source-only wrapper must dispatch a recognized conditional to ADR-0324 first,
-then a recognized finite group spine to ADR-0323, and otherwise return ADR-0322;
-checker failure must never change that order. Parser and diagnostic proof work
-remains paused.
+the canonical source union remain unchanged. ADR-0324 itself adds no wrapper;
+ADR-0325 below now selects its complete result first whenever the unchanged
+conditional classifier is true. Parser and diagnostic proof work remains paused.
+
+The conditional, finite three-or-more-group and frozen established singleton
+paths now share one additive source-only wrapper (ADR-0325). It is a finite nested
+conditional, not a retry loop: the unchanged ADR-0324 classifier selects the
+complete ADR-0324 `Option` first; only when false can the unchanged ADR-0323
+classifier select the complete ADR-0323 `Option`; when both are false the wrapper
+returns the exact complete ADR-0322 result. Thus recognized rejection is final
+and checker success never controls dispatch. Three declarative constructors
+retain the evaluated classifier equations and complete selected child; exact
+branch equations, success/absence, Core typing and nested provenance expose the
+whole executable boundary without another classifier, path enum, recursion or
+AST rewriting. Independent symbolic and fully parsed consumers cover the three
+routes, their recognized failures, exact equality on frozen ADR-0322 controls,
+literal parsed spans and the established nonempty-store fuel 10/11 and 13/14
+boundaries. ADR-0317 through ADR-0324, all existing relations and checkers, the
+recursive checker and canonical source unions remain unchanged. This wrapper
+changes reachability and precedence only. Groups around a conditional or branch
+lambda, nested conditional/call propagation, tuple, return, inferred-let and
+typed-body expected propagation, multiple arguments, global resolution, source
+closures, runtime-world safety, cost theorems and backend guarantees remain
+separate. Parser and diagnostic proof work remains paused.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

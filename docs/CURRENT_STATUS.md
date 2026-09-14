@@ -1843,11 +1843,11 @@ parsed consumers cover depths three, four and a deeper finite control, ordered
 exact spans, and the unchanged nonempty-store Core fuel 10/11 boundary. Depths
 zero through two remain the ADR-0322/ADR-0321 boundary, and ADR-0317 through
 ADR-0322, the recursive checker, canonical source union and existing entries
-remain unchanged. ADR-0323 itself adds no wrapper: at that boundary, a future
-entry could dispatch true to ADR-0323 and false exactly to ADR-0322, with
-recognized failure still final. Conditional expected-type propagation remained
-the next viable frontend frontier there; ADR-0324 below now implements that
-standalone step. Parser and diagnostic proof work remains paused.
+remain unchanged. ADR-0323 itself adds no wrapper; ADR-0325 below now selects it
+only when the conditional classifier is false and its own group-spine classifier
+is true, retaining recognized failure as final. Conditional expected-type
+propagation remained the next viable frontend frontier there; ADR-0324 below
+implements that standalone step. Parser and diagnostic proof work remains paused.
 
 Expected types now cross the two immediate branches of one source conditional
 at that singleton-argument boundary through a standalone opt-in adapter
@@ -1869,10 +1869,34 @@ three direct-lambda branch partitions; the parsed cases retain every exact span
 and both Boolean choices, with fuel 13 exactly exhausted and fuel 14 returning
 Word 7 with the literal nonempty input store. ADR-0317 through ADR-0323, their
 entries and checkers, the recursive checker and canonical source union remain
-unchanged. ADR-0324 adds no wrapper: a future source-only entry must try the
-conditional classifier first, then ADR-0323's finite-group-spine classifier,
-and otherwise return ADR-0322, with every recognized failure still final.
+unchanged. ADR-0324 itself adds no wrapper; ADR-0325 below now returns its
+complete result first whenever the unchanged conditional classifier is true.
 Parser and diagnostic proof work remains paused.
+
+The standalone conditional, finite three-or-more-group and frozen existing
+singleton-application paths now share one nonrecursive conditional-first wrapper
+(ADR-0325). It tests the unchanged ADR-0324 conditional classifier first; when
+false, it tests the unchanged ADR-0323 finite-group-spine classifier; when both
+are false, it returns the exact ADR-0322 result. The selected complete `Option`
+is returned literally, so a recognized conditional or group-spine failure is
+final and never falls through. Its three-constructor relation retains the
+evaluated classifier equations and complete selected child. Exact branch
+equations, success/absence, Core typing and nested provenance expose all three
+routes without a combined classifier, path enum, recursion or source rewriting.
+Independent symbolic and fully parsed consumers cover all three conditional
+branch partitions, finite group depths three, four and deeper, direct and one-
+or two-group lambdas, ordinary depths zero, one and three, and the all-ordinary
+conditional. Recognized ADR-0324 and ADR-0323 failures remain final; all doubly
+unrecognized boundaries retain equality to the complete frozen ADR-0322 result.
+Independent Core witnesses preserve the literal nonempty store at the established
+fuel 13/14 conditional and fuel 10/11 lambda-application boundaries. ADR-0317
+through ADR-0324, their relations and checkers, the recursive checker and
+canonical source unions remain unchanged. The wrapper adds reachability and fixed
+precedence, not new expression semantics. Groups around a conditional or a
+conditional branch lambda, nested conditional/call propagation, tuple, return,
+inferred-let and typed-body expected propagation, multiple arguments, global
+resolution, source closures, runtime-world safety, cost theorems and backend
+guarantees remain separate. Parser and diagnostic proof work remains paused.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
