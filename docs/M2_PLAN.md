@@ -1131,11 +1131,15 @@ and the literal old lowering/Core application. Independent symbolic and parsed
 consumers keep nonsurjective shifts, duplicate/foreign rows, nonempty stores and
 opaque payloads without adding runtime typing or source-closure conversion.
 
-Next compose owner transport with the remaining checked unary and binary data
-image adapters using these shared contracts. General expected-type propagation
-and global function resolution remain separate. The old stronger pure
-store/source-bound guarantees do not transfer, and structural arguments alone do
-not validate stores.
+Checked owner transport now packages the common local-expression boundary once
+for every admitted closed data expression (ADR-0316). Successful checking and
+exact runtime/context IDs expose mapped checking, both resolution/lowering stages
+and the literal old Core image for every arbitrary mapped endpoint. Bool/Word
+unary, short-circuit, strict binary and parsed consumers instantiate the same
+theorem under nonsurjective maps with duplicate/foreign rows and opaque stores.
+General expected-type propagation and global function resolution remain the next
+separate integrations. Raw success still cannot manufacture static premises,
+runtime validity, cost or dispatch.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

@@ -1721,6 +1721,18 @@ and parsed consumers construct old, mapped and Core paths independently under a
 nonsurjective shift, duplicate/foreign rows, nonempty stores and opaque payloads.
 Raw success still supplies none of checking, alignment, data gates or Core images.
 
+Checked closed data expressions now cross the same owner/Core boundary directly
+(ADR-0316). One general theorem combines successful local checking and exact
+runtime/context ID alignment with the existing data gate. It returns the mapped
+checker and ordered IDs, original and mapped resolution/lowering stages, the
+literal old Core expression/type, and an iff for every arbitrary mapped raw
+endpoint. This covers all twelve admitted constructors without unary or binary
+wrapper APIs. Independent Bool/Word unary, Bool short-circuit, strict Word binary
+and parsed consumers construct old, mapped and Core paths first, while retaining
+nonsurjective shifts, duplicate/foreign rows, opaque stores, checker rejection,
+misalignment and gate exclusions. No raw success supplies the missing premises,
+runtime typing, validity, cost, dispatch or totality.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
