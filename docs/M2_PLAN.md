@@ -1245,9 +1245,35 @@ Core fuel 10/11 boundary. Depths zero through two remain with ADR-0322/ADR-0321;
 ADR-0317 through ADR-0322, the recursive checker, canonical source union and all
 existing entry points remain unchanged. ADR-0323 adds no wrapper. A future
 wrapper may classify this shape first, return ADR-0323 exactly when true and
-ADR-0322 exactly when false, with recognized failure final. Expected-type
-propagation through conditionals is the next viable frontend semantics frontier;
-parser and diagnostic proof work remains paused.
+ADR-0322 exactly when false, with recognized failure final. At that boundary,
+expected-type propagation through conditionals remained the next viable
+frontend semantics frontier; ADR-0324 below now implements that standalone
+step. Parser and diagnostic proof work remains paused.
+
+One immediate conditional argument now has its own standalone expected-lambda
+adapter (ADR-0324). Its total source-only classifier requires an exact singleton
+call whose sole payload is an immediate conditional with at least one immediate
+ungrouped direct computation lambda. The unchanged recursive checker establishes
+the original callee's literal function type and checks the original condition at
+exactly Bool. An immediate direct-lambda branch uses the unchanged expected
+checker at that literal parameter type; every other immediate branch uses the
+unchanged recursive checker and must infer exactly the same type. Both original
+branches are checked statically before the exact Core conditional is applied.
+Any failure after recognition is final and cannot select another checker or
+fall through. In particular, a grouped or nested branch lambda remains an
+ordinary branch and receives no expected unwrapping, even if the other immediate
+branch recognizes the outer shape. An all-ordinary conditional is
+classifier-false and returns `none` here, preserving the exact frozen ADR-0322
+recursive success. Independent symbolic and fully parsed consumers cover the
+lambda/ordinary, ordinary/lambda and lambda/lambda partitions. The three parsed
+forms retain every original span and exercise both Boolean choices: fuel 13 is
+exactly exhausted, while fuel 14 returns Word 7 with the exact nonempty initial
+store. ADR-0317 through ADR-0323, their public entries, both child checkers and
+the canonical source union remain unchanged. ADR-0324 adds no wrapper. A future
+source-only wrapper must dispatch a recognized conditional to ADR-0324 first,
+then a recognized finite group spine to ADR-0323, and otherwise return ADR-0322;
+checker failure must never change that order. Parser and diagnostic proof work
+remains paused.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
