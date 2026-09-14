@@ -242,6 +242,8 @@ import Solcore.Frontend.RuntimeCapturedOwnerProperties
 import Solcore.Frontend.ClosedSourceOwnerProperties
 import Solcore.Frontend.ClosedSourceEvaluatorOwnerStepProperties
 import Solcore.Frontend.ClosedSourceEvaluatorOwnerProperties
+import Solcore.Frontend.ClosedSourceOwnerReflectionProperties
+import Solcore.Frontend.ClosedSourceOwnerBudgetProperties
 import Solcore.Frontend.ClosedSourceDataBody
 import Solcore.Frontend.ClosedSourceDataBodyProperties
 import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
