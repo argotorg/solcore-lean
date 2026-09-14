@@ -335,6 +335,8 @@ import Solcore.Test.FrontendExpectedLambdaArgumentApplicationProperties
 import Solcore.Test.FrontendParsedExpectedLambdaArgumentApplication
 import Solcore.Test.FrontendLocalApplicationWithExpectedLambdaProperties
 import Solcore.Test.FrontendParsedLocalApplicationWithExpectedLambda
+import Solcore.Test.FrontendGroupedExpectedLambdaArgumentApplicationProperties
+import Solcore.Test.FrontendParsedGroupedExpectedLambdaArgumentApplication
 import Solcore.Test.FrontendRuntimeValueBoundaryProperties
 import Solcore.Test.FrontendRuntimeValueProperties
 import Solcore.Test.FrontendParsedRuntimeClosureValues
@@ -6139,6 +6141,7 @@ def run : IO Unit := do
   frontendParsedExpectedLambdaLetSpineTests
   adr0317ParsedExpectedLambdaArgumentTests
   adr0318LocalApplicationWithExpectedLambdaTests
+  adr0319ParsedGroupedExpectedLambdaTests
   frontendParsedRuntimeClosureValueTests
   frontendParsedSourceLambdaEffectTests
   frontendParsedSourceComputationBodyEffectTests
