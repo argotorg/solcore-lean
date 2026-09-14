@@ -229,6 +229,8 @@ private def verifyFailures : IO Unit := do
       ("ordinary-type", "apply(flag ? lam(x){return x;} : wrong)"),
       ("ordinary-missing", "apply(flag ? lam(x){return x;} : missing)"),
       ("nonfunction", "flag(flag ? lam(x){return x;} : ordinary)"),
+      ("mixed-grouped", "apply(flag ? lam(x){return x;} : (lam(y){return y;}))"),
+      ("mixed-nested", "apply(flag ? lam(x){return x;} : ordinary(lam(y){return y;}))"),
       ("callee-missing", "globalApply(flag ? lam(x){return x;} : ordinary)")] do
     rejected label text true
   for (label, text) in [
