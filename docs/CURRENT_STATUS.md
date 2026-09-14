@@ -1827,6 +1827,27 @@ nested-call, tuple, conditional, return, inferred-let, typed-body,
 multiple-argument or global expected-type propagation is added, and parser and
 diagnostic proof work remains paused.
 
+Expected types now cross every finite source-group spine of depth at least
+three through a standalone exact-singleton adapter (ADR-0323). The public
+`DirectLambdaGroupSpine` evidence retains the original terminal direct lambda
+and the maximal list of all group spans in outermost-to-innermost order. Its
+total classifier, relation and checker share the same minimum-three boundary;
+the checker infers the original callee and passes its literal parameter type to
+the unchanged expected-lambda checker. Groups are transparent only in the exact
+Core application, and every failure after shape recognition is final without
+fallback. The private extractor uses an explicit `WellFounded.fix (measure
+sizeOf).wf`, with soundness proved by explicit well-founded induction; it uses
+neither `termination_by` nor fuel and all owned declarations remain
+compiled total, without a generated partial helper. Independent symbolic and
+parsed consumers cover depths three, four and a deeper finite control, ordered
+exact spans, and the unchanged nonempty-store Core fuel 10/11 boundary. Depths
+zero through two remain the ADR-0322/ADR-0321 boundary, and ADR-0317 through
+ADR-0322, the recursive checker, canonical source union and existing entries
+remain unchanged. This ADR adds no wrapper: a future entry may dispatch true to
+ADR-0323 and false exactly to ADR-0322, with recognized failure still final.
+Conditional expected-type propagation is the next viable frontend frontier;
+parser and diagnostic proof work remains paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

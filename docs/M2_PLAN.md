@@ -1226,6 +1226,29 @@ Third or arbitrary group spines, nested calls, tuples, conditionals, returns,
 inferred lets, typed bodies, multiple arguments and global expected-type
 propagation remain separate, and parser/diagnostic proof work remains paused.
 
+A standalone exact-singleton adapter now covers every finite group spine of
+depth at least three ending immediately at a direct computation lambda
+(ADR-0323). `DirectLambdaGroupSpine` records the original terminal and the
+maximal outermost-to-innermost sequence of all group spans. Its total classifier,
+declarative relation and executable checker enforce the same three-group
+minimum; the checker keeps the original callee and passes its literal inferred
+parameter type to the unchanged expected-lambda checker. The groups disappear
+only in Core. Once the source shape is recognized, callee, unary-type,
+lambda-header or body failure is final and never falls back. The private syntax
+walk is an explicit `WellFounded.fix (measure sizeOf).wf`, and its soundness
+proof uses explicit
+well-founded induction, avoiding `termination_by`, fuel and generated
+partial declarations while leaving every owned declaration compiled total.
+Independent symbolic and fully parsed consumers cover depths three, four and a
+deeper finite spine, every ordered exact span and the unchanged nonempty-store
+Core fuel 10/11 boundary. Depths zero through two remain with ADR-0322/ADR-0321;
+ADR-0317 through ADR-0322, the recursive checker, canonical source union and all
+existing entry points remain unchanged. ADR-0323 adds no wrapper. A future
+wrapper may classify this shape first, return ADR-0323 exactly when true and
+ADR-0322 exactly when false, with recognized failure final. Expected-type
+propagation through conditionals is the next viable frontend semantics frontier;
+parser and diagnostic proof work remains paused.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
