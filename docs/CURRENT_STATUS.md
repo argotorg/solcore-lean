@@ -1775,10 +1775,23 @@ grouped shape is recognized, failure is final and never falls back. This new
 shape belongs only to the standalone adapter: ADR-0317, ADR-0318, the recursive
 checker, existing entries and the canonical source union remain unchanged, and
 ADR-0318 cannot reach it. The standalone APIs are not a three-way dispatcher;
-a future unified entry needs a new group-first source wrapper. A second group,
-nested calls, tuples, conditionals, returns, inferred lets, typed bodies,
-multiple arguments and global resolution remain separate, while parser and
-diagnostic proofs remain paused.
+ADR-0320 supplies a separate group-first source wrapper without changing them.
+
+The three local singleton-application leaves now have one additive opt-in entry
+(ADR-0320). Its total source classifier recognizes only an exact singleton call
+with one group whose immediate child is a direct lambda. True delegates exactly
+to ADR-0319; false delegates exactly to the complete ADR-0318 entry, including
+its direct, ordinary and recursively transparent ordinary-group behavior. Two
+public branch equations fix both Option results for arbitrary sources. Thus a
+recognized grouped failure is final, while grouped ordinary inputs and their
+deeper ordinary groups retain ADR-0318 behavior. Exact success/absence, Core
+typing and nested provenance have independent symbolic and parsed consumers;
+the latter fixes four exact AST/span representatives, multi-group controls and
+the existing fuel 10/11 store-preserving execution. No prior entry, checker or
+source union changes. A second or arbitrary group around a lambda, nested-call,
+tuple, conditional, return, inferred-let, typed-body, multiple-argument and
+global expected propagation remain separate, while parser and diagnostic proofs
+remain paused.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

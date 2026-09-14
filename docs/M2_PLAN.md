@@ -1171,10 +1171,23 @@ A recognized grouped failure is final and never falls back. This adds one shape
 only to the new standalone adapter: ADR-0317, ADR-0318, the recursive checker,
 existing entries and the canonical source union are unchanged, and ADR-0318
 cannot reach it. The standalone families do not form a three-way dispatcher.
-Any future unified entry must be a new group-first, source-only wrapper.
+ADR-0320 now supplies the required group-first wrapper without changing those
+standalone contracts.
+
+The grouped, direct and ordinary singleton paths now share one additive opt-in
+entry (ADR-0320). A total source classifier recognizes exactly one group whose
+immediate child is a direct lambda. Its true branch is exactly ADR-0319; its
+false branch is exactly the complete ADR-0318 result for every source. The two
+generic branch equations make recognized grouped failure final without fallback
+and preserve direct, ordinary and recursively transparent ordinary-group
+behavior. The nested relation, exact success/absence, Core typing and provenance
+are consumed by independent symbolic and parsed four-path tests with malformed
+recognized branches, multi-group controls, duplicate/foreign rows, opaque
+values, a nonempty store and exact Core execution. No earlier checker, entry or
+canonical union is widened.
 
 Expected types still need separate propagation through a second or arbitrary
-group layer, nested calls, tuples, conditionals, returns, inferred-let bindings
+group layer around a lambda, nested calls, tuples, conditionals, returns, inferred-let bindings
 and typed body sites. These remain adapter-local absences, not language-wide
 rejection claims. Global function resolution remains deferred until a
 catalog/lookup relation, local/global precedence, declaration-owner policy,
