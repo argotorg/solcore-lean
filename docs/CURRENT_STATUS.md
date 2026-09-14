@@ -1763,6 +1763,23 @@ adapter adds no accepted source-union member and changes neither child checker
 nor existing entry point. Global resolution and multi-argument propagation
 remain separate, and the paused parser/diagnostic proof frontier is unchanged.
 
+Expected types now also cross exactly one source group at that argument boundary
+(ADR-0319). A standalone opt-in adapter accepts an exact singleton call whose
+sole argument is one group with a direct lambda as its immediate child. It
+infers the original local callee, checks that child at the literal parameter
+type, retains the outer call, argument-list and group spans, and erases only the
+group in the exact Core application. Exact success/absence, Core typing and
+provenance have independent symbolic and parsed consumers with duplicate and
+foreign rows, opaque values, a nonempty store and exact Core execution. Once the
+grouped shape is recognized, failure is final and never falls back. This new
+shape belongs only to the standalone adapter: ADR-0317, ADR-0318, the recursive
+checker, existing entries and the canonical source union remain unchanged, and
+ADR-0318 cannot reach it. The standalone APIs are not a three-way dispatcher;
+a future unified entry needs a new group-first source wrapper. A second group,
+nested calls, tuples, conditionals, returns, inferred lets, typed bodies,
+multiple arguments and global resolution remain separate, while parser and
+diagnostic proofs remain paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

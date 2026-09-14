@@ -1161,12 +1161,25 @@ Core typing and provenance, plus independent symbolic and parsed consumers,
 cover both branches without adding an accepted source-union member or changing
 either child checker.
 
-Expected types still need separate propagation through grouping, nested calls,
-tuples, conditionals, returns, inferred-let bindings and typed body sites. These
-remain adapter-local absences, not language-wide rejection claims. Global
-function resolution remains deferred until a catalog/lookup relation, local/global
-precedence, declaration-owner policy, arity lowering and recursive closure
-environment are fixed; none is manufactured by this local application entry.
+Exactly one grouping boundary now has a separate opt-in adapter (ADR-0319). For
+an exact singleton call whose sole argument is one group around a direct lambda,
+it infers the original local callee and passes the literal parameter type to the
+unchanged expected checker. Evidence retains the call, argument-list and group
+spans while only the group disappears from the exact Core apply; exact absence,
+typing, provenance and independent symbolic/parsed execution cover the boundary.
+A recognized grouped failure is final and never falls back. This adds one shape
+only to the new standalone adapter: ADR-0317, ADR-0318, the recursive checker,
+existing entries and the canonical source union are unchanged, and ADR-0318
+cannot reach it. The standalone families do not form a three-way dispatcher.
+Any future unified entry must be a new group-first, source-only wrapper.
+
+Expected types still need separate propagation through a second or arbitrary
+group layer, nested calls, tuples, conditionals, returns, inferred-let bindings
+and typed body sites. These remain adapter-local absences, not language-wide
+rejection claims. Global function resolution remains deferred until a
+catalog/lookup relation, local/global precedence, declaration-owner policy,
+arity lowering and recursive closure environment are fixed; none is manufactured
+by these local application adapters.
 The parser/diagnostic proof frontier remains paused.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
