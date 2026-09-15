@@ -1384,6 +1384,36 @@ broader nested/tuple/return/inferred-let/typed-body/multiple-argument/global
 expected propagation, source closure, runtime-world safety, cost and backend
 guarantees remain separate. Parser and diagnostic proof development remains paused.
 
+The exact-three grouped-conditional source partition now has its standalone
+exact-singleton adapter (ADR-0330). A total source-only classifier requires one
+argument with precisely three whole-expression groups around an immediate
+conditional and at least one ungrouped direct computation-lambda branch. The
+original callee and Bool condition still use recursive checking, while both
+original branches use the unchanged ADR-0324 checker at the literal inferred
+parameter type. The literal Core is unchanged and only the three groups are
+transparent there; complete children and every source span remain in provenance.
+Any classifier-selected semantic failure returns `none` finally.
+
+Independent symbolic and registered parsed matrices freeze all three success
+partitions, ten selected failures, classifier-false depth and shape neighbors,
+inherited failures and complete ADR-0329 predecessor Options. ADR-0329 itself is
+unchanged and does not dispatch to the new standalone adapter. For each new source
+its exact-depth-two classifier is false, so its complete result is the unchanged
+ADR-0327 `Option`, and all three new successes remain unreachable there as `none`.
+Runtime controls retain the nonempty opaque/cell/host-function store and both
+Boolean choices: fuel 13 is exhausted and fuel 14 returns Word 7 unchanged.
+Conditional controls at depths zero through two also keep 13/14; direct and
+finite-group expected-lambda controls keep 10/11.
+
+ADR-0317 through ADR-0329, existing classifiers, relations, checkers, recursive
+and canonical entries and source unions remain unchanged. The next additive
+frontend-semantics step is ADR-0331, whose nonrecursive source dispatch must return
+the complete ADR-0330 `Option` when the new classifier is true and otherwise the
+complete ADR-0329 `Option`; selected `none` remains final. Four or more whole
+groups, a generic or deeper grouped-conditional spine, grouped branch lambdas and
+broader expected propagation remain deferred alongside source closure, runtime-
+world safety, cost and backend guarantees. Parser and diagnostic proof work stays paused.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
