@@ -1475,6 +1475,43 @@ typed-body/multiple-argument/global expected propagation remain deferred alongsi
 source-union integration, source closure, runtime-world safety, cost and backend
 guarantees. Parser and diagnostic proof work stays paused.
 
+The exact-four grouped-conditional path now has its additive selecting wrapper
+(ADR-0333). One nonrecursive source-only branch evaluates the unchanged ADR-0332
+classifier once: true returns the exact complete ADR-0332 `Option`, and false
+returns the exact complete unchanged ADR-0331 `Option`. Classifier-selected `none`
+is final; no checker-success retry, fallback, source reconstruction or rewriting
+changes the source partition. Both complete children remain unchanged.
+
+Two declarative constructors retain the classifier equation and complete selected
+child. Exact branch equations, executable/declarative success and absence, Core
+typing and nested provenance expose both layers without another classifier, path
+enum or recursion. Independent symbolic and registered parsed consumers freeze
+exactly three success partitions, ten selected failures, eighteen false neighbors,
+twelve inherited or boundary failures and thirty complete ADR-0331 Options. The
+false-neighbor matrix has exactly twelve `some` and six `none`, while complete
+parsed preservation has twelve `some` and eighteen `none`. Proof-producing ASTs
+retain the primary `0..50` call/full span and four group spans `6..49`, `7..48`,
+`8..47`, `9..46`, plus `0..48`, `0..52` and `0..32` call/full controls for the
+three-group predecessor, five-group boundary and four-group direct lambda.
+
+Thirteen wrapper runtime selections retain the nonempty environment and store with
+the opaque closure, cell reference and host function for both Boolean choices.
+Conditional paths keep exact fuel 13/14 and direct or finite-group lambda paths
+keep 10/11; all finish at the exact `Word 7` with identical store. Manual
+evaluation, stateful-runner soundness and determinism remain explicit, and the
+wrapper changes no Core, environment, store, cost or result.
+
+ADR-0317 through ADR-0332, all existing classifiers, relations and checkers, the
+recursive checker, canonical entries and source unions remain unchanged. ADR-0333
+adds only reachability and fixed precedence. The next independent standalone leaf
+is ADR-0334: exactly five whole-expression groups around the same immediate
+conditional; its selecting wrapper remains separate. Six or more groups, a generic
+or deeper grouped-conditional spine, grouped branch lambdas and broader nested/
+call/tuple/return/inferred-let/typed-body/multiple-argument/global expected
+propagation remain deferred alongside source-union integration, source closure,
+runtime-world safety, cost and backend guarantees. Parser and diagnostic proof
+work stays paused.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
