@@ -2053,6 +2053,37 @@ branch lambdas, broader expected propagation, source closures, runtime-world saf
 costs and backend guarantees remain deferred. Parser and diagnostic proof work
 remains paused.
 
+Exactly four transparent whole-expression groups around an immediate conditional
+now have a standalone source-only exact-singleton adapter (ADR-0332). Its total
+classifier requires one argument with precisely those four groups and at least one
+immediate ungrouped direct computation-lambda branch. The unchanged recursive
+checker still handles the original callee and Bool condition, while both original
+branches reuse the ADR-0324 checker at the literal inferred parameter type. The
+Core is unchanged; only the four groups are transparent, and all source spans and
+complete child derivations remain in provenance. Classifier-selected failure is
+final without fallback, source rewriting or recursion.
+
+Independent symbolic and registered parsed matrices cover three success
+partitions, ten selected failures, eighteen classifier-false shapes, twelve
+inherited or boundary failures and thirty complete ADR-0331 Options. They retain
+proof-producing exact AST/spans for the primary, three-group predecessor,
+five-group boundary and four-group direct-lambda control. ADR-0331 is unchanged
+and cannot reach this standalone leaf: its exact-three classifier is false on
+every new source, so it returns the complete ADR-0329 `Option`, literally `none`
+on all three successes. Thirteen runtime selections preserve the nonempty
+opaque/cell/host-function store for both Boolean choices. Conditional depths zero
+through four retain fuel 13/14; direct lambdas at depths zero through five retain
+10/11, together with runner soundness and determinism.
+
+ADR-0317 through ADR-0331 and every existing classifier, relation, checker,
+recursive/canonical entry and source union remain unchanged. ADR-0332 is standalone
+and opt-in. ADR-0333 is the next nonrecursive wrapper: its true branch will return
+the complete ADR-0332 `Option`, and its false branch the complete ADR-0331 `Option`,
+with selected `none` final. Five or more groups, a generic/deeper grouped-
+conditional spine, grouped branch lambdas, broader expected propagation, source
+closures, runtime-world safety, costs and backend guarantees remain deferred.
+Parser and diagnostic proof work remains paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
