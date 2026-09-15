@@ -1923,6 +1923,29 @@ more groups around a conditional, grouped branch lambdas and broader nested, tup
 return, inferred-let, typed-body, multi-argument or global propagation remain
 separate. Parser and diagnostic proof work remains paused.
 
+One-level-grouped conditional candidates now reach their standalone adapter through
+a second nonrecursive source-only wrapper (ADR-0327). It evaluates the unchanged
+ADR-0326 classifier once: true returns the exact complete ADR-0326 `Option`, while
+false returns the exact complete ADR-0325 `Option`. A recognized ADR-0326 rejection
+is therefore final and never falls through. Its two-constructor relation retains
+the evaluated classifier equation and complete selected child. Exact branch
+equations, success/absence, Core typing and nested provenance expose both routes
+without another classifier, path enum, recursion, source rewriting or success-based
+dispatch.
+
+Independent symbolic and fully parsed consumers cover all three grouped-conditional
+branch partitions, the complete ADR-0325 success partition, selected final ADR-0326
+failures and inherited predecessor failures. They retain exact complete predecessor
+Options, proof-producing AST/span equality and the literal nonempty opaque/cell/
+host-function store. Conditional controls keep the fuel 13/14 boundary, and direct
+and finite-group lambda controls keep fuel 10/11. ADR-0317 through ADR-0326, their
+classifiers, relations and checkers, the recursive checker and canonical source
+unions remain unchanged. The wrapper adds reachability and fixed precedence only.
+Two or more whole groups around a conditional, grouped conditional branch lambdas,
+broader nested/tuple/return/inferred-let/typed-body/multi-argument/global propagation,
+source closures, runtime-world safety, cost and backend guarantees remain separate.
+Parser and diagnostic proof work remains paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

@@ -1314,6 +1314,24 @@ existing ADR-0324 recognized-failure boundary. Nested calls/conditionals, tuple,
 return, inferred-let, typed-body, multiple-argument and global expected propagation
 also remain later work. Parser and diagnostic proofs remain paused.
 
+The one-level grouped-conditional adapter now joins the established local
+application paths through an additive wrapper (ADR-0327). The unchanged ADR-0326
+classifier selects the complete ADR-0326 `Option`; only a false classifier returns
+the exact complete ADR-0325 `Option`. Recognized ADR-0326 failure is final. Two
+declarative constructors, exact branch equations, success/absence, Core typing and
+nested provenance expose the selected complete child without a new classifier,
+path enum, recursion, source reconstruction or success-based retry.
+
+Independent symbolic and parsed consumers cover all three new branch partitions,
+the existing ADR-0325 routes, selected new and inherited failures, complete Option
+preservation, exact parsed spans and the nonempty-store fuel 13/14 and 10/11
+boundaries. ADR-0317 through ADR-0326 and canonical source unions remain unchanged;
+this step changes reachability and precedence only. Two or more groups around a
+conditional, grouped branch lambdas and broader nested, tuple, return, inferred-let,
+typed-body, multiple-argument and global expected propagation remain later work.
+Runtime-world safety, cost/backend guarantees and parser/diagnostic proofs also
+remain separate.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
