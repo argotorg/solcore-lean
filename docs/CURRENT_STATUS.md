@@ -2157,6 +2157,43 @@ grouped branch lambdas, broader expected propagation, source closures, runtime-w
 safety, costs and backend guarantees remain deferred. Parser and diagnostic proof
 work remains paused.
 
+The exact-five grouped-conditional adapter now joins the established local-
+application paths through a nonrecursive source-only wrapper (ADR-0335). It
+evaluates the unchanged ADR-0334 classifier once: true returns the exact complete
+ADR-0334 `Option`, while false returns the exact complete unchanged ADR-0333
+`Option`. A classifier-true `none` is final, without retry, fallback, `orElse`,
+source rewriting or recursion. Both complete children and the classifier remain
+unchanged.
+
+Its two-constructor relation retains the classifier equation and complete selected
+child. Exact branch equations, executable/declarative correspondence, exact
+absence, Core typing and nested wrapper/child provenance expose both routes.
+Independent symbolic and registered parsed consumers cover exactly three success
+partitions, ten selected failures, twenty classifier-false neighbors, thirteen
+inherited or boundary failures and thirty-three complete ADR-0333 Options. The
+false-neighbor matrix is exactly fourteen `some` and six `none`; full parsed
+preservation is fourteen `some` and nineteen `none`. Proof-producing equality
+retains the primary call/full span `0..52` and group spans `6..51`, `7..50`,
+`8..49`, `9..48`, `10..47`, plus call/full spans `0..50`, `0..54` and `0..34`
+for the four-group predecessor, six-group boundary and five-group direct lambda.
+
+Fifteen literal wrapper selections preserve the nonempty environment and store
+containing the opaque closure, cell reference and host function for both Boolean
+choices. Conditional controls at depths zero through four exhaust fuel 13 and
+finish at 14; direct and finite-group lambda controls at depths zero through six
+exhaust 10 and finish at 11. Every path returns exact `Word 7` with the identical
+store. Manual evaluation, stateful-runner soundness and determinism are retained;
+the wrapper changes no Core, environment, store, cost or result.
+
+ADR-0317 through ADR-0334 and every existing classifier, relation, checker,
+recursive/canonical entry and source union remain unchanged. ADR-0335 adds only
+reachability and fixed precedence. ADR-0336 is the next standalone semantic leaf:
+exactly six whole-expression groups around the same immediate conditional; its
+selecting wrapper remains later. Seven or more groups, a generic/deeper spine,
+grouped branch lambdas, broader expected propagation, source closures, runtime-
+world safety, costs and backend guarantees remain deferred. Parser and diagnostic
+proof work remains paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
