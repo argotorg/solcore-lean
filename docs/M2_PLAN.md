@@ -1512,6 +1512,45 @@ propagation remain deferred alongside source-union integration, source closure,
 runtime-world safety, cost and backend guarantees. Parser and diagnostic proof
 work stays paused.
 
+The exact-five grouped-conditional source partition now has its standalone
+source-only exact-singleton adapter (ADR-0334). A total classifier requires one
+argument with precisely five whole-expression groups around an immediate
+conditional and at least one ungrouped direct computation-lambda branch. The
+original callee and Bool condition retain unchanged recursive checking, while
+both original branches reuse the unchanged ADR-0324 checker at the literal inferred
+parameter type. The literal Core is unchanged and only the five groups are
+transparent there; every original span and complete child remains in provenance.
+Classifier-selected semantic failure returns `none` finally.
+
+Independent symbolic and registered parsed matrices freeze three success
+partitions, ten selected failures, twenty classifier-false neighbors, thirteen
+inherited or boundary failures and thirty-three parsed complete ADR-0333 Options.
+The false-neighbor matrix is exactly fourteen `some` and six `none`; parsed
+preservation is fourteen `some` and nineteen `none`. Proof-producing ASTs retain
+the primary `0..52` call/full span and group spans `6..51`, `7..50`, `8..49`,
+`9..48`, `10..47`, plus `0..50`, `0..54` and `0..34` call/full controls for the
+four-group predecessor, six-group boundary and five-group direct lambda. ADR-0333
+stays unchanged: every new success false-routes its exact-four classifier to the
+complete ADR-0331 `Option` and remains literally `none`.
+
+Fifteen runtime selections retain the nonempty environment and store with the
+opaque closure, cell reference and host function for both Boolean choices.
+Conditional paths at depths zero through four keep exact fuel 13/14, and direct or
+finite-group lambda paths at depths zero through six keep 10/11. All finish at the
+exact `Word 7` with identical store; manual evaluation, stateful-runner soundness
+and determinism remain explicit.
+
+ADR-0317 through ADR-0333, all existing classifiers, relations and checkers, the
+recursive checker, canonical entries and source unions remain unchanged. ADR-0334
+is standalone and opt-in. The next additive frontend-semantics step is ADR-0335,
+whose nonrecursive source dispatch must return the complete ADR-0334 `Option` when
+the new classifier is true and otherwise the complete ADR-0333 `Option`; selected
+`none` remains final. Six or more grouped conditionals, a generic/deeper spine,
+grouped branch lambdas and broader nested/call/tuple/return/inferred-let/typed-body/
+multiple-argument/global expected propagation remain deferred alongside source-
+union integration, source closure, runtime-world safety, cost and backend
+guarantees. Parser and diagnostic proof work stays paused.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

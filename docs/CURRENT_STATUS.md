@@ -2120,6 +2120,43 @@ deeper grouped-conditional spine, grouped branch lambdas, broader expected
 propagation, source closures, runtime-world safety, costs and backend guarantees
 remain deferred. Parser and diagnostic proof work remains paused.
 
+Exactly five transparent whole-expression groups around an immediate conditional
+now have a standalone source-only exact-singleton adapter (ADR-0334). Its total
+classifier requires one argument with precisely those five groups and at least one
+immediate ungrouped direct computation-lambda branch. The original callee and Bool
+condition retain unchanged recursive checking, and both original branches reuse
+the unchanged ADR-0324 checker at the literal inferred parameter type. The literal
+Core is unchanged; the five groups are transparent only there, while every source
+span and complete child derivation remains in provenance. Classifier-selected
+semantic failure is final without fallback, source rewriting or recursion.
+
+Independent symbolic and registered parsed consumers cover exactly three success
+partitions, ten selected failures, twenty classifier-false neighbors and thirteen
+inherited or boundary failures. The false-neighbor matrix has fourteen `some` and
+six `none`; all thirty-three parsed ADR-0333 preservation rows have fourteen `some`
+and nineteen `none`. Proof-producing equality fixes the primary call/full span
+`0..52` with group spans `6..51`, `7..50`, `8..49`, `9..48` and `10..47`, plus
+call/full spans `0..50`, `0..54` and `0..34` for the four-group predecessor,
+six-group boundary and five-group direct-lambda control. ADR-0333 remains unchanged:
+its exact-four classifier is false on every new success, so it returns its complete
+ADR-0331 false-branch `Option`, literally `none` in all three cases.
+
+Fifteen runtime selections retain the nonempty environment and store containing the
+opaque closure, cell reference and host function for both Boolean choices.
+Conditional controls at depths zero through four exhaust fuel 13 and finish at 14;
+direct and finite-group lambda controls at depths zero through six exhaust 10 and
+finish at 11. Every path returns the exact `Word 7` with the identical store, with
+manual evaluation, stateful-runner soundness and determinism retained.
+
+ADR-0317 through ADR-0333 and every existing classifier, relation, checker,
+recursive/canonical entry and source union remain unchanged. ADR-0334 is standalone
+and opt-in. ADR-0335 is the next nonrecursive integration frontier: true must return
+the complete ADR-0334 `Option`, false the complete ADR-0333 `Option`, and a selected
+`none` must remain final. Six or more grouped conditionals, a generic/deeper spine,
+grouped branch lambdas, broader expected propagation, source closures, runtime-world
+safety, costs and backend guarantees remain deferred. Parser and diagnostic proof
+work remains paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
