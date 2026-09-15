@@ -1357,6 +1357,33 @@ multiple-argument and global expected propagation remain later work. Runtime-wor
 safety, cost/backend guarantees and general parser/diagnostic proofs also remain
 separate.
 
+The two-level grouped-conditional path now has its additive selecting wrapper
+(ADR-0329). The wrapper is a nonrecursive source-only branch: an unchanged
+ADR-0328 classifier result of true returns the exact complete ADR-0328 `Option`,
+and false returns the exact complete unchanged ADR-0327 `Option`. Selected
+failure is final; no checker-success retry, fallback, source reconstruction or
+rewriting changes the dispatch boundary.
+
+Two declarative constructors retain the classifier equation and complete selected
+child. Exact branch equations, success/absence, Core typing and nested provenance
+make both routes explicit without another classifier, path enum or recursion.
+Independent symbolic and registered parsed consumers freeze the three ADR-0328
+success partitions, the complete ADR-0327 predecessor routes, selected and
+inherited failures, whole-`Option` equality, exact AST spans and provenance.
+Runtime controls preserve the nonempty opaque/cell/host-function store: each new
+conditional Core exhausts fuel 13 and returns Word 7 unchanged at fuel 14 for
+both Boolean choices. Immediate and one-group conditionals keep 13/14, while
+direct and finite-group expected-lambda predecessors keep 10/11.
+
+ADR-0317 through ADR-0328, all existing classifiers, relations and checkers, the
+recursive checker and canonical source unions remain unchanged. ADR-0329 adds
+only reachability and fixed precedence. The next independent standalone leaf is
+exactly three whole groups around the same immediate conditional; a finite deeper
+spine remains later until that exact depth is frozen. Grouped branch lambdas,
+broader nested/tuple/return/inferred-let/typed-body/multiple-argument/global
+expected propagation, source closure, runtime-world safety, cost and backend
+guarantees remain separate. Parser and diagnostic proof development remains paused.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
