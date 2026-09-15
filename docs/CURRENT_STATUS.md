@@ -1946,6 +1946,30 @@ broader nested/tuple/return/inferred-let/typed-body/multi-argument/global propag
 source closures, runtime-world safety, cost and backend guarantees remain separate.
 Parser and diagnostic proof work remains paused.
 
+Exactly two transparent whole-expression groups around an immediate conditional
+now have a standalone exact-singleton adapter (ADR-0328). Its total source-only
+classifier requires the sole argument to have precisely those two groups and at
+least one immediate ungrouped direct computation-lambda branch. The original
+callee and condition use recursive checking; both original branches reuse the
+unchanged ADR-0324 branch checker at the literal inferred parameter type. Both
+groups disappear only from the literal Core, while all source spans and complete
+child derivations remain in provenance. Every recognized semantic failure is final.
+
+Independent symbolic and registered fully parsed consumers cover all three branch
+partitions, the selected failure matrix, exact source partitions and complete
+ADR-0327 predecessor Options on neighboring shapes. They retain
+proof-producing AST/span equality and the literal nonempty opaque/cell/host-function
+store. All three produced Cores keep the fuel 13/14 boundary for both Boolean
+choices and return Word 7 without changing that store.
+
+ADR-0317 through ADR-0327, their classifiers, relations and checkers, the recursive
+checker and canonical source unions remain unchanged. ADR-0328 is still standalone:
+no wrapper selects it before ADR-0327 yet. That later wrapper, three or more whole
+groups around a conditional, grouped conditional branch lambdas, broader nested/
+tuple/return/inferred-let/typed-body/multi-argument/global propagation, source
+closures, runtime-world safety, costs, backend guarantees and parser/diagnostic
+proofs remain separate.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word

@@ -1332,6 +1332,31 @@ typed-body, multiple-argument and global expected propagation remain later work.
 Runtime-world safety, cost/backend guarantees and parser/diagnostic proofs also
 remain separate.
 
+Exactly two groups around the same immediate conditional now have their own
+standalone exact-singleton adapter (ADR-0328). Its total source classifier requires
+a sole argument shaped as group/group/conditional with at least one ungrouped
+immediate direct computation-lambda branch. Depths one and three, all-ordinary and
+grouped- or nested-only branch shapes remain outside this exact partition.
+
+The checker retains the original callee, condition and branches, recursively
+requires a function callee and Bool condition, and applies the unchanged ADR-0324
+branch checker at the literal inferred parameter type. The two source groups are
+transparent only in the returned Core; the relation retains every original source
+span and complete child derivation. Recognized callee, condition, header, body,
+type, resolution or opposite-branch failures return the selected `none` directly.
+
+Independent symbolic and registered parsed consumers freeze all three success
+partitions, selected failures, exact classifier separation, complete unchanged
+ADR-0327 predecessor Options, exact parsed spans and
+the nonempty-store fuel 13/14 boundary for both Boolean choices. ADR-0317 through
+ADR-0327 and canonical source unions remain unchanged. This unit remains
+standalone: a wrapper selecting ADR-0328 before the complete ADR-0327 result is the
+next distinct integration step. Three or more whole groups around a conditional,
+grouped branch lambdas and broader nested, tuple, return, inferred-let, typed-body,
+multiple-argument and global expected propagation remain later work. Runtime-world
+safety, cost/backend guarantees and general parser/diagnostic proofs also remain
+separate.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects
