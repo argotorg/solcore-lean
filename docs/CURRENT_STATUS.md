@@ -2194,6 +2194,44 @@ grouped branch lambdas, broader expected propagation, source closures, runtime-
 world safety, costs and backend guarantees remain deferred. Parser and diagnostic
 proof work remains paused.
 
+Exactly six transparent whole-expression groups around an immediate conditional
+now have a standalone source-only exact-singleton adapter (ADR-0336). Its total
+classifier requires one argument with precisely those six groups and at least one
+immediate ungrouped direct computation-lambda branch. The original callee and Bool
+condition retain unchanged recursive checking, and both original branches reuse
+the unchanged ADR-0324 checker at the literal inferred parameter type. The literal
+Core is unchanged; all six group spans and complete child derivations remain in
+provenance. Classifier-selected semantic failure is final without retry, fallback,
+source rewriting or recursion. The production surface has exactly eight authored
+roots, thirty-seven owned declarations, thirty-one public and six private.
+
+Independent symbolic and registered parsed consumers cover exactly three success
+partitions, ten selected failures, twenty-two classifier-false neighbors and
+fourteen inherited or boundary failures. False neighbors are sixteen `some` and
+six `none`; all thirty-six parsed complete ADR-0335 preservation rows are sixteen
+`some` and twenty `none`. Proof-producing equality fixes the primary call/full
+span `0..54`, group spans `6..53`, `7..52`, `8..51`, `9..50`, `10..49` and
+`11..48`, plus call/full spans `0..52`, `0..56` and `0..36` for the five-group
+predecessor, seven-group boundary and six-group direct-lambda control. ADR-0335
+remains unchanged and returns literally `none` on all three new successes.
+
+Seventeen runtime selections retain the nonempty environment and store containing
+the opaque closure, cell reference and host function for both Boolean choices.
+Conditional controls at depths zero through five exhaust fuel 13 and finish at 14;
+direct and finite-group lambda controls at depths zero through seven exhaust 10 and
+finish at 11. Every path returns exact `Word 7` with the identical store. Manual
+evaluation, stateful-runner soundness and determinism remain explicit; this leaf
+adds no Core node, runtime step, cost or result change.
+
+ADR-0317 through ADR-0335 and every existing classifier, relation, checker,
+recursive/canonical entry and source union remain unchanged. ADR-0336 is standalone
+and opt-in. ADR-0337 is the next nonrecursive source-only integration frontier: it
+must select the complete ADR-0336 `Option` before the complete ADR-0335 `Option`,
+with selected `none` final. Seven or more groups, a generic/deeper spine, grouped
+branch lambdas, broader expected propagation, source closures, runtime-world
+safety, costs and backend guarantees remain deferred. Frontend semantics remains
+the active priority; parser and diagnostic proof work remains paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
