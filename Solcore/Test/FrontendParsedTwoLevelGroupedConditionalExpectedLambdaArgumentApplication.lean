@@ -198,41 +198,72 @@ private def verifyFailures : IO Unit := do
       ("mixed-grouped", "apply(((flag ? lam(x){return x;} : (lam(y){return y;}))))"),
       ("mixed-nested", "apply(((flag ? lam(x){return x;} : ordinary(lam(y){return y;}))))"),
       ("callee-missing", "globalApply(((flag ? lam(x){return x;} : ordinary)))")] do rejected label text
-private def preserved (label text : String) (expected : Option (Core.Expr × Core.Ty)) : IO Unit := do
+private def preserved (label text : String) (oneLevel : Bool)
+    (expected : Option (Core.Expr × Core.Ty)) : IO Unit := do
   let (_, parsed) ← parseComplete s!"adr0328-{label}.sol" text
+  let current := elaborateLocalApplicationWithOneLevelGroupedConditionalExpectedLambda? types owner inputs parsed
+  let older := elaborateLocalApplicationWithConditionalAndFiniteGroupedExpectedLambda? types owner inputs parsed
+  let groupedConditional := elaborateOneLevelGroupedConditionalExpectedLambdaArgumentApplication? types owner inputs parsed
   check (!isTwoLevelGroupedConditionalExpectedLambdaArgumentApplication parsed &&
-    (elaborateTwoLevelGroupedConditionalExpectedLambdaArgumentApplication?
-      types owner inputs parsed).isNone &&
-    elaborateLocalApplicationWithOneLevelGroupedConditionalExpectedLambda?
-      types owner inputs parsed == expected) s!"{label}: exact ADR0327 Option changed"
+    (elaborateTwoLevelGroupedConditionalExpectedLambdaArgumentApplication? types owner inputs parsed).isNone &&
+    isOneLevelGroupedConditionalExpectedLambdaArgumentApplication parsed == oneLevel && current == expected)
+    s!"{label}: exact ADR0328/ADR0327 Option changed"
+  if boundary : isOneLevelGroupedConditionalExpectedLambdaArgumentApplication parsed = true then
+    check (groupedConditional == expected) s!"{label}: exact ADR0326 Option changed"
+    proof (elaborateLocalApplicationWithOneLevelGroupedConditionalExpectedLambda?_of_oneLevelGroupedConditional
+      (types := types) (owner := owner) (inputs := inputs) (source := parsed) boundary)
+  else
+    have falseBoundary : isOneLevelGroupedConditionalExpectedLambdaArgumentApplication parsed = false := by
+      cases equality : isOneLevelGroupedConditionalExpectedLambdaArgumentApplication parsed <;> simp_all
+    check (older == expected) s!"{label}: exact ADR0325 Option changed"
+    proof (elaborateLocalApplicationWithOneLevelGroupedConditionalExpectedLambda?_of_existing
+      (types := types) (owner := owner) (inputs := inputs) (source := parsed) falseBoundary)
 private def verifyPreservation : IO Unit := do
   preserved "one-group-conditional" "apply((flag ? lam(x){return x;} : ordinary))"
-    (some (.apply (.var 0) (.ifE (.var 3) lambdaCore (.var 4)), .word))
-  preserved "three-group-conditional" "apply((((flag ? lam(x){return x;} : ordinary))))" none
+    true (some (.apply (.var 0) (.ifE (.var 3) lambdaCore (.var 4)), .word))
+  preserved "immediate-conditional" "apply(flag ? lam(x){return x;} : ordinary)"
+    false (some (.apply (.var 0) (.ifE (.var 3) lambdaCore (.var 4)), .word))
+  preserved "three-group-conditional" "apply((((flag ? lam(x){return x;} : ordinary))))" false none
   preserved "all-ordinary" "apply(((flag ? ordinary : ordinary)))"
-    (some (.apply (.var 0) (.ifE (.var 3) (.var 4) (.var 4)), .word))
-  preserved "direct-lambda" "apply(lam(x){return x;})" (some (.apply (.var 0) lambdaCore, .word))
-  preserved "three-lambda-groups" "apply((((lam(x){return x;}))))" (some (.apply (.var 0) lambdaCore, .word))
+    false (some (.apply (.var 0) (.ifE (.var 3) (.var 4) (.var 4)), .word))
+  for (label, text) in [("direct-lambda", "apply(lam(x){return x;})"),
+      ("one-lambda-group", "apply((lam(x){return x;}))"),
+      ("two-lambda-groups", "apply(((lam(x){return x;})))"),
+      ("three-lambda-groups", "apply((((lam(x){return x;}))))")] do
+    preserved label text false (some (.apply (.var 0) lambdaCore, .word))
+  preserved "ordinary-singleton" "apply(ordinary)" false (some (.apply (.var 0) (.var 4), .word))
   for (label, text) in [("grouped-only", "apply(((flag ? (lam(x){return x;}) : ordinary)))"),
       ("nested-only", "apply(((flag ? ordinary(lam(x){return x;}) : ordinary)))"),
       ("zero", "apply()"), ("multi", "apply(lam(x){return x;},ordinary)"),
-      ("top", "((flag ? lam(x){return x;} : ordinary))")] do preserved label text none
-private def runExact (mode : Mode) (choice : Bool) : IO Unit := do
-  match Core.runStateful 13 (Core.State.initial (core mode) (environment choice) store) with
-  | .outOfFuel _ => pure () | _ => throw (IO.userError s!"{label mode}: completed below 14")
-  match actual : Core.runStateful 14 (Core.State.initial (core mode) (environment choice) store) with
+      ("top", "((flag ? lam(x){return x;} : ordinary))")] do preserved label text false none
+private def directCore : Core.Expr := .apply (.var 0) lambdaCore
+private theorem directE (choice : Bool) : Core.Evaluates (environment choice) store directCore (.word seven) store :=
+  .apply (.var rfl) .lambda (.apply (.var rfl) .word (.var rfl))
+private def runExact (runtimeLabel : String) (below complete : Nat) (candidate : Core.Expr) (choice : Bool)
+    (expected : Core.Evaluates (environment choice) store candidate (.word seven) store) : IO Unit := do
+  match Core.runStateful below (Core.State.initial candidate (environment choice) store) with
+  | .outOfFuel _ => pure () | _ => throw (IO.userError s!"{runtimeLabel}: completed below {complete}")
+  match actual : Core.runStateful complete (Core.State.initial candidate (environment choice) store) with
   | .done value finalStore =>
-    check (value == .word seven && finalStore == store) s!"{label mode}: result/store"
-    have expected : Core.Evaluates (environment choice) store (core mode) (.word seven) store := by
-      simpa [environment] using independently_executed_two_group_conditional_core mode choice
-        opaqueValue (.cellRef (.function .unit .word) 31) (.word seven) store
+    check (value == .word seven && finalStore == store) s!"{runtimeLabel}: result/store"
     proof (Core.evaluation_deterministic (Core.runStateful_evaluation_sound actual) expected)
-  | .outOfFuel _ => throw (IO.userError s!"{label mode}: out at 14")
-  | .fault _ _ => throw (IO.userError s!"{label mode}: fault")
+  | .outOfFuel _ => throw (IO.userError s!"{runtimeLabel}: out at {complete}")
+  | .fault _ _ => throw (IO.userError s!"{runtimeLabel}: fault")
 private def exercise : IO Unit := do
   for mode in [Mode.lambdaOrdinary, .ordinaryLambda, .lambdaLambda] do
     verifySuccess mode
-    for choice in [false, true] do runExact mode choice
+    for choice in [false, true] do
+      runExact (label mode) 13 14 (core mode) choice (by
+        have evaluated := independently_executed_two_group_conditional_core mode choice
+          opaqueValue (.cellRef (.function .unit .word) 31) (.word seven) store
+        simpa [environment] using evaluated)
+  for choice in [false, true] do
+    let conditionalEvidence := independently_executed_two_group_conditional_core .lambdaOrdinary choice
+      opaqueValue (.cellRef (.function .unit .word) 31) (.word seven) store
+    runExact "immediate-conditional-control" 13 14 (core .lambdaOrdinary) choice (by simpa [environment] using conditionalEvidence)
+    runExact "one-group-conditional-control" 13 14 (core .lambdaOrdinary) choice (by simpa [environment] using conditionalEvidence)
+    runExact "direct-lambda-control" 10 11 directCore choice (directE choice)
+    runExact "finite-group-lambda-control" 10 11 directCore choice (directE choice)
   verifyFailures
   verifyPreservation
 end Tests.ADR0328ParsedTwoLevelGroupedConditionalConsumerIndependent
