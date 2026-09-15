@@ -1414,6 +1414,34 @@ groups, a generic or deeper grouped-conditional spine, grouped branch lambdas an
 broader expected propagation remain deferred alongside source closure, runtime-
 world safety, cost and backend guarantees. Parser and diagnostic proof work stays paused.
 
+The exact-three grouped-conditional path now has its additive selecting wrapper
+(ADR-0331). One nonrecursive source-only branch evaluates the unchanged ADR-0330
+classifier once: true returns the exact complete ADR-0330 `Option`, and false
+returns the exact complete unchanged ADR-0329 `Option`. Classifier-selected
+failure is final; no checker-success retry, fallback, source reconstruction or
+rewriting changes the source partition.
+
+Two declarative constructors retain the classifier equation and the complete
+selected child. Exact branch equations, executable/declarative success and absence,
+Core typing and nested provenance expose both layers without another classifier,
+path enum or recursion. Independent symbolic and registered parsed consumers freeze
+all three success partitions, ten selected failures, sixteen false shapes and eleven
+inherited failures. The parsed matrix proves complete ADR-0329 Option preservation
+for all twenty-seven false rows and fixes the principal, two-group, four-group and
+three-group direct-lambda AST spans. Eleven wrapper-bound runtime selections preserve
+the nonempty opaque/cell/host-function store for both Boolean choices: conditionals
+retain fuel 13/14 and direct or finite-group lambdas retain 10/11, together with
+soundness and determinism.
+
+ADR-0317 through ADR-0330, all existing classifiers, relations and checkers, the
+recursive checker and canonical source unions remain unchanged. ADR-0331 adds only
+reachability and fixed precedence. The next independent standalone leaf (ADR-0332)
+is exactly four whole-expression groups around the same immediate conditional;
+its later selecting wrapper remains separate. A generic or deeper grouped-conditional spine,
+grouped branch lambdas, broader nested/tuple/return/inferred-let/typed-body/multiple-
+argument/global expected propagation, source closure, runtime-world safety, cost and
+backend guarantees remain deferred. Parser and diagnostic proof work stays paused.
+
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
 evaluation equivalence for the original operands, with arbitrary left effects

@@ -2026,6 +2026,33 @@ groups, a generic/deeper grouped-conditional spine, grouped branch lambdas, broa
 expected propagation, source closures, runtime-world safety, costs and backend
 guarantees remain deferred. Parser and diagnostic proof work remains paused.
 
+The exact-three grouped-conditional adapter now joins the established local
+application paths through a nonrecursive source-only wrapper (ADR-0331). It
+evaluates the unchanged ADR-0330 classifier once: true returns the exact complete
+ADR-0330 `Option`, while false returns the exact complete unchanged ADR-0329
+`Option`. A classifier-true `none` is final, without retry, fallback, source
+rewriting or reconstruction.
+
+Its two-constructor relation retains the classifier equation and complete selected
+child. Exact branch equations, success/absence, Core typing and nested provenance
+expose both the outer wrapper and the selected complete child. Independent symbolic
+and registered parsed consumers cover all three success partitions, ten selected
+failures, sixteen classifier-false shapes and eleven inherited failures; the parsed
+matrix preserves all twenty-seven complete ADR-0329 Options and fixes the primary,
+two-group, four-group and direct-lambda AST spans by proof-producing equality.
+Eleven runtime selections retain the literal nonempty opaque/cell/host-function
+store for both Boolean choices: conditional controls exhaust fuel 13 and finish at
+14, while direct and finite-group lambda controls exhaust 10 and finish at 11.
+
+ADR-0317 through ADR-0330, every existing classifier, relation and checker, the
+recursive checker and canonical source unions remain unchanged. ADR-0331 adds only
+reachability and fixed precedence. The next standalone semantic frontier (ADR-0332)
+is exactly four whole-expression groups around the same immediate conditional;
+its selecting wrapper remains a later step. A generic/deeper grouped-conditional spine, grouped
+branch lambdas, broader expected propagation, source closures, runtime-world safety,
+costs and backend guarantees remain deferred. Parser and diagnostic proof work
+remains paused.
+
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
 fragment, typing inversion recovers the Bool result and both original Word
