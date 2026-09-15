@@ -373,6 +373,8 @@ import Solcore.Test.FrontendSixLevelGroupedConditionalExpectedLambdaArgumentAppl
 import Solcore.Test.FrontendParsedSixLevelGroupedConditionalExpectedLambdaArgumentApplication
 import Solcore.Test.FrontendLocalApplicationWithSixLevelGroupedConditionalExpectedLambdaProperties
 import Solcore.Test.FrontendParsedLocalApplicationWithSixLevelGroupedConditionalExpectedLambda
+import Solcore.Test.FrontendSevenLevelGroupedConditionalExpectedLambdaArgumentApplicationProperties
+import Solcore.Test.FrontendParsedSevenLevelGroupedConditionalExpectedLambdaArgumentApplication
 import Solcore.Test.FrontendRuntimeValueBoundaryProperties
 import Solcore.Test.FrontendRuntimeValueProperties
 import Solcore.Test.FrontendParsedRuntimeClosureValues
@@ -6196,6 +6198,7 @@ def run : IO Unit := do
     *> adr0335ParsedLocalApplicationWithFiveLevelGroupedConditionalExpectedLambdaTests
     *> adr0336ParsedSixLevelGroupedConditionalExpectedLambdaTests
     *> adr0337ParsedLocalApplicationWithSixLevelGroupedConditionalExpectedLambdaTests
+    *> adr0338ParsedSevenLevelGroupedConditionalExpectedLambdaTests
   frontendParsedRuntimeClosureValueTests
   frontendParsedSourceLambdaEffectTests
   frontendParsedSourceComputationBodyEffectTests
