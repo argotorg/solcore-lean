@@ -1,0 +1,91 @@
+# ADR-0342: Executable whole-program static-semantics spine
+
+## Status
+
+Accepted for staged implementation.
+
+## Context
+
+The canonical syntax retains declarations, imports, generic parameters,
+predicates, traits and impls, while the active frontend still consumes
+caller-supplied monomorphic name tables.  Extending local expression adapters
+does not establish a source-program type system.
+
+The next milestone prioritizes one executable path across the whole static
+semantics over theorem density.  Parser diagnostics and exhaustive edge-case
+proofs remain useful, but they must not block an initial working checker.
+
+## Decision
+
+Add an independent source type-system layer instead of extending `Core.Ty`.
+The layer provides:
+
+1. deterministic whole-program declaration identities and environments;
+2. source type-name resolution, including generic-parameter shadowing;
+3. rigid type parameters, flexible inference variables, substitutions,
+   schemes and instantiation;
+4. occurs-checking first-order unification;
+5. resolved trait predicates, impl rules, evidence and bounded tabled search;
+6. overload selection, explicit coercion search and literal defaulting; and
+7. an executable parser-to-program-checker entry point.
+
+The implementation order is:
+
+```text
+program environment
+  -> type-name resolution
+  -> source types and schemes
+  -> unification and impl-head matching
+  -> trait evidence and tabled resolution
+  -> overload/coercion/literal inference
+  -> whole-program checking
+```
+
+`Core.Ty` remains the closed monomorphic runtime language.  A later
+specialization boundary projects fully solved source types and expressions to
+Core.  This prevents source polymorphism from invalidating the existing Core
+metatheory.
+
+## Initial executable profile
+
+The first profile is deliberately small but end to end:
+
+- canonical parsed files and stable top-level declaration IDs;
+- builtin and user-defined type constructors;
+- rank-1 explicit polymorphism and ordinary let generalization where safe;
+- functions, calls, lambdas, tuples, conditionals and the canonical operators;
+- numeric literal constraints with a deterministic default;
+- trait and impl predicates with finite evidence-producing search; and
+- enough statement checking to validate ordinary function bodies.
+
+Success, rejection and inconclusive search are distinct results.  No failed
+selected overload or impl silently falls back after committing to an ambiguous
+candidate.
+
+## Deferred boundaries
+
+The first profile may reject rather than guess for:
+
+- cyclic aliases and polymorphic recursion;
+- higher-rank or higher-kinded polymorphism;
+- overlapping/default impl policy beyond explicit ambiguity;
+- recursive trait cycles that need coinductive reasoning;
+- multi-step or user-defined coercion cycles;
+- complete import re-export and hiding interactions;
+- nested contract namespaces and every member-overload rule; and
+- proof-level completeness for diagnostics and all negative edge cases.
+
+These are explicit extensions of the executable profile, not permission to
+return an unsound successful result.
+
+## Verification policy
+
+Every stage must compile and have executable positive and negative tests.
+Small correspondence lemmas are added where they stabilize an API, but broad
+soundness/completeness theorem families are postponed until the vertical path
+is usable.  `sorry`, `admit`, authored axioms, `unsafe` and `native_decide`
+remain forbidden.
+
+ADR-0340's standalone generic grouped-conditional work remains compatible but
+is not a prerequisite for this milestone.  Further grouped-depth frontend
+expansion is paused while this whole-program path is built.
