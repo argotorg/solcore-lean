@@ -105,9 +105,36 @@ structure ElaboratedFunction where
   coreTypeChecked : Core.infer? inputs.values core = some returnType
   deriving Repr
 
+/-- The source-local half of elaboration, before stable identities are lowered
+to Core positions and the resulting Core term is independently rechecked.
+`unconsumedRequirements` is retained at this boundary so call-aware consumers
+cannot accidentally bypass the existing evidence-execution gate. -/
+structure BodyDraft where
+  declaration : Resolved.DeclarationId
+  inputs : Resolved.Context
+  resolved : Resolved.Expr
+  returnType : Core.Ty
+  rootOccurrence : OccurrenceId
+  unconsumedRequirements : List RequirementId
+  deriving Repr
+
+/-- A call-aware expression consumer receives an expected-type-checking
+continuation for arguments in the current lexical scope.  The error type is
+parametric so whole-program linkers can retain their own exact failures while
+lifting ordinary source-to-Core failures through `lowerFunctionBodyWith`. -/
+abbrev CallElaborator (error : Type) :=
+  (lowerArgument : Core.Ty → ExpressionId →
+    Except error Resolved.Expr) →
+  Resolved.Context → ExpressionNode → ExpressionId →
+  List ExpressionId → CallResolution → Except error Resolved.Expr
+
 private def fail {alpha : Type} (site : ErrorSite) (reason : ErrorReason) :
     Except Error alpha :=
   .error { site, reason }
+
+private def failWith {error alpha : Type} (lift : Error → error)
+    (site : ErrorSite) (reason : ErrorReason) : Except error alpha :=
+  .error (lift { site, reason })
 
 private def nominalHead? : Ty → Option Resolved.DeclarationId
   | .constructor (.declaration id) => some id
@@ -193,84 +220,105 @@ private def productExpression : List Resolved.Expr → Resolved.Expr
   | [element] => element
   | element :: rest => .pair element (productExpression rest)
 
+private def ensureTypeWith {error : Type} (lift : Error → error)
+    (site : ErrorSite) (expected : Core.Ty) (type : Ty) :
+    Except error Unit := do
+  let actual ← (lowerType site type).mapError lift
+  if actual = expected then
+    pure ()
+  else
+    failWith lift site (.typedNodeTypeMismatch expected actual)
+
 /-- Lower one expression by following category-safe occurrence edges.  Fuel is
 derived from the finite node table and turns malformed cyclic tables into a
 located error. -/
-private def lowerExpressionFuel (fuel : Nat) (source : TypedSource)
-    (scope : List Resolved.LocalId) (id : ExpressionId) :
-    Except Error Resolved.Expr :=
+private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error) (fuel : Nat) (source : TypedSource)
+    (scope : Resolved.Context) (id : ExpressionId) :
+    Except error Resolved.Expr :=
   match fuel with
-  | 0 => fail (.occurrence id.occurrence) .expressionDepthLimit
+  | 0 => failWith lift (.occurrence id.occurrence) .expressionDepthLimit
   | fuel + 1 =>
-    match lookupExpression source id with
+    match (lookupExpression source id).mapError lift with
     | .error error => .error error
     | .ok node =>
         if !node.coercions.isEmpty then
-          fail (.occurrence id.occurrence) (.coercionsPresent node.coercions)
+          failWith lift (.occurrence id.occurrence)
+            (.coercionsPresent node.coercions)
         else if !node.requirements.isEmpty then
-          fail (.occurrence id.occurrence)
+          failWith lift (.occurrence id.occurrence)
             (.requirementsPresent node.requirements)
         else
           match lowerType (.occurrence id.occurrence) node.type with
-          | .error error => .error error
+          | .error error => .error (lift error)
           | .ok _ =>
             match node.form with
             | .literal literal =>
                 match interpretWordLiteral? ⟨node.span, literal⟩ with
                 | some word => pure (.word word)
                 | none =>
-                    fail (.occurrence id.occurrence) (.invalidWordLiteral literal)
+                    failWith lift (.occurrence id.occurrence)
+                      (.invalidWordLiteral literal)
             | .reference _ (.local binder) =>
-                if scope.contains binder then
+                if scope.ids.contains binder then
                   pure (.var binder)
                 else
-                  fail (.occurrence id.occurrence) (.unknownLocal binder)
+                  failWith lift (.occurrence id.occurrence)
+                    (.unknownLocal binder)
             | .reference _ (.builtinBoolean value) => pure (.bool value)
             | .reference _ (.declaration _) =>
-                fail (.occurrence id.occurrence)
+                failWith lift (.occurrence id.occurrence)
                   (.unsupportedExpression .declarationReference)
-            | .group inner => lowerExpressionFuel fuel source scope inner
+            | .group inner =>
+                lowerExpressionFuelWith lift onCall fuel source scope inner
             | .tuple elements => do
                 let resolved ← elements.mapM fun element =>
-                  lowerExpressionFuel fuel source scope element
+                  lowerExpressionFuelWith lift onCall fuel source scope element
                 pure (productExpression resolved)
             | .unary operator operand => do
-                let operand ← lowerExpressionFuel fuel source scope operand
+                let operand ←
+                  lowerExpressionFuelWith lift onCall fuel source scope operand
                 pure <| match operator with
                   | .logicalNot => .unary .boolNot operand
                   | .bitNot => .unary .wordNot operand
             | .binary left operator right => do
-                let left ← lowerExpressionFuel fuel source scope left
-                let right ← lowerExpressionFuel fuel source scope right
+                let left ←
+                  lowerExpressionFuelWith lift onCall fuel source scope left
+                let right ←
+                  lowerExpressionFuelWith lift onCall fuel source scope right
                 pure (directBinary operator left right)
             | .conditional condition thenBranch elseBranch => do
                 pure (.ifE
-                  (← lowerExpressionFuel fuel source scope condition)
-                  (← lowerExpressionFuel fuel source scope thenBranch)
-                  (← lowerExpressionFuel fuel source scope elseBranch))
-            | .call _ _ _ => fail (.occurrence id.occurrence)
-                (.unsupportedExpression .call)
-            | .lambda _ _ _ => fail (.occurrence id.occurrence)
+                  (← lowerExpressionFuelWith lift onCall fuel source scope
+                    condition)
+                  (← lowerExpressionFuelWith lift onCall fuel source scope
+                    thenBranch)
+                  (← lowerExpressionFuelWith lift onCall fuel source scope
+                    elseBranch))
+            | .call callee arguments resolution =>
+                onCall
+                  (fun expected argument => do
+                    let argumentNode ←
+                      (lookupExpression source argument).mapError lift
+                    ensureTypeWith lift (.occurrence argument.occurrence)
+                      expected argumentNode.type
+                    lowerExpressionFuelWith lift onCall fuel source scope
+                      argument)
+                  scope node callee arguments resolution
+            | .lambda _ _ _ => failWith lift (.occurrence id.occurrence)
                 (.unsupportedExpression .lambda)
-            | .proxy _ => fail (.occurrence id.occurrence)
+            | .proxy _ => failWith lift (.occurrence id.occurrence)
                 (.unsupportedExpression .proxy)
-            | .index _ _ => fail (.occurrence id.occurrence)
+            | .index _ _ => failWith lift (.occurrence id.occurrence)
                 (.unsupportedExpression .index)
 
-private def ensureType (site : ErrorSite) (expected : Core.Ty)
-    (type : Ty) : Except Error Unit := do
-  let actual ← lowerType site type
-  if actual = expected then
-    pure ()
-  else
-    fail site (.typedNodeTypeMismatch expected actual)
-
-private def lowerExpressionAs (fuel : Nat) (source : TypedSource)
+private def lowerExpressionAsWith {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error) (fuel : Nat) (source : TypedSource)
     (scope : Resolved.Context) (expected : Core.Ty) (id : ExpressionId) :
-    Except Error Resolved.Expr := do
-  let node ← lookupExpression source id
-  ensureType (.occurrence id.occurrence) expected node.type
-  lowerExpressionFuel fuel source scope.ids id
+    Except error Resolved.Expr := do
+  let node ← (lookupExpression source id).mapError lift
+  ensureTypeWith lift (.occurrence id.occurrence) expected node.type
+  lowerExpressionFuelWith lift onCall fuel source scope id
 
 private def statementRoots : List NodeId → Except Error (List StatementId)
   | [] => .ok []
@@ -286,116 +334,163 @@ private def finalStatement? : List StatementId → Option StatementId
 
 /-- Lower the tail-normal statement profile.  Each statement edge consumes
 fuel, while expression edges consume the remaining fuel independently. -/
-private def lowerStatementsFuel : Nat → TypedSource → Resolved.Context →
-    Core.Ty → ErrorSite → ErrorReason → List StatementId →
-    Except Error Resolved.Expr
+private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error) :
+    Nat → TypedSource → Resolved.Context → Core.Ty → ErrorSite →
+      ErrorReason → List StatementId → Except error Resolved.Expr
   | _, _, _, _, fallthroughSite, fallthroughReason, [] =>
-      fail fallthroughSite fallthroughReason
+      failWith lift fallthroughSite fallthroughReason
   | 0, _, _, _, _, _, id :: _ =>
-      fail (.occurrence id.occurrence) .statementDepthLimit
+      failWith lift (.occurrence id.occurrence) .statementDepthLimit
   | fuel + 1, source, scope, expected, fallthroughSite, fallthroughReason,
       id :: rest => do
-    let node ← lookupStatement source id
+    let node ← (lookupStatement source id).mapError lift
     let site := ErrorSite.occurrence id.occurrence
     match node.form with
     | .letDecl binder initializer => do
-        ensureType site .unit node.type
+        ensureTypeWith lift site .unit node.type
         if scope.ids.contains binder.id then
-          fail (.binder binder.id) (.duplicateLocal binder.id)
+          failWith lift (.binder binder.id) (.duplicateLocal binder.id)
         else if !binder.scheme.quantified.isEmpty then
-          fail (.binder binder.id)
+          failWith lift (.binder binder.id)
             (.polymorphicLocal binder.scheme.quantified)
         else
-          let binderType ← lowerType (.binder binder.id) binder.scheme.body
+          let binderType ← (lowerType (.binder binder.id)
+            binder.scheme.body).mapError lift
           let initializer ← match initializer with
-            | none => fail site .uninitializedLet
+            | none => failWith lift site .uninitializedLet
             | some initializer =>
-                lowerExpressionAs fuel source scope binderType initializer
-          let body ← lowerStatementsFuel fuel source
+                lowerExpressionAsWith lift onCall fuel source scope binderType
+                  initializer
+          let body ← lowerStatementsFuelWith lift onCall fuel source
             ((binder.id, binderType) :: scope) expected
             fallthroughSite fallthroughReason rest
           pure (.letE binder.id initializer body)
     | .returnStmt value => do
         if !rest.isEmpty then
-          fail site (.nonTailStatement .returnStmt)
+          failWith lift site (.nonTailStatement .returnStmt)
         else
-          ensureType site expected node.type
+          ensureTypeWith lift site expected node.type
           match value with
           | none =>
               if expected = .unit then
                 pure .unit
               else
-                fail site (.typedNodeTypeMismatch expected .unit)
-          | some value => lowerExpressionAs fuel source scope expected value
+                failWith lift site (.typedNodeTypeMismatch expected .unit)
+          | some value =>
+              lowerExpressionAsWith lift onCall fuel source scope expected value
     | .ifThen condition thenBody elseBody => do
         if !rest.isEmpty then
-          fail site (.nonTailStatement .ifThen)
+          failWith lift site (.nonTailStatement .ifThen)
         else
           match elseBody with
-          | none => fail site .missingElseBranch
+          | none => failWith lift site .missingElseBranch
           | some elseBody => do
-              ensureType site expected node.type
-              let condition ← lowerExpressionAs fuel source scope .bool condition
-              let thenBranch ← lowerStatementsFuel fuel source scope expected
-                site (.conditionalBranchFallthrough .thenBranch) thenBody
-              let elseBranch ← lowerStatementsFuel fuel source scope expected
-                site (.conditionalBranchFallthrough .elseBranch) elseBody
+              ensureTypeWith lift site expected node.type
+              let condition ← lowerExpressionAsWith lift onCall fuel source
+                scope .bool condition
+              let thenBranch ← lowerStatementsFuelWith lift onCall fuel source
+                scope expected site (.conditionalBranchFallthrough .thenBranch)
+                thenBody
+              let elseBranch ← lowerStatementsFuelWith lift onCall fuel source
+                scope expected site (.conditionalBranchFallthrough .elseBranch)
+                elseBody
               pure (.ifE condition thenBranch elseBranch)
     | .block body => do
         if !rest.isEmpty then
-          fail site (.nonTailStatement .block)
+          failWith lift site (.nonTailStatement .block)
         else
-          ensureType site expected node.type
-          lowerStatementsFuel fuel source scope expected site .blockFallthrough body
+          ensureTypeWith lift site expected node.type
+          lowerStatementsFuelWith lift onCall fuel source scope expected site
+            .blockFallthrough body
     | .expression _ _ =>
-        fail site (.unsupportedStatement .expression)
+        failWith lift site (.unsupportedStatement .expression)
 
-/-- Lower a checked monomorphic builtin function body to the existing resolved
-local fragment and then to an open, independently rechecked Core expression. -/
-def elaborateFunction (function : CheckedFunction) :
-    Except Error ElaboratedFunction := do
+/-- Preserve the original call-free profile as a reusable call policy. -/
+def rejectCalls : CallElaborator Error :=
+  fun _ _ node _ _ _ =>
+    fail (.occurrence node.id.occurrence) (.unsupportedExpression .call)
+
+/-- Lower a checked function body to the resolved local fragment while letting
+one caller-supplied policy handle otherwise staged call nodes.  All ordinary
+typed-node, lexical-scope, coercion and requirement checks remain owned by this
+module and are lifted into the consumer's error type. -/
+def lowerFunctionBodyWith {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error) (function : CheckedFunction) :
+    Except error BodyDraft := do
   let source := function.typedBody
   if source.owner != function.declaration then
-    fail (.declaration function.declaration)
+    failWith lift (.declaration function.declaration)
       (.ownerMismatch function.declaration source.owner)
   else
-    let roots ← statementRoots source.roots
+    let roots ← (statementRoots source.roots).mapError lift
     let rootOccurrence ← match roots with
       | [] =>
-          fail (.declaration function.declaration) .statementListFallthrough
+          failWith lift (.declaration function.declaration)
+            .statementListFallthrough
       | root :: _ => pure root.occurrence
-    let inputs ← lowerInputs source.inputs
-    let expected ← lowerType (.declaration function.declaration)
-      function.inferredBodyType
+    let inputs ← (lowerInputs source.inputs).mapError lift
+    let expected ← (lowerType (.declaration function.declaration)
+      function.inferredBodyType).mapError lift
     let fallthroughSite := match finalStatement? roots with
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
-    let resolved ← lowerStatementsFuel (source.nodes.length + 1) source inputs
-      expected fallthroughSite .statementListFallthrough roots
-    unless function.solvedRequirements.isEmpty do
+    let resolved ← lowerStatementsFuelWith lift onCall
+      (source.nodes.length + 1) source inputs expected fallthroughSite
+      .statementListFallthrough roots
+    pure {
+      declaration := function.declaration
+      inputs
+      resolved
+      returnType := expected
+      rootOccurrence
+      unconsumedRequirements := function.solvedRequirements.map fun requirement =>
+        requirement.id
+    }
+
+/-- Finish a body draft through the unchanged evidence gate, exact positional
+lowering and independent Core type reconstruction. -/
+def BodyDraft.finalize (draft : BodyDraft) : Except Error ElaboratedFunction := do
+    unless draft.unconsumedRequirements.isEmpty do
       throw {
-        site := .declaration function.declaration
+        site := .declaration draft.declaration
         reason := .unconsumedRequirements
-          (function.solvedRequirements.map (·.id))
+          draft.unconsumedRequirements
       }
-    match lowered : resolved.lower? inputs.ids with
-    | none => fail (.occurrence rootOccurrence) .resolvedLoweringFailed
+    match lowered : draft.resolved.lower? draft.inputs.ids with
+    | none => fail (.occurrence draft.rootOccurrence) .resolvedLoweringFailed
     | some core =>
-        match inferred : Core.infer? inputs.values core with
-        | none => fail (.occurrence rootOccurrence) .coreInferenceFailed
+        match inferred : Core.infer? draft.inputs.values core with
+        | none => fail (.occurrence draft.rootOccurrence) .coreInferenceFailed
         | some actual =>
-            if equal : actual = expected then
+            if equal : actual = draft.returnType then
               pure {
-                declaration := function.declaration
-                inputs
-                resolved
+                declaration := draft.declaration
+                inputs := draft.inputs
+                resolved := draft.resolved
                 core
-                returnType := expected
+                returnType := draft.returnType
                 resolvedLowered := lowered
                 coreTypeChecked := by simpa [equal] using inferred
               }
             else
-              fail (.occurrence rootOccurrence)
-                (.returnTypeMismatch expected actual)
+              fail (.occurrence draft.rootOccurrence)
+                (.returnTypeMismatch draft.returnType actual)
+
+/-- Lift finalization failures into a whole-program consumer's error type. -/
+def BodyDraft.finalizeWith {error : Type} (lift : Error → error)
+    (draft : BodyDraft) : Except error ElaboratedFunction :=
+  draft.finalize.mapError lift
+
+/-- Build the original call-rejecting body draft. -/
+def lowerFunctionBody (function : CheckedFunction) : Except Error BodyDraft :=
+  lowerFunctionBodyWith id rejectCalls function
+
+/-- Lower a checked monomorphic builtin function body to the existing resolved
+local fragment and then to an open, independently rechecked Core expression.
+This compatibility entry point keeps rejecting every call. -/
+def elaborateFunction (function : CheckedFunction) :
+    Except Error ElaboratedFunction := do
+  (← lowerFunctionBody function).finalize
 
 end Solcore.Frontend.SourceCoreElaboration
