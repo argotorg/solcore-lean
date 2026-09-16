@@ -1249,6 +1249,15 @@ import Solcore.Test.OracleV5WireProtocol
 import Solcore.Test.OracleV5WireRequest
 import Solcore.Test.OracleV5WorldMaterialization
 import Solcore.Test.OracleV5WorldMaterializationProperties
+import Solcore.Test.TypeSystemInference
+import Solcore.Test.ProgramEnvironmentAndTypeResolution
+import Solcore.Test.ProgramImports
+import Solcore.Test.ProgramLoading
+import Solcore.Test.TraitResolution
+import Solcore.Test.TypedTraitResolution
+import Solcore.Test.ProgramSignatures
+import Solcore.Test.SourceInference
+import Solcore.Test.ProgramChecking
 
 set_option autoImplicit false
 
@@ -6014,6 +6023,15 @@ def testCanonicalRawLexing : IO Unit := do
       (execution.actualUnits <= Solcore.Surface.Multi.lexBound raw.contentUtf8.size)
       s!"canonical source {reprStr raw.id} exceeded the lexer bound"
 
+def staticSemanticsSpineTests : IO Unit := do
+  testProgramEnvironmentAndTypeResolution
+  testProgramImports
+  testProgramLoading
+  TypedTraitResolution.testTypedTraitResolution
+  testProgramSignatures
+  SourceInference.testSourceInference
+  ProgramChecking.testProgramChecking
+
 def run : IO Unit := do
   coreLocalFragmentPairBoundaryTests
   resolvedPairBoundaryTests
@@ -6531,6 +6549,7 @@ def run : IO Unit := do
 end Tests
 
 def main : IO UInt32 := do
+  Tests.staticSemanticsSpineTests
   Tests.run
   IO.println "solcore-lean tests passed"
   return 0
