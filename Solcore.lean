@@ -12,6 +12,7 @@ import Solcore.Oracle.Stream
 import Solcore.Synthesis
 import Solcore.Syntax
 import Solcore.Resolved
+import Solcore.TypeSystem
 import Solcore.Frontend
 
 /-!

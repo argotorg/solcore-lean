@@ -401,6 +401,7 @@ import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
 import Solcore.Frontend.TypedLetReturnTreeRawOwnerProperties
 import Solcore.Frontend.LocalExpressionLookupProperties
 import Solcore.Frontend.TypedLetReturnTreeLookupProperties
+import Solcore.Frontend.ProgramChecking
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,
