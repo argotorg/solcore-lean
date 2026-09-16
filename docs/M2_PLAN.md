@@ -47,19 +47,25 @@ evidence-producing tabled class resolution.  The supported source expression
 and statement fragment performs minimum-cost overload selection after
 candidate-local numeric defaulting, source-arity-preserving per-argument
 coercion, bounded evidence-producing shortest-path `Coerce<From, To>` search,
-operator-trait checking and deterministic numeric-literal defaulting.  The
-whole-program entry point accumulates function failures while preserving
-no-solution versus inconclusive trait outcomes.
+operator-trait checking, proxy-value type resolution, mapping read-index
+inference and deterministic numeric-literal defaulting.  The whole-program
+entry point accumulates function failures while preserving no-solution versus
+inconclusive trait outcomes.  Proxy and mapping-index support is currently a
+type-checking boundary, not executable lowering.
 
 This is an executable-first milestone rather than a completed proof campaign.
-The next vertical work is to cover advanced expression and statement forms,
-represent executable conversion terms, and define specialization/elaboration
-into monomorphic Semantic Core.  Constructor and operator export selectors,
-cyclic aliases, polymorphic recursion, higher-rank/higher-kinded types, generic
-or symbolic coercion intermediates, coinductive trait/coercion cycles and a
-complete overlap policy remain explicit edge-case work.  Broad diagnostic and
-static-semantics soundness/completeness theorem families do not block these
-executable stages.
+The next vertical work is to introduce an occurrence-addressed typed/resolved
+source IR before broadening selection-bearing expressions and statements.  It
+must retain binder identities, chosen overloads, instantiated types, obligation
+identities and ordered coercion steps.  Constructor catalogs and construction,
+patterns/match, member selection and place-aware assignment can then extend that
+IR, followed by executable conversion terms and specialization/elaboration into
+monomorphic Semantic Core.  Constructor and operator export selectors, cyclic
+aliases, polymorphic recursion, higher-rank/higher-kinded types, generic or
+symbolic coercion intermediates, coinductive trait/coercion cycles and a complete
+overlap policy remain explicit edge-case work.  Broad diagnostic and static-
+semantics soundness/completeness theorem families do not block these executable
+stages.
 
 The first semantic slice, ADR-0154, introduces structured resolved declaration
 and local identities, exact local-table lookup, and a monomorphic local

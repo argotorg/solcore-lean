@@ -123,7 +123,18 @@ local numeric defaulting and coercion counts select only minimum-cost overloads.
 Expected-type mismatches prefer a direct coercion, then breadth-first search
 ground intermediate types to the configured bound; a unique shortest path
 retains ordered predicates and evidence, while equal shortest paths and depth
-exhaustion are explicit errors.  Constructor/operator export selectors,
-advanced expressions/statements, generic/symbolic coercion intermediates,
-executable conversion terms, and source specialization or lowering to
-`Core.Ty` are outside the completed profile.
+exhaustion are explicit errors.  Proxy values resolve their source type, and
+mapping read indexes unify a key/value pair while checking the key through the
+same expected-type/coercion boundary.  They remain type-checking-only forms.
+Constructor/operator export selectors, the remaining advanced expressions and
+statements, generic/symbolic coercion intermediates, executable conversion
+terms, and source specialization or lowering to `Core.Ty` are outside the
+completed profile.
+
+The next internal boundary is an occurrence-addressed typed/resolved source IR.
+The initial checker deliberately returns only final types and flat solved
+predicates/evidence; executable conversion and specialization additionally need
+stable local binder identities, chosen declarations and instantiations, and the
+coercion requirement attached to each exact source occurrence.  Selection-
+bearing constructor/member/match/assignment work follows that carrier rather
+than extending the information-losing result shape.

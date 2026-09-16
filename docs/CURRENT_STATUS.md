@@ -5592,7 +5592,12 @@ competitor outcomes.
 
 The first source-body checker handles locals, functions and overload sets,
 calls, lambdas, tuples, groups, conditionals, supported unary/binary operators,
-blocks, lets, returns, expression statements and statement conditionals.
+proxy values, mapping read indexes, blocks, lets, returns, expression statements
+and statement conditionals.  Proxy payloads reuse general source type-name
+resolution.  Mapping reads infer key/value types by unification, check the key
+with the ordinary coercion boundary, and pass the mapped value through the
+surrounding expected type.  These two forms are type-checking boundaries only;
+no executable read or proxy term is claimed yet.
 Decimal and hexadecimal literals use inference variables and default
 deterministically to Word when unconstrained.  Candidate-local defaulting gives
 Word zero cost, while trait-backed literal interpretations and introduced
@@ -5610,14 +5615,21 @@ resolved, and have all supported function bodies checked in declaration order.
 This is deliberately an executable-first profile with reduced proof density.
 Constructor/operator export selectors and the remaining module-reference edge
 cases are explicit errors; the initial no-import and canonical-path lookup
-fallbacks remain for compatibility.  Dot construction, proxies, indexing,
-general fields, arrays, assignment, match, loops, assembly and loop control
-reject as unsupported.  Higher-rank and higher-kinded polymorphism,
+fallbacks remain for compatibility.  Dot construction, general fields, arrays,
+assignment, match, loops, assembly and loop control reject as unsupported.
+Higher-rank and higher-kinded polymorphism,
 polymorphic recursion, coinductive trait cycles and overlap policy beyond
 explicit ambiguity are deferred.  Generic or symbolic intermediate coercion
 paths, coinductive coercion cycles and insertion of executable conversion terms
 are not yet connected, and no specialization, elaboration or lowering from
 solved source terms to Semantic Core is claimed.
+
+Before adding constructor/member selection, match, assignment or executable
+conversion, the next architecture boundary is an occurrence-addressed typed and
+resolved source IR.  The current checker retains a final type and a flat list of
+predicates/evidence, but not the selected overload, local binder identity,
+coercion insertion site or ordered steps at each expression occurrence.  Those
+facts must become explicit before specialization can consume them.
 
 ## What is not yet claimed
 
