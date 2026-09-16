@@ -301,23 +301,32 @@ def isNumericVariable (state : State) (type : Ty) : Bool :=
   state.numericVariables.any fun origin =>
     decide (state.resolve (.variable origin.metavariable) = state.resolve type)
 
-def binaryTraitName : Syntax.BinaryOp → String
-  | .multiply => "Mul"
-  | .divide => "Div"
-  | .modulo => "Mod"
-  | .add => "Add"
-  | .subtract => "Sub"
-  | .bitAnd => "BitAnd"
-  | .bitXor => "BitXor"
-  | .bitOr => "BitOr"
-  | .less => "Less"
-  | .greater => "Greater"
-  | .lessEqual => "LessEqual"
-  | .greaterEqual => "GreaterEqual"
-  | .equal => "Eq"
-  | .notEqual => "Eq"
-  | .logicalAnd => "And"
-  | .logicalOr => "Or"
+/-- The target language deliberately mixes trait-backed operators with ordinary
+named functions from its standard prelude.  Keeping that distinction in one
+table prevents inference and executable linking from inventing incompatible
+operator traits independently. -/
+inductive BinaryOperatorDispatch where
+  | traitMethod (traitName methodName : String)
+  | function (name : String)
+  deriving Repr, DecidableEq
+
+def binaryOperatorDispatch : Syntax.BinaryOp → BinaryOperatorDispatch
+  | .multiply => .traitMethod "Mul" "mul"
+  | .divide => .traitMethod "Div" "div"
+  | .modulo => .traitMethod "Mod" "mod"
+  | .add => .traitMethod "Add" "add"
+  | .subtract => .traitMethod "Sub" "sub"
+  | .bitAnd => .traitMethod "BitAnd" "band"
+  | .bitXor => .traitMethod "BitXor" "bxor"
+  | .bitOr => .traitMethod "BitOr" "bor"
+  | .less => .function "lt"
+  | .greater => .traitMethod "Ord" "gt"
+  | .lessEqual => .function "le"
+  | .greaterEqual => .function "ge"
+  | .equal => .traitMethod "Eq" "eq"
+  | .notEqual => .function "ne"
+  | .logicalAnd => .function "and"
+  | .logicalOr => .function "or"
 
 def binaryResultIsBool : Syntax.BinaryOp → Bool
   | .less | .greater | .lessEqual | .greaterEqual
@@ -355,17 +364,20 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
       state
     }
   else
-    match ← operatorTrait? context (binaryTraitName operator) with
-    | some trait =>
-        let (requirement, state) := state.addRequirementWithId {
-          trait, subject := operand, arguments := []
-        }
-        pure {
-          type := if binaryResultIsBool operator then .bool else operand
-          requirements := [requirement]
-          state
-        }
-    | none => throw (.operatorNotSupported (binaryTraitName operator) operand)
+    match binaryOperatorDispatch operator with
+    | .function name => throw (.unknownVariable name)
+    | .traitMethod traitName _ =>
+        match ← operatorTrait? context traitName with
+        | some trait =>
+            let (requirement, state) := state.addRequirementWithId {
+              trait, subject := operand, arguments := []
+            }
+            pure {
+              type := if binaryResultIsBool operator then .bool else operand
+              requirements := [requirement]
+              state
+            }
+        | none => throw (.operatorNotSupported traitName operand)
 
 def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
     (operandType : Ty) (state : State) :

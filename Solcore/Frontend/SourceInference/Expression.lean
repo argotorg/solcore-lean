@@ -102,10 +102,12 @@ def recordExpressionWithExpected (context : Context) (source : Syntax.Expr)
     (requirements ++ coercionRequirements fitted.coercions)
     fitted.coercions fitted.state
 
-def recordSelectedCall (source callee : Syntax.Expr) (name : String)
-    (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
+def recordSelectedCallResult (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) :
     InferredExpression × State :=
-  let state := attachExpressionCoercions attempt.state attempt.argumentCoercions
+  let state := attachExpressionCoercions state attempt.argumentCoercions
   let state := attachNumericRequirements state attempt.numericRequirements
   let (calleeId, state) := state.allocateExpressionId
   let calleeExpression : InferredExpression := {
@@ -114,12 +116,19 @@ def recordSelectedCall (source callee : Syntax.Expr) (name : String)
   }
   let (_, state) := recordExpression callee calleeExpression
     (.reference name (.declaration attempt.instantiation)) [] [] state
-  recordExpression source attempt.result
+  recordExpression source result
     (.call calleeId (arguments.map (·.id))
       (.declaration attempt.instantiation))
     (coercionRequirements attempt.callCoercions ++
-      attempt.signatureRequirements)
-    attempt.callCoercions state
+      attempt.signatureRequirements ++
+      coercionRequirements trailingCoercions)
+    (attempt.callCoercions ++ trailingCoercions) state
+
+def recordSelectedCall (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
+    InferredExpression × State :=
+  recordSelectedCallResult source callee name arguments attempt
+    attempt.result [] attempt.state
 
 def recordIndirectCall (source : Syntax.Expr) (callee : InferredExpression)
     (arguments : List InferredExpression) (result : IndirectApplicationResult) :
@@ -213,13 +222,37 @@ mutual
             (.unary operator.value operand.id) inferred.requirements expected
             inferred.state
       | .binary left operator right => do
+          let numericStart := state.numericVariables.length
           let (left, state) ← inferExprFuel fuel context left none state
           let (right, state) ← inferExprFuel fuel context right none state
-          let inferred ← inferBinaryOperator context operator.value
-            left.type right.type state
-          recordExpressionWithExpected context expression id inferred.type
-            (.binary left.id operator.value right.id) inferred.requirements
-            expected inferred.state
+          let numericVariables := state.numericVariables.drop numericStart
+          match binaryOperatorDispatch operator.value with
+          | .function name =>
+              match ← functionsNamed context name with
+              | [] =>
+                  let inferred ← inferBinaryOperator context operator.value
+                    left.type right.type state
+                  recordExpressionWithExpected context expression id inferred.type
+                    (.binary left.id operator.value right.id)
+                    inferred.requirements expected inferred.state
+              | candidates =>
+                  let attempt ← selectFunctionCandidateFrom context name
+                    candidates [left, right] numericVariables id (some .bool) state
+                  let fitted ← withExpected context attempt.state
+                    attempt.result expected
+                  let callee : Syntax.Expr := {
+                    span := operator.span
+                    value := .identifier { span := operator.span, value := name }
+                  }
+                  pure <| recordSelectedCallResult expression callee name
+                    [left, right] attempt fitted.expression fitted.coercions
+                    fitted.state
+          | .traitMethod _ _ =>
+              let inferred ← inferBinaryOperator context operator.value
+                left.type right.type state
+              recordExpressionWithExpected context expression id inferred.type
+                (.binary left.id operator.value right.id) inferred.requirements
+                expected inferred.state
       | .conditional condition _ thenBranch _ elseBranch => do
           let (condition, state) ← inferExprFuel fuel context condition
             (some .bool) state

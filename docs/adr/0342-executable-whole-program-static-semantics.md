@@ -15,8 +15,10 @@ requirement/evidence validation and forwards closed implementation witnesses
 through nested constrained calls.  Trait and implementation method declarations
 are retained in checked catalogs with exact signature conformance.  Narrow
 runtime-evidence slices execute the strict arithmetic/bitwise trait methods and
-`Eq<T>.eq` by selecting, checking and capture-free inlining the closed
-implementation method body; source `!=` negates the selected `eq` result.  A
+`Eq<T>.eq` and `Ord<T>.gt` by selecting, checking and capture-free inlining the
+closed implementation method body.  Target-compatible `!=`, `<`, `<=`, `>=`,
+`&&` and `||` select ordinary `ne`, `lt`, `le`, `ge`, `and` and `or` functions
+and reuse the direct-call specialization/linking path.  A
 conversion slice validates each closed coercion edge by exact requirement
 identity and executes the selected `Coerce<From, To>.coerce` method body for
 direct-call arguments, forwarded generic evidence and call results.
@@ -97,9 +99,9 @@ The first profile may reject rather than guess for:
   `Coerce<From, To>.coerce` profile;
 - budget-exhausted specialization outcomes and every direct-call cycle;
 - seed roots with unresolved assumptions, runtime evidence outside the narrow
-  strict arithmetic/bitwise, `Eq<T>` and `Coerce<From, To>` profiles, indirect
-  calls, named operator-function dispatch and general impl-method execution at
-  the Core-linking boundary;
+  strict arithmetic/bitwise, `Eq<T>`, premise-free `Ord<T>` and
+  `Coerce<From, To>` profiles, indirect calls and general impl-method execution
+  at the Core-linking boundary;
 - constructor/operator export selectors and the remaining module-reference
   edge cases;
 - nested contract namespaces and every member-overload rule; and
@@ -268,7 +270,8 @@ witness for the same goal.  The validated call requirements are then consumed
 statically and never become Core values or impl-method calls.
 
 The runtime binary trait-evidence consumer is connected for strict arithmetic,
-bitwise operators and equality.  A required occurrence must carry exactly one
+bitwise operators, equality and greater-than ordering.  A required occurrence
+must carry exactly one
 solved operator requirement whose closed implementation evidence agrees with
 the typed occurrence.  The selected declaration must be a one-parameter trait
 with exactly one non-generic method and one monomorphic, premise-free,
@@ -276,10 +279,21 @@ with exactly one non-generic method and one monomorphic, premise-free,
 checked against the instantiated two-operand signature and capture-free inlined
 after the operands have been bound left to right.  `Add.add`, `Sub.sub`,
 `Mul.mul`, `Div.div`, `Mod.mod`, `BitAnd.band`, `BitXor.bxor` and `BitOr.bor`
-must return the operand type; `Eq.eq` must return Bool, and source `!=` negates
-that selected method result.  The implementation body, not a builtin operator
+must return the operand type; `Eq.eq` and `Ord.gt` must return Bool.  The
+implementation body, not a builtin operator
 opcode, is authoritative; each regression returns a distinguishable non-builtin
 result.
+
+The source checker follows the target's mixed binary dispatch table.  `!=`,
+`<`, `<=`, `>=`, `&&` and `||` resolve visible ordinary functions named `ne`,
+`lt`, `le`, `ge`, `and` and `or`.  The operator occurrence is recorded as an
+ordinary direct call with a synthetic callee reference at the operator span,
+so overload selection, signature predicates, argument and result coercions,
+specialization edges and evidence forwarding use the existing call path.  The
+selected result must fit Bool before it is fitted to the surrounding expected
+type.  A visible but inapplicable candidate is an overload error; only complete
+absence of the operator function enables the compatibility fallback to direct
+Word/Bool builtins for source fixtures without a loaded standard prelude.
 
 The first runtime coercion consumer is connected by the same rule: method
 bodies, not endpoint types, define behavior.  One step must identify exactly
@@ -314,9 +328,8 @@ placements, runtime input mismatches, malformed plans and each principal
 staged boundary; small checked laws retain the runtime input gate and budget
 result.
 
-The next internal boundary is expansion from these runtime trait-evidence
-profiles to target-compatible named operator-function dispatch for ordering and
-logical operators, followed by broader implementation shapes and method bodies
+The next internal boundary is expansion to broader implementation shapes,
+including premise-bearing standard `Ord`, and method bodies
 that themselves contain evidence-bearing operations.  Recursive calls require
 a separate named or global recursive Core representation rather than cyclic
 inlining.

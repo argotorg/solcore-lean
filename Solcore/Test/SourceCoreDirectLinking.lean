@@ -30,7 +30,7 @@ private def workspace : Workspace.RawWorkspace := {
       "}",
       "impl Eq<Word> {",
       "  function eq(left: Word, right: Word) returns (Bool) {",
-      "    return left != right;",
+      "    return !(left == right);",
       "  }",
       "}",
       "impl Add<Word> {",
@@ -43,6 +43,9 @@ private def workspace : Workspace.RawWorkspace := {
       "  function coerce(value: Bool) returns (Word) {",
       "    return value ? 41 : 7;",
       "  }",
+      "}",
+      "function ne<T>(left: T, right: T) returns (Bool) where T: Eq {",
+      "  return !(left == right);",
       "}",
       "function identity<T>(value: T) returns (T) { return value; }",
       "function wrap<U>(value: U) returns (U) { return identity(value); }",
@@ -117,6 +120,15 @@ private def signatureNamed (program : CheckedProgram) (name : String) :
   | signatures => throw (IO.userError
       s!"expected one signature named `{name}`, found {signatures.length}")
 
+private def signatureNamedWithGenericArity (program : CheckedProgram)
+    (name : String) (genericArity : Nat) : IO ProgramFunctionSignature := do
+  match program.signatures.functions.filter fun signature =>
+      signature.name == name &&
+        signature.scheme.parameters.length == genericArity with
+  | [signature] => pure signature
+  | signatures => throw (IO.userError
+      s!"expected one `{name}` signature with {genericArity} generic parameters, found {signatures.length}")
+
 private def functionFor (program : CheckedProgram)
     (signature : ProgramFunctionSignature) : IO CheckedFunction := do
   match program.functions.filter fun function =>
@@ -140,6 +152,14 @@ private def firstDirectCallNode? : List Node → Option ExpressionNode
       | .call _ _ (.declaration _) => some node
       | _ => firstDirectCallNode? rest
   | .statement _ :: rest => firstDirectCallNode? rest
+
+private def firstBinaryNode? : List Node → Option ExpressionNode
+  | [] => none
+  | .expression node :: rest =>
+      match node.form with
+      | .binary _ _ _ => some node
+      | _ => firstBinaryNode? rest
+  | .statement _ :: rest => firstBinaryNode? rest
 
 private def firstCoercedNode? : List Node → Option ExpressionNode
   | [] => none
@@ -465,7 +485,7 @@ private def testRuntimeEvidenceBoundaries (program : CheckedProgram) : IO Unit :
 
   let inequalityConstrained ← signatureNamed program "inequalityConstrained"
   let inequalityOutcome ← runOrThrow "inequality evidence" program
-    [monomorphicRequest inequalityConstrained] 2
+    [monomorphicRequest inequalityConstrained] 3
   let inequalityLinked ←
     linkOrThrow "inequality evidence" program inequalityOutcome
   let inequalityKey : SourceSpecialization.SpecializationKey := {
@@ -691,6 +711,510 @@ private def testStrictRuntimeBinaryEvidence : IO Unit := do
         some (.done expected [])))
       s!"{name} did not execute its selected strict binary method body"
 
+private structure NamedOperatorCase where
+  entryName : String
+  callee : ProgramFunctionSignature
+  operandType : Ty
+  inputs : List Core.Value
+  expected : Bool
+  requirementCount : Nat
+
+private def testNamedOperatorCase (program : CheckedProgram)
+    (case : NamedOperatorCase) : IO Unit := do
+  let entry ← signatureNamed program case.entryName
+  let function ← functionFor program entry
+  let call ← match firstDirectCallNode? function.typedBody.nodes with
+    | some call => pure call
+    | none => throw (IO.userError
+        s!"{case.entryName}: named operator did not become a direct call")
+  let (calleeId, arguments, instantiation) ← match call.form with
+    | .call callee arguments (.declaration instantiation) =>
+        pure (callee, arguments, instantiation)
+    | form => throw (IO.userError
+        s!"{case.entryName}: selected call changed form: {reprStr form}")
+  let calleeNode ← match function.typedBody.lookupExpression? calleeId with
+    | some callee => pure callee
+    | none => throw (IO.userError
+        s!"{case.entryName}: synthetic callee node was absent")
+  let calleeMatches := match calleeNode.form with
+    | .reference name (.declaration reference) =>
+        decide (name = case.callee.name ∧ reference = instantiation)
+    | _ => false
+  let argumentBinders := arguments.filterMap fun argument =>
+    match function.typedBody.lookupExpression? argument with
+    | some { form := .reference _ (.local binder), .. } => some binder
+    | _ => none
+  let solved := call.requirements.filterMap fun requirement =>
+    function.solvedRequirements.find? fun row => row.id == requirement
+  let expectedType := Ty.function
+    (Ty.product case.operandType case.operandType) .bool
+  let expectedTypeArguments :=
+    if case.callee.scheme.parameters.isEmpty then [] else [case.operandType]
+  assertTrue (calleeMatches && decide (
+      call.type = .bool ∧ calleeNode.type = instantiation.type ∧
+      instantiation.declaration = case.callee.id ∧
+      instantiation.type = expectedType ∧
+      instantiation.parameterSubstitution.map (fun entry => entry.2) =
+        expectedTypeArguments ∧
+      arguments.length = 2 ∧
+      argumentBinders = function.typedBody.inputs.map (fun binder => binder.id) ∧
+      call.requirements.length = case.requirementCount ∧
+      solved.length = case.requirementCount ∧
+      solved.map (fun row => row.predicate) = instantiation.predicates) &&
+      solved.all fun row => row.evidence matches .implementation _)
+    s!"{case.entryName}: named operator lost its selected-call typed metadata"
+
+  let outcome ← runOrThrow s!"{case.entryName} named operator" program
+    [monomorphicRequest entry] 2
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"{case.entryName}: expected a complete plan, found {reprStr other}")
+  let specializedCallee := plan.specializations.find? fun specialized =>
+    specialized.declaration == case.callee.id
+  assertTrue (decide (
+      plan.specializations.map (fun specialized => specialized.declaration) =
+        [entry.id, case.callee.id] ∧
+      plan.callEdges.map (fun edge =>
+        (edge.caller.declaration, edge.occurrence, edge.callee.declaration)) =
+        [(entry.id, call.id, case.callee.id)]) &&
+      specializedCallee.any fun specialized =>
+        decide (specialized.key.arguments = expectedTypeArguments ∧
+          specialized.assumptions = instantiation.predicates))
+    s!"{case.entryName}: named operator did not specialize through its selected edge"
+  let linked ← linkOrThrow s!"{case.entryName} named operator" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        s!"{case.entryName}: linked root was absent")
+  assertTrue (decide (linkedEntry.run? case.inputs 2048 =
+      some (.done (.bool case.expected) [])))
+    s!"{case.entryName}: selected named function body was not authoritative"
+
+private def testNamedOperatorFunctionsAndOrd : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Ord<T> {",
+    "  function gt(left: T, right: T) returns (Bool);",
+    "}",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return true; }",
+    "}",
+    "impl Ord<Word> {",
+    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "}",
+    "function ne<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "  return true;",
+    "}",
+    "function lt<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "  return false;",
+    "}",
+    "function lt(left: Word, right: Word) returns (Word) { return 77; }",
+    "function le<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "  return true;",
+    "}",
+    "function ge<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "  return true;",
+    "}",
+    "function and(left: Bool, right: Bool) returns (Bool) { return false; }",
+    "function or(left: Bool, right: Bool) returns (Bool) { return false; }",
+    "function gt(left: Word, right: Word) returns (Bool) { return false; }",
+    "function notEqualEntry(left: Word, right: Word) returns (Bool) {",
+    "  return left != right;",
+    "}",
+    "function lessEntry(left: Word, right: Word) returns (Bool) {",
+    "  let selected = left < right;",
+    "  return selected;",
+    "}",
+    "function lessEqualEntry(left: Word, right: Word) returns (Bool) {",
+    "  return left <= right;",
+    "}",
+    "function greaterEqualEntry(left: Word, right: Word) returns (Bool) {",
+    "  return left >= right;",
+    "}",
+    "function logicalAndEntry(left: Bool, right: Bool) returns (Bool) {",
+    "  return left && right;",
+    "}",
+    "function logicalOrEntry(left: Bool, right: Bool) returns (Bool) {",
+    "  return left || right;",
+    "}",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "  return left > right;",
+    "}",
+    "function greaterEntry(left: Word, right: Word) returns (Bool) {",
+    "  return greaterWithEvidence(left, right);",
+    "}"
+  ])
+  let ne ← signatureNamedWithGenericArity program "ne" 1
+  let lt ← signatureNamedWithGenericArity program "lt" 1
+  let le ← signatureNamedWithGenericArity program "le" 1
+  let ge ← signatureNamedWithGenericArity program "ge" 1
+  let and ← signatureNamedWithGenericArity program "and" 0
+  let or ← signatureNamedWithGenericArity program "or" 0
+  let cases : List NamedOperatorCase := [
+    {
+      entryName := "notEqualEntry"
+      callee := ne
+      operandType := .word
+      inputs := [.word (word 7), .word (word 7)]
+      expected := true
+      requirementCount := 1
+    },
+    {
+      entryName := "lessEntry"
+      callee := lt
+      operandType := .word
+      inputs := [.word (word 1), .word (word 2)]
+      expected := false
+      requirementCount := 1
+    },
+    {
+      entryName := "lessEqualEntry"
+      callee := le
+      operandType := .word
+      inputs := [.word (word 2), .word (word 1)]
+      expected := true
+      requirementCount := 1
+    },
+    {
+      entryName := "greaterEqualEntry"
+      callee := ge
+      operandType := .word
+      inputs := [.word (word 1), .word (word 2)]
+      expected := true
+      requirementCount := 1
+    },
+    {
+      entryName := "logicalAndEntry"
+      callee := and
+      operandType := .bool
+      inputs := [.bool true, .bool true]
+      expected := false
+      requirementCount := 0
+    },
+    {
+      entryName := "logicalOrEntry"
+      callee := or
+      operandType := .bool
+      inputs := [.bool false, .bool true]
+      expected := false
+      requirementCount := 0
+    }
+  ]
+  for case in cases do
+    testNamedOperatorCase program case
+
+  let ord ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Ord" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"Ord dispatch: expected one trait, found {traits.length}")
+  let greater ← signatureNamed program "greaterWithEvidence"
+  let greaterEntry ← signatureNamed program "greaterEntry"
+  let namedGt ← signatureNamedWithGenericArity program "gt" 0
+  let greaterFunction ← functionFor program greater
+  let greaterBinary ← match firstBinaryNode? greaterFunction.typedBody.nodes with
+    | some node => pure node
+    | none => throw (IO.userError
+        "Ord dispatch: generic greater body lost its binary occurrence")
+  let requirement ← match greaterBinary.requirements with
+    | [requirement] => pure requirement
+    | requirements => throw (IO.userError
+        s!"Ord dispatch: expected one binary requirement, found {requirements.length}")
+  let solved ← match greaterFunction.solvedRequirements.filter fun row =>
+      row.id == requirement with
+    | [solved] => pure solved
+    | rows => throw (IO.userError
+        s!"Ord dispatch: expected one solved row, found {rows.length}")
+  assertTrue ((match greaterBinary.form with
+      | .binary _ .greater _ => true
+      | _ => false) && decide (
+      greaterBinary.type = .bool ∧ solved.predicate.trait = ord.id ∧
+      solved.predicate.arguments = []) &&
+      (solved.evidence matches .assumption _))
+    "source > did not retain its Ord.gt requirement and generic assumption"
+
+  let greaterOutcome ← runOrThrow "Ord.gt dispatch" program
+    [monomorphicRequest greaterEntry] 2
+  let greaterPlan ← match greaterOutcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"Ord dispatch: expected a complete plan, found {reprStr other}")
+  let specializedGreater := greaterPlan.specializations.find? fun specialized =>
+    specialized.declaration == greater.id
+  assertTrue (decide (
+      greaterPlan.specializations.map (fun specialized => specialized.declaration) =
+        [greaterEntry.id, greater.id] ∧
+      greaterPlan.callEdges.map (fun edge => edge.callee.declaration) =
+        [greater.id]) &&
+      !greaterPlan.specializations.any (fun specialized =>
+        specialized.declaration == namedGt.id) &&
+      specializedGreater.any fun specialized =>
+        decide (specialized.key.arguments = [.word] ∧
+          specialized.assumptions.length = 1 ∧
+          specialized.assumptions.all fun predicate =>
+            predicate.trait = ord.id ∧ predicate.subject = .word))
+    "source > selected the named gt decoy or lost its Ord specialization"
+  let greaterLinked ← linkOrThrow "Ord.gt dispatch" program greaterOutcome
+  let greaterKey : SourceSpecialization.SpecializationKey := {
+    declaration := greaterEntry.id
+    arguments := []
+  }
+  let linkedGreater ← match greaterLinked.findEntry? greaterKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "Ord dispatch: linked root was absent")
+  assertTrue (decide (linkedGreater.run?
+      [.word (word 1), .word (word 2)] 2048 =
+        some (.done (.bool true) [])))
+    "source > did not execute the selected nonstandard Ord.gt method body"
+
+private def testNamedOperatorMismatchDoesNotFallback : IO Unit := do
+  let raw : Workspace.RawWorkspace := {
+    entry := "main.solc"
+    mainSources := [{
+      path := "main.solc"
+      content := String.intercalate "\n" [
+        "function and(left: Word, right: Word) returns (Bool) { return false; }",
+        "function entry(left: Bool, right: Bool) returns (Bool) {",
+        "  return left && right;",
+        "}"
+      ]
+    }]
+    externalLibraries := []
+  }
+  match checkProgram raw with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .inference { error := .noMatchingOverload "and" candidates, .. } =>
+            candidates.length == 1
+        | _ => false)
+        "an inapplicable visible and overload lost its selection diagnostic"
+  | .ok _ => throw (IO.userError
+      "an inapplicable visible and overload silently used builtin fallback")
+
+private def testHeterogeneousNamedOperator : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "function lt(left: Word, right: Bool) returns (Bool) { return right; }",
+    "function entry(left: Word, right: Bool) returns (Bool) {",
+    "  return left < right;",
+    "}"
+  ])
+  let lt ← signatureNamed program "lt"
+  let entry ← signatureNamed program "entry"
+  let function ← functionFor program entry
+  let call ← match firstDirectCallNode? function.typedBody.nodes with
+    | some call => pure call
+    | none => throw (IO.userError
+        "heterogeneous <: named operator did not become a direct call")
+  let selected := match call.form with
+    | .call _ arguments (.declaration instantiation) =>
+        decide (arguments.length = 2 ∧ instantiation.declaration = lt.id ∧
+          instantiation.type = .function (.product .word .bool) .bool)
+    | _ => false
+  assertTrue (selected && call.requirements.isEmpty && call.coercions.isEmpty)
+    "heterogeneous <: operands were unified before ordinary overload selection"
+  let outcome ← runOrThrow "heterogeneous named operator" program
+    [monomorphicRequest entry] 2
+  let linked ← linkOrThrow "heterogeneous named operator" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "heterogeneous named operator: linked root was absent")
+  assertTrue (decide (
+      linkedEntry.run? [.word (word 7), .bool true] 1024 =
+        some (.done (.bool true) []) ∧
+      linkedEntry.run? [.word (word 7), .bool false] 1024 =
+        some (.done (.bool false) [])))
+    "heterogeneous named operator did not execute the selected function"
+
+private def testNamedOperatorResultCoercionChain : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Ord<T> {",
+    "  function gt(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Coerce<From, To> {",
+    "  function coerce(value: From) returns (To);",
+    "}",
+    "impl Ord<Word> {",
+    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "}",
+    "impl Coerce<Word, Bool> {",
+    "  function coerce(value: Word) returns (Bool) { return false; }",
+    "}",
+    "impl Coerce<Bool, Word> {",
+    "  function coerce(value: Bool) returns (Word) {",
+    "    return value ? 91 : 92;",
+    "  }",
+    "}",
+    "function lt<T>(left: T, right: T) returns (Word) where T: Ord {",
+    "  return 5;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Word) {",
+    "  return left < right;",
+    "}"
+  ])
+  let lt ← signatureNamed program "lt"
+  let entry ← signatureNamed program "entry"
+  let function ← functionFor program entry
+  let call ← match firstDirectCallNode? function.typedBody.nodes with
+    | some call => pure call
+    | none => throw (IO.userError
+        "named operator coercion chain: direct call was absent")
+  let instantiation ← match call.form with
+    | .call _ _ (.declaration instantiation) => pure instantiation
+    | form => throw (IO.userError
+        s!"named operator coercion chain: unexpected form {reprStr form}")
+  let solved := call.requirements.filterMap fun requirement =>
+    function.solvedRequirements.find? fun row => row.id == requirement
+  let coercionRequirements := call.coercions.map (fun step => step.requirement)
+  let endpoints := call.coercions.map fun step => (step.source, step.target)
+  let signatureIsMiddle := match solved, instantiation.predicates with
+    | [_, middle, _], [expected] => middle.predicate == expected
+    | _, _ => false
+  assertTrue (signatureIsMiddle && decide (
+      call.type = .word ∧ instantiation.declaration = lt.id ∧
+      instantiation.type = .function (.product .word .word) .word ∧
+      call.requirements.map (fun requirement => requirement.index) = [0, 1, 2] ∧
+      coercionRequirements.map (fun requirement => requirement.index) = [0, 2] ∧
+      endpoints = [(.word, .bool), (.bool, .word)]) &&
+      solved.all fun row => row.evidence matches .implementation _)
+    "named operator lost result/signature/outer coercion requirement order"
+  let outcome ← runOrThrow "named operator coercion chain" program
+    [monomorphicRequest entry] 2
+  let linked ← linkOrThrow "named operator coercion chain" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "named operator coercion chain: linked root was absent")
+  assertTrue (decide (linkedEntry.run?
+      [.word (word 1), .word (word 2)] 4096 =
+        some (.done (.word (word 92)) [])))
+    "named operator did not execute both result coercion method bodies"
+
+private structure BuiltinOperatorCase where
+  entryName : String
+  operator : Syntax.BinaryOp
+  inputs : List Core.Value
+  expected : Bool
+
+private def testBuiltinOperatorFallback : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "function builtinNotEqual(left: Word, right: Word) returns (Bool) {",
+    "  return left != right;",
+    "}",
+    "function builtinLess(left: Word, right: Word) returns (Bool) {",
+    "  return left < right;",
+    "}",
+    "function builtinLessEqual(left: Word, right: Word) returns (Bool) {",
+    "  return left <= right;",
+    "}",
+    "function builtinGreaterEqual(left: Word, right: Word) returns (Bool) {",
+    "  return left >= right;",
+    "}",
+    "function builtinAnd(left: Bool, right: Bool) returns (Bool) {",
+    "  return left && right;",
+    "}",
+    "function builtinOr(left: Bool, right: Bool) returns (Bool) {",
+    "  return left || right;",
+    "}",
+    "function builtinGreater(left: Word, right: Word) returns (Bool) {",
+    "  return left > right;",
+    "}"
+  ])
+  let cases : List BuiltinOperatorCase := [
+    {
+      entryName := "builtinNotEqual"
+      operator := .notEqual
+      inputs := [.word (word 7), .word (word 7)]
+      expected := false
+    },
+    {
+      entryName := "builtinLess"
+      operator := .less
+      inputs := [.word (word 1), .word (word 2)]
+      expected := true
+    },
+    {
+      entryName := "builtinLessEqual"
+      operator := .lessEqual
+      inputs := [.word (word 1), .word (word 2)]
+      expected := true
+    },
+    {
+      entryName := "builtinGreaterEqual"
+      operator := .greaterEqual
+      inputs := [.word (word 1), .word (word 2)]
+      expected := false
+    },
+    {
+      entryName := "builtinAnd"
+      operator := .logicalAnd
+      inputs := [.bool true, .bool true]
+      expected := true
+    },
+    {
+      entryName := "builtinOr"
+      operator := .logicalOr
+      inputs := [.bool false, .bool true]
+      expected := true
+    },
+    {
+      entryName := "builtinGreater"
+      operator := .greater
+      inputs := [.word (word 1), .word (word 2)]
+      expected := false
+    }
+  ]
+  for case in cases do
+    let entry ← signatureNamed program case.entryName
+    let function ← functionFor program entry
+    let binary ← match firstBinaryNode? function.typedBody.nodes with
+      | some binary => pure binary
+      | none => throw (IO.userError
+          s!"{case.entryName}: builtin fallback did not retain a binary node")
+    assertTrue ((match binary.form with
+        | .binary _ operator _ => operator == case.operator
+        | _ => false) && binary.requirements.isEmpty &&
+        (firstDirectCallNode? function.typedBody.nodes).isNone)
+      s!"{case.entryName}: builtin fallback acquired call/evidence metadata"
+    let outcome ← runOrThrow s!"{case.entryName} builtin fallback" program
+      [monomorphicRequest entry] 1
+    let plan ← match outcome with
+      | .complete plan => pure plan
+      | other => throw (IO.userError
+          s!"{case.entryName}: expected a complete plan, found {reprStr other}")
+    assertTrue (decide (plan.specializations.map
+        (fun specialized => specialized.declaration) = [entry.id] ∧
+        plan.callEdges = []))
+      s!"{case.entryName}: builtin fallback created a named call edge"
+    let linked ← linkOrThrow s!"{case.entryName} builtin fallback"
+      program outcome
+    let key : SourceSpecialization.SpecializationKey := {
+      declaration := entry.id
+      arguments := []
+    }
+    let linkedEntry ← match linked.findEntry? key with
+      | some linkedEntry => pure linkedEntry
+      | none => throw (IO.userError
+          s!"{case.entryName}: linked builtin root was absent")
+    assertTrue (decide (linkedEntry.run? case.inputs 1024 =
+        some (.done (.bool case.expected) [])))
+      s!"{case.entryName}: builtin compatibility behavior changed"
+
 private def testMultiStepRuntimeCoercion : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Coerce<From, To> {",
@@ -893,7 +1417,8 @@ private def testMalformedCoercionEvidence
 
 /-- Exercise complete acyclic generic linking, capture-free argument staging,
 runtime input validation, finite-budget and recursion boundaries, proof-only
-trait-evidence forwarding, runtime evidence/coercion gates, malformed
+trait-evidence forwarding, strict and named operator authority, Ord dispatch,
+builtin operator compatibility, runtime evidence/coercion gates, malformed
 requirement metadata, the legacy call-free entry point, and defensive plan
 reconstruction. -/
 def testSourceCoreDirectLinking : IO Unit := do
@@ -906,6 +1431,11 @@ def testSourceCoreDirectLinking : IO Unit := do
   testRuntimeEvidenceBoundaries program
   testImplementationMethodLoweringBoundary
   testStrictRuntimeBinaryEvidence
+  testNamedOperatorFunctionsAndOrd
+  testNamedOperatorMismatchDoesNotFallback
+  testHeterogeneousNamedOperator
+  testNamedOperatorResultCoercionChain
+  testBuiltinOperatorFallback
   testMultiStepRuntimeCoercion
   testMalformedRequirementMetadata program
   testMalformedCoercionEvidence program

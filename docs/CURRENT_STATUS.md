@@ -44,8 +44,12 @@ exact requirement/evidence validation.  Checked trait/implementation catalogs
 now retain and signature-check their methods.  Deliberately narrow runtime
 evidence paths execute selected monomorphic arithmetic and bitwise methods
 (`Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`, `BitAnd.band`,
-`BitXor.bxor`, `BitOr.bor`) and `Eq<T>.eq`; source `!=` negates the selected
-`eq` result.  The same method-authoritative boundary executes a closed
+`BitXor.bxor`, `BitOr.bor`), `Eq<T>.eq` and `Ord<T>.gt`.  Target-compatible
+ordering and logical operators now select ordinary visible functions `ne`,
+`lt`, `le`, `ge`, `and` and `or` through the same overload, evidence,
+specialization and direct-call path; source `!=` therefore follows `ne` rather
+than an invented binary-trait rule.  The same method-authoritative boundary
+executes a closed
 `Coerce<From, To>.coerce` profile at direct-call arguments, through forwarded
 generic evidence, and on call results.  Other runtime evidence remains outside
 this path.  It is not yet a general source compiler or a public source Oracle.
@@ -5645,7 +5649,7 @@ A direct call's signature predicates may be consumed statically when its
 requirement IDs, predicates and evidence goals match exactly; closed
 implementation evidence is forwarded through nested constrained calls and may
 justify a conversion inside the generic callee.  Cyclic or indirect calls,
-runtime trait evidence beyond the strict arithmetic/bitwise, `Eq<T>` and
+runtime trait evidence beyond the strict arithmetic/bitwise, `Eq<T>`, `Ord<T>` and
 `Coerce<From, To>` profiles, general conversion execution and general source
 semantics are not claimed.
 
@@ -5791,7 +5795,8 @@ requirements are consumed statically and do not become Core values or method
 calls.
 
 The runtime binary profile is executable for strict arithmetic, bitwise
-operators and equality.  A required occurrence must have exactly one matching
+operators, equality and greater-than ordering.  A required occurrence must have
+exactly one matching
 solved operator requirement and closed implementation witness.  The selected
 trait must have one type parameter and one non-generic method; its selected
 implementation and method must be monomorphic, premise-free and `where`-free.
@@ -5799,9 +5804,23 @@ The method body is checked against its instantiated two-operand signature, its
 operands are bound left to right, and the body is capture-free inlined into the
 linked Core term.  `Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`,
 `BitAnd.band`, `BitXor.bxor` and `BitOr.bor` must return the operand type;
-`Eq.eq` must return Bool.  Source `!=` is the Boolean negation of the selected
-`eq` result.  Method bodies are authoritative: regressions use results that
+`Eq.eq` and `Ord.gt` must return Bool.  Method bodies are authoritative:
+regressions use results that
 deliberately differ from the builtin operation for every profile.
+
+The target's mixed operator dispatch is also executable.  `!=`, `<`, `<=`,
+`>=`, `&&` and `||` resolve the visible ordinary functions `ne`, `lt`, `le`,
+`ge`, `and` and `or` respectively.  Each operator occurrence becomes the same
+typed direct-call form as source call syntax, including the exact selected
+instantiation, signature requirements, argument/result coercions, worklist edge
+and evidence forwarding.  Selection first requires the operator result to fit
+Bool, then applies the surrounding expected type, so a non-Bool overload cannot
+win merely from contextual result typing.  Visible but inapplicable or ambiguous
+candidates remain overload errors.  For compatibility with standalone source
+fixtures that do not load a standard prelude, absence of every visible function
+with the required name retains the old direct Word/Bool builtin lowering.  That
+fallback keeps short-circuit Bool lowering; an ordinary `and` or `or` call uses
+the target's current eager call behavior.
 
 The first executable conversion profile uses the same selected-method
 authority.  Each output coercion step must name exactly one attached and solved
@@ -5836,9 +5855,8 @@ both conditional paths, all method-authoritative strict Word binary profiles,
 and the direct, forwarded-generic and call-result conversion profiles, and
 cover the staged failure cases.
 
-The next frontend boundary is expansion from these narrow runtime-evidence
-profiles to target-compatible named operator-function dispatch for ordering and
-logical operators, then to broader implementation shapes and method bodies that
+The next frontend boundary is expansion to broader implementation shapes,
+including the standard `Ord<T> where T: Eq` premise, and method bodies that
 themselves contain evidence-bearing operations.  Recursive source calls require
 a separate named or global recursive-function representation rather than cyclic
 inlining.
@@ -5856,8 +5874,8 @@ Solcore source text. In particular, it does not yet provide:
   pipeline;
 - execution of cyclic or indirect source call graphs, runtime
   evidence-dependent operator/literal/non-call forms outside the narrow
-  strict arithmetic/bitwise, `Eq<T>` and `Coerce<From, To>` profiles, named
-  operator-function dispatch, general impl methods, generic or symbolic
+  strict arithmetic/bitwise, `Eq<T>`, premise-free `Ord<T>` and
+  `Coerce<From, To>` profiles, general impl methods, generic or symbolic
   conversion execution, or method bodies containing calls,
   coercions, or required operations;
 - unbounded recursive contract-call depth;
