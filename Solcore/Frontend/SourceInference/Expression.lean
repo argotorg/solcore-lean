@@ -43,6 +43,17 @@ def typeDependsOnNumeric (state : State) (type : Ty) : Bool :=
   type.freeVariables.any fun metavariable =>
     isNumericVariable state (.variable metavariable)
 
+def generalizeValue (state : State) (locals : TypeSystem.Environment)
+    (type : Ty) : Scheme :=
+  let requirementVariables := state.requirements.flatMap fun predicate =>
+    TypedTraitResolution.predicateVariables (applyPredicate state predicate)
+  let blockedVariables := locals.freeVariables ++ requirementVariables
+  {
+    quantified := type.freeVariables.filter fun metavariable =>
+      !(blockedVariables.contains metavariable)
+    body := type
+  }
+
 mutual
 
   def inferExprFuel (fuel : Nat) (context : Context)
@@ -177,7 +188,7 @@ mutual
           let scheme := if typeDependsOnNumeric state valueType then
               Scheme.mono valueType
             else
-              locals.generalize valueType
+              generalizeValue state locals valueType
           pure {
             type := .unit
             hasValue := false

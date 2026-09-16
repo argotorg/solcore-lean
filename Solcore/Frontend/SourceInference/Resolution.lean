@@ -145,76 +145,108 @@ def functionParts? : Ty → Option (Ty × Ty)
   | .function parameter result => some (parameter, result)
   | _ => none
 
-def allPredicatesSolvable (context : Context) (state : State) :
-    List ProgramPredicate → Bool
-  | [] => true
-  | predicate :: rest =>
-      predicateSolvable context state predicate &&
-        allPredicatesSolvable context state rest
+def validateCandidatePredicates (context : Context) (state : State) :
+    List ProgramPredicate → Except Error Unit
+  | [] => .ok ()
+  | predicate :: rest => do
+      let normalized := applyPredicate state predicate
+      if (TypedTraitResolution.predicateVariables normalized).isEmpty then
+        let _ ← solvePredicate context state normalized
+        validateCandidatePredicates context state rest
+      else
+        validateCandidatePredicates context state rest
 
 def tryFunctionCandidate (context : Context)
     (argumentType : Ty) (expected : Option Ty) (state : State)
-    (signature : ProgramFunctionSignature) : Option (Ty × State) := do
+    (signature : ProgramFunctionSignature) :
+    Except Error (Option (Ty × State)) :=
   let instantiated := signature.scheme.instantiate state.inference.next
-  let (parameter, result) ← functionParts? instantiated.body
-  let inference := { state.inference with next := instantiated.next }
-  let state := { state with inference }
-  let state ← (unify state parameter argumentType).toOption
-  let state ← match expected with
-    | none => some state
-    | some expected => (unify state result expected).toOption
-  if allPredicatesSolvable context state instantiated.predicates then
-    some (state.resolve result, state.addRequirements instantiated.predicates)
-  else
-    none
+  let candidate? : Option (Ty × State) := do
+    let (parameter, result) ← functionParts? instantiated.body
+    let inference := { state.inference with next := instantiated.next }
+    let state := { state with inference }
+    let state ← (unify state parameter argumentType).toOption
+    let state ← match expected with
+      | none => some state
+      | some expected => (unify state result expected).toOption
+    some (result, state)
+  match candidate? with
+  | none => .ok none
+  | some (result, state) => do
+      validateCandidatePredicates context state instantiated.predicates
+      pure (some (state.resolve result,
+        state.addRequirements instantiated.predicates))
 
 def tryCoercibleFunctionCandidate (context : Context)
     (argumentType : Ty) (expected : Option Ty) (state : State)
-    (signature : ProgramFunctionSignature) : Option (Ty × State) := do
+    (signature : ProgramFunctionSignature) :
+    Except Error (Option (Ty × State)) :=
   let requirementCount := state.requirements.length
   let instantiated := signature.scheme.instantiate state.inference.next
-  let (parameter, result) ← functionParts? instantiated.body
-  let inference := { state.inference with next := instantiated.next }
-  let state := { state with inference }
-  let (_, state) ← (withExpected context state argumentType
-    (some parameter)).toOption
-  let (result, state) ← (withExpected context state result expected).toOption
-  let introducedRequirements := state.requirements.drop requirementCount
-  if allPredicatesSolvable context state
-      (instantiated.predicates ++ introducedRequirements) then
-    some (state.resolve result, state.addRequirements instantiated.predicates)
-  else
-    none
+  let candidate? : Option (Ty × State × List ProgramPredicate) := do
+    let (parameter, result) ← functionParts? instantiated.body
+    let inference := { state.inference with next := instantiated.next }
+    let state := { state with inference }
+    let (_, state) ← (withExpected context state argumentType
+      (some parameter)).toOption
+    let (result, state) ← (withExpected context state result expected).toOption
+    some (result, state, state.requirements.drop requirementCount)
+  match candidate? with
+  | none => .ok none
+  | some (result, state, introducedRequirements) => do
+      validateCandidatePredicates context state
+        (instantiated.predicates ++ introducedRequirements)
+      pure (some (state.resolve result,
+        state.addRequirements instantiated.predicates))
 
-def successfulCandidates (context : Context) (argumentType : Ty)
-    (expected : Option Ty) (state : State) :
-    List ProgramFunctionSignature →
-      List (ProgramFunctionSignature × Ty × State)
-  | [] => []
+structure CandidateSearch where
+  successes : List (ProgramFunctionSignature × Ty × State) := []
+  failures : List Error := []
+
+def collectCandidateAttempts
+    (attempt : ProgramFunctionSignature →
+      Except Error (Option (Ty × State))) :
+    List ProgramFunctionSignature → CandidateSearch
+  | [] => {}
   | signature :: rest =>
-      match tryFunctionCandidate context argumentType expected state signature with
-      | none => successfulCandidates context argumentType expected state rest
-      | some (result, next) =>
-          (signature, result, next) ::
-            successfulCandidates context argumentType expected state rest
+      let tail := collectCandidateAttempts attempt rest
+      match attempt signature with
+      | .ok none => tail
+      | .ok (some (result, state)) => {
+          tail with successes := (signature, result, state) :: tail.successes
+        }
+      | .error error => { tail with failures := error :: tail.failures }
 
-def successfulCoercibleCandidates (context : Context) (argumentType : Ty)
-    (expected : Option Ty) (state : State) :
-    List ProgramFunctionSignature →
-      List (ProgramFunctionSignature × Ty × State)
-  | [] => []
-  | signature :: rest =>
-      match tryCoercibleFunctionCandidate context argumentType expected state signature with
-      | none => successfulCoercibleCandidates context argumentType expected state rest
-      | some (result, next) =>
-          (signature, result, next) ::
-            successfulCoercibleCandidates context argumentType expected state rest
+def firstInconclusive? : List Error → Option Error
+  | [] => none
+  | error :: rest =>
+      match error with
+      | .inconclusiveTrait _ => some error
+      | _ => firstInconclusive? rest
 
-def selectUniqueCandidate (name : String)
-    (allCandidates : List ProgramFunctionSignature) :
-    List (ProgramFunctionSignature × Ty × State) → Except Error (Ty × State)
-  | [] => .error (.noMatchingOverload name (allCandidates.map (·.id)))
-  | [(_, result, state)] => .ok (result, state)
+def firstNoSolution? : List Error → Option Error
+  | [] => none
+  | error :: rest =>
+      match error with
+      | .noTraitImplementation _ => some error
+      | _ => firstNoSolution? rest
+
+def selectCandidateSearch (name : String)
+    (allCandidates : List ProgramFunctionSignature)
+    (fallbackFailures : List Error) (search : CandidateSearch) :
+    Except Error (Ty × State) :=
+  match search.successes with
+  | [] =>
+      match firstInconclusive? search.failures with
+      | some error => .error error
+      | none =>
+          match firstNoSolution? (search.failures ++ fallbackFailures) with
+          | some error => .error error
+          | none => .error (.noMatchingOverload name (allCandidates.map (·.id)))
+  | [(_, result, state)] =>
+      match firstInconclusive? search.failures with
+      | some error => .error error
+      | none => .ok (result, state)
   | successes =>
       .error (.ambiguousOverload name (successes.map fun success => success.1.id))
 
@@ -222,10 +254,18 @@ def selectFunctionCandidate (context : Context) (name : String)
     (argumentType : Ty) (expected : Option Ty) (state : State) :
     Except Error (Ty × State) :=
   let candidates := functionsNamed context name
-  match successfulCandidates context argumentType expected state candidates with
-  | [] => selectUniqueCandidate name candidates <|
-      successfulCoercibleCandidates context argumentType expected state candidates
-  | successes => selectUniqueCandidate name candidates successes
+  let exact := collectCandidateAttempts
+    (tryFunctionCandidate context argumentType expected state) candidates
+  match exact.successes with
+  | [] =>
+      match firstInconclusive? exact.failures with
+      | some error => .error error
+      | none =>
+          let coercible := collectCandidateAttempts
+            (tryCoercibleFunctionCandidate context argumentType expected state)
+            candidates
+          selectCandidateSearch name candidates exact.failures coercible
+  | _ => selectCandidateSearch name candidates [] exact
 
 def applyFunctionType (context : Context) (calleeType argumentType : Ty)
     (expected : Option Ty) (state : State) : Except Error (Ty × State) :=
