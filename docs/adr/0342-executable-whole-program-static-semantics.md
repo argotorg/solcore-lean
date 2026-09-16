@@ -17,8 +17,8 @@ are retained in checked catalogs with exact signature conformance.  Narrow
 runtime-evidence slices execute the strict arithmetic/bitwise trait methods and
 `Eq<T>.eq` and `Ord<T>.gt` by selecting, checking and capture-free inlining the
 closed implementation method body.  Target-compatible `!=`, `<`, `<=`, `>=`,
-`&&` and `||` select ordinary `ne`, `lt`, `le`, `ge`, `and` and `or` functions
-and reuse the direct-call specialization/linking path.  A
+`&&`, `||` and `!` select ordinary `ne`, `lt`, `le`, `ge`, `and`, `or` and
+`not` functions and reuse the direct-call specialization/linking path.  A
 conversion slice validates each closed coercion edge by exact requirement
 identity and executes the selected `Coerce<From, To>.coerce` method body for
 direct-call arguments, forwarded generic evidence and call results.
@@ -284,14 +284,16 @@ implementation body, not a builtin operator
 opcode, is authoritative; each regression returns a distinguishable non-builtin
 result.
 
-The source checker follows the target's mixed binary dispatch table.  `!=`,
-`<`, `<=`, `>=`, `&&` and `||` resolve visible ordinary functions named `ne`,
-`lt`, `le`, `ge`, `and` and `or`.  The operator occurrence is recorded as an
+The source checker follows the target's mixed operator dispatch table.  `!=`,
+`<`, `<=`, `>=`, `&&`, `||` and unary `!` resolve visible ordinary functions
+named `ne`, `lt`, `le`, `ge`, `and`, `or` and `not`.  The operator occurrence is recorded as an
 ordinary direct call with a synthetic callee reference at the operator span,
 so overload selection, signature predicates, argument and result coercions,
-specialization edges and evidence forwarding use the existing call path.  The
-selected result must fit Bool before it is fitted to the surrounding expected
-type.  A visible but inapplicable candidate is an overload error; only complete
+specialization edges and evidence forwarding use the existing call path.
+Binary comparison/logical results must fit Bool before they are fitted to the
+surrounding expected type; unary `not` instead receives that expected type
+directly, matching the target.  A visible but inapplicable candidate is an
+overload error; only complete
 absence of the operator function enables the compatibility fallback to direct
 Word/Bool builtins for source fixtures without a loaded standard prelude.
 

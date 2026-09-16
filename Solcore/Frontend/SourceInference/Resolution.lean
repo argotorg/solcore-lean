@@ -305,12 +305,12 @@ def isNumericVariable (state : State) (type : Ty) : Bool :=
 named functions from its standard prelude.  Keeping that distinction in one
 table prevents inference and executable linking from inventing incompatible
 operator traits independently. -/
-inductive BinaryOperatorDispatch where
+inductive OperatorDispatch where
   | traitMethod (traitName methodName : String)
   | function (name : String)
   deriving Repr, DecidableEq
 
-def binaryOperatorDispatch : Syntax.BinaryOp → BinaryOperatorDispatch
+def binaryOperatorDispatch : Syntax.BinaryOp → OperatorDispatch
   | .multiply => .traitMethod "Mul" "mul"
   | .divide => .traitMethod "Div" "div"
   | .modulo => .traitMethod "Mod" "mod"
@@ -327,6 +327,10 @@ def binaryOperatorDispatch : Syntax.BinaryOp → BinaryOperatorDispatch
   | .notEqual => .function "ne"
   | .logicalAnd => .function "and"
   | .logicalOr => .function "or"
+
+def unaryOperatorDispatch : Syntax.UnaryOp → OperatorDispatch
+  | .logicalNot => .function "not"
+  | .bitNot => .traitMethod "BitNot" "bnot"
 
 def binaryResultIsBool : Syntax.BinaryOp → Bool
   | .less | .greater | .lessEqual | .greaterEqual
@@ -386,26 +390,26 @@ def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
   let builtin := match operator with
     | .logicalNot => Ty.bool
     | .bitNot => Ty.word
-  let traitName := match operator with
-    | .logicalNot => "Not"
-    | .bitNot => "BitNot"
   if operand = builtin then
     pure { type := builtin, requirements := [], state }
   else if operand.freeVariables.isEmpty = false && isNumericVariable state operand then
     let state ← unify state operand builtin
     pure { type := builtin, requirements := [], state }
   else
-    match ← operatorTrait? context traitName with
-    | some trait =>
-        let (requirement, state) := state.addRequirementWithId {
-          trait, subject := operand, arguments := []
-        }
-        pure {
-          type := if operator == .logicalNot then .bool else operand
-          requirements := [requirement]
-          state
-        }
-    | none => throw (.operatorNotSupported traitName operand)
+    match unaryOperatorDispatch operator with
+    | .function name => throw (.unknownVariable name)
+    | .traitMethod traitName _ =>
+        match ← operatorTrait? context traitName with
+        | some trait =>
+            let (requirement, state) := state.addRequirementWithId {
+              trait, subject := operand, arguments := []
+            }
+            pure {
+              type := if operator == .logicalNot then .bool else operand
+              requirements := [requirement]
+              state
+            }
+        | none => throw (.operatorNotSupported traitName operand)
 
 /-- Expected-type checking result for one exact source occurrence. -/
 structure ExpectationResult where

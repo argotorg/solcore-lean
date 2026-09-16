@@ -215,12 +215,33 @@ mutual
             (Ty.productMany (elements.map (·.type)))
             (.tuple (elements.map (·.id))) [] expected state
       | .unary operator operand => do
+          let numericStart := state.numericVariables.length
           let (operand, state) ← inferExprFuel fuel context operand none state
-          let inferred ← inferUnaryOperator context operator.value
-            operand.type state
-          recordExpressionWithExpected context expression id inferred.type
-            (.unary operator.value operand.id) inferred.requirements expected
-            inferred.state
+          let numericVariables := state.numericVariables.drop numericStart
+          match unaryOperatorDispatch operator.value with
+          | .function name =>
+              match ← functionsNamed context name with
+              | [] =>
+                  let inferred ← inferUnaryOperator context operator.value
+                    operand.type state
+                  recordExpressionWithExpected context expression id
+                    inferred.type (.unary operator.value operand.id)
+                    inferred.requirements expected inferred.state
+              | candidates =>
+                  let attempt ← selectFunctionCandidateFrom context name
+                    candidates [operand] numericVariables id expected state
+                  let callee : Syntax.Expr := {
+                    span := operator.span
+                    value := .identifier { span := operator.span, value := name }
+                  }
+                  pure <| recordSelectedCall expression callee name
+                    [operand] attempt
+          | .traitMethod _ _ =>
+              let inferred ← inferUnaryOperator context operator.value
+                operand.type state
+              recordExpressionWithExpected context expression id inferred.type
+                (.unary operator.value operand.id) inferred.requirements expected
+                inferred.state
       | .binary left operator right => do
           let numericStart := state.numericVariables.length
           let (left, state) ← inferExprFuel fuel context left none state

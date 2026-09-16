@@ -45,10 +45,11 @@ now retain and signature-check their methods.  Deliberately narrow runtime
 evidence paths execute selected monomorphic arithmetic and bitwise methods
 (`Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`, `BitAnd.band`,
 `BitXor.bxor`, `BitOr.bor`), `Eq<T>.eq` and `Ord<T>.gt`.  Target-compatible
-ordering and logical operators now select ordinary visible functions `ne`,
-`lt`, `le`, `ge`, `and` and `or` through the same overload, evidence,
-specialization and direct-call path; source `!=` therefore follows `ne` rather
-than an invented binary-trait rule.  The same method-authoritative boundary
+ordering, logical and logical-negation operators now select ordinary visible
+functions `ne`, `lt`, `le`, `ge`, `and`, `or` and `not` through the same
+overload, evidence, specialization and direct-call path; source `!=` and `!`
+therefore follow `ne` and `not` rather than invented traits.  The same
+method-authoritative boundary
 executes a closed
 `Coerce<From, To>.coerce` profile at direct-call arguments, through forwarded
 generic evidence, and on call results.  Other runtime evidence remains outside
@@ -5809,18 +5810,20 @@ regressions use results that
 deliberately differ from the builtin operation for every profile.
 
 The target's mixed operator dispatch is also executable.  `!=`, `<`, `<=`,
-`>=`, `&&` and `||` resolve the visible ordinary functions `ne`, `lt`, `le`,
-`ge`, `and` and `or` respectively.  Each operator occurrence becomes the same
+`>=`, `&&`, `||` and unary `!` resolve the visible ordinary functions `ne`,
+`lt`, `le`, `ge`, `and`, `or` and `not` respectively.  Each operator occurrence becomes the same
 typed direct-call form as source call syntax, including the exact selected
 instantiation, signature requirements, argument/result coercions, worklist edge
-and evidence forwarding.  Selection first requires the operator result to fit
-Bool, then applies the surrounding expected type, so a non-Bool overload cannot
-win merely from contextual result typing.  Visible but inapplicable or ambiguous
+and evidence forwarding.  Binary comparison/logical selection first requires
+the operator result to fit Bool, then applies the surrounding expected type, so
+a non-Bool overload cannot win merely from contextual result typing.  Unary
+`not` follows the target by receiving the surrounding expected type directly.
+Visible but inapplicable or ambiguous
 candidates remain overload errors.  For compatibility with standalone source
 fixtures that do not load a standard prelude, absence of every visible function
 with the required name retains the old direct Word/Bool builtin lowering.  That
-fallback keeps short-circuit Bool lowering; an ordinary `and` or `or` call uses
-the target's current eager call behavior.
+fallback keeps primitive Bool negation and short-circuit Bool lowering; an
+ordinary `and` or `or` call uses the target's current eager call behavior.
 
 The first executable conversion profile uses the same selected-method
 authority.  Each output coercion step must name exactly one attached and solved

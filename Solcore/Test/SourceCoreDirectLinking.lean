@@ -161,6 +161,14 @@ private def firstBinaryNode? : List Node → Option ExpressionNode
       | _ => firstBinaryNode? rest
   | .statement _ :: rest => firstBinaryNode? rest
 
+private def firstUnaryNode? : List Node → Option ExpressionNode
+  | [] => none
+  | .expression node :: rest =>
+      match node.form with
+      | .unary _ _ => some node
+      | _ => firstUnaryNode? rest
+  | .statement _ :: rest => firstUnaryNode? rest
+
 private def firstCoercedNode? : List Node → Option ExpressionNode
   | [] => none
   | .expression node :: rest =>
@@ -974,6 +982,228 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
         some (.done (.bool true) [])))
     "source > did not execute the selected nonstandard Ord.gt method body"
 
+private def testNamedLogicalNotWithEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Marker<T> {}",
+    "impl Marker<Bool> {}",
+    "function not<T>(value: T) returns (Bool) where T: Marker {",
+    "  return true;",
+    "}",
+    "function negateWithEvidence<T>(value: T) returns (Bool) where T: Marker {",
+    "  return !value;",
+    "}",
+    "function logicalNotEntry(value: Bool) returns (Bool) {",
+    "  return negateWithEvidence(value);",
+    "}"
+  ])
+  let marker ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Marker" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"logical !: expected one Marker trait, found {traits.length}")
+  let not ← signatureNamed program "not"
+  let negate ← signatureNamed program "negateWithEvidence"
+  let entry ← signatureNamed program "logicalNotEntry"
+  let function ← functionFor program negate
+  let input ← match function.typedBody.inputs with
+    | [input] => pure input
+    | inputs => throw (IO.userError
+        s!"logical !: expected one generic input, found {inputs.length}")
+  let call ← match firstDirectCallNode? function.typedBody.nodes with
+    | some call => pure call
+    | none => throw (IO.userError
+        "logical ! did not become a direct call to not")
+  let (calleeId, arguments, instantiation) ← match call.form with
+    | .call callee arguments (.declaration instantiation) =>
+        pure (callee, arguments, instantiation)
+    | form => throw (IO.userError
+        s!"logical !: selected call changed form: {reprStr form}")
+  let calleeNode ← match function.typedBody.lookupExpression? calleeId with
+    | some callee => pure callee
+    | none => throw (IO.userError
+        "logical !: synthetic not callee node was absent")
+  let argumentIsInput := match arguments with
+    | [argument] =>
+        match function.typedBody.lookupExpression? argument with
+        | some { form := .reference _ (.local binder), .. } => binder == input.id
+        | _ => false
+    | _ => false
+  let calleeMatches := match calleeNode.form with
+    | .reference "not" (.declaration reference) => reference == instantiation
+    | _ => false
+  let requirement ← match call.requirements with
+    | [requirement] => pure requirement
+    | requirements => throw (IO.userError
+        s!"logical !: expected one call requirement, found {requirements.length}")
+  let solved ← match function.solvedRequirements.filter fun row =>
+      row.id == requirement with
+    | [solved] => pure solved
+    | rows => throw (IO.userError
+        s!"logical !: expected one solved row, found {rows.length}")
+  let operandType := input.scheme.body
+  assertTrue (argumentIsInput && calleeMatches && decide (
+      call.type = .bool ∧ calleeNode.type = instantiation.type ∧
+      instantiation.declaration = not.id ∧
+      instantiation.type = .function operandType .bool ∧
+      instantiation.parameterSubstitution.map (fun entry => entry.2) =
+        [operandType] ∧
+      instantiation.predicates = [solved.predicate] ∧
+      solved.predicate.trait = marker.id ∧
+      solved.predicate.subject = operandType ∧
+      solved.predicate.arguments = [] ∧ call.coercions = []) &&
+      (solved.evidence matches .assumption _))
+    "logical ! lost its selected not call or forwarded generic evidence"
+
+  let outcome ← runOrThrow "logical ! named function" program
+    [monomorphicRequest entry] 3
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"logical !: expected a complete plan, found {reprStr other}")
+  let expectedPredicate : ProgramPredicate := {
+    trait := marker.id
+    subject := .bool
+    arguments := []
+  }
+  let specializedNegate := plan.specializations.find? fun specialized =>
+    specialized.declaration == negate.id
+  let specializedNot := plan.specializations.find? fun specialized =>
+    specialized.declaration == not.id
+  assertTrue (decide (
+      plan.specializations.map (fun specialized => specialized.declaration) =
+        [entry.id, negate.id, not.id] ∧
+      plan.callEdges.map (fun edge =>
+        (edge.caller.declaration, edge.callee.declaration)) =
+        [(entry.id, negate.id), (negate.id, not.id)]) &&
+      specializedNegate.any fun specialized => decide (
+        specialized.key.arguments = [.bool] ∧
+        specialized.assumptions = [expectedPredicate]) &&
+      specializedNot.any fun specialized => decide (
+        specialized.key.arguments = [.bool] ∧
+        specialized.assumptions = [expectedPredicate]))
+    "logical ! did not retain its ordinary-call worklist edge and evidence"
+  let linked ← linkOrThrow "logical ! named function" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError "logical !: linked root was absent")
+  assertTrue (decide (linkedEntry.run? [.bool true] 2048 =
+      some (.done (.bool true) [])))
+    "logical ! did not execute the nonstandard generic not body"
+
+private def testNamedLogicalNotExpectedType : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "function not(value: Word) returns (Word) { return 91; }",
+    "function entry(value: Word) returns (Word) { return !value; }"
+  ])
+  let not ← signatureNamed program "not"
+  let entry ← signatureNamed program "entry"
+  let function ← functionFor program entry
+  let call ← match firstDirectCallNode? function.typedBody.nodes with
+    | some call => pure call
+    | none => throw (IO.userError
+        "logical ! Word result did not become a direct call")
+  let (calleeId, arguments, instantiation) ← match call.form with
+    | .call callee arguments (.declaration instantiation) =>
+        pure (callee, arguments, instantiation)
+    | form => throw (IO.userError
+        s!"logical ! Word result: unexpected form {reprStr form}")
+  let calleeMatches := match function.typedBody.lookupExpression? calleeId with
+    | some { form := .reference "not" (.declaration reference), type, .. } =>
+        decide (reference = instantiation ∧ type = .function .word .word)
+    | _ => false
+  assertTrue (calleeMatches && decide (
+      call.type = .word ∧ instantiation.declaration = not.id ∧
+      instantiation.type = .function .word .word ∧ arguments.length = 1 ∧
+      call.requirements = [] ∧ call.coercions = []))
+    "logical ! ignored the selected not function's non-Bool expected type"
+  let outcome ← runOrThrow "logical ! expected type" program
+    [monomorphicRequest entry] 2
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"logical ! expected type: incomplete plan {reprStr other}")
+  assertTrue (decide (
+      plan.specializations.map (fun specialized => specialized.declaration) =
+        [entry.id, not.id] ∧
+      plan.callEdges.map (fun edge => edge.callee.declaration) = [not.id]))
+    "logical ! expected type did not produce the selected not edge"
+  let linked ← linkOrThrow "logical ! expected type" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "logical ! expected type: linked root was absent")
+  assertTrue (decide (linkedEntry.run? [.word (word 7)] 1024 =
+      some (.done (.word (word 91)) [])))
+    "logical ! did not execute the expected-type-selected not body"
+
+private def testNamedLogicalNotMismatchDoesNotFallback : IO Unit := do
+  let raw : Workspace.RawWorkspace := {
+    entry := "main.solc"
+    mainSources := [{
+      path := "main.solc"
+      content := String.intercalate "\n" [
+        "function not(value: Word) returns (Bool) { return false; }",
+        "function entry(value: Bool) returns (Bool) { return !value; }"
+      ]
+    }]
+    externalLibraries := []
+  }
+  match checkProgram raw with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .inference { error := .noMatchingOverload "not" candidates, .. } =>
+            candidates.length == 1
+        | _ => false)
+        "an inapplicable visible not overload lost its selection diagnostic"
+  | .ok _ => throw (IO.userError
+      "an inapplicable visible not overload silently used builtin fallback")
+
+private def testBuiltinLogicalNotFallback : IO Unit := do
+  let program ← checkedProgramOf
+    "function entry(value: Bool) returns (Bool) { return !value; }"
+  let entry ← signatureNamed program "entry"
+  let function ← functionFor program entry
+  let unary ← match firstUnaryNode? function.typedBody.nodes with
+    | some unary => pure unary
+    | none => throw (IO.userError
+        "logical ! builtin fallback did not retain a unary node")
+  assertTrue ((match unary.form with
+      | .unary .logicalNot _ => true
+      | _ => false) && unary.type == .bool && unary.requirements.isEmpty &&
+      (firstDirectCallNode? function.typedBody.nodes).isNone)
+    "logical ! builtin fallback acquired call or evidence metadata"
+  let outcome ← runOrThrow "logical ! builtin fallback" program
+    [monomorphicRequest entry] 1
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"logical ! builtin fallback: incomplete plan {reprStr other}")
+  assertTrue (decide (
+      plan.specializations.map (fun specialized => specialized.declaration) =
+        [entry.id] ∧ plan.callEdges = []))
+    "logical ! builtin fallback created a named call edge"
+  let linked ← linkOrThrow "logical ! builtin fallback" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "logical ! builtin fallback: linked root was absent")
+  assertTrue (decide (
+      linkedEntry.run? [.bool true] 1024 = some (.done (.bool false) []) ∧
+      linkedEntry.run? [.bool false] 1024 = some (.done (.bool true) [])))
+    "logical ! builtin fallback changed primitive Bool negation"
+
 private def testNamedOperatorMismatchDoesNotFallback : IO Unit := do
   let raw : Workspace.RawWorkspace := {
     entry := "main.solc"
@@ -1432,6 +1662,10 @@ def testSourceCoreDirectLinking : IO Unit := do
   testImplementationMethodLoweringBoundary
   testStrictRuntimeBinaryEvidence
   testNamedOperatorFunctionsAndOrd
+  testNamedLogicalNotWithEvidence
+  testNamedLogicalNotExpectedType
+  testNamedLogicalNotMismatchDoesNotFallback
+  testBuiltinLogicalNotFallback
   testNamedOperatorMismatchDoesNotFallback
   testHeterogeneousNamedOperator
   testNamedOperatorResultCoercionChain
