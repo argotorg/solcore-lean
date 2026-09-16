@@ -83,8 +83,8 @@ mutual
           | none =>
               if name.value == "true" || name.value == "false" then
                 withExpected context state .bool expected
-              else
-                match functionsNamed context name.value with
+              else do
+                match ← functionsNamed context name.value with
                 | [] => .error (.unknownVariable name.value)
                 | [signature] =>
                     let instantiated := signature.scheme.instantiate state.inference.next
@@ -138,16 +138,31 @@ mutual
           let (argumentTypes, state) ← inferExprsFuel fuel context
             arguments.elements state
           let argumentType := Ty.productMany argumentTypes
-          match calleeIdentifier? callee with
-          | some name =>
-              match state.locals.lookup? name with
-              | none => selectFunctionCandidate context name argumentType expected state
+          match calleeQualifiedIdentifier? callee with
+          | some (namespaceName, name) =>
+              match state.locals.lookup? namespaceName with
               | some _ =>
                   let (calleeType, state) ← inferExprFuel fuel context callee none state
                   applyFunctionType context calleeType argumentType expected state
+              | none =>
+                  match ← qualifiedFunctionsNamed context namespaceName name with
+                  | some candidates =>
+                      selectFunctionCandidateFrom context s!"{namespaceName}.{name}"
+                        candidates argumentType expected state
+                  | none =>
+                      let (calleeType, state) ← inferExprFuel fuel context callee none state
+                      applyFunctionType context calleeType argumentType expected state
           | none =>
-              let (calleeType, state) ← inferExprFuel fuel context callee none state
-              applyFunctionType context calleeType argumentType expected state
+              match calleeIdentifier? callee with
+              | some name =>
+                  match state.locals.lookup? name with
+                  | none => selectFunctionCandidate context name argumentType expected state
+                  | some _ =>
+                      let (calleeType, state) ← inferExprFuel fuel context callee none state
+                      applyFunctionType context calleeType argumentType expected state
+              | none =>
+                  let (calleeType, state) ← inferExprFuel fuel context callee none state
+                  applyFunctionType context calleeType argumentType expected state
       | .dotConstructor .. => .error (.unsupportedExpression "dot constructor")
       | .proxy .. => .error (.unsupportedExpression "proxy value")
       | .index .. => .error (.unsupportedExpression "index")

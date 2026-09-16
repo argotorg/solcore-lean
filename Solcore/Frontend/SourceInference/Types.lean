@@ -36,6 +36,9 @@ inductive Error where
         Resolved.DeclarationId Ty Resolved.DeclarationId)
   | ambiguousOperatorTrait
       (name : String) (candidates : List Resolved.DeclarationId)
+  | ambiguousImportedNamespace
+      (name : String) (candidates : List Workspace.ModuleId)
+  | importVisibility (errors : List ProgramImportError)
   | operatorNotSupported (operator : String) (operand : Ty)
   | nonNumericLiteral (type : Ty)
   | unsupportedLiteral (kind : String)

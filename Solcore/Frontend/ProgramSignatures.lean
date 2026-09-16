@@ -127,6 +127,9 @@ inductive ProgramSignatureError where
   | traitArityMismatch
       (declaration trait : Resolved.DeclarationId)
       (expected actual : Nat)
+  | importVisibility
+      (declaration : Resolved.DeclarationId)
+      (errors : List ProgramImportError)
   | typeResolution
       (declaration : Resolved.DeclarationId)
       (error : ProgramTypeResolutionError)
@@ -173,16 +176,23 @@ private def resolveSignatureTypes
 
 private def traitCandidates
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
-    (name : String) : List ProgramDeclaration :=
+    (name : String) : Except ProgramSignatureError (List ProgramDeclaration) :=
   match environment.localTraitsNamed declaration.id.moduleId name with
-  | [] => environment.traitsNamed name
-  | localCandidates => localCandidates
+  | localCandidates@(_ :: _) => .ok localCandidates
+  | [] =>
+      match buildProgramImports environment declaration.id.moduleId with
+      | .error errors => .error (.importVisibility declaration.id errors)
+      | .ok visibility =>
+          if visibility.hasImports then
+            .ok (visibility.traitsNamed name)
+          else
+            .ok (environment.traitsNamed name)
 
 private def resolveTrait
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
     (name : String) (actualArity : Nat) :
-    Except ProgramSignatureError Resolved.DeclarationId :=
-  match traitCandidates environment declaration name with
+    Except ProgramSignatureError Resolved.DeclarationId := do
+  match ← traitCandidates environment declaration name with
   | [] => .error (.unknownTrait declaration.id name)
   | [trait] =>
       if trait.genericParameters.length = actualArity then

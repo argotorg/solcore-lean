@@ -14,24 +14,55 @@ def localFunctionsNamed (context : Context) (name : String) :
     signature.name == name &&
       decide (signature.id.moduleId = context.scope.currentModule)
 
+def signaturesForDeclarations (context : Context)
+    (declarations : List ProgramDeclaration) : List ProgramFunctionSignature :=
+  declarations.filterMap fun declaration =>
+    context.signatures.functions.find? fun signature =>
+      decide (signature.id = declaration.id)
+
 def functionsNamed (context : Context) (name : String) :
-    List ProgramFunctionSignature :=
+    Except Error (List ProgramFunctionSignature) :=
   let localCandidates := localFunctionsNamed context name
-  if localCandidates.isEmpty then
-    context.signatures.functions.filter fun signature => signature.name == name
+  if !localCandidates.isEmpty then
+    .ok localCandidates
   else
-    localCandidates
+    match buildProgramImports context.environment context.scope.currentModule with
+    | .error errors => .error (.importVisibility errors)
+    | .ok visibility =>
+        if visibility.hasImports then
+          .ok (signaturesForDeclarations context (visibility.valuesNamed name))
+        else
+          .ok (context.signatures.functions.filter fun signature =>
+            signature.name == name)
+
+def qualifiedFunctionsNamed (context : Context) (namespaceName name : String) :
+    Except Error (Option (List ProgramFunctionSignature)) :=
+  match buildProgramImports context.environment context.scope.currentModule with
+  | .error errors => .error (.importVisibility errors)
+  | .ok visibility =>
+      match visibility.modulesNamed namespaceName with
+      | [] => .ok none
+      | [moduleId] =>
+          .ok (some (context.signatures.localFunctionsNamed moduleId name))
+      | modules => .error (.ambiguousImportedNamespace namespaceName modules)
 
 def traitCandidates (context : Context) (name : String) :
-    List ProgramDeclaration :=
+    Except Error (List ProgramDeclaration) :=
   match context.environment.localTraitsNamed context.scope.currentModule name with
-  | [] => context.environment.traitsNamed name
-  | localCandidates => localCandidates
+  | localCandidates@(_ :: _) => .ok localCandidates
+  | [] =>
+      match buildProgramImports context.environment context.scope.currentModule with
+      | .error errors => .error (.importVisibility errors)
+      | .ok visibility =>
+          if visibility.hasImports then
+            .ok (visibility.traitsNamed name)
+          else
+            .ok (context.environment.traitsNamed name)
 
 def conventionalTraitWithArity? (context : Context) (name : String)
     (arity : Nat) :
-    Except Error (Option Resolved.DeclarationId) :=
-  let candidates := (traitCandidates context name).filter fun declaration =>
+    Except Error (Option Resolved.DeclarationId) := do
+  let candidates := (← traitCandidates context name).filter fun declaration =>
     declaration.genericParameters.length == arity
   match candidates with
   | [] => .ok none
@@ -259,10 +290,10 @@ def selectCandidateSearch (name : String)
   | successes =>
       .error (.ambiguousOverload name (successes.map fun success => success.1.id))
 
-def selectFunctionCandidate (context : Context) (name : String)
+def selectFunctionCandidateFrom (context : Context) (name : String)
+    (candidates : List ProgramFunctionSignature)
     (argumentType : Ty) (expected : Option Ty) (state : State) :
     Except Error (Ty × State) :=
-  let candidates := functionsNamed context name
   let exact := collectCandidateAttempts
     (tryFunctionCandidate context argumentType expected state) candidates
   match exact.successes with
@@ -275,6 +306,12 @@ def selectFunctionCandidate (context : Context) (name : String)
             candidates
           selectCandidateSearch name candidates exact.failures coercible
   | _ => selectCandidateSearch name candidates [] exact
+
+def selectFunctionCandidate (context : Context) (name : String)
+    (argumentType : Ty) (expected : Option Ty) (state : State) :
+    Except Error (Ty × State) := do
+  selectFunctionCandidateFrom context name (← functionsNamed context name)
+    argumentType expected state
 
 def applyFunctionType (context : Context) (calleeType argumentType : Ty)
     (expected : Option Ty) (state : State) : Except Error (Ty × State) :=
@@ -290,6 +327,12 @@ def applyFunctionType (context : Context) (calleeType argumentType : Ty)
 def calleeIdentifier? : Syntax.Expr → Option String
   | ⟨_, .identifier name⟩ => some name.value
   | ⟨_, .group inner⟩ => calleeIdentifier? inner
+  | _ => none
+
+def calleeQualifiedIdentifier? : Syntax.Expr → Option (String × String)
+  | ⟨_, .field base _ name⟩ =>
+      (calleeIdentifier? base).map fun namespaceName => (namespaceName, name.value)
+  | ⟨_, .group inner⟩ => calleeQualifiedIdentifier? inner
   | _ => none
 
 end Solcore.Frontend.SourceInference.Detail
