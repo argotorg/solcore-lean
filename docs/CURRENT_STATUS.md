@@ -36,10 +36,11 @@ An initial executable whole-program static-semantics path now consumes that
 canonical syntax.  It loads a workspace, constructs declaration and type
 environments, resolves signatures and predicates, infers the supported source
 fragment, and returns checked functions with occurrence-addressed typed bodies
-and trait evidence.  A first internal downstream bridge now lowers the closed
-monomorphic builtin subset of those typed bodies to independently rechecked
-Semantic Core.  It is not yet a whole-program source compiler or a public
-source Oracle.
+and trait evidence.  The internal downstream path now specializes explicit
+roots, discovers finite direct-call plans, and lowers complete acyclic plans in
+the closed evidence-free builtin subset to independently rechecked Semantic
+Core entries.  It is not yet a general source compiler or a public source
+Oracle.
 
 ## What works now
 
@@ -5562,9 +5563,11 @@ ordinary specialization is now public and compile-time consumed. Recovered
 malformed output remains separate so that recovery is not confused with
 language acceptance.
 
-The initial whole-program resolver and source checker below now consume the
-canonical syntax, while elaboration into checked Semantic Core remains a later
-stage. Canonical local references, Boolean
+The initial whole-program resolver, checker, specialization planner and
+restricted acyclic linker below now consume the canonical syntax.  Checked
+Semantic Core is reached only for explicitly seeded, complete evidence-free
+plans in the builtin tail-normal fragment; this is not a public or general
+source elaborator.  Canonical local references, Boolean
 operators, Word addition/subtraction/multiplication/unsigned division/remainder,
 bitwise operations, unsigned `>`/`<`/`<=`/`>=` and Word equality/inequality, strict
 Word literals, and conditionals connect through the explicit-table adapters above.
@@ -5624,8 +5627,10 @@ polymorphic recursion, coinductive trait cycles and overlap policy beyond
 explicit ambiguity are deferred.  Generic or symbolic intermediate coercion
 paths, coinductive coercion cycles and insertion of executable conversion terms
 are not yet connected.  The specialization and lowering slices described below
-cover a deliberately closed builtin subset; general direct calls, evidence
-execution and whole-program Semantic Core linking are not yet claimed.
+cover a deliberately closed builtin subset.  Complete acyclic direct calls
+without requirements or coercions are executable through the restricted plan
+linker; cyclic or indirect calls, conversion/evidence execution and general
+source semantics are not claimed.
 
 Before adding constructor/member selection, match, assignment or executable
 conversion, the next architecture boundary is an occurrence-addressed typed and
@@ -5684,12 +5689,13 @@ Missing or category-wrong node edges,
 duplicate inputs or active local IDs, polymorphic locals, unresolved source
 types, non-Word literals, typed-node mismatches, uninitialized lets, missing
 else branches, fallthrough, non-tail control statements and unconsumed
-requirements all produce located elaboration errors.  Calls, lambdas,
-expression statements, proxy/index forms, nominal types and any node carrying a
-coercion or trait requirement reject explicitly instead of receiving an
-invented runtime meaning.  End-to-end regressions execute both branches after
-nested blocks and shadowing lets, in addition to the original product-returning
-expression profile.
+requirements all produce located elaboration errors.  The standalone function
+elaborator still rejects calls; the validated plan linker described below
+supplies the only call callback.  Lambdas, expression statements, proxy/index
+forms, nominal types and any node carrying a coercion or trait requirement
+reject explicitly instead of receiving an invented runtime meaning.  End-to-end
+regressions execute both branches after nested blocks and shadowing lets, in
+addition to the original product-returning expression profile.
 
 The first rigid/generic specialization boundary is also executable.
 `ProgramFunctionSignature` supplies the authoritative declaration-parameter
@@ -5730,19 +5736,43 @@ multi-parameter calls, deterministic nested-call order, duplicate roots and
 call occurrences, recursive keys, finite budget exhaustion, retained where
 predicates, malformed typed metadata and the indirect-call boundary.
 
-The next frontend boundary is direct-call lowering and whole-program Core
-linking, followed by executable trait/coercion evidence.  Constructors, members
-and place-aware statements remain later in dependency order.  A whole-program
-reference to an obligation remains the owning declaration paired with its
-function-local requirement identity.
+The first specialized direct-call linker is now executable for complete
+acyclic plans.  It defensively reconstructs the worklist from canonical roots,
+checks canonical specialized entries and exact per-occurrence call edges, then
+recursively elaborates each target and expands calls into capture-free
+`Resolved.Expr` lets.  Arguments are evaluated left to right into fresh
+temporaries before callee input aliases enter scope.  Each explicitly seeded
+entry is lowered and independently rechecked by `Core.infer?`; seed order and
+duplicates are preserved, and execution checks exact runtime argument types
+before entering the existing Core machine.  This is finite inlining, not a
+named or global recursive-function facility in Core.
+
+Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
+direct-call cycles, nonempty specialized assumptions or solved requirements,
+coercion-bearing nodes and indirect calls reject explicitly.  Thus the
+worklist may close same-key self or mutual recursion, but the current linker
+does not assign those cycles an executable meaning.  Small checked laws fix
+the runtime input-type gate and budget-exhaustion boundary; end-to-end
+regressions execute both paths through nested generic calls and cover the
+staged failure cases.
+
+The next frontend boundary is executable trait/coercion evidence, including
+conversion-term insertion.  Recursive source calls require a separate named
+or global recursive-function representation rather than cyclic inlining.
+Automatic entry discovery, constructors, members and place-aware statements
+remain later in dependency order.  A whole-program reference to an obligation
+remains the owning declaration paired with its function-local requirement
+identity.
 
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary
 Solcore source text. In particular, it does not yet provide:
 
-- automatic entry-point seeding, direct-call Core linking, and execution as one
+- automatic entry-point discovery/seeding and a public source-to-execution
   pipeline;
+- execution of cyclic, indirect, evidence-bearing or coercion-bearing source
+  call graphs;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;

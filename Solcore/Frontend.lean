@@ -408,6 +408,8 @@ import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.Frontend.SourceSpecializationWorklistProperties
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.SourceCoreElaborationProperties
+import Solcore.Frontend.SourceCoreDirectLinking
+import Solcore.Frontend.SourceCoreDirectLinkingProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,

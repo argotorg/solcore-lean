@@ -8,8 +8,11 @@ trait evidence, minimum-cost overload selection after candidate-local literal
 defaulting, source-arity-preserving per-argument coercion and bounded multi-step
 shortest-path coercion are connected end to end.  A first monomorphic builtin
 typed-source-to-Core bridge, rigid/generic specialization and finite direct-call
-specialization worklist are also executable.  Conversion-term insertion,
-direct-call lowering and whole-program Core linking remain staged extensions.
+specialization worklist are also executable.  A restricted linker connects
+complete acyclic evidence-free direct-call plans to independently rechecked
+Core entries.  Conversion-term insertion, trait/coercion evidence execution,
+recursive or indirect source calls, automatic entry discovery and a public
+source pipeline remain staged extensions.
 
 ## Context
 
@@ -48,7 +51,7 @@ program environment
   -> whole-program checking
 ```
 
-`Core.Ty` remains the closed monomorphic runtime language.  A later
+`Core.Ty` remains the closed monomorphic runtime language.  A separate
 specialization boundary projects fully solved source types and expressions to
 Core.  This prevents source polymorphism from invalidating the existing Core
 metatheory.
@@ -82,6 +85,9 @@ The first profile may reject rather than guess for:
 - generic or symbolic intermediate coercion paths and coercion cycles that need
   coinductive reasoning;
 - insertion of executable conversion terms;
+- budget-exhausted specialization outcomes and every direct-call cycle;
+- nonempty specialized assumptions or solved requirements, coercion-bearing
+  nodes, and indirect calls at the Core-linking boundary;
 - constructor/operator export selectors and the remaining module-reference
   edge cases;
 - nested contract namespaces and every member-overload rule; and
@@ -130,9 +136,10 @@ mapping read indexes unify a key/value pair while checking the key through the
 same expected-type/coercion boundary.  They remain type-checking-only forms.
 Constructor/operator export selectors, the remaining advanced expressions and
 statements, generic/symbolic coercion intermediates, executable conversion
-terms, general source specialization and general lowering to `Core.Ty` are
-outside the completed profile; the call-free ground specialization and builtin
-tail-normal lowering slices below are implemented.
+terms, unrestricted source specialization and general lowering to `Core.Ty`
+are outside the completed profile; the ground specialization, builtin
+tail-normal lowering and restricted acyclic linking slices below are
+implemented.
 
 The next internal boundary is an occurrence-addressed typed/resolved source IR.
 As its first carrier step, every inferred trait or coercion obligation now gets
@@ -208,8 +215,28 @@ edge is accepted.  Signature assumptions and solved evidence are retained for
 the later execution layer rather than discharged here, and indirect calls are
 an explicit profile error.
 
-The next internal boundary adds direct Core calls and whole-program linking,
-then executable conversion/trait evidence.  Selection-bearing constructor,
+The first specialized direct-call linker accepts only complete acyclic plans.
+It reconstructs the worklist from canonical roots, checks canonical entries and
+the exact per-occurrence edge list, and expands each direct call into
+capture-free `Resolved.Expr` lets.  Arguments are evaluated left to right into
+fresh temporaries before callee input aliases enter scope.  Every explicitly
+seeded entry is then lowered and independently rechecked by `Core.infer?`, and
+runtime entry checks require the exact argument-type sequence.  Seed order and
+duplicates are preserved.  This is finite inlining rather than a named or
+global recursive-function facility.
+
+Budget-exhausted outcomes, direct-call cycles, nonempty specialized assumptions
+or solved requirements, coercion-bearing nodes and indirect calls all reject
+explicitly.  The worklist can therefore close same-key recursive graphs for
+finite planning without claiming they are executable in the current Core.
+Executable regressions cover nested generic calls, both conditional paths,
+runtime input mismatches, malformed plans and each principal staged boundary;
+small checked laws retain the runtime input gate and budget result.
+
+The next internal boundary is executable conversion and trait/coercion
+evidence.  Recursive calls require a separate named or global recursive Core
+representation rather than cyclic inlining.  Selection-bearing constructor,
 member, match and assignment work follows the same carrier rather than
-extending an information-losing result shape.  Whole-program consumers identify
-an obligation by its owning declaration together with its function-local ID.
+extending an information-losing result shape.  Whole-program consumers
+identify an obligation by its owning declaration together with its
+function-local ID.
