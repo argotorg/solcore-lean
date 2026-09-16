@@ -114,6 +114,9 @@ private def fresheningAvoidsGoalCollision : Bool :=
   decide (freshened.head = showPredicate (box (.variable ⟨6⟩)) ∧
     freshened.wherePredicates = [equality (.variable ⟨6⟩)])
 
+private def concreteImplDoesNotBindGoal : Bool :=
+  decide (matchImplHead? equalityWordRule (equality (.variable ⟨5⟩)) = none)
+
 /-- Execute the typed impl-head/unification bridge without umbrella registration. -/
 def testTypedTraitResolution : IO Unit := do
   assertTrue successfulResolution
@@ -122,6 +125,8 @@ def testTypedTraitResolution : IO Unit := do
     "full predicate arguments were not included in impl-head unification"
   assertTrue fresheningAvoidsGoalCollision
     "impl variables were not freshened away from goal variables"
+  assertTrue concreteImplDoesNotBindGoal
+    "a concrete impl silently bound a caller-owned goal variable"
   assertTrue (decide (matchImplHead? showBoxRule (showPredicate (box .word)) =
       some [equality .word]))
     "typed head matcher did not expose instantiated where predicates"

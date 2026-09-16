@@ -161,7 +161,11 @@ def matchImplHead? (rule : ImplRule) (goal : Predicate) :
   let freshened := freshenRuleFor rule goal
   let constraints ← headConstraints? freshened.head goal
   let substitution ← (Unification.unify constraints).toOption
-  pure (freshened.wherePredicates.map (applySubstitution substitution))
+  let goalVariables := predicateVariables goal
+  if substitution.domain.any goalVariables.contains then
+    none
+  else
+    pure (freshened.wherePredicates.map (applySubstitution substitution))
 
 /-- Typed head matcher accepted by the generic tabled-resolution kernel. -/
 def headMatcher : TraitResolution.HeadMatcher TraitId Ty ImplId :=
