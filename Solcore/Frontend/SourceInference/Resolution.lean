@@ -189,6 +189,35 @@ def functionParts? : Ty → Option (Ty × Ty)
   | .function parameter result => some (parameter, result)
   | _ => none
 
+/-- Recover the source-level parameter list from its bundled function type.
+
+The source arity is authoritative. In particular, an arity-one function keeps a
+product parameter intact instead of treating its components as separate call
+arguments. -/
+def parameterTypesForArity? : Nat → Ty → Option (List Ty)
+  | 0, parameter => if parameter = .unit then some [] else none
+  | 1, parameter => some [parameter]
+  | arity + 2, .product parameter rest => do
+      let parameters ← parameterTypesForArity? (arity + 1) rest
+      pure (parameter :: parameters)
+  | _ + 2, _ => none
+
+def unifyArguments : State → List Ty → List Ty → Option State
+  | state, [], [] => some state
+  | state, argument :: arguments, parameter :: parameters => do
+      let state ← (unify state argument parameter).toOption
+      unifyArguments state arguments parameters
+  | _, _, _ => none
+
+def coerceArguments (context : Context) :
+    State → List Ty → List Ty → Except Error (Option State)
+  | state, [], [] => .ok (some state)
+  | state, argument :: arguments, parameter :: parameters => do
+      match ← candidateWithExpected context state argument (some parameter) with
+      | none => pure none
+      | some (_, state) => coerceArguments context state arguments parameters
+  | _, _, _ => .ok none
+
 def validateCandidatePredicates (context : Context) (state : State) :
     List ProgramPredicate → Except Error Unit
   | [] => .ok ()
@@ -201,15 +230,16 @@ def validateCandidatePredicates (context : Context) (state : State) :
         validateCandidatePredicates context state rest
 
 def tryFunctionCandidate (context : Context)
-    (argumentType : Ty) (expected : Option Ty) (state : State)
+    (argumentTypes : List Ty) (expected : Option Ty) (state : State)
     (signature : ProgramFunctionSignature) :
     Except Error (Option (Ty × State)) :=
   let instantiated := signature.scheme.instantiate state.inference.next
   let candidate? : Option (Ty × State) := do
     let (parameter, result) ← functionParts? instantiated.body
+    let parameters ← parameterTypesForArity? signature.parameterTypes.length parameter
     let inference := { state.inference with next := instantiated.next }
     let state := { state with inference }
-    let state ← (unify state parameter argumentType).toOption
+    let state ← unifyArguments state argumentTypes parameters
     let state ← match expected with
       | none => some state
       | some expected => (unify state result expected).toOption
@@ -222,7 +252,7 @@ def tryFunctionCandidate (context : Context)
         state.addRequirements instantiated.predicates))
 
 def tryCoercibleFunctionCandidate (context : Context)
-    (argumentType : Ty) (expected : Option Ty) (state : State)
+    (argumentTypes : List Ty) (expected : Option Ty) (state : State)
     (signature : ProgramFunctionSignature) :
     Except Error (Option (Ty × State)) :=
   let requirementCount := state.requirements.length
@@ -230,20 +260,23 @@ def tryCoercibleFunctionCandidate (context : Context)
   match functionParts? instantiated.body with
   | none => .ok none
   | some (parameter, result) => do
-      let inference := { state.inference with next := instantiated.next }
-      let state := { state with inference }
-      match ← candidateWithExpected context state argumentType (some parameter) with
+      match parameterTypesForArity? signature.parameterTypes.length parameter with
       | none => pure none
-      | some (_, state) =>
-          match ← candidateWithExpected context state result expected with
+      | some parameters =>
+          let inference := { state.inference with next := instantiated.next }
+          let state := { state with inference }
+          match ← coerceArguments context state argumentTypes parameters with
           | none => pure none
-          | some (result, state) =>
-              let introducedRequirements :=
-                state.requirements.drop requirementCount
-              validateCandidatePredicates context state
-                (instantiated.predicates ++ introducedRequirements)
-              pure (some (state.resolve result,
-                state.addRequirements instantiated.predicates))
+          | some state =>
+              match ← candidateWithExpected context state result expected with
+              | none => pure none
+              | some (result, state) =>
+                  let introducedRequirements :=
+                    state.requirements.drop requirementCount
+                  validateCandidatePredicates context state
+                    (instantiated.predicates ++ introducedRequirements)
+                  pure (some (state.resolve result,
+                    state.addRequirements instantiated.predicates))
 
 structure CandidateSearch where
   successes : List (ProgramFunctionSignature × Ty × State) := []
@@ -298,26 +331,26 @@ def selectCandidateSearch (name : String)
 
 def selectFunctionCandidateFrom (context : Context) (name : String)
     (candidates : List ProgramFunctionSignature)
-    (argumentType : Ty) (expected : Option Ty) (state : State) :
+    (argumentTypes : List Ty) (expected : Option Ty) (state : State) :
     Except Error (Ty × State) :=
   let exact := collectCandidateAttempts
-    (tryFunctionCandidate context argumentType expected state) candidates
+    (tryFunctionCandidate context argumentTypes expected state) candidates
   match exact.successes with
   | [] =>
       match firstBlockingFailure? exact.failures with
       | some error => .error error
       | none =>
           let coercible := collectCandidateAttempts
-            (tryCoercibleFunctionCandidate context argumentType expected state)
+            (tryCoercibleFunctionCandidate context argumentTypes expected state)
             candidates
           selectCandidateSearch name candidates exact.failures coercible
   | _ => selectCandidateSearch name candidates [] exact
 
 def selectFunctionCandidate (context : Context) (name : String)
-    (argumentType : Ty) (expected : Option Ty) (state : State) :
+    (argumentTypes : List Ty) (expected : Option Ty) (state : State) :
     Except Error (Ty × State) := do
   selectFunctionCandidateFrom context name (← functionsNamed context name)
-    argumentType expected state
+    argumentTypes expected state
 
 def applyFunctionType (context : Context) (calleeType argumentType : Ty)
     (expected : Option Ty) (state : State) : Except Error (Ty × State) :=
