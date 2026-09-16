@@ -43,8 +43,11 @@ Proof-only direct-call signature predicates may be discharged statically after
 exact requirement/evidence validation.  Checked trait/implementation catalogs
 now retain and signature-check their methods, and the first deliberately narrow
 runtime-evidence path executes a selected monomorphic `Add<T>` implementation
-method body.  Other runtime evidence remains outside this path.  It is not yet
-a general source compiler or a public source Oracle.
+method body.  The same method-authoritative boundary now executes a narrow
+closed `Coerce<From, To>.coerce` profile at direct-call arguments, through
+forwarded generic evidence, and on call results.  Other runtime evidence
+remains outside this path.  It is not yet a general source compiler or a public
+source Oracle.
 
 ## What works now
 
@@ -5633,19 +5636,22 @@ assignment, match, loops, assembly and loop control reject as unsupported.
 Higher-rank and higher-kinded polymorphism,
 polymorphic recursion, coinductive trait cycles and overlap policy beyond
 explicit ambiguity are deferred.  Generic or symbolic intermediate coercion
-paths, coinductive coercion cycles and insertion of executable conversion terms
-are not yet connected.  The specialization and lowering slices described below
-cover a deliberately closed builtin subset.  Complete acyclic direct calls
-without coercions are executable through the restricted plan linker.  A direct
-call's signature predicates may be consumed statically when its requirement
-IDs, predicates and evidence goals match exactly; closed implementation
-evidence is forwarded through nested constrained calls.  Cyclic or indirect
-calls, runtime trait evidence beyond the single-method `Add<T>` profile,
-conversion execution and general source semantics are not claimed.
+paths and coinductive coercion cycles are not yet connected.  The specialization
+and lowering slices described below cover a deliberately closed builtin subset.
+Complete acyclic direct calls are executable through the restricted plan
+linker, including a narrow closed `Coerce<From, To>.coerce` conversion profile.
+A direct call's signature predicates may be consumed statically when its
+requirement IDs, predicates and evidence goals match exactly; closed
+implementation evidence is forwarded through nested constrained calls and may
+justify a conversion inside the generic callee.  Cyclic or indirect calls,
+runtime trait evidence beyond the single-method `Add<T>` and
+`Coerce<From, To>` profiles, general conversion execution and general source
+semantics are not claimed.
 
-Before adding constructor/member selection, match, assignment or executable
-conversion, the next architecture boundary is an occurrence-addressed typed and
-resolved source IR.  Its first carrier layer is implemented: each inferred
+Before adding constructor/member selection, match, assignment or broader
+executable conversion, the next architecture boundary is an
+occurrence-addressed typed and resolved source IR.  Its first carrier layer is
+implemented: each inferred
 trait or coercion obligation receives a contiguous function-local identity, and
 finalization retains that identity together with the normalized predicate and
 its matching evidence in one canonical solved-requirement record.  Allocation
@@ -5659,12 +5665,17 @@ semantic expression and statement receives a declaration-owned occurrence identi
 function inputs, lambda parameters and nested lets retain stable binder
 identities across lexical shadowing; and roots use category-safe expression or
 statement wrappers.  Direct calls retain the selected declaration, exact
-generic-parameter substitution and instantiated predicates, while indirect
-calls retain their semantic callee occurrence.  Ordered coercion steps are
-attached to the argument or result occurrence where they are required,
-operator and signature obligations are attached to their introducing node,
-and literal-defaulting obligations return to the originating literal.  Losing
-overload candidates cannot contribute nodes, requirements or allocator state.
+generic-parameter substitution and instantiated predicates.  An expression
+node's stored `type` is always its authoritative post-coercion type; a nonempty
+output path derives the raw type from its first edge and must compose edge by
+edge to that stored type.  Indirect calls retain their semantic callee
+occurrence plus separate before/after types and an ordered coercion path for the
+bundled arguments, so argument conversion cannot be confused with conversion
+of the call result.  Ordered output coercion steps are attached to the argument
+or result occurrence where they are required, operator and signature
+obligations are attached to their introducing node, and literal-defaulting
+obligations return to the originating literal.  Losing overload candidates
+cannot contribute nodes, requirements or allocator state.
 Transparent callee groups and qualified-name field chains are normalized to one
 semantic direct-callee reference carrying the complete selected name and outer
 callee span; this table is therefore not a one-node-per-parser-AST trace.
@@ -5673,15 +5684,18 @@ which may be inside a transparent group during expected-driven inference or on
 the outer argument when a completed argument is fitted to a call parameter.
 
 Finalization applies the inference substitution through node types, binder
-schemes, declaration instantiations, predicates and coercion endpoints without
-changing any identity.  The checked function exposes this closed node table as
-its typed body together with the canonical solved-requirement list.  End-to-end
-regressions cover nested shadowing, generic overload selection, rejected
-candidates, a two-edge coercion path, operator evidence, literal defaulting,
-category-safe lookup and a one-owner correspondence between attached and
-solved requirement identities.  Small checked laws cover allocator and
-substitution identity preservation; general preservation and ownership
-completeness theorems remain deferred under the executable-first proof policy.
+schemes, declaration instantiations, predicates, output coercion endpoints and
+indirect argument-bundle metadata without changing any identity.  The checked
+function exposes this closed node table as its typed body together with the
+canonical solved-requirement list.  Specialization and worklist admission
+recheck exact coercion endpoints and adjacency before downstream consumers use
+the carrier.  End-to-end regressions cover nested shadowing, generic overload
+selection, rejected candidates, a two-edge coercion path, indirect bundle
+metadata, operator evidence, literal defaulting, category-safe lookup and a
+one-owner correspondence between attached and solved requirement identities.
+Small checked laws cover allocator and substitution identity preservation;
+general preservation and ownership completeness theorems remain deferred under
+the executable-first proof policy.
 
 The first consumer of this carrier is now executable.  A checked function in
 the tail-normal statement profile can lower initialized lets, nested lexical
@@ -5698,16 +5712,19 @@ result stores checked equations both for exact `Resolved.Expr.lower?` output
 and for independent `Core.infer?` reconstruction of its declared return type.
 Missing or category-wrong node edges,
 duplicate inputs or active local IDs, polymorphic locals, unresolved source
-types, non-Word literals, typed-node mismatches, uninitialized lets, missing
-else branches, fallthrough, non-tail control statements and unconsumed
-requirements all produce located elaboration errors.  The standalone function
-elaborator still rejects calls; the validated plan linker described below
-supplies the only call callback.  Lambdas, expression statements, proxy/index
-forms, nominal types, coercions and every non-call trait requirement reject
-explicitly instead of receiving an invented runtime meaning.  The linker's
-call callback is the sole exception: it reports exactly which call-owned
-requirements it has validated and statically consumed, and function finalization
-rejects any solved requirement left unconsumed.  End-to-end
+types, non-Word literals, typed-node mismatches, malformed coercion paths,
+uninitialized lets, missing else branches, fallthrough, non-tail control
+statements and unconsumed requirements all produce located elaboration errors.
+The standalone function elaborator still rejects calls and coercions; the
+validated plan linker described below supplies the policies which give those
+forms their restricted meaning.  The general lowering entry validates every
+coercion path's non-identity edges, exact endpoints, adjacency and attached
+`RequirementId`s, then requires each policy result to declare the matching Core
+source/target types and consume exactly that step's ID.  Function finalization
+reconciles all IDs once against the canonical solved-requirement table.  Lambdas,
+expression statements, proxy/index forms, nominal types and unsupported trait
+requirements still reject explicitly instead of receiving an invented runtime
+meaning.  End-to-end
 regressions execute both branches after nested blocks and shadowing lets, in
 addition to the original product-returning expression profile.
 
@@ -5782,23 +5799,43 @@ left to right, and the body is capture-free inlined into the linked Core term.
 The method body is authoritative: the regression implementation computes
 subtraction, so `50 + 8` through generic evidence evaluates to `42`, not `58`.
 
+The first executable conversion profile uses the same selected-method
+authority.  Each output coercion step must name exactly one attached and solved
+requirement whose predicate and evidence goal are exactly
+`Coerce<From, To>` for that edge.  An unresolved assumption rejects unless a
+unique matching closed implementation witness was forwarded from the caller.
+The selected two-parameter trait must have the sole method `coerce`, and the
+selected implementation and method must satisfy the same monomorphic,
+premise-free, `where`-free profile.  The method is checked at one `From` input
+and one `To` result and then capture-free inlined; endpoint types validate the
+method but never invent its behavior.  Regressions execute a direct Bool-to-Word
+argument conversion, the same conversion justified by evidence forwarded into
+a generic callee, and a call-result conversion alongside separate proof-only
+signature evidence.  The fixture's method returns `41` or `7`, confirming that
+the selected method body—not a hard-coded endpoint conversion—is executed.
+
 Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
 direct-call cycles, seed roots with unresolved assumptions, unconsumed
-non-call/operator/literal requirements outside that `Add<T>` exception,
-coercion-bearing nodes and indirect calls reject explicitly.  Other runtime
-operators, generic or premise-bearing implementation methods, multi-method or
-`where`-constrained profiles, and coercion methods remain explicit boundaries.
+non-call/operator/literal requirements outside the two explicit profiles and
+indirect calls reject explicitly.  Other runtime operators, generic or
+premise-bearing implementation methods, multi-method or `where`-constrained
+profiles remain explicit boundaries.  Implementation method bodies themselves
+must fit the standalone tail-normal Core-lowerable subset: calls, coercions and
+required operations inside a method body still reject.  Nominal source types
+also remain outside the closed Core type projection.
 Thus the worklist may close same-key self or mutual recursion, but the current
 linker does not assign those cycles an executable meaning.  Small checked laws
 fix the runtime input-type gate and budget-exhaustion boundary; end-to-end
 regressions execute proof-only constrained and nested generic calls as well as
-both conditional paths and the method-authoritative `Add<Word>` profile, and
-cover the staged failure cases.
+both conditional paths, the method-authoritative `Add<Word>` profile and the
+direct, forwarded-generic and call-result conversion profiles, and cover the
+staged failure cases.
 
-The next frontend boundary is expansion from this one runtime trait-evidence
-profile to coercion evidence and conversion-term insertion, then to other
-operators and implementation shapes.  Recursive source calls require a separate
-named or global recursive-function representation rather than cyclic inlining.
+The next frontend boundary is expansion from these two narrow runtime-evidence
+profiles to other operators and implementation shapes, then to method bodies
+that themselves contain evidence-bearing operations.  Recursive source calls
+require a separate named or global recursive-function representation rather
+than cyclic inlining.
 Automatic entry discovery, constructors, members and place-aware statements
 remain later in dependency order.  A whole-program reference to an obligation
 remains the owning declaration paired with its function-local requirement
@@ -5813,7 +5850,9 @@ Solcore source text. In particular, it does not yet provide:
   pipeline;
 - execution of cyclic or indirect source call graphs, runtime
   evidence-dependent operator/literal/non-call forms outside the narrow
-  `Add<T>` profile, general impl methods, or coercion-bearing source calls;
+  `Add<T>` and `Coerce<From, To>` profiles, general impl methods, generic or
+  symbolic conversion execution, or method bodies containing calls,
+  coercions, or required operations;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;

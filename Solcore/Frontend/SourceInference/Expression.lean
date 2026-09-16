@@ -67,6 +67,7 @@ def attachExpressionCoercions (state : State)
   entries.foldl (fun state entry =>
     state.modifyExpressionNode entry.expression fun node => {
       node with
+      type := entry.coercions.foldl (fun _ step => step.target) node.type
       requirements := node.requirements ++ coercionRequirements entry.coercions
       coercions := node.coercions ++ entry.coercions
     }) state
@@ -123,11 +124,18 @@ def recordSelectedCall (source callee : Syntax.Expr) (name : String)
 def recordIndirectCall (source : Syntax.Expr) (callee : InferredExpression)
     (arguments : List InferredExpression) (result : IndirectApplicationResult) :
     InferredExpression × State :=
+  let argumentType := Ty.productMany (arguments.map (·.type))
+  let coercedArgumentType := result.argumentCoercions.foldl
+    (fun _ step => step.target) argumentType
   recordExpression source result.result
-    (.call callee.id (arguments.map (·.id)) .indirect)
+    (.call callee.id (arguments.map (·.id)) (.indirect {
+      argumentTypeBeforeCoercion := argumentType
+      argumentTypeAfterCoercion := coercedArgumentType
+      argumentCoercions := result.argumentCoercions
+    }))
     (coercionRequirements result.argumentCoercions ++
       coercionRequirements result.callCoercions)
-    (result.argumentCoercions ++ result.callCoercions) result.state
+    result.callCoercions result.state
 
 mutual
 

@@ -90,6 +90,21 @@ inductive ErrorReason where
   | callArgumentArityMismatch (expected actual : Nat)
   | binaryRequirementsMismatch
       (expected actual : List RequirementId)
+  | identityCoercionStep
+      (index : Nat) (requirement : RequirementId) (type : Ty)
+  | coercionPathDiscontinuity
+      (index : Nat) (expectedSource actualSource : Ty)
+  | coercionPathTargetMismatch (expectedTarget actualTarget : Ty)
+  | missingCoercionRequirement
+      (requirement : RequirementId) (attached : List RequirementId)
+  | duplicateCoercionRequirement (requirement : RequirementId)
+  | coercionPlanSourceTypeMismatch
+      (requirement : RequirementId) (expected actual : Core.Ty)
+  | coercionPlanTargetTypeMismatch
+      (requirement : RequirementId) (expected actual : Core.Ty)
+  | coercionPlanRequirementsMismatch
+      (requirement : RequirementId)
+      (expected actual : List RequirementId)
   | unknownConsumedRequirement (requirement : RequirementId)
   | duplicateConsumedRequirement (requirement : RequirementId)
   | unconsumedRequirements (requirements : List RequirementId)
@@ -163,11 +178,28 @@ structure RequiredBinaryPlan (error : Type) where
 
 /-- A whole-program consumer may give runtime meaning to an otherwise staged,
 requirement-bearing binary expression.  Source Core still owns child lookup,
-left-to-right traversal, coercion rejection, type checking, and requirement
-reconciliation. -/
+left-to-right traversal, coercion-aware child lowering, type checking, and
+requirement reconciliation. -/
 abbrev RequiredBinaryElaborator (error : Type) :=
   Resolved.Context → ExpressionNode → ExpressionId → Syntax.BinaryOp →
   ExpressionId → Except error (RequiredBinaryPlan error)
+
+/-- One executable coercion step declares both Core endpoints and the exact
+requirement discharge it owns before transforming an already lowered source
+expression.  Endpoint declarations keep malformed or stale policies from
+silently assigning runtime meaning to a different typed path. -/
+structure CoercionPlan (error : Type) where
+  sourceType : Core.Ty
+  targetType : Core.Ty
+  consumedRequirements : List RequirementId
+  build : Resolved.Expr → Except error Resolved.Expr
+
+/-- A whole-program consumer may give runtime meaning to one evidence-bearing
+coercion edge.  Source Core retains path validation, base-form traversal,
+source-order composition, and exact requirement accounting. -/
+abbrev CoercionElaborator (error : Type) :=
+  Resolved.Context → ExpressionNode → CoercionStep →
+  Except error (CoercionPlan error)
 
 private def fail {alpha : Type} (site : ErrorSite) (reason : ErrorReason) :
     Except Error alpha :=
@@ -270,205 +302,314 @@ private def ensureTypeWith {error : Type} (lift : Error → error)
   else
     failWith lift site (.typedNodeTypeMismatch expected actual)
 
+private def eraseRequirement? (target : RequirementId) :
+    List RequirementId → Option (List RequirementId)
+  | [] => none
+  | requirement :: rest =>
+      if requirement = target then
+        some rest
+      else
+        (eraseRequirement? target rest).map fun remaining =>
+          requirement :: remaining
+
+private structure PreparedCoercionPath where
+  rawType : Ty
+  remainingRequirements : List RequirementId
+
+private def consumeCoercionRequirementWith {error : Type}
+    (lift : Error → error) (site : ErrorSite)
+    (attached : List RequirementId) (seen : List RequirementId)
+    (remaining : List RequirementId) (requirement : RequirementId) :
+    Except error (List RequirementId) :=
+  if seen.contains requirement then
+    failWith lift site (.duplicateCoercionRequirement requirement)
+  else
+    match eraseRequirement? requirement remaining with
+    | none =>
+        failWith lift site (.missingCoercionRequirement requirement attached)
+    | some result =>
+        if result.contains requirement then
+          failWith lift site (.duplicateCoercionRequirement requirement)
+        else
+          pure result
+
+private def prepareCoercionTailWith {error : Type}
+    (lift : Error → error) (site : ErrorSite)
+    (attached : List RequirementId) (finalType : Ty) :
+    Nat → Ty → List RequirementId → List RequirementId →
+      List CoercionStep → Except error (List RequirementId)
+  | _, previousTarget, _, remaining, [] =>
+      if previousTarget = finalType then
+        pure remaining
+      else
+        failWith lift site
+          (.coercionPathTargetMismatch finalType previousTarget)
+  | index, previousTarget, seen, remaining, step :: rest => do
+      if step.source != previousTarget then
+        failWith lift site
+          (.coercionPathDiscontinuity index previousTarget step.source)
+      else if step.source = step.target then
+        failWith lift site
+          (.identityCoercionStep index step.requirement step.source)
+      else
+        let remaining ← consumeCoercionRequirementWith lift site attached
+          seen remaining step.requirement
+        prepareCoercionTailWith lift site attached finalType (index + 1)
+          step.target (step.requirement :: seen) remaining rest
+
+private def prepareCoercionPathWith {error : Type}
+    (lift : Error → error) (node : ExpressionNode)
+    (first : CoercionStep) (rest : List CoercionStep) :
+    Except error PreparedCoercionPath := do
+  let site := ErrorSite.occurrence node.id.occurrence
+  if first.source = first.target then
+    failWith lift site
+      (.identityCoercionStep 0 first.requirement first.source)
+  else
+    let remaining ← consumeCoercionRequirementWith lift site
+      node.requirements [] node.requirements first.requirement
+    let remaining ← prepareCoercionTailWith lift site node.requirements
+      node.type 1 first.target [first.requirement] remaining rest
+    pure {
+      rawType := first.source
+      remainingRequirements := remaining
+    }
+
+private def checkedCoercionPlansWith {error : Type}
+    (lift : Error → error) (onCoercion : CoercionElaborator error)
+    (scope : Resolved.Context) (node : ExpressionNode) :
+    List CoercionStep → Except error (List (CoercionPlan error))
+  | [] => pure []
+  | step :: rest => do
+      let sourceType ←
+        (lowerType (.occurrence node.id.occurrence) step.source).mapError lift
+      let targetType ←
+        (lowerType (.occurrence node.id.occurrence) step.target).mapError lift
+      let plan ← onCoercion scope node step
+      if plan.sourceType != sourceType then
+        failWith lift (.occurrence node.id.occurrence)
+          (.coercionPlanSourceTypeMismatch step.requirement sourceType
+            plan.sourceType)
+      else if plan.targetType != targetType then
+        failWith lift (.occurrence node.id.occurrence)
+          (.coercionPlanTargetTypeMismatch step.requirement targetType
+            plan.targetType)
+      else if plan.consumedRequirements != [step.requirement] then
+        failWith lift (.occurrence node.id.occurrence)
+          (.coercionPlanRequirementsMismatch step.requirement
+            [step.requirement] plan.consumedRequirements)
+      else
+        pure (plan :: (← checkedCoercionPlansWith lift onCoercion scope
+          node rest))
+
+private def applyCoercionPlans {error : Type}
+    (resolved : Resolved.Expr) (consumed : List RequirementId) :
+    List (CoercionPlan error) → Except error LoweredExpression
+  | [] => pure { resolved, consumedRequirements := consumed }
+  | plan :: rest => do
+      let resolved ← plan.build resolved
+      applyCoercionPlans resolved
+        (consumed ++ plan.consumedRequirements) rest
+
+/-- Lower one coercion-cleared expression node.  Recursive edges return to the
+outer traversal, so every child independently receives its own coercion policy
+without reapplying the current node's path. -/
+private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error)
+    (onRequiredBinary : RequiredBinaryElaborator error)
+    (source : TypedSource) (scope : Resolved.Context)
+    (recurse : ExpressionId → Except error LoweredExpression)
+    (node : ExpressionNode) : Except error LoweredExpression :=
+  let id := node.id
+  match node.form with
+  | .call callee arguments resolution => do
+      let plan ← onCall scope node callee arguments resolution
+      if plan.consumedRequirements != node.requirements then
+        failWith lift (.occurrence id.occurrence)
+          (.callRequirementsMismatch node.requirements
+            plan.consumedRequirements)
+      else if plan.argumentTypes.length != arguments.length then
+        failWith lift (.occurrence id.occurrence)
+          (.callArgumentArityMismatch plan.argumentTypes.length
+            arguments.length)
+      else
+        let loweredArguments ←
+          (plan.argumentTypes.zip arguments).mapM fun pair => do
+            let argumentNode ←
+              (lookupExpression source pair.2).mapError lift
+            ensureTypeWith lift (.occurrence pair.2.occurrence)
+              pair.1 argumentNode.type
+            recurse pair.2
+        let resolved ← plan.build
+          (loweredArguments.map fun argument => argument.resolved)
+        pure {
+          resolved
+          consumedRequirements :=
+            loweredArguments.flatMap
+              (fun argument => argument.consumedRequirements) ++
+            plan.consumedRequirements
+        }
+  | .binary left operator right =>
+      if node.requirements.isEmpty then
+        match lowerType (.occurrence id.occurrence) node.type with
+        | .error error => .error (lift error)
+        | .ok _ => do
+            let left ← recurse left
+            let right ← recurse right
+            pure {
+              resolved := directBinary operator left.resolved right.resolved
+              consumedRequirements := left.consumedRequirements ++
+                right.consumedRequirements
+            }
+      else do
+        let plan ← onRequiredBinary scope node left operator right
+        if plan.consumedRequirements != node.requirements then
+          failWith lift (.occurrence id.occurrence)
+            (.binaryRequirementsMismatch node.requirements
+              plan.consumedRequirements)
+        else
+          match lowerType (.occurrence id.occurrence) node.type with
+          | .error error => .error (lift error)
+          | .ok _ =>
+            let leftNode ← (lookupExpression source left).mapError lift
+            ensureTypeWith lift (.occurrence left.occurrence)
+              plan.leftType leftNode.type
+            let loweredLeft ← recurse left
+            let rightNode ← (lookupExpression source right).mapError lift
+            ensureTypeWith lift (.occurrence right.occurrence)
+              plan.rightType rightNode.type
+            let loweredRight ← recurse right
+            let resolved ← plan.build loweredLeft.resolved
+              loweredRight.resolved
+            pure {
+              resolved
+              consumedRequirements :=
+                loweredLeft.consumedRequirements ++
+                loweredRight.consumedRequirements ++
+                plan.consumedRequirements
+            }
+  | _ =>
+      if !node.requirements.isEmpty then
+        failWith lift (.occurrence id.occurrence)
+          (.requirementsPresent node.requirements)
+      else
+        match lowerType (.occurrence id.occurrence) node.type with
+        | .error error => .error (lift error)
+        | .ok _ =>
+          match node.form with
+          | .literal literal =>
+              match interpretWordLiteral? ⟨node.span, literal⟩ with
+              | some word => pure {
+                  resolved := .word word
+                  consumedRequirements := []
+                }
+              | none =>
+                  failWith lift (.occurrence id.occurrence)
+                    (.invalidWordLiteral literal)
+          | .reference _ (.local binder) =>
+              if scope.ids.contains binder then
+                pure {
+                  resolved := .var binder
+                  consumedRequirements := []
+                }
+              else
+                failWith lift (.occurrence id.occurrence)
+                  (.unknownLocal binder)
+          | .reference _ (.builtinBoolean value) => pure {
+              resolved := .bool value
+              consumedRequirements := []
+            }
+          | .reference _ (.declaration _) =>
+              failWith lift (.occurrence id.occurrence)
+                (.unsupportedExpression .declarationReference)
+          | .group inner => recurse inner
+          | .tuple elements => do
+              let lowered ← elements.mapM recurse
+              pure {
+                resolved := productExpression
+                  (lowered.map fun element => element.resolved)
+                consumedRequirements := lowered.flatMap
+                  (fun element => element.consumedRequirements)
+              }
+          | .unary operator operand => do
+              let operand ← recurse operand
+              pure {
+                resolved := match operator with
+                  | .logicalNot => .unary .boolNot operand.resolved
+                  | .bitNot => .unary .wordNot operand.resolved
+                consumedRequirements := operand.consumedRequirements
+              }
+          | .binary _ _ _ =>
+              failWith lift (.occurrence id.occurrence)
+                (.requirementsPresent node.requirements)
+          | .conditional condition thenBranch elseBranch => do
+              let condition ← recurse condition
+              let thenBranch ← recurse thenBranch
+              let elseBranch ← recurse elseBranch
+              pure {
+                resolved := .ifE condition.resolved thenBranch.resolved
+                  elseBranch.resolved
+                consumedRequirements :=
+                  condition.consumedRequirements ++
+                  thenBranch.consumedRequirements ++
+                  elseBranch.consumedRequirements
+              }
+          | .call _ _ _ =>
+              failWith lift (.occurrence id.occurrence)
+                (.unsupportedExpression .call)
+          | .lambda _ _ _ => failWith lift (.occurrence id.occurrence)
+              (.unsupportedExpression .lambda)
+          | .proxy _ => failWith lift (.occurrence id.occurrence)
+              (.unsupportedExpression .proxy)
+          | .index _ _ => failWith lift (.occurrence id.occurrence)
+              (.unsupportedExpression .index)
+
 /-- Lower one expression by following category-safe occurrence edges.  Fuel is
 derived from the finite node table and turns malformed cyclic tables into a
-located error. -/
+located error.  A nonempty coercion path is checked and planned once around a
+coercion-cleared view of the base node. -/
 private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onCoercion : CoercionElaborator error)
     (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
     (id : ExpressionId) :
     Except error LoweredExpression :=
   match fuel with
   | 0 => failWith lift (.occurrence id.occurrence) .expressionDepthLimit
-  | fuel + 1 =>
-    match (lookupExpression source id).mapError lift with
-    | .error error => .error error
-    | .ok node =>
-        if !node.coercions.isEmpty then
-          failWith lift (.occurrence id.occurrence)
-            (.coercionsPresent node.coercions)
-        else
-          match node.form with
-          | .call callee arguments resolution => do
-              let plan ← onCall scope node callee arguments resolution
-              if plan.consumedRequirements != node.requirements then
-                failWith lift (.occurrence id.occurrence)
-                  (.callRequirementsMismatch node.requirements
-                    plan.consumedRequirements)
-              else if plan.argumentTypes.length != arguments.length then
-                failWith lift (.occurrence id.occurrence)
-                  (.callArgumentArityMismatch plan.argumentTypes.length
-                    arguments.length)
-              else
-                let loweredArguments ←
-                  (plan.argumentTypes.zip arguments).mapM fun pair => do
-                    let argumentNode ←
-                      (lookupExpression source pair.2).mapError lift
-                    if !argumentNode.coercions.isEmpty then
-                      failWith lift (.occurrence pair.2.occurrence)
-                        (.coercionsPresent argumentNode.coercions)
-                    else
-                      ensureTypeWith lift (.occurrence pair.2.occurrence)
-                        pair.1 argumentNode.type
-                      lowerExpressionFuelWith lift onCall onRequiredBinary fuel
-                        source scope pair.2
-                let resolved ← plan.build
-                  (loweredArguments.map fun argument => argument.resolved)
-                pure {
-                  resolved
-                  consumedRequirements :=
-                    loweredArguments.flatMap
-                      (fun argument => argument.consumedRequirements) ++
-                    plan.consumedRequirements
-                }
-          | .binary left operator right =>
-              if node.requirements.isEmpty then
-                match lowerType (.occurrence id.occurrence) node.type with
-                | .error error => .error (lift error)
-                | .ok _ => do
-                    let left ← lowerExpressionFuelWith lift onCall
-                      onRequiredBinary fuel source scope left
-                    let right ← lowerExpressionFuelWith lift onCall
-                      onRequiredBinary fuel source scope right
-                    pure {
-                      resolved := directBinary operator left.resolved
-                        right.resolved
-                      consumedRequirements := left.consumedRequirements ++
-                        right.consumedRequirements
-                    }
-              else do
-                let plan ← onRequiredBinary scope node left operator right
-                if plan.consumedRequirements != node.requirements then
-                  failWith lift (.occurrence id.occurrence)
-                    (.binaryRequirementsMismatch node.requirements
-                      plan.consumedRequirements)
-                else
-                  match lowerType (.occurrence id.occurrence) node.type with
-                  | .error error => .error (lift error)
-                  | .ok _ =>
-                    let leftNode ← (lookupExpression source left).mapError lift
-                    if !leftNode.coercions.isEmpty then
-                      failWith lift (.occurrence left.occurrence)
-                        (.coercionsPresent leftNode.coercions)
-                    else
-                      ensureTypeWith lift (.occurrence left.occurrence)
-                        plan.leftType leftNode.type
-                      let loweredLeft ← lowerExpressionFuelWith lift onCall
-                        onRequiredBinary fuel source scope left
-                      let rightNode ←
-                        (lookupExpression source right).mapError lift
-                      if !rightNode.coercions.isEmpty then
-                        failWith lift (.occurrence right.occurrence)
-                          (.coercionsPresent rightNode.coercions)
-                      else
-                        ensureTypeWith lift (.occurrence right.occurrence)
-                          plan.rightType rightNode.type
-                        let loweredRight ← lowerExpressionFuelWith lift onCall
-                          onRequiredBinary fuel source scope right
-                        let resolved ← plan.build loweredLeft.resolved
-                          loweredRight.resolved
-                        pure {
-                          resolved
-                          consumedRequirements :=
-                            loweredLeft.consumedRequirements ++
-                            loweredRight.consumedRequirements ++
-                            plan.consumedRequirements
-                        }
-          | _ =>
-              if !node.requirements.isEmpty then
-                failWith lift (.occurrence id.occurrence)
-                  (.requirementsPresent node.requirements)
-              else
-                match lowerType (.occurrence id.occurrence) node.type with
-                | .error error => .error (lift error)
-                | .ok _ =>
-                  match node.form with
-                  | .literal literal =>
-                      match interpretWordLiteral? ⟨node.span, literal⟩ with
-                      | some word => pure {
-                          resolved := .word word
-                          consumedRequirements := []
-                        }
-                      | none =>
-                          failWith lift (.occurrence id.occurrence)
-                            (.invalidWordLiteral literal)
-                  | .reference _ (.local binder) =>
-                      if scope.ids.contains binder then
-                        pure {
-                          resolved := .var binder
-                          consumedRequirements := []
-                        }
-                      else
-                        failWith lift (.occurrence id.occurrence)
-                          (.unknownLocal binder)
-                  | .reference _ (.builtinBoolean value) => pure {
-                      resolved := .bool value
-                      consumedRequirements := []
-                    }
-                  | .reference _ (.declaration _) =>
-                      failWith lift (.occurrence id.occurrence)
-                        (.unsupportedExpression .declarationReference)
-                  | .group inner =>
-                      lowerExpressionFuelWith lift onCall onRequiredBinary fuel
-                        source scope inner
-                  | .tuple elements => do
-                      let lowered ← elements.mapM fun element =>
-                        lowerExpressionFuelWith lift onCall onRequiredBinary
-                          fuel source scope element
-                      pure {
-                        resolved := productExpression
-                          (lowered.map fun element => element.resolved)
-                        consumedRequirements := lowered.flatMap
-                          (fun element => element.consumedRequirements)
-                      }
-                  | .unary operator operand => do
-                      let operand ←
-                        lowerExpressionFuelWith lift onCall onRequiredBinary
-                          fuel source scope operand
-                      pure {
-                        resolved := match operator with
-                          | .logicalNot => .unary .boolNot operand.resolved
-                          | .bitNot => .unary .wordNot operand.resolved
-                        consumedRequirements := operand.consumedRequirements
-                      }
-                  | .binary _ _ _ =>
-                      failWith lift (.occurrence id.occurrence)
-                        (.requirementsPresent node.requirements)
-                  | .conditional condition thenBranch elseBranch => do
-                      let condition ← lowerExpressionFuelWith lift onCall
-                        onRequiredBinary fuel source scope condition
-                      let thenBranch ← lowerExpressionFuelWith lift onCall
-                        onRequiredBinary fuel source scope thenBranch
-                      let elseBranch ← lowerExpressionFuelWith lift onCall
-                        onRequiredBinary fuel source scope elseBranch
-                      pure {
-                        resolved := .ifE condition.resolved thenBranch.resolved
-                          elseBranch.resolved
-                        consumedRequirements :=
-                          condition.consumedRequirements ++
-                          thenBranch.consumedRequirements ++
-                          elseBranch.consumedRequirements
-                      }
-                  | .call _ _ _ =>
-                      failWith lift (.occurrence id.occurrence)
-                        (.unsupportedExpression .call)
-                  | .lambda _ _ _ => failWith lift (.occurrence id.occurrence)
-                      (.unsupportedExpression .lambda)
-                  | .proxy _ => failWith lift (.occurrence id.occurrence)
-                      (.unsupportedExpression .proxy)
-                  | .index _ _ => failWith lift (.occurrence id.occurrence)
-                      (.unsupportedExpression .index)
+  | fuel + 1 => do
+      let node ← (lookupExpression source id).mapError lift
+      let recurse := lowerExpressionFuelWith lift onCall onRequiredBinary
+        onCoercion fuel source scope
+      match node.coercions with
+      | [] =>
+          lowerExpressionNodeWith lift onCall onRequiredBinary source scope
+            recurse node
+      | first :: rest => do
+          let prepared ← prepareCoercionPathWith lift node first rest
+          let plans ← checkedCoercionPlansWith lift onCoercion scope node
+            (first :: rest)
+          let baseNode := {
+            node with
+            type := prepared.rawType
+            requirements := prepared.remainingRequirements
+            coercions := []
+          }
+          let base ← lowerExpressionNodeWith lift onCall onRequiredBinary
+            source scope recurse baseNode
+          applyCoercionPlans base.resolved base.consumedRequirements plans
 
 private def lowerExpressionAsWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onCoercion : CoercionElaborator error)
     (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
     (expected : Core.Ty) (id : ExpressionId) :
     Except error LoweredExpression := do
   let node ← (lookupExpression source id).mapError lift
   ensureTypeWith lift (.occurrence id.occurrence) expected node.type
-  lowerExpressionFuelWith lift onCall onRequiredBinary fuel source scope id
+  lowerExpressionFuelWith lift onCall onRequiredBinary onCoercion fuel source
+    scope id
 
 private def statementRoots : List NodeId → Except Error (List StatementId)
   | [] => .ok []
@@ -486,7 +627,8 @@ private def finalStatement? : List StatementId → Option StatementId
 fuel, while expression edges consume the remaining fuel independently. -/
 private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
-    (onRequiredBinary : RequiredBinaryElaborator error) :
+    (onRequiredBinary : RequiredBinaryElaborator error)
+    (onCoercion : CoercionElaborator error) :
     Nat → TypedSource → Resolved.Context → Core.Ty → ErrorSite →
       ErrorReason → List StatementId → Except error LoweredExpression
   | _, _, _, _, fallthroughSite, fallthroughReason, [] =>
@@ -511,10 +653,10 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           let initializer ← match initializer with
             | none => failWith lift site .uninitializedLet
             | some initializer =>
-                lowerExpressionAsWith lift onCall onRequiredBinary fuel source
-                  scope binderType initializer
-          let body ← lowerStatementsFuelWith lift onCall onRequiredBinary fuel
-            source ((binder.id, binderType) :: scope) expected
+                lowerExpressionAsWith lift onCall onRequiredBinary onCoercion
+                  fuel source scope binderType initializer
+          let body ← lowerStatementsFuelWith lift onCall onRequiredBinary
+            onCoercion fuel source ((binder.id, binderType) :: scope) expected
             fallthroughSite fallthroughReason rest
           pure {
             resolved := .letE binder.id initializer.resolved body.resolved
@@ -536,8 +678,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
               else
                 failWith lift site (.typedNodeTypeMismatch expected .unit)
           | some value =>
-              lowerExpressionAsWith lift onCall onRequiredBinary fuel source
-                scope expected value
+              lowerExpressionAsWith lift onCall onRequiredBinary onCoercion
+                fuel source scope expected value
     | .ifThen condition thenBody elseBody => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .ifThen)
@@ -547,12 +689,12 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           | some elseBody => do
               ensureTypeWith lift site expected node.type
               let condition ← lowerExpressionAsWith lift onCall
-                onRequiredBinary fuel source scope .bool condition
+                onRequiredBinary onCoercion fuel source scope .bool condition
               let thenBranch ← lowerStatementsFuelWith lift onCall
-                onRequiredBinary fuel source scope expected site
+                onRequiredBinary onCoercion fuel source scope expected site
                 (.conditionalBranchFallthrough .thenBranch) thenBody
               let elseBranch ← lowerStatementsFuelWith lift onCall
-                onRequiredBinary fuel source scope expected site
+                onRequiredBinary onCoercion fuel source scope expected site
                 (.conditionalBranchFallthrough .elseBranch) elseBody
               pure {
                 resolved := .ifE condition.resolved thenBranch.resolved
@@ -566,8 +708,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           failWith lift site (.nonTailStatement .block)
         else
           ensureTypeWith lift site expected node.type
-          lowerStatementsFuelWith lift onCall onRequiredBinary fuel source scope
-            expected site .blockFallthrough body
+          lowerStatementsFuelWith lift onCall onRequiredBinary onCoercion fuel
+            source scope expected site .blockFallthrough body
     | .expression _ _ =>
         failWith lift site (.unsupportedStatement .expression)
 
@@ -585,22 +727,18 @@ def rejectCalls : CallElaborator Error :=
             (.unsupportedExpression .call)
 
 /-- Preserve the original evidence-free profile for requirement-bearing binary
-expressions.  Coercions are rejected by the enclosing traversal before this
-policy is consulted. -/
+expressions. -/
 def rejectRequiredBinaries : RequiredBinaryElaborator Error :=
   fun _ node _ _ _ =>
     fail (.occurrence node.id.occurrence)
       (.requirementsPresent node.requirements)
 
-private def eraseRequirement? (target : RequirementId) :
-    List RequirementId → Option (List RequirementId)
-  | [] => none
-  | requirement :: rest =>
-      if requirement = target then
-        some rest
-      else
-        (eraseRequirement? target rest).map fun remaining =>
-          requirement :: remaining
+/-- Preserve the standalone profile's explicit coercion rejection while the
+general policy entry point remains available to whole-program consumers. -/
+def rejectCoercions : CoercionElaborator Error :=
+  fun _ node _ =>
+    fail (.occurrence node.id.occurrence)
+      (.coercionsPresent node.coercions)
 
 private def reconcileConsumedRequirementsAux
     (declaration : Resolved.DeclarationId) (seen available : List RequirementId) :
@@ -629,13 +767,14 @@ def reconcileConsumedRequirements
   reconcileConsumedRequirementsAux declaration [] solved consumed
 
 /-- Lower a checked function body to the resolved local fragment while letting
-caller-supplied policies handle otherwise staged calls and requirement-bearing
-binary expressions.  All child traversal, typed-node, lexical-scope, coercion,
-and requirement checks remain owned by this module and are lifted into the
-consumer's error type. -/
-def lowerFunctionBodyWithPolicies {error : Type} (lift : Error → error)
+caller-supplied policies handle otherwise staged calls, requirement-bearing
+binary expressions, and coercion steps.  All child traversal, typed-node,
+lexical-scope, coercion-path, and requirement checks remain owned by this
+module and are lifted into the consumer's error type. -/
+def lowerFunctionBodyWithAllPolicies {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onCoercion : CoercionElaborator error)
     (function : CheckedFunction) :
     Except error BodyDraft := do
   let source := function.typedBody
@@ -656,8 +795,8 @@ def lowerFunctionBodyWithPolicies {error : Type} (lift : Error → error)
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
     let lowered ← lowerStatementsFuelWith lift onCall onRequiredBinary
-      (source.nodes.length + 1) source inputs expected fallthroughSite
-      .statementListFallthrough roots
+      onCoercion (source.nodes.length + 1) source inputs expected
+      fallthroughSite .statementListFallthrough roots
     let solvedRequirements :=
       function.solvedRequirements.map fun requirement => requirement.id
     let unconsumedRequirements ←
@@ -671,6 +810,20 @@ def lowerFunctionBodyWithPolicies {error : Type} (lift : Error → error)
       rootOccurrence
       unconsumedRequirements
     }
+
+/-- Compatibility entry point for call and required-binary consumers.  It
+retains the previous explicit coercion rejection until a consumer opts into
+`lowerFunctionBodyWithAllPolicies`. -/
+def lowerFunctionBodyWithPolicies {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error)
+    (onRequiredBinary : RequiredBinaryElaborator error)
+    (function : CheckedFunction) :
+    Except error BodyDraft :=
+  lowerFunctionBodyWithAllPolicies lift onCall onRequiredBinary
+    (fun _ node _ =>
+      failWith lift (.occurrence node.id.occurrence)
+        (.coercionsPresent node.coercions))
+    function
 
 /-- Compatibility entry point for call-aware consumers.  Requirement-bearing
 binary expressions retain the original explicit rejection until the consumer

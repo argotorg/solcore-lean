@@ -50,7 +50,7 @@ private def instantiation : DeclarationInstantiation := {
 private def expression : ExpressionNode := {
   id := expressionId
   span
-  type := variable0
+  type := variable1
   form := .reference "chosen" (.declaration instantiation)
   requirements := [requirementId]
   coercions := [{
@@ -87,7 +87,8 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
   match closed.lookupExpression? expressionId with
   | none => throw (IO.userError "typed expression lookup lost its node")
   | some node =>
-      assertTrue (decide (node.type = .word ∧
+      assertTrue (decide (node.rawType = .word ∧ node.type = .bool ∧
+          node.hasValidCoercionPath ∧
           node.requirements = [requirementId] ∧
           node.coercions = [{
             requirement := requirementId
@@ -107,6 +108,58 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
       | _ => throw (IO.userError "typed reference resolution changed shape")
   assertTrue (decide (closed.lookupStatement? ⟨⟨owner, 0⟩⟩ = none))
     "category-safe lookup reinterpreted an expression as a statement"
+  let indirect := CallResolution.indirect {
+    argumentTypeBeforeCoercion := variable0
+    argumentTypeAfterCoercion := variable1
+    argumentCoercions := [{
+      requirement := requirementId
+      source := variable0
+      target := variable1
+    }]
+  }
+  match indirect.applySubstitution substitution with
+  | .indirect metadata =>
+      assertTrue (decide (metadata.argumentTypeBeforeCoercion = .word ∧
+          metadata.argumentTypeAfterCoercion = .bool ∧
+          metadata.argumentCoercions = [{
+            requirement := requirementId
+            source := .word
+            target := .bool
+          }] ∧ metadata.hasValidArgumentCoercionPath))
+        "final substitution did not close indirect argument coercion metadata"
+  | .declaration _ => throw (IO.userError
+      "final substitution changed an indirect call into a declaration call")
+
+private def testCoercionPathValidation : IO Unit := do
+  let secondRequirement : RequirementId := ⟨5⟩
+  let disconnected : ExpressionNode := {
+    expression with
+    type := .unit
+    coercions := [
+      { requirement := requirementId, source := .word, target := .bool },
+      { requirement := secondRequirement, source := .word, target := .unit }
+    ]
+  }
+  assertTrue (!disconnected.hasValidCoercionPath)
+    "a disconnected expression coercion path was accepted"
+  let wrongTarget : ExpressionNode := {
+    expression with
+    type := .unit
+    coercions := [{
+      requirement := requirementId
+      source := .word
+      target := .bool
+    }]
+  }
+  assertTrue (!wrongTarget.hasValidCoercionPath)
+    "an expression coercion path ending before node.type was accepted"
+  let exact : ExpressionNode := {
+    expression with
+    type := .unit
+    coercions := []
+  }
+  assertTrue (decide (exact.rawType = .unit ∧ exact.hasValidCoercionPath))
+    "an uncoerced expression did not use its stored type as its raw type"
 
 private def testInferenceStateScaffolding : IO Unit := do
   let locals : TypeSystem.Environment :=
@@ -168,6 +221,7 @@ private def testInferenceStateScaffolding : IO Unit := do
 
 def testSourceTypedIR : IO Unit := do
   testFinalSubstitutionPreservesIdentity
+  testCoercionPathValidation
   testInferenceStateScaffolding
 
 end Tests.SourceTypedIR

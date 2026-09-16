@@ -77,12 +77,45 @@ private def firstDirectCall? : List Node → Option (ExpressionId × ExpressionI
       some (id, callee)
   | _ :: rest => firstDirectCall? rest
 
+private def firstIndirectCall? :
+    List Node → Option (ExpressionNode × IndirectCallResolution)
+  | [] => none
+  | .expression node@{ form := .call _ _ (.indirect metadata), .. } :: _ =>
+      some (node, metadata)
+  | _ :: rest => firstIndirectCall? rest
+
 private def setExpressionType (nodes : List Node) (target : ExpressionId)
     (type : Ty) : List Node :=
   nodes.map fun node => match node with
   | .expression expression =>
       if expression.id == target then
         .expression { expression with type }
+      else
+        node
+  | .statement _ => node
+
+private def setExpressionCoercions (nodes : List Node) (target : ExpressionId)
+    (coercions : List CoercionStep) : List Node :=
+  nodes.map fun node => match node with
+  | .expression expression =>
+      if expression.id == target then
+        .expression { expression with coercions }
+      else
+        node
+  | .statement _ => node
+
+private def setIndirectMetadata (nodes : List Node) (target : ExpressionId)
+    (metadata : IndirectCallResolution) : List Node :=
+  nodes.map fun node => match node with
+  | .expression expression =>
+      if expression.id == target then
+        match expression.form with
+        | .call callee arguments (.indirect _) =>
+            .expression {
+              expression with
+              form := .call callee arguments (.indirect metadata)
+            }
+        | _ => node
       else
         node
   | .statement _ => node
@@ -253,11 +286,40 @@ private def testAssumptionPreservation (program : CheckedProgram) : IO Unit := d
 
 private def testIndirectCallBoundary (program : CheckedProgram) : IO Unit := do
   let apply ← signatureNamed program "apply"
+  let function ← functionFor program apply
+  let (call, metadata) ← match firstIndirectCall? function.typedBody.nodes with
+    | some call => pure call
+    | none => throw (IO.userError "apply: indirect call metadata was absent")
+  assertTrue (decide (call.type = .word ∧ call.coercions = [] ∧
+      metadata.argumentTypeBeforeCoercion = .word ∧
+      metadata.argumentTypeAfterCoercion = .word ∧
+      metadata.argumentCoercions = [] ∧
+      metadata.hasValidArgumentCoercionPath))
+    "apply: exact indirect arguments produced malformed call metadata"
   match SourceSpecializationWorklist.run program
       [monomorphicRequest apply] 1 with
   | .error (.indirectCall _) => pure ()
   | result => throw (IO.userError
       s!"indirect call was not rejected explicitly: {reprStr result}")
+  let malformedMetadata := {
+    metadata with argumentTypeAfterCoercion := Ty.bool
+  }
+  let malformedFunction : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setIndirectMetadata function.typedBody.nodes call.id
+        malformedMetadata
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program malformedFunction)
+      [monomorphicRequest apply] 1 with
+  | .error (.invalidIndirectArgumentCoercionPath actual metadata) =>
+      assertTrue (actual == call.id && !metadata.hasValidArgumentCoercionPath)
+        "invalid indirect metadata lost its call occurrence or path"
+  | result => throw (IO.userError
+      s!"malformed indirect coercion metadata was not rejected: {reprStr result}")
 
 private def testMalformedTypedMetadata (program : CheckedProgram) : IO Unit := do
   let select ← signatureNamed program "select"
@@ -280,6 +342,25 @@ private def testMalformedTypedMetadata (program : CheckedProgram) : IO Unit := d
         "callee-node type mismatch lost the owning call occurrence"
   | result => throw (IO.userError
       s!"malformed callee-node type was not isolated: {reprStr result}")
+  let invalidPath : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setExpressionCoercions function.typedBody.nodes call [{
+        requirement := ⟨99⟩
+        source := .word
+        target := .bool
+      }]
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program invalidPath)
+      [monomorphicRequest select] 2 with
+  | .error (.invalidExpressionCoercionPath actual .word .word [_]) =>
+      assertTrue (actual == call)
+        "invalid output coercion path lost its expression occurrence"
+  | result => throw (IO.userError
+      s!"an output coercion not ending at node.type was accepted: {reprStr result}")
   let missingNodeFunction : CheckedFunction := {
     function with
     typedBody := {

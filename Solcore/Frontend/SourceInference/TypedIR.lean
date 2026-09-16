@@ -40,6 +40,16 @@ structure CoercionStep where
   target : Ty
   deriving Repr, BEq, DecidableEq
 
+/-- Metadata for applying an indirectly obtained function type.  A source
+argument list is bundled into one product before it is compared with the
+function parameter, so any coercion of that bundle belongs here rather than to
+the call expression's result coercion path. -/
+structure IndirectCallResolution where
+  argumentTypeBeforeCoercion : Ty
+  argumentTypeAfterCoercion : Ty
+  argumentCoercions : List CoercionStep := []
+  deriving Repr, BEq, DecidableEq
+
 /-- The semantic target selected for a source name occurrence. -/
 inductive ReferenceResolution where
   | local (binder : Resolved.LocalId)
@@ -48,9 +58,10 @@ inductive ReferenceResolution where
   deriving Repr, BEq, DecidableEq
 
 /-- How a call's callee was selected.  An indirect call obtains its function
-type from the referenced callee expression node. -/
+type from the referenced callee expression node and retains any coercion of
+the bundled arguments separately from the call result. -/
 inductive CallResolution where
-  | indirect
+  | indirect (metadata : IndirectCallResolution)
   | declaration (instantiation : DeclarationInstantiation)
   deriving Repr, BEq, DecidableEq
 
@@ -104,7 +115,9 @@ inductive ExpressionForm where
 
 /-- One typed expression occurrence.  `requirements` contains every obligation
 introduced at this occurrence in source-inference order; `coercions` gives the
-ordered conversion-path subset with its source and target types. -/
+ordered result-conversion subset with its source and target types, and `type`
+is always the type after that path.  Indirect argument-bundle conversions live
+in `CallResolution.indirect` metadata. -/
 structure ExpressionNode where
   id : ExpressionId
   span : Syntax.SourceSpan
@@ -200,6 +213,39 @@ def applySubstitution (substitution : Substitution)
 
 end CoercionStep
 
+namespace CoercionPath
+
+/-- Check exact endpoints and adjacency for an ordered coercion path.  The
+empty path is valid precisely when its endpoints agree. -/
+def isValid (source target : Ty) : List CoercionStep → Bool
+  | [] => source == target
+  | step :: rest =>
+      step.source == source &&
+        match rest with
+        | [] => step.target == target
+        | _ => isValid step.target target rest
+
+end CoercionPath
+
+namespace IndirectCallResolution
+
+def applySubstitution (substitution : Substitution)
+    (metadata : IndirectCallResolution) : IndirectCallResolution := {
+  argumentTypeBeforeCoercion :=
+    substitution.apply metadata.argumentTypeBeforeCoercion
+  argumentTypeAfterCoercion :=
+    substitution.apply metadata.argumentTypeAfterCoercion
+  argumentCoercions := metadata.argumentCoercions.map
+    (CoercionStep.applySubstitution substitution)
+}
+
+def hasValidArgumentCoercionPath
+    (metadata : IndirectCallResolution) : Bool :=
+  CoercionPath.isValid metadata.argumentTypeBeforeCoercion
+    metadata.argumentTypeAfterCoercion metadata.argumentCoercions
+
+end IndirectCallResolution
+
 namespace ReferenceResolution
 
 def applySubstitution (substitution : Substitution) :
@@ -215,7 +261,8 @@ namespace CallResolution
 
 def applySubstitution (substitution : Substitution) :
     CallResolution → CallResolution
-  | .indirect => .indirect
+  | .indirect metadata =>
+      .indirect (metadata.applySubstitution substitution)
   | .declaration instantiation =>
       .declaration (instantiation.applySubstitution substitution)
 
@@ -248,6 +295,19 @@ def applySubstitution (substitution : Substitution) : ExpressionForm → Express
 end ExpressionForm
 
 namespace ExpressionNode
+
+/-- The type produced by the source expression before its retained output
+coercion path.  For an uncoerced expression the stored post-coercion type is
+also its raw type. -/
+def rawType (node : ExpressionNode) : Ty :=
+  match node.coercions with
+  | [] => node.type
+  | first :: _ => first.source
+
+/-- Every retained output coercion begins at `rawType`, composes edge by edge,
+and ends at the expression node's authoritative post-coercion `type`. -/
+def hasValidCoercionPath (node : ExpressionNode) : Bool :=
+  CoercionPath.isValid node.rawType node.type node.coercions
 
 def applySubstitution (substitution : Substitution)
     (node : ExpressionNode) : ExpressionNode :=

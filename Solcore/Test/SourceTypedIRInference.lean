@@ -259,6 +259,8 @@ private def testTypedInferenceFacts (fixture : Fixture)
           match node.form with
           | .reference "item" (.local binder) =>
               assertTrue (decide (binder = inner.id ∧
+                  node.rawType = word ∧ node.type = box ∧
+                  node.hasValidCoercionPath ∧
                   node.requirements = [firstCoercion.id, secondCoercion.id] ∧
                   node.coercions = [
                     { requirement := firstCoercion.id, source := word, target := mid },
@@ -297,6 +299,38 @@ private def testTypedInferenceFacts (fixture : Fixture)
       attached.all solvedIds.contains && solvedIds.all attached.contains)
     "typed expression requirement ownership and solved requirements diverged"
 
+private def testIndirectArgumentBundleCoercion : IO Unit := do
+  let fixture ← check (String.intercalate "\n" [
+    "trait Coerce<From, To> {}",
+    "enum Box { Only }",
+    "impl Coerce<Word, Box> {}",
+    "function apply(f: function(Box) returns (Word), value: Word) returns (Word) {",
+    "  return f(value);",
+    "}"
+  ])
+  let apply ← checkedNamed fixture "apply"
+  let box ← namedType fixture.environment "Box"
+  let coerce ← namedTrait fixture.environment "Coerce"
+  let solved ← findSolved apply (predicate coerce .word [box])
+  match (expressionNodes apply.typedBody).filter fun node =>
+      match node.form with
+      | .call _ _ (.indirect _) => true
+      | _ => false with
+  | [{ type, form := .call _ [_] (.indirect metadata), requirements,
+        coercions, .. }] =>
+      assertTrue (decide (type = .word ∧ requirements = [solved.id] ∧
+          coercions = [] ∧
+          metadata.argumentTypeBeforeCoercion = .word ∧
+          metadata.argumentTypeAfterCoercion = box ∧
+          metadata.argumentCoercions = [{
+            requirement := solved.id
+            source := .word
+            target := box
+          }] ∧ metadata.hasValidArgumentCoercionPath))
+        "an indirect argument-bundle coercion leaked into the call output path"
+  | calls => throw (IO.userError
+      s!"expected one indirect call with bundle metadata, found {calls.length}")
+
 /-- Check that the real source-inference traversal produces a complete,
 occurrence-addressed semantic carrier without leaking speculative candidates. -/
 def testSourceTypedIRInference : IO Unit := do
@@ -332,5 +366,6 @@ def testSourceTypedIRInference : IO Unit := do
   let run ← checkedNamed fixture "run"
   testIdentityAndLookup run
   testTypedInferenceFacts fixture run
+  testIndirectArgumentBundleCoercion
 
 end Tests.SourceTypedIRInference

@@ -90,6 +90,11 @@ inductive Error where
   | specializedCalleeAssumptionsMismatch
       (call : ExpressionId)
       (instantiationPredicates specializedAssumptions : List ProgramPredicate)
+  | invalidExpressionCoercionPath
+      (expression : ExpressionId) (source target : Ty)
+      (coercions : List CoercionStep)
+  | invalidIndirectArgumentCoercionPath
+      (call : ExpressionId) (metadata : IndirectCallResolution)
   | indirectCall (occurrence : ExpressionId)
   deriving Repr, DecidableEq
 
@@ -182,6 +187,17 @@ private def directCall (program : CheckedProgram)
     callee := specialized.key
   })
 
+private def validateExpressionCoercions (node : ExpressionNode) :
+    Except Error Unit := do
+  if !node.hasValidCoercionPath then
+    throw (.invalidExpressionCoercionPath node.id node.rawType node.type
+      node.coercions)
+
+private def validateIndirectArgumentCoercions (node : ExpressionNode)
+    (metadata : IndirectCallResolution) : Except Error Unit := do
+  if !metadata.hasValidArgumentCoercionPath then
+    throw (.invalidIndirectArgumentCoercionPath node.id metadata)
+
 /-- Collect direct requests and per-occurrence edges in typed-source node
 order.  An indirect call is outside this initial closed-call profile. -/
 private def collectDirectCalls (program : CheckedProgram)
@@ -192,8 +208,10 @@ private def collectDirectCalls (program : CheckedProgram)
   | node :: rest => do
       match node with
       | .expression expression =>
+          validateExpressionCoercions expression
           match expression.form with
-          | .call _ _ .indirect =>
+          | .call _ _ (.indirect metadata) =>
+              validateIndirectArgumentCoercions expression metadata
               throw (.indirectCall expression.id)
           | .call callee _ (.declaration instantiation) =>
               let (request, edge) ←

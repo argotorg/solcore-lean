@@ -92,9 +92,23 @@ def applyReferenceResolution (substitution : ParameterSubstitution) :
       .declaration (applyInstantiation substitution instantiation)
   | .builtinBoolean value => .builtinBoolean value
 
+def applyIndirectCallResolution (substitution : ParameterSubstitution)
+    (metadata : IndirectCallResolution) : IndirectCallResolution := {
+  argumentTypeBeforeCoercion :=
+    substitution.apply metadata.argumentTypeBeforeCoercion
+  argumentTypeAfterCoercion :=
+    substitution.apply metadata.argumentTypeAfterCoercion
+  argumentCoercions := metadata.argumentCoercions.map fun step => {
+    step with
+    source := substitution.apply step.source
+    target := substitution.apply step.target
+  }
+}
+
 def applyCallResolution (substitution : ParameterSubstitution) :
     CallResolution → CallResolution
-  | .indirect => .indirect
+  | .indirect metadata =>
+      .indirect (applyIndirectCallResolution substitution metadata)
   | .declaration instantiation =>
       .declaration (applyInstantiation substitution instantiation)
 
@@ -263,7 +277,11 @@ private def referenceTypes : ReferenceResolution → List Ty
   | .declaration instantiation => instantiationTypes instantiation
 
 private def callResolutionTypes : CallResolution → List Ty
-  | .indirect => []
+  | .indirect metadata =>
+      metadata.argumentTypeBeforeCoercion ::
+        metadata.argumentTypeAfterCoercion ::
+        metadata.argumentCoercions.flatMap fun step =>
+          [step.source, step.target]
   | .declaration instantiation => instantiationTypes instantiation
 
 private def expressionFormTypes : ExpressionForm → List Ty

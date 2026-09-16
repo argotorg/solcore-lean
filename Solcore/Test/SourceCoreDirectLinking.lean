@@ -24,7 +24,10 @@ private def workspace : Workspace.RawWorkspace := {
       "trait Add<T> {",
       "  function add(left: T, right: T) returns (T);",
       "}",
-      "trait Coerce<From, To> {}",
+      "trait Marker<T> {}",
+      "trait Coerce<From, To> {",
+      "  function coerce(value: From) returns (To);",
+      "}",
       "impl Eq<Word> {",
       "  function eq(left: Word, right: Word) returns (Bool) {",
       "    return left == right;",
@@ -35,7 +38,12 @@ private def workspace : Workspace.RawWorkspace := {
       "    return left - right;",
       "  }",
       "}",
-      "impl Coerce<Bool, Word> {}",
+      "impl Marker<Bool> {}",
+      "impl Coerce<Bool, Word> {",
+      "  function coerce(value: Bool) returns (Word) {",
+      "    return value ? 41 : 7;",
+      "  }",
+      "}",
       "function identity<T>(value: T) returns (T) { return value; }",
       "function wrap<U>(value: U) returns (U) { return identity(value); }",
       "function select<A, B>(left: A, right: B) returns (A) { return left; }",
@@ -62,7 +70,17 @@ private def workspace : Workspace.RawWorkspace := {
       "  return equalWithEvidence(left, right);",
       "}",
       "function acceptWord(value: Word) returns (Word) { return value; }",
-      "function coercionCall(value: Bool) returns (Word) { return acceptWord(value); }"
+      "function coercionCall(value: Bool) returns (Word) { return acceptWord(value); }",
+      "function coerceWithEvidence<T>(value: T) returns (Word) where T: Coerce<Word> {",
+      "  return acceptWord(value);",
+      "}",
+      "function genericCoercion(value: Bool) returns (Word) {",
+      "  return coerceWithEvidence(value);",
+      "}",
+      "function keepMarker<T>(value: T) returns (T) where T: Marker { return value; }",
+      "function resultCoercion(value: Bool) returns (Word) {",
+      "  return keepMarker(value);",
+      "}"
     ]
   }]
   externalLibraries := []
@@ -116,6 +134,12 @@ private def firstDirectCallNode? : List Node → Option ExpressionNode
       | .call _ _ (.declaration _) => some node
       | _ => firstDirectCallNode? rest
   | .statement _ :: rest => firstDirectCallNode? rest
+
+private def firstCoercedNode? : List Node → Option ExpressionNode
+  | [] => none
+  | .expression node :: rest =>
+      if node.coercions.isEmpty then firstCoercedNode? rest else some node
+  | .statement _ :: rest => firstCoercedNode? rest
 
 private def replaceExpressionRequirements (nodes : List Node)
     (target : ExpressionId) (requirements : List RequirementId) : List Node :=
@@ -429,16 +453,49 @@ private def testRuntimeEvidenceBoundaries (program : CheckedProgram) : IO Unit :
   let coercionCall ← signatureNamed program "coercionCall"
   let coercionOutcome ← runOrThrow "coercion call" program
     [monomorphicRequest coercionCall] 2
-  match SourceCoreDirectLinking.link program coercionOutcome with
-  | .error (.sourceCore error) =>
-      match error.reason with
-      | .coercionsPresent coercions =>
-          assertTrue (!coercions.isEmpty)
-            "coercion rejection lost its typed conversion edge"
-      | reason => throw (IO.userError
-          s!"coercion reached the wrong Source Core boundary: {reprStr reason}")
-  | result => throw (IO.userError
-      s!"a coercion-bearing call linked without runtime coercion semantics: {reprStr result}")
+  let coercionLinked ← linkOrThrow "coercion call" program coercionOutcome
+  let coercionKey : SourceSpecialization.SpecializationKey := {
+    declaration := coercionCall.id
+    arguments := []
+  }
+  let coercionEntry ← match coercionLinked.findEntry? coercionKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "coercion call: linked root was absent")
+  assertTrue (decide (coercionEntry.run? [.bool true] 1024 =
+        some (.done (.word (word 41)) []) ∧
+      coercionEntry.run? [.bool false] 1024 =
+        some (.done (.word (word 7)) [])))
+    "Coerce evidence did not execute its selected conditional method body"
+
+  let genericCoercion ← signatureNamed program "genericCoercion"
+  let genericOutcome ← runOrThrow "generic coercion" program
+    [monomorphicRequest genericCoercion] 3
+  let genericLinked ← linkOrThrow "generic coercion" program genericOutcome
+  let genericKey : SourceSpecialization.SpecializationKey := {
+    declaration := genericCoercion.id
+    arguments := []
+  }
+  let genericEntry ← match genericLinked.findEntry? genericKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "generic coercion: linked root was absent")
+  assertTrue (decide (genericEntry.run? [.bool true] 2048 =
+      some (.done (.word (word 41)) [])))
+    "closed Coerce evidence was not forwarded to a generic callee conversion"
+
+  let resultCoercion ← signatureNamed program "resultCoercion"
+  let resultOutcome ← runOrThrow "call-result coercion" program
+    [monomorphicRequest resultCoercion] 2
+  let resultLinked ← linkOrThrow "call-result coercion" program resultOutcome
+  let resultKey : SourceSpecialization.SpecializationKey := {
+    declaration := resultCoercion.id
+    arguments := []
+  }
+  let resultEntry ← match resultLinked.findEntry? resultKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "call-result coercion: linked root was absent")
+  assertTrue (decide (resultEntry.run? [.bool false] 2048 =
+      some (.done (.word (word 7)) [])))
+    "call-result coercion did not coexist with its proof-only signature evidence"
 
 private def testImplementationMethodLoweringBoundary : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -475,6 +532,45 @@ private def testImplementationMethodLoweringBoundary : IO Unit := do
         "unsupported implementation-method call lost its exact boundary metadata"
   | result => throw (IO.userError
       s!"an implementation-method call crossed the standalone Core boundary: {reprStr result}")
+
+private def testMultiStepRuntimeCoercion : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Coerce<From, To> {",
+    "  function coerce(value: From) returns (To);",
+    "}",
+    "impl Coerce<Bool, Word> {",
+    "  function coerce(value: Bool) returns (Word) {",
+    "    return value ? 41 : 7;",
+    "  }",
+    "}",
+    "impl Coerce<Word, (Bool, Bool)> {",
+    "  function coerce(value: Word) returns ((Bool, Bool)) {",
+    "    return (value == 41, value == 7);",
+    "  }",
+    "}",
+    "function acceptPair(value: (Bool, Bool)) returns ((Bool, Bool)) {",
+    "  return value;",
+    "}",
+    "function entry(value: Bool) returns ((Bool, Bool)) {",
+    "  return acceptPair(value);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let outcome ← runOrThrow "multi-step coercion" program
+    [monomorphicRequest entry] 2
+  let linked ← linkOrThrow "multi-step coercion" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError "multi-step coercion: linked root was absent")
+  assertTrue (decide (linkedEntry.run? [.bool true] 4096 =
+        some (.done (.pair (.bool true) (.bool false)) []) ∧
+      linkedEntry.run? [.bool false] 4096 =
+        some (.done (.pair (.bool false) (.bool true)) [])))
+    "multi-step Coerce evidence did not compose both selected method bodies"
 
 private def testMalformedRequirementMetadata
     (program : CheckedProgram) : IO Unit := do
@@ -567,6 +663,76 @@ private def testMalformedRequirementMetadata
   | result => throw (IO.userError
       s!"reordered call requirements were accepted: {reprStr result}")
 
+private def testMalformedCoercionEvidence
+    (program : CheckedProgram) : IO Unit := do
+  let coercionCall ← signatureNamed program "coercionCall"
+  let function ← functionFor program coercionCall
+  let node ← match firstCoercedNode? function.typedBody.nodes with
+    | some node => pure node
+    | none => throw (IO.userError
+        "coercionCall: coercion-bearing argument node was absent")
+  let step ← match node.coercions with
+    | [step] => pure step
+    | coercions => throw (IO.userError
+        s!"coercionCall: expected one coercion step, found {coercions.length}")
+  let solved ← match function.solvedRequirements.filter fun solved =>
+      solved.id == step.requirement with
+    | [solved] => pure solved
+    | requirements => throw (IO.userError
+        s!"coercionCall: expected one coercion solved row, found {requirements.length}")
+  let evidenceWithGoal := fun goal => match solved.evidence with
+    | .assumption _ => PredicateEvidence.assumption goal
+    | .implementation (.byImpl _ implementation premises) =>
+        .implementation (.byImpl goal implementation premises)
+  let wrongPredicate : ProgramPredicate := {
+    solved.predicate with subject := .word
+  }
+  let wrongGoalFunction : CheckedFunction := {
+    function with
+    solvedRequirements := function.solvedRequirements.map fun requirement =>
+      if requirement.id == solved.id then
+        { requirement with evidence := evidenceWithGoal wrongPredicate }
+      else
+        requirement
+  }
+  let wrongGoalProgram := replaceFunction program wrongGoalFunction
+  match SourceSpecializationWorklist.run wrongGoalProgram
+      [monomorphicRequest coercionCall] 2 with
+  | .error (.specialization declaration
+      (.evidenceGoalMismatch requirement expected actual)) =>
+      assertTrue (decide (declaration = coercionCall.id ∧
+          requirement = solved.id ∧ expected = solved.predicate ∧
+          actual = wrongPredicate))
+        "malformed coercion evidence goal lost its exact specialization metadata"
+  | result => throw (IO.userError
+      s!"a coercion evidence-goal mismatch reached linking: {reprStr result}")
+
+  let wrongPredicateFunction : CheckedFunction := {
+    function with
+    solvedRequirements := function.solvedRequirements.map fun requirement =>
+      if requirement.id == solved.id then
+        { requirement with
+          predicate := wrongPredicate
+          evidence := evidenceWithGoal wrongPredicate
+        }
+      else
+        requirement
+  }
+  let wrongPredicateProgram := replaceFunction program wrongPredicateFunction
+  let wrongPredicateOutcome ← runOrThrow "malformed coercion predicate"
+    wrongPredicateProgram [monomorphicRequest coercionCall] 2
+  match SourceCoreDirectLinking.link wrongPredicateProgram
+      wrongPredicateOutcome with
+  | .error (.runtimeCoercionPredicateMismatch key occurrence requirement
+      expectedSource expectedTarget actual) =>
+      assertTrue (decide (key.declaration = coercionCall.id ∧
+          occurrence = node.id ∧ requirement = solved.id ∧
+          expectedSource = step.source ∧ expectedTarget = step.target ∧
+          actual = wrongPredicate))
+        "malformed coercion predicate lost its path or solved metadata"
+  | result => throw (IO.userError
+      s!"a coercion predicate/path mismatch was accepted: {reprStr result}")
+
 /-- Exercise complete acyclic generic linking, capture-free argument staging,
 runtime input validation, finite-budget and recursion boundaries, proof-only
 trait-evidence forwarding, runtime evidence/coercion gates, malformed
@@ -581,6 +747,8 @@ def testSourceCoreDirectLinking : IO Unit := do
   testProofOnlyEvidence program
   testRuntimeEvidenceBoundaries program
   testImplementationMethodLoweringBoundary
+  testMultiStepRuntimeCoercion
   testMalformedRequirementMetadata program
+  testMalformedCoercionEvidence program
 
 end Tests.SourceCoreDirectLinking

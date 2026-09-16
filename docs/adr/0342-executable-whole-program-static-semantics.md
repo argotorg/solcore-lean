@@ -16,9 +16,11 @@ through nested constrained calls.  Trait and implementation method declarations
 are retained in checked catalogs with exact signature conformance.  The first
 runtime-evidence slice executes a deliberately narrow `Add<T>` profile by
 selecting, checking and capture-free inlining the closed implementation method
-body.  Conversion-term insertion, other runtime evidence, recursive or indirect
-source calls, automatic entry discovery and a public source pipeline remain
-staged extensions.
+body.  A second narrow slice validates each closed coercion edge by exact
+requirement identity and executes the selected `Coerce<From, To>.coerce` method
+body for direct-call arguments, forwarded generic evidence and call results.
+Other runtime evidence, recursive or indirect source calls, automatic entry
+discovery and a public source pipeline remain staged extensions.
 
 ## Context
 
@@ -90,10 +92,11 @@ The first profile may reject rather than guess for:
 - recursive trait cycles that need coinductive reasoning;
 - generic or symbolic intermediate coercion paths and coercion cycles that need
   coinductive reasoning;
-- insertion of executable conversion terms;
+- general executable conversion terms outside the closed method-backed
+  `Coerce<From, To>.coerce` profile;
 - budget-exhausted specialization outcomes and every direct-call cycle;
 - seed roots with unresolved assumptions, runtime evidence outside the narrow
-  single-method `Add<T>` profile, coercion-bearing nodes, indirect calls and
+  single-method `Add<T>` and `Coerce<From, To>` profiles, indirect calls and
   general impl-method execution at the Core-linking boundary;
 - constructor/operator export selectors and the remaining module-reference
   edge cases;
@@ -144,10 +147,10 @@ exhaustion are explicit errors.  Proxy values resolve their source type, and
 mapping read indexes unify a key/value pair while checking the key through the
 same expected-type/coercion boundary.  They remain type-checking-only forms.
 Constructor/operator export selectors, the remaining advanced expressions and
-statements, generic/symbolic coercion intermediates, executable conversion
-terms, unrestricted source specialization and general lowering to `Core.Ty`
-are outside the completed profile; the ground specialization, builtin
-tail-normal lowering and restricted acyclic linking slices below are
+statements, generic/symbolic coercion intermediates, general executable
+conversion terms, unrestricted source specialization and general lowering to
+`Core.Ty` are outside the completed profile; the ground specialization,
+builtin tail-normal lowering and restricted acyclic linking slices below are
 implemented.
 
 The next internal boundary is an occurrence-addressed typed/resolved source IR.
@@ -164,10 +167,15 @@ numeric finalization and repeated equal predicates.
 The inference traversal now populates that additive carrier.  Declaration-
 owned occurrence IDs distinguish expressions and statements; typed nodes
 retain stable input, lambda and let binders, selected declaration
-instantiations, requirement IDs and ordered coercion steps; and a final
-substitution closes every embedded type, scheme and predicate without changing
-identities.  Generic declaration instantiation retains the exact rigid-
-parameter substitution instead of only its applied body and predicates.
+instantiations, requirement IDs and ordered coercion steps.  `ExpressionNode.type`
+is authoritative after its output coercions: a nonempty path starts at its
+first edge's source, composes exactly, and ends at the stored type.  Indirect
+calls separately retain the bundled arguments' type before and after coercion
+and their ordered edge path, rather than attaching that conversion to the call
+result.  A final substitution closes every embedded type, scheme, predicate,
+coercion endpoint and indirect bundle field without changing identities.
+Generic declaration instantiation retains the exact rigid-parameter
+substitution instead of only its applied body and predicates.
 
 The inference state owns the declaration, monotone binder/occurrence
 allocators and the typed-node table.  Scope exit restores only lexical
@@ -186,7 +194,9 @@ groups and qualified-name field chains in a selected direct callee normalize
 to one declaration-reference node with the outer callee span.  Expected-type
 coercions are attached at the fitting boundary: expected-driven transparent
 descent may place one on the inner node, while later call-argument fitting
-places it on the completed outer argument node.
+places it on the completed outer argument node.  Specialization and worklist
+admission validate the exact endpoints and adjacency of every output path and
+the separately stored indirect argument-bundle path before using the carrier.
 
 The first Core consumer accepts a tail-normal statement profile over closed
 builtin Unit/Bool/Word/product types.  Initialized lets, nested lexical blocks,
@@ -203,6 +213,16 @@ exact discharge which is reconciled against the canonical solved-requirement
 table.  Regressions run both conditional paths with
 concrete inputs and stable-ID shadowing rather than stopping at structural
 output.
+
+The policy-bearing Core consumer now also owns coercion traversal.  It checks
+that every path has non-identity edges, exact source/target continuity and an
+endpoint equal to the node's authoritative post-coercion type.  Every step must
+refer to an attached `RequirementId` exactly once; its policy must declare the
+matching lowered Core endpoint types and consume exactly that ID.  Ordered
+plans are then applied to the already lowered raw expression, and the function
+still reconciles all consumed IDs once against its solved-requirement table.
+The compatibility and standalone entries continue to reject coercions until a
+whole-program consumer supplies such a policy.
 
 The first rigid/generic specialization boundary uses the resolved signature's
 complete parameter list to canonicalize exact ground call-site substitutions
@@ -256,23 +276,42 @@ after the operands have been bound left to right.  The implementation body, not
 the builtin addition opcode, is authoritative; regressions use a subtraction
 body to distinguish those meanings.
 
+The first runtime coercion consumer is connected by the same rule: method
+bodies, not endpoint types, define behavior.  One step must identify exactly
+one solved requirement whose predicate and evidence goal are precisely
+`Coerce<From, To>` for the typed edge.  An assumption is accepted only when a
+unique matching closed implementation witness was forwarded into the current
+generic specialization.  The selected trait has two parameters and the sole
+method `coerce`; the implementation and method must be monomorphic,
+premise-free, `where`-free and signature-conforming.  The checked method must
+lower from one `From` input to one `To` result before it is capture-free inlined.
+Executable regressions cover a direct call-argument conversion, a conversion
+inside a generic callee justified by forwarded evidence, and conversion of a
+call result which also carries independent proof-only signature evidence.  A
+Bool-to-Word fixture returns `41` or `7`, demonstrating that no hard-coded
+endpoint conversion supplies the runtime result.
+
 Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
-assumptions, non-call/operator/literal requirements outside that `Add<T>`
-exception, coercion-bearing nodes and indirect calls all reject explicitly.
-Other evidence-dependent operators, generic or premise-bearing implementation
-methods, multi-method or `where`-constrained profiles, and coercion methods are
-not assigned an invented runtime meaning.  The worklist can therefore close
+assumptions, non-call/operator/literal requirements outside those two narrow
+profiles and indirect calls all reject explicitly.  Other evidence-dependent
+operators, generic or premise-bearing implementation methods, multi-method or
+`where`-constrained profiles are not assigned an invented runtime meaning.
+Selected implementation method bodies must themselves remain in the standalone
+tail-normal Core-lowerable fragment: calls, coercions and required operations
+inside those bodies still reject, as do nominal types with no `Core.Ty`
+projection.  The worklist can therefore close
 same-key recursive graphs for finite planning without claiming they are
 executable in the current Core.  Executable regressions cover proof-only
 constrained and nested generic calls, both conditional paths, the
-method-authoritative `Add<Word>` profile, runtime input mismatches, malformed
-plans and each principal staged boundary; small checked laws retain the runtime
-input gate and budget result.
+method-authoritative `Add<Word>` profile, all three conversion placements,
+runtime input mismatches, malformed plans and each principal staged boundary;
+small checked laws retain the runtime input gate and budget result.
 
-The next internal boundary is expansion from this single runtime trait-evidence
-profile to coercion evidence and conversion-term insertion, followed by other
-operators and implementation shapes.  Recursive calls require a separate named
-or global recursive Core representation rather than cyclic inlining.
+The next internal boundary is expansion from these two runtime trait-evidence
+profiles to other operators and implementation shapes, followed by method
+bodies that themselves contain evidence-bearing operations.  Recursive calls
+require a separate named or global recursive Core representation rather than
+cyclic inlining.
 Selection-bearing constructor,
 member, match and assignment work follows the same carrier rather than
 extending an information-losing result shape.  Whole-program consumers

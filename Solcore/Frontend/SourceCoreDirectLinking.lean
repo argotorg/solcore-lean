@@ -17,10 +17,10 @@ Direct-call signature predicates are proof-only in the current executable
 fragment.  Each call must account positionally for its exact requirement IDs;
 implementation evidence is threaded into the callee, while assumption evidence
 must be discharged by a unique incoming witness with the same goal.  Evidence
-never becomes a runtime Core value.  One deliberately narrow required-binary
-profile uses closed `Add<T>` evidence to select, check, and inline the sole
-monomorphic implementation method.  Coercions and every other runtime-evidence
-shape remain explicit staged boundaries.
+never becomes a runtime Core value.  Deliberately narrow required-binary and
+coercion profiles use closed `Add<T>` and `Coerce<From, To>` evidence to select,
+check, and inline the sole monomorphic implementation method.  Every other
+runtime-evidence shape remains an explicit staged boundary.
 
 The current Core has no recursive binding construct.  Accordingly, recursive
 specialization cycles are rejected explicitly rather than assigned an
@@ -106,6 +106,27 @@ inductive Error where
   | runtimeBinaryResultTypeMismatch
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (expected actual : Core.Ty)
+  | coercionRequirementEvidenceGoalMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | runtimeCoercionEvidenceUnresolved
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (predicate : ProgramPredicate)
+  | runtimeCoercionTraitNameMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (expected actual : String)
+  | runtimeCoercionPredicateMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+      (expectedSource expectedTarget : TypeSystem.Ty)
+      (actual : ProgramPredicate)
+  | runtimeCoercionInputTypesMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (expected actual : List Core.Ty)
+  | runtimeCoercionResultTypeMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (expected actual : Core.Ty)
   | implMethodSourceCore
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (method : ProgramImplMethodId)
@@ -441,6 +462,23 @@ private def runtimeBinaryMethod? :
   | .add => some ("Add", "add")
   | _ => none
 
+private def exactRuntimeCoercionEvidence (caller : SpecializedFunction)
+    (node : ExpressionNode) (step : CoercionStep)
+    (available : List PredicateEvidence) :
+    Except Error (ProgramPredicate × TypedTraitResolution.Evidence) := do
+  let solved ← exactSolvedRequirement caller node.id step.requirement
+  let goal := solved.evidence.goal
+  if goal != solved.predicate then
+    throw (.coercionRequirementEvidenceGoalMismatch caller.key node.id
+      step.requirement solved.predicate goal)
+  let evidence ← actualRequirementEvidence caller node.id step.requirement
+    available solved.evidence
+  match evidence with
+  | .implementation implementation => pure (solved.predicate, implementation)
+  | .assumption predicate =>
+      throw (.runtimeCoercionEvidenceUnresolved caller.key node.id
+        step.requirement predicate)
+
 /-- Turn one closed operator witness into a checked, capture-free inline plan.
 The implementation method body, not the specialized operand type, is the
 runtime authority. -/
@@ -455,8 +493,8 @@ private def requiredBinaryPlan (program : CheckedProgram)
   let (requirement, predicate, evidence) ←
     exactRuntimeBinaryEvidence caller node available
   let method ←
-    (ExecutableImplMethods.checkMonomorphicPremiseFreeMethod program evidence
-      methodName).mapError fun error =>
+    (ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program evidence
+      1 methodName).mapError fun error =>
         .executableImplMethod caller.key node.id error
   let trait ← match program.signatures.trait? predicate.trait with
     | some trait => pure trait
@@ -494,6 +532,56 @@ private def requiredBinaryPlan (program : CheckedProgram)
       pure (bindValues (temporaries.zip [left, right]) body)
   }
 
+/-- Turn one closed `Coerce<From, To>` witness into a checked, capture-free
+inline conversion.  Endpoint types validate the selected method; they never
+invent the conversion's runtime behavior. -/
+private def coercionPlan (program : CheckedProgram)
+    (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (caller : SpecializedFunction) (available : List PredicateEvidence)
+    (node : ExpressionNode) (step : CoercionStep) :
+    Except Error (SourceCoreElaboration.CoercionPlan Error) := do
+  let (predicate, evidence) ←
+    exactRuntimeCoercionEvidence caller node step available
+  let trait ← match program.signatures.trait? predicate.trait with
+    | some trait => pure trait
+    | none => throw (.executableImplMethod caller.key node.id
+        (.missingTrait predicate.trait))
+  if trait.name != "Coerce" then
+    throw (.runtimeCoercionTraitNameMismatch caller.key node.id
+      step.requirement "Coerce" trait.name)
+  if predicate.subject != step.source || predicate.arguments != [step.target] then
+    throw (.runtimeCoercionPredicateMismatch caller.key node.id
+      step.requirement step.source step.target predicate)
+  let method ←
+    (ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program evidence
+      2 "coerce").mapError fun error =>
+        .executableImplMethod caller.key node.id error
+  let elaborated ←
+    (SourceCoreElaboration.elaborateFunction method.checked).mapError fun error =>
+      .implMethodSourceCore caller.key node.id method.id error
+  let sourceType ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      step.source).mapError Error.sourceCore
+  let targetType ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      step.target).mapError Error.sourceCore
+  let expectedInputs := [sourceType]
+  if elaborated.inputs.values != expectedInputs then
+    throw (.runtimeCoercionInputTypesMismatch caller.key node.id
+      step.requirement expectedInputs elaborated.inputs.values)
+  if elaborated.returnType != targetType then
+    throw (.runtimeCoercionResultTypeMismatch caller.key node.id
+      step.requirement targetType elaborated.returnType)
+  pure {
+    sourceType
+    targetType
+    consumedRequirements := [step.requirement]
+    build := fun value =>
+      let temporaries := freshTemporaries temporaryOwner temporaryBase 1
+      let body := aliasInputs elaborated.inputs temporaries elaborated.resolved
+      pure (bindValues (temporaries.zip [value]) body)
+  }
+
 private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
     (visiting : List SpecializationKey)
@@ -509,10 +597,10 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
         let specialized ← exactSpecialization plan key
         validateAssumptionEvidence specialized.key specialized.assumptions
           assumptionEvidence
-        SourceCoreElaboration.lowerFunctionBodyWithPolicies Error.sourceCore
+        SourceCoreElaboration.lowerFunctionBodyWithAllPolicies Error.sourceCore
           (fun _ node _ arguments resolution => do
             let instantiation ← match resolution with
-              | .indirect => throw (.indirectCall node.id)
+              | .indirect _ => throw (.indirectCall node.id)
               | .declaration instantiation => pure instantiation
             let calleeEvidence ← exactCallRequirementEvidence specialized node
               assumptionEvidence instantiation
@@ -554,6 +642,9 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
           (fun _ node _ operator _ =>
             requiredBinaryPlan program temporaryOwner temporaryBase specialized
               assumptionEvidence node operator)
+          (fun _ node step =>
+            coercionPlan program temporaryOwner temporaryBase specialized
+              assumptionEvidence node step)
           specialized.function
 termination_by fuel
 

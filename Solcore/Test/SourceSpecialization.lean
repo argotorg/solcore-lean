@@ -26,7 +26,8 @@ private def checkedProgram : IO CheckedProgram := do
   let content := String.intercalate "\n" [
     "function select<A, B>(left: A, right: B) returns (A) { return left; }",
     "function identity<T>(value: T) returns (T) { return value; }",
-    "function phantom<T, U>(value: T) returns (T) { return value; }"
+    "function phantom<T, U>(value: T) returns (T) { return value; }",
+    "function apply<T>(f: function(T) returns (T), value: T) returns (T) { return f(value); }"
   ]
   match checkProgram (workspace content) with
   | .ok checked => pure checked
@@ -141,6 +142,32 @@ private def testPhantomParameter (program : CheckedProgram) : IO Unit := do
       (.initial elaborated.core [.bool false]) = .done (.bool false) []))
     "phantom specialization did not execute at its used Bool parameter"
 
+private def testIndirectMetadataSpecialization
+    (program : CheckedProgram) : IO Unit := do
+  let (signature, function) ← checkedNamed program "apply"
+  let parameter ← match signature.scheme.parameters with
+    | [parameter] => pure parameter
+    | parameters => throw (IO.userError
+        s!"apply lost its generic parameter: {reprStr parameters}")
+  let specialized ← specializeOrThrow "apply" signature function
+    [(parameter, .word)]
+  let calls := specialized.function.typedBody.nodes.filterMap fun
+    | .expression node =>
+        match node.form with
+        | .call _ _ (.indirect metadata) => some (node, metadata)
+        | _ => none
+    | .statement _ => none
+  match calls with
+  | [(node, metadata)] =>
+      assertTrue (decide (node.type = .word ∧ node.coercions = [] ∧
+          metadata.argumentTypeBeforeCoercion = .word ∧
+          metadata.argumentTypeAfterCoercion = .word ∧
+          metadata.argumentCoercions = [] ∧
+          metadata.hasValidArgumentCoercionPath))
+        "specialization did not close indirect call metadata at Word"
+  | _ => throw (IO.userError
+      s!"expected one specialized indirect call, found {calls.length}")
+
 private def testValidationErrors (program : CheckedProgram) : IO Unit := do
   let (signature, function) ← checkedNamed program "select"
   let (identitySignature, identityFunction) ← checkedNamed program "identity"
@@ -221,6 +248,7 @@ def testSourceSpecialization : IO Unit := do
   testSelect program
   testIdentity program
   testPhantomParameter program
+  testIndirectMetadataSpecialization program
   testValidationErrors program
 
 end Tests.SourceSpecialization

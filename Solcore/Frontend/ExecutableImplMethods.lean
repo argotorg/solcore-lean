@@ -3,7 +3,7 @@ import Solcore.Frontend.ProgramChecking
 /-!
 Checked source bodies for the first executable implementation-method profile.
 
-This boundary intentionally accepts only single-parameter, monomorphic,
+This boundary intentionally accepts only explicitly sized, monomorphic,
 premise-free implementation evidence whose trait, implementation, and sole
 method carry no additional predicates.  It validates the retained method
 catalog defensively, projects the implementation method to an ordinary
@@ -26,10 +26,22 @@ structure CheckedMethod where
   checked : SourceInference.CheckedFunction
   deriving Repr
 
+/-- The first reason that a purportedly closed evidence goal still contains a
+non-runtime type. -/
+inductive NonClosedType where
+  | flexible (id : TypeVarId)
+  | rigid (id : TypeParameterId)
+  | error
+  deriving Repr, DecidableEq
+
 /-- Explicit rejections at the deliberately narrow executable-method boundary. -/
 inductive Error where
   | evidencePremisesPresent
       (implementation : Resolved.DeclarationId) (count : Nat)
+  | evidenceGoalArityMismatch
+      (trait : Resolved.DeclarationId) (expected actual : Nat)
+  | evidenceGoalNotClosed
+      (goal : ProgramPredicate) (reason : NonClosedType)
   | missingImplementation (implementation : Resolved.DeclarationId)
   | duplicateImplementations
       (implementation : Resolved.DeclarationId) (count : Nat)
@@ -110,19 +122,44 @@ private def onlyTraitMethod
   | [method] => .ok method
   | methods => .error (.multipleTraitMethods trait.id methods.length)
 
+private def firstNonClosedType : Ty → Option NonClosedType
+  | .variable id => some (.flexible id)
+  | .parameter id => some (.rigid id)
+  | .constructor _ => none
+  | .application left right
+  | .function left right
+  | .product left right
+  | .mapping left right =>
+      (firstNonClosedType left).orElse fun _ => firstNonClosedType right
+  | .proxy inner
+  | .comptime inner => firstNonClosedType inner
+  | .error => some .error
+
+private def firstNonClosedGoalType (goal : ProgramPredicate) :
+    Option NonClosedType :=
+  (firstNonClosedType goal.subject).orElse fun _ =>
+    goal.arguments.findSome? firstNonClosedType
+
 /-- Select and check the sole executable method justified by one closed piece
 of trait evidence.  Runtime dictionaries, generic implementations, recursive
 premises, and predicate-bearing declarations remain explicit later profiles. -/
-def checkMonomorphicPremiseFreeMethod
+def checkMonomorphicPremiseFreeMethodWithArity
     (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
-    (expectedName : String) : Except Error CheckedMethod := do
+    (expectedTraitArity : Nat) (expectedName : String) :
+    Except Error CheckedMethod := do
   let .byImpl goal implementationId premises := evidence
   unless premises.isEmpty do
     throw (.evidencePremisesPresent implementationId premises.length)
+  let goalArity := goal.arguments.length + 1
+  unless goalArity = expectedTraitArity do
+    throw (.evidenceGoalArityMismatch goal.trait expectedTraitArity goalArity)
   let implementation ← exactImplementation program implementationId
   unless implementation.parameters.isEmpty do
     throw (.implementationParametersPresent implementation.id
       implementation.parameters)
+  match firstNonClosedGoalType goal with
+  | some reason => throw (.evidenceGoalNotClosed goal reason)
+  | none => pure ()
   unless implementation.head = goal do
     throw (.implementationHeadMismatch implementation.id goal
       implementation.head)
@@ -130,8 +167,8 @@ def checkMonomorphicPremiseFreeMethod
     throw (.implementationPredicatesPresent implementation.id
       implementation.wherePredicates)
   let trait ← exactTrait program goal.trait
-  unless trait.parameters.length = 1 do
-    throw (.traitArityMismatch trait.id 1 trait.parameters.length)
+  unless trait.parameters.length = expectedTraitArity do
+    throw (.traitArityMismatch trait.id expectedTraitArity trait.parameters.length)
   unless trait.wherePredicates.isEmpty do
     throw (.traitPredicatesPresent trait.id trait.wherePredicates)
   let implementationMethod ←
@@ -166,5 +203,12 @@ def checkMonomorphicPremiseFreeMethod
     synthetic
     checked
   }
+
+/-- Compatibility entry for the original one-parameter runtime trait profile.
+Consumers of multi-parameter traits must opt into the explicit-arity entry. -/
+def checkMonomorphicPremiseFreeMethod
+    (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
+    (expectedName : String) : Except Error CheckedMethod :=
+  checkMonomorphicPremiseFreeMethodWithArity program evidence 1 expectedName
 
 end Solcore.Frontend.ExecutableImplMethods

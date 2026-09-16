@@ -172,7 +172,11 @@ private def testRequirementsAndCoercions (function : CheckedFunction) : IO Unit 
   let coerced := withExpression function expression fun node => {
     node with
     requirements := [requirement]
-    coercions := [{ requirement, source := .word, target := .bool }]
+    coercions := [{
+      requirement
+      source := .word
+      target := node.type
+    }]
   }
   expectError "coercion" coerced (.occurrence expression.occurrence)
     fun reason => match reason with
@@ -188,6 +192,70 @@ private def requiredWordBinaryPolicy (consumed : List RequirementId) :
     consumedRequirements := consumed
     build := fun left right => pure (.binary .wordAdd left right)
   }
+
+private def solvedWordRequirement (declaration : Resolved.DeclarationId)
+    (requirement : RequirementId) : SolvedRequirement :=
+  let predicate : ProgramPredicate := {
+    trait := declaration
+    subject := .word
+    arguments := []
+  }
+  {
+    id := requirement
+    predicate
+    evidence := .assumption predicate
+  }
+
+private def executableCoercionPolicy :
+    SourceCoreElaboration.CoercionElaborator
+      SourceCoreElaboration.Error :=
+  fun _ node step =>
+    match step.source, step.target with
+    | .constructor (.builtin .word), .constructor (.builtin .bool) =>
+        pure {
+          sourceType := .word
+          targetType := .bool
+          consumedRequirements := [step.requirement]
+          build := fun value => pure
+            (.unary .boolNot (.binary .wordEq value (.word (word 0))))
+        }
+    | .constructor (.builtin .bool), .constructor (.builtin .word) =>
+        pure {
+          sourceType := .bool
+          targetType := .word
+          consumedRequirements := [step.requirement]
+          build := fun value => pure
+            (.ifE value (.word (word 1)) (.word (word 0)))
+        }
+    | _, _ => throw {
+        site := .occurrence node.id.occurrence
+        reason := .unsupportedType step.source
+      }
+
+private def constantCoercionPolicy (sourceType targetType : Core.Ty)
+    (consumed : List RequirementId) :
+    SourceCoreElaboration.CoercionElaborator
+      SourceCoreElaboration.Error :=
+  fun _ _ _ => pure {
+    sourceType
+    targetType
+    consumedRequirements := consumed
+    build := fun value => pure value
+  }
+
+private def expectCoercionPolicyError (label : String)
+    (function : CheckedFunction) (expression : ExpressionId)
+    (policy : SourceCoreElaboration.CoercionElaborator
+      SourceCoreElaboration.Error)
+    (accept : SourceCoreElaboration.ErrorReason → Bool) : IO Unit := do
+  match SourceCoreElaboration.lowerFunctionBodyWithAllPolicies id
+      SourceCoreElaboration.rejectCalls
+      SourceCoreElaboration.rejectRequiredBinaries policy function with
+  | .ok _ => throw (IO.userError s!"{label}: malformed coercion path lowered")
+  | .error error =>
+      assertTrue (decide (error.site = .occurrence expression.occurrence) &&
+          accept error.reason)
+        s!"{label}: wrong coercion error {reprStr error}"
 
 private def testRequiredBinaryPolicy : IO Unit := do
   let program ← checkedProgram
@@ -268,11 +336,194 @@ private def testRequiredBinaryPolicy : IO Unit := do
           | _ => false)
         s!"required binary leftover reported the wrong error: {reprStr error}"
 
+private def testCallAwareCompatibility : IO Unit := do
+  let program ← checkedProgram (String.intercalate "\n" [
+    "function callee(value: Word) returns (Word) { return value; }",
+    "function caller(value: Word) returns (Word) { return callee(value); }"
+  ])
+  let function ← checkedNamed program "caller"
+  let onCall : SourceCoreElaboration.CallElaborator
+      SourceCoreElaboration.Error :=
+    fun _ node _ _ _ => pure {
+      argumentTypes := [.word]
+      consumedRequirements := []
+      build := fun arguments =>
+        match arguments with
+        | [argument] => pure argument
+        | arguments => throw {
+            site := .occurrence node.id.occurrence
+            reason := .callArgumentArityMismatch 1 arguments.length
+          }
+    }
+  let draft ← match SourceCoreElaboration.lowerFunctionBodyWith id onCall
+      function with
+    | .ok draft => pure draft
+    | .error error => throw (IO.userError
+        s!"call-aware compatibility wrapper did not lower: {reprStr error}")
+  let lowered ← match draft.finalize with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"call-aware compatibility wrapper did not finalize: {reprStr error}")
+  assertTrue (decide (Core.runStateful 100
+      (.initial lowered.core [.word (word 19)]) =
+        .done (.word (word 19)) []))
+    "call-aware compatibility wrapper changed its custom call semantics"
+
+private def testCoercionPolicy : IO Unit := do
+  let program ← checkedProgram
+    "function coerced(x: Word) returns (Word) { return x + 1; }"
+  let function ← checkedNamed program "coerced"
+  let (_, expression) ← rootIds function
+  let root ← match function.typedBody.lookupExpression? expression with
+    | some node => pure node
+    | none => throw (IO.userError "coercion fixture lost its root expression")
+  let left ← match root.form with
+    | .binary left .add _ => pure left
+    | _ => throw (IO.userError "coercion fixture root is not addition")
+  let binaryRequirement : RequirementId := ⟨201⟩
+  let firstCoercion : RequirementId := ⟨202⟩
+  let secondCoercion : RequirementId := ⟨203⟩
+  let solved := [
+    solvedWordRequirement function.declaration binaryRequirement,
+    solvedWordRequirement function.declaration firstCoercion,
+    solvedWordRequirement function.declaration secondCoercion
+  ]
+  let rootCoerced : CheckedFunction := {
+    function with
+    solvedRequirements := solved
+    typedBody := changeExpression function.typedBody expression fun node => {
+      node with
+      requirements := [secondCoercion, binaryRequirement, firstCoercion]
+      coercions := [
+        { requirement := firstCoercion, source := .word, target := .bool },
+        { requirement := secondCoercion, source := .bool, target := .word }
+      ]
+    }
+  }
+  let rootDraft ← match
+      SourceCoreElaboration.lowerFunctionBodyWithAllPolicies id
+        SourceCoreElaboration.rejectCalls
+        (requiredWordBinaryPolicy [binaryRequirement])
+        executableCoercionPolicy rootCoerced with
+    | .ok draft => pure draft
+    | .error error => throw (IO.userError
+        s!"root coercion policy did not lower: {reprStr error}")
+  let rootLowered ← match rootDraft.finalize with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"root coercion policy did not finalize: {reprStr error}")
+  assertTrue (decide (Core.runStateful 100
+      (.initial rootLowered.core [.word (word 4)]) =
+        .done (.word (word 1)) []))
+    "coercion requirements were removed positionally or plans ran out of order"
+
+  let childCoerced : CheckedFunction := {
+    function with
+    solvedRequirements := solved
+    typedBody :=
+      changeExpression
+        (changeExpression function.typedBody expression fun node => {
+          node with requirements := [binaryRequirement]
+        }) left fun node => {
+          node with
+          requirements := [firstCoercion, secondCoercion]
+          coercions := [
+            { requirement := firstCoercion, source := .word, target := .bool },
+            { requirement := secondCoercion, source := .bool, target := .word }
+          ]
+        }
+  }
+  let childDraft ← match
+      SourceCoreElaboration.lowerFunctionBodyWithAllPolicies id
+        SourceCoreElaboration.rejectCalls
+        (requiredWordBinaryPolicy [binaryRequirement])
+        executableCoercionPolicy childCoerced with
+    | .ok draft => pure draft
+    | .error error => throw (IO.userError
+        s!"required-binary child coercion did not lower: {reprStr error}")
+  let childLowered ← match childDraft.finalize with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"required-binary child coercion did not finalize: {reprStr error}")
+  assertTrue (decide (Core.runStateful 100
+      (.initial childLowered.core [.word (word 4)]) =
+        .done (.word (word 2)) []))
+    "required-binary traversal did not recursively execute child coercions"
+
+private def testMalformedCoercionPolicies : IO Unit := do
+  let program ← checkedProgram
+    "function identity(x: Word) returns (Word) { return x; }"
+  let function ← checkedNamed program "identity"
+  let (_, expression) ← rootIds function
+  let first : RequirementId := ⟨301⟩
+  let second : RequirementId := ⟨302⟩
+  let changed (requirements : List RequirementId)
+      (coercions : List CoercionStep) : CheckedFunction :=
+    withExpression function expression fun node => {
+      node with requirements, coercions
+    }
+  expectCoercionPolicyError "identity coercion step"
+    (changed [first] [{ requirement := first, source := .word, target := .word }])
+    expression executableCoercionPolicy fun reason => match reason with
+      | .identityCoercionStep 0 actual .word => actual == first
+      | _ => false
+  expectCoercionPolicyError "discontinuous coercion path"
+    (changed [first, second] [
+      { requirement := first, source := .word, target := .bool },
+      { requirement := second, source := .word, target := .bool }
+    ]) expression executableCoercionPolicy fun reason => match reason with
+      | .coercionPathDiscontinuity 1 .bool .word => true
+      | _ => false
+  expectCoercionPolicyError "wrong coercion target"
+    (changed [first]
+      [{ requirement := first, source := .word, target := .bool }])
+    expression executableCoercionPolicy fun reason => match reason with
+      | .coercionPathTargetMismatch .word .bool => true
+      | _ => false
+  expectCoercionPolicyError "missing coercion requirement"
+    (changed [first] [
+      { requirement := first, source := .word, target := .bool },
+      { requirement := second, source := .bool, target := .word }
+    ]) expression executableCoercionPolicy fun reason => match reason with
+      | .missingCoercionRequirement actual [attached] =>
+          actual == second && attached == first
+      | _ => false
+  expectCoercionPolicyError "duplicate coercion requirement"
+    (changed [first] [
+      { requirement := first, source := .word, target := .bool },
+      { requirement := first, source := .bool, target := .word }
+    ]) expression executableCoercionPolicy fun reason => match reason with
+      | .duplicateCoercionRequirement actual => actual == first
+      | _ => false
+  let valid := changed [first, second] [
+    { requirement := first, source := .word, target := .bool },
+    { requirement := second, source := .bool, target := .word }
+  ]
+  expectCoercionPolicyError "coercion plan source"
+    valid expression (constantCoercionPolicy .bool .bool [first])
+    fun reason => match reason with
+      | .coercionPlanSourceTypeMismatch actual .word .bool => actual == first
+      | _ => false
+  expectCoercionPolicyError "coercion plan target"
+    valid expression (constantCoercionPolicy .word .word [first])
+    fun reason => match reason with
+      | .coercionPlanTargetTypeMismatch actual .bool .word => actual == first
+      | _ => false
+  expectCoercionPolicyError "coercion plan requirements"
+    valid expression (constantCoercionPolicy .word .bool [])
+    fun reason => match reason with
+      | .coercionPlanRequirementsMismatch actual [expected] [] =>
+          actual == first && expected == first
+      | _ => false
+
 private def testUnsupportedExpressions (function : CheckedFunction) : IO Unit := do
   let (_, expression) ← rootIds function
   let cases : List
       (String × ExpressionForm × SourceCoreElaboration.UnsupportedExpression) := [
-    ("call", .call expression [] .indirect, .call),
+    ("call", .call expression [] (.indirect {
+      argumentTypeBeforeCoercion := .unit
+      argumentTypeAfterCoercion := .unit
+    }), .call),
     ("lambda", .lambda [] .word [], .lambda),
     ("proxy", .proxy .word, .proxy),
     ("index", .index expression expression, .index)
@@ -387,6 +638,9 @@ def testSourceCoreElaboration : IO Unit := do
   testUninitializedLetRejected
   testRequirementsAndCoercions function
   testRequiredBinaryPolicy
+  testCallAwareCompatibility
+  testCoercionPolicy
+  testMalformedCoercionPolicies
   testUnsupportedExpressions function
   testBrokenEdges function
   testUnsupportedTypesAndDuplicateInputs function
