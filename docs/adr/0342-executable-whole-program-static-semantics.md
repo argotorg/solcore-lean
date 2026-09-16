@@ -6,8 +6,10 @@ Implemented for the initial executable checking profile.  Explicit public
 interfaces, type/trait/value imports and re-exports, rank-1 inference, bounded
 trait evidence, minimum-cost overload selection after candidate-local literal
 defaulting, source-arity-preserving per-argument coercion and bounded multi-step
-shortest-path coercion are connected end to end.  Executable conversion-term
-insertion and specialization to Semantic Core remain staged extensions.
+shortest-path coercion are connected end to end.  A first monomorphic builtin
+typed-source-to-Core bridge is also executable.  Conversion-term insertion,
+generic/direct-call specialization and whole-program Core linking remain staged
+extensions.
 
 ## Context
 
@@ -169,10 +171,19 @@ coercions are attached at the fitting boundary: expected-driven transparent
 descent may place one on the inner node, while later call-argument fitting
 places it on the completed outer argument node.
 
-Executable conversion and specialization can now consume stable expression and
-local binder identities, chosen declarations and instantiations, and the
-ordered coercion requirements at each occurrence.  That is the next internal
-boundary.  Selection-bearing constructor/member/match/assignment work follows
-the same carrier rather than extending an information-losing result shape.
-Whole-program consumers identify an obligation by its owning declaration
-together with its function-local ID.
+The first Core consumer accepts one terminal return over closed builtin
+Unit/Bool/Word/product types, local references, groups, tuples, builtin
+operators and conditionals.  It follows typed occurrence edges into
+`Resolved.Expr`, lowers stable local identities to an open positional Core
+context, and independently checks the Core result type.  It has explicit
+located failures for malformed carriers, overflow literals and every staged
+type, requirement, coercion or expression form.  Its regression runs the
+resulting Core with concrete inputs rather than stopping at structural output.
+
+The next internal boundary extends statement lowering through lets, blocks and
+terminal conditionals, then adds generic specialization worklists, direct
+calls, and executable conversion/trait evidence in that order.  Selection-
+bearing constructor/member/match/assignment work follows the same carrier
+rather than extending an information-losing result shape.  Whole-program
+consumers identify an obligation by its owning declaration together with its
+function-local ID.

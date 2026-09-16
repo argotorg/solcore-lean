@@ -36,8 +36,10 @@ An initial executable whole-program static-semantics path now consumes that
 canonical syntax.  It loads a workspace, constructs declaration and type
 environments, resolves signatures and predicates, infers the supported source
 fragment, and returns checked functions with occurrence-addressed typed bodies
-and trait evidence.  This checker is an internal Lean API; it does not yet
-lower source programs to Semantic Core or publish a source Oracle.
+and trait evidence.  A first internal downstream bridge now lowers the closed
+monomorphic builtin subset of those typed bodies to independently rechecked
+Semantic Core.  It is not yet a whole-program source compiler or a public
+source Oracle.
 
 ## What works now
 
@@ -5664,11 +5666,27 @@ solved requirement identities.  Small checked laws cover allocator and
 substitution identity preservation; general preservation and ownership
 completeness theorems remain deferred under the executable-first proof policy.
 
-The next frontend boundary is to use this resolved typed body as the input to
-explicit conversion/specialization and Semantic Core elaboration, while adding
-constructors, members and place-aware statements in dependency order.  A
-whole-program reference to an obligation remains the owning declaration paired
-with its function-local requirement identity.
+The first consumer of this carrier is now executable.  A checked function with
+one terminal return can lower closed builtin Unit, Bool, Word and product types,
+local references, groups, tuples, builtin unary/binary operators and
+conditionals through `Resolved.Expr` to an open Semantic Core expression.
+Numeric spellings are range-checked at this boundary.  Stable input identities
+determine the positional Core context, and the resulting Core is independently
+inferred again before its return type is accepted.  Missing or category-wrong
+node edges, duplicate inputs, unresolved source types, non-Word literals,
+typed-node mismatches and unconsumed requirements all produce located
+elaboration errors.  Calls, lambdas, proxy/index forms, nominal types and any
+node carrying a coercion or trait requirement reject explicitly instead of
+receiving an invented runtime meaning.  End-to-end regression reaches the Core
+machine with concrete Bool/Word inputs and checks the resulting product value.
+
+The next frontend boundary extends statement lowering from the singleton
+terminal return to lets, blocks and terminal conditionals.  Generic
+specialization and its declaration-instantiation worklist follow, then direct
+calls and executable trait/coercion evidence.  Constructors, members and
+place-aware statements remain later in dependency order.  A whole-program
+reference to an obligation remains the owning declaration paired with its
+function-local requirement identity.
 
 ## What is not yet claimed
 

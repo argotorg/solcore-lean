@@ -1266,6 +1266,7 @@ import Solcore.Test.SourceStructuralExpressions
 import Solcore.Test.SourceRequirementIdentity
 import Solcore.Test.SourceTypedIR
 import Solcore.Test.SourceTypedIRInference
+import Solcore.Test.SourceCoreElaboration
 import Solcore.Test.ProgramChecking
 
 set_option autoImplicit false
@@ -6048,6 +6049,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceRequirementIdentity.testSourceRequirementIdentity
   SourceTypedIR.testSourceTypedIR
   SourceTypedIRInference.testSourceTypedIRInference
+  SourceCoreElaboration.testSourceCoreElaboration
   ProgramChecking.testProgramChecking
 
 def run : IO Unit := do
