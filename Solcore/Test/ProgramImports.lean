@@ -59,15 +59,20 @@ private def importedEnvironment : IO ProgramEnvironment := do
   let source ← parsed .main "library/types.solc" (String.intercalate "\n" [
     "enum Public { P }",
     "enum Hidden { H }",
-    "enum Renamed { R }"
+    "enum Renamed { R }",
+    "trait Marker<T> {}",
+    "trait HiddenTrait<T> {}",
+    "function pick(value: Word) returns (Word) { return value; }",
+    "function pick(value: Bool) returns (Bool) { return value; }",
+    "function hiddenValue() returns (Word) { return 0; }"
   ])
   let external ← parsed (.external "dep") "external.solc"
     "enum Remote { R }"
   let consumer ← parsed .main "consumer.solc" (String.intercalate "\n" [
     "import library.types;",
     "import * as Lib from library.types;",
-    "import * from library.types hiding {Hidden};",
-    "import {Renamed as Alias, Hidden} from library.types hiding {Hidden};",
+    "import * from library.types hiding {Hidden, HiddenTrait, hiddenValue};",
+    "import {Renamed as Alias, Hidden, Marker, Marker as ChosenTrait, pick, pick as chosen, HiddenTrait as HiddenMarker, hiddenValue as hidden} from library.types hiding {Hidden, HiddenTrait, hiddenValue};",
     "import @dep.external;",
     "import * as Ext from @dep.external;",
     "enum Public { Local }",
@@ -91,7 +96,9 @@ private def testVisibilityConstruction : IO Unit := do
   | .ok visibility =>
       assertTrue (decide (visibility.hasImports = true ∧
           visibility.namespaces.length = 4 ∧
-          visibility.types.length = 3))
+          visibility.types.length = 3 ∧
+          visibility.traits.length = 3 ∧
+          visibility.values.length = 6))
         "direct import visibility shape changed"
       assertTrue (decide ((visibility.modulesNamed "types").length = 1 ∧
           (visibility.modulesNamed "Lib").length = 1 ∧
@@ -103,6 +110,18 @@ private def testVisibilityConstruction : IO Unit := do
           (visibility.typesNamed "Alias").length = 1 ∧
           (visibility.typesNamed "Hidden").isEmpty = true))
         "wildcard/selected/hiding visibility changed"
+      assertTrue (decide (
+          (visibility.traitsNamed "Marker").length = 1 ∧
+          (visibility.traitsNamed "ChosenTrait").length = 1 ∧
+          (visibility.traitsNamed "HiddenTrait").isEmpty = true ∧
+          (visibility.traitsNamed "HiddenMarker").isEmpty = true))
+        "trait wildcard/selected/alias/hiding/dedup visibility changed"
+      assertTrue (decide (
+          (visibility.valuesNamed "pick").length = 2 ∧
+          (visibility.valuesNamed "chosen").length = 2 ∧
+          (visibility.valuesNamed "hiddenValue").isEmpty = true ∧
+          (visibility.valuesNamed "hidden").isEmpty = true))
+        "value overload/selected/alias/hiding/dedup visibility changed"
 
 private def testSuccessfulLookup : IO Unit := do
   let environment ← importedEnvironment
@@ -141,8 +160,16 @@ private def testHiddenAndAmbiguousLookup : IO Unit := do
   | .error (.unknownTypeName ["Hidden"]) => pure ()
   | result => throw (IO.userError
       s!"hidden import remained visible: {reprStr result}")
-  let left ← parsed .main "left.solc" "enum Shared { Left }"
-  let right ← parsed .main "right.solc" "enum Shared { Right }"
+  let left ← parsed .main "left.solc" (String.intercalate "\n" [
+    "enum Shared { Left }",
+    "trait Shared<T> {}",
+    "function sharedValue(value: Word) returns (Word) { return value; }"
+  ])
+  let right ← parsed .main "right.solc" (String.intercalate "\n" [
+    "enum Shared { Right }",
+    "trait Shared<T> {}",
+    "function sharedValue(value: Bool) returns (Bool) { return value; }"
+  ])
   let consumer ← parsed .main "ambiguous.solc" (String.intercalate "\n" [
     "import * from left;",
     "import * from right;",
@@ -152,6 +179,14 @@ private def testHiddenAndAmbiguousLookup : IO Unit := do
     "type Qualified = Both.Shared;"
   ])
   let ambiguous ← build [left, right, consumer]
+  let visibility ← match buildProgramImports ambiguous
+      (← declaration ambiguous "ambiguous" "Unqualified").id.moduleId with
+    | .ok visibility => pure visibility
+    | .error errors => throw (IO.userError
+        s!"ambiguous imports failed to build: {reprStr errors}")
+  assertTrue (decide ((visibility.traitsNamed "Shared").length = 2 ∧
+      (visibility.valuesNamed "sharedValue").length = 2))
+    "imported trait/value ambiguity did not retain all candidates"
   for alias in ["Unqualified", "Qualified"] do
     let declaration ← declaration ambiguous "ambiguous" alias
     let source ← aliasSource declaration
@@ -171,8 +206,10 @@ private def testImportErrors : IO Unit := do
   let deferredOwner ← declaration deferredEnvironment "deferred" "Kept"
   match buildProgramImports deferredEnvironment deferredOwner.id.moduleId with
   | .ok visibility =>
-      assertTrue visibility.types.isEmpty
-        "deferred value/trait selectors entered type visibility"
+      assertTrue (decide (visibility.types.isEmpty = true ∧
+          (visibility.valuesNamed "value").length = 1 ∧
+          (visibility.traitsNamed "Marker").length = 1))
+        "selected value/trait visibility changed"
   | .error errors => throw (IO.userError
       s!"known deferred selector was rejected: {reprStr errors}")
   let badSelection ← parsed .main "bad_selection.solc"
@@ -191,6 +228,14 @@ private def testImportErrors : IO Unit := do
       [.unknownSelectedType _ _ "Missing"]) => pure ()
   | result => throw (IO.userError
       s!"type resolver did not expose import failure: {reprStr result}")
+  let badOperator ← parsed .main "bad_operator.solc"
+    "import {(==) as eq} from source; type Kept = Word;"
+  let operatorEnvironment ← build [source, badOperator]
+  let operatorOwner ← declaration operatorEnvironment "bad_operator" "Kept"
+  match buildProgramImports operatorEnvironment operatorOwner.id.moduleId with
+  | .error [.unknownSelectedType _ _ "=="] => pure ()
+  | result => throw (IO.userError
+      s!"operator selector was ignored or lost its spelling: {reprStr result}")
   let badModule ← parsed .main "bad_module.solc"
     "import absent.module; type Kept = Word;"
   let moduleEnvironment ← build [badModule]
