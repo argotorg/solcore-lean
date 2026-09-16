@@ -168,6 +168,30 @@ private def testConstrainedLetDoesNotGeneralizeAwayEvidence : IO Unit := do
         "a constrained let detached its predicate from the instantiated type"
   | .ok _ => throw (IO.userError "Eq<Word> evidence was reused for Bool")
 
+private def testAmbiguousCoercionTrait : IO Unit := do
+  let raw : Workspace.RawWorkspace := {
+    entry := "main.solc"
+    mainSources := [
+      { path := "left.solc", content := "trait Coerce<From, To> {}" },
+      { path := "right.solc", content := "trait Coerce<From, To> {}" },
+      {
+        path := "main.solc"
+        content := String.intercalate "\n" [
+          "function accept(value: Bool) returns (Bool) { return value; }",
+          "function reject(value: Word) returns (Bool) { return accept(value); }"
+        ]
+      }
+    ]
+    externalLibraries := []
+  }
+  match SourceInference.loadAndCheckProgram raw with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .ambiguousOperatorTrait "Coerce" candidates, .. } =>
+            candidates.length == 2
+        | _ => false) "ambiguous Coerce declarations lost their diagnostic"
+  | .ok _ => throw (IO.userError "ambiguous Coerce declaration was selected")
+
 /-- Exercise parsed lambdas, local schemes, tuples, grouping, conditionals,
 operators, numeric expected/default behavior, and explicit deferrals. -/
 def testSourceInference : IO Unit := do
@@ -180,5 +204,6 @@ def testSourceInference : IO Unit := do
   testMissingCoercion
   testInconclusiveCoercion
   testConstrainedLetDoesNotGeneralizeAwayEvidence
+  testAmbiguousCoercionTrait
 
 end Tests.SourceInference
