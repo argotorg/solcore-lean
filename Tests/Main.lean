@@ -1264,6 +1264,7 @@ import Solcore.Test.SourceLiteralOverloadRanking
 import Solcore.Test.SourceMultiStepCoercion
 import Solcore.Test.SourceStructuralExpressions
 import Solcore.Test.SourceRequirementIdentity
+import Solcore.Test.SourceTypedIR
 import Solcore.Test.ProgramChecking
 
 set_option autoImplicit false
@@ -6044,6 +6045,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceMultiStepCoercion.testSourceMultiStepCoercion
   SourceStructuralExpressions.testSourceStructuralExpressions
   SourceRequirementIdentity.testSourceRequirementIdentity
+  SourceTypedIR.testSourceTypedIR
   ProgramChecking.testProgramChecking
 
 def run : IO Unit := do

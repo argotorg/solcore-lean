@@ -79,7 +79,9 @@ private def testSuccessfulCollection : IO Unit := do
       | predicates => throw (IO.userError
           s!"function predicates changed: {reprStr predicates}")
       let instantiated := signature.scheme.instantiate 7
-      assertTrue (decide (instantiated.body =
+      assertTrue (decide (instantiated.parameterSubstitution =
+          [({ owner := choose.id, index := 0 }, .variable ⟨7⟩)] ∧
+          instantiated.body =
           .function (.product (.variable ⟨7⟩) (.variable ⟨7⟩))
             (.variable ⟨7⟩) ∧
           instantiated.predicates = [{

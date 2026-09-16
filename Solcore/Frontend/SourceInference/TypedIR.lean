@@ -1,0 +1,336 @@
+import Solcore.Frontend.ProgramSignatures
+import Solcore.Frontend.SourceInference.Identity
+import Solcore.Frontend.TypedTraitResolution
+import Solcore.Syntax.Term
+
+/-!
+Occurrence-addressed typed source carrier.
+
+This module is deliberately independent of the inference traversal.  It records
+the facts needed by later specialization without changing which source programs
+the current checker accepts.
+-/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend.SourceInference
+
+open TypeSystem
+
+/-- One typed local binding, retaining its stable lexical identity. -/
+structure TypedBinder where
+  id : Resolved.LocalId
+  name : String
+  scheme : Scheme
+  span : Option Syntax.SourceSpan := none
+  deriving Repr, BEq, DecidableEq
+
+/-- The selected and instantiated view of one top-level declaration. -/
+structure DeclarationInstantiation where
+  declaration : Resolved.DeclarationId
+  parameterSubstitution : ParameterSubstitution
+  type : Ty
+  predicates : List ProgramPredicate
+  deriving Repr, BEq, DecidableEq
+
+/-- One evidence-bearing edge in an inserted coercion path. -/
+structure CoercionStep where
+  requirement : RequirementId
+  source : Ty
+  target : Ty
+  deriving Repr, BEq, DecidableEq
+
+/-- The semantic target selected for a source name occurrence. -/
+inductive ReferenceResolution where
+  | local (binder : Resolved.LocalId)
+  | declaration (instantiation : DeclarationInstantiation)
+  | builtinBoolean (value : Bool)
+  deriving Repr, BEq, DecidableEq
+
+/-- How a call's callee was selected.  An indirect call obtains its function
+type from the referenced callee expression node. -/
+inductive CallResolution where
+  | indirect
+  | declaration (instantiation : DeclarationInstantiation)
+  deriving Repr, BEq, DecidableEq
+
+/-- Category-safe identity of one expression occurrence. -/
+structure ExpressionId where
+  occurrence : OccurrenceId
+  deriving Repr, BEq, DecidableEq
+
+/-- Category-safe identity of one statement occurrence. -/
+structure StatementId where
+  occurrence : OccurrenceId
+  deriving Repr, BEq, DecidableEq
+
+/-- Category-preserving identity of either typed source-node kind. -/
+inductive NodeId where
+  | expression (id : ExpressionId)
+  | statement (id : StatementId)
+  deriving Repr, BEq, DecidableEq
+
+namespace NodeId
+
+def occurrenceId : NodeId → OccurrenceId
+  | .expression id => id.occurrence
+  | .statement id => id.occurrence
+
+end NodeId
+
+/-- Typed expression shape.  Recursive children are occurrence identities, so
+the carrier is compact and does not duplicate subtrees. -/
+inductive ExpressionForm where
+  | literal (literal : Syntax.CoreLiteralValue)
+  | reference (name : String) (resolution : ReferenceResolution)
+  | group (inner : ExpressionId)
+  | tuple (elements : List ExpressionId)
+  | unary (operator : Syntax.UnaryOp) (operand : ExpressionId)
+  | binary
+      (left : ExpressionId) (operator : Syntax.BinaryOp) (right : ExpressionId)
+  | conditional
+      (condition thenBranch elseBranch : ExpressionId)
+  | lambda
+      (parameters : List TypedBinder)
+      (returnType : Ty)
+      (body : List StatementId)
+  | call
+      (callee : ExpressionId)
+      (arguments : List ExpressionId)
+      (resolution : CallResolution)
+  | proxy (inner : Ty)
+  | index (base index : ExpressionId)
+  deriving Repr, BEq, DecidableEq
+
+/-- One typed expression occurrence.  `requirements` contains every obligation
+introduced at this occurrence in source-inference order; `coercions` gives the
+ordered conversion-path subset with its source and target types. -/
+structure ExpressionNode where
+  id : ExpressionId
+  span : Syntax.SourceSpan
+  type : Ty
+  form : ExpressionForm
+  requirements : List RequirementId := []
+  coercions : List CoercionStep := []
+  deriving Repr, BEq, DecidableEq
+
+/-- Typed statement shape for every statement form accepted by the current
+source-inference traversal. -/
+inductive StatementForm where
+  | letDecl (binder : TypedBinder) (initializer : Option ExpressionId)
+  | returnStmt (value : Option ExpressionId)
+  | expression (expression : ExpressionId) (trailingSemicolon : Bool)
+  | ifThen
+      (condition : ExpressionId)
+      (thenBody : List StatementId)
+      (elseBody : Option (List StatementId))
+  | block (body : List StatementId)
+  deriving Repr, BEq, DecidableEq
+
+/-- One typed statement occurrence and its inferred result type. -/
+structure StatementNode where
+  id : StatementId
+  span : Syntax.SourceSpan
+  type : Ty
+  form : StatementForm
+  deriving Repr, BEq, DecidableEq
+
+/-- A heterogeneous node table preserves one occurrence order while keeping
+expression and statement identities statically distinct. -/
+inductive Node where
+  | expression (node : ExpressionNode)
+  | statement (node : StatementNode)
+  deriving Repr, BEq, DecidableEq
+
+/-- Typed source for one declaration.  All recursive edges point into `nodes`;
+`roots` retain the checked entry points in order, including standalone
+expression roots. -/
+structure TypedSource where
+  owner : Resolved.DeclarationId
+  inputs : List TypedBinder
+  roots : List NodeId
+  nodes : List Node
+  deriving Repr, BEq, DecidableEq
+
+private def applyFinalToParameters (substitution : Substitution)
+    (parameters : ParameterSubstitution) : ParameterSubstitution :=
+  parameters.map fun entry => (entry.1, substitution.apply entry.2)
+
+namespace TypedBinder
+
+/-- Apply the final inference substitution without entering quantified scheme
+variables. -/
+def applySubstitution (substitution : Substitution)
+    (binder : TypedBinder) : TypedBinder :=
+  { binder with scheme := Scheme.apply substitution binder.scheme }
+
+end TypedBinder
+
+namespace DeclarationInstantiation
+
+/-- Retain the complete result of instantiating one resolved declaration. -/
+def ofInstantiated (declaration : Resolved.DeclarationId)
+    (instantiated : InstantiatedConstrainedDeclaration) :
+    DeclarationInstantiation := {
+  declaration
+  parameterSubstitution := instantiated.parameterSubstitution
+  type := instantiated.body
+  predicates := instantiated.predicates
+}
+
+/-- Close every flexible type position retained by an instantiation. -/
+def applySubstitution (substitution : Substitution)
+    (instantiation : DeclarationInstantiation) : DeclarationInstantiation :=
+  { instantiation with
+    parameterSubstitution :=
+      applyFinalToParameters substitution instantiation.parameterSubstitution
+    type := substitution.apply instantiation.type
+    predicates := instantiation.predicates.map
+      (TypedTraitResolution.applySubstitution substitution) }
+
+end DeclarationInstantiation
+
+namespace CoercionStep
+
+def applySubstitution (substitution : Substitution)
+    (step : CoercionStep) : CoercionStep :=
+  { step with
+    source := substitution.apply step.source
+    target := substitution.apply step.target }
+
+end CoercionStep
+
+namespace ReferenceResolution
+
+def applySubstitution (substitution : Substitution) :
+    ReferenceResolution → ReferenceResolution
+  | .local binder => .local binder
+  | .declaration instantiation =>
+      .declaration (instantiation.applySubstitution substitution)
+  | .builtinBoolean value => .builtinBoolean value
+
+end ReferenceResolution
+
+namespace CallResolution
+
+def applySubstitution (substitution : Substitution) :
+    CallResolution → CallResolution
+  | .indirect => .indirect
+  | .declaration instantiation =>
+      .declaration (instantiation.applySubstitution substitution)
+
+end CallResolution
+
+namespace ExpressionForm
+
+/-- Apply a final substitution to all semantic types embedded directly in an
+expression shape.  Child occurrence identities remain stable. -/
+def applySubstitution (substitution : Substitution) : ExpressionForm → ExpressionForm :=
+  fun form => match form with
+    | .literal value => .literal value
+    | .reference name resolution =>
+        .reference name (resolution.applySubstitution substitution)
+    | .group inner => .group inner
+    | .tuple elements => .tuple elements
+    | .unary operator operand => .unary operator operand
+    | .binary left operator right => .binary left operator right
+    | .conditional condition thenBranch elseBranch =>
+        .conditional condition thenBranch elseBranch
+    | .lambda parameters returnType body =>
+        .lambda
+          (parameters.map (TypedBinder.applySubstitution substitution))
+          (substitution.apply returnType) body
+    | .call callee arguments resolution =>
+        .call callee arguments (resolution.applySubstitution substitution)
+    | .proxy inner => .proxy (substitution.apply inner)
+    | .index base key => .index base key
+
+end ExpressionForm
+
+namespace ExpressionNode
+
+def applySubstitution (substitution : Substitution)
+    (node : ExpressionNode) : ExpressionNode :=
+  { node with
+    type := substitution.apply node.type
+    form := node.form.applySubstitution substitution
+    coercions := node.coercions.map (CoercionStep.applySubstitution substitution) }
+
+end ExpressionNode
+
+namespace StatementForm
+
+/-- Apply a final substitution to binder schemes embedded in a statement. -/
+def applySubstitution (substitution : Substitution) : StatementForm → StatementForm :=
+  fun form => match form with
+    | .letDecl binder initializer =>
+        .letDecl (binder.applySubstitution substitution) initializer
+    | .returnStmt value => .returnStmt value
+    | .expression expressionId trailingSemicolon =>
+        .expression expressionId trailingSemicolon
+    | .ifThen condition thenBody elseBody =>
+        .ifThen condition thenBody elseBody
+    | .block body => .block body
+
+end StatementForm
+
+namespace StatementNode
+
+def applySubstitution (substitution : Substitution)
+    (node : StatementNode) : StatementNode :=
+  { node with
+    type := substitution.apply node.type
+    form := node.form.applySubstitution substitution }
+
+end StatementNode
+
+namespace Node
+
+/-- Recover the category-preserving identity stored by one node. -/
+def id : Node → NodeId
+  | .expression node => .expression node.id
+  | .statement node => .statement node.id
+
+/-- Erase the expression/statement category while retaining source identity. -/
+def occurrenceId : Node → OccurrenceId
+  | node => node.id.occurrenceId
+
+def applySubstitution (substitution : Substitution) : Node → Node
+  | .expression node => .expression (node.applySubstitution substitution)
+  | .statement node => .statement (node.applySubstitution substitution)
+
+end Node
+
+namespace TypedSource
+
+/-- First node with the requested declaration-owned occurrence identity. -/
+def lookupNode? (source : TypedSource) (id : OccurrenceId) : Option Node :=
+  source.nodes.find? fun node => decide (node.occurrenceId = id)
+
+/-- Typed expression lookup without permitting a statement ID at the API
+boundary. -/
+def lookupExpression? (source : TypedSource)
+    (id : ExpressionId) : Option ExpressionNode :=
+  match source.lookupNode? id.occurrence with
+  | some (.expression node) => some node
+  | _ => none
+
+/-- Typed statement lookup without permitting an expression ID at the API
+boundary. -/
+def lookupStatement? (source : TypedSource)
+    (id : StatementId) : Option StatementNode :=
+  match source.lookupNode? id.occurrence with
+  | some (.statement node) => some node
+  | _ => none
+
+/-- Close every embedded flexible type while preserving all stable identities
+and source-table order. -/
+def applySubstitution (substitution : Substitution)
+    (source : TypedSource) : TypedSource :=
+  { source with
+    inputs := source.inputs.map (TypedBinder.applySubstitution substitution)
+    nodes := source.nodes.map (Node.applySubstitution substitution) }
+
+end TypedSource
+
+end Solcore.Frontend.SourceInference

@@ -5637,9 +5637,20 @@ for repeated equal predicates.
 
 The current checker does not yet retain the selected overload, local binder
 identity, coercion insertion site or ordered requirement IDs at each expression
-occurrence.  The next carrier step makes those facts explicit before
-specialization can consume them.  A whole-program reference to an obligation is
-the owning declaration paired with its function-local requirement ID.
+occurrence in its result.  The additive typed-IR schema for those facts is now
+implemented: declaration-owned occurrence IDs have category-safe expression,
+statement and root wrappers; nodes retain typed binders, complete generic
+declaration instantiations, requirement IDs and ordered coercion steps; and
+final substitution preserves every identity while closing embedded types,
+schemes and predicates.  The selected generic instantiation also retains its
+exact rigid-parameter substitution.  Small checked laws and an executable
+carrier regression cover identity preservation, category-safe lookup and
+substitution through declaration and coercion metadata.
+
+The next carrier step threads this node table through inference and attaches
+the already allocated requirement IDs to their exact occurrences.  A
+whole-program reference to an obligation is the owning declaration paired with
+its function-local requirement ID.
 
 ## What is not yet claimed
 

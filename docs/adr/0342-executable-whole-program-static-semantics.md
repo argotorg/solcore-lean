@@ -143,6 +143,15 @@ solving, while executable tests cover coercion paths, candidate rollback,
 numeric finalization and repeated equal predicates.
 
 The checker still does not attach those IDs to exact syntax occurrences.
+The additive carrier for doing so is now present: declaration-owned occurrence
+IDs distinguish expressions and statements; typed nodes retain binders,
+selected declaration instantiations, requirement IDs and ordered coercion
+steps; and a final substitution closes every embedded type, scheme and
+predicate without changing identities.  Generic declaration instantiation now
+also retains the exact rigid-parameter substitution instead of only its applied
+body and predicates.  This carrier is public and independently tested, but the
+inference traversal has not yet populated it.
+
 Executable conversion and specialization additionally need stable expression
 and local binder identities, chosen declarations and instantiations, and the
 ordered coercion requirements at each occurrence.  Selection-bearing

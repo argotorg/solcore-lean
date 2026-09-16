@@ -1,5 +1,6 @@
 import Solcore.Frontend.ProgramLoading
 import Solcore.Frontend.ProgramSignatures
+import Solcore.Frontend.SourceInference.Identity
 import Solcore.Frontend.TypedTraitResolution
 import Solcore.TypeSystem.Inference
 
@@ -25,11 +26,6 @@ def goal : PredicateEvidence → ProgramPredicate
   | .implementation (.byImpl predicate _ _) => predicate
 
 end PredicateEvidence
-
-/-- Function-local identity of one inferred trait or coercion obligation. -/
-structure RequirementId where
-  index : Nat
-  deriving Repr, BEq, DecidableEq
 
 /-- An unsolved obligation retained independently of its eventual evidence. -/
 structure Requirement where

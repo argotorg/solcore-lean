@@ -74,6 +74,15 @@ overlap policy remain explicit edge-case work.  Broad diagnostic and static-
 semantics soundness/completeness theorem families do not block these executable
 stages.
 
+The additive IR carrier portion is complete.  It defines declaration-owned,
+category-safe occurrence IDs; typed binder, expression and statement nodes;
+complete selected declaration instantiations; requirement/coercion links; node
+lookup; and final substitution that preserves identities.  Exact generic
+parameter substitutions are retained at instantiation time.  The active next
+step is traversal wiring: populate the node table, allocate local binder IDs,
+commit only the selected overload's metadata and attach numeric/coercion
+requirements to their originating expression nodes.
+
 The first semantic slice, ADR-0154, introduces structured resolved declaration
 and local identities, exact local-table lookup, and a monomorphic local
 expression language. Independent typing and evaluation correspond in both

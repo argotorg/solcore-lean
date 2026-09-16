@@ -34,6 +34,7 @@ structure ConstrainedDeclarationScheme where
 
 /-- The result of consistently instantiating a constrained declaration. -/
 structure InstantiatedConstrainedDeclaration where
+  parameterSubstitution : TypeSystem.ParameterSubstitution
   predicates : List ProgramPredicate
   body : TypeSystem.Ty
   next : Nat
@@ -71,6 +72,7 @@ def instantiate (scheme : ConstrainedDeclarationScheme) (next : Nat) :
   let (substitution, next) :=
     freshParameterSubstitution scheme.parameters next []
   {
+    parameterSubstitution := substitution
     predicates := scheme.predicates.map (ProgramPredicate.applyParameters substitution)
     body := substitution.apply scheme.body
     next
