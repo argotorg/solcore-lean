@@ -170,8 +170,17 @@ mutual
                   let (calleeType, state) ← inferExprFuel fuel context callee none state
                   applyFunctionType context calleeType argumentType expected state
       | .dotConstructor .. => .error (.unsupportedExpression "dot constructor")
-      | .proxy .. => .error (.unsupportedExpression "proxy value")
-      | .index .. => .error (.unsupportedExpression "index")
+      | .proxy _ sourceType => do
+          let inner ← resolveSourceType context sourceType
+          withExpected context state (.proxy inner) expected
+      | .index base _ index => do
+          let (baseType, state) ← inferExprFuel fuel context base none state
+          let (keyType, state) := state.fresh
+          let (valueType, state) := state.fresh
+          let state ← unify state baseType (.mapping keyType valueType)
+          let (_, state) ← inferExprFuel fuel context index
+            (some (state.resolve keyType)) state
+          withExpected context state (state.resolve valueType) expected
       | .field .. => .error (.unsupportedExpression "field")
       | .array .. => .error (.unsupportedExpression "array")
       | .error => .error (.unsupportedExpression "parser recovery")
