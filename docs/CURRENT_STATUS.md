@@ -5690,19 +5690,35 @@ invented runtime meaning.  End-to-end regressions execute both branches after
 nested blocks and shadowing lets, in addition to the original product-returning
 expression profile.
 
-The next frontend boundary is rigid/generic specialization and its
-declaration-instantiation worklist, followed by direct calls and executable
-trait/coercion evidence.  Constructors, members and place-aware statements
-remain later in dependency order.  A whole-program reference to an obligation
-remains the owning declaration paired with its function-local requirement
-identity.
+The first rigid/generic specialization boundary is also executable.
+`ProgramFunctionSignature` supplies the authoritative declaration-parameter
+order, including phantom parameters which do not occur in a body.  An arbitrary
+call-site parameter substitution is validated for exact coverage, ownership,
+uniqueness and ground arguments, then canonicalized into a deterministic
+declaration-plus-argument key.  Specialization rewrites every retained source
+type, binder, nested declaration-instantiation value, coercion endpoint,
+predicate and recursive evidence goal while preserving declaration, local,
+occurrence, node, requirement and implementation identities.  Malformed
+predicate/evidence pairs and residual open types reject explicitly.  The
+initial executable profile defers local let-polymorphism rather than assigning
+free metavariables a runtime meaning.
+
+Raw-source regressions specialize generic functions at Word and Bool, including
+reverse-order supplied substitutions and an unused generic parameter, then pass
+the resulting checked function through the existing Source-to-Core boundary and
+execute it.  The next frontend boundary is the finite specialization worklist
+which discovers those keys from direct-call metadata, followed by Core direct
+calls and executable trait/coercion evidence.  Constructors, members and
+place-aware statements remain later in dependency order.  A whole-program
+reference to an obligation remains the owning declaration paired with its
+function-local requirement identity.
 
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary
 Solcore source text. In particular, it does not yet provide:
 
-- solved source checking through specialization, Core lowering, and execution
+- general whole-program discovery, specialization, Core linking, and execution
   as one pipeline;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;

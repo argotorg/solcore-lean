@@ -7,9 +7,9 @@ interfaces, type/trait/value imports and re-exports, rank-1 inference, bounded
 trait evidence, minimum-cost overload selection after candidate-local literal
 defaulting, source-arity-preserving per-argument coercion and bounded multi-step
 shortest-path coercion are connected end to end.  A first monomorphic builtin
-typed-source-to-Core bridge is also executable.  Conversion-term insertion,
-generic/direct-call specialization and whole-program Core linking remain staged
-extensions.
+typed-source-to-Core bridge and call-free rigid/generic specialization are also
+executable.  Conversion-term insertion, specialization-worklist discovery,
+direct-call lowering and whole-program Core linking remain staged extensions.
 
 ## Context
 
@@ -130,8 +130,9 @@ mapping read indexes unify a key/value pair while checking the key through the
 same expected-type/coercion boundary.  They remain type-checking-only forms.
 Constructor/operator export selectors, the remaining advanced expressions and
 statements, generic/symbolic coercion intermediates, executable conversion
-terms, and source specialization or lowering to `Core.Ty` are outside the
-completed profile.
+terms, general source specialization and general lowering to `Core.Ty` are
+outside the completed profile; the call-free ground specialization and builtin
+tail-normal lowering slices below are implemented.
 
 The next internal boundary is an occurrence-addressed typed/resolved source IR.
 As its first carrier step, every inferred trait or coercion obligation now gets
@@ -185,9 +186,19 @@ coercion or expression form.  Regressions run both conditional paths with
 concrete inputs and stable-ID shadowing rather than stopping at structural
 output.
 
-The next internal boundary adds rigid/generic specialization and its
-declaration-instantiation worklist, then direct calls and executable
-conversion/trait evidence in that order.  Selection-bearing
+The first rigid/generic specialization boundary uses the resolved signature's
+complete parameter list to canonicalize exact ground call-site substitutions
+into deterministic declaration/argument keys.  It closes every retained
+typed-source, nested declaration-instantiation, requirement and recursive
+evidence type while preserving semantic identities.  Phantom parameters remain
+in the key; missing, duplicate, foreign, open or residual types and mismatched
+evidence goals reject explicitly.  Call-free generic bodies specialized at
+Word or Bool continue through the Core consumer and execute.  Local
+let-polymorphism remains an explicit deferred boundary.
+
+The next internal boundary adds finite specialization-worklist discovery from
+direct-call metadata, then direct Core calls and executable conversion/trait
+evidence in that order.  Selection-bearing
 constructor/member/match/assignment work follows the same carrier rather than
 extending an information-losing result shape.  Whole-program consumers identify
 an obligation by its owning declaration together with its function-local ID.

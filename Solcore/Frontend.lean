@@ -402,6 +402,8 @@ import Solcore.Frontend.TypedLetReturnTreeRawOwnerProperties
 import Solcore.Frontend.LocalExpressionLookupProperties
 import Solcore.Frontend.TypedLetReturnTreeLookupProperties
 import Solcore.Frontend.ProgramChecking
+import Solcore.Frontend.SourceSpecialization
+import Solcore.Frontend.SourceSpecializationProperties
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.SourceCoreElaborationProperties
 

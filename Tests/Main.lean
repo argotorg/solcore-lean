@@ -1266,6 +1266,7 @@ import Solcore.Test.SourceStructuralExpressions
 import Solcore.Test.SourceRequirementIdentity
 import Solcore.Test.SourceTypedIR
 import Solcore.Test.SourceTypedIRInference
+import Solcore.Test.SourceSpecialization
 import Solcore.Test.SourceCoreElaboration
 import Solcore.Test.ProgramChecking
 
@@ -6049,6 +6050,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceRequirementIdentity.testSourceRequirementIdentity
   SourceTypedIR.testSourceTypedIR
   SourceTypedIRInference.testSourceTypedIRInference
+  SourceSpecialization.testSourceSpecialization
   SourceCoreElaboration.testSourceCoreElaboration
   ProgramChecking.testProgramChecking
 
