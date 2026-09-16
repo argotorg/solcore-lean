@@ -30,7 +30,7 @@ private def workspace : Workspace.RawWorkspace := {
       "}",
       "impl Eq<Word> {",
       "  function eq(left: Word, right: Word) returns (Bool) {",
-      "    return left == right;",
+      "    return left != right;",
       "  }",
       "}",
       "impl Add<Word> {",
@@ -68,6 +68,12 @@ private def workspace : Workspace.RawWorkspace := {
       "}",
       "function equalityConstrained(left: Word, right: Word) returns (Bool) {",
       "  return equalWithEvidence(left, right);",
+      "}",
+      "function notEqualWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+      "  return left != right;",
+      "}",
+      "function inequalityConstrained(left: Word, right: Word) returns (Bool) {",
+      "  return notEqualWithEvidence(left, right);",
       "}",
       "function acceptWord(value: Word) returns (Word) { return value; }",
       "function coercionCall(value: Bool) returns (Word) { return acceptWord(value); }",
@@ -440,15 +446,41 @@ private def testRuntimeEvidenceBoundaries (program : CheckedProgram) : IO Unit :
     "Add evidence did not execute the selected subtracting impl method body"
 
   let equalityConstrained ← signatureNamed program "equalityConstrained"
-  let equalWithEvidence ← signatureNamed program "equalWithEvidence"
-  let equalityOutcome ← runOrThrow "unsupported equality evidence" program
+  let equalityOutcome ← runOrThrow "equality evidence" program
     [monomorphicRequest equalityConstrained] 2
-  match SourceCoreDirectLinking.link program equalityOutcome with
-  | .error (.unsupportedRuntimeBinary key _ .equal) =>
-      assertTrue (decide (key.declaration = equalWithEvidence.id))
-        "unsupported operator rejection lost its exact generic callee"
-  | result => throw (IO.userError
-      s!"unsupported equality evidence reached runtime: {reprStr result}")
+  let equalityLinked ← linkOrThrow "equality evidence" program equalityOutcome
+  let equalityKey : SourceSpecialization.SpecializationKey := {
+    declaration := equalityConstrained.id
+    arguments := []
+  }
+  let equalityEntry ← match equalityLinked.findEntry? equalityKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "equality evidence: linked root was absent")
+  assertTrue (decide (equalityEntry.run?
+        [.word (word 50), .word (word 50)] 1024 =
+          some (.done (.bool false) []) ∧
+      equalityEntry.run? [.word (word 50), .word (word 8)] 1024 =
+          some (.done (.bool true) [])))
+    "Eq evidence did not execute the selected nonstandard impl method body"
+
+  let inequalityConstrained ← signatureNamed program "inequalityConstrained"
+  let inequalityOutcome ← runOrThrow "inequality evidence" program
+    [monomorphicRequest inequalityConstrained] 2
+  let inequalityLinked ←
+    linkOrThrow "inequality evidence" program inequalityOutcome
+  let inequalityKey : SourceSpecialization.SpecializationKey := {
+    declaration := inequalityConstrained.id
+    arguments := []
+  }
+  let inequalityEntry ← match inequalityLinked.findEntry? inequalityKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "inequality evidence: linked root was absent")
+  assertTrue (decide (inequalityEntry.run?
+        [.word (word 50), .word (word 50)] 1024 =
+          some (.done (.bool true) []) ∧
+      inequalityEntry.run? [.word (word 50), .word (word 8)] 1024 =
+          some (.done (.bool false) [])))
+    "source != did not negate the selected Eq.eq method result"
 
   let coercionCall ← signatureNamed program "coercionCall"
   let coercionOutcome ← runOrThrow "coercion call" program
@@ -532,6 +564,34 @@ private def testImplementationMethodLoweringBoundary : IO Unit := do
         "unsupported implementation-method call lost its exact boundary metadata"
   | result => throw (IO.userError
       s!"an implementation-method call crossed the standalone Core boundary: {reprStr result}")
+
+private def testUnsupportedRuntimeBinaryBoundary : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Sub<T> {",
+    "  function sub(left: T, right: T) returns (T);",
+    "}",
+    "impl Sub<Word> {",
+    "  function sub(left: Word, right: Word) returns (Word) {",
+    "    return left + right;",
+    "  }",
+    "}",
+    "function subtractWithEvidence<T>(left: T, right: T) returns (T) where T: Sub {",
+    "  return left - right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Word) {",
+    "  return subtractWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let subtractWithEvidence ← signatureNamed program "subtractWithEvidence"
+  let outcome ← runOrThrow "unsupported subtraction evidence" program
+    [monomorphicRequest entry] 2
+  match SourceCoreDirectLinking.link program outcome with
+  | .error (.unsupportedRuntimeBinary key _ .subtract) =>
+      assertTrue (decide (key.declaration = subtractWithEvidence.id))
+        "unsupported operator rejection lost its exact generic callee"
+  | result => throw (IO.userError
+      s!"unsupported subtraction evidence reached runtime: {reprStr result}")
 
 private def testMultiStepRuntimeCoercion : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -747,6 +807,7 @@ def testSourceCoreDirectLinking : IO Unit := do
   testProofOnlyEvidence program
   testRuntimeEvidenceBoundaries program
   testImplementationMethodLoweringBoundary
+  testUnsupportedRuntimeBinaryBoundary
   testMultiStepRuntimeCoercion
   testMalformedRequirementMetadata program
   testMalformedCoercionEvidence program

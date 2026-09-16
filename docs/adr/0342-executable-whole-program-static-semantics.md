@@ -13,12 +13,13 @@ complete acyclic direct-call plans to independently rechecked Core entries.
 It statically discharges proof-only call-signature predicates after exact
 requirement/evidence validation and forwards closed implementation witnesses
 through nested constrained calls.  Trait and implementation method declarations
-are retained in checked catalogs with exact signature conformance.  The first
-runtime-evidence slice executes a deliberately narrow `Add<T>` profile by
-selecting, checking and capture-free inlining the closed implementation method
-body.  A second narrow slice validates each closed coercion edge by exact
-requirement identity and executes the selected `Coerce<From, To>.coerce` method
-body for direct-call arguments, forwarded generic evidence and call results.
+are retained in checked catalogs with exact signature conformance.  Narrow
+runtime-evidence slices execute `Add<T>.add` and `Eq<T>.eq` by selecting,
+checking and capture-free inlining the closed implementation method body;
+source `!=` negates the selected `eq` result.  A conversion slice validates
+each closed coercion edge by exact requirement identity and executes the
+selected `Coerce<From, To>.coerce` method body for direct-call arguments,
+forwarded generic evidence and call results.
 Other runtime evidence, recursive or indirect source calls, automatic entry
 discovery and a public source pipeline remain staged extensions.
 
@@ -96,8 +97,8 @@ The first profile may reject rather than guess for:
   `Coerce<From, To>.coerce` profile;
 - budget-exhausted specialization outcomes and every direct-call cycle;
 - seed roots with unresolved assumptions, runtime evidence outside the narrow
-  single-method `Add<T>` and `Coerce<From, To>` profiles, indirect calls and
-  general impl-method execution at the Core-linking boundary;
+  single-method `Add<T>`, `Eq<T>` and `Coerce<From, To>` profiles, indirect
+  calls and general impl-method execution at the Core-linking boundary;
 - constructor/operator export selectors and the remaining module-reference
   edge cases;
 - nested contract namespaces and every member-overload rule; and
@@ -265,16 +266,18 @@ caller's assumption marker is replaced only by a unique incoming implementation
 witness for the same goal.  The validated call requirements are then consumed
 statically and never become Core values or impl-method calls.
 
-The first runtime trait-evidence consumer is connected for one explicit
-profile.  A required binary addition must carry exactly one solved
-`Add<Operand>` requirement whose closed implementation evidence agrees with the
-typed occurrence.  The selected declaration must be a one-parameter `Add<T>`
-trait with exactly one non-generic method and one monomorphic, premise-free,
+The runtime binary trait-evidence consumer is connected for addition and
+equality.  A required occurrence must carry exactly one solved `Add<Operand>`
+or `Eq<Operand>` requirement whose closed implementation evidence agrees with
+the typed occurrence.  The selected declaration must be a one-parameter trait
+with exactly one non-generic method and one monomorphic, premise-free,
 `where`-free implementation with exactly one conforming method.  Its body is
 checked against the instantiated two-operand signature and capture-free inlined
-after the operands have been bound left to right.  The implementation body, not
-the builtin addition opcode, is authoritative; regressions use a subtraction
-body to distinguish those meanings.
+after the operands have been bound left to right.  `Add.add` must return the
+operand type; `Eq.eq` must return Bool, and source `!=` negates that selected
+method result.  The implementation body, not a builtin operator opcode, is
+authoritative: regressions use subtraction for addition and builtin inequality
+for equality to distinguish those meanings.
 
 The first runtime coercion consumer is connected by the same rule: method
 bodies, not endpoint types, define behavior.  One step must identify exactly
@@ -292,9 +295,10 @@ Bool-to-Word fixture returns `41` or `7`, demonstrating that no hard-coded
 endpoint conversion supplies the runtime result.
 
 Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
-assumptions, non-call/operator/literal requirements outside those two narrow
-profiles and indirect calls all reject explicitly.  Other evidence-dependent
-operators, generic or premise-bearing implementation methods, multi-method or
+assumptions, non-call/operator/literal requirements outside the supported
+binary and conversion profiles and indirect calls all reject explicitly.
+Other evidence-dependent operators, generic or premise-bearing implementation
+methods, multi-method or
 `where`-constrained profiles are not assigned an invented runtime meaning.
 Selected implementation method bodies must themselves remain in the standalone
 tail-normal Core-lowerable fragment: calls, coercions and required operations
@@ -303,15 +307,15 @@ projection.  The worklist can therefore close
 same-key recursive graphs for finite planning without claiming they are
 executable in the current Core.  Executable regressions cover proof-only
 constrained and nested generic calls, both conditional paths, the
-method-authoritative `Add<Word>` profile, all three conversion placements,
-runtime input mismatches, malformed plans and each principal staged boundary;
-small checked laws retain the runtime input gate and budget result.
+method-authoritative `Add<Word>` and `Eq<Word>` profiles, all three conversion
+placements, runtime input mismatches, malformed plans and each principal staged
+boundary; small checked laws retain the runtime input gate and budget result.
 
-The next internal boundary is expansion from these two runtime trait-evidence
-profiles to other operators and implementation shapes, followed by method
-bodies that themselves contain evidence-bearing operations.  Recursive calls
-require a separate named or global recursive Core representation rather than
-cyclic inlining.
+The next internal boundary is expansion from these runtime trait-evidence
+profiles to the remaining operators and implementation shapes, followed by
+method bodies that themselves contain evidence-bearing operations.  Recursive
+calls require a separate named or global recursive Core representation rather
+than cyclic inlining.
 Selection-bearing constructor,
 member, match and assignment work follows the same carrier rather than
 extending an information-losing result shape.  Whole-program consumers

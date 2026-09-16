@@ -18,9 +18,10 @@ fragment.  Each call must account positionally for its exact requirement IDs;
 implementation evidence is threaded into the callee, while assumption evidence
 must be discharged by a unique incoming witness with the same goal.  Evidence
 never becomes a runtime Core value.  Deliberately narrow required-binary and
-coercion profiles use closed `Add<T>` and `Coerce<From, To>` evidence to select,
-check, and inline the sole monomorphic implementation method.  Every other
-runtime-evidence shape remains an explicit staged boundary.
+coercion profiles use closed `Add<T>`, `Eq<T>` and `Coerce<From, To>` evidence
+to select, check, and inline the sole monomorphic implementation method.  Source
+`!=` negates the selected `Eq.eq` result.  Every other runtime-evidence shape
+remains an explicit staged boundary.
 
 The current Core has no recursive binding construct.  Accordingly, recursive
 specialization cycles are rejected explicitly rather than assigned an
@@ -457,10 +458,53 @@ private def exactRuntimeBinaryEvidence (caller : SpecializedFunction)
       throw (.runtimeBinaryEvidenceUnresolved caller.key node.id requirement
         predicate)
 
-private def runtimeBinaryMethod? :
-    Syntax.BinaryOp → Option (String × String)
-  | .add => some ("Add", "add")
+private inductive RuntimeBinaryResultKind where
+  | operand
+  | boolean
+
+private inductive RuntimeBinaryResultTransform where
+  | identity
+  | boolNot
+
+private structure RuntimeBinaryProfile where
+  traitName : String
+  methodName : String
+  resultKind : RuntimeBinaryResultKind
+  resultTransform : RuntimeBinaryResultTransform
+
+private def runtimeBinaryProfile? :
+    Syntax.BinaryOp → Option RuntimeBinaryProfile
+  | .add => some {
+      traitName := "Add"
+      methodName := "add"
+      resultKind := .operand
+      resultTransform := .identity
+    }
+  | .equal => some {
+      traitName := "Eq"
+      methodName := "eq"
+      resultKind := .boolean
+      resultTransform := .identity
+    }
+  | .notEqual => some {
+      traitName := "Eq"
+      methodName := "eq"
+      resultKind := .boolean
+      resultTransform := .boolNot
+    }
   | _ => none
+
+private def runtimeBinaryResultType (profile : RuntimeBinaryProfile)
+    (operandType : Core.Ty) : Core.Ty :=
+  match profile.resultKind with
+  | .operand => operandType
+  | .boolean => .bool
+
+private def transformRuntimeBinaryResult (profile : RuntimeBinaryProfile)
+    (result : Resolved.Expr) : Resolved.Expr :=
+  match profile.resultTransform with
+  | .identity => result
+  | .boolNot => .unary .boolNot result
 
 private def exactRuntimeCoercionEvidence (caller : SpecializedFunction)
     (node : ExpressionNode) (step : CoercionStep)
@@ -487,22 +531,22 @@ private def requiredBinaryPlan (program : CheckedProgram)
     (caller : SpecializedFunction) (available : List PredicateEvidence)
     (node : ExpressionNode) (operator : Syntax.BinaryOp) :
     Except Error (SourceCoreElaboration.RequiredBinaryPlan Error) := do
-  let (expectedTraitName, methodName) ← match runtimeBinaryMethod? operator with
-    | some names => pure names
+  let profile ← match runtimeBinaryProfile? operator with
+    | some profile => pure profile
     | none => throw (.unsupportedRuntimeBinary caller.key node.id operator)
   let (requirement, predicate, evidence) ←
     exactRuntimeBinaryEvidence caller node available
   let method ←
     (ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program evidence
-      1 methodName).mapError fun error =>
+      1 profile.methodName).mapError fun error =>
         .executableImplMethod caller.key node.id error
   let trait ← match program.signatures.trait? predicate.trait with
     | some trait => pure trait
     | none => throw (.executableImplMethod caller.key node.id
         (.missingTrait predicate.trait))
-  if trait.name != expectedTraitName then
+  if trait.name != profile.traitName then
     throw (.runtimeBinaryTraitNameMismatch caller.key node.id
-      expectedTraitName trait.name)
+      profile.traitName trait.name)
   let elaborated ←
     (SourceCoreElaboration.elaborateFunction method.checked).mapError fun error =>
       .implMethodSourceCore caller.key node.id method.id error
@@ -513,8 +557,9 @@ private def requiredBinaryPlan (program : CheckedProgram)
   if elaborated.inputs.values != expectedInputs then
     throw (.runtimeBinaryInputTypesMismatch caller.key node.id expectedInputs
       elaborated.inputs.values)
-  if elaborated.returnType != operandType then
-    throw (.runtimeBinaryResultTypeMismatch caller.key node.id operandType
+  let expectedResult := runtimeBinaryResultType profile operandType
+  if elaborated.returnType != expectedResult then
+    throw (.runtimeBinaryResultTypeMismatch caller.key node.id expectedResult
       elaborated.returnType)
   let nodeResult ←
     (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
@@ -529,7 +574,8 @@ private def requiredBinaryPlan (program : CheckedProgram)
     build := fun left right =>
       let temporaries := freshTemporaries temporaryOwner temporaryBase 2
       let body := aliasInputs elaborated.inputs temporaries elaborated.resolved
-      pure (bindValues (temporaries.zip [left, right]) body)
+      pure (transformRuntimeBinaryResult profile
+        (bindValues (temporaries.zip [left, right]) body))
   }
 
 /-- Turn one closed `Coerce<From, To>` witness into a checked, capture-free

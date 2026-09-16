@@ -41,13 +41,13 @@ roots, discovers finite direct-call plans, and lowers complete acyclic plans in
 the closed builtin subset to independently rechecked Semantic Core entries.
 Proof-only direct-call signature predicates may be discharged statically after
 exact requirement/evidence validation.  Checked trait/implementation catalogs
-now retain and signature-check their methods, and the first deliberately narrow
-runtime-evidence path executes a selected monomorphic `Add<T>` implementation
-method body.  The same method-authoritative boundary now executes a narrow
-closed `Coerce<From, To>.coerce` profile at direct-call arguments, through
-forwarded generic evidence, and on call results.  Other runtime evidence
-remains outside this path.  It is not yet a general source compiler or a public
-source Oracle.
+now retain and signature-check their methods.  Deliberately narrow runtime
+evidence paths execute selected monomorphic `Add<T>.add` and `Eq<T>.eq`
+implementation bodies; source `!=` negates the selected `eq` result.  The same
+method-authoritative boundary executes a closed `Coerce<From, To>.coerce`
+profile at direct-call arguments, through forwarded generic evidence, and on
+call results.  Other runtime evidence remains outside this path.  It is not yet
+a general source compiler or a public source Oracle.
 
 ## What works now
 
@@ -5644,7 +5644,7 @@ A direct call's signature predicates may be consumed statically when its
 requirement IDs, predicates and evidence goals match exactly; closed
 implementation evidence is forwarded through nested constrained calls and may
 justify a conversion inside the generic callee.  Cyclic or indirect calls,
-runtime trait evidence beyond the single-method `Add<T>` and
+runtime trait evidence beyond the single-method `Add<T>`, `Eq<T>` and
 `Coerce<From, To>` profiles, general conversion execution and general source
 semantics are not claimed.
 
@@ -5789,15 +5789,19 @@ ambiguous evidence is never erased.  Once validated, those call-owned
 requirements are consumed statically and do not become Core values or method
 calls.
 
-The first runtime trait-evidence profile is executable for addition.  A required
-binary `+` occurrence must have exactly one matching solved `Add<Operand>`
-requirement and closed implementation witness.  The selected trait must have one
-type parameter and one non-generic method; its selected implementation and
-method must be monomorphic, premise-free and `where`-free.  The method body is
-checked against its instantiated two-operand signature, its operands are bound
-left to right, and the body is capture-free inlined into the linked Core term.
-The method body is authoritative: the regression implementation computes
-subtraction, so `50 + 8` through generic evidence evaluates to `42`, not `58`.
+The runtime binary profile is executable for addition and equality.  A required
+binary occurrence must have exactly one matching solved `Add<Operand>` or
+`Eq<Operand>` requirement and closed implementation witness.  The selected
+trait must have one type parameter and one non-generic method; its selected
+implementation and method must be monomorphic, premise-free and `where`-free.
+The method body is checked against its instantiated two-operand signature, its
+operands are bound left to right, and the body is capture-free inlined into the
+linked Core term.  `Add.add` must return the operand type and `Eq.eq` must return
+Bool.  Source `!=` is the Boolean negation of the selected `eq` result.  Method
+bodies are authoritative: the addition regression computes subtraction, so
+`50 + 8` through generic evidence evaluates to `42`, while the equality
+regression deliberately returns builtin inequality and reverses ordinary
+`==`/`!=` results.
 
 The first executable conversion profile uses the same selected-method
 authority.  Each output coercion step must name exactly one attached and solved
@@ -5816,10 +5820,11 @@ the selected method body—not a hard-coded endpoint conversion—is executed.
 
 Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
 direct-call cycles, seed roots with unresolved assumptions, unconsumed
-non-call/operator/literal requirements outside the two explicit profiles and
-indirect calls reject explicitly.  Other runtime operators, generic or
-premise-bearing implementation methods, multi-method or `where`-constrained
-profiles remain explicit boundaries.  Implementation method bodies themselves
+non-call/operator/literal requirements outside the supported binary and
+conversion profiles and indirect calls reject explicitly.  Other runtime
+operators, generic or premise-bearing implementation methods, multi-method or
+`where`-constrained profiles remain explicit boundaries.  Implementation
+method bodies themselves
 must fit the standalone tail-normal Core-lowerable subset: calls, coercions and
 required operations inside a method body still reject.  Nominal source types
 also remain outside the closed Core type projection.
@@ -5827,15 +5832,15 @@ Thus the worklist may close same-key self or mutual recursion, but the current
 linker does not assign those cycles an executable meaning.  Small checked laws
 fix the runtime input-type gate and budget-exhaustion boundary; end-to-end
 regressions execute proof-only constrained and nested generic calls as well as
-both conditional paths, the method-authoritative `Add<Word>` profile and the
-direct, forwarded-generic and call-result conversion profiles, and cover the
-staged failure cases.
+both conditional paths, the method-authoritative `Add<Word>` and `Eq<Word>`
+profiles and the direct, forwarded-generic and call-result conversion profiles,
+and cover the staged failure cases.
 
-The next frontend boundary is expansion from these two narrow runtime-evidence
-profiles to other operators and implementation shapes, then to method bodies
-that themselves contain evidence-bearing operations.  Recursive source calls
-require a separate named or global recursive-function representation rather
-than cyclic inlining.
+The next frontend boundary is expansion from these narrow runtime-evidence
+profiles to the remaining operators and implementation shapes, then to method
+bodies that themselves contain evidence-bearing operations.  Recursive source
+calls require a separate named or global recursive-function representation
+rather than cyclic inlining.
 Automatic entry discovery, constructors, members and place-aware statements
 remain later in dependency order.  A whole-program reference to an obligation
 remains the owning declaration paired with its function-local requirement
@@ -5850,8 +5855,8 @@ Solcore source text. In particular, it does not yet provide:
   pipeline;
 - execution of cyclic or indirect source call graphs, runtime
   evidence-dependent operator/literal/non-call forms outside the narrow
-  `Add<T>` and `Coerce<From, To>` profiles, general impl methods, generic or
-  symbolic conversion execution, or method bodies containing calls,
+  `Add<T>`, `Eq<T>` and `Coerce<From, To>` profiles, general impl methods,
+  generic or symbolic conversion execution, or method bodies containing calls,
   coercions, or required operations;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
