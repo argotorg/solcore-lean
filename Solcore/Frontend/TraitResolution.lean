@@ -1,0 +1,239 @@
+set_option autoImplicit false
+
+namespace Solcore.Frontend.TraitResolution
+
+universe u v w
+
+/-- A resolved trait obligation. The distinguished `subject` is kept separate
+from the remaining trait arguments so source predicates can be represented
+without losing their written role. -/
+structure Predicate (Trait : Type u) (Ty : Type v) where
+  trait : Trait
+  subject : Ty
+  arguments : List Ty
+  deriving Repr, BEq, DecidableEq
+
+/-- A generic implementation rule before its head has been matched against a
+goal. Type variables, when present, live in the caller's `Ty` representation. -/
+structure ImplRule (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
+  id : ImplId
+  head : Predicate Trait Ty
+  wherePredicates : List (Predicate Trait Ty)
+  deriving Repr, BEq, DecidableEq
+
+/-- One implementation whose head matched a goal. `premises` must already have
+the head matcher's substitution applied. -/
+structure Candidate (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
+  implId : ImplId
+  premises : List (Predicate Trait Ty)
+  deriving Repr, BEq, DecidableEq
+
+/-- Boundary owned by the type layer: freshen an implementation, match its head,
+and return its instantiated where predicates. `none` means the head does not
+match. -/
+abbrev HeadMatcher (Trait : Type u) (Ty : Type v) (ImplId : Type w) :=
+  ImplRule Trait Ty ImplId → Predicate Trait Ty →
+    Option (List (Predicate Trait Ty))
+
+/-- A finite implementation catalog plus the type-specific head matcher. -/
+structure Program (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
+  rules : List (ImplRule Trait Ty ImplId)
+  matchHead : HeadMatcher Trait Ty ImplId
+
+variable {Trait : Type u} {Ty : Type v} {ImplId : Type w}
+
+/-- Exact monomorphic head matching, useful before a unifier is connected. -/
+@[reducible] def exactHeadMatcher [DecidableEq Trait] [DecidableEq Ty] :
+    HeadMatcher Trait Ty ImplId :=
+  fun rule goal =>
+    if rule.head = goal then some rule.wherePredicates else none
+
+namespace Program
+
+/-- Enumerate all matching rules in declaration order. -/
+@[reducible] def candidates (program : Program Trait Ty ImplId)
+    (goal : Predicate Trait Ty) : List (Candidate Trait Ty ImplId) :=
+  program.rules.filterMap fun rule =>
+    (program.matchHead rule goal).map fun premises =>
+      { implId := rule.id, premises := premises }
+
+end Program
+
+/-- Executable evidence records the selected implementation and evidence for
+each instantiated where predicate in source order. -/
+inductive Evidence (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
+  | byImpl
+      (goal : Predicate Trait Ty)
+      (implId : ImplId)
+      (premises : List (Evidence Trait Ty ImplId))
+  deriving Repr, BEq
+
+/-- Why bounded resolution could not make a coherent yes/no decision. -/
+inductive InconclusiveReason (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
+  | depthLimit (goal : Predicate Trait Ty)
+  | cycle (goal : Predicate Trait Ty)
+  | ambiguous
+      (goal : Predicate Trait Ty)
+      (first second : ImplId)
+  | incompleteCandidates
+      (goal : Predicate Trait Ty)
+      (successful : ImplId)
+  deriving Repr, BEq, DecidableEq
+
+/-- Three-way resolution result. Ambiguity is explicit inside `inconclusive`,
+because selecting either overlapping implementation would be incoherent. -/
+inductive Outcome (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
+  | success (evidence : Evidence Trait Ty ImplId)
+  | noSolution
+  | inconclusive (reason : InconclusiveReason Trait Ty ImplId)
+  deriving Repr, BEq
+
+/-- Small observable counters used to confirm that repeated obligations use the
+completed-goal table rather than expanding the same goal again. -/
+structure Statistics where
+  expandedGoals : Nat := 0
+  memoHits : Nat := 0
+  deriving Repr, BEq, DecidableEq
+
+/-- Public result of one bounded resolution query. -/
+structure Report (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
+  outcome : Outcome Trait Ty ImplId
+  statistics : Statistics
+  deriving Repr, BEq
+
+namespace Detail
+
+/-! Implementation details are named so kernel-reduced consumer tests can unfold
+the executable search without relying on native code generation. -/
+
+abbrev Memo (Trait : Type u) (Ty : Type v) (ImplId : Type w) :=
+  List (Predicate Trait Ty × Outcome Trait Ty ImplId)
+
+structure SearchState (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
+  memo : Memo Trait Ty ImplId := []
+  statistics : Statistics := {}
+
+@[reducible] def lookupMemo? [DecidableEq Trait] [DecidableEq Ty]
+    (goal : Predicate Trait Ty) : Memo Trait Ty ImplId →
+      Option (Outcome Trait Ty ImplId)
+  | [] => none
+  | (cached, outcome) :: rest =>
+      if cached = goal then some outcome else lookupMemo? goal rest
+
+@[reducible] def isActive [DecidableEq Trait] [DecidableEq Ty]
+    (goal : Predicate Trait Ty) : List (Predicate Trait Ty) → Bool
+  | [] => false
+  | candidate :: rest =>
+      if candidate = goal then true else isActive goal rest
+
+inductive PremiseOutcome
+    (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
+  | success (evidence : List (Evidence Trait Ty ImplId))
+  | noSolution
+  | inconclusive (reason : InconclusiveReason Trait Ty ImplId)
+
+@[reducible] def resolvePremises
+    (resolveChild : SearchState Trait Ty ImplId → Predicate Trait Ty →
+      Outcome Trait Ty ImplId × SearchState Trait Ty ImplId) :
+    SearchState Trait Ty ImplId → List (Predicate Trait Ty) →
+      PremiseOutcome Trait Ty ImplId × SearchState Trait Ty ImplId
+  | state, [] => (.success [], state)
+  | state, premise :: rest =>
+      let (headOutcome, afterHead) := resolveChild state premise
+      match headOutcome with
+      | .noSolution => (.noSolution, afterHead)
+      | .success headEvidence =>
+          let (tailOutcome, afterTail) :=
+            resolvePremises resolveChild afterHead rest
+          match tailOutcome with
+          | .success tailEvidence =>
+              (.success (headEvidence :: tailEvidence), afterTail)
+          | .noSolution => (.noSolution, afterTail)
+          | .inconclusive reason => (.inconclusive reason, afterTail)
+      | .inconclusive headReason =>
+          let (tailOutcome, afterTail) :=
+            resolvePremises resolveChild afterHead rest
+          match tailOutcome with
+          | .noSolution => (.noSolution, afterTail)
+          | .success _ => (.inconclusive headReason, afterTail)
+          | .inconclusive _ => (.inconclusive headReason, afterTail)
+
+@[reducible] def resolveCandidates
+    (resolveChild : SearchState Trait Ty ImplId → Predicate Trait Ty →
+      Outcome Trait Ty ImplId × SearchState Trait Ty ImplId)
+    (goal : Predicate Trait Ty) :
+    SearchState Trait Ty ImplId → List (Candidate Trait Ty ImplId) →
+      Option (ImplId × Evidence Trait Ty ImplId) →
+      Option (InconclusiveReason Trait Ty ImplId) →
+      Outcome Trait Ty ImplId × SearchState Trait Ty ImplId
+  | state, [], none, none => (.noSolution, state)
+  | state, [], none, some reason => (.inconclusive reason, state)
+  | state, [], some (_, evidence), none => (.success evidence, state)
+  | state, [], some (implId, _), some _ =>
+      (.inconclusive (.incompleteCandidates goal implId), state)
+  | state, candidate :: rest, firstSuccess, firstUnknown =>
+      let (premiseOutcome, afterCandidate) :=
+        resolvePremises resolveChild state candidate.premises
+      match premiseOutcome with
+      | .noSolution =>
+          resolveCandidates resolveChild goal afterCandidate rest
+            firstSuccess firstUnknown
+      | .inconclusive reason =>
+          resolveCandidates resolveChild goal afterCandidate rest
+            firstSuccess (firstUnknown.orElse fun _ => some reason)
+      | .success premiseEvidence =>
+          let evidence := Evidence.byImpl goal candidate.implId premiseEvidence
+          match firstSuccess with
+          | none =>
+              resolveCandidates resolveChild goal afterCandidate rest
+                (some (candidate.implId, evidence)) firstUnknown
+          | some (previousImpl, _) =>
+              (.inconclusive
+                (.ambiguous goal previousImpl candidate.implId), afterCandidate)
+
+@[reducible] def cacheConclusive [DecidableEq Trait] [DecidableEq Ty]
+    (goal : Predicate Trait Ty) (outcome : Outcome Trait Ty ImplId)
+    (state : SearchState Trait Ty ImplId) : SearchState Trait Ty ImplId :=
+  match outcome with
+  | .success _
+  | .noSolution => { state with memo := (goal, outcome) :: state.memo }
+  | .inconclusive _ => state
+
+@[reducible] def resolveAux [DecidableEq Trait] [DecidableEq Ty]
+    (program : Program Trait Ty ImplId) :
+    Nat → List (Predicate Trait Ty) → SearchState Trait Ty ImplId →
+      Predicate Trait Ty → Outcome Trait Ty ImplId × SearchState Trait Ty ImplId
+  | fuel, active, state, goal =>
+      match lookupMemo? goal state.memo with
+      | some outcome =>
+          (outcome, { state with statistics.memoHits := state.statistics.memoHits + 1 })
+      | none =>
+          if isActive goal active then
+            (.inconclusive (.cycle goal), state)
+          else
+            match fuel with
+            | 0 => (.inconclusive (.depthLimit goal), state)
+            | remaining + 1 =>
+                let expanded :=
+                  { state with
+                    statistics.expandedGoals := state.statistics.expandedGoals + 1 }
+                let resolveChild nextState child :=
+                  resolveAux program remaining (goal :: active) nextState child
+                let (outcome, finished) :=
+                  resolveCandidates resolveChild goal expanded
+                    (program.candidates goal) none none
+                (outcome, cacheConclusive goal outcome finished)
+
+end Detail
+
+/-- Resolve one trait obligation with a maximum implementation-chain depth.
+Completed success and no-solution entries are tabled. Cycles, depth exhaustion,
+ambiguity, and searches that might still hide a competing implementation remain
+explicitly inconclusive. -/
+@[reducible] def resolve [DecidableEq Trait] [DecidableEq Ty]
+    (program : Program Trait Ty ImplId) (maxDepth : Nat)
+    (goal : Predicate Trait Ty) : Report Trait Ty ImplId :=
+  let (outcome, state) := Detail.resolveAux program maxDepth [] {} goal
+  { outcome := outcome, statistics := state.statistics }
+
+end Solcore.Frontend.TraitResolution
