@@ -1251,6 +1251,7 @@ import Solcore.Test.OracleV5WorldMaterialization
 import Solcore.Test.OracleV5WorldMaterializationProperties
 import Solcore.Test.TypeSystemInference
 import Solcore.Test.ProgramEnvironmentAndTypeResolution
+import Solcore.Test.ProgramInterfaces
 import Solcore.Test.ProgramImports
 import Solcore.Test.ImportedResolutionConsumers
 import Solcore.Test.ProgramLoading
@@ -6026,6 +6027,7 @@ def testCanonicalRawLexing : IO Unit := do
 
 def staticSemanticsSpineTests : IO Unit := do
   testProgramEnvironmentAndTypeResolution
+  testProgramInterfaces
   testProgramImports
   Tests.ImportedResolutionConsumers.testImportedResolutionConsumers
   testProgramLoading
