@@ -29,4 +29,17 @@ theorem lowerType_product {site : ErrorSite} {left right : Ty}
   simp [lowerType, leftAccepted, rightAccepted, bind, Except.bind,
     pure, Pure.pure, Except.pure]
 
+/-- Every successful source elaboration carries the independently checked Core
+typing equation at its public boundary. -/
+@[simp] theorem ElaboratedFunction.resolved_lowers
+    (function : ElaboratedFunction) :
+    function.resolved.lower? function.inputs.ids = some function.core :=
+  function.resolvedLowered
+
+@[simp] theorem ElaboratedFunction.core_infers
+    (function : ElaboratedFunction) :
+    Core.infer? function.inputs.values function.core =
+      some function.returnType :=
+  function.coreTypeChecked
+
 end Solcore.Frontend.SourceCoreElaboration

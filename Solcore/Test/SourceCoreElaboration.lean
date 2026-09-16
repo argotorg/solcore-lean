@@ -111,6 +111,54 @@ private def testEndToEnd : IO CheckedFunction := do
       s!"empty return did not lower: {reprStr error}")
   pure function
 
+private def testStatementLowering : IO Unit := do
+  let program ← checkedProgram (String.intercalate "\n" [
+    "function statements(flag: Bool, x: Word) returns (Word) {",
+    "  {",
+    "    let base: Word = x + 1;",
+    "    let base: Word = base * 2;",
+    "    if (flag) {",
+    "      return base + 10;",
+    "    } else {",
+    "      return x + 20;",
+    "    }",
+    "  }",
+    "}"
+  ])
+  let function ← checkedNamed program "statements"
+  let lowered ← match SourceCoreElaboration.elaborateFunction function with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"checked statement body did not lower: {reprStr error}")
+  assertTrue (decide (lowered.inputs.values = [.bool, .word] ∧
+      lowered.returnType = .word ∧
+      Core.infer? lowered.inputs.values lowered.core = some .word))
+    "statement lowering changed its open Core context or result type"
+  assertTrue (decide (Core.runStateful 200
+      (.initial lowered.core [.bool true, .word (word 3)]) =
+        .done (.word (word 18)) []))
+    "true tail-if branch lost initialized lets, shadowing, or input lookup"
+  assertTrue (decide (Core.runStateful 200
+      (.initial lowered.core [.bool false, .word (word 3)]) =
+        .done (.word (word 23)) []))
+    "false tail-if branch lost its outer input reference"
+
+private def testUninitializedLetRejected : IO Unit := do
+  let program ← checkedProgram (String.intercalate "\n" [
+    "function uninitialized(x: Word) returns (Word) {",
+    "  let pending: Word;",
+    "  return pending;",
+    "}"
+  ])
+  let function ← checkedNamed program "uninitialized"
+  let statement ← match function.typedBody.roots with
+    | .statement statement :: _ => pure statement
+    | _ => throw (IO.userError
+        "uninitialized-let fixture lost its first statement root")
+  expectError "uninitialized let" function
+    (.occurrence statement.occurrence)
+    fun reason => reason matches .uninitializedLet
+
 private def testRequirementsAndCoercions (function : CheckedFunction) : IO Unit := do
   let (_, expression) ← rootIds function
   let requirement : RequirementId := ⟨37⟩
@@ -246,6 +294,8 @@ private def testOverflowLiteral : IO Unit := do
 staged boundary that must reject explicitly. -/
 def testSourceCoreElaboration : IO Unit := do
   let function ← testEndToEnd
+  testStatementLowering
+  testUninitializedLetRejected
   testRequirementsAndCoercions function
   testUnsupportedExpressions function
   testBrokenEdges function

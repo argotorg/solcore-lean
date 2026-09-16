@@ -33,15 +33,32 @@ inductive UnsupportedExpression where
   | index
   deriving Repr, BEq, DecidableEq
 
+/-- Statement forms outside the tail-normal executable profile. -/
+inductive UnsupportedStatement where
+  | expression
+  deriving Repr, BEq, DecidableEq
+
+/-- Statements whose control-flow meaning cannot be preserved before the end
+of the current statement list. -/
+inductive NonTailStatement where
+  | returnStmt
+  | ifThen
+  | block
+  deriving Repr, BEq, DecidableEq
+
+/-- Identify the branch of a tail conditional that can fall through. -/
+inductive ConditionalBranch where
+  | thenBranch
+  | elseBranch
+  deriving Repr, BEq, DecidableEq
+
 /-- Precise rejection reasons at the typed-source-to-Core boundary. -/
 inductive ErrorReason where
   | ownerMismatch
       (expected actual : Resolved.DeclarationId)
-  | expectedSingleStatementRoot (actual : Nat)
   | missingNode
   | expectedExpressionNode
   | expectedStatementNode
-  | expectedTerminalReturn
   | coercionsPresent (coercions : List CoercionStep)
   | requirementsPresent (requirements : List RequirementId)
   | flexibleTypeVariable (id : TypeVarId)
@@ -50,10 +67,20 @@ inductive ErrorReason where
   | unsupportedType (type : Ty)
   | polymorphicInput (variables : List TypeVarId)
   | duplicateInput (id : Resolved.LocalId)
+  | polymorphicLocal (variables : List TypeVarId)
+  | duplicateLocal (id : Resolved.LocalId)
   | unsupportedExpression (kind : UnsupportedExpression)
+  | unsupportedStatement (kind : UnsupportedStatement)
+  | uninitializedLet
+  | nonTailStatement (kind : NonTailStatement)
+  | missingElseBranch
+  | statementListFallthrough
+  | blockFallthrough
+  | conditionalBranchFallthrough (branch : ConditionalBranch)
   | invalidWordLiteral (literal : Syntax.CoreLiteralValue)
   | unknownLocal (id : Resolved.LocalId)
   | expressionDepthLimit
+  | statementDepthLimit
   | typedNodeTypeMismatch (expected actual : Core.Ty)
   | resolvedLoweringFailed
   | coreInferenceFailed
@@ -74,6 +101,8 @@ structure ElaboratedFunction where
   resolved : Resolved.Expr
   core : Core.Expr
   returnType : Core.Ty
+  resolvedLowered : resolved.lower? inputs.ids = some core
+  coreTypeChecked : Core.infer? inputs.values core = some returnType
   deriving Repr
 
 private def fail {alpha : Type} (site : ErrorSite) (reason : ErrorReason) :
@@ -228,17 +257,98 @@ private def lowerExpressionFuel (fuel : Nat) (source : TypedSource)
             | .index _ _ => fail (.occurrence id.occurrence)
                 (.unsupportedExpression .index)
 
-private def terminalExpression (source : TypedSource)
-    (root : NodeId) : Except Error (OccurrenceId × Option ExpressionId × Core.Ty) := do
-  let id ← match root with
-    | .statement id => pure id
-    | .expression id =>
-        fail (.occurrence id.occurrence) .expectedStatementNode
-  let node ← lookupStatement source id
-  let type ← lowerType (.occurrence id.occurrence) node.type
-  match node.form with
-  | .returnStmt value => pure (id.occurrence, value, type)
-  | _ => fail (.occurrence id.occurrence) .expectedTerminalReturn
+private def ensureType (site : ErrorSite) (expected : Core.Ty)
+    (type : Ty) : Except Error Unit := do
+  let actual ← lowerType site type
+  if actual = expected then
+    pure ()
+  else
+    fail site (.typedNodeTypeMismatch expected actual)
+
+private def lowerExpressionAs (fuel : Nat) (source : TypedSource)
+    (scope : Resolved.Context) (expected : Core.Ty) (id : ExpressionId) :
+    Except Error Resolved.Expr := do
+  let node ← lookupExpression source id
+  ensureType (.occurrence id.occurrence) expected node.type
+  lowerExpressionFuel fuel source scope.ids id
+
+private def statementRoots : List NodeId → Except Error (List StatementId)
+  | [] => .ok []
+  | .statement id :: rest => do
+      pure (id :: (← statementRoots rest))
+  | .expression id :: _ =>
+      fail (.occurrence id.occurrence) .expectedStatementNode
+
+private def finalStatement? : List StatementId → Option StatementId
+  | [] => none
+  | [id] => some id
+  | _ :: rest => finalStatement? rest
+
+/-- Lower the tail-normal statement profile.  Each statement edge consumes
+fuel, while expression edges consume the remaining fuel independently. -/
+private def lowerStatementsFuel : Nat → TypedSource → Resolved.Context →
+    Core.Ty → ErrorSite → ErrorReason → List StatementId →
+    Except Error Resolved.Expr
+  | _, _, _, _, fallthroughSite, fallthroughReason, [] =>
+      fail fallthroughSite fallthroughReason
+  | 0, _, _, _, _, _, id :: _ =>
+      fail (.occurrence id.occurrence) .statementDepthLimit
+  | fuel + 1, source, scope, expected, fallthroughSite, fallthroughReason,
+      id :: rest => do
+    let node ← lookupStatement source id
+    let site := ErrorSite.occurrence id.occurrence
+    match node.form with
+    | .letDecl binder initializer => do
+        ensureType site .unit node.type
+        if scope.ids.contains binder.id then
+          fail (.binder binder.id) (.duplicateLocal binder.id)
+        else if !binder.scheme.quantified.isEmpty then
+          fail (.binder binder.id)
+            (.polymorphicLocal binder.scheme.quantified)
+        else
+          let binderType ← lowerType (.binder binder.id) binder.scheme.body
+          let initializer ← match initializer with
+            | none => fail site .uninitializedLet
+            | some initializer =>
+                lowerExpressionAs fuel source scope binderType initializer
+          let body ← lowerStatementsFuel fuel source
+            ((binder.id, binderType) :: scope) expected
+            fallthroughSite fallthroughReason rest
+          pure (.letE binder.id initializer body)
+    | .returnStmt value => do
+        if !rest.isEmpty then
+          fail site (.nonTailStatement .returnStmt)
+        else
+          ensureType site expected node.type
+          match value with
+          | none =>
+              if expected = .unit then
+                pure .unit
+              else
+                fail site (.typedNodeTypeMismatch expected .unit)
+          | some value => lowerExpressionAs fuel source scope expected value
+    | .ifThen condition thenBody elseBody => do
+        if !rest.isEmpty then
+          fail site (.nonTailStatement .ifThen)
+        else
+          match elseBody with
+          | none => fail site .missingElseBranch
+          | some elseBody => do
+              ensureType site expected node.type
+              let condition ← lowerExpressionAs fuel source scope .bool condition
+              let thenBranch ← lowerStatementsFuel fuel source scope expected
+                site (.conditionalBranchFallthrough .thenBranch) thenBody
+              let elseBranch ← lowerStatementsFuel fuel source scope expected
+                site (.conditionalBranchFallthrough .elseBranch) elseBody
+              pure (.ifE condition thenBranch elseBranch)
+    | .block body => do
+        if !rest.isEmpty then
+          fail site (.nonTailStatement .block)
+        else
+          ensureType site expected node.type
+          lowerStatementsFuel fuel source scope expected site .blockFallthrough body
+    | .expression _ _ =>
+        fail site (.unsupportedStatement .expression)
 
 /-- Lower a checked monomorphic builtin function body to the existing resolved
 local fragment and then to an open, independently rechecked Core expression. -/
@@ -249,52 +359,43 @@ def elaborateFunction (function : CheckedFunction) :
     fail (.declaration function.declaration)
       (.ownerMismatch function.declaration source.owner)
   else
-    let root ← match source.roots with
-      | [root] => pure root
-      | roots =>
-          fail (.declaration function.declaration)
-            (.expectedSingleStatementRoot roots.length)
+    let roots ← statementRoots source.roots
+    let rootOccurrence ← match roots with
+      | [] =>
+          fail (.declaration function.declaration) .statementListFallthrough
+      | root :: _ => pure root.occurrence
     let inputs ← lowerInputs source.inputs
     let expected ← lowerType (.declaration function.declaration)
       function.inferredBodyType
-    let (rootOccurrence, value, statementType) ← terminalExpression source root
-    if statementType != expected then
-      fail (.occurrence rootOccurrence)
-        (.typedNodeTypeMismatch expected statementType)
-    else
-      let resolved ← match value with
-        | none => pure .unit
-        | some id => do
-            let node ← lookupExpression source id
-            let actual ← lowerType (.occurrence id.occurrence) node.type
-            unless actual = expected do
-              throw {
-                site := .occurrence id.occurrence
-                reason := .typedNodeTypeMismatch expected actual
+    let fallthroughSite := match finalStatement? roots with
+      | some statement => ErrorSite.occurrence statement.occurrence
+      | none => ErrorSite.declaration function.declaration
+    let resolved ← lowerStatementsFuel (source.nodes.length + 1) source inputs
+      expected fallthroughSite .statementListFallthrough roots
+    unless function.solvedRequirements.isEmpty do
+      throw {
+        site := .declaration function.declaration
+        reason := .unconsumedRequirements
+          (function.solvedRequirements.map (·.id))
+      }
+    match lowered : resolved.lower? inputs.ids with
+    | none => fail (.occurrence rootOccurrence) .resolvedLoweringFailed
+    | some core =>
+        match inferred : Core.infer? inputs.values core with
+        | none => fail (.occurrence rootOccurrence) .coreInferenceFailed
+        | some actual =>
+            if equal : actual = expected then
+              pure {
+                declaration := function.declaration
+                inputs
+                resolved
+                core
+                returnType := expected
+                resolvedLowered := lowered
+                coreTypeChecked := by simpa [equal] using inferred
               }
-            lowerExpressionFuel (source.nodes.length + 1) source inputs.ids id
-      unless function.solvedRequirements.isEmpty do
-        throw {
-          site := .declaration function.declaration
-          reason := .unconsumedRequirements
-            (function.solvedRequirements.map (·.id))
-        }
-      let core ← match resolved.lower? inputs.ids with
-        | some core => pure core
-        | none => fail (.occurrence rootOccurrence) .resolvedLoweringFailed
-      match Core.infer? inputs.values core with
-      | none => fail (.occurrence rootOccurrence) .coreInferenceFailed
-      | some actual =>
-          if actual = expected then
-            pure {
-              declaration := function.declaration
-              inputs
-              resolved
-              core
-              returnType := expected
-            }
-          else
-            fail (.occurrence rootOccurrence)
-              (.returnTypeMismatch expected actual)
+            else
+              fail (.occurrence rootOccurrence)
+                (.returnTypeMismatch expected actual)
 
 end Solcore.Frontend.SourceCoreElaboration

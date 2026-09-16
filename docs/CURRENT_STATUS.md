@@ -5666,27 +5666,36 @@ solved requirement identities.  Small checked laws cover allocator and
 substitution identity preservation; general preservation and ownership
 completeness theorems remain deferred under the executable-first proof policy.
 
-The first consumer of this carrier is now executable.  A checked function with
-one terminal return can lower closed builtin Unit, Bool, Word and product types,
-local references, groups, tuples, builtin unary/binary operators and
-conditionals through `Resolved.Expr` to an open Semantic Core expression.
-Numeric spellings are range-checked at this boundary.  Stable input identities
-determine the positional Core context, and the resulting Core is independently
-inferred again before its return type is accepted.  Missing or category-wrong
-node edges, duplicate inputs, unresolved source types, non-Word literals,
-typed-node mismatches and unconsumed requirements all produce located
-elaboration errors.  Calls, lambdas, proxy/index forms, nominal types and any
-node carrying a coercion or trait requirement reject explicitly instead of
-receiving an invented runtime meaning.  End-to-end regression reaches the Core
-machine with concrete Bool/Word inputs and checks the resulting product value.
+The first consumer of this carrier is now executable.  A checked function in
+the tail-normal statement profile can lower initialized lets, nested lexical
+blocks, terminal conditionals with two returning branches and terminal returns.
+Closed builtin Unit, Bool, Word and product types, local references, groups,
+tuples, builtin unary/binary operators and expression conditionals pass through
+`Resolved.Expr` to an open Semantic Core expression.  Let initializers use the
+old scope, their tails use the stable binder-prepended scope, and both
+conditional branches begin from the same outer scope.  Numeric spellings are
+range-checked at this boundary.
 
-The next frontend boundary extends statement lowering from the singleton
-terminal return to lets, blocks and terminal conditionals.  Generic
-specialization and its declaration-instantiation worklist follow, then direct
-calls and executable trait/coercion evidence.  Constructors, members and
-place-aware statements remain later in dependency order.  A whole-program
-reference to an obligation remains the owning declaration paired with its
-function-local requirement identity.
+Stable input identities determine the positional Core context.  Every accepted
+result stores checked equations both for exact `Resolved.Expr.lower?` output
+and for independent `Core.infer?` reconstruction of its declared return type.
+Missing or category-wrong node edges,
+duplicate inputs or active local IDs, polymorphic locals, unresolved source
+types, non-Word literals, typed-node mismatches, uninitialized lets, missing
+else branches, fallthrough, non-tail control statements and unconsumed
+requirements all produce located elaboration errors.  Calls, lambdas,
+expression statements, proxy/index forms, nominal types and any node carrying a
+coercion or trait requirement reject explicitly instead of receiving an
+invented runtime meaning.  End-to-end regressions execute both branches after
+nested blocks and shadowing lets, in addition to the original product-returning
+expression profile.
+
+The next frontend boundary is rigid/generic specialization and its
+declaration-instantiation worklist, followed by direct calls and executable
+trait/coercion evidence.  Constructors, members and place-aware statements
+remain later in dependency order.  A whole-program reference to an obligation
+remains the owning declaration paired with its function-local requirement
+identity.
 
 ## What is not yet claimed
 

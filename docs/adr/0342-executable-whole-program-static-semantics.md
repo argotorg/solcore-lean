@@ -171,19 +171,23 @@ coercions are attached at the fitting boundary: expected-driven transparent
 descent may place one on the inner node, while later call-argument fitting
 places it on the completed outer argument node.
 
-The first Core consumer accepts one terminal return over closed builtin
-Unit/Bool/Word/product types, local references, groups, tuples, builtin
-operators and conditionals.  It follows typed occurrence edges into
-`Resolved.Expr`, lowers stable local identities to an open positional Core
-context, and independently checks the Core result type.  It has explicit
-located failures for malformed carriers, overflow literals and every staged
-type, requirement, coercion or expression form.  Its regression runs the
-resulting Core with concrete inputs rather than stopping at structural output.
+The first Core consumer accepts a tail-normal statement profile over closed
+builtin Unit/Bool/Word/product types.  Initialized lets, nested lexical blocks,
+terminal conditionals with two returning branches and terminal returns compose
+with local references, groups, tuples, builtin operators and expression
+conditionals.  It follows typed occurrence edges into `Resolved.Expr`, lowers
+stable local identities to an open positional Core context, and retains checked
+equations for exact resolved lowering and the independently inferred Core
+result type.  It has
+explicit located failures for malformed carriers, overflow literals,
+fallthrough, non-tail control statements and every staged type, requirement,
+coercion or expression form.  Regressions run both conditional paths with
+concrete inputs and stable-ID shadowing rather than stopping at structural
+output.
 
-The next internal boundary extends statement lowering through lets, blocks and
-terminal conditionals, then adds generic specialization worklists, direct
-calls, and executable conversion/trait evidence in that order.  Selection-
-bearing constructor/member/match/assignment work follows the same carrier
-rather than extending an information-losing result shape.  Whole-program
-consumers identify an obligation by its owning declaration together with its
-function-local ID.
+The next internal boundary adds rigid/generic specialization and its
+declaration-instantiation worklist, then direct calls and executable
+conversion/trait evidence in that order.  Selection-bearing
+constructor/member/match/assignment work follows the same carrier rather than
+extending an information-losing result shape.  Whole-program consumers identify
+an obligation by its owning declaration together with its function-local ID.
