@@ -404,6 +404,8 @@ import Solcore.Frontend.TypedLetReturnTreeLookupProperties
 import Solcore.Frontend.ProgramChecking
 import Solcore.Frontend.SourceSpecialization
 import Solcore.Frontend.SourceSpecializationProperties
+import Solcore.Frontend.SourceSpecializationWorklist
+import Solcore.Frontend.SourceSpecializationWorklistProperties
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.SourceCoreElaborationProperties
 

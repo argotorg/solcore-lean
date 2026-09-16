@@ -7,8 +7,8 @@ interfaces, type/trait/value imports and re-exports, rank-1 inference, bounded
 trait evidence, minimum-cost overload selection after candidate-local literal
 defaulting, source-arity-preserving per-argument coercion and bounded multi-step
 shortest-path coercion are connected end to end.  A first monomorphic builtin
-typed-source-to-Core bridge and call-free rigid/generic specialization are also
-executable.  Conversion-term insertion, specialization-worklist discovery,
+typed-source-to-Core bridge, rigid/generic specialization and finite direct-call
+specialization worklist are also executable.  Conversion-term insertion,
 direct-call lowering and whole-program Core linking remain staged extensions.
 
 ## Context
@@ -196,9 +196,20 @@ evidence goals reject explicitly.  Call-free generic bodies specialized at
 Word or Bool continue through the Core consumer and execute.  Local
 let-polymorphism remains an explicit deferred boundary.
 
-The next internal boundary adds finite specialization-worklist discovery from
-direct-call metadata, then direct Core calls and executable conversion/trait
-evidence in that order.  Selection-bearing
-constructor/member/match/assignment work follows the same carrier rather than
+The finite specialization worklist now accepts raw seed requests and resolves
+each one through exact declaration/signature/body lookup and the canonical
+specialization function.  Plans preserve canonical seed roots in input order,
+first-discovery FIFO specializations and every direct-call expression edge.
+Discovery follows typed-node order.  Duplicate canonical keys do not consume
+budget, so same-key recursion closes; type-growing polymorphic recursion exposes
+a partial plan and the first unseen key at the finite bound.  Callee-reference,
+instantiation, specialized type and predicate metadata are checked before an
+edge is accepted.  Signature assumptions and solved evidence are retained for
+the later execution layer rather than discharged here, and indirect calls are
+an explicit profile error.
+
+The next internal boundary adds direct Core calls and whole-program linking,
+then executable conversion/trait evidence.  Selection-bearing constructor,
+member, match and assignment work follows the same carrier rather than
 extending an information-losing result shape.  Whole-program consumers identify
 an obligation by its owning declaration together with its function-local ID.

@@ -5623,8 +5623,9 @@ Higher-rank and higher-kinded polymorphism,
 polymorphic recursion, coinductive trait cycles and overlap policy beyond
 explicit ambiguity are deferred.  Generic or symbolic intermediate coercion
 paths, coinductive coercion cycles and insertion of executable conversion terms
-are not yet connected, and no specialization, elaboration or lowering from
-solved source terms to Semantic Core is claimed.
+are not yet connected.  The specialization and lowering slices described below
+cover a deliberately closed builtin subset; general direct calls, evidence
+execution and whole-program Semantic Core linking are not yet claimed.
 
 Before adding constructor/member selection, match, assignment or executable
 conversion, the next architecture boundary is an occurrence-addressed typed and
@@ -5706,10 +5707,32 @@ free metavariables a runtime meaning.
 Raw-source regressions specialize generic functions at Word and Bool, including
 reverse-order supplied substitutions and an unused generic parameter, then pass
 the resulting checked function through the existing Source-to-Core boundary and
-execute it.  The next frontend boundary is the finite specialization worklist
-which discovers those keys from direct-call metadata, followed by Core direct
-calls and executable trait/coercion evidence.  Constructors, members and
-place-aware statements remain later in dependency order.  A whole-program
+execute it.
+
+Finite whole-program specialization discovery is now executable from an
+explicit list of raw seed requests.  Every seed and discovered callee passes
+through exact environment/signature/body lookup and the same authoritative
+specialization boundary.  The resulting plan retains canonical seed keys in
+input order, including duplicates, first-discovery FIFO specializations, and a
+separate edge for every direct-call expression occurrence.  Typed-node order
+determines discovery order; raw nested substitutions are re-canonicalized in
+the callee signature's parameter order.
+
+The worklist charges its bound only for distinct canonical keys.  Same-key self
+and mutual recursion therefore close normally, while type-growing polymorphic
+recursion returns a partial plan, the first unseen canonical key and its pending
+queue instead of diverging.  Direct-call reference metadata, instantiated
+types and predicates are checked against the specialized callee.  Signature
+assumptions and solved caller evidence remain intact but are not consumed at
+this stage, and indirect calls reject explicitly.  Small checked laws cover
+empty and zero-budget boundaries; raw-source regressions cover canonical
+multi-parameter calls, deterministic nested-call order, duplicate roots and
+call occurrences, recursive keys, finite budget exhaustion, retained where
+predicates, malformed typed metadata and the indirect-call boundary.
+
+The next frontend boundary is direct-call lowering and whole-program Core
+linking, followed by executable trait/coercion evidence.  Constructors, members
+and place-aware statements remain later in dependency order.  A whole-program
 reference to an obligation remains the owning declaration paired with its
 function-local requirement identity.
 
@@ -5718,8 +5741,8 @@ function-local requirement identity.
 The current public system is not yet an end-to-end implementation for arbitrary
 Solcore source text. In particular, it does not yet provide:
 
-- general whole-program discovery, specialization, Core linking, and execution
-  as one pipeline;
+- automatic entry-point seeding, direct-call Core linking, and execution as one
+  pipeline;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;
