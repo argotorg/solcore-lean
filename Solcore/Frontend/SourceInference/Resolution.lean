@@ -202,21 +202,60 @@ def parameterTypesForArity? : Nat → Ty → Option (List Ty)
       pure (parameter :: parameters)
   | _ + 2, _ => none
 
-def unifyArguments : State → List Ty → List Ty → Option State
-  | state, [], [] => some state
+def fitArguments (context : Context) :
+    State → List Ty → List Ty → Except Error (Option (State × Nat))
+  | state, [], [] => .ok (some (state, 0))
   | state, argument :: arguments, parameter :: parameters => do
-      let state ← (unify state argument parameter).toOption
-      unifyArguments state arguments parameters
-  | _, _, _ => none
-
-def coerceArguments (context : Context) :
-    State → List Ty → List Ty → Except Error (Option State)
-  | state, [], [] => .ok (some state)
-  | state, argument :: arguments, parameter :: parameters => do
+      let requirementCount := state.requirements.length
       match ← candidateWithExpected context state argument (some parameter) with
       | none => pure none
-      | some (_, state) => coerceArguments context state arguments parameters
+      | some (_, state) =>
+          let headCost := state.requirements.length - requirementCount
+          match ← fitArguments context state arguments parameters with
+          | none => pure none
+          | some (state, cost) =>
+              pure (some (state, headCost + cost))
   | _, _, _ => .ok none
+
+structure CandidateNumericResult where
+  state : State
+  cost : Nat
+
+def defaultCandidateNumericVariable (context : Context)
+    (metavariable : TypeVarId) (state : State) :
+    Except Error CandidateNumericResult := do
+  let type := state.resolve (.variable metavariable)
+  if type = .word then
+    pure { state, cost := 0 }
+  else
+    match type with
+    | .variable _ =>
+        pure { state := ← unify state type .word, cost := 0 }
+    | _ =>
+        match ← conventionalTrait? context ["FromLiteral", "Numeric"] with
+        | none => throw (.nonNumericLiteral type)
+        | some trait =>
+            let predicate : ProgramPredicate := {
+              trait
+              subject := type
+              arguments := []
+            }
+            pure { state := state.addRequirement predicate, cost := 1 }
+
+def defaultCandidateNumerics (context : Context) :
+    List TypeVarId → State → Except Error CandidateNumericResult
+  | [], state => .ok { state, cost := 0 }
+  | metavariable :: rest, state => do
+      let head ← defaultCandidateNumericVariable context metavariable state
+      let tail ← defaultCandidateNumerics context rest head.state
+      pure { state := tail.state, cost := head.cost + tail.cost }
+
+def removeCandidateNumerics (state : State)
+    (metavariables : List TypeVarId) : State := {
+  state with
+  numericVariables := state.numericVariables.filter fun metavariable =>
+    !metavariables.contains metavariable
+}
 
 def validateCandidatePredicates (context : Context) (state : State) :
     List ProgramPredicate → Except Error Unit
@@ -229,32 +268,16 @@ def validateCandidatePredicates (context : Context) (state : State) :
       else
         validateCandidatePredicates context state rest
 
-def tryFunctionCandidate (context : Context)
-    (argumentTypes : List Ty) (expected : Option Ty) (state : State)
-    (signature : ProgramFunctionSignature) :
-    Except Error (Option (Ty × State)) :=
-  let instantiated := signature.scheme.instantiate state.inference.next
-  let candidate? : Option (Ty × State) := do
-    let (parameter, result) ← functionParts? instantiated.body
-    let parameters ← parameterTypesForArity? signature.parameterTypes.length parameter
-    let inference := { state.inference with next := instantiated.next }
-    let state := { state with inference }
-    let state ← unifyArguments state argumentTypes parameters
-    let state ← match expected with
-      | none => some state
-      | some expected => (unify state result expected).toOption
-    some (result, state)
-  match candidate? with
-  | none => .ok none
-  | some (result, state) => do
-      validateCandidatePredicates context state instantiated.predicates
-      pure (some (state.resolve result,
-        state.addRequirements instantiated.predicates))
+structure CandidateAttemptResult where
+  result : Ty
+  state : State
+  cost : Nat
 
-def tryCoercibleFunctionCandidate (context : Context)
-    (argumentTypes : List Ty) (expected : Option Ty) (state : State)
+def tryFunctionCandidate (context : Context)
+    (argumentTypes : List Ty) (numericVariables : List TypeVarId)
+    (expected : Option Ty) (state : State)
     (signature : ProgramFunctionSignature) :
-    Except Error (Option (Ty × State)) :=
+    Except Error (Option CandidateAttemptResult) :=
   let requirementCount := state.requirements.length
   let instantiated := signature.scheme.instantiate state.inference.next
   match functionParts? instantiated.body with
@@ -265,34 +288,54 @@ def tryCoercibleFunctionCandidate (context : Context)
       | some parameters =>
           let inference := { state.inference with next := instantiated.next }
           let state := { state with inference }
-          match ← coerceArguments context state argumentTypes parameters with
+          match ← fitArguments context state argumentTypes parameters with
           | none => pure none
-          | some state =>
+          | some (state, argumentCost) =>
+              let resultRequirementCount := state.requirements.length
               match ← candidateWithExpected context state result expected with
               | none => pure none
               | some (result, state) =>
+                  let resultCost :=
+                    state.requirements.length - resultRequirementCount
+                  let numeric ←
+                    defaultCandidateNumerics context numericVariables state
+                  let state := removeCandidateNumerics numeric.state numericVariables
                   let introducedRequirements :=
                     state.requirements.drop requirementCount
                   validateCandidatePredicates context state
                     (instantiated.predicates ++ introducedRequirements)
-                  pure (some (state.resolve result,
-                    state.addRequirements instantiated.predicates))
+                  pure (some {
+                    result := state.resolve result
+                    state := state.addRequirements instantiated.predicates
+                    cost := argumentCost + resultCost + numeric.cost
+                  })
+
+structure CandidateSuccess where
+  signature : ProgramFunctionSignature
+  result : Ty
+  state : State
+  cost : Nat
 
 structure CandidateSearch where
-  successes : List (ProgramFunctionSignature × Ty × State) := []
+  successes : List CandidateSuccess := []
   failures : List Error := []
 
 def collectCandidateAttempts
     (attempt : ProgramFunctionSignature →
-      Except Error (Option (Ty × State))) :
+      Except Error (Option CandidateAttemptResult)) :
     List ProgramFunctionSignature → CandidateSearch
   | [] => {}
   | signature :: rest =>
       let tail := collectCandidateAttempts attempt rest
       match attempt signature with
       | .ok none => tail
-      | .ok (some (result, state)) => {
-          tail with successes := (signature, result, state) :: tail.successes
+      | .ok (some result) => {
+          tail with successes := {
+            signature
+            result := result.result
+            state := result.state
+            cost := result.cost
+          } :: tail.successes
         }
       | .error error => { tail with failures := error :: tail.failures }
 
@@ -300,57 +343,65 @@ def firstBlockingFailure? : List Error → Option Error
   | [] => none
   | error :: rest =>
       match error with
-      | .noTraitImplementation _ => firstBlockingFailure? rest
+      | .noTraitImplementation _
+      | .nonNumericLiteral _ => firstBlockingFailure? rest
       | _ => some error
 
 def firstNoSolution? : List Error → Option Error
   | [] => none
   | error :: rest =>
       match error with
-      | .noTraitImplementation _ => some error
+      | .noTraitImplementation _
+      | .nonNumericLiteral _ => some error
       | _ => firstNoSolution? rest
+
+def minimumCandidateCost : List CandidateSuccess → Option Nat
+  | [] => none
+  | success :: rest => some <| rest.foldl
+      (fun cost candidate => min cost candidate.cost) success.cost
+
+def bestCandidateSuccesses (successes : List CandidateSuccess) :
+    List CandidateSuccess :=
+  match minimumCandidateCost successes with
+  | none => []
+  | some cost => successes.filter fun success => success.cost == cost
 
 def selectCandidateSearch (name : String)
     (allCandidates : List ProgramFunctionSignature)
-    (fallbackFailures : List Error) (search : CandidateSearch) :
+    (search : CandidateSearch) :
     Except Error (Ty × State) :=
-  match search.successes with
+  match bestCandidateSuccesses search.successes with
   | [] =>
       match firstBlockingFailure? search.failures with
       | some error => .error error
       | none =>
-          match firstNoSolution? (search.failures ++ fallbackFailures) with
+          match firstNoSolution? search.failures with
           | some error => .error error
           | none => .error (.noMatchingOverload name (allCandidates.map (·.id)))
-  | [(_, result, state)] =>
+  | [success] =>
       match firstBlockingFailure? search.failures with
       | some error => .error error
-      | none => .ok (result, state)
+      | none => .ok (success.result, success.state)
   | successes =>
-      .error (.ambiguousOverload name (successes.map fun success => success.1.id))
+      .error (.ambiguousOverload name
+        (successes.map fun success => success.signature.id))
 
 def selectFunctionCandidateFrom (context : Context) (name : String)
     (candidates : List ProgramFunctionSignature)
-    (argumentTypes : List Ty) (expected : Option Ty) (state : State) :
+    (argumentTypes : List Ty) (numericVariables : List TypeVarId)
+    (expected : Option Ty) (state : State) :
     Except Error (Ty × State) :=
-  let exact := collectCandidateAttempts
-    (tryFunctionCandidate context argumentTypes expected state) candidates
-  match exact.successes with
-  | [] =>
-      match firstBlockingFailure? exact.failures with
-      | some error => .error error
-      | none =>
-          let coercible := collectCandidateAttempts
-            (tryCoercibleFunctionCandidate context argumentTypes expected state)
-            candidates
-          selectCandidateSearch name candidates exact.failures coercible
-  | _ => selectCandidateSearch name candidates [] exact
+  let search := collectCandidateAttempts
+    (tryFunctionCandidate context argumentTypes numericVariables expected state)
+    candidates
+  selectCandidateSearch name candidates search
 
 def selectFunctionCandidate (context : Context) (name : String)
-    (argumentTypes : List Ty) (expected : Option Ty) (state : State) :
+    (argumentTypes : List Ty) (numericVariables : List TypeVarId)
+    (expected : Option Ty) (state : State) :
     Except Error (Ty × State) := do
   selectFunctionCandidateFrom context name (← functionsNamed context name)
-    argumentTypes expected state
+    argumentTypes numericVariables expected state
 
 def applyFunctionType (context : Context) (calleeType argumentType : Ty)
     (expected : Option Ty) (state : State) : Except Error (Ty × State) :=

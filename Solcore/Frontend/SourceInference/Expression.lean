@@ -135,8 +135,10 @@ mutual
           withExpected context state (.function (state.resolve parameterType)
             (state.resolve resultType)) expected
       | .call callee arguments => do
+          let numericStart := state.numericVariables.length
           let (argumentTypes, state) ← inferExprsFuel fuel context
             arguments.elements state
+          let numericVariables := state.numericVariables.drop numericStart
           let argumentType := Ty.productMany argumentTypes
           match calleeQualifiedIdentifier? callee with
           | some (namespacePath, name) =>
@@ -150,7 +152,7 @@ mutual
                   | some candidates =>
                       selectFunctionCandidateFrom context
                         (String.intercalate "." (namespacePath ++ [name]))
-                        candidates argumentTypes expected state
+                        candidates argumentTypes numericVariables expected state
                   | none =>
                       let (calleeType, state) ← inferExprFuel fuel context callee none state
                       applyFunctionType context calleeType argumentType expected state
@@ -158,7 +160,9 @@ mutual
               match calleeIdentifier? callee with
               | some name =>
                   match state.locals.lookup? name with
-                  | none => selectFunctionCandidate context name argumentTypes expected state
+                  | none =>
+                      selectFunctionCandidate context name argumentTypes
+                        numericVariables expected state
                   | some _ =>
                       let (calleeType, state) ← inferExprFuel fuel context callee none state
                       applyFunctionType context calleeType argumentType expected state
