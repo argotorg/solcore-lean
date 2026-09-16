@@ -139,15 +139,17 @@ mutual
             arguments.elements state
           let argumentType := Ty.productMany argumentTypes
           match calleeQualifiedIdentifier? callee with
-          | some (namespaceName, name) =>
+          | some (namespacePath, name) =>
+              let namespaceName := namespacePath.head!
               match state.locals.lookup? namespaceName with
               | some _ =>
                   let (calleeType, state) ← inferExprFuel fuel context callee none state
                   applyFunctionType context calleeType argumentType expected state
               | none =>
-                  match ← qualifiedFunctionsNamed context namespaceName name with
+                  match ← qualifiedFunctionsNamed context namespacePath name with
                   | some candidates =>
-                      selectFunctionCandidateFrom context s!"{namespaceName}.{name}"
+                      selectFunctionCandidateFrom context
+                        (String.intercalate "." (namespacePath ++ [name]))
                         candidates argumentType expected state
                   | none =>
                       let (calleeType, state) ← inferExprFuel fuel context callee none state

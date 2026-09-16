@@ -57,6 +57,7 @@ private def resolveAlias (environment : ProgramEnvironment)
 
 private def importedEnvironment : IO ProgramEnvironment := do
   let source ← parsed .main "library/types.solc" (String.intercalate "\n" [
+    "export {*};",
     "enum Public { P }",
     "enum Hidden { H }",
     "enum Renamed { R }",
@@ -67,7 +68,7 @@ private def importedEnvironment : IO ProgramEnvironment := do
     "function hiddenValue() returns (Word) { return 0; }"
   ])
   let external ← parsed (.external "dep") "external.solc"
-    "enum Remote { R }"
+    "export {*}; enum Remote { R }"
   let consumer ← parsed .main "consumer.solc" (String.intercalate "\n" [
     "import library.types;",
     "import * as Lib from library.types;",
@@ -161,11 +162,13 @@ private def testHiddenAndAmbiguousLookup : IO Unit := do
   | result => throw (IO.userError
       s!"hidden import remained visible: {reprStr result}")
   let left ← parsed .main "left.solc" (String.intercalate "\n" [
+    "export {*};",
     "enum Shared { Left }",
     "trait Shared<T> {}",
     "function sharedValue(value: Word) returns (Word) { return value; }"
   ])
   let right ← parsed .main "right.solc" (String.intercalate "\n" [
+    "export {*};",
     "enum Shared { Right }",
     "trait Shared<T> {}",
     "function sharedValue(value: Bool) returns (Bool) { return value; }"
@@ -199,7 +202,7 @@ private def testHiddenAndAmbiguousLookup : IO Unit := do
 
 private def testImportErrors : IO Unit := do
   let source ← parsed .main "source.solc"
-    "enum Present { P } function value() {} trait Marker<T> {}"
+    "export {*}; enum Present { P } function value() {} trait Marker<T> {}"
   let deferred ← parsed .main "deferred.solc"
     "import {value, Marker} from source; type Kept = Word;"
   let deferredEnvironment ← build [source, deferred]
@@ -217,7 +220,7 @@ private def testImportErrors : IO Unit := do
   let selectionEnvironment ← build [source, badSelection]
   let selectionOwner ← declaration selectionEnvironment "bad_selection" "Kept"
   match buildProgramImports selectionEnvironment selectionOwner.id.moduleId with
-  | .error [.unknownSelectedType _ _ "Missing"] => pure ()
+  | .error [.publicInterface [.unknownImportName _ _ "Missing"]] => pure ()
   | result => throw (IO.userError
       s!"unknown selected import result changed: {reprStr result}")
   let trigger ← declaration selectionEnvironment "bad_selection" "Trigger"
@@ -225,7 +228,7 @@ private def testImportErrors : IO Unit := do
   match resolveProgramTypeExpr selectionEnvironment (.ofDeclaration trigger)
       triggerSource with
   | .error (.importVisibility
-      [.unknownSelectedType _ _ "Missing"]) => pure ()
+      [.publicInterface [.unknownImportName _ _ "Missing"]]) => pure ()
   | result => throw (IO.userError
       s!"type resolver did not expose import failure: {reprStr result}")
   let badOperator ← parsed .main "bad_operator.solc"
@@ -233,7 +236,7 @@ private def testImportErrors : IO Unit := do
   let operatorEnvironment ← build [source, badOperator]
   let operatorOwner ← declaration operatorEnvironment "bad_operator" "Kept"
   match buildProgramImports operatorEnvironment operatorOwner.id.moduleId with
-  | .error [.unknownSelectedType _ _ "=="] => pure ()
+  | .error [.publicInterface [.unknownImportName _ _ "=="]] => pure ()
   | result => throw (IO.userError
       s!"operator selector was ignored or lost its spelling: {reprStr result}")
   let badModule ← parsed .main "bad_module.solc"
@@ -241,7 +244,7 @@ private def testImportErrors : IO Unit := do
   let moduleEnvironment ← build [badModule]
   let moduleOwner ← declaration moduleEnvironment "bad_module" "Kept"
   match buildProgramImports moduleEnvironment moduleOwner.id.moduleId with
-  | .error [.unknownModule _ false ["absent", "module"]] => pure ()
+  | .error [.publicInterface [.unknownModule _ ["absent", "module"]]] => pure ()
   | result => throw (IO.userError
       s!"unknown imported module result changed: {reprStr result}")
 

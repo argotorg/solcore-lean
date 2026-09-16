@@ -22,6 +22,7 @@ private def raw (sources : List (String × String)) (entry : String) :
 }
 
 private def provider : String := String.intercalate "\n" [
+  "export {*};",
   "trait Eq<T> {}",
   "function remote(value: Bool) returns (Bool) { return value; }",
   "function hidden(value: Bool) returns (Bool) { return value; }"
@@ -74,8 +75,8 @@ private def testNoImportFallback : IO Unit := do
     "consumer.solc")
 
 private def testAmbiguousNamespace : IO Unit := do
-  let left := "function choose(value: Word) returns (Word) { return value; }"
-  let right := "function choose(value: Word) returns (Word) { return value; }"
+  let left := "export {*}; function choose(value: Word) returns (Word) { return value; }"
+  let right := "export {*}; function choose(value: Word) returns (Word) { return value; }"
   let consumer := String.intercalate "\n" [
     "import * as Shared from left;",
     "import * as Shared from right;",
@@ -92,6 +93,53 @@ private def testAmbiguousNamespace : IO Unit := do
         "ambiguous imported namespace lost its explicit diagnostic"
   | .ok _ => throw (IO.userError "ambiguous imported namespace was selected")
 
+private def testReexportedEntitiesAndModulePath : IO Unit := do
+  let provider := String.intercalate "\n" [
+    "enum Box { Only }",
+    "trait Marker<T> {}",
+    "function keep(value: Bool) returns (Bool) { return value; }",
+    "export {*};"
+  ]
+  let facade := String.intercalate "\n" [
+    "import {Marker as Comparable, keep as renamed} from provider;",
+    "export {Comparable, renamed};",
+    "export provider as P;"
+  ]
+  let consumer := String.intercalate "\n" [
+    "import * from facade;",
+    "import * as F from facade;",
+    "impl Comparable<Word> {}",
+    "function constrained<T>(value: T) returns (T) where T: Comparable { return value; }",
+    "function run(value: F.P.Box) returns (Bool, Bool) { return (renamed(true), F.P.keep(true)); }"
+  ]
+  expectSuccess (raw [
+    ("provider.solc", provider),
+    ("facade.solc", facade),
+    ("consumer.solc", consumer)
+  ] "consumer.solc")
+
+private def testNamespaceHonorsPublicInterface : IO Unit := do
+  let provider := String.intercalate "\n" [
+    "function visible(value: Bool) returns (Bool) { return value; }",
+    "function hidden(value: Bool) returns (Bool) { return value; }",
+    "export {visible};"
+  ]
+  let consumer := String.intercalate "\n" [
+    "import * as Provider from provider;",
+    "function bad() returns (Bool) { return Provider.hidden(true); }"
+  ]
+  match SourceInference.loadAndCheckProgram
+      (raw [("provider.solc", provider), ("consumer.solc", consumer)]
+        "consumer.solc") with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .noMatchingOverload "Provider.hidden" candidates, .. } =>
+            candidates.isEmpty
+        | _ => false)
+        "a non-public value leaked through an imported namespace"
+  | .ok _ => throw (IO.userError
+      "a non-public value leaked through an imported namespace")
+
 /-- Exercise import-aware trait and value lookup at their semantic consumers. -/
 def testImportedResolutionConsumers : IO Unit := do
   testSelectedValuesTraitsAndLocalShadowing
@@ -99,5 +147,7 @@ def testImportedResolutionConsumers : IO Unit := do
   testImportsCloseUnqualifiedVisibility
   testNoImportFallback
   testAmbiguousNamespace
+  testReexportedEntitiesAndModulePath
+  testNamespaceHonorsPublicInterface
 
 end Tests.ImportedResolutionConsumers

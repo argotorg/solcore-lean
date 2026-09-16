@@ -1,12 +1,11 @@
-import Solcore.Frontend.ProgramEnvironment
+import Solcore.Frontend.ProgramInterfaces
 
 /-!
-Direct import visibility for the executable whole-program environment.
+Import visibility over explicit whole-program public interfaces.
 
-This layer intentionally stops before exports and re-exports.  It resolves
-canonical import module paths and direct visibility in the type, trait, and
-value namespaces.  Value imports preserve overload sets; operator selectors
-use their spelling as a value-namespace name.
+The target module is resolved canonically, while item imports read only its
+fixed-point public interface.  Value imports preserve overload sets; operator
+selectors use their spelling as a value-namespace name.
 -/
 
 set_option autoImplicit false
@@ -41,6 +40,7 @@ structure ProgramImportedValue where
 /-- Direct visibility contributed by all imports in one source module. -/
 structure ProgramImports where
   hasImports : Bool := false
+  publicInterfaces : ProgramInterfaces := { entries := [] }
   namespaces : List ProgramImportedNamespace := []
   types : List ProgramImportedType := []
   traits : List ProgramImportedTrait := []
@@ -69,6 +69,7 @@ inductive ProgramImportError where
       (importer target : Workspace.ModuleId)
       (name : String)
       (candidates : List Resolved.DeclarationId)
+  | publicInterface (errors : List ProgramInterfaceError)
   deriving Repr, DecidableEq
 
 /-- Spelling components of one parsed import module path. -/
@@ -124,53 +125,43 @@ private def hiddenSelectorNames
 private def isHidden (hidden : List String) (source localName : String) : Bool :=
   hidden.contains source || hidden.contains localName
 
-private def targetTypes
-    (environment : ProgramEnvironment) (target : Workspace.ModuleId) :
-    List ProgramDeclaration :=
-  environment.declarationsIn target |>.filter fun declaration =>
-    declaration.nameSpace == some ProgramDeclarationNamespace.type
-
-private def targetTraits
-    (environment : ProgramEnvironment) (target : Workspace.ModuleId) :
-    List ProgramDeclaration :=
-  environment.declarationsIn target |>.filter fun declaration =>
-    declaration.nameSpace == some ProgramDeclarationNamespace.trait
-
-private def targetValues
-    (environment : ProgramEnvironment) (target : Workspace.ModuleId) :
-    List ProgramDeclaration :=
-  environment.declarationsIn target |>.filter fun declaration =>
-    declaration.nameSpace == some ProgramDeclarationNamespace.value
+private def targetEntities
+    (interfaces : ProgramInterfaces) (target : Workspace.ModuleId)
+    (nameSpace : ProgramDeclarationNamespace) : List ProgramPublicEntity :=
+  match interfaces.interface? target with
+  | none => []
+  | some interface => interface.entities.filter fun entity =>
+      entity.declaration.nameSpace == some nameSpace
 
 private def wildcardTypes
-    (environment : ProgramEnvironment) (target : Workspace.ModuleId)
+    (interfaces : ProgramInterfaces) (target : Workspace.ModuleId)
     (hidden : List String) : List ProgramImportedType :=
-  (targetTypes environment target).filterMap fun declaration =>
-    match declaration.name with
-    | some name =>
-        if hidden.contains name then none
-        else some { localName := name, declaration }
-    | none => none
+  (targetEntities interfaces target .type).filterMap fun entity =>
+    if hidden.contains entity.publicName then none
+    else some {
+      localName := entity.publicName
+      declaration := entity.declaration
+    }
 
 private def wildcardTraits
-    (environment : ProgramEnvironment) (target : Workspace.ModuleId)
+    (interfaces : ProgramInterfaces) (target : Workspace.ModuleId)
     (hidden : List String) : List ProgramImportedTrait :=
-  (targetTraits environment target).filterMap fun declaration =>
-    match declaration.name with
-    | some name =>
-        if hidden.contains name then none
-        else some { localName := name, declaration }
-    | none => none
+  (targetEntities interfaces target .trait).filterMap fun entity =>
+    if hidden.contains entity.publicName then none
+    else some {
+      localName := entity.publicName
+      declaration := entity.declaration
+    }
 
 private def wildcardValues
-    (environment : ProgramEnvironment) (target : Workspace.ModuleId)
+    (interfaces : ProgramInterfaces) (target : Workspace.ModuleId)
     (hidden : List String) : List ProgramImportedValue :=
-  (targetValues environment target).filterMap fun declaration =>
-    match declaration.name with
-    | some name =>
-        if hidden.contains name then none
-        else some { localName := name, declaration }
-    | none => none
+  (targetEntities interfaces target .value).filterMap fun entity =>
+    if hidden.contains entity.publicName then none
+    else some {
+      localName := entity.publicName
+      declaration := entity.declaration
+    }
 
 private structure SelectedDeclarations where
   errors : List ProgramImportError := []
@@ -189,7 +180,7 @@ private def selectedTrait
         (declarations.map (·.id))], [])
 
 private def selectedDeclarations
-    (environment : ProgramEnvironment) (importer target : Workspace.ModuleId)
+    (interfaces : ProgramInterfaces) (importer target : Workspace.ModuleId)
     (hidden : List String) (selection : Syntax.SelectedImport) :
     SelectedDeclarations :=
   let sourceName := selectorSpelling selection.value.source
@@ -197,9 +188,9 @@ private def selectedDeclarations
   if isHidden hidden sourceName localName then
     {}
   else
-    let typeCandidates := environment.localTypesNamed target sourceName
-    let traitCandidates := environment.localTraitsNamed target sourceName
-    let valueCandidates := environment.localValuesNamed target sourceName
+    let typeCandidates := interfaces.entitiesNamed target .type sourceName
+    let traitCandidates := interfaces.entitiesNamed target .trait sourceName
+    let valueCandidates := interfaces.entitiesNamed target .value sourceName
     let typeResult : List ProgramImportError × List ProgramImportedType :=
       match typeCandidates with
       | [] => ([], [])
@@ -223,11 +214,11 @@ private def selectedDeclarations
     }
 
 private def selectedDeclarationsList
-    (environment : ProgramEnvironment) (importer target : Workspace.ModuleId)
+    (interfaces : ProgramInterfaces) (importer target : Workspace.ModuleId)
     (hidden : List String) (selections : List Syntax.SelectedImport) :
     SelectedDeclarations :=
   selections.foldl (fun result selection =>
-    let next := selectedDeclarations environment importer target hidden selection
+    let next := selectedDeclarations interfaces importer target hidden selection
     {
       errors := result.errors ++ next.errors
       types := result.types ++ next.types
@@ -263,7 +254,8 @@ private def addSelectedDeclarations
     selected.values
 
 private def processImport
-    (environment : ProgramEnvironment) (importer : Workspace.ModuleId)
+    (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
+    (importer : Workspace.ModuleId)
     (visibility : ProgramImports) (declaration : Syntax.ImportDecl) :
     List ProgramImportError × ProgramImports :=
   match declaration.value with
@@ -282,14 +274,14 @@ private def processImport
       | .ok target =>
           let hidden := hiddenSelectorNames hidingClause
           ([], addWildcardDeclarations visibility
-            (wildcardTypes environment target hidden)
-            (wildcardTraits environment target hidden)
-            (wildcardValues environment target hidden))
+            (wildcardTypes interfaces target hidden)
+            (wildcardTraits interfaces target hidden)
+            (wildcardValues interfaces target hidden))
   | .selected selection path hidingClause =>
       match resolveProgramImportModule environment importer path with
       | .error error => ([error], visibility)
       | .ok target =>
-          let selected := selectedDeclarationsList environment importer target
+          let selected := selectedDeclarationsList interfaces importer target
             (hiddenSelectorNames hidingClause) selection.elements.toList
           (selected.errors, addSelectedDeclarations visibility selected)
 
@@ -300,15 +292,19 @@ private def importsInModule (module : ProgramModule) : List Syntax.ImportDecl :=
     | _ => none
 
 private def buildProgramImportsFrom
-    (environment : ProgramEnvironment) (importer : Workspace.ModuleId)
+    (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
+    (importer : Workspace.ModuleId)
     (declarations : List Syntax.ImportDecl) :
     List ProgramImportError × ProgramImports :=
   declarations.foldl (fun result declaration =>
-    let next := processImport environment importer result.2 declaration
+    let next := processImport environment interfaces importer result.2 declaration
     (result.1 ++ next.1, next.2))
-    ([], { hasImports := !declarations.isEmpty })
+    ([], {
+      hasImports := !declarations.isEmpty
+      publicInterfaces := interfaces
+    })
 
-/-- Build direct type and namespace visibility for one program module.
+/-- Build public-interface-backed visibility for one program module.
 Scopes not owned by the environment retain the old empty-import behavior. -/
 def buildProgramImports
     (environment : ProgramEnvironment) (importer : Workspace.ModuleId) :
@@ -316,9 +312,12 @@ def buildProgramImports
   match environment.modules.find? fun module => decide (module.id = importer) with
   | none => .ok {}
   | some module =>
-      let result := buildProgramImportsFrom environment importer
-        (importsInModule module)
-      if result.1.isEmpty then .ok result.2 else .error result.1
+      match buildProgramInterfaces environment with
+      | .error errors => .error [.publicInterface errors]
+      | .ok interfaces =>
+          let result := buildProgramImportsFrom environment interfaces importer
+            (importsInModule module)
+          if result.1.isEmpty then .ok result.2 else .error result.1
 
 namespace ProgramImports
 
@@ -359,6 +358,45 @@ def modulesNamed (visibility : ProgramImports) (name : String) :
     List Workspace.ModuleId :=
   (visibility.namespaces.filterMap fun imported =>
     if imported.localName == name then some imported.target else none).eraseDups
+
+/-- Whether the first component denotes an imported module namespace. -/
+def hasNamespaceRoot (visibility : ProgramImports) : List String → Bool
+  | [] => false
+  | root :: _ => !(visibility.modulesNamed root).isEmpty
+
+/-- Follow an imported namespace and then any public module re-export bindings. -/
+def namespacePathTargets (visibility : ProgramImports) :
+    List String → List Workspace.ModuleId
+  | [] => []
+  | root :: rest =>
+      rest.foldl (fun targets component =>
+        (targets.flatMap fun target =>
+          visibility.publicInterfaces.modulesNamed target component).eraseDups)
+        (visibility.modulesNamed root)
+
+/-- Public declarations reached through an imported/re-exported module path. -/
+def declarationsInNamespacePathNamed
+    (visibility : ProgramImports) (path : List String)
+    (nameSpace : ProgramDeclarationNamespace) (name : String) :
+    List ProgramDeclaration :=
+  deduplicateDeclarationsAux [] <|
+    (visibility.namespacePathTargets path).flatMap fun target =>
+      visibility.publicInterfaces.entitiesNamed target nameSpace name
+
+/-- Public types reached through an imported/re-exported module path. -/
+def typesInNamespacePathNamed (visibility : ProgramImports)
+    (path : List String) (name : String) : List ProgramDeclaration :=
+  visibility.declarationsInNamespacePathNamed path .type name
+
+/-- Public traits reached through an imported/re-exported module path. -/
+def traitsInNamespacePathNamed (visibility : ProgramImports)
+    (path : List String) (name : String) : List ProgramDeclaration :=
+  visibility.declarationsInNamespacePathNamed path .trait name
+
+/-- Public values reached through an imported/re-exported module path. -/
+def valuesInNamespacePathNamed (visibility : ProgramImports)
+    (path : List String) (name : String) : List ProgramDeclaration :=
+  visibility.declarationsInNamespacePathNamed path .value name
 
 end ProgramImports
 

@@ -35,16 +35,22 @@ def functionsNamed (context : Context) (name : String) :
           .ok (context.signatures.functions.filter fun signature =>
             signature.name == name)
 
-def qualifiedFunctionsNamed (context : Context) (namespaceName name : String) :
+def qualifiedFunctionsNamed (context : Context)
+    (namespacePath : List String) (name : String) :
     Except Error (Option (List ProgramFunctionSignature)) :=
   match buildProgramImports context.environment context.scope.currentModule with
   | .error errors => .error (.importVisibility errors)
   | .ok visibility =>
-      match visibility.modulesNamed namespaceName with
-      | [] => .ok none
-      | [moduleId] =>
-          .ok (some (context.signatures.localFunctionsNamed moduleId name))
-      | modules => .error (.ambiguousImportedNamespace namespaceName modules)
+      if !visibility.hasNamespaceRoot namespacePath then
+        .ok none
+      else
+        match visibility.namespacePathTargets namespacePath with
+        | [] => .ok (some [])
+        | [_] =>
+            .ok (some (signaturesForDeclarations context
+              (visibility.valuesInNamespacePathNamed namespacePath name)))
+        | modules => .error (.ambiguousImportedNamespace
+            (String.intercalate "." namespacePath) modules)
 
 def traitCandidates (context : Context) (name : String) :
     Except Error (List ProgramDeclaration) :=
@@ -329,10 +335,19 @@ def calleeIdentifier? : Syntax.Expr → Option String
   | ⟨_, .group inner⟩ => calleeIdentifier? inner
   | _ => none
 
-def calleeQualifiedIdentifier? : Syntax.Expr → Option (String × String)
-  | ⟨_, .field base _ name⟩ =>
-      (calleeIdentifier? base).map fun namespaceName => (namespaceName, name.value)
-  | ⟨_, .group inner⟩ => calleeQualifiedIdentifier? inner
+def calleeNameComponents? : Syntax.Expr → Option (List String)
+  | ⟨_, .identifier name⟩ => some [name.value]
+  | ⟨_, .field base _ name⟩ => do
+      let components ← calleeNameComponents? base
+      pure (components ++ [name.value])
+  | ⟨_, .group inner⟩ => calleeNameComponents? inner
+  | _ => none
+
+def calleeQualifiedIdentifier? (expression : Syntax.Expr) :
+    Option (List String × String) := do
+  let components ← calleeNameComponents? expression
+  match components with
+  | _ :: _ :: _ => some (components.dropLast, components.getLast!)
   | _ => none
 
 end Solcore.Frontend.SourceInference.Detail

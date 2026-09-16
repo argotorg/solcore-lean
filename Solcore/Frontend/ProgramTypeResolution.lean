@@ -4,11 +4,10 @@ import Solcore.TypeSystem.Type
 /-!
 Executable whole-program resolution of canonical source type expressions.
 
-The policy is intentionally useful before import/export formalization lands:
-unqualified names prefer a generic parameter, then a builtin, then the current
-module, and finally a program-wide unique declaration.  Qualified names select
-an exact module path.  Explicit `main`, `standard`, and external-library
-prefixes may cross library boundaries.
+Unqualified names prefer a generic parameter, then a builtin, then the current
+module, and then imported public entities.  Imported namespace paths traverse
+public module re-exports.  The no-import and explicit canonical-path fallbacks
+remain as the initial-profile compatibility boundary.
 -/
 
 set_option autoImplicit false
@@ -108,14 +107,6 @@ private def qualifiedCandidates
       moduleQualifierMatches scope.currentModule moduleComponents
         declaration.id.moduleId
 
-private def importedQualifiedCandidates
-    (environment : ProgramEnvironment) (modules : List Workspace.ModuleId)
-    (name : String) : List ProgramDeclaration :=
-  environment.declarations.filter fun declaration =>
-    declaration.nameSpace == some ProgramDeclarationNamespace.type &&
-      declaration.name == some name &&
-      modules.any fun moduleId => decide (moduleId = declaration.id.moduleId)
-
 private def declaredType
     (components : List String) (declaration : ProgramDeclaration)
     (arguments : List TypeSystem.Ty) :
@@ -178,18 +169,14 @@ private def resolveNamedProgramType
       match buildProgramImports environment scope.currentModule with
       | .error errors => .error (.importVisibility errors)
       | .ok visibility =>
-          match moduleComponents with
-          | [alias] =>
-              match visibility.modulesNamed alias with
-              | [] =>
-                  uniqueDeclaredType components arguments
-                    (qualifiedCandidates environment scope moduleComponents name)
-              | modules =>
-                  uniqueDeclaredType components arguments
-                    (importedQualifiedCandidates environment modules name)
-          | _ =>
-              uniqueDeclaredType components arguments
-                (qualifiedCandidates environment scope moduleComponents name)
+          if visibility.hasNamespaceRoot moduleComponents then
+            uniqueDeclaredType components arguments
+              (visibility.typesInNamespacePathNamed moduleComponents name)
+          else
+            -- Kept for the executable initial profile: an unbound canonical
+            -- module path may still address a declaration directly.
+            uniqueDeclaredType components arguments
+              (qualifiedCandidates environment scope moduleComponents name)
 
 private def tupleProgramType : List TypeSystem.Ty → TypeSystem.Ty
   | [] => .constructor (.builtin .unit)

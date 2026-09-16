@@ -71,7 +71,7 @@ private def importedTypeWorkspace : Workspace.RawWorkspace := {
   mainSources := [
     {
       path := "models.solc"
-      content := "enum Box { Only }"
+      content := "export {*}; enum Box { Only }"
     },
     {
       path := "main.solc"
