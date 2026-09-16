@@ -1,4 +1,4 @@
-import Solcore.Frontend.ProgramEnvironment
+import Solcore.Frontend.ProgramImports
 import Solcore.TypeSystem.Type
 
 /-!
@@ -44,6 +44,7 @@ inductive ProgramTypeResolutionError where
       (name : String) (parameterIndex argumentCount : Nat)
   | typeArityMismatch
       (components : List String) (expected actual : Nat)
+  | importVisibility (errors : List ProgramImportError)
   | nestingLimit
   deriving Repr, DecidableEq
 
@@ -107,6 +108,14 @@ private def qualifiedCandidates
       moduleQualifierMatches scope.currentModule moduleComponents
         declaration.id.moduleId
 
+private def importedQualifiedCandidates
+    (environment : ProgramEnvironment) (modules : List Workspace.ModuleId)
+    (name : String) : List ProgramDeclaration :=
+  environment.declarations.filter fun declaration =>
+    declaration.nameSpace == some ProgramDeclarationNamespace.type &&
+      declaration.name == some name &&
+      modules.any fun moduleId => decide (moduleId = declaration.id.moduleId)
+
 private def declaredType
     (components : List String) (declaration : ProgramDeclaration)
     (arguments : List TypeSystem.Ty) :
@@ -147,15 +156,40 @@ private def resolveNamedProgramType
                 .error (.typeArityMismatch components 0 arguments.length)
           | none =>
               match environment.localTypesNamed scope.currentModule name with
-              | [] => uniqueDeclaredType components arguments
-                  (environment.typesNamed name)
+              | [] =>
+                  match buildProgramImports environment scope.currentModule with
+                  | .error errors => .error (.importVisibility errors)
+                  | .ok visibility =>
+                      match visibility.typesNamed name with
+                      | [] =>
+                          if visibility.hasImports then
+                            .error (.unknownTypeName components)
+                          else
+                            uniqueDeclaredType components arguments
+                              (environment.typesNamed name)
+                      | importedCandidates =>
+                          uniqueDeclaredType components arguments
+                            importedCandidates
               | localCandidates =>
                   uniqueDeclaredType components arguments localCandidates
   | _ =>
       let name := components.getLast!
       let moduleComponents := components.dropLast
-      uniqueDeclaredType components arguments
-        (qualifiedCandidates environment scope moduleComponents name)
+      match buildProgramImports environment scope.currentModule with
+      | .error errors => .error (.importVisibility errors)
+      | .ok visibility =>
+          match moduleComponents with
+          | [alias] =>
+              match visibility.modulesNamed alias with
+              | [] =>
+                  uniqueDeclaredType components arguments
+                    (qualifiedCandidates environment scope moduleComponents name)
+              | modules =>
+                  uniqueDeclaredType components arguments
+                    (importedQualifiedCandidates environment modules name)
+          | _ =>
+              uniqueDeclaredType components arguments
+                (qualifiedCandidates environment scope moduleComponents name)
 
 private def tupleProgramType : List TypeSystem.Ty → TypeSystem.Ty
   | [] => .constructor (.builtin .unit)
