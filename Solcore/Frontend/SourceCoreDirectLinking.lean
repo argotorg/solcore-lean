@@ -12,6 +12,13 @@ elaborates every seed while replacing each direct call with a capture-free
 right into fresh temporary identities before the callee's stable input
 identities are aliased to those temporaries.
 
+Direct-call signature predicates are proof-only in the current executable
+fragment.  Each call must account positionally for its exact requirement IDs;
+implementation evidence is threaded into the callee, while assumption evidence
+must be discharged by a unique incoming witness with the same goal.  The
+evidence never becomes a runtime Core value.  Coercions and requirements owned
+by any non-call expression remain explicit staged boundaries.
+
 The current Core has no recursive binding construct.  Accordingly, recursive
 specialization cycles are rejected explicitly rather than assigned an
 approximate runtime meaning.
@@ -44,6 +51,40 @@ inductive Error where
       (expected actual : List CallEdge)
   | unresolvedAssumptions
       (key : SpecializationKey) (assumptions : List ProgramPredicate)
+  | assumptionEvidenceCountMismatch
+      (key : SpecializationKey) (expected actual : Nat)
+  | assumptionEvidenceGoalMismatch
+      (key : SpecializationKey) (index : Nat)
+      (expected actual : ProgramPredicate)
+  | unresolvedAssumptionEvidence
+      (key : SpecializationKey) (predicate : ProgramPredicate)
+  | callRequirementCountMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : Nat)
+  | duplicateCallRequirement
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+  | missingSolvedRequirement
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+  | duplicateSolvedRequirements
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (count : Nat)
+  | callRequirementPredicateMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | callRequirementEvidenceGoalMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | missingAssumptionEvidence
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (predicate : ProgramPredicate)
+  | ambiguousAssumptionEvidence
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (predicate : ProgramPredicate)
+      (count : Nat)
   | missingCallEdge
       (caller : SpecializationKey) (occurrence : ExpressionId)
   | duplicateCallEdges
@@ -130,11 +171,7 @@ private def validateCanonicalSpecializations (program : CheckedProgram) :
         parameterSubstitution := specialized.parameterSubstitution
       }).mapError liftWorklistValidation
       if canonical == specialized then
-        if specialized.assumptions.isEmpty then
-          validateCanonicalSpecializations program rest
-        else
-          throw (.unresolvedAssumptions specialized.key
-            specialized.assumptions)
+        validateCanonicalSpecializations program rest
       else
         throw (.nonCanonicalSpecialization specialized.key)
 
@@ -239,9 +276,115 @@ private def exactCallEdge (plan : Plan) (caller : SpecializationKey)
   | [edge] => .ok edge
   | edges => .error (.duplicateCallEdges caller occurrence edges.length)
 
+private def firstDuplicateRequirement :
+    List RequirementId → Option RequirementId
+  | [] => none
+  | requirement :: rest =>
+      if rest.contains requirement then some requirement
+      else firstDuplicateRequirement rest
+
+/-- Incoming witnesses correspond positionally to the specialized signature
+assumptions.  A recursive call must receive actual implementation evidence;
+forwarding another unresolved assumption would only move the proof hole. -/
+private def validateAssumptionEvidenceGoals (key : SpecializationKey) :
+    Nat → List ProgramPredicate → List PredicateEvidence →
+      Except Error Unit
+  | _, [], [] => pure ()
+  | index, expected :: expectedRest, evidence :: evidenceRest => do
+      let actual := evidence.goal
+      if actual != expected then
+        throw (.assumptionEvidenceGoalMismatch key index expected actual)
+      match evidence with
+      | .assumption predicate =>
+          throw (.unresolvedAssumptionEvidence key predicate)
+      | .implementation _ =>
+          validateAssumptionEvidenceGoals key (index + 1) expectedRest
+            evidenceRest
+  | _, expected, evidence =>
+      throw (.assumptionEvidenceCountMismatch key expected.length
+        evidence.length)
+
+private def validateAssumptionEvidence (key : SpecializationKey)
+    (assumptions : List ProgramPredicate)
+    (evidence : List PredicateEvidence) : Except Error Unit := do
+  if assumptions.length != evidence.length then
+    throw (.assumptionEvidenceCountMismatch key assumptions.length
+      evidence.length)
+  validateAssumptionEvidenceGoals key 0 assumptions evidence
+
+private def exactSolvedRequirement (caller : SpecializedFunction)
+    (occurrence : ExpressionId) (requirement : RequirementId) :
+    Except Error SolvedRequirement :=
+  let candidates := caller.function.solvedRequirements.filter fun solved =>
+    decide (solved.id = requirement)
+  match candidates with
+  | [] => .error (.missingSolvedRequirement caller.key occurrence requirement)
+  | [solved] => .ok solved
+  | solved =>
+      .error (.duplicateSolvedRequirements caller.key occurrence requirement
+        solved.length)
+
+/-- Replace a function-local assumption marker with the unique actual witness
+supplied at this specialization invocation. -/
+private def actualRequirementEvidence (caller : SpecializedFunction)
+    (occurrence : ExpressionId) (requirement : RequirementId)
+    (available : List PredicateEvidence) : PredicateEvidence →
+      Except Error PredicateEvidence
+  | evidence@(.implementation _) => pure evidence
+  | .assumption predicate =>
+      let candidates := available.filter fun evidence =>
+        decide (evidence.goal = predicate)
+      match candidates with
+      | [] =>
+          .error (.missingAssumptionEvidence caller.key occurrence requirement
+            predicate)
+      | [evidence] => .ok evidence
+      | evidence =>
+          .error (.ambiguousAssumptionEvidence caller.key occurrence
+            requirement predicate evidence.length)
+
+/-- Recover call evidence in the declaration instantiation's predicate order.
+No operator, literal, or coercion requirement is accepted by this path. -/
+private def callRequirementEvidence (caller : SpecializedFunction)
+    (occurrence : ExpressionId) (available : List PredicateEvidence) :
+    List RequirementId → List ProgramPredicate →
+      Except Error (List PredicateEvidence)
+  | [], [] => pure []
+  | requirement :: requirements, predicate :: predicates => do
+      let solved ← exactSolvedRequirement caller occurrence requirement
+      if solved.predicate != predicate then
+        throw (.callRequirementPredicateMismatch caller.key occurrence
+          requirement predicate solved.predicate)
+      let goal := solved.evidence.goal
+      if goal != solved.predicate then
+        throw (.callRequirementEvidenceGoalMismatch caller.key occurrence
+          requirement solved.predicate goal)
+      let evidence ← actualRequirementEvidence caller occurrence requirement
+        available solved.evidence
+      pure (evidence :: (← callRequirementEvidence caller occurrence
+        available requirements predicates))
+  | requirements, predicates =>
+      throw (.callRequirementCountMismatch caller.key occurrence
+        predicates.length requirements.length)
+
+private def exactCallRequirementEvidence (caller : SpecializedFunction)
+    (node : ExpressionNode) (available : List PredicateEvidence)
+    (instantiation : DeclarationInstantiation) :
+    Except Error (List PredicateEvidence) := do
+  if node.requirements.length != instantiation.predicates.length then
+    throw (.callRequirementCountMismatch caller.key node.id
+      instantiation.predicates.length node.requirements.length)
+  match firstDuplicateRequirement node.requirements with
+  | some requirement =>
+      throw (.duplicateCallRequirement caller.key node.id requirement)
+  | none =>
+      callRequirementEvidence caller node.id available node.requirements
+        instantiation.predicates
+
 private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
-    (visiting : List SpecializationKey) (fuel : Nat)
+    (visiting : List SpecializationKey)
+    (assumptionEvidence : List PredicateEvidence) (fuel : Nat)
     (key : SpecializationKey) :
     Except Error SourceCoreElaboration.BodyDraft :=
   if visiting.contains key then
@@ -251,13 +394,15 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
     | 0 => .error (.linkDepthLimit key)
     | remaining + 1 => do
         let specialized ← exactSpecialization plan key
-        unless specialized.assumptions.isEmpty do
-          throw (.unresolvedAssumptions key specialized.assumptions)
+        validateAssumptionEvidence specialized.key specialized.assumptions
+          assumptionEvidence
         SourceCoreElaboration.lowerFunctionBodyWith Error.sourceCore
-          (fun lowerArgument _ node _ arguments resolution => do
+          (fun _ node _ arguments resolution => do
             let instantiation ← match resolution with
               | .indirect => throw (.indirectCall node.id)
               | .declaration instantiation => pure instantiation
+            let calleeEvidence ← exactCallRequirementEvidence specialized node
+              assumptionEvidence instantiation
             let edge ← exactCallEdge plan key node.id
             let resolvedCallee ←
               (SourceSpecializationWorklist.resolveRequest program {
@@ -268,7 +413,8 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
               throw (.callEdgeCalleeMismatch key node.id edge.callee
                 resolvedCallee.key)
             let calleeDraft ← buildDraftFuel program plan temporaryOwner
-              temporaryBase (key :: visiting) remaining edge.callee
+              temporaryBase (key :: visiting) calleeEvidence remaining
+              edge.callee
             let callee ← calleeDraft.finalizeWith Error.sourceCore
             if callee.inputs.length != arguments.length then
               throw (.argumentArityMismatch node.id callee.inputs.length
@@ -279,12 +425,19 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
             if callResult != callee.returnType then
               throw (.callResultTypeMismatch node.id callee.returnType
                 callResult)
-            let loweredArguments ← (callee.inputs.zip arguments).mapM
-              fun pair => lowerArgument pair.1.2 pair.2
-            let temporaries := freshTemporaries temporaryOwner temporaryBase
-              arguments.length
-            let body := aliasInputs callee.inputs temporaries callee.resolved
-            pure (bindValues (temporaries.zip loweredArguments) body))
+            pure {
+              argumentTypes := callee.inputs.values
+              consumedRequirements := node.requirements
+              build := fun loweredArguments => do
+                if loweredArguments.length != callee.inputs.length then
+                  throw (.argumentArityMismatch node.id callee.inputs.length
+                    loweredArguments.length)
+                let temporaries := freshTemporaries temporaryOwner
+                  temporaryBase loweredArguments.length
+                let body := aliasInputs callee.inputs temporaries
+                  callee.resolved
+                pure (bindValues (temporaries.zip loweredArguments) body)
+            })
           specialized.function
 termination_by fuel
 
@@ -293,8 +446,11 @@ private def linkSeeds (program : CheckedProgram) (plan : Plan)
       Except Error (List LinkedEntry)
   | [] => pure []
   | key :: rest => do
-      let draft ← buildDraftFuel program plan key.declaration temporaryBase []
-        (plan.specializations.length + 1) key
+      let specialized ← exactSpecialization plan key
+      unless specialized.assumptions.isEmpty do
+        throw (.unresolvedAssumptions key specialized.assumptions)
+      let draft ← buildDraftFuel program plan key.declaration temporaryBase
+        [] [] (plan.specializations.length + 1) key
       let elaborated ← draft.finalizeWith Error.sourceCore
       pure ({ key, elaborated } ::
         (← linkSeeds program plan temporaryBase rest))

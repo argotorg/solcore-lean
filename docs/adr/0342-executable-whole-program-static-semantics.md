@@ -9,10 +9,13 @@ defaulting, source-arity-preserving per-argument coercion and bounded multi-step
 shortest-path coercion are connected end to end.  A first monomorphic builtin
 typed-source-to-Core bridge, rigid/generic specialization and finite direct-call
 specialization worklist are also executable.  A restricted linker connects
-complete acyclic evidence-free direct-call plans to independently rechecked
-Core entries.  Conversion-term insertion, trait/coercion evidence execution,
-recursive or indirect source calls, automatic entry discovery and a public
-source pipeline remain staged extensions.
+complete acyclic direct-call plans to independently rechecked Core entries.
+It statically discharges proof-only call-signature predicates after exact
+requirement/evidence validation and forwards closed implementation witnesses
+through nested constrained calls.  Conversion-term insertion, runtime
+trait/coercion evidence and impl-method execution, recursive or indirect source
+calls, automatic entry discovery and a public source pipeline remain staged
+extensions.
 
 ## Context
 
@@ -86,8 +89,9 @@ The first profile may reject rather than guess for:
   coinductive reasoning;
 - insertion of executable conversion terms;
 - budget-exhausted specialization outcomes and every direct-call cycle;
-- nonempty specialized assumptions or solved requirements, coercion-bearing
-  nodes, and indirect calls at the Core-linking boundary;
+- seed roots with unresolved assumptions, non-call/operator/literal runtime
+  evidence use, coercion-bearing nodes, indirect calls and impl-method execution
+  at the Core-linking boundary;
 - constructor/operator export selectors and the remaining module-reference
   edge cases;
 - nested contract namespaces and every member-overload rule; and
@@ -188,8 +192,10 @@ stable local identities to an open positional Core context, and retains checked
 equations for exact resolved lowering and the independently inferred Core
 result type.  It has
 explicit located failures for malformed carriers, overflow literals,
-fallthrough, non-tail control statements and every staged type, requirement,
-coercion or expression form.  Regressions run both conditional paths with
+fallthrough, non-tail control statements and every staged type, coercion or
+expression form.  Requirements reject unless a call-aware consumer reports an
+exact discharge which is reconciled against the canonical solved-requirement
+table.  Regressions run both conditional paths with
 concrete inputs and stable-ID shadowing rather than stopping at structural
 output.
 
@@ -212,8 +218,8 @@ budget, so same-key recursion closes; type-growing polymorphic recursion exposes
 a partial plan and the first unseen key at the finite bound.  Callee-reference,
 instantiation, specialized type and predicate metadata are checked before an
 edge is accepted.  Signature assumptions and solved evidence are retained for
-the later execution layer rather than discharged here, and indirect calls are
-an explicit profile error.
+the linker rather than discharged by planning, and indirect calls are an
+explicit profile error.
 
 The first specialized direct-call linker accepts only complete acyclic plans.
 It reconstructs the worklist from canonical roots, checks canonical entries and
@@ -225,17 +231,29 @@ runtime entry checks require the exact argument-type sequence.  Seed order and
 duplicates are preserved.  This is finite inlining rather than a named or
 global recursive-function facility.
 
-Budget-exhausted outcomes, direct-call cycles, nonempty specialized assumptions
-or solved requirements, coercion-bearing nodes and indirect calls all reject
-explicitly.  The worklist can therefore close same-key recursive graphs for
-finite planning without claiming they are executable in the current Core.
-Executable regressions cover nested generic calls, both conditional paths,
-runtime input mismatches, malformed plans and each principal staged boundary;
-small checked laws retain the runtime input gate and budget result.
+Call-signature predicates are proof-only in this executable fragment.  Every
+call must account positionally for its exact requirement IDs; the linker
+rejects duplicate IDs and validates the uniquely selected solved requirement's
+predicate and evidence goal against the callee instantiation.  Closed
+implementation evidence is forwarded into the callee.  A nested generic
+caller's assumption marker is replaced only by a unique incoming implementation
+witness for the same goal.  The validated call requirements are then consumed
+statically and never become Core values or impl-method calls.
 
-The next internal boundary is executable conversion and trait/coercion
-evidence.  Recursive calls require a separate named or global recursive Core
-representation rather than cyclic inlining.  Selection-bearing constructor,
+Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
+assumptions, non-call/operator/literal requirements, coercion-bearing nodes and
+indirect calls all reject explicitly.  Impl method bodies are not lowered or
+executed.  The worklist can therefore close same-key recursive graphs for
+finite planning without claiming they are executable in the current Core.
+Executable regressions cover proof-only constrained and nested generic calls,
+both conditional paths, runtime input mismatches, malformed plans and each
+principal staged boundary; small checked laws retain the runtime input gate and
+budget result.
+
+The next internal boundary is runtime conversion and trait/coercion evidence,
+including impl-method execution.  Recursive calls require a separate named or
+global recursive Core representation rather than cyclic inlining.
+Selection-bearing constructor,
 member, match and assignment work follows the same carrier rather than
 extending an information-losing result shape.  Whole-program consumers
 identify an obligation by its owning declaration together with its

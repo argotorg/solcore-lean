@@ -19,7 +19,11 @@ private def workspace : Workspace.RawWorkspace := {
     path := "main.solc"
     content := String.intercalate "\n" [
       "trait Eq<T> {}",
+      "trait Add<T> {}",
+      "trait Coerce<From, To> {}",
       "impl Eq<Word> {}",
+      "impl Add<Word> {}",
+      "impl Coerce<Bool, Word> {}",
       "function identity<T>(value: T) returns (T) { return value; }",
       "function wrap<U>(value: U) returns (U) { return identity(value); }",
       "function select<A, B>(left: A, right: B) returns (A) { return left; }",
@@ -28,7 +32,19 @@ private def workspace : Workspace.RawWorkspace := {
       "}",
       "function loop<T>(value: T) returns (T) { return loop(value); }",
       "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-      "function constrained(value: Word) returns (Word) { return keep(value); }"
+      "function constrained(value: Word) returns (Word) { return keep(value); }",
+      "function relay<T>(value: T) returns (T) where T: Eq { return keep(value); }",
+      "function nestedConstrained(value: Word) returns (Word) { return relay(value); }",
+      "function keepBoth<T>(value: T) returns (T) where T: Eq, T: Add { return value; }",
+      "function bothConstrained(value: Word) returns (Word) { return keepBoth(value); }",
+      "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
+      "  return left + right;",
+      "}",
+      "function operatorConstrained(left: Word, right: Word) returns (Word) {",
+      "  return addWithEvidence(left, right);",
+      "}",
+      "function acceptWord(value: Word) returns (Word) { return value; }",
+      "function coercionCall(value: Bool) returns (Word) { return acceptWord(value); }"
     ]
   }]
   externalLibraries := []
@@ -63,6 +79,24 @@ private def replaceFunction (program : CheckedProgram)
     if function.declaration == replacement.declaration then replacement
     else function
 }
+
+private def firstDirectCallNode? : List Node → Option ExpressionNode
+  | [] => none
+  | .expression node :: rest =>
+      match node.form with
+      | .call _ _ (.declaration _) => some node
+      | _ => firstDirectCallNode? rest
+  | .statement _ :: rest => firstDirectCallNode? rest
+
+private def replaceExpressionRequirements (nodes : List Node)
+    (target : ExpressionId) (requirements : List RequirementId) : List Node :=
+  nodes.map fun node => match node with
+  | .expression expression =>
+      if expression.id == target then
+        .expression { expression with requirements }
+      else
+        node
+  | .statement _ => node
 
 private def renameLocalReference (oldId newId : Resolved.LocalId) :
     ExpressionForm → ExpressionForm
@@ -271,28 +305,194 @@ private def testCycle (program : CheckedProgram) : IO Unit := do
   | result => throw (IO.userError
       s!"self-recursive Core link was not rejected: {reprStr result}")
 
-private def testEvidenceBoundary (program : CheckedProgram) : IO Unit := do
+private def testProofOnlyEvidence (program : CheckedProgram) : IO Unit := do
   let keep ← signatureNamed program "keep"
   let constrained ← signatureNamed program "constrained"
   let outcome ← runOrThrow "constrained" program
     [monomorphicRequest constrained] 2
-  match SourceCoreDirectLinking.link program outcome with
+  let linked ← linkOrThrow "constrained" program outcome
+  let constrainedKey : SourceSpecialization.SpecializationKey := {
+    declaration := constrained.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? constrainedKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "constrained: linked root was absent")
+  let fortyOne := Core.Value.word (word 41)
+  assertTrue (decide (linkedEntry.run? [fortyOne] 256 =
+      some (.done fortyOne [])))
+    "runtime-unused direct-call evidence did not erase before execution"
+
+  let relay ← signatureNamed program "relay"
+  let nested ← signatureNamed program "nestedConstrained"
+  let nestedOutcome ← runOrThrow "nested constrained" program
+    [monomorphicRequest nested] 3
+  let nestedPlan ← match nestedOutcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"nested constrained: expected a complete plan, found {reprStr other}")
+  let nestedSpecialized := nestedPlan.specializations.find? fun specialized =>
+    specialized.declaration == nested.id
+  let relaySpecialized := nestedPlan.specializations.find? fun specialized =>
+    specialized.declaration == relay.id
+  let keepSpecialized := nestedPlan.specializations.find? fun specialized =>
+    specialized.declaration == keep.id
+  let implementationAtRoot := nestedSpecialized.any fun specialized =>
+    specialized.function.solvedRequirements.any fun requirement =>
+      requirement.evidence matches .implementation _
+  let assumptionInRelay := relaySpecialized.any fun specialized =>
+    specialized.function.solvedRequirements.any fun requirement =>
+      requirement.evidence matches .assumption _
+  let retainedKeepAssumption := keepSpecialized.any fun specialized =>
+    specialized.assumptions.length == 1
+  assertTrue (implementationAtRoot && assumptionInRelay &&
+      retainedKeepAssumption)
+    "nested constrained fixture did not retain its implementation/assumption chain"
+  let nestedLinked ← linkOrThrow "nested constrained" program nestedOutcome
+  let nestedKey : SourceSpecialization.SpecializationKey := {
+    declaration := nested.id
+    arguments := []
+  }
+  let nestedEntry ← match nestedLinked.findEntry? nestedKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "nested constrained: linked root was absent")
+  assertTrue (decide (nestedEntry.run? [fortyOne] 512 =
+      some (.done fortyOne [])))
+    "assumption evidence was not forwarded through the nested generic call"
+
+  let keepRequest ← unaryRequest keep .word
+  let keepOutcome ← runOrThrow "unresolved keep seed" program [keepRequest] 1
+  match SourceCoreDirectLinking.link program keepOutcome with
   | .error (.unresolvedAssumptions key assumptions) =>
       assertTrue (decide (key.declaration = keep.id ∧ assumptions.length = 1))
-        "constraint rejection lost the specialized callee assumption"
-  | .error (.sourceCore error) =>
-      let explicitEvidenceBoundary := match error.reason with
-        | .requirementsPresent requirements => !requirements.isEmpty
-        | .unconsumedRequirements requirements => !requirements.isEmpty
-        | _ => false
-      assertTrue explicitEvidenceBoundary
-        s!"constrained call failed outside the evidence boundary: {reprStr error}"
+        "unresolved seed rejection lost the specialized root assumption"
   | result => throw (IO.userError
-      s!"constrained direct call was not rejected explicitly: {reprStr result}")
+      s!"an unresolved constrained seed was not rejected: {reprStr result}")
+
+private def testRuntimeEvidenceBoundaries (program : CheckedProgram) : IO Unit := do
+  let operatorConstrained ← signatureNamed program "operatorConstrained"
+  let operatorOutcome ← runOrThrow "operator evidence" program
+    [monomorphicRequest operatorConstrained] 2
+  match SourceCoreDirectLinking.link program operatorOutcome with
+  | .error (.sourceCore error) =>
+      match error.reason with
+      | .requirementsPresent requirements =>
+          assertTrue (!requirements.isEmpty)
+            "generic operator rejection lost its requirement identity"
+      | reason => throw (IO.userError
+          s!"generic operator reached the wrong Source Core boundary: {reprStr reason}")
+  | result => throw (IO.userError
+      s!"generic operator evidence was erased as proof-only: {reprStr result}")
+
+  let coercionCall ← signatureNamed program "coercionCall"
+  let coercionOutcome ← runOrThrow "coercion call" program
+    [monomorphicRequest coercionCall] 2
+  match SourceCoreDirectLinking.link program coercionOutcome with
+  | .error (.sourceCore error) =>
+      match error.reason with
+      | .coercionsPresent coercions =>
+          assertTrue (!coercions.isEmpty)
+            "coercion rejection lost its typed conversion edge"
+      | reason => throw (IO.userError
+          s!"coercion reached the wrong Source Core boundary: {reprStr reason}")
+  | result => throw (IO.userError
+      s!"a coercion-bearing call linked without runtime coercion semantics: {reprStr result}")
+
+private def testMalformedRequirementMetadata
+    (program : CheckedProgram) : IO Unit := do
+  let constrained ← signatureNamed program "constrained"
+  let function ← functionFor program constrained
+  let call ← match firstDirectCallNode? function.typedBody.nodes with
+    | some call => pure call
+    | none => throw (IO.userError
+        "constrained: direct call requirement owner was absent")
+  let solved ← match function.solvedRequirements with
+    | [solved] => pure solved
+    | requirements => throw (IO.userError
+        s!"constrained: expected one solved requirement, found {requirements.length}")
+
+  let wrongId : RequirementId := ⟨solved.id.index + 100⟩
+  let wrongIdFunction : CheckedFunction := {
+    function with
+    solvedRequirements := [{ solved with id := wrongId }]
+  }
+  let wrongIdProgram := replaceFunction program wrongIdFunction
+  let wrongIdOutcome ← runOrThrow "malformed requirement id" wrongIdProgram
+    [monomorphicRequest constrained] 2
+  match SourceCoreDirectLinking.link wrongIdProgram wrongIdOutcome with
+  | .error (.missingSolvedRequirement key occurrence requirement) =>
+      assertTrue (decide (key.declaration = constrained.id ∧
+          occurrence = call.id ∧ requirement = solved.id))
+        "malformed requirement-ID rejection lost its caller or occurrence"
+  | result => throw (IO.userError
+      s!"a call requirement with no solved row was accepted: {reprStr result}")
+
+  let wrongPredicate : ProgramPredicate := {
+    solved.predicate with subject := .bool
+  }
+  let wrongEvidence : PredicateEvidence := match solved.evidence with
+    | .assumption _ => .assumption wrongPredicate
+    | .implementation (.byImpl _ implementation premises) =>
+        .implementation (.byImpl wrongPredicate implementation premises)
+  let wrongPredicateFunction : CheckedFunction := {
+    function with
+    solvedRequirements := [{
+      solved with predicate := wrongPredicate, evidence := wrongEvidence
+    }]
+  }
+  let wrongPredicateProgram := replaceFunction program wrongPredicateFunction
+  let wrongPredicateOutcome ← runOrThrow "malformed requirement predicate"
+    wrongPredicateProgram [monomorphicRequest constrained] 2
+  match SourceCoreDirectLinking.link wrongPredicateProgram
+      wrongPredicateOutcome with
+  | .error (.callRequirementPredicateMismatch key occurrence requirement
+      expected actual) =>
+      assertTrue (decide (key.declaration = constrained.id ∧
+          occurrence = call.id ∧ requirement = solved.id ∧
+          expected = solved.predicate ∧ actual = wrongPredicate))
+        "malformed requirement-predicate rejection lost exact metadata"
+  | result => throw (IO.userError
+      s!"a mismatched solved predicate was accepted: {reprStr result}")
+
+  let both ← signatureNamed program "bothConstrained"
+  let bothFunction ← functionFor program both
+  let bothCall ← match firstDirectCallNode? bothFunction.typedBody.nodes with
+    | some call => pure call
+    | none => throw (IO.userError
+        "bothConstrained: direct call requirement owner was absent")
+  let (first, second) ← match bothFunction.solvedRequirements with
+    | [first, second] => pure (first, second)
+    | requirements => throw (IO.userError
+        s!"bothConstrained: expected two solved requirements, found {requirements.length}")
+  let reversedRequirements ← match bothCall.requirements with
+    | [first, second] => pure [second, first]
+    | requirements => throw (IO.userError
+        s!"bothConstrained: expected two call requirements, found {requirements.length}")
+  let wrongOrderFunction : CheckedFunction := {
+    bothFunction with
+    typedBody := {
+      bothFunction.typedBody with
+      nodes := replaceExpressionRequirements bothFunction.typedBody.nodes
+        bothCall.id reversedRequirements
+    }
+  }
+  let wrongOrderProgram := replaceFunction program wrongOrderFunction
+  let wrongOrderOutcome ← runOrThrow "malformed requirement order"
+    wrongOrderProgram [monomorphicRequest both] 2
+  match SourceCoreDirectLinking.link wrongOrderProgram wrongOrderOutcome with
+  | .error (.callRequirementPredicateMismatch key occurrence requirement
+      expected actual) =>
+      assertTrue (decide (key.declaration = both.id ∧
+          occurrence = bothCall.id ∧ requirement = second.id ∧
+          expected = first.predicate ∧ actual = second.predicate))
+        "malformed requirement-order rejection lost positional evidence"
+  | result => throw (IO.userError
+      s!"reordered call requirements were accepted: {reprStr result}")
 
 /-- Exercise complete acyclic generic linking, capture-free argument staging,
-runtime input validation, finite-budget and recursion boundaries, retained
-trait evidence, the legacy call-free entry point, and defensive plan
+runtime input validation, finite-budget and recursion boundaries, proof-only
+trait-evidence forwarding, runtime evidence/coercion gates, malformed
+requirement metadata, the legacy call-free entry point, and defensive plan
 reconstruction. -/
 def testSourceCoreDirectLinking : IO Unit := do
   let program ← checkedProgram
@@ -300,6 +500,8 @@ def testSourceCoreDirectLinking : IO Unit := do
   testBudgetExhaustion program
   testCaptureAvoidance program
   testCycle program
-  testEvidenceBoundary program
+  testProofOnlyEvidence program
+  testRuntimeEvidenceBoundaries program
+  testMalformedRequirementMetadata program
 
 end Tests.SourceCoreDirectLinking

@@ -29,6 +29,35 @@ theorem lowerType_product {site : ErrorSite} {left right : Ty}
   simp [lowerType, leftAccepted, rightAccepted, bind, Except.bind,
     pure, Pure.pure, Except.pure]
 
+@[simp] theorem reconcileConsumedRequirements_nil
+    (declaration : Resolved.DeclarationId) (solved : List RequirementId) :
+    reconcileConsumedRequirements declaration solved [] = .ok solved := by
+  rfl
+
+@[simp] theorem reconcileConsumedRequirements_single
+    (declaration : Resolved.DeclarationId) :
+    reconcileConsumedRequirements declaration [⟨0⟩] [⟨0⟩] =
+      .ok [] := by
+  rfl
+
+@[simp] theorem reconcileConsumedRequirements_unknown
+    (declaration : Resolved.DeclarationId) (requirement : RequirementId) :
+    reconcileConsumedRequirements declaration [] [requirement] =
+      .error {
+        site := .declaration declaration
+        reason := .unknownConsumedRequirement requirement
+      } := by
+  rfl
+
+@[simp] theorem reconcileConsumedRequirements_duplicate
+    (declaration : Resolved.DeclarationId) :
+    reconcileConsumedRequirements declaration [⟨0⟩] [⟨0⟩, ⟨0⟩] =
+      .error {
+        site := .declaration declaration
+        reason := .duplicateConsumedRequirement ⟨0⟩
+      } := by
+  rfl
+
 /-- Every successful source elaboration carries the independently checked Core
 typing equation at its public boundary. -/
 @[simp] theorem ElaboratedFunction.resolved_lowers

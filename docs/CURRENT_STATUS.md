@@ -38,9 +38,10 @@ environments, resolves signatures and predicates, infers the supported source
 fragment, and returns checked functions with occurrence-addressed typed bodies
 and trait evidence.  The internal downstream path now specializes explicit
 roots, discovers finite direct-call plans, and lowers complete acyclic plans in
-the closed evidence-free builtin subset to independently rechecked Semantic
-Core entries.  It is not yet a general source compiler or a public source
-Oracle.
+the closed builtin subset to independently rechecked Semantic Core entries.
+Proof-only direct-call signature predicates may be discharged statically after
+exact requirement/evidence validation; runtime evidence use remains outside
+this path.  It is not yet a general source compiler or a public source Oracle.
 
 ## What works now
 
@@ -5565,9 +5566,11 @@ language acceptance.
 
 The initial whole-program resolver, checker, specialization planner and
 restricted acyclic linker below now consume the canonical syntax.  Checked
-Semantic Core is reached only for explicitly seeded, complete evidence-free
-plans in the builtin tail-normal fragment; this is not a public or general
-source elaborator.  Canonical local references, Boolean
+Semantic Core is reached only for explicitly seeded, complete acyclic plans in
+the builtin tail-normal fragment.  The linker admits proof-only direct-call
+signature predicates when every requirement and its closed implementation
+evidence match exactly; this is not a public or general source elaborator.
+Canonical local references, Boolean
 operators, Word addition/subtraction/multiplication/unsigned division/remainder,
 bitwise operations, unsigned `>`/`<`/`<=`/`>=` and Word equality/inequality, strict
 Word literals, and conditionals connect through the explicit-table adapters above.
@@ -5628,9 +5631,12 @@ explicit ambiguity are deferred.  Generic or symbolic intermediate coercion
 paths, coinductive coercion cycles and insertion of executable conversion terms
 are not yet connected.  The specialization and lowering slices described below
 cover a deliberately closed builtin subset.  Complete acyclic direct calls
-without requirements or coercions are executable through the restricted plan
-linker; cyclic or indirect calls, conversion/evidence execution and general
-source semantics are not claimed.
+without coercions are executable through the restricted plan linker.  A direct
+call's signature predicates may be consumed statically when its requirement
+IDs, predicates and evidence goals match exactly; closed implementation
+evidence is forwarded through nested constrained calls.  Cyclic or indirect
+calls, runtime trait evidence use, conversion execution and general source
+semantics are not claimed.
 
 Before adding constructor/member selection, match, assignment or executable
 conversion, the next architecture boundary is an occurrence-addressed typed and
@@ -5692,8 +5698,11 @@ else branches, fallthrough, non-tail control statements and unconsumed
 requirements all produce located elaboration errors.  The standalone function
 elaborator still rejects calls; the validated plan linker described below
 supplies the only call callback.  Lambdas, expression statements, proxy/index
-forms, nominal types and any node carrying a coercion or trait requirement
-reject explicitly instead of receiving an invented runtime meaning.  End-to-end
+forms, nominal types, coercions and every non-call trait requirement reject
+explicitly instead of receiving an invented runtime meaning.  The linker's
+call callback is the sole exception: it reports exactly which call-owned
+requirements it has validated and statically consumed, and function finalization
+rejects any solved requirement left unconsumed.  End-to-end
 regressions execute both branches after nested blocks and shadowing lets, in
 addition to the original product-returning expression profile.
 
@@ -5747,18 +5756,31 @@ duplicates are preserved, and execution checks exact runtime argument types
 before entering the existing Core machine.  This is finite inlining, not a
 named or global recursive-function facility in Core.
 
-Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
-direct-call cycles, nonempty specialized assumptions or solved requirements,
-coercion-bearing nodes and indirect calls reject explicitly.  Thus the
-worklist may close same-key self or mutual recursion, but the current linker
-does not assign those cycles an executable meaning.  Small checked laws fix
-the runtime input-type gate and budget-exhaustion boundary; end-to-end
-regressions execute both paths through nested generic calls and cover the
-staged failure cases.
+Direct-call signature predicates are proof-only in this executable fragment.
+For each call, the linker validates the exact requirement count and order,
+rejects duplicate IDs, looks up each function-local solved requirement
+uniquely, and checks both its predicate and evidence goal against the selected
+callee instantiation.  An implementation witness is forwarded into the
+callee.  A nested generic wrapper's assumption marker must resolve to a unique
+incoming closed implementation witness for the same goal; unresolved or
+ambiguous evidence is never erased.  Once validated, those call-owned
+requirements are consumed statically and do not become Core values or method
+calls.
 
-The next frontend boundary is executable trait/coercion evidence, including
-conversion-term insertion.  Recursive source calls require a separate named
-or global recursive-function representation rather than cyclic inlining.
+Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
+direct-call cycles, seed roots with unresolved assumptions, unconsumed
+non-call/operator/literal requirements, coercion-bearing nodes and indirect
+calls reject explicitly.  Trait/impl method bodies are not lowered or executed.
+Thus the worklist may close same-key self or mutual recursion, but the current
+linker does not assign those cycles an executable meaning.  Small checked laws
+fix the runtime input-type gate and budget-exhaustion boundary; end-to-end
+regressions execute proof-only constrained and nested generic calls as well as
+both conditional paths, and cover the staged failure cases.
+
+The next frontend boundary is runtime trait/coercion evidence, including impl
+method execution and conversion-term insertion.  Recursive source calls require
+a separate named or global recursive-function representation rather than cyclic
+inlining.
 Automatic entry discovery, constructors, members and place-aware statements
 remain later in dependency order.  A whole-program reference to an obligation
 remains the owning declaration paired with its function-local requirement
@@ -5771,8 +5793,9 @@ Solcore source text. In particular, it does not yet provide:
 
 - automatic entry-point discovery/seeding and a public source-to-execution
   pipeline;
-- execution of cyclic, indirect, evidence-bearing or coercion-bearing source
-  call graphs;
+- execution of cyclic or indirect source call graphs, runtime
+  evidence-dependent operator/literal/non-call forms, impl methods, or
+  coercion-bearing source calls;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;
