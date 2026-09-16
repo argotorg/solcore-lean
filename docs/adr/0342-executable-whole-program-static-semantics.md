@@ -4,9 +4,10 @@
 
 Implemented for the initial executable checking profile.  Explicit public
 interfaces, type/trait/value imports and re-exports, rank-1 inference, bounded
-trait evidence, overload selection, one-step expected-type coercion and numeric
-defaulting are connected end to end.  Multi-step coercion/ranking and
-specialization to Semantic Core remain staged extensions.
+trait evidence, minimum-cost overload selection after candidate-local literal
+defaulting, source-arity-preserving per-argument coercion and bounded multi-step
+shortest-path coercion are connected end to end.  Executable conversion-term
+insertion and specialization to Semantic Core remain staged extensions.
 
 ## Context
 
@@ -59,7 +60,9 @@ The first profile is deliberately small but end to end:
 - rank-1 explicit polymorphism and ordinary let generalization where safe;
 - functions, calls, lambdas, tuples, conditionals and the canonical operators;
 - numeric literal constraints with a deterministic default;
-- trait and impl predicates with finite evidence-producing search; and
+- trait and impl predicates with finite evidence-producing search;
+- direct-first, bounded shortest-path coercion over concrete intermediate
+  types; and
 - enough statement checking to validate ordinary function bodies.
 
 Success, rejection and inconclusive search are distinct results.  No failed
@@ -74,7 +77,9 @@ The first profile may reject rather than guess for:
 - higher-rank or higher-kinded polymorphism;
 - overlapping/default impl policy beyond explicit ambiguity;
 - recursive trait cycles that need coinductive reasoning;
-- multi-step or user-defined coercion cycles;
+- generic or symbolic intermediate coercion paths and coercion cycles that need
+  coinductive reasoning;
+- insertion of executable conversion terms;
 - constructor/operator export selectors and the remaining module-reference
   edge cases;
 - nested contract namespaces and every member-overload rule; and
@@ -112,7 +117,13 @@ negative cases are deferred.  Imports consume explicit fixed-point public
 interfaces in the type, trait and value namespaces; overload sets, aliases,
 hiding, local and remote re-exports, positive cycles, and public module-binding
 traversal are executable.  The initial profile still retains its no-import and
-explicit canonical-path compatibility fallbacks.  Constructor/operator export
-selectors, advanced expressions/statements, multi-step and per-argument product
-coercion, literal-default-aware overload ranking, and source specialization or
-lowering to `Core.Ty` are outside the completed profile.
+explicit canonical-path compatibility fallbacks.  Source arity controls
+per-argument fitting without flattening a tuple-valued argument.  Candidate-
+local numeric defaulting and coercion counts select only minimum-cost overloads.
+Expected-type mismatches prefer a direct coercion, then breadth-first search
+ground intermediate types to the configured bound; a unique shortest path
+retains ordered predicates and evidence, while equal shortest paths and depth
+exhaustion are explicit errors.  Constructor/operator export selectors,
+advanced expressions/statements, generic/symbolic coercion intermediates,
+executable conversion terms, and source specialization or lowering to
+`Core.Ty` are outside the completed profile.

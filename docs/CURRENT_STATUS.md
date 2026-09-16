@@ -5594,10 +5594,16 @@ The first source-body checker handles locals, functions and overload sets,
 calls, lambdas, tuples, groups, conditionals, supported unary/binary operators,
 blocks, lets, returns, expression statements and statement conditionals.
 Decimal and hexadecimal literals use inference variables and default
-deterministically to Word when unconstrained; non-Word literal obligations and
-operator obligations can be discharged through resolved traits.  Expected-type
-mismatches can request a single `Coerce<From, To>` obligation, whose selected
-implementation or local assumption is retained as evidence.  A raw
+deterministically to Word when unconstrained.  Candidate-local defaulting gives
+Word zero cost, while trait-backed literal interpretations and introduced
+coercion requirements add cost; only minimum-cost overloads compete and equal
+minima remain ambiguous.  Function arguments are fitted independently at the
+source arity, while one tuple-valued argument remains whole.  Expected-type
+mismatches try a direct `Coerce<From, To>` obligation first and then search
+concrete coercion edges breadth first to a context bound of four by default.
+The unique shortest path retains its predicates and implementation or local
+assumption evidence in order; equal shortest paths and depth exhaustion are
+explicit errors, while path-local visitation terminates finite cycles.  A raw
 workspace can therefore be loaded, have all function and impl signatures
 resolved, and have all supported function bodies checked in declaration order.
 
@@ -5608,11 +5614,10 @@ fallbacks remain for compatibility.  Dot construction, proxies, indexing,
 general fields, arrays, assignment, match, loops, assembly and loop control
 reject as unsupported.  Higher-rank and higher-kinded polymorphism,
 polymorphic recursion, coinductive trait cycles and overlap policy beyond
-explicit ambiguity are deferred.  Multi-step coercion search, per-argument
-coercion inside a multi-parameter product, literal-default-aware overload
-ranking and insertion of executable conversion terms are not yet connected,
-and no specialization, elaboration or lowering from solved source terms to
-Semantic Core is claimed.
+explicit ambiguity are deferred.  Generic or symbolic intermediate coercion
+paths, coinductive coercion cycles and insertion of executable conversion terms
+are not yet connected, and no specialization, elaboration or lowering from
+solved source terms to Semantic Core is claimed.
 
 ## What is not yet claimed
 
