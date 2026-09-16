@@ -73,6 +73,23 @@ private def testNumericExpectedType : IO Unit := do
         | _ => false) "a numeric literal silently checked as Bool"
   | .ok _ => throw (IO.userError "a numeric literal checked as Bool")
 
+private def testTraitBackedLiteral : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait FromLiteral<T> {}",
+    "enum Box { Only }",
+    "impl FromLiteral<Box> {}",
+    "function literal() returns (Box) { return 1; }"
+  ]
+  let checked ← check source
+  match checked with
+  | [function] =>
+      assertTrue (decide (function.predicates.length = 1) &&
+          function.evidence.any fun evidence => match evidence with
+            | .implementation _ => true
+            | .assumption _ => false)
+        "trait-backed non-Word literal lost its predicate or evidence"
+  | _ => throw (IO.userError "literal fixture lost its checked function")
+
 private def testUnsupportedStatement : IO Unit := do
   let source :=
     "function loop(flag: Bool) { while (flag) { return; } }"
@@ -105,7 +122,8 @@ private def testMissingCoercion : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
-    "function reject(value: Word) returns (Box) { return value; }"
+    "function accept(value: Box) returns (Box) { return value; }",
+    "function reject(value: Word) returns (Box) { return accept(value); }"
   ]
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
@@ -115,14 +133,52 @@ private def testMissingCoercion : IO Unit := do
         | _ => false) "missing coercion implementation was accepted"
   | .ok _ => throw (IO.userError "missing coercion implementation was accepted")
 
+private def testInconclusiveCoercion : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Coerce<From, To> {}",
+    "enum Box { Only }",
+    "impl Coerce<Word, Box> {}",
+    "impl Coerce<Word, Box> {}",
+    "function accept(value: Box) returns (Box) { return value; }",
+    "function reject(value: Word) returns (Box) { return accept(value); }"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace source) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .inconclusiveTrait (.ambiguous _ _ _), .. } => true
+        | _ => false) "overlapping coercion implementations lost ambiguity"
+  | .ok _ => throw (IO.userError "ambiguous coercion implementation was selected")
+
+private def testConstrainedLetDoesNotGeneralizeAwayEvidence : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Eq<T> {}",
+    "impl Eq<Word> {}",
+    "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
+    "function reject() returns (Bool) {",
+    "  let f = lam(value) { return keep(value); };",
+    "  return f(true);",
+    "}"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace source) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            predicate.subject == TypeSystem.Ty.bool
+        | _ => false)
+        "a constrained let detached its predicate from the instantiated type"
+  | .ok _ => throw (IO.userError "Eq<Word> evidence was reused for Bool")
+
 /-- Exercise parsed lambdas, local schemes, tuples, grouping, conditionals,
 operators, numeric expected/default behavior, and explicit deferrals. -/
 def testSourceInference : IO Unit := do
   testLambdaLetTupleConditional
   testAmbiguousOverload
   testNumericExpectedType
+  testTraitBackedLiteral
   testUnsupportedStatement
   testTraitBackedCoercion
   testMissingCoercion
+  testInconclusiveCoercion
+  testConstrainedLetDoesNotGeneralizeAwayEvidence
 
 end Tests.SourceInference

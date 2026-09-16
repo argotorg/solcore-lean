@@ -66,6 +66,35 @@ private def testSuccessfulProgram : IO Unit := do
       assertTrue (hasImplementationEvidence function)
         "generic where predicate did not retain implementation evidence"
 
+private def importedTypeWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc"
+  mainSources := [
+    {
+      path := "models.solc"
+      content := "enum Box { Only }"
+    },
+    {
+      path := "main.solc"
+      content := String.intercalate "\n" [
+        "import * from models;",
+        "function echo(value: Box) returns (Box) { return value; }"
+      ]
+    }
+  ]
+  externalLibraries := []
+}
+
+private def testImportedTypeProgram : IO Unit := do
+  let checked ← match checkProgram importedTypeWorkspace with
+    | .ok checked => pure checked
+    | .error errors => throw (IO.userError
+        s!"imported whole-program fixture failed: {reprStr errors}")
+  match checked.signatures.functions with
+  | [signature] =>
+      assertTrue (decide (signature.parameterTypes = signature.returnTypes))
+        "imported type resolved inconsistently across a function signature"
+  | _ => throw (IO.userError "imported fixture lost its function signature")
+
 private def unsolvedTraitWorkspace : Workspace.RawWorkspace := {
   entry := "broken.solc"
   mainSources := [{
@@ -146,6 +175,7 @@ private def testStageClassification : IO Unit := do
 overloads, calls, predicates, implementation evidence, and numeric literals. -/
 def testProgramChecking : IO Unit := do
   testSuccessfulProgram
+  testImportedTypeProgram
   testNoSolution
   testInconclusive
   testStageClassification
