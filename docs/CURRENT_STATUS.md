@@ -5574,10 +5574,13 @@ v4; that interface continues to mean only its frozen Surface v1 format.
 ADR-0342 now has an end-to-end initial checking profile.  Raw workspaces are
 validated and diagnostic-free canonical files are parsed before stable
 module-and-position declaration identities and separate type, trait, and value
-namespaces are built.  Direct plain/namespace, wildcard, selective, alias and
-hiding imports participate in type-name lookup.  Generic parameters shadow
-imported and program types, while qualified and external module lookup remain
-explicit.
+namespaces are built.  Explicit public interfaces are computed by finite least
+fixed point, so local and remote re-exports, imported aliases, hiding, overload
+sets and positive re-export cycles have deterministic executable meaning.
+Plain/namespace, wildcard and selective imports consume those interfaces for
+types, traits and values.  Generic parameters and local declarations retain
+their priority, while imported public module bindings support multi-component
+qualified type and function paths.
 
 The independent source type layer provides rigid declaration parameters,
 flexible inference variables, substitutions, rank-1 schemes, instantiation,
@@ -5599,16 +5602,17 @@ workspace can therefore be loaded, have all function and impl signatures
 resolved, and have all supported function bodies checked in declaration order.
 
 This is deliberately an executable-first profile with reduced proof density.
-Current direct imports expose types and namespace aliases, not imported values
-or traits, exports, or re-exports.  Dot construction, proxies, indexing,
-fields, arrays, assignment, match, loops, assembly and loop control reject as
-unsupported.  Higher-rank and higher-kinded polymorphism, polymorphic recursion,
-coinductive trait cycles and overlap policy beyond explicit ambiguity are
-deferred.  Multi-step coercion search, per-argument coercion inside a
-multi-parameter product, literal-default-aware overload ranking and insertion
-of executable conversion terms are not yet connected, and no
-specialization, elaboration or lowering from solved source terms to Semantic
-Core is claimed.
+Constructor/operator export selectors and the remaining module-reference edge
+cases are explicit errors; the initial no-import and canonical-path lookup
+fallbacks remain for compatibility.  Dot construction, proxies, indexing,
+general fields, arrays, assignment, match, loops, assembly and loop control
+reject as unsupported.  Higher-rank and higher-kinded polymorphism,
+polymorphic recursion, coinductive trait cycles and overlap policy beyond
+explicit ambiguity are deferred.  Multi-step coercion search, per-argument
+coercion inside a multi-parameter product, literal-default-aware overload
+ranking and insertion of executable conversion terms are not yet connected,
+and no specialization, elaboration or lowering from solved source terms to
+Semantic Core is claimed.
 
 ## What is not yet claimed
 

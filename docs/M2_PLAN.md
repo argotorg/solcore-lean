@@ -38,23 +38,24 @@ their declarative rules remain the formal specification authority.
 
 Further diagnostic-trace proof work is paused in favor of frontend semantics.
 ADR-0342's initial executable static-semantics spine is now present: canonical
-raw workspaces load into stable whole-program declaration environments; direct
-type imports and namespace aliases feed general source type-name resolution;
-rigid parameters, flexible variables, substitutions and rank-1 schemes feed
-occurs-checking unification; and resolved function, trait and impl signatures
-feed bounded evidence-producing tabled class resolution.  The supported source
-expression and statement fragment performs overload selection, one-step
-expected-type `Coerce<From, To>` resolution, operator-trait checking and
-deterministic numeric-literal defaulting, and the whole-program
-entry point accumulates function failures while preserving no-solution versus
-inconclusive trait outcomes.
+raw workspaces load into stable whole-program declaration environments;
+explicit fixed-point public interfaces feed type, trait and value imports,
+re-exports and qualified module-binding traversal; rigid parameters, flexible
+variables, substitutions and rank-1 schemes feed occurs-checking unification;
+and resolved function, trait and impl signatures feed bounded
+evidence-producing tabled class resolution.  The supported source expression
+and statement fragment performs overload selection, one-step expected-type
+`Coerce<From, To>` resolution, operator-trait checking and deterministic
+numeric-literal defaulting, and the whole-program entry point accumulates
+function failures while preserving no-solution versus inconclusive trait
+outcomes.
 
 This is an executable-first milestone rather than a completed proof campaign.
-The next vertical work is to extend imports from types to values and traits,
-extend coercion to multi-step and per-argument search, rank overloads after
-literal defaulting, cover advanced expression and statement forms, and define
-specialization/elaboration into monomorphic
-Semantic Core.  Exports/re-exports, cyclic aliases, polymorphic recursion,
+The next vertical work is to extend coercion to per-argument and bounded
+multi-step search, rank overloads after candidate-local literal defaulting,
+cover advanced expression and statement forms, and define
+specialization/elaboration into monomorphic Semantic Core.  Constructor and
+operator export selectors, cyclic aliases, polymorphic recursion,
 higher-rank/higher-kinded types, coinductive trait cycles and a complete overlap
 policy remain explicit edge-case work.  Broad diagnostic and static-semantics
 soundness/completeness theorem families do not block these executable stages.

@@ -2,11 +2,11 @@
 
 ## Status
 
-Implemented for the initial executable checking profile.  Direct type imports,
-rank-1 inference, bounded trait evidence, overload selection, one-step
-expected-type coercion and numeric defaulting are connected end to end.
-Multi-step coercion/ranking and specialization to Semantic Core remain staged
-extensions.
+Implemented for the initial executable checking profile.  Explicit public
+interfaces, type/trait/value imports and re-exports, rank-1 inference, bounded
+trait evidence, overload selection, one-step expected-type coercion and numeric
+defaulting are connected end to end.  Multi-step coercion/ranking and
+specialization to Semantic Core remain staged extensions.
 
 ## Context
 
@@ -75,7 +75,8 @@ The first profile may reject rather than guess for:
 - overlapping/default impl policy beyond explicit ambiguity;
 - recursive trait cycles that need coinductive reasoning;
 - multi-step or user-defined coercion cycles;
-- complete import re-export and hiding interactions;
+- constructor/operator export selectors and the remaining module-reference
+  edge cases;
 - nested contract namespaces and every member-overload rule; and
 - proof-level completeness for diagnostics and all negative edge cases.
 
@@ -107,8 +108,11 @@ distinct results.
 This delivery intentionally has a lower proof density than the preceding
 parser and local-semantics slices.  Executable positive and negative tests fix
 the vertical behavior; broad soundness/completeness theorem families and rare
-negative cases are deferred.  Direct imports currently affect type and module
-namespaces only; imported values and traits, re-exports, advanced
-expressions/statements, multi-step and per-argument product coercion,
-literal-default-aware overload ranking, and source specialization or lowering
-to `Core.Ty` are outside the completed profile.
+negative cases are deferred.  Imports consume explicit fixed-point public
+interfaces in the type, trait and value namespaces; overload sets, aliases,
+hiding, local and remote re-exports, positive cycles, and public module-binding
+traversal are executable.  The initial profile still retains its no-import and
+explicit canonical-path compatibility fallbacks.  Constructor/operator export
+selectors, advanced expressions/statements, multi-step and per-argument product
+coercion, literal-default-aware overload ranking, and source specialization or
+lowering to `Core.Ty` are outside the completed profile.
