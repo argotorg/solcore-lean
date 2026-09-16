@@ -38,6 +38,9 @@ inductive Error where
       (name : String) (candidates : List Resolved.DeclarationId)
   | ambiguousImportedNamespace
       (name : String) (candidates : List Workspace.ModuleId)
+  | ambiguousCoercion
+      (source target : Ty) (firstPath secondPath : List Ty)
+  | coercionDepthLimit (source target : Ty) (limit : Nat)
   | importVisibility (errors : List ProgramImportError)
   | operatorNotSupported (operator : String) (operand : Ty)
   | nonNumericLiteral (type : Ty)
@@ -54,6 +57,7 @@ structure Context where
   scope : ProgramTypeScope
   assumptions : List ProgramPredicate := []
   traitDepth : Nat := 32
+  coercionDepth : Nat := 4
 
 /-- Mutable inference information threaded through a source body. -/
 structure State where

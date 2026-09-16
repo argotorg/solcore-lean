@@ -87,6 +87,184 @@ def conventionalTrait?
       | some trait => pure (some trait)
       | none => conventionalTrait? context rest
 
+structure CoercionEdge where
+  target : Ty
+  predicate : ProgramPredicate
+  deriving Repr, DecidableEq
+
+structure CoercionPath where
+  current : Ty
+  visited : List Ty
+  predicates : List ProgramPredicate
+  deriving Repr, DecidableEq
+
+/-- Outgoing edges whose evidence is unique, plus inconclusive edges retained
+only as a fallback diagnostic if every viable frontier is exhausted. -/
+structure CoercionEdges where
+  viable : List CoercionEdge := []
+  blocked : List Error := []
+
+structure CoercionExpansion where
+  paths : List CoercionPath := []
+  blocked : List Error := []
+
+def typeHasParameter : Ty → Bool
+  | .parameter _ => true
+  | .variable _
+  | .constructor _
+  | .error => false
+  | .application left right
+  | .function left right
+  | .product left right
+  | .mapping left right => typeHasParameter left || typeHasParameter right
+  | .proxy inner
+  | .comptime inner => typeHasParameter inner
+
+def isGroundCoercionTarget (type : Ty) : Bool :=
+  type.freeVariables.isEmpty && !typeHasParameter type
+
+def coercionRuleEdge? (trait : Resolved.DeclarationId) (source : Ty)
+    (rule : ProgramImplRule) : Option CoercionEdge := do
+  if rule.head.trait != trait then none else pure ()
+  let freshened := TypedTraitResolution.freshenRuleFor rule {
+    trait
+    subject := source
+    arguments := [source]
+  }
+  let freshTarget ← match freshened.head.arguments with
+    | [target] => some target
+    | _ => none
+  let substitution ← (Unification.unify [{
+    left := freshened.head.subject
+    right := source
+  }]).toOption
+  if substitution.domain.any source.freeVariables.contains then none else pure ()
+  let target := substitution.apply freshTarget
+  if !isGroundCoercionTarget target then none else pure ()
+  pure {
+    target
+    predicate := { trait, subject := source, arguments := [target] }
+  }
+
+def assumptionCoercionEdges (context : Context) (state : State)
+    (trait : Resolved.DeclarationId) (source : Ty) : List CoercionEdge :=
+  context.assumptions.filterMap fun assumption =>
+    let predicate := applyPredicate state assumption
+    if predicate.trait != trait || predicate.subject != source then
+      none
+    else
+      match predicate.arguments with
+      | [target] =>
+          if isGroundCoercionTarget target then some { target, predicate }
+          else none
+      | _ => none
+
+def coercionEdges (context : Context) (state : State)
+    (trait : Resolved.DeclarationId) (source : Ty) : List CoercionEdge :=
+  ((context.signatures.implRules.filterMap (coercionRuleEdge? trait source)) ++
+    assumptionCoercionEdges context state trait source).eraseDups
+
+def viableCoercionEdges (context : Context) (state : State) :
+    List CoercionEdge → CoercionEdges
+  | [] => {}
+  | edge :: rest =>
+      let tail := viableCoercionEdges context state rest
+      match solvePredicate context state edge.predicate with
+      | .ok _ => { tail with viable := edge :: tail.viable }
+      | .error (.noTraitImplementation _) => tail
+      | .error error => { tail with blocked := error :: tail.blocked }
+
+def expandCoercionPath (context : Context) (state : State)
+    (trait : Resolved.DeclarationId) (path : CoercionPath) :
+    CoercionExpansion :=
+  let candidates := (coercionEdges context state trait path.current).filter
+    fun edge => !path.visited.contains edge.target
+  let edges := viableCoercionEdges context state
+    candidates
+  {
+    paths := edges.viable.map fun edge => {
+      current := edge.target
+      visited := path.visited ++ [edge.target]
+      predicates := path.predicates ++ [edge.predicate]
+    }
+    blocked := edges.blocked
+  }
+
+def expandCoercionPaths (context : Context) (state : State)
+    (trait : Resolved.DeclarationId) :
+    List CoercionPath → CoercionExpansion
+  | [] => {}
+  | path :: rest =>
+      let head := expandCoercionPath context state trait path
+      let tail := expandCoercionPaths context state trait rest
+      {
+        paths := head.paths ++ tail.paths
+        blocked := head.blocked ++ tail.blocked
+      }
+
+def finishCoercionSearch (blocked : List Error) :
+    Except Error (Option (List ProgramPredicate)) :=
+  match blocked with
+  | error :: _ => .error error
+  | [] => .ok none
+
+def selectCoercionPath (source target : Ty)
+    (paths : List CoercionPath) : Except Error (Option (List ProgramPredicate)) :=
+  match (paths.filter fun path => path.current == target).eraseDups with
+  | [] => .ok none
+  | [path] => .ok (some path.predicates)
+  | first :: second :: _ =>
+      .error (.ambiguousCoercion source target first.visited second.visited)
+
+/-- Breadth-first search for a unique shortest coercion path. The fuel is an
+edge bound, not a recursion guard: one additional expansion distinguishes
+ordinary exhaustion from an explicitly truncated search. -/
+def searchCoercionPaths (context : Context) (state : State)
+    (trait : Resolved.DeclarationId) (source target : Ty) :
+    Nat → List CoercionPath → List Error →
+      Except Error (Option (List ProgramPredicate))
+  | 0, frontier, blocked => do
+      let beyond := expandCoercionPaths context state trait frontier
+      if beyond.paths.isEmpty then
+        finishCoercionSearch (blocked ++ beyond.blocked)
+      else throw (.coercionDepthLimit source target context.coercionDepth)
+  | fuel + 1, frontier, blocked => do
+      let next := expandCoercionPaths context state trait frontier
+      match ← selectCoercionPath source target next.paths with
+      | some predicates => pure (some predicates)
+      | none => do
+          let blocked := blocked ++ next.blocked
+          if next.paths.isEmpty then finishCoercionSearch blocked
+          else
+            searchCoercionPaths context state trait source target fuel
+              next.paths blocked
+
+/-- Prefer the direct obligation, then search concrete intermediate types.
+Returning the unsolved direct predicate preserves the existing final error when
+the bounded graph has neither a path nor an inconclusive edge. -/
+def coercionPlan? (context : Context) (state : State)
+    (source target : Ty) : Except Error (Option (List ProgramPredicate)) := do
+  match ← conventionalTraitWithArity? context "Coerce" 2 with
+  | none => pure none
+  | some trait =>
+      let direct : ProgramPredicate := {
+        trait
+        subject := source
+        arguments := [target]
+      }
+      match solvePredicate context state direct with
+      | .ok _ => pure (some [direct])
+      | .error (.noTraitImplementation _) =>
+          match ← searchCoercionPaths context state trait source target
+              context.coercionDepth [{
+                current := source
+                visited := [source]
+                predicates := []
+              }] [] with
+          | some predicates => pure (some predicates)
+          | none => pure (some [direct])
+      | .error error => throw error
+
 def isNumericVariable (state : State) (type : Ty) : Bool :=
   state.numericVariables.any fun metavariable =>
     decide (state.resolve (.variable metavariable) = state.resolve type)
@@ -167,15 +345,12 @@ def withExpected (context : Context) (state : State) (actual : Ty) : Option Ty �
       | .error error =>
           match error with
           | .mismatch _ _ => do
-              match ← conventionalTraitWithArity? context "Coerce" 2 with
+              let source := state.resolve actual
+              let target := state.resolve expected
+              match ← coercionPlan? context state source target with
               | none => throw (.unification error)
-              | some trait =>
-                  let predicate : ProgramPredicate := {
-                    trait
-                    subject := state.resolve actual
-                    arguments := [state.resolve expected]
-                  }
-                  pure (state.resolve expected, state.addRequirement predicate)
+              | some predicates =>
+                  pure (target, state.addRequirements predicates)
           | _ => throw (.unification error)
 
 def candidateWithExpected (context : Context) (state : State) (actual : Ty)
