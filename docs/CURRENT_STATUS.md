@@ -2333,11 +2333,25 @@ boundary and direct-lambda controls. Conditional routes retain fuel 13/14 and
 lambda routes retain 10/11 with the exact result and unchanged store.
 
 ADR-0317 through ADR-0338 remain unchanged; ADR-0339 adds only reachability and
-fixed precedence. The active next frontend-semantics frontier is a generic
-grouped-conditional spine that preserves these frozen exact-depth routes. A new
-standalone exact-eight staircase step is therefore deferred. Grouped branch
-lambdas and broader propagation remain separate, and parser/diagnostic proof work
-remains paused.
+fixed precedence. ADR-0340 has now started the generic grouped-conditional path
+without extending that entry. `ConditionalGroupSpine` represents every finite
+outermost-to-innermost group-span list ending at the original immediate
+conditional, and its total extractor is exact in both directions. The explicit
+`WellFounded.fix (measure sizeOf).wf` implementation adds no fuel, partial or
+unsafe helper. Its five authored roots compile to 25 owned declarations: 23
+public and two private.
+
+The standalone generic adapter is also implemented for the disjoint boundary
+`8 ≤ spans.length`. It exposes a source-only classifier and exact classifier
+iff, relation, checker correspondence/absence, Core typing, provenance and
+classification. It keeps the unchanged ADR-0324 branch policy and literal Core,
+and classifier-selected semantic failure is final inside the adapter. Its nine
+authored roots compile to 43 owned declarations: 34 public and nine private.
+Depths zero through seven remain owned by frozen ADR-0317 through ADR-0339. The
+new adapter is not yet registered or reachable from the current wrapper;
+independent symbolic/parsed consumers and the later ADR-0341 selecting wrapper
+remain next. The exact-eight staircase is superseded, while grouped branch
+lambdas, broader propagation and parser/diagnostic proof work remain separate.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local

@@ -1730,12 +1730,25 @@ Primary, predecessor, boundary and direct-lambda call/full spans remain exactly
 `0..56`, `0..54`, `0..58` and `0..38`; conditional execution remains exact at
 fuel 13/14 and lambda execution at 10/11, with identical results and stores.
 
-The next active implementation is a generic grouped-conditional spine. It must
-leave every ADR-0317 through ADR-0339 exact-depth classifier, checker, theorem and
-precedence route unchanged, and it must expose only total compiled declarations.
-The previously implied exact-eight standalone step is deferred rather than added
-to the staircase. Parser and diagnostic proof work stays paused while frontend
-semantics remains prioritized.
+ADR-0340 has started the generic grouped-conditional implementation while
+leaving every ADR-0317 through ADR-0339 classifier, checker, theorem and
+precedence route unchanged. The reusable `ConditionalGroupSpine` records every
+finite ordered group-span prefix and original terminal immediate conditional;
+its exact executable peel uses explicit well-founded descent and exposes five
+authored roots. No fuel, partial, unsafe or generated `_unsafe_rec` declaration
+is introduced.
+
+The source-disjoint standalone adapter is implemented at `8 ≤ spans.length`.
+Its source-only classifier, exact iff, relation, checker correspondence/absence,
+Core typing, complete provenance and classified theorem reuse the unchanged
+ADR-0324 branch checker and literal Core construction. Depths zero through seven
+cannot enter this boundary. The foundation compiles to 25/23/2 and the adapter
+to 43/34/9 owned/public/private declarations; three direct compiler modes are
+byte-identical for each. The current ADR-0339 entry remains unchanged, so the
+new standalone adapter is not yet reachable. Independent symbolic and parsed
+consumers come next, followed by registration and the separate ADR-0341
+generic-first wrapper. Parser and diagnostic proof work stays paused while
+frontend semantics remains prioritized.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered
