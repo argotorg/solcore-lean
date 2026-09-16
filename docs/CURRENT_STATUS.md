@@ -42,12 +42,13 @@ the closed builtin subset to independently rechecked Semantic Core entries.
 Proof-only direct-call signature predicates may be discharged statically after
 exact requirement/evidence validation.  Checked trait/implementation catalogs
 now retain and signature-check their methods.  Deliberately narrow runtime
-evidence paths execute selected monomorphic `Add<T>.add` and `Eq<T>.eq`
-implementation bodies; source `!=` negates the selected `eq` result.  The same
-method-authoritative boundary executes a closed `Coerce<From, To>.coerce`
-profile at direct-call arguments, through forwarded generic evidence, and on
-call results.  Other runtime evidence remains outside this path.  It is not yet
-a general source compiler or a public source Oracle.
+evidence paths execute selected monomorphic arithmetic and bitwise methods
+(`Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`, `BitAnd.band`,
+`BitXor.bxor`, `BitOr.bor`) and `Eq<T>.eq`; source `!=` negates the selected
+`eq` result.  The same method-authoritative boundary executes a closed
+`Coerce<From, To>.coerce` profile at direct-call arguments, through forwarded
+generic evidence, and on call results.  Other runtime evidence remains outside
+this path.  It is not yet a general source compiler or a public source Oracle.
 
 ## What works now
 
@@ -5644,7 +5645,7 @@ A direct call's signature predicates may be consumed statically when its
 requirement IDs, predicates and evidence goals match exactly; closed
 implementation evidence is forwarded through nested constrained calls and may
 justify a conversion inside the generic callee.  Cyclic or indirect calls,
-runtime trait evidence beyond the single-method `Add<T>`, `Eq<T>` and
+runtime trait evidence beyond the strict arithmetic/bitwise, `Eq<T>` and
 `Coerce<From, To>` profiles, general conversion execution and general source
 semantics are not claimed.
 
@@ -5789,19 +5790,18 @@ ambiguous evidence is never erased.  Once validated, those call-owned
 requirements are consumed statically and do not become Core values or method
 calls.
 
-The runtime binary profile is executable for addition and equality.  A required
-binary occurrence must have exactly one matching solved `Add<Operand>` or
-`Eq<Operand>` requirement and closed implementation witness.  The selected
+The runtime binary profile is executable for strict arithmetic, bitwise
+operators and equality.  A required occurrence must have exactly one matching
+solved operator requirement and closed implementation witness.  The selected
 trait must have one type parameter and one non-generic method; its selected
 implementation and method must be monomorphic, premise-free and `where`-free.
 The method body is checked against its instantiated two-operand signature, its
 operands are bound left to right, and the body is capture-free inlined into the
-linked Core term.  `Add.add` must return the operand type and `Eq.eq` must return
-Bool.  Source `!=` is the Boolean negation of the selected `eq` result.  Method
-bodies are authoritative: the addition regression computes subtraction, so
-`50 + 8` through generic evidence evaluates to `42`, while the equality
-regression deliberately returns builtin inequality and reverses ordinary
-`==`/`!=` results.
+linked Core term.  `Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`,
+`BitAnd.band`, `BitXor.bxor` and `BitOr.bor` must return the operand type;
+`Eq.eq` must return Bool.  Source `!=` is the Boolean negation of the selected
+`eq` result.  Method bodies are authoritative: regressions use results that
+deliberately differ from the builtin operation for every profile.
 
 The first executable conversion profile uses the same selected-method
 authority.  Each output coercion step must name exactly one attached and solved
@@ -5832,15 +5832,16 @@ Thus the worklist may close same-key self or mutual recursion, but the current
 linker does not assign those cycles an executable meaning.  Small checked laws
 fix the runtime input-type gate and budget-exhaustion boundary; end-to-end
 regressions execute proof-only constrained and nested generic calls as well as
-both conditional paths, the method-authoritative `Add<Word>` and `Eq<Word>`
-profiles and the direct, forwarded-generic and call-result conversion profiles,
-and cover the staged failure cases.
+both conditional paths, all method-authoritative strict Word binary profiles,
+and the direct, forwarded-generic and call-result conversion profiles, and
+cover the staged failure cases.
 
 The next frontend boundary is expansion from these narrow runtime-evidence
-profiles to the remaining operators and implementation shapes, then to method
-bodies that themselves contain evidence-bearing operations.  Recursive source
-calls require a separate named or global recursive-function representation
-rather than cyclic inlining.
+profiles to target-compatible named operator-function dispatch for ordering and
+logical operators, then to broader implementation shapes and method bodies that
+themselves contain evidence-bearing operations.  Recursive source calls require
+a separate named or global recursive-function representation rather than cyclic
+inlining.
 Automatic entry discovery, constructors, members and place-aware statements
 remain later in dependency order.  A whole-program reference to an obligation
 remains the owning declaration paired with its function-local requirement
@@ -5855,8 +5856,9 @@ Solcore source text. In particular, it does not yet provide:
   pipeline;
 - execution of cyclic or indirect source call graphs, runtime
   evidence-dependent operator/literal/non-call forms outside the narrow
-  `Add<T>`, `Eq<T>` and `Coerce<From, To>` profiles, general impl methods,
-  generic or symbolic conversion execution, or method bodies containing calls,
+  strict arithmetic/bitwise, `Eq<T>` and `Coerce<From, To>` profiles, named
+  operator-function dispatch, general impl methods, generic or symbolic
+  conversion execution, or method bodies containing calls,
   coercions, or required operations;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;

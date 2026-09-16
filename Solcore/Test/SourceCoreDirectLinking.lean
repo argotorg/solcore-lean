@@ -565,33 +565,131 @@ private def testImplementationMethodLoweringBoundary : IO Unit := do
   | result => throw (IO.userError
       s!"an implementation-method call crossed the standalone Core boundary: {reprStr result}")
 
-private def testUnsupportedRuntimeBinaryBoundary : IO Unit := do
+private def testStrictRuntimeBinaryEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Sub<T> {",
     "  function sub(left: T, right: T) returns (T);",
     "}",
+    "trait Mul<T> {",
+    "  function mul(left: T, right: T) returns (T);",
+    "}",
+    "trait Div<T> {",
+    "  function div(left: T, right: T) returns (T);",
+    "}",
+    "trait Mod<T> {",
+    "  function mod(left: T, right: T) returns (T);",
+    "}",
+    "trait BitAnd<T> {",
+    "  function band(left: T, right: T) returns (T);",
+    "}",
+    "trait BitXor<T> {",
+    "  function bxor(left: T, right: T) returns (T);",
+    "}",
+    "trait BitOr<T> {",
+    "  function bor(left: T, right: T) returns (T);",
+    "}",
     "impl Sub<Word> {",
     "  function sub(left: Word, right: Word) returns (Word) {",
-    "    return left + right;",
+    "    return left;",
+    "  }",
+    "}",
+    "impl Mul<Word> {",
+    "  function mul(left: Word, right: Word) returns (Word) {",
+    "    return 91;",
+    "  }",
+    "}",
+    "impl Div<Word> {",
+    "  function div(left: Word, right: Word) returns (Word) {",
+    "    return 92;",
+    "  }",
+    "}",
+    "impl Mod<Word> {",
+    "  function mod(left: Word, right: Word) returns (Word) {",
+    "    return 93;",
+    "  }",
+    "}",
+    "impl BitAnd<Word> {",
+    "  function band(left: Word, right: Word) returns (Word) {",
+    "    return 94;",
+    "  }",
+    "}",
+    "impl BitXor<Word> {",
+    "  function bxor(left: Word, right: Word) returns (Word) {",
+    "    return 95;",
+    "  }",
+    "}",
+    "impl BitOr<Word> {",
+    "  function bor(left: Word, right: Word) returns (Word) {",
+    "    return 96;",
     "  }",
     "}",
     "function subtractWithEvidence<T>(left: T, right: T) returns (T) where T: Sub {",
     "  return left - right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Word) {",
+    "function multiplyWithEvidence<T>(left: T, right: T) returns (T) where T: Mul {",
+    "  return left * right;",
+    "}",
+    "function divideWithEvidence<T>(left: T, right: T) returns (T) where T: Div {",
+    "  return left / right;",
+    "}",
+    "function moduloWithEvidence<T>(left: T, right: T) returns (T) where T: Mod {",
+    "  return left % right;",
+    "}",
+    "function bitAndWithEvidence<T>(left: T, right: T) returns (T) where T: BitAnd {",
+    "  return left & right;",
+    "}",
+    "function bitXorWithEvidence<T>(left: T, right: T) returns (T) where T: BitXor {",
+    "  return left ^ right;",
+    "}",
+    "function bitOrWithEvidence<T>(left: T, right: T) returns (T) where T: BitOr {",
+    "  return left | right;",
+    "}",
+    "function subtractEntry(left: Word, right: Word) returns (Word) {",
     "  return subtractWithEvidence(left, right);",
+    "}",
+    "function multiplyEntry(left: Word, right: Word) returns (Word) {",
+    "  return multiplyWithEvidence(left, right);",
+    "}",
+    "function divideEntry(left: Word, right: Word) returns (Word) {",
+    "  return divideWithEvidence(left, right);",
+    "}",
+    "function moduloEntry(left: Word, right: Word) returns (Word) {",
+    "  return moduloWithEvidence(left, right);",
+    "}",
+    "function bitAndEntry(left: Word, right: Word) returns (Word) {",
+    "  return bitAndWithEvidence(left, right);",
+    "}",
+    "function bitXorEntry(left: Word, right: Word) returns (Word) {",
+    "  return bitXorWithEvidence(left, right);",
+    "}",
+    "function bitOrEntry(left: Word, right: Word) returns (Word) {",
+    "  return bitOrWithEvidence(left, right);",
     "}"
   ])
-  let entry ← signatureNamed program "entry"
-  let subtractWithEvidence ← signatureNamed program "subtractWithEvidence"
-  let outcome ← runOrThrow "unsupported subtraction evidence" program
-    [monomorphicRequest entry] 2
-  match SourceCoreDirectLinking.link program outcome with
-  | .error (.unsupportedRuntimeBinary key _ .subtract) =>
-      assertTrue (decide (key.declaration = subtractWithEvidence.id))
-        "unsupported operator rejection lost its exact generic callee"
-  | result => throw (IO.userError
-      s!"unsupported subtraction evidence reached runtime: {reprStr result}")
+  let cases : List (String × List Core.Value × Core.Value) := [
+    ("subtractEntry", [.word (word 50), .word (word 8)], .word (word 50)),
+    ("multiplyEntry", [.word (word 6), .word (word 7)], .word (word 91)),
+    ("divideEntry", [.word (word 50), .word (word 8)], .word (word 92)),
+    ("moduloEntry", [.word (word 50), .word (word 8)], .word (word 93)),
+    ("bitAndEntry", [.word (word 6), .word (word 9)], .word (word 94)),
+    ("bitXorEntry", [.word (word 6), .word (word 3)], .word (word 95)),
+    ("bitOrEntry", [.word (word 6), .word (word 3)], .word (word 96))
+  ]
+  for (name, inputs, expected) in cases do
+    let entry ← signatureNamed program name
+    let outcome ← runOrThrow s!"{name} evidence" program
+      [monomorphicRequest entry] 2
+    let linked ← linkOrThrow s!"{name} evidence" program outcome
+    let key : SourceSpecialization.SpecializationKey := {
+      declaration := entry.id
+      arguments := []
+    }
+    let linkedEntry ← match linked.findEntry? key with
+      | some linkedEntry => pure linkedEntry
+      | none => throw (IO.userError s!"{name}: linked root was absent")
+    assertTrue (decide (linkedEntry.run? inputs 2048 =
+        some (.done expected [])))
+      s!"{name} did not execute its selected strict binary method body"
 
 private def testMultiStepRuntimeCoercion : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -807,7 +905,7 @@ def testSourceCoreDirectLinking : IO Unit := do
   testProofOnlyEvidence program
   testRuntimeEvidenceBoundaries program
   testImplementationMethodLoweringBoundary
-  testUnsupportedRuntimeBinaryBoundary
+  testStrictRuntimeBinaryEvidence
   testMultiStepRuntimeCoercion
   testMalformedRequirementMetadata program
   testMalformedCoercionEvidence program
