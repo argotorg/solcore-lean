@@ -62,16 +62,16 @@ mutual
               let state := {
                 state with numericVariables := state.numericVariables ++ [metavariable]
               }
-              withExpected state type expected
+              withExpected context state type expected
           | .string _ => .error (.unsupportedLiteral "string")
       | .identifier name =>
           match state.locals.lookup? name.value with
           | some scheme =>
               let (type, inference) := state.inference.instantiate scheme
-              withExpected { state with inference } type expected
+              withExpected context { state with inference } type expected
           | none =>
               if name.value == "true" || name.value == "false" then
-                withExpected state .bool expected
+                withExpected context state .bool expected
               else
                 match functionsNamed context name.value with
                 | [] => .error (.unknownVariable name.value)
@@ -80,29 +80,29 @@ mutual
                     let inference := { state.inference with next := instantiated.next }
                     let state := { state with inference }
                       |>.addRequirements instantiated.predicates
-                    withExpected state instantiated.body expected
+                    withExpected context state instantiated.body expected
                 | candidates =>
                     .error (.ambiguousOverload name.value (candidates.map (·.id)))
       | .group inner => inferExprFuel fuel context inner expected state
       | .tuple elements => do
           let (types, state) ← inferExprsFuel fuel context elements.elements state
-          withExpected state (Ty.productMany types) expected
+          withExpected context state (Ty.productMany types) expected
       | .unary operator operand => do
           let (operandType, state) ← inferExprFuel fuel context operand none state
           let (type, state) ← inferUnaryOperator context operator.value operandType state
-          withExpected state type expected
+          withExpected context state type expected
       | .binary left operator right => do
           let (leftType, state) ← inferExprFuel fuel context left none state
           let (rightType, state) ← inferExprFuel fuel context right none state
           let (type, state) ← inferBinaryOperator context operator.value
             leftType rightType state
-          withExpected state type expected
+          withExpected context state type expected
       | .conditional condition _ thenBranch _ elseBranch => do
           let (_, state) ← inferExprFuel fuel context condition (some .bool) state
           let (thenType, state) ← inferExprFuel fuel context thenBranch expected state
           let (elseType, state) ← inferExprFuel fuel context elseBranch expected state
           let state ← unify state thenType elseType
-          withExpected state (state.resolve thenType) expected
+          withExpected context state (state.resolve thenType) expected
       | .lambda _ parameters returnType body => do
           let outerLocals := state.locals
           let (parameterTypes, state) ← bindLambdaParameters context
@@ -121,7 +121,7 @@ mutual
           let bodyResult ← inferStatementsFuel fuel context body.value resultType state
           let state ← unify bodyResult.state bodyResult.type resultType
           let state := state.withLocals outerLocals
-          withExpected state (.function (state.resolve parameterType)
+          withExpected context state (.function (state.resolve parameterType)
             (state.resolve resultType)) expected
       | .call callee arguments => do
           let (argumentTypes, state) ← inferExprsFuel fuel context
@@ -133,14 +133,10 @@ mutual
               | none => selectFunctionCandidate context name argumentType expected state
               | some _ =>
                   let (calleeType, state) ← inferExprFuel fuel context callee none state
-                  let (resultType, state) := state.fresh
-                  let state ← unify state calleeType (.function argumentType resultType)
-                  withExpected state resultType expected
+                  applyFunctionType context calleeType argumentType expected state
           | none =>
               let (calleeType, state) ← inferExprFuel fuel context callee none state
-              let (resultType, state) := state.fresh
-              let state ← unify state calleeType (.function argumentType resultType)
-              withExpected state resultType expected
+              applyFunctionType context calleeType argumentType expected state
       | .dotConstructor .. => .error (.unsupportedExpression "dot constructor")
       | .proxy .. => .error (.unsupportedExpression "proxy value")
       | .index .. => .error (.unsupportedExpression "index")

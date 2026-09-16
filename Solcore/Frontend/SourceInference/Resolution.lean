@@ -28,14 +28,19 @@ def traitCandidates (context : Context) (name : String) :
   | [] => context.environment.traitsNamed name
   | localCandidates => localCandidates
 
-def operatorTrait? (context : Context) (name : String) :
+def conventionalTraitWithArity? (context : Context) (name : String)
+    (arity : Nat) :
     Except Error (Option Resolved.DeclarationId) :=
   let candidates := (traitCandidates context name).filter fun declaration =>
-    declaration.genericParameters.length == 1
+    declaration.genericParameters.length == arity
   match candidates with
   | [] => .ok none
   | [candidate] => .ok (some candidate.id)
   | _ => .error (.ambiguousOperatorTrait name (candidates.map (·.id)))
+
+def operatorTrait? (context : Context) (name : String) :
+    Except Error (Option Resolved.DeclarationId) :=
+  conventionalTraitWithArity? context name 1
 
 def conventionalTrait?
     (context : Context) : List String → Except Error (Option Resolved.DeclarationId)
@@ -114,12 +119,27 @@ def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
         pure (if operator == .logicalNot then .bool else operand, state)
     | none => throw (.operatorNotSupported traitName operand)
 
-def withExpected (state : State) (actual : Ty) : Option Ty →
+def withExpected (context : Context) (state : State) (actual : Ty) : Option Ty →
     Except Error (Ty × State)
   | none => .ok (state.resolve actual, state)
-  | some expected => do
-      let state ← unify state actual expected
-      pure (state.resolve expected, state)
+  | some expected =>
+      match state.inference.unify actual expected with
+      | .ok inference =>
+          let state := { state with inference }
+          .ok (state.resolve expected, state)
+      | .error error =>
+          match error with
+          | .mismatch _ _ => do
+              match ← conventionalTraitWithArity? context "Coerce" 2 with
+              | none => throw (.unification error)
+              | some trait =>
+                  let predicate : ProgramPredicate := {
+                    trait
+                    subject := state.resolve actual
+                    arguments := [state.resolve expected]
+                  }
+                  pure (state.resolve expected, state.addRequirement predicate)
+          | _ => throw (.unification error)
 
 def functionParts? : Ty → Option (Ty × Ty)
   | .function parameter result => some (parameter, result)
@@ -148,6 +168,24 @@ def tryFunctionCandidate (context : Context)
   else
     none
 
+def tryCoercibleFunctionCandidate (context : Context)
+    (argumentType : Ty) (expected : Option Ty) (state : State)
+    (signature : ProgramFunctionSignature) : Option (Ty × State) := do
+  let requirementCount := state.requirements.length
+  let instantiated := signature.scheme.instantiate state.inference.next
+  let (parameter, result) ← functionParts? instantiated.body
+  let inference := { state.inference with next := instantiated.next }
+  let state := { state with inference }
+  let (_, state) ← (withExpected context state argumentType
+    (some parameter)).toOption
+  let (result, state) ← (withExpected context state result expected).toOption
+  let introducedRequirements := state.requirements.drop requirementCount
+  if allPredicatesSolvable context state
+      (instantiated.predicates ++ introducedRequirements) then
+    some (state.resolve result, state.addRequirements instantiated.predicates)
+  else
+    none
+
 def successfulCandidates (context : Context) (argumentType : Ty)
     (expected : Option Ty) (state : State) :
     List ProgramFunctionSignature →
@@ -160,15 +198,45 @@ def successfulCandidates (context : Context) (argumentType : Ty)
           (signature, result, next) ::
             successfulCandidates context argumentType expected state rest
 
+def successfulCoercibleCandidates (context : Context) (argumentType : Ty)
+    (expected : Option Ty) (state : State) :
+    List ProgramFunctionSignature →
+      List (ProgramFunctionSignature × Ty × State)
+  | [] => []
+  | signature :: rest =>
+      match tryCoercibleFunctionCandidate context argumentType expected state signature with
+      | none => successfulCoercibleCandidates context argumentType expected state rest
+      | some (result, next) =>
+          (signature, result, next) ::
+            successfulCoercibleCandidates context argumentType expected state rest
+
+def selectUniqueCandidate (name : String)
+    (allCandidates : List ProgramFunctionSignature) :
+    List (ProgramFunctionSignature × Ty × State) → Except Error (Ty × State)
+  | [] => .error (.noMatchingOverload name (allCandidates.map (·.id)))
+  | [(_, result, state)] => .ok (result, state)
+  | successes =>
+      .error (.ambiguousOverload name (successes.map fun success => success.1.id))
+
 def selectFunctionCandidate (context : Context) (name : String)
     (argumentType : Ty) (expected : Option Ty) (state : State) :
     Except Error (Ty × State) :=
   let candidates := functionsNamed context name
   match successfulCandidates context argumentType expected state candidates with
-  | [] => .error (.noMatchingOverload name (candidates.map (·.id)))
-  | [(_, result, state)] => .ok (result, state)
-  | successes =>
-      .error (.ambiguousOverload name (successes.map fun success => success.1.id))
+  | [] => selectUniqueCandidate name candidates <|
+      successfulCoercibleCandidates context argumentType expected state candidates
+  | successes => selectUniqueCandidate name candidates successes
+
+def applyFunctionType (context : Context) (calleeType argumentType : Ty)
+    (expected : Option Ty) (state : State) : Except Error (Ty × State) :=
+  match functionParts? (state.resolve calleeType) with
+  | some (parameter, result) => do
+      let (_, state) ← withExpected context state argumentType (some parameter)
+      withExpected context state result expected
+  | none => do
+      let (resultType, state) := state.fresh
+      let state ← unify state calleeType (.function argumentType resultType)
+      withExpected context state resultType expected
 
 def calleeIdentifier? : Syntax.Expr → Option String
   | ⟨_, .identifier name⟩ => some name.value

@@ -83,6 +83,38 @@ private def testUnsupportedStatement : IO Unit := do
         | _ => false) "deferred while inference was not explicit"
   | .ok _ => throw (IO.userError "deferred while inference was accepted")
 
+private def testTraitBackedCoercion : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Coerce<From, To> {}",
+    "enum Box { Only }",
+    "impl Coerce<Word, Box> {}",
+    "function accept(value: Box) returns (Box) { return value; }",
+    "function convert(value: Word) returns (Box) { return accept(value); }"
+  ]
+  let checked ← check source
+  match checked.find? fun function =>
+      function.evidence.any fun evidence => match evidence with
+        | .implementation _ => true
+        | .assumption _ => false with
+  | some function =>
+      assertTrue (decide (function.predicates.length = 1))
+        "coercion evidence lost its Coerce predicate"
+  | none => throw (IO.userError "trait-backed coercion produced no evidence")
+
+private def testMissingCoercion : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Coerce<From, To> {}",
+    "enum Box { Only }",
+    "function reject(value: Word) returns (Box) { return value; }"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace source) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            predicate.arguments.length == 1
+        | _ => false) "missing coercion implementation was accepted"
+  | .ok _ => throw (IO.userError "missing coercion implementation was accepted")
+
 /-- Exercise parsed lambdas, local schemes, tuples, grouping, conditionals,
 operators, numeric expected/default behavior, and explicit deferrals. -/
 def testSourceInference : IO Unit := do
@@ -90,5 +122,7 @@ def testSourceInference : IO Unit := do
   testAmbiguousOverload
   testNumericExpectedType
   testUnsupportedStatement
+  testTraitBackedCoercion
+  testMissingCoercion
 
 end Tests.SourceInference
