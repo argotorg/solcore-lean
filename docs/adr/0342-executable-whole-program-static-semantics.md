@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted for staged implementation.
+Implemented for the initial executable checking profile.  Direct type imports,
+rank-1 inference, bounded trait evidence, overload selection, one-step
+expected-type coercion and numeric defaulting are connected end to end.
+Multi-step coercion/ranking and specialization to Semantic Core remain staged
+extensions.
 
 ## Context
 
@@ -89,3 +93,21 @@ remain forbidden.
 ADR-0340's standalone generic grouped-conditional work remains compatible but
 is not a prerequisite for this milestone.  Further grouped-depth frontend
 expansion is paused while this whole-program path is built.
+
+## Implemented boundary
+
+The executable path now validates and parses every workspace module, assigns
+stable declaration identities, constructs whole-program namespaces, resolves
+source types and signatures, checks implementation heads and `where`
+predicates, and infers the supported function-body fragment.  Successful
+checking retains substitutions, normalized predicates and concrete trait
+evidence.  Failed and depth/cycle/ambiguity-inconclusive trait searches remain
+distinct results.
+
+This delivery intentionally has a lower proof density than the preceding
+parser and local-semantics slices.  Executable positive and negative tests fix
+the vertical behavior; broad soundness/completeness theorem families and rare
+negative cases are deferred.  Direct imports currently affect type and module
+namespaces only; imported values and traits, re-exports, advanced
+expressions/statements, multi-step coercion and overload ranking, and source
+specialization or lowering to `Core.Ty` are outside the completed profile.

@@ -37,6 +37,27 @@ their declarative rules remain the formal specification authority.
 ### Active semantic priority
 
 Further diagnostic-trace proof work is paused in favor of frontend semantics.
+ADR-0342's initial executable static-semantics spine is now present: canonical
+raw workspaces load into stable whole-program declaration environments; direct
+type imports and namespace aliases feed general source type-name resolution;
+rigid parameters, flexible variables, substitutions and rank-1 schemes feed
+occurs-checking unification; and resolved function, trait and impl signatures
+feed bounded evidence-producing tabled class resolution.  The supported source
+expression and statement fragment performs overload selection, one-step
+expected-type `Coerce<From, To>` resolution, operator-trait checking and
+deterministic numeric-literal defaulting, and the whole-program
+entry point accumulates function failures while preserving no-solution versus
+inconclusive trait outcomes.
+
+This is an executable-first milestone rather than a completed proof campaign.
+The next vertical work is to extend imports from types to values and traits,
+extend coercion to multi-step search and overload ranking, cover advanced
+expression and statement forms, and define specialization/elaboration into monomorphic
+Semantic Core.  Exports/re-exports, cyclic aliases, polymorphic recursion,
+higher-rank/higher-kinded types, coinductive trait cycles and a complete overlap
+policy remain explicit edge-case work.  Broad diagnostic and static-semantics
+soundness/completeness theorem families do not block these executable stages.
+
 The first semantic slice, ADR-0154, introduces structured resolved declaration
 and local identities, exact local-table lookup, and a monomorphic local
 expression language. Independent typing and evaluation correspond in both
@@ -3756,9 +3777,10 @@ preserve forward order, strict progress, end-of-window termination, exact
 comment attachment, and recovery diagnostics. Recovered malformed output
 remains separate so that recovery is not confused with language acceptance.
 
-This frontend work remains separate from the completed syntax-independent
-execution semantics. Resolution, source typing, and elaboration will consume
-the canonical syntax result after the grammar boundary is coherent.
+This grammar work remains separate from the completed syntax-independent
+execution semantics.  The initial whole-program resolution and source checker
+now consume canonical diagnostic-free syntax; specialization and elaboration
+into executable Semantic Core remain separate.
 
 ## Completion conditions
 
@@ -3776,6 +3798,7 @@ The canonical syntax slice is complete when:
   documentation; and
 - the complete build, tests, metadata validation, and kernel audit pass.
 
-Resolution, source typing, elaboration, and end-to-end source execution are the
-next frontend stages. They consume the syntax result without changing the
-meaning of checked Semantic Core or Oracle v5.
+Initial whole-program resolution and source typing now consume the syntax
+result without changing the meaning of checked Semantic Core or Oracle v5.
+Extending that profile, specializing solved source terms, lowering them to
+checked Core, and end-to-end source execution are the next frontend stages.

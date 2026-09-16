@@ -32,6 +32,13 @@ definitions. Oracle v4 remains available only as a frozen historical
 compatibility interface. Formal parser proofs continue after the executable
 grammar; this does not block use of the Lean parser API.
 
+An initial executable whole-program static-semantics path now consumes that
+canonical syntax.  It loads a workspace, constructs declaration and type
+environments, resolves signatures and predicates, infers the supported source
+fragment, and returns checked functions with trait evidence.  This checker is
+an internal Lean API; it does not yet lower source programs to Semantic Core or
+publish a source Oracle.
+
 ## What works now
 
 ### Resolved local-expression semantics
@@ -5553,20 +5560,62 @@ ordinary specialization is now public and compile-time consumed. Recovered
 malformed output remains separate so that recovery is not confused with
 language acceptance.
 
-Full source resolution, source type checking, and elaboration into checked
-Semantic Core remain separate later stages. Canonical local references, Boolean
+The initial whole-program resolver and source checker below now consume the
+canonical syntax, while elaboration into checked Semantic Core remains a later
+stage. Canonical local references, Boolean
 operators, Word addition/subtraction/multiplication/unsigned division/remainder,
 bitwise operations, unsigned `>`/`<`/`<=`/`>=` and Word equality/inequality, strict
 Word literals, and conditionals connect through the explicit-table adapters above.
 No new frontend result is published through Oracle
 v4; that interface continues to mean only its frozen Surface v1 format.
 
+### Executable whole-program static semantics
+
+ADR-0342 now has an end-to-end initial checking profile.  Raw workspaces are
+validated and diagnostic-free canonical files are parsed before stable
+module-and-position declaration identities and separate type, trait, and value
+namespaces are built.  Direct plain/namespace, wildcard, selective, alias and
+hiding imports participate in type-name lookup.  Generic parameters shadow
+imported and program types, while qualified and external module lookup remain
+explicit.
+
+The independent source type layer provides rigid declaration parameters,
+flexible inference variables, substitutions, rank-1 schemes, instantiation,
+let generalization, occurs-checking unification, and resolved function and impl
+signatures.  Implementation-head matching freshens parameters before
+unification.  Bounded tabled trait resolution returns evidence and distinguishes
+success, no solution, and inconclusive depth, cycle, overlap, or incomplete
+competitor outcomes.
+
+The first source-body checker handles locals, functions and overload sets,
+calls, lambdas, tuples, groups, conditionals, supported unary/binary operators,
+blocks, lets, returns, expression statements and statement conditionals.
+Decimal and hexadecimal literals use inference variables and default
+deterministically to Word when unconstrained; non-Word literal obligations and
+operator obligations can be discharged through resolved traits.  Expected-type
+mismatches can request a single `Coerce<From, To>` obligation, whose selected
+implementation or local assumption is retained as evidence.  A raw
+workspace can therefore be loaded, have all function and impl signatures
+resolved, and have all supported function bodies checked in declaration order.
+
+This is deliberately an executable-first profile with reduced proof density.
+Current direct imports expose types and namespace aliases, not imported values
+or traits, exports, or re-exports.  Dot construction, proxies, indexing,
+fields, arrays, assignment, match, loops, assembly and loop control reject as
+unsupported.  Higher-rank and higher-kinded polymorphism, polymorphic recursion,
+coinductive trait cycles and overlap policy beyond explicit ambiguity are
+deferred.  Multi-step coercion search, coercion-aware overload ranking and
+insertion of executable conversion terms are not yet connected, and no
+specialization, elaboration or lowering from solved source terms to Semantic
+Core is claimed.
+
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary
 Solcore source text. In particular, it does not yet provide:
 
-- source resolution, typing, elaboration, and execution as one pipeline;
+- solved source checking through specialization, Core lowering, and execution
+  as one pipeline;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;
