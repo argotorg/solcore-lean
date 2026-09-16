@@ -1708,11 +1708,34 @@ recursive/canonical entries and source unions remain unchanged. ADR-0339 is the
 next additive nonrecursive source-only wrapper: evaluate the ADR-0338 classifier
 once, return its exact complete `Option` when true, otherwise return the exact
 complete unchanged ADR-0337 `Option`; selected `none` remains final. Exact-eight
-or deeper and generic grouped-conditional spines, grouped branch lambdas, broader
+and deeper standalone steps are superseded as the immediate direction by a
+generic grouped-conditional spine. Grouped branch lambdas and broader
 nested/call/tuple/return/inferred-let/typed-body/multiple-argument/global expected
 propagation, source-union integration, source closures, runtime-world safety,
 costs and backend guarantees remain deferred. Frontend semantics stays the active
 priority; parser and diagnostic proof work stays paused.
+
+ADR-0339 integrates the exact-seven adapter through one nonrecursive source-only
+dispatch. The unchanged ADR-0338 classifier is evaluated exactly once; true
+returns its complete `Option`, false returns the complete unchanged ADR-0337
+`Option`, and selected failure is final. The relation, checker and six theorems
+expose literal branch equality, success/absence, Core typing and complete nested
+provenance. The production surface is exactly 8 authored roots and 15 owned,
+public declarations with no private declaration.
+
+The independent symbolic and registered parsed contracts retain 3 successes, 10
+selected failures, 24 false neighbors (18 `some`/6 `none`), 15 inherited failures,
+39 predecessor preservation rows (18 `some`/21 `none`) and 19 runtime selections.
+Primary, predecessor, boundary and direct-lambda call/full spans remain exactly
+`0..56`, `0..54`, `0..58` and `0..38`; conditional execution remains exact at
+fuel 13/14 and lambda execution at 10/11, with identical results and stores.
+
+The next active implementation is a generic grouped-conditional spine. It must
+leave every ADR-0317 through ADR-0339 exact-depth classifier, checker, theorem and
+precedence route unchanged, and it must expose only total compiled declarations.
+The previously implied exact-eight standalone step is deferred rather than added
+to the staircase. Parser and diagnostic proof work stays paused while frontend
+semantics remains prioritized.
 
 The ordered Core comparison bridge now uses these prerequisites (ADR-0191).
 Right-local membership alone supports exact typing inversion and raw ordered

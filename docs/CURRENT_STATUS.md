@@ -2309,10 +2309,35 @@ and canonical entries and source unions remain unchanged. ADR-0339 is the next
 nonrecursive source-only wrapper: evaluate the ADR-0338 classifier once; true
 returns the exact complete ADR-0338 `Option`, false returns the exact complete
 unchanged ADR-0337 `Option`, and classifier-selected `none` is final. Exact-eight
-and deeper/generic spines, grouped branch lambdas, broader expected propagation,
-source closures, runtime-world safety, costs and backend guarantees remain
-deferred. Frontend semantics remains the active priority; parser and diagnostic
-proof work remains paused.
+and deeper standalone steps are superseded as the immediate direction by a
+generic grouped-conditional spine. Grouped branch lambdas, broader expected
+propagation, source closures, runtime-world safety, costs and backend guarantees
+remain deferred. Frontend semantics remains the active priority; parser and
+diagnostic proof work remains paused.
+
+The exact-seven grouped-conditional adapter now joins the established local-
+application paths through the nonrecursive source-only ADR-0339 wrapper. It
+evaluates the unchanged ADR-0338 classifier once: true returns the complete
+ADR-0338 `Option`, false returns the complete unchanged ADR-0337 `Option`, and a
+classifier-selected `none` is final. The two-constructor relation, literal branch
+equations, success/absence, Core typing and nested provenance expose the complete
+selected child. Its production surface has exactly eight authored roots, fifteen
+owned declarations, all public and none private.
+
+Independent symbolic and registered parsed consumers retain three successes,
+ten selected failures, twenty-four false neighbors (eighteen `some`, six `none`),
+fifteen inherited failures, thirty-nine predecessor preservation rows (eighteen
+`some`, twenty-one `none`) and nineteen runtime selections. Exact parsed call/full
+spans are `0..56`, `0..54`, `0..58` and `0..38` for the primary, predecessor,
+boundary and direct-lambda controls. Conditional routes retain fuel 13/14 and
+lambda routes retain 10/11 with the exact result and unchanged store.
+
+ADR-0317 through ADR-0338 remain unchanged; ADR-0339 adds only reachability and
+fixed precedence. The active next frontend-semantics frontier is a generic
+grouped-conditional spine that preserves these frozen exact-depth routes. A new
+standalone exact-eight staircase step is therefore deferred. Grouped branch
+lambdas and broader propagation remain separate, and parser/diagnostic proof work
+remains paused.
 
 The existing ordered Core Word less-than expansion now consumes these insertion
 foundations directly (ADR-0191). With only the right operand in the local
