@@ -46,7 +46,8 @@ def typeDependsOnNumeric (state : State) (type : Ty) : Bool :=
 def generalizeValue (state : State) (locals : TypeSystem.Environment)
     (type : Ty) : Scheme :=
   let requirementVariables := state.requirements.flatMap fun predicate =>
-    TypedTraitResolution.predicateVariables (applyPredicate state predicate)
+    TypedTraitResolution.predicateVariables
+      (applyPredicate state predicate.predicate)
   let blockedVariables := locals.freeVariables ++ requirementVariables
   {
     quantified := type.freeVariables.filter fun metavariable =>

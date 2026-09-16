@@ -381,11 +381,11 @@ def fitArguments (context : Context) :
     State → List Ty → List Ty → Except Error (Option (State × Nat))
   | state, [], [] => .ok (some (state, 0))
   | state, argument :: arguments, parameter :: parameters => do
-      let requirementCount := state.requirements.length
+      let requirementMark := state.requirementMark
       match ← candidateWithExpected context state argument (some parameter) with
       | none => pure none
       | some (_, state) =>
-          let headCost := state.requirements.length - requirementCount
+          let headCost := state.requirementCountSince requirementMark
           match ← fitArguments context state arguments parameters with
           | none => pure none
           | some (state, cost) =>
@@ -453,7 +453,7 @@ def tryFunctionCandidate (context : Context)
     (expected : Option Ty) (state : State)
     (signature : ProgramFunctionSignature) :
     Except Error (Option CandidateAttemptResult) :=
-  let requirementCount := state.requirements.length
+  let requirementMark := state.requirementMark
   let instantiated := signature.scheme.instantiate state.inference.next
   match functionParts? instantiated.body with
   | none => .ok none
@@ -466,19 +466,20 @@ def tryFunctionCandidate (context : Context)
           match ← fitArguments context state argumentTypes parameters with
           | none => pure none
           | some (state, argumentCost) =>
-              let resultRequirementCount := state.requirements.length
+              let resultRequirementMark := state.requirementMark
               match ← candidateWithExpected context state result expected with
               | none => pure none
               | some (result, state) =>
-                  let resultCost :=
-                    state.requirements.length - resultRequirementCount
+                  let resultCost := state.requirementCountSince
+                    resultRequirementMark
                   let numeric ←
                     defaultCandidateNumerics context numericVariables state
                   let state := removeCandidateNumerics numeric.state numericVariables
                   let introducedRequirements :=
-                    state.requirements.drop requirementCount
+                    state.requirementsSince requirementMark
                   validateCandidatePredicates context state
-                    (instantiated.predicates ++ introducedRequirements)
+                    (instantiated.predicates ++
+                      introducedRequirements.map (·.predicate))
                   pure (some {
                     result := state.resolve result
                     state := state.addRequirements instantiated.predicates

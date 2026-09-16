@@ -132,9 +132,20 @@ terms, and source specialization or lowering to `Core.Ty` are outside the
 completed profile.
 
 The next internal boundary is an occurrence-addressed typed/resolved source IR.
-The initial checker deliberately returns only final types and flat solved
-predicates/evidence; executable conversion and specialization additionally need
-stable local binder identities, chosen declarations and instantiations, and the
-coercion requirement attached to each exact source occurrence.  Selection-
-bearing constructor/member/match/assignment work follows that carrier rather
-than extending the information-losing result shape.
+As its first carrier step, every inferred trait or coercion obligation now gets
+a function-local `RequirementId`.  Unsolved requirements retain that identity,
+and finalization produces one ordered `SolvedRequirement` containing the same
+identity, its normalized predicate and its matching evidence.  Speculative
+overload candidates fork the immutable input state and only the selected state
+is committed, so rejected candidates cannot consume IDs or leave gaps.  Small
+preservation lemmas fix canonical allocation and ID-order preservation across
+solving, while executable tests cover coercion paths, candidate rollback,
+numeric finalization and repeated equal predicates.
+
+The checker still does not attach those IDs to exact syntax occurrences.
+Executable conversion and specialization additionally need stable expression
+and local binder identities, chosen declarations and instantiations, and the
+ordered coercion requirements at each occurrence.  Selection-bearing
+constructor/member/match/assignment work follows that carrier rather than
+extending an information-losing result shape.  Whole-program consumers identify
+an obligation by its owning declaration together with its function-local ID.

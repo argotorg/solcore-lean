@@ -17,6 +17,38 @@ inductive PredicateEvidence where
   | implementation (evidence : TypedTraitResolution.Evidence)
   deriving Repr, BEq
 
+namespace PredicateEvidence
+
+/-- The normalized obligation justified by this evidence. -/
+def goal : PredicateEvidence → ProgramPredicate
+  | .assumption predicate => predicate
+  | .implementation (.byImpl predicate _ _) => predicate
+
+end PredicateEvidence
+
+/-- Function-local identity of one inferred trait or coercion obligation. -/
+structure RequirementId where
+  index : Nat
+  deriving Repr, BEq, DecidableEq
+
+/-- An unsolved obligation retained independently of its eventual evidence. -/
+structure Requirement where
+  id : RequirementId
+  predicate : ProgramPredicate
+  deriving Repr, BEq, DecidableEq
+
+/-- Append-only checkpoint used by speculative candidate evaluation. -/
+structure RequirementMark where
+  count : Nat
+  deriving Repr, BEq, DecidableEq
+
+/-- A normalized obligation paired with the evidence selected at finalization. -/
+structure SolvedRequirement where
+  id : RequirementId
+  predicate : ProgramPredicate
+  evidence : PredicateEvidence
+  deriving Repr, BEq
+
 /-- Failures reported by the executable source inference slice. -/
 inductive Error where
   | unknownVariable (name : String)
@@ -64,15 +96,15 @@ structure State where
   inference : InferState
   locals : TypeSystem.Environment
   numericVariables : List TypeVarId := []
-  requirements : List ProgramPredicate := []
+  nextRequirement : Nat := 0
+  requirements : List Requirement := []
   deriving Repr, DecidableEq
 
 /-- Final source-expression result after numeric defaulting and trait search. -/
 structure Result where
   type : Ty
   substitution : Substitution
-  predicates : List ProgramPredicate
-  evidence : List PredicateEvidence
+  solvedRequirements : List SolvedRequirement
   deriving Repr, BEq
 
 /-- One successfully checked top-level source function. -/
@@ -81,9 +113,32 @@ structure CheckedFunction where
   type : Ty
   inferredBodyType : Ty
   substitution : Substitution
-  predicates : List ProgramPredicate
-  evidence : List PredicateEvidence
+  solvedRequirements : List SolvedRequirement
   deriving Repr, BEq
+
+namespace Result
+
+/-- Backward-compatible predicate projection in requirement order. -/
+def predicates (result : Result) : List ProgramPredicate :=
+  result.solvedRequirements.map (·.predicate)
+
+/-- Backward-compatible evidence projection in requirement order. -/
+def evidence (result : Result) : List PredicateEvidence :=
+  result.solvedRequirements.map (·.evidence)
+
+end Result
+
+namespace CheckedFunction
+
+/-- Backward-compatible predicate projection in requirement order. -/
+def predicates (function : CheckedFunction) : List ProgramPredicate :=
+  function.solvedRequirements.map (·.predicate)
+
+/-- Backward-compatible evidence projection in requirement order. -/
+def evidence (function : CheckedFunction) : List PredicateEvidence :=
+  function.solvedRequirements.map (·.evidence)
+
+end CheckedFunction
 
 /-- A source function paired with its body-checking failure. -/
 structure FunctionError where
@@ -108,6 +163,11 @@ def initial (locals : TypeSystem.Environment := []) : State := {
 def resolve (state : State) (type : Ty) : Ty :=
   state.inference.resolve type
 
+/-- Canonical states allocate every function-local requirement ID exactly once
+and in append order. -/
+def RequirementsWellFormed (state : State) : Prop :=
+  state.requirements.map (·.id.index) = List.range state.nextRequirement
+
 def fresh (state : State) : Ty × State :=
   let (type, inference) := state.inference.fresh
   (type, { state with inference })
@@ -115,11 +175,38 @@ def fresh (state : State) : Ty × State :=
 def withLocals (state : State) (locals : TypeSystem.Environment) : State :=
   { state with locals }
 
+def addRequirementWithId (state : State) (predicate : ProgramPredicate) :
+    RequirementId × State :=
+  let id : RequirementId := ⟨state.nextRequirement⟩
+  (id, {
+    state with
+    nextRequirement := state.nextRequirement + 1
+    requirements := state.requirements ++ [{ id, predicate }]
+  })
+
 def addRequirement (state : State) (predicate : ProgramPredicate) : State :=
-  { state with requirements := state.requirements ++ [predicate] }
+  (state.addRequirementWithId predicate).2
+
+def addRequirementsWithIds : State → List ProgramPredicate →
+    List RequirementId × State
+  | state, [] => ([], state)
+  | state, predicate :: rest =>
+      let (id, state) := state.addRequirementWithId predicate
+      let (ids, state) := addRequirementsWithIds state rest
+      (id :: ids, state)
 
 def addRequirements (state : State) (predicates : List ProgramPredicate) : State :=
-  { state with requirements := state.requirements ++ predicates }
+  (state.addRequirementsWithIds predicates).2
+
+def requirementMark (state : State) : RequirementMark :=
+  ⟨state.requirements.length⟩
+
+def requirementsSince (state : State) (mark : RequirementMark) :
+    List Requirement :=
+  state.requirements.drop mark.count
+
+def requirementCountSince (state : State) (mark : RequirementMark) : Nat :=
+  state.requirements.length - mark.count
 
 end State
 
@@ -143,9 +230,8 @@ def requirementAssumption?
   context.assumptions.any fun assumption =>
     decide (applyPredicate state assumption = goal)
 
-def solvePredicate (context : Context) (state : State)
-    (source : ProgramPredicate) : Except Error PredicateEvidence :=
-  let goal := applyPredicate state source
+def solveNormalizedPredicate (context : Context) (state : State)
+    (goal : ProgramPredicate) : Except Error PredicateEvidence :=
   if requirementAssumption? context state goal then
     .ok (.assumption goal)
   else
@@ -154,6 +240,10 @@ def solvePredicate (context : Context) (state : State)
     | { outcome := .success evidence, .. } => .ok (.implementation evidence)
     | { outcome := .noSolution, .. } => .error (.noTraitImplementation goal)
     | { outcome := .inconclusive reason, .. } => .error (.inconclusiveTrait reason)
+
+def solvePredicate (context : Context) (state : State)
+    (source : ProgramPredicate) : Except Error PredicateEvidence :=
+  solveNormalizedPredicate context state (applyPredicate state source)
 
 def predicateSolvable (context : Context) (state : State)
     (predicate : ProgramPredicate) : Bool :=
@@ -169,6 +259,15 @@ def solvePredicates (context : Context) (state : State) :
       let evidence ← solvePredicate context state normalized
       let (predicates, evidenceRest) ← solvePredicates context state rest
       pure (normalized :: predicates, evidence :: evidenceRest)
+
+def solveRequirements (context : Context) (state : State) :
+    List Requirement → Except Error (List SolvedRequirement)
+  | [] => .ok []
+  | requirement :: rest => do
+      let predicate := applyPredicate state requirement.predicate
+      let evidence ← solveNormalizedPredicate context state predicate
+      let solved ← solveRequirements context state rest
+      pure ({ id := requirement.id, predicate, evidence } :: solved)
 
 def resolveSourceType (context : Context)
     (source : Syntax.TypeExpr) : Except Error Ty :=

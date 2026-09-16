@@ -5626,10 +5626,20 @@ solved source terms to Semantic Core is claimed.
 
 Before adding constructor/member selection, match, assignment or executable
 conversion, the next architecture boundary is an occurrence-addressed typed and
-resolved source IR.  The current checker retains a final type and a flat list of
-predicates/evidence, but not the selected overload, local binder identity,
-coercion insertion site or ordered steps at each expression occurrence.  Those
-facts must become explicit before specialization can consume them.
+resolved source IR.  Its first carrier layer is implemented: each inferred
+trait or coercion obligation receives a contiguous function-local identity, and
+finalization retains that identity together with the normalized predicate and
+its matching evidence in one canonical solved-requirement record.  Allocation
+well-formedness and solver order preservation have small checked proofs.
+End-to-end regressions cover ordered multi-step coercions, speculative overload
+rollback without ID gaps, inference-to-finalization continuity and distinct IDs
+for repeated equal predicates.
+
+The current checker does not yet retain the selected overload, local binder
+identity, coercion insertion site or ordered requirement IDs at each expression
+occurrence.  The next carrier step makes those facts explicit before
+specialization can consume them.  A whole-program reference to an obligation is
+the owning declaration paired with its function-local requirement ID.
 
 ## What is not yet claimed
 

@@ -35,12 +35,11 @@ def defaultNumerics (context : Context) :
 def finalize (context : Context) (type : Ty) (state : State) :
     Except Error Result := do
   let state ← defaultNumerics context state.numericVariables state
-  let (predicates, evidence) ← solvePredicates context state state.requirements
+  let solvedRequirements ← solveRequirements context state state.requirements
   pure {
     type := state.resolve type
     substitution := state.inference.substitution
-    predicates
-    evidence
+    solvedRequirements
   }
 
 end Detail
@@ -94,8 +93,7 @@ def checkFunctionBody (environment : ProgramEnvironment)
     type := signature.scheme.body
     inferredBodyType := result.type
     substitution := result.substitution
-    predicates := result.predicates
-    evidence := result.evidence
+    solvedRequirements := result.solvedRequirements
   }
 
 private def checkFunctionBodiesAux (environment : ProgramEnvironment)

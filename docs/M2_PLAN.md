@@ -54,13 +54,20 @@ inconclusive trait outcomes.  Proxy and mapping-index support is currently a
 type-checking boundary, not executable lowering.
 
 This is an executable-first milestone rather than a completed proof campaign.
-The next vertical work is to introduce an occurrence-addressed typed/resolved
-source IR before broadening selection-bearing expressions and statements.  It
-must retain binder identities, chosen overloads, instantiated types, obligation
-identities and ordered coercion steps.  Constructor catalogs and construction,
-patterns/match, member selection and place-aware assignment can then extend that
-IR, followed by executable conversion terms and specialization/elaboration into
-monomorphic Semantic Core.  Constructor and operator export selectors, cyclic
+The first typed-carrier step now assigns contiguous function-local identities to
+obligations and preserves each identity with its normalized predicate and
+evidence through finalization.  Allocation and solve-order preservation have
+small proofs, and transactional candidate tests establish that losing overloads
+do not leak identities.
+
+The next vertical work completes an occurrence-addressed typed/resolved source
+IR before broadening selection-bearing expressions and statements.  It must
+retain expression and binder identities, chosen overloads, instantiated types,
+obligation identities and ordered coercion steps.  Constructor catalogs and
+construction, patterns/match, member selection and place-aware assignment can
+then extend that IR, followed by executable conversion terms and
+specialization/elaboration into monomorphic Semantic Core.  Constructor and
+operator export selectors, cyclic
 aliases, polymorphic recursion, higher-rank/higher-kinded types, generic or
 symbolic coercion intermediates, coinductive trait/coercion cycles and a complete
 overlap policy remain explicit edge-case work.  Broad diagnostic and static-

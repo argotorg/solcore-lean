@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.Program
+import Solcore.Frontend.SourceInference.RequirementProperties
 
 /-!
 Executable source-connected type inference.
