@@ -51,8 +51,9 @@ inconclusive trait outcomes.
 
 This is an executable-first milestone rather than a completed proof campaign.
 The next vertical work is to extend imports from types to values and traits,
-extend coercion to multi-step search and overload ranking, cover advanced
-expression and statement forms, and define specialization/elaboration into monomorphic
+extend coercion to multi-step and per-argument search, rank overloads after
+literal defaulting, cover advanced expression and statement forms, and define
+specialization/elaboration into monomorphic
 Semantic Core.  Exports/re-exports, cyclic aliases, polymorphic recursion,
 higher-rank/higher-kinded types, coinductive trait cycles and a complete overlap
 policy remain explicit edge-case work.  Broad diagnostic and static-semantics

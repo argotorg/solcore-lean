@@ -5604,8 +5604,9 @@ or traits, exports, or re-exports.  Dot construction, proxies, indexing,
 fields, arrays, assignment, match, loops, assembly and loop control reject as
 unsupported.  Higher-rank and higher-kinded polymorphism, polymorphic recursion,
 coinductive trait cycles and overlap policy beyond explicit ambiguity are
-deferred.  Multi-step coercion search, coercion-aware overload ranking and
-insertion of executable conversion terms are not yet connected, and no
+deferred.  Multi-step coercion search, per-argument coercion inside a
+multi-parameter product, literal-default-aware overload ranking and insertion
+of executable conversion terms are not yet connected, and no
 specialization, elaboration or lowering from solved source terms to Semantic
 Core is claimed.
 

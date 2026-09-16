@@ -109,5 +109,6 @@ parser and local-semantics slices.  Executable positive and negative tests fix
 the vertical behavior; broad soundness/completeness theorem families and rare
 negative cases are deferred.  Direct imports currently affect type and module
 namespaces only; imported values and traits, re-exports, advanced
-expressions/statements, multi-step coercion and overload ranking, and source
-specialization or lowering to `Core.Ty` are outside the completed profile.
+expressions/statements, multi-step and per-argument product coercion,
+literal-default-aware overload ranking, and source specialization or lowering
+to `Core.Ty` are outside the completed profile.
