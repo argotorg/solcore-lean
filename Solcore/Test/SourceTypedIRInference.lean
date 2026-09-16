@@ -176,13 +176,39 @@ private def testTypedInferenceFacts (fixture : Fixture)
   let genericChoose ← namedFunctionWhere fixture.environment "choose" fun declaration =>
     !declaration.genericParameters.isEmpty
   let accept ← namedFunctionWhere fixture.environment "accept" fun _ => true
-  let input ← match source.inputs with
-    | [input] => pure input
-    | inputs => throw (IO.userError
-        s!"run retained {inputs.length} typed inputs instead of one")
-  assertTrue (input.name == "item" && decide (input.scheme = .mono word))
+  let input ← match source.inputs.find? fun binder => binder.name == "item" with
+    | some input => pure input
+    | none => throw (IO.userError "run lost its item input binder")
+  let boxInput ← match source.inputs.find? fun binder => binder.name == "box" with
+    | some input => pure input
+    | none => throw (IO.userError "run lost its box input binder")
+  assertTrue (source.inputs.length == 2 &&
+      decide (input.scheme = .mono word) &&
+      decide (boxInput.scheme = .mono box))
     "run's input binder lost its name or type"
   let inner ← shadowedBinder source input
+
+  match source.roots with
+  | [.statement blockId, .statement useOuterId, .statement returnId] =>
+      match source.lookupStatement? blockId,
+          source.lookupStatement? useOuterId,
+          source.lookupStatement? returnId with
+      | some { form := .block nested, .. },
+          some { form := .expression outerReference true, .. },
+          some { form := .returnStmt (some _), .. } =>
+          assertTrue (nested.length == 3 && nested.all fun id =>
+              !(source.roots.contains (.statement id)))
+            "nested block statements leaked into the top-level root list"
+          match source.lookupExpression? outerReference with
+          | some { form := .reference "item" (.local binder), .. } =>
+              assertTrue (binder == input.id)
+                "block scope restoration did not recover the outer item binder"
+          | _ => throw (IO.userError
+              "post-block item use lost its typed outer reference")
+      | _, _, _ => throw (IO.userError
+          "typed statement roots lost block/expression/return source order")
+  | roots => throw (IO.userError
+      s!"expected three ordered top-level statement roots, found {roots.length}")
 
   let readySolved ← findSolved run (predicate ready word)
   let firstCoercion ← findSolved run (predicate coerce word [mid])
@@ -293,10 +319,13 @@ def testSourceTypedIRInference : IO Unit := do
     "  return true;",
     "}",
     "function accept(value: Box) returns (Box) { return value; }",
-    "function run(item: Word) returns (Box) {",
-    "  let item = item;",
-    "  choose(item);",
-    "  let box = accept(item);",
+    "function run(item: Word, box: Box) returns (Box) {",
+    "  {",
+    "    let item = item;",
+    "    choose(item);",
+    "    accept(item);",
+    "  }",
+    "  item;",
     "  return box + 1;",
     "}"
   ])

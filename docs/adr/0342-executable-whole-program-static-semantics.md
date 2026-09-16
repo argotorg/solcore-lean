@@ -142,25 +142,37 @@ preservation lemmas fix canonical allocation and ID-order preservation across
 solving, while executable tests cover coercion paths, candidate rollback,
 numeric finalization and repeated equal predicates.
 
-The checker still does not attach those IDs to exact syntax occurrences.
-The additive carrier for doing so is now present: declaration-owned occurrence
-IDs distinguish expressions and statements; typed nodes retain binders,
-selected declaration instantiations, requirement IDs and ordered coercion
-steps; and a final substitution closes every embedded type, scheme and
-predicate without changing identities.  Generic declaration instantiation now
-also retains the exact rigid-parameter substitution instead of only its applied
-body and predicates.  This carrier is public and independently tested, but the
-inference traversal has not yet populated it.
+The inference traversal now populates that additive carrier.  Declaration-
+owned occurrence IDs distinguish expressions and statements; typed nodes
+retain stable input, lambda and let binders, selected declaration
+instantiations, requirement IDs and ordered coercion steps; and a final
+substitution closes every embedded type, scheme and predicate without changing
+identities.  Generic declaration instantiation retains the exact rigid-
+parameter substitution instead of only its applied body and predicates.
 
-The inference state now owns the declaration, stable input and nested local
-binders, monotone binder/occurrence allocators and the typed-node table.  Scope
-exit restores only lexical visibility, never allocation or accumulated
-semantic facts.  The remaining connection is for expression, statement and
-candidate-resolution paths to emit and annotate the prepared nodes.
+The inference state owns the declaration, monotone binder/occurrence
+allocators and the typed-node table.  Scope exit restores only lexical
+visibility, never allocation or accumulated semantic facts.  Direct and
+indirect calls, operators, coercions and numeric defaulting return metadata to
+the exact introducing occurrence.  Only the selected overload state is
+committed, so rejected candidates cannot leak nodes, requirements or allocator
+progress.  Checked functions expose the final substituted table as their typed
+body.  End-to-end tests cover shadowing, generic selection, losing candidates,
+ordered multi-step coercion and one-owner correspondence between attached and
+solved requirements.  Broad transition-preservation and ownership-completeness
+theorems remain deferred by the executable-first verification policy.
 
-Executable conversion and specialization additionally need stable expression
-and local binder identities, chosen declarations and instantiations, and the
-ordered coercion requirements at each occurrence.  Selection-bearing
-constructor/member/match/assignment work follows that carrier rather than
-extending an information-losing result shape.  Whole-program consumers identify
-an obligation by its owning declaration together with its function-local ID.
+The carrier is semantic rather than a lossless parser trace.  Transparent
+groups and qualified-name field chains in a selected direct callee normalize
+to one declaration-reference node with the outer callee span.  Expected-type
+coercions are attached at the fitting boundary: expected-driven transparent
+descent may place one on the inner node, while later call-argument fitting
+places it on the completed outer argument node.
+
+Executable conversion and specialization can now consume stable expression and
+local binder identities, chosen declarations and instantiations, and the
+ordered coercion requirements at each occurrence.  That is the next internal
+boundary.  Selection-bearing constructor/member/match/assignment work follows
+the same carrier rather than extending an information-losing result shape.
+Whole-program consumers identify an obligation by its owning declaration
+together with its function-local ID.

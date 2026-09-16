@@ -5635,8 +5635,8 @@ End-to-end regressions cover ordered multi-step coercions, speculative overload
 rollback without ID gaps, inference-to-finalization continuity and distinct IDs
 for repeated equal predicates.
 
-The source traversal now populates that typed-IR schema.  Every supported
-expression and statement receives a declaration-owned occurrence identity;
+The source traversal now populates that typed-IR schema.  Every retained
+semantic expression and statement receives a declaration-owned occurrence identity;
 function inputs, lambda parameters and nested lets retain stable binder
 identities across lexical shadowing; and roots use category-safe expression or
 statement wrappers.  Direct calls retain the selected declaration, exact
@@ -5646,6 +5646,12 @@ attached to the argument or result occurrence where they are required,
 operator and signature obligations are attached to their introducing node,
 and literal-defaulting obligations return to the originating literal.  Losing
 overload candidates cannot contribute nodes, requirements or allocator state.
+Transparent callee groups and qualified-name field chains are normalized to one
+semantic direct-callee reference carrying the complete selected name and outer
+callee span; this table is therefore not a one-node-per-parser-AST trace.
+Expected-type coercions belong to the semantic boundary where fitting occurs,
+which may be inside a transparent group during expected-driven inference or on
+the outer argument when a completed argument is fitted to a call parameter.
 
 Finalization applies the inference substitution through node types, binder
 schemes, declaration instantiations, predicates and coercion endpoints without
