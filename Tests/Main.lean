@@ -1258,6 +1258,7 @@ import Solcore.Test.ProgramLoading
 import Solcore.Test.TraitResolution
 import Solcore.Test.TypedTraitResolution
 import Solcore.Test.ProgramSignatures
+import Solcore.Test.ExecutableImplMethods
 import Solcore.Test.SourceInference
 import Solcore.Test.SourceCoercionRanking
 import Solcore.Test.SourceLiteralOverloadRanking
@@ -6044,6 +6045,7 @@ def staticSemanticsSpineTests : IO Unit := do
   testProgramLoading
   TypedTraitResolution.testTypedTraitResolution
   testProgramSignatures
+  ExecutableImplMethods.testExecutableImplMethods
   SourceInference.testSourceInference
   SourceCoercionRanking.testSourceCoercionRanking
   SourceLiteralOverloadRanking.testSourceLiteralOverloadRanking

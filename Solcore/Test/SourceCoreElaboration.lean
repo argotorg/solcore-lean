@@ -179,6 +179,95 @@ private def testRequirementsAndCoercions (function : CheckedFunction) : IO Unit 
       | .coercionsPresent [_] => true
       | _ => false
 
+private def requiredWordBinaryPolicy (consumed : List RequirementId) :
+    SourceCoreElaboration.RequiredBinaryElaborator
+      SourceCoreElaboration.Error :=
+  fun _ _ _ _ _ => pure {
+    leftType := .word
+    rightType := .word
+    consumedRequirements := consumed
+    build := fun left right => pure (.binary .wordAdd left right)
+  }
+
+private def testRequiredBinaryPolicy : IO Unit := do
+  let program ← checkedProgram
+    "function required(x: Word) returns (Word) { return x + 1; }"
+  let function ← checkedNamed program "required"
+  let (_, expression) ← rootIds function
+  let requirement : RequirementId := ⟨101⟩
+  let leftover : RequirementId := ⟨102⟩
+  let predicate : ProgramPredicate := {
+    trait := function.declaration
+    subject := .word
+    arguments := []
+  }
+  let required : CheckedFunction := {
+    function with
+    solvedRequirements := [{
+      id := requirement
+      predicate
+      evidence := .assumption predicate
+    }]
+    typedBody := changeExpression function.typedBody expression fun node => {
+      node with requirements := [requirement]
+    }
+  }
+  expectError "required binary default policy" required
+    (.occurrence expression.occurrence)
+    fun reason => match reason with
+      | .requirementsPresent [actual] => actual == requirement
+      | _ => false
+  let draft ← match SourceCoreElaboration.lowerFunctionBodyWithPolicies id
+      SourceCoreElaboration.rejectCalls
+      (requiredWordBinaryPolicy [requirement]) required with
+    | .ok draft => pure draft
+    | .error error => throw (IO.userError
+        s!"required binary policy did not lower: {reprStr error}")
+  let lowered ← match draft.finalize with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"required binary policy did not finalize: {reprStr error}")
+  assertTrue (decide (Core.runStateful 100
+      (.initial lowered.core [.word (word 4)]) =
+        .done (.word (word 5)) []))
+    "required binary policy changed child order or runtime meaning"
+  match SourceCoreElaboration.lowerFunctionBodyWithPolicies id
+      SourceCoreElaboration.rejectCalls (requiredWordBinaryPolicy [])
+      required with
+  | .ok _ => throw (IO.userError
+      "required binary policy accepted mismatched requirement identities")
+  | .error error =>
+      assertTrue (decide (error.site = .occurrence expression.occurrence) &&
+          match error.reason with
+          | .binaryRequirementsMismatch [expected] [] =>
+              expected == requirement
+          | _ => false)
+        s!"required binary mismatch reported the wrong error: {reprStr error}"
+  let withLeftover : CheckedFunction := {
+    required with
+    solvedRequirements := required.solvedRequirements ++ [{
+      id := leftover
+      predicate
+      evidence := .assumption predicate
+    }]
+  }
+  let leftoverDraft ← match
+      SourceCoreElaboration.lowerFunctionBodyWithPolicies id
+        SourceCoreElaboration.rejectCalls
+        (requiredWordBinaryPolicy [requirement]) withLeftover with
+    | .ok draft => pure draft
+    | .error error => throw (IO.userError
+        s!"required binary leftover failed before finalization: {reprStr error}")
+  match leftoverDraft.finalize with
+  | .ok _ => throw (IO.userError
+      "required binary policy silently discarded an unconsumed requirement")
+  | .error error =>
+      assertTrue (decide (error.site = .declaration function.declaration) &&
+          match error.reason with
+          | .unconsumedRequirements [actual] => actual == leftover
+          | _ => false)
+        s!"required binary leftover reported the wrong error: {reprStr error}"
+
 private def testUnsupportedExpressions (function : CheckedFunction) : IO Unit := do
   let (_, expression) ← rootIds function
   let cases : List
@@ -297,6 +386,7 @@ def testSourceCoreElaboration : IO Unit := do
   testStatementLowering
   testUninitializedLetRejected
   testRequirementsAndCoercions function
+  testRequiredBinaryPolicy
   testUnsupportedExpressions function
   testBrokenEdges function
   testUnsupportedTypesAndDuplicateInputs function

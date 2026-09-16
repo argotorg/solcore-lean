@@ -12,10 +12,13 @@ specialization worklist are also executable.  A restricted linker connects
 complete acyclic direct-call plans to independently rechecked Core entries.
 It statically discharges proof-only call-signature predicates after exact
 requirement/evidence validation and forwards closed implementation witnesses
-through nested constrained calls.  Conversion-term insertion, runtime
-trait/coercion evidence and impl-method execution, recursive or indirect source
-calls, automatic entry discovery and a public source pipeline remain staged
-extensions.
+through nested constrained calls.  Trait and implementation method declarations
+are retained in checked catalogs with exact signature conformance.  The first
+runtime-evidence slice executes a deliberately narrow `Add<T>` profile by
+selecting, checking and capture-free inlining the closed implementation method
+body.  Conversion-term insertion, other runtime evidence, recursive or indirect
+source calls, automatic entry discovery and a public source pipeline remain
+staged extensions.
 
 ## Context
 
@@ -89,9 +92,9 @@ The first profile may reject rather than guess for:
   coinductive reasoning;
 - insertion of executable conversion terms;
 - budget-exhausted specialization outcomes and every direct-call cycle;
-- seed roots with unresolved assumptions, non-call/operator/literal runtime
-  evidence use, coercion-bearing nodes, indirect calls and impl-method execution
-  at the Core-linking boundary;
+- seed roots with unresolved assumptions, runtime evidence outside the narrow
+  single-method `Add<T>` profile, coercion-bearing nodes, indirect calls and
+  general impl-method execution at the Core-linking boundary;
 - constructor/operator export selectors and the remaining module-reference
   edge cases;
 - nested contract namespaces and every member-overload rule; and
@@ -120,7 +123,9 @@ source types and signatures, checks implementation heads and `where`
 predicates, and infers the supported function-body fragment.  Successful
 checking retains substitutions, normalized predicates and concrete trait
 evidence.  Failed and depth/cycle/ambiguity-inconclusive trait searches remain
-distinct results.
+distinct results.  Resolved trait and implementation catalogs retain stable
+trait, implementation and method identities.  Catalog construction rejects
+duplicate, missing, extra and signature-incompatible implementation methods.
 
 This delivery intentionally has a lower proof density than the preceding
 parser and local-semantics slices.  Executable positive and negative tests fix
@@ -240,19 +245,34 @@ caller's assumption marker is replaced only by a unique incoming implementation
 witness for the same goal.  The validated call requirements are then consumed
 statically and never become Core values or impl-method calls.
 
-Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
-assumptions, non-call/operator/literal requirements, coercion-bearing nodes and
-indirect calls all reject explicitly.  Impl method bodies are not lowered or
-executed.  The worklist can therefore close same-key recursive graphs for
-finite planning without claiming they are executable in the current Core.
-Executable regressions cover proof-only constrained and nested generic calls,
-both conditional paths, runtime input mismatches, malformed plans and each
-principal staged boundary; small checked laws retain the runtime input gate and
-budget result.
+The first runtime trait-evidence consumer is connected for one explicit
+profile.  A required binary addition must carry exactly one solved
+`Add<Operand>` requirement whose closed implementation evidence agrees with the
+typed occurrence.  The selected declaration must be a one-parameter `Add<T>`
+trait with exactly one non-generic method and one monomorphic, premise-free,
+`where`-free implementation with exactly one conforming method.  Its body is
+checked against the instantiated two-operand signature and capture-free inlined
+after the operands have been bound left to right.  The implementation body, not
+the builtin addition opcode, is authoritative; regressions use a subtraction
+body to distinguish those meanings.
 
-The next internal boundary is runtime conversion and trait/coercion evidence,
-including impl-method execution.  Recursive calls require a separate named or
-global recursive Core representation rather than cyclic inlining.
+Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
+assumptions, non-call/operator/literal requirements outside that `Add<T>`
+exception, coercion-bearing nodes and indirect calls all reject explicitly.
+Other evidence-dependent operators, generic or premise-bearing implementation
+methods, multi-method or `where`-constrained profiles, and coercion methods are
+not assigned an invented runtime meaning.  The worklist can therefore close
+same-key recursive graphs for finite planning without claiming they are
+executable in the current Core.  Executable regressions cover proof-only
+constrained and nested generic calls, both conditional paths, the
+method-authoritative `Add<Word>` profile, runtime input mismatches, malformed
+plans and each principal staged boundary; small checked laws retain the runtime
+input gate and budget result.
+
+The next internal boundary is expansion from this single runtime trait-evidence
+profile to coercion evidence and conversion-term insertion, followed by other
+operators and implementation shapes.  Recursive calls require a separate named
+or global recursive Core representation rather than cyclic inlining.
 Selection-bearing constructor,
 member, match and assignment work follows the same carrier rather than
 extending an information-losing result shape.  Whole-program consumers

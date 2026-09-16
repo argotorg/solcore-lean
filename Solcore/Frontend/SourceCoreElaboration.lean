@@ -88,6 +88,8 @@ inductive ErrorReason where
   | callRequirementsMismatch
       (expected actual : List RequirementId)
   | callArgumentArityMismatch (expected actual : Nat)
+  | binaryRequirementsMismatch
+      (expected actual : List RequirementId)
   | unknownConsumedRequirement (requirement : RequirementId)
   | duplicateConsumedRequirement (requirement : RequirementId)
   | unconsumedRequirements (requirements : List RequirementId)
@@ -147,6 +149,25 @@ lifting ordinary source-to-Core failures through `lowerFunctionBodyWith`. -/
 abbrev CallElaborator (error : Type) :=
   Resolved.Context → ExpressionNode → ExpressionId →
   List ExpressionId → CallResolution → Except error (CallPlan error)
+
+/-- A policy for a requirement-bearing binary expression declares the exact
+types at which Source Core must check its left and right children, identifies
+the requirements discharged by the policy, and combines already recursively
+lowered children.  The fixed-arity builder deliberately cannot traverse source
+edges itself. -/
+structure RequiredBinaryPlan (error : Type) where
+  leftType : Core.Ty
+  rightType : Core.Ty
+  consumedRequirements : List RequirementId
+  build : Resolved.Expr → Resolved.Expr → Except error Resolved.Expr
+
+/-- A whole-program consumer may give runtime meaning to an otherwise staged,
+requirement-bearing binary expression.  Source Core still owns child lookup,
+left-to-right traversal, coercion rejection, type checking, and requirement
+reconciliation. -/
+abbrev RequiredBinaryElaborator (error : Type) :=
+  Resolved.Context → ExpressionNode → ExpressionId → Syntax.BinaryOp →
+  ExpressionId → Except error (RequiredBinaryPlan error)
 
 private def fail {alpha : Type} (site : ErrorSite) (reason : ErrorReason) :
     Except Error alpha :=
@@ -253,8 +274,10 @@ private def ensureTypeWith {error : Type} (lift : Error → error)
 derived from the finite node table and turns malformed cyclic tables into a
 located error. -/
 private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
-    (onCall : CallElaborator error) (fuel : Nat) (source : TypedSource)
-    (scope : Resolved.Context) (id : ExpressionId) :
+    (onCall : CallElaborator error)
+    (onRequiredBinary : RequiredBinaryElaborator error)
+    (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
+    (id : ExpressionId) :
     Except error LoweredExpression :=
   match fuel with
   | 0 => failWith lift (.occurrence id.occurrence) .expressionDepthLimit
@@ -288,8 +311,8 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
                     else
                       ensureTypeWith lift (.occurrence pair.2.occurrence)
                         pair.1 argumentNode.type
-                      lowerExpressionFuelWith lift onCall fuel source scope
-                        pair.2
+                      lowerExpressionFuelWith lift onCall onRequiredBinary fuel
+                        source scope pair.2
                 let resolved ← plan.build
                   (loweredArguments.map fun argument => argument.resolved)
                 pure {
@@ -299,6 +322,59 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
                       (fun argument => argument.consumedRequirements) ++
                     plan.consumedRequirements
                 }
+          | .binary left operator right =>
+              if node.requirements.isEmpty then
+                match lowerType (.occurrence id.occurrence) node.type with
+                | .error error => .error (lift error)
+                | .ok _ => do
+                    let left ← lowerExpressionFuelWith lift onCall
+                      onRequiredBinary fuel source scope left
+                    let right ← lowerExpressionFuelWith lift onCall
+                      onRequiredBinary fuel source scope right
+                    pure {
+                      resolved := directBinary operator left.resolved
+                        right.resolved
+                      consumedRequirements := left.consumedRequirements ++
+                        right.consumedRequirements
+                    }
+              else do
+                let plan ← onRequiredBinary scope node left operator right
+                if plan.consumedRequirements != node.requirements then
+                  failWith lift (.occurrence id.occurrence)
+                    (.binaryRequirementsMismatch node.requirements
+                      plan.consumedRequirements)
+                else
+                  match lowerType (.occurrence id.occurrence) node.type with
+                  | .error error => .error (lift error)
+                  | .ok _ =>
+                    let leftNode ← (lookupExpression source left).mapError lift
+                    if !leftNode.coercions.isEmpty then
+                      failWith lift (.occurrence left.occurrence)
+                        (.coercionsPresent leftNode.coercions)
+                    else
+                      ensureTypeWith lift (.occurrence left.occurrence)
+                        plan.leftType leftNode.type
+                      let loweredLeft ← lowerExpressionFuelWith lift onCall
+                        onRequiredBinary fuel source scope left
+                      let rightNode ←
+                        (lookupExpression source right).mapError lift
+                      if !rightNode.coercions.isEmpty then
+                        failWith lift (.occurrence right.occurrence)
+                          (.coercionsPresent rightNode.coercions)
+                      else
+                        ensureTypeWith lift (.occurrence right.occurrence)
+                          plan.rightType rightNode.type
+                        let loweredRight ← lowerExpressionFuelWith lift onCall
+                          onRequiredBinary fuel source scope right
+                        let resolved ← plan.build loweredLeft.resolved
+                          loweredRight.resolved
+                        pure {
+                          resolved
+                          consumedRequirements :=
+                            loweredLeft.consumedRequirements ++
+                            loweredRight.consumedRequirements ++
+                            plan.consumedRequirements
+                        }
           | _ =>
               if !node.requirements.isEmpty then
                 failWith lift (.occurrence id.occurrence)
@@ -334,11 +410,12 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
                       failWith lift (.occurrence id.occurrence)
                         (.unsupportedExpression .declarationReference)
                   | .group inner =>
-                      lowerExpressionFuelWith lift onCall fuel source scope inner
+                      lowerExpressionFuelWith lift onCall onRequiredBinary fuel
+                        source scope inner
                   | .tuple elements => do
                       let lowered ← elements.mapM fun element =>
-                        lowerExpressionFuelWith lift onCall fuel source scope
-                          element
+                        lowerExpressionFuelWith lift onCall onRequiredBinary
+                          fuel source scope element
                       pure {
                         resolved := productExpression
                           (lowered.map fun element => element.resolved)
@@ -347,32 +424,24 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
                       }
                   | .unary operator operand => do
                       let operand ←
-                        lowerExpressionFuelWith lift onCall fuel source scope
-                          operand
+                        lowerExpressionFuelWith lift onCall onRequiredBinary
+                          fuel source scope operand
                       pure {
                         resolved := match operator with
                           | .logicalNot => .unary .boolNot operand.resolved
                           | .bitNot => .unary .wordNot operand.resolved
                         consumedRequirements := operand.consumedRequirements
                       }
-                  | .binary left operator right => do
-                      let left ←
-                        lowerExpressionFuelWith lift onCall fuel source scope left
-                      let right ←
-                        lowerExpressionFuelWith lift onCall fuel source scope right
-                      pure {
-                        resolved := directBinary operator left.resolved
-                          right.resolved
-                        consumedRequirements := left.consumedRequirements ++
-                          right.consumedRequirements
-                      }
+                  | .binary _ _ _ =>
+                      failWith lift (.occurrence id.occurrence)
+                        (.requirementsPresent node.requirements)
                   | .conditional condition thenBranch elseBranch => do
-                      let condition ← lowerExpressionFuelWith lift onCall fuel
-                        source scope condition
-                      let thenBranch ← lowerExpressionFuelWith lift onCall fuel
-                        source scope thenBranch
-                      let elseBranch ← lowerExpressionFuelWith lift onCall fuel
-                        source scope elseBranch
+                      let condition ← lowerExpressionFuelWith lift onCall
+                        onRequiredBinary fuel source scope condition
+                      let thenBranch ← lowerExpressionFuelWith lift onCall
+                        onRequiredBinary fuel source scope thenBranch
+                      let elseBranch ← lowerExpressionFuelWith lift onCall
+                        onRequiredBinary fuel source scope elseBranch
                       pure {
                         resolved := .ifE condition.resolved thenBranch.resolved
                           elseBranch.resolved
@@ -392,12 +461,14 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
                       (.unsupportedExpression .index)
 
 private def lowerExpressionAsWith {error : Type} (lift : Error → error)
-    (onCall : CallElaborator error) (fuel : Nat) (source : TypedSource)
-    (scope : Resolved.Context) (expected : Core.Ty) (id : ExpressionId) :
+    (onCall : CallElaborator error)
+    (onRequiredBinary : RequiredBinaryElaborator error)
+    (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
+    (expected : Core.Ty) (id : ExpressionId) :
     Except error LoweredExpression := do
   let node ← (lookupExpression source id).mapError lift
   ensureTypeWith lift (.occurrence id.occurrence) expected node.type
-  lowerExpressionFuelWith lift onCall fuel source scope id
+  lowerExpressionFuelWith lift onCall onRequiredBinary fuel source scope id
 
 private def statementRoots : List NodeId → Except Error (List StatementId)
   | [] => .ok []
@@ -414,7 +485,8 @@ private def finalStatement? : List StatementId → Option StatementId
 /-- Lower the tail-normal statement profile.  Each statement edge consumes
 fuel, while expression edges consume the remaining fuel independently. -/
 private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
-    (onCall : CallElaborator error) :
+    (onCall : CallElaborator error)
+    (onRequiredBinary : RequiredBinaryElaborator error) :
     Nat → TypedSource → Resolved.Context → Core.Ty → ErrorSite →
       ErrorReason → List StatementId → Except error LoweredExpression
   | _, _, _, _, fallthroughSite, fallthroughReason, [] =>
@@ -439,10 +511,10 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           let initializer ← match initializer with
             | none => failWith lift site .uninitializedLet
             | some initializer =>
-                lowerExpressionAsWith lift onCall fuel source scope binderType
-                  initializer
-          let body ← lowerStatementsFuelWith lift onCall fuel source
-            ((binder.id, binderType) :: scope) expected
+                lowerExpressionAsWith lift onCall onRequiredBinary fuel source
+                  scope binderType initializer
+          let body ← lowerStatementsFuelWith lift onCall onRequiredBinary fuel
+            source ((binder.id, binderType) :: scope) expected
             fallthroughSite fallthroughReason rest
           pure {
             resolved := .letE binder.id initializer.resolved body.resolved
@@ -464,7 +536,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
               else
                 failWith lift site (.typedNodeTypeMismatch expected .unit)
           | some value =>
-              lowerExpressionAsWith lift onCall fuel source scope expected value
+              lowerExpressionAsWith lift onCall onRequiredBinary fuel source
+                scope expected value
     | .ifThen condition thenBody elseBody => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .ifThen)
@@ -473,14 +546,14 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           | none => failWith lift site .missingElseBranch
           | some elseBody => do
               ensureTypeWith lift site expected node.type
-              let condition ← lowerExpressionAsWith lift onCall fuel source
-                scope .bool condition
-              let thenBranch ← lowerStatementsFuelWith lift onCall fuel source
-                scope expected site (.conditionalBranchFallthrough .thenBranch)
-                thenBody
-              let elseBranch ← lowerStatementsFuelWith lift onCall fuel source
-                scope expected site (.conditionalBranchFallthrough .elseBranch)
-                elseBody
+              let condition ← lowerExpressionAsWith lift onCall
+                onRequiredBinary fuel source scope .bool condition
+              let thenBranch ← lowerStatementsFuelWith lift onCall
+                onRequiredBinary fuel source scope expected site
+                (.conditionalBranchFallthrough .thenBranch) thenBody
+              let elseBranch ← lowerStatementsFuelWith lift onCall
+                onRequiredBinary fuel source scope expected site
+                (.conditionalBranchFallthrough .elseBranch) elseBody
               pure {
                 resolved := .ifE condition.resolved thenBranch.resolved
                   elseBranch.resolved
@@ -493,8 +566,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           failWith lift site (.nonTailStatement .block)
         else
           ensureTypeWith lift site expected node.type
-          lowerStatementsFuelWith lift onCall fuel source scope expected site
-            .blockFallthrough body
+          lowerStatementsFuelWith lift onCall onRequiredBinary fuel source scope
+            expected site .blockFallthrough body
     | .expression _ _ =>
         failWith lift site (.unsupportedStatement .expression)
 
@@ -510,6 +583,14 @@ def rejectCalls : CallElaborator Error :=
       | .ok _ =>
           fail (.occurrence node.id.occurrence)
             (.unsupportedExpression .call)
+
+/-- Preserve the original evidence-free profile for requirement-bearing binary
+expressions.  Coercions are rejected by the enclosing traversal before this
+policy is consulted. -/
+def rejectRequiredBinaries : RequiredBinaryElaborator Error :=
+  fun _ node _ _ _ =>
+    fail (.occurrence node.id.occurrence)
+      (.requirementsPresent node.requirements)
 
 private def eraseRequirement? (target : RequirementId) :
     List RequirementId → Option (List RequirementId)
@@ -548,11 +629,14 @@ def reconcileConsumedRequirements
   reconcileConsumedRequirementsAux declaration [] solved consumed
 
 /-- Lower a checked function body to the resolved local fragment while letting
-one caller-supplied policy handle otherwise staged call nodes.  All ordinary
-typed-node, lexical-scope, coercion and requirement checks remain owned by this
-module and are lifted into the consumer's error type. -/
-def lowerFunctionBodyWith {error : Type} (lift : Error → error)
-    (onCall : CallElaborator error) (function : CheckedFunction) :
+caller-supplied policies handle otherwise staged calls and requirement-bearing
+binary expressions.  All child traversal, typed-node, lexical-scope, coercion,
+and requirement checks remain owned by this module and are lifted into the
+consumer's error type. -/
+def lowerFunctionBodyWithPolicies {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error)
+    (onRequiredBinary : RequiredBinaryElaborator error)
+    (function : CheckedFunction) :
     Except error BodyDraft := do
   let source := function.typedBody
   if source.owner != function.declaration then
@@ -571,7 +655,7 @@ def lowerFunctionBodyWith {error : Type} (lift : Error → error)
     let fallthroughSite := match finalStatement? roots with
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
-    let lowered ← lowerStatementsFuelWith lift onCall
+    let lowered ← lowerStatementsFuelWith lift onCall onRequiredBinary
       (source.nodes.length + 1) source inputs expected fallthroughSite
       .statementListFallthrough roots
     let solvedRequirements :=
@@ -587,6 +671,18 @@ def lowerFunctionBodyWith {error : Type} (lift : Error → error)
       rootOccurrence
       unconsumedRequirements
     }
+
+/-- Compatibility entry point for call-aware consumers.  Requirement-bearing
+binary expressions retain the original explicit rejection until the consumer
+opts into `lowerFunctionBodyWithPolicies`. -/
+def lowerFunctionBodyWith {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error) (function : CheckedFunction) :
+    Except error BodyDraft :=
+  lowerFunctionBodyWithPolicies lift onCall
+    (fun _ node _ _ _ =>
+      failWith lift (.occurrence node.id.occurrence)
+        (.requirementsPresent node.requirements))
+    function
 
 /-- Finish a body draft through the unchanged evidence gate, exact positional
 lowering and independent Core type reconstruction. -/

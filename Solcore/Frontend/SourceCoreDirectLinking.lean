@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.SourceSpecializationWorklist
+import Solcore.Frontend.ExecutableImplMethods
 import Solcore.Core.Machine
 
 /-!
@@ -15,9 +16,11 @@ identities are aliased to those temporaries.
 Direct-call signature predicates are proof-only in the current executable
 fragment.  Each call must account positionally for its exact requirement IDs;
 implementation evidence is threaded into the callee, while assumption evidence
-must be discharged by a unique incoming witness with the same goal.  The
-evidence never becomes a runtime Core value.  Coercions and requirements owned
-by any non-call expression remain explicit staged boundaries.
+must be discharged by a unique incoming witness with the same goal.  Evidence
+never becomes a runtime Core value.  One deliberately narrow required-binary
+profile uses closed `Add<T>` evidence to select, check, and inline the sole
+monomorphic implementation method.  Coercions and every other runtime-evidence
+shape remain explicit staged boundaries.
 
 The current Core has no recursive binding construct.  Accordingly, recursive
 specialization cycles are rejected explicitly rather than assigned an
@@ -78,6 +81,35 @@ inductive Error where
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (requirement : RequirementId)
       (expected actual : ProgramPredicate)
+  | binaryRequirementCountMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : Nat)
+  | binaryRequirementEvidenceGoalMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | unsupportedRuntimeBinary
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (operator : Syntax.BinaryOp)
+  | runtimeBinaryEvidenceUnresolved
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (predicate : ProgramPredicate)
+  | executableImplMethod
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (error : ExecutableImplMethods.Error)
+  | runtimeBinaryTraitNameMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : String)
+  | runtimeBinaryInputTypesMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : List Core.Ty)
+  | runtimeBinaryResultTypeMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : Core.Ty)
+  | implMethodSourceCore
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (method : ProgramImplMethodId)
+      (error : SourceCoreElaboration.Error)
   | missingAssumptionEvidence
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (requirement : RequirementId) (predicate : ProgramPredicate)
@@ -381,6 +413,87 @@ private def exactCallRequirementEvidence (caller : SpecializedFunction)
       callRequirementEvidence caller node.id available node.requirements
         instantiation.predicates
 
+private def exactRuntimeBinaryEvidence (caller : SpecializedFunction)
+    (node : ExpressionNode) (available : List PredicateEvidence) :
+    Except Error (RequirementId × ProgramPredicate ×
+      TypedTraitResolution.Evidence) := do
+  let requirement ← match node.requirements with
+    | [requirement] => pure requirement
+    | requirements =>
+        throw (.binaryRequirementCountMismatch caller.key node.id 1
+          requirements.length)
+  let solved ← exactSolvedRequirement caller node.id requirement
+  let goal := solved.evidence.goal
+  if goal != solved.predicate then
+    throw (.binaryRequirementEvidenceGoalMismatch caller.key node.id
+      requirement solved.predicate goal)
+  let evidence ← actualRequirementEvidence caller node.id requirement
+    available solved.evidence
+  match evidence with
+  | .implementation implementation =>
+      pure (requirement, solved.predicate, implementation)
+  | .assumption predicate =>
+      throw (.runtimeBinaryEvidenceUnresolved caller.key node.id requirement
+        predicate)
+
+private def runtimeBinaryMethod? :
+    Syntax.BinaryOp → Option (String × String)
+  | .add => some ("Add", "add")
+  | _ => none
+
+/-- Turn one closed operator witness into a checked, capture-free inline plan.
+The implementation method body, not the specialized operand type, is the
+runtime authority. -/
+private def requiredBinaryPlan (program : CheckedProgram)
+    (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (caller : SpecializedFunction) (available : List PredicateEvidence)
+    (node : ExpressionNode) (operator : Syntax.BinaryOp) :
+    Except Error (SourceCoreElaboration.RequiredBinaryPlan Error) := do
+  let (expectedTraitName, methodName) ← match runtimeBinaryMethod? operator with
+    | some names => pure names
+    | none => throw (.unsupportedRuntimeBinary caller.key node.id operator)
+  let (requirement, predicate, evidence) ←
+    exactRuntimeBinaryEvidence caller node available
+  let method ←
+    (ExecutableImplMethods.checkMonomorphicPremiseFreeMethod program evidence
+      methodName).mapError fun error =>
+        .executableImplMethod caller.key node.id error
+  let trait ← match program.signatures.trait? predicate.trait with
+    | some trait => pure trait
+    | none => throw (.executableImplMethod caller.key node.id
+        (.missingTrait predicate.trait))
+  if trait.name != expectedTraitName then
+    throw (.runtimeBinaryTraitNameMismatch caller.key node.id
+      expectedTraitName trait.name)
+  let elaborated ←
+    (SourceCoreElaboration.elaborateFunction method.checked).mapError fun error =>
+      .implMethodSourceCore caller.key node.id method.id error
+  let operandType ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      predicate.subject).mapError Error.sourceCore
+  let expectedInputs := [operandType, operandType]
+  if elaborated.inputs.values != expectedInputs then
+    throw (.runtimeBinaryInputTypesMismatch caller.key node.id expectedInputs
+      elaborated.inputs.values)
+  if elaborated.returnType != operandType then
+    throw (.runtimeBinaryResultTypeMismatch caller.key node.id operandType
+      elaborated.returnType)
+  let nodeResult ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      node.type).mapError Error.sourceCore
+  if elaborated.returnType != nodeResult then
+    throw (.runtimeBinaryResultTypeMismatch caller.key node.id nodeResult
+      elaborated.returnType)
+  pure {
+    leftType := operandType
+    rightType := operandType
+    consumedRequirements := [requirement]
+    build := fun left right =>
+      let temporaries := freshTemporaries temporaryOwner temporaryBase 2
+      let body := aliasInputs elaborated.inputs temporaries elaborated.resolved
+      pure (bindValues (temporaries.zip [left, right]) body)
+  }
+
 private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
     (visiting : List SpecializationKey)
@@ -396,7 +509,7 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
         let specialized ← exactSpecialization plan key
         validateAssumptionEvidence specialized.key specialized.assumptions
           assumptionEvidence
-        SourceCoreElaboration.lowerFunctionBodyWith Error.sourceCore
+        SourceCoreElaboration.lowerFunctionBodyWithPolicies Error.sourceCore
           (fun _ node _ arguments resolution => do
             let instantiation ← match resolution with
               | .indirect => throw (.indirectCall node.id)
@@ -438,6 +551,9 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
                   callee.resolved
                 pure (bindValues (temporaries.zip loweredArguments) body)
             })
+          (fun _ node _ operator _ =>
+            requiredBinaryPlan program temporaryOwner temporaryBase specialized
+              assumptionEvidence node operator)
           specialized.function
 termination_by fuel
 

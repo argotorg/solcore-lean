@@ -18,11 +18,23 @@ private def workspace : Workspace.RawWorkspace := {
   mainSources := [{
     path := "main.solc"
     content := String.intercalate "\n" [
-      "trait Eq<T> {}",
-      "trait Add<T> {}",
+      "trait Eq<T> {",
+      "  function eq(left: T, right: T) returns (Bool);",
+      "}",
+      "trait Add<T> {",
+      "  function add(left: T, right: T) returns (T);",
+      "}",
       "trait Coerce<From, To> {}",
-      "impl Eq<Word> {}",
-      "impl Add<Word> {}",
+      "impl Eq<Word> {",
+      "  function eq(left: Word, right: Word) returns (Bool) {",
+      "    return left == right;",
+      "  }",
+      "}",
+      "impl Add<Word> {",
+      "  function add(left: Word, right: Word) returns (Word) {",
+      "    return left - right;",
+      "  }",
+      "}",
       "impl Coerce<Bool, Word> {}",
       "function identity<T>(value: T) returns (T) { return value; }",
       "function wrap<U>(value: U) returns (U) { return identity(value); }",
@@ -43,6 +55,12 @@ private def workspace : Workspace.RawWorkspace := {
       "function operatorConstrained(left: Word, right: Word) returns (Word) {",
       "  return addWithEvidence(left, right);",
       "}",
+      "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+      "  return left == right;",
+      "}",
+      "function equalityConstrained(left: Word, right: Word) returns (Bool) {",
+      "  return equalWithEvidence(left, right);",
+      "}",
       "function acceptWord(value: Word) returns (Word) { return value; }",
       "function coercionCall(value: Bool) returns (Word) { return acceptWord(value); }"
     ]
@@ -55,6 +73,17 @@ private def checkedProgram : IO CheckedProgram := do
   | .ok program => pure program
   | .error errors => throw (IO.userError
       s!"direct-linking fixture failed checking: {reprStr errors}")
+
+private def checkedProgramOf (content : String) : IO CheckedProgram := do
+  let workspace : Workspace.RawWorkspace := {
+    entry := "main.solc"
+    mainSources := [{ path := "main.solc", content }]
+    externalLibraries := []
+  }
+  match checkProgram workspace with
+  | .ok program => pure program
+  | .error errors => throw (IO.userError
+      s!"direct-linking boundary fixture failed checking: {reprStr errors}")
 
 private def signatureNamed (program : CheckedProgram) (name : String) :
     IO ProgramFunctionSignature := do
@@ -373,16 +402,29 @@ private def testRuntimeEvidenceBoundaries (program : CheckedProgram) : IO Unit :
   let operatorConstrained ← signatureNamed program "operatorConstrained"
   let operatorOutcome ← runOrThrow "operator evidence" program
     [monomorphicRequest operatorConstrained] 2
-  match SourceCoreDirectLinking.link program operatorOutcome with
-  | .error (.sourceCore error) =>
-      match error.reason with
-      | .requirementsPresent requirements =>
-          assertTrue (!requirements.isEmpty)
-            "generic operator rejection lost its requirement identity"
-      | reason => throw (IO.userError
-          s!"generic operator reached the wrong Source Core boundary: {reprStr reason}")
+  let operatorLinked ← linkOrThrow "operator evidence" program operatorOutcome
+  let operatorKey : SourceSpecialization.SpecializationKey := {
+    declaration := operatorConstrained.id
+    arguments := []
+  }
+  let operatorEntry ← match operatorLinked.findEntry? operatorKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "operator evidence: linked root was absent")
+  assertTrue (decide (operatorEntry.run?
+      [.word (word 50), .word (word 8)] 1024 =
+        some (.done (.word (word 42)) [])))
+    "Add evidence did not execute the selected subtracting impl method body"
+
+  let equalityConstrained ← signatureNamed program "equalityConstrained"
+  let equalWithEvidence ← signatureNamed program "equalWithEvidence"
+  let equalityOutcome ← runOrThrow "unsupported equality evidence" program
+    [monomorphicRequest equalityConstrained] 2
+  match SourceCoreDirectLinking.link program equalityOutcome with
+  | .error (.unsupportedRuntimeBinary key _ .equal) =>
+      assertTrue (decide (key.declaration = equalWithEvidence.id))
+        "unsupported operator rejection lost its exact generic callee"
   | result => throw (IO.userError
-      s!"generic operator evidence was erased as proof-only: {reprStr result}")
+      s!"unsupported equality evidence reached runtime: {reprStr result}")
 
   let coercionCall ← signatureNamed program "coercionCall"
   let coercionOutcome ← runOrThrow "coercion call" program
@@ -397,6 +439,42 @@ private def testRuntimeEvidenceBoundaries (program : CheckedProgram) : IO Unit :
           s!"coercion reached the wrong Source Core boundary: {reprStr reason}")
   | result => throw (IO.userError
       s!"a coercion-bearing call linked without runtime coercion semantics: {reprStr result}")
+
+private def testImplementationMethodLoweringBoundary : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "}",
+    "impl Add<Word> {",
+    "  function add(left: Word, right: Word) returns (Word) {",
+    "    return helper(left);",
+    "  }",
+    "}",
+    "function helper(value: Word) returns (Word) { return value; }",
+    "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
+    "  return left + right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Word) {",
+    "  return addWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let addWithEvidence ← signatureNamed program "addWithEvidence"
+  let implementation ← match program.signatures.implementations with
+    | [implementation] => pure implementation
+    | implementations => throw (IO.userError
+        s!"method boundary: expected one implementation, found {implementations.length}")
+  let outcome ← runOrThrow "implementation method call boundary" program
+    [monomorphicRequest entry] 2
+  match SourceCoreDirectLinking.link program outcome with
+  | .error (.implMethodSourceCore key _ method error) =>
+      assertTrue (decide (key.declaration = addWithEvidence.id ∧
+          method.implementation = implementation.id ∧
+          method.methodIndex = 0) &&
+          (error.reason matches .unsupportedExpression .call))
+        "unsupported implementation-method call lost its exact boundary metadata"
+  | result => throw (IO.userError
+      s!"an implementation-method call crossed the standalone Core boundary: {reprStr result}")
 
 private def testMalformedRequirementMetadata
     (program : CheckedProgram) : IO Unit := do
@@ -502,6 +580,7 @@ def testSourceCoreDirectLinking : IO Unit := do
   testCycle program
   testProofOnlyEvidence program
   testRuntimeEvidenceBoundaries program
+  testImplementationMethodLoweringBoundary
   testMalformedRequirementMetadata program
 
 end Tests.SourceCoreDirectLinking

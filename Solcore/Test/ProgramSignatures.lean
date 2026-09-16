@@ -107,6 +107,108 @@ private def testSuccessfulCollection : IO Unit := do
         "impl head/where predicate resolution changed"
   | rules => throw (IO.userError s!"impl rules changed: {reprStr rules}")
 
+private def testMethodCatalog : IO Unit := do
+  let source ← parsed "methods.solc" (String.intercalate "\n" [
+    "trait Marker<T> {}",
+    "trait Add<T> where T: Marker {",
+    "  function add(left: T, right: T) returns (T) where T: Marker;",
+    "}",
+    "impl Add<Word> where Word: Marker {",
+    "  function add(left: Word, right: Word) returns (Word) where Word: Marker {",
+    "    return left - right;",
+    "  }",
+    "}"
+  ])
+  let environment ← catalog [source]
+  let marker ← declarationNamed environment "Marker"
+  let add ← declarationNamed environment "Add"
+  let implementation ← match environment.declarations.find? fun declaration =>
+      declaration.kind == ProgramDeclarationKind.implementation with
+    | some declaration => pure declaration
+    | none => throw (IO.userError "missing Add implementation")
+  let signatures ← match buildProgramSignatures environment with
+    | .ok signatures => pure signatures
+    | .error errors =>
+        throw (IO.userError s!"method signature failure: {reprStr errors}")
+  assertTrue (decide (signatures.traits.length = 2 ∧
+      signatures.implementations.length = 1 ∧
+      signatures.implRules.length = 1))
+    "trait/implementation catalog sizes changed"
+  let some traitSignature := signatures.trait? add.id
+    | throw (IO.userError "missing Add trait signature")
+  let traitParameter : TypeSystem.Ty :=
+    .parameter { owner := add.id, index := 0 }
+  assertTrue (decide (traitSignature.parameters =
+      [{ owner := add.id, index := 0 }] ∧
+      traitSignature.wherePredicates = [{
+        trait := marker.id
+        subject := traitParameter
+        arguments := []
+      }]))
+    "trait parameters or declaration predicates changed"
+  let traitMethod ← match traitSignature.methods with
+    | [method] => pure method
+    | methods => throw (IO.userError
+        s!"trait method catalog changed: {reprStr methods}")
+  assertTrue (decide (traitMethod.id = {
+        trait := add.id
+        methodIndex := 0
+      } ∧ traitMethod.name = "add" ∧
+      traitMethod.parameterNames = ["left", "right"] ∧
+      traitMethod.parameterTypes = [traitParameter, traitParameter] ∧
+      traitMethod.returnTypes = [traitParameter] ∧
+      traitMethod.wherePredicates = [{
+        trait := marker.id
+        subject := traitParameter
+        arguments := []
+      }]))
+    "resolved trait method signature changed"
+  let some implementationSignature := signatures.implementation? implementation.id
+    | throw (IO.userError "missing Add implementation signature")
+  assertTrue (decide (implementationSignature.parameters = [] ∧
+      implementationSignature.head = {
+        trait := add.id
+        subject := .word
+        arguments := []
+      } ∧ implementationSignature.wherePredicates = [{
+        trait := marker.id
+        subject := .word
+        arguments := []
+      }]))
+    "implementation head or declaration predicates changed"
+  let implMethod ← match implementationSignature.methods with
+    | [method] => pure method
+    | methods => throw (IO.userError
+        s!"implementation method catalog changed: {reprStr methods}")
+  assertTrue (decide (implMethod.id = {
+        implementation := implementation.id
+        methodIndex := 0
+      } ∧ implMethod.traitMethod = traitMethod.id ∧
+      implMethod.name = "add" ∧
+      implMethod.parameterNames = ["left", "right"] ∧
+      implMethod.parameterTypes = [.word, .word] ∧
+      implMethod.returnTypes = [.word] ∧
+      implMethod.wherePredicates = [{
+        trait := marker.id
+        subject := .word
+        arguments := []
+      }]))
+    "resolved implementation method signature changed"
+  assertTrue (decide ((signatures.traitMethod? traitMethod.id).isSome ∧
+      (signatures.implMethod? implMethod.id).isSome))
+    "role-tagged method lookup changed"
+  let synthetic := implementationSignature.functionSignatureOfMethod implMethod
+  assertTrue (decide (synthetic.id = implementation.id ∧
+      synthetic.name = "add" ∧
+      synthetic.parameterNames = ["left", "right"] ∧
+      synthetic.parameterTypes = [.word, .word] ∧
+      synthetic.returnTypes = [.word] ∧
+      synthetic.scheme.parameters = [] ∧
+      synthetic.scheme.predicates =
+        implementationSignature.wherePredicates ++ implMethod.wherePredicates ∧
+      synthetic.scheme.body = .function (.product .word .word) .word))
+    "implementation method function projection changed"
+
 private def expectSingleError (content : String)
     (accept : ProgramSignatureError → Bool) : IO Unit := do
   let source ← parsed "failure.solc" content
@@ -149,6 +251,59 @@ private def testFailures : IO Unit := do
     | .traitArityMismatch _ _ 2 1 => true
     | _ => false
 
+private def testMethodFailures : IO Unit := do
+  expectSingleError (String.intercalate "\n" [
+    "trait Add<T> { function add(left: T, right: T) returns (T); }",
+    "impl Add<Word> {}"
+  ]) fun error => match error with
+    | .missingImplMethod _ { methodIndex := 0, .. } "add" => true
+    | _ => false
+  expectSingleError (String.intercalate "\n" [
+    "trait Add<T> {}",
+    "impl Add<Word> {",
+    "  function add(left: Word, right: Word) returns (Word) { return left; }",
+    "}"
+  ]) fun error => match error with
+    | .extraImplMethod { methodIndex := 0, .. } "add" => true
+    | _ => false
+  expectSingleError (String.intercalate "\n" [
+    "trait Add<T> { function add(left: T, right: T) returns (T); }",
+    "impl Add<Word> {",
+    "  function add(left: Bool, right: Bool) returns (Bool) { return left; }",
+    "}"
+  ]) fun error => match error with
+    | .implMethodSignatureMismatch { methodIndex := 0, .. }
+        { methodIndex := 0, .. } [.word, .word] [.bool, .bool]
+        [.word] [.bool] => true
+    | _ => false
+  expectSingleError (String.intercalate "\n" [
+    "trait Marker<T> {}",
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T) where T: Marker;",
+    "}",
+    "impl Add<Word> {",
+    "  function add(left: Word, right: Word) returns (Word) { return left; }",
+    "}"
+  ]) fun error => match error with
+    | .implMethodPredicateMismatch { methodIndex := 0, .. }
+        { methodIndex := 0, .. } [_] [] => true
+    | _ => false
+  expectSingleError (String.intercalate "\n" [
+    "trait Add<T> { function add(value: T) returns (T); }",
+    "impl Add<Word> {",
+    "  function add(value: Word) returns (Word) { return value; }",
+    "  function add(other: Word) returns (Word) { return other; }",
+    "}"
+  ]) fun error => match error with
+    | .duplicateImplMethod _ "add" 0 1 => true
+    | _ => false
+  expectSingleError (String.intercalate "\n" [
+    "trait Add<T> { function add<U>(value: T) returns (T); }",
+    "impl Add<Word> {}"
+  ]) fun error => match error with
+    | .traitMethodLocalGenerics { methodIndex := 0, .. } => true
+    | _ => false
+
 private def testAmbiguousTrait : IO Unit := do
   let left ← parsed "left.solc" "trait Shared<T> {}"
   let right ← parsed "right.solc" "trait Shared<T> {}"
@@ -167,7 +322,9 @@ end ProgramSignatures
 /-- Run the first source-connected signature and trait-rule vertical slice. -/
 def testProgramSignatures : IO Unit := do
   ProgramSignatures.testSuccessfulCollection
+  ProgramSignatures.testMethodCatalog
   ProgramSignatures.testFailures
+  ProgramSignatures.testMethodFailures
   ProgramSignatures.testAmbiguousTrait
 
 end Tests
