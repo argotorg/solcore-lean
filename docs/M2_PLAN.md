@@ -83,6 +83,13 @@ step is traversal wiring: populate the node table, allocate local binder IDs,
 commit only the selected overload's metadata and attach numeric/coercion
 requirements to their originating expression nodes.
 
+The state portion of that step is implemented.  Each inference run now carries
+its declaration owner, stable input/local binders, independent monotone binder
+and shared expression/statement occurrence streams, and an append-ordered node
+table.  Nested-scope restoration deliberately preserves all allocators and
+semantic facts.  The remaining work is to make the expression/statement and
+resolution traversals emit and annotate those nodes.
+
 The first semantic slice, ADR-0154, introduces structured resolved declaration
 and local identities, exact local-table lookup, and a monomorphic local
 expression language. Independent typing and evaluation correspond in both

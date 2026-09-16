@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceInference.Program
 import Solcore.Frontend.SourceInference.RequirementProperties
+import Solcore.Frontend.SourceInference.StateProperties
 import Solcore.Frontend.SourceInference.TypedIR
 import Solcore.Frontend.SourceInference.TypedIRProperties
 

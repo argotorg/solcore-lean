@@ -8,8 +8,9 @@ namespace Solcore.Frontend.SourceInference
 
 namespace State
 
-theorem initial_requirementsWellFormed (locals : TypeSystem.Environment) :
-    (initial locals).RequirementsWellFormed := by
+theorem initial_requirementsWellFormed (owner : Resolved.DeclarationId)
+    (locals : TypeSystem.Environment) :
+    (initial owner locals).RequirementsWellFormed := by
   rfl
 
 theorem addRequirementWithId_preserves_requirementsWellFormed

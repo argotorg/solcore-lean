@@ -1,6 +1,6 @@
 import Solcore.Frontend.ProgramLoading
 import Solcore.Frontend.ProgramSignatures
-import Solcore.Frontend.SourceInference.Identity
+import Solcore.Frontend.SourceInference.TypedIR
 import Solcore.Frontend.TypedTraitResolution
 import Solcore.TypeSystem.Inference
 
@@ -87,10 +87,23 @@ structure Context where
   traitDepth : Nat := 32
   coercionDepth : Nat := 4
 
+/-- The lexical portion of inference state.  Restoring this snapshot leaves
+identity allocators and every accumulated semantic fact untouched. -/
+structure LexicalScope where
+  locals : TypeSystem.Environment
+  binders : List TypedBinder
+  deriving Repr, DecidableEq
+
 /-- Mutable inference information threaded through a source body. -/
 structure State where
+  owner : Resolved.DeclarationId
   inference : InferState
   locals : TypeSystem.Environment
+  inputs : List TypedBinder
+  localBinders : List TypedBinder
+  nextLocal : Nat
+  nextOccurrence : Nat := 0
+  nodes : List Node := []
   numericVariables : List TypeVarId := []
   nextRequirement : Nat := 0
   requirements : List Requirement := []
@@ -151,10 +164,25 @@ inductive ProgramCheckError where
 
 namespace State
 
-def initial (locals : TypeSystem.Environment := []) : State := {
-  inference := .initial locals.nextVariable
-  locals
-}
+private def initialBinders (owner : Resolved.DeclarationId)
+    (locals : TypeSystem.Environment) : List TypedBinder :=
+  locals.mapIdx fun index entry => {
+    id := { owner, binderIndex := index }
+    name := entry.1
+    scheme := entry.2
+  }
+
+def initial (owner : Resolved.DeclarationId)
+    (locals : TypeSystem.Environment := []) : State :=
+  let binders := initialBinders owner locals
+  {
+    owner
+    inference := .initial locals.nextVariable
+    locals
+    inputs := binders
+    localBinders := binders
+    nextLocal := locals.length
+  }
 
 def resolve (state : State) (type : Ty) : Ty :=
   state.inference.resolve type
@@ -168,8 +196,97 @@ def fresh (state : State) : Ty × State :=
   let (type, inference) := state.inference.fresh
   (type, { state with inference })
 
+/-- Compatibility helper for the pre-typed-IR traversal.  It replaces only the
+type environment; typed traversal should use `lexicalScope` and
+`restoreLexicalScope` so its binder scope remains aligned. -/
 def withLocals (state : State) (locals : TypeSystem.Environment) : State :=
   { state with locals }
+
+/-- Resolve the innermost stable binder carrying a source name. -/
+def lookupBinder? (state : State) (name : String) : Option TypedBinder :=
+  state.localBinders.find? fun binder => binder.name == name
+
+/-- Capture only the name/type and stable-binder portion of the current lexical
+scope. -/
+def lexicalScope (state : State) : LexicalScope := {
+  locals := state.locals
+  binders := state.localBinders
+}
+
+/-- Leave a nested lexical scope without reusing any local, occurrence, or
+requirement identities allocated inside it. -/
+def restoreLexicalScope (state : State) (scope : LexicalScope) : State := {
+  state with
+  locals := scope.locals
+  localBinders := scope.binders
+}
+
+/-- Allocate and enter one stable local binder in the current lexical scope. -/
+def allocateBinder (state : State) (name : String) (scheme : Scheme)
+    (span : Option Syntax.SourceSpan := none) : TypedBinder × State :=
+  let binder : TypedBinder := {
+    id := { owner := state.owner, binderIndex := state.nextLocal }
+    name
+    scheme
+    span
+  }
+  (binder, {
+    state with
+    locals := (name, scheme) :: state.locals
+    localBinders := binder :: state.localBinders
+    nextLocal := state.nextLocal + 1
+  })
+
+private def allocateOccurrence (state : State) : OccurrenceId × State :=
+  let id : OccurrenceId := { owner := state.owner, index := state.nextOccurrence }
+  (id, { state with nextOccurrence := state.nextOccurrence + 1 })
+
+/-- Allocate one expression occurrence from the declaration-wide node stream. -/
+def allocateExpressionId (state : State) : ExpressionId × State :=
+  let (occurrence, state) := state.allocateOccurrence
+  (⟨occurrence⟩, state)
+
+/-- Allocate one statement occurrence from the same declaration-wide node
+stream used by expressions. -/
+def allocateStatementId (state : State) : StatementId × State :=
+  let (occurrence, state) := state.allocateOccurrence
+  (⟨occurrence⟩, state)
+
+/-- Append one already allocated node, preserving source-inference order. -/
+def recordNode (state : State) (node : Node) : State :=
+  { state with nodes := state.nodes ++ [node] }
+
+/-- Modify one expression node without permitting its identity or category to
+change.  Missing identities leave the table unchanged. -/
+def modifyExpressionNode (state : State) (id : ExpressionId)
+    (modify : ExpressionNode → ExpressionNode) : State :=
+  { state with nodes := state.nodes.map fun
+      | .expression node =>
+          if node.id = id then
+            .expression { modify node with id }
+          else
+            .expression node
+      | .statement node => .statement node }
+
+/-- Modify one statement node without permitting its identity or category to
+change.  Missing identities leave the table unchanged. -/
+def modifyStatementNode (state : State) (id : StatementId)
+    (modify : StatementNode → StatementNode) : State :=
+  { state with nodes := state.nodes.map fun
+      | .expression node => .expression node
+      | .statement node =>
+          if node.id = id then
+            .statement { modify node with id }
+          else
+            .statement node }
+
+/-- Materialize the additive typed-source carrier for the requested roots. -/
+def toTypedSource (state : State) (roots : List NodeId) : TypedSource := {
+  owner := state.owner
+  inputs := state.inputs
+  roots
+  nodes := state.nodes
+}
 
 def addRequirementWithId (state : State) (predicate : ProgramPredicate) :
     RequirementId × State :=

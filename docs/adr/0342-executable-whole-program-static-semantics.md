@@ -152,6 +152,12 @@ also retains the exact rigid-parameter substitution instead of only its applied
 body and predicates.  This carrier is public and independently tested, but the
 inference traversal has not yet populated it.
 
+The inference state now owns the declaration, stable input and nested local
+binders, monotone binder/occurrence allocators and the typed-node table.  Scope
+exit restores only lexical visibility, never allocation or accumulated
+semantic facts.  The remaining connection is for expression, statement and
+candidate-resolution paths to emit and annotate the prepared nodes.
+
 Executable conversion and specialization additionally need stable expression
 and local binder identities, chosen declarations and instantiations, and the
 ordered coercion requirements at each occurrence.  Selection-bearing

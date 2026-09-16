@@ -5652,6 +5652,13 @@ the already allocated requirement IDs to their exact occurrences.  A
 whole-program reference to an obligation is the owning declaration paired with
 its function-local requirement ID.
 
+The inference state is prepared for that traversal: it owns the declaration,
+stable input and nested local binders, monotone local/occurrence allocators and
+an append-ordered typed-node table.  Lexical restoration changes only the
+visible type/binder scope and cannot rewind identities, requirements or nodes.
+Allocation/restoration laws and executable shadowing/node-table regressions are
+checked.  Expression and statement traversal still needs to populate the table.
+
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary

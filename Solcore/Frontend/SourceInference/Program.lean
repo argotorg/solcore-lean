@@ -48,7 +48,8 @@ end Detail
 def inferExpression (context : Context) (expression : Syntax.Expr)
     (locals : TypeSystem.Environment := []) (fuel : Nat := 1024) :
     Except Error Result := do
-  let (type, state) ← Detail.inferExprFuel fuel context expression none (.initial locals)
+  let (type, state) ← Detail.inferExprFuel fuel context expression none
+    (.initial context.scope.genericOwner locals)
   Detail.finalize context type state
 
 /-- Check one source expression against an expected semantic source type. -/
@@ -56,7 +57,7 @@ def checkExpression (context : Context) (expression : Syntax.Expr) (expected : T
     (locals : TypeSystem.Environment := []) (fuel : Nat := 1024) :
     Except Error Result := do
   let (type, state) ← Detail.inferExprFuel fuel context expression (some expected)
-    (.initial locals)
+    (.initial context.scope.genericOwner locals)
   Detail.finalize context type state
 
 private def functionLocals (signature : ProgramFunctionSignature) :
@@ -83,7 +84,7 @@ def checkFunctionBody (environment : ProgramEnvironment)
     assumptions := signature.scheme.predicates
   }
   let expected := Ty.productMany signature.returnTypes
-  let state := State.initial (functionLocals signature)
+  let state := State.initial context.scope.genericOwner (functionLocals signature)
   let body ← Detail.inferStatementsFuel fuel context signature.source.value.body.value
     expected state
   let state ← Detail.unify body.state body.type expected

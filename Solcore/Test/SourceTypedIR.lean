@@ -1,3 +1,4 @@
+import Solcore.Frontend.SourceInference.Types
 import Solcore.Frontend.SourceInference.TypedIRProperties
 
 /-! Executable coverage for the additive occurrence-addressed typed IR carrier. -/
@@ -107,7 +108,66 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
   assertTrue (decide (closed.lookupStatement? ⟨⟨owner, 0⟩⟩ = none))
     "category-safe lookup reinterpreted an expression as a statement"
 
+private def testInferenceStateScaffolding : IO Unit := do
+  let locals : TypeSystem.Environment :=
+    [("first", .mono .word), ("second", .mono .bool)]
+  let initial := State.initial owner locals
+  let outer := initial.lexicalScope
+  assertTrue (decide (initial.owner = owner ∧ initial.nextLocal = 2 ∧
+      initial.inputs.map (·.id) = [⟨owner, 0⟩, ⟨owner, 1⟩] ∧
+      initial.localBinders = initial.inputs))
+    "initial inference binders were not assigned stable declaration-local IDs"
+  let (nested, state) := initial.allocateBinder "first" (.mono .word) (some span)
+  let (expressionId, state) := state.allocateExpressionId
+  let (statementId, state) := state.allocateStatementId
+  assertTrue (decide (nested.id = ⟨owner, 2⟩ ∧
+      state.lookupBinder? "first" = some nested ∧
+      expressionId.occurrence = ⟨owner, 0⟩ ∧
+      statementId.occurrence = ⟨owner, 1⟩))
+    "inference-state allocators did not use independent stable ID streams"
+  let expressionNode : ExpressionNode := {
+    id := expressionId
+    span
+    type := .word
+    form := .proxy .word
+  }
+  let statementNode : StatementNode := {
+    id := statementId
+    span
+    type := .word
+    form := .expression expressionId false
+  }
+  let state := state.recordNode (.expression expressionNode)
+    |>.recordNode (.statement statementNode)
+    |>.modifyExpressionNode expressionId fun node => {
+        node with
+        id := ⟨⟨owner, 99⟩⟩
+        type := .bool
+      }
+  let state := state.restoreLexicalScope outer
+  let typed := state.toTypedSource
+    [.expression expressionId, .statement statementId]
+  assertTrue (decide (state.locals = locals ∧
+      state.localBinders = initial.localBinders ∧
+      state.lookupBinder? "first" = initial.inputs.head? ∧
+      state.nextLocal = 3 ∧ state.nextOccurrence = 2 ∧
+      typed.owner = owner ∧ typed.inputs = initial.inputs ∧
+      typed.nodes.length = 2))
+    "lexical restoration rewound semantic state or changed typed inputs"
+  match typed.lookupExpression? expressionId with
+  | some node =>
+      assertTrue (decide (node.id = expressionId ∧ node.type = .bool))
+        "typed-node modification changed its stable identity"
+  | none => throw (IO.userError "recorded expression was absent from typed source")
+  match typed.lookupStatement? statementId with
+  | some node =>
+      assertTrue (decide (node.id = statementId ∧
+          node.form = .expression expressionId false))
+        "recorded statement changed while modifying an expression"
+  | none => throw (IO.userError "recorded statement was absent from typed source")
+
 def testSourceTypedIR : IO Unit := do
   testFinalSubstitutionPreservesIdentity
+  testInferenceStateScaffolding
 
 end Tests.SourceTypedIR
