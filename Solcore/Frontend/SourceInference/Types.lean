@@ -94,6 +94,22 @@ structure LexicalScope where
   binders : List TypedBinder
   deriving Repr, DecidableEq
 
+/-- The identity and current semantic type of one inferred expression.
+
+Resolution helpers carry these together so that every coercion, overload
+requirement, and numeric-defaulting requirement can be returned to the exact
+source occurrence that introduced it. -/
+structure InferredExpression where
+  id : ExpressionId
+  type : Ty
+  deriving Repr, BEq, DecidableEq
+
+/-- A flexible numeric-literal type together with its source occurrence. -/
+structure NumericOrigin where
+  metavariable : TypeVarId
+  expression : ExpressionId
+  deriving Repr, BEq, DecidableEq
+
 /-- Mutable inference information threaded through a source body. -/
 structure State where
   owner : Resolved.DeclarationId
@@ -104,7 +120,7 @@ structure State where
   nextLocal : Nat
   nextOccurrence : Nat := 0
   nodes : List Node := []
-  numericVariables : List TypeVarId := []
+  numericVariables : List NumericOrigin := []
   nextRequirement : Nat := 0
   requirements : List Requirement := []
   deriving Repr, DecidableEq
@@ -114,6 +130,7 @@ structure Result where
   type : Ty
   substitution : Substitution
   solvedRequirements : List SolvedRequirement
+  typedSource : TypedSource
   deriving Repr, BEq
 
 /-- One successfully checked top-level source function. -/
@@ -123,6 +140,7 @@ structure CheckedFunction where
   inferredBodyType : Ty
   substitution : Substitution
   solvedRequirements : List SolvedRequirement
+  typedBody : TypedSource
   deriving Repr, BEq
 
 namespace Result

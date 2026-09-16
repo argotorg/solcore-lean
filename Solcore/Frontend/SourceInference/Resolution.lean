@@ -88,6 +88,15 @@ def conventionalTrait?
       | none => conventionalTrait? context rest
 
 structure CoercionEdge where
+  source : Ty
+  target : Ty
+  predicate : ProgramPredicate
+  deriving Repr, DecidableEq
+
+/-- One not-yet-committed edge selected by coercion search.  Requirement IDs
+are allocated only after the whole path has been selected. -/
+structure PlannedCoercionStep where
+  source : Ty
   target : Ty
   predicate : ProgramPredicate
   deriving Repr, DecidableEq
@@ -95,7 +104,7 @@ structure CoercionEdge where
 structure CoercionPath where
   current : Ty
   visited : List Ty
-  predicates : List ProgramPredicate
+  steps : List PlannedCoercionStep
   deriving Repr, DecidableEq
 
 /-- Outgoing edges whose evidence is unique, plus inconclusive edges retained
@@ -142,6 +151,7 @@ def coercionRuleEdge? (trait : Resolved.DeclarationId) (source : Ty)
   let target := substitution.apply freshTarget
   if !isGroundCoercionTarget target then none else pure ()
   pure {
+    source
     target
     predicate := { trait, subject := source, arguments := [target] }
   }
@@ -155,7 +165,7 @@ def assumptionCoercionEdges (context : Context) (state : State)
     else
       match predicate.arguments with
       | [target] =>
-          if isGroundCoercionTarget target then some { target, predicate }
+          if isGroundCoercionTarget target then some { source, target, predicate }
           else none
       | _ => none
 
@@ -185,7 +195,11 @@ def expandCoercionPath (context : Context) (state : State)
     paths := edges.viable.map fun edge => {
       current := edge.target
       visited := path.visited ++ [edge.target]
-      predicates := path.predicates ++ [edge.predicate]
+      steps := path.steps ++ [{
+        source := edge.source
+        target := edge.target
+        predicate := edge.predicate
+      }]
     }
     blocked := edges.blocked
   }
@@ -203,16 +217,17 @@ def expandCoercionPaths (context : Context) (state : State)
       }
 
 def finishCoercionSearch (blocked : List Error) :
-    Except Error (Option (List ProgramPredicate)) :=
+    Except Error (Option (List PlannedCoercionStep)) :=
   match blocked with
   | error :: _ => .error error
   | [] => .ok none
 
 def selectCoercionPath (source target : Ty)
-    (paths : List CoercionPath) : Except Error (Option (List ProgramPredicate)) :=
+    (paths : List CoercionPath) :
+    Except Error (Option (List PlannedCoercionStep)) :=
   match (paths.filter fun path => path.current == target).eraseDups with
   | [] => .ok none
-  | [path] => .ok (some path.predicates)
+  | [path] => .ok (some path.steps)
   | first :: second :: _ =>
       .error (.ambiguousCoercion source target first.visited second.visited)
 
@@ -222,7 +237,7 @@ ordinary exhaustion from an explicitly truncated search. -/
 def searchCoercionPaths (context : Context) (state : State)
     (trait : Resolved.DeclarationId) (source target : Ty) :
     Nat → List CoercionPath → List Error →
-      Except Error (Option (List ProgramPredicate))
+      Except Error (Option (List PlannedCoercionStep))
   | 0, frontier, blocked => do
       let beyond := expandCoercionPaths context state trait frontier
       if beyond.paths.isEmpty then
@@ -243,7 +258,8 @@ def searchCoercionPaths (context : Context) (state : State)
 Returning the unsolved direct predicate preserves the existing final error when
 the bounded graph has neither a path nor an inconclusive edge. -/
 def coercionPlan? (context : Context) (state : State)
-    (source target : Ty) : Except Error (Option (List ProgramPredicate)) := do
+    (source target : Ty) :
+    Except Error (Option (List PlannedCoercionStep)) := do
   match ← conventionalTraitWithArity? context "Coerce" 2 with
   | none => pure none
   | some trait =>
@@ -253,21 +269,37 @@ def coercionPlan? (context : Context) (state : State)
         arguments := [target]
       }
       match solvePredicate context state direct with
-      | .ok _ => pure (some [direct])
+      | .ok _ => pure (some [{ source, target, predicate := direct }])
       | .error (.noTraitImplementation _) =>
           match ← searchCoercionPaths context state trait source target
               context.coercionDepth [{
                 current := source
                 visited := [source]
-                predicates := []
+                steps := []
               }] [] with
-          | some predicates => pure (some predicates)
-          | none => pure (some [direct])
+          | some steps => pure (some steps)
+          | none => pure (some [{ source, target, predicate := direct }])
       | .error error => throw error
 
+/-- Allocate requirement identities for a selected coercion path in path
+order.  Search itself is pure, so rejected overload candidates never consume
+identities in the committed state. -/
+def commitCoercionPlan : State → List PlannedCoercionStep →
+    List CoercionStep × State
+  | state, [] => ([], state)
+  | state, step :: rest =>
+      let (requirement, state) :=
+        state.addRequirementWithId step.predicate
+      let (steps, state) := commitCoercionPlan state rest
+      ({
+        requirement
+        source := step.source
+        target := step.target
+      } :: steps, state)
+
 def isNumericVariable (state : State) (type : Ty) : Bool :=
-  state.numericVariables.any fun metavariable =>
-    decide (state.resolve (.variable metavariable) = state.resolve type)
+  state.numericVariables.any fun origin =>
+    decide (state.resolve (.variable origin.metavariable) = state.resolve type)
 
 def binaryTraitName : Syntax.BinaryOp → String
   | .multiply => "Mul"
@@ -296,25 +328,48 @@ def binaryBuiltinType : Syntax.BinaryOp → Ty
   | .logicalAnd | .logicalOr => .bool
   | _ => .word
 
+/-- Operator inference result together with the obligations introduced by the
+operator occurrence itself. -/
+structure OperatorInferenceResult where
+  type : Ty
+  requirements : List RequirementId
+  state : State
+
 def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
-    (left right : Ty) (state : State) : Except Error (Ty × State) := do
+    (left right : Ty) (state : State) :
+    Except Error OperatorInferenceResult := do
   let state ← unify state left right
   let operand := state.resolve left
   let builtin := binaryBuiltinType operator
   if operand = builtin then
-    pure (if binaryResultIsBool operator then .bool else builtin, state)
+    pure {
+      type := if binaryResultIsBool operator then .bool else builtin
+      requirements := []
+      state
+    }
   else if operand.freeVariables.isEmpty = false && isNumericVariable state operand then
     let state ← unify state operand builtin
-    pure (if binaryResultIsBool operator then .bool else builtin, state)
+    pure {
+      type := if binaryResultIsBool operator then .bool else builtin
+      requirements := []
+      state
+    }
   else
     match ← operatorTrait? context (binaryTraitName operator) with
     | some trait =>
-        let state := state.addRequirement { trait, subject := operand, arguments := [] }
-        pure (if binaryResultIsBool operator then .bool else operand, state)
+        let (requirement, state) := state.addRequirementWithId {
+          trait, subject := operand, arguments := []
+        }
+        pure {
+          type := if binaryResultIsBool operator then .bool else operand
+          requirements := [requirement]
+          state
+        }
     | none => throw (.operatorNotSupported (binaryTraitName operator) operand)
 
 def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
-    (operandType : Ty) (state : State) : Except Error (Ty × State) := do
+    (operandType : Ty) (state : State) :
+    Except Error OperatorInferenceResult := do
   let operand := state.resolve operandType
   let builtin := match operator with
     | .logicalNot => Ty.bool
@@ -323,38 +378,65 @@ def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
     | .logicalNot => "Not"
     | .bitNot => "BitNot"
   if operand = builtin then
-    pure (builtin, state)
+    pure { type := builtin, requirements := [], state }
   else if operand.freeVariables.isEmpty = false && isNumericVariable state operand then
     let state ← unify state operand builtin
-    pure (builtin, state)
+    pure { type := builtin, requirements := [], state }
   else
     match ← operatorTrait? context traitName with
     | some trait =>
-        let state := state.addRequirement { trait, subject := operand, arguments := [] }
-        pure (if operator == .logicalNot then .bool else operand, state)
+        let (requirement, state) := state.addRequirementWithId {
+          trait, subject := operand, arguments := []
+        }
+        pure {
+          type := if operator == .logicalNot then .bool else operand
+          requirements := [requirement]
+          state
+        }
     | none => throw (.operatorNotSupported traitName operand)
 
-def withExpected (context : Context) (state : State) (actual : Ty) : Option Ty →
-    Except Error (Ty × State)
-  | none => .ok (state.resolve actual, state)
+/-- Expected-type checking result for one exact source occurrence. -/
+structure ExpectationResult where
+  expression : InferredExpression
+  coercions : List CoercionStep
+  state : State
+
+def withExpected (context : Context) (state : State)
+    (actual : InferredExpression) : Option Ty →
+    Except Error ExpectationResult
+  | none => .ok {
+      expression := { actual with type := state.resolve actual.type }
+      coercions := []
+      state
+    }
   | some expected =>
-      match state.inference.unify actual expected with
+      match state.inference.unify actual.type expected with
       | .ok inference =>
           let state := { state with inference }
-          .ok (state.resolve expected, state)
+          .ok {
+            expression := { actual with type := state.resolve expected }
+            coercions := []
+            state
+          }
       | .error error =>
           match error with
           | .mismatch _ _ => do
-              let source := state.resolve actual
+              let source := state.resolve actual.type
               let target := state.resolve expected
               match ← coercionPlan? context state source target with
               | none => throw (.unification error)
-              | some predicates =>
-                  pure (target, state.addRequirements predicates)
+              | some plan =>
+                  let (coercions, state) := commitCoercionPlan state plan
+                  pure {
+                    expression := { actual with type := target }
+                    coercions
+                    state
+                  }
           | _ => throw (.unification error)
 
-def candidateWithExpected (context : Context) (state : State) (actual : Ty)
-    (expected : Option Ty) : Except Error (Option (Ty × State)) :=
+def candidateWithExpected (context : Context) (state : State)
+    (actual : InferredExpression) (expected : Option Ty) :
+    Except Error (Option ExpectationResult) :=
   match withExpected context state actual expected with
   | .ok result => .ok (some result)
   | .error (.unification (.mismatch _ _)) => .ok none
@@ -377,35 +459,63 @@ def parameterTypesForArity? : Nat → Ty → Option (List Ty)
       pure (parameter :: parameters)
   | _ + 2, _ => none
 
+structure ExpressionCoercions where
+  expression : ExpressionId
+  coercions : List CoercionStep
+  deriving Repr, BEq, DecidableEq
+
+structure ArgumentFitResult where
+  state : State
+  cost : Nat
+  coercions : List ExpressionCoercions
+
 def fitArguments (context : Context) :
-    State → List Ty → List Ty → Except Error (Option (State × Nat))
-  | state, [], [] => .ok (some (state, 0))
+    State → List InferredExpression → List Ty →
+      Except Error (Option ArgumentFitResult)
+  | state, [], [] => .ok (some { state, cost := 0, coercions := [] })
   | state, argument :: arguments, parameter :: parameters => do
       let requirementMark := state.requirementMark
       match ← candidateWithExpected context state argument (some parameter) with
       | none => pure none
-      | some (_, state) =>
-          let headCost := state.requirementCountSince requirementMark
-          match ← fitArguments context state arguments parameters with
+      | some fitted =>
+          let headCost := fitted.state.requirementCountSince requirementMark
+          match ← fitArguments context fitted.state arguments parameters with
           | none => pure none
-          | some (state, cost) =>
-              pure (some (state, headCost + cost))
+          | some tail =>
+              pure (some {
+                state := tail.state
+                cost := headCost + tail.cost
+                coercions := {
+                  expression := argument.id
+                  coercions := fitted.coercions
+                } :: tail.coercions
+              })
   | _, _, _ => .ok none
+
+structure RequirementAttachment where
+  expression : ExpressionId
+  requirement : RequirementId
+  deriving Repr, BEq, DecidableEq
 
 structure CandidateNumericResult where
   state : State
   cost : Nat
+  requirements : List RequirementAttachment
 
 def defaultCandidateNumericVariable (context : Context)
-    (metavariable : TypeVarId) (state : State) :
+    (origin : NumericOrigin) (state : State) :
     Except Error CandidateNumericResult := do
-  let type := state.resolve (.variable metavariable)
+  let type := state.resolve (.variable origin.metavariable)
   if type = .word then
-    pure { state, cost := 0 }
+    pure { state, cost := 0, requirements := [] }
   else
     match type with
     | .variable _ =>
-        pure { state := ← unify state type .word, cost := 0 }
+        pure {
+          state := ← unify state type .word
+          cost := 0
+          requirements := []
+        }
     | _ =>
         match ← conventionalTrait? context ["FromLiteral", "Numeric"] with
         | none => throw (.nonNumericLiteral type)
@@ -415,21 +525,30 @@ def defaultCandidateNumericVariable (context : Context)
               subject := type
               arguments := []
             }
-            pure { state := state.addRequirement predicate, cost := 1 }
+            let (requirement, state) := state.addRequirementWithId predicate
+            pure {
+              state
+              cost := 1
+              requirements := [{ expression := origin.expression, requirement }]
+            }
 
 def defaultCandidateNumerics (context : Context) :
-    List TypeVarId → State → Except Error CandidateNumericResult
-  | [], state => .ok { state, cost := 0 }
-  | metavariable :: rest, state => do
-      let head ← defaultCandidateNumericVariable context metavariable state
+    List NumericOrigin → State → Except Error CandidateNumericResult
+  | [], state => .ok { state, cost := 0, requirements := [] }
+  | origin :: rest, state => do
+      let head ← defaultCandidateNumericVariable context origin state
       let tail ← defaultCandidateNumerics context rest head.state
-      pure { state := tail.state, cost := head.cost + tail.cost }
+      pure {
+        state := tail.state
+        cost := head.cost + tail.cost
+        requirements := head.requirements ++ tail.requirements
+      }
 
 def removeCandidateNumerics (state : State)
-    (metavariables : List TypeVarId) : State := {
+    (origins : List NumericOrigin) : State := {
   state with
-  numericVariables := state.numericVariables.filter fun metavariable =>
-    !metavariables.contains metavariable
+  numericVariables := state.numericVariables.filter fun origin =>
+    !origins.contains origin
 }
 
 def validateCandidatePredicates (context : Context) (state : State) :
@@ -444,13 +563,18 @@ def validateCandidatePredicates (context : Context) (state : State) :
         validateCandidatePredicates context state rest
 
 structure CandidateAttemptResult where
-  result : Ty
+  instantiation : DeclarationInstantiation
+  result : InferredExpression
+  argumentCoercions : List ExpressionCoercions
+  callCoercions : List CoercionStep
+  signatureRequirements : List RequirementId
+  numericRequirements : List RequirementAttachment
   state : State
   cost : Nat
 
 def tryFunctionCandidate (context : Context)
-    (argumentTypes : List Ty) (numericVariables : List TypeVarId)
-    (expected : Option Ty) (state : State)
+    (arguments : List InferredExpression) (numericOrigins : List NumericOrigin)
+    (call : ExpressionId) (expected : Option Ty) (state : State)
     (signature : ProgramFunctionSignature) :
     Except Error (Option CandidateAttemptResult) :=
   let requirementMark := state.requirementMark
@@ -463,34 +587,44 @@ def tryFunctionCandidate (context : Context)
       | some parameters =>
           let inference := { state.inference with next := instantiated.next }
           let state := { state with inference }
-          match ← fitArguments context state argumentTypes parameters with
+          match ← fitArguments context state arguments parameters with
           | none => pure none
-          | some (state, argumentCost) =>
-              let resultRequirementMark := state.requirementMark
-              match ← candidateWithExpected context state result expected with
+          | some fittedArguments =>
+              let resultRequirementMark := fittedArguments.state.requirementMark
+              match ← candidateWithExpected context fittedArguments.state
+                  { id := call, type := result } expected with
               | none => pure none
-              | some (result, state) =>
-                  let resultCost := state.requirementCountSince
+              | some fittedResult =>
+                  let resultCost := fittedResult.state.requirementCountSince
                     resultRequirementMark
                   let numeric ←
-                    defaultCandidateNumerics context numericVariables state
-                  let state := removeCandidateNumerics numeric.state numericVariables
+                    defaultCandidateNumerics context numericOrigins fittedResult.state
+                  let state := removeCandidateNumerics numeric.state numericOrigins
                   let introducedRequirements :=
                     state.requirementsSince requirementMark
                   validateCandidatePredicates context state
                     (instantiated.predicates ++
                       introducedRequirements.map (·.predicate))
+                  let (signatureRequirements, state) :=
+                    state.addRequirementsWithIds instantiated.predicates
                   pure (some {
-                    result := state.resolve result
-                    state := state.addRequirements instantiated.predicates
-                    cost := argumentCost + resultCost + numeric.cost
+                    instantiation :=
+                      DeclarationInstantiation.ofInstantiated signature.id instantiated
+                    result := {
+                      fittedResult.expression with
+                      type := state.resolve fittedResult.expression.type
+                    }
+                    argumentCoercions := fittedArguments.coercions
+                    callCoercions := fittedResult.coercions
+                    signatureRequirements
+                    numericRequirements := numeric.requirements
+                    state
+                    cost := fittedArguments.cost + resultCost + numeric.cost
                   })
 
 structure CandidateSuccess where
   signature : ProgramFunctionSignature
-  result : Ty
-  state : State
-  cost : Nat
+  attempt : CandidateAttemptResult
 
 structure CandidateSearch where
   successes : List CandidateSuccess := []
@@ -508,9 +642,7 @@ def collectCandidateAttempts
       | .ok (some result) => {
           tail with successes := {
             signature
-            result := result.result
-            state := result.state
-            cost := result.cost
+            attempt := result
           } :: tail.successes
         }
       | .error error => { tail with failures := error :: tail.failures }
@@ -534,18 +666,18 @@ def firstNoSolution? : List Error → Option Error
 def minimumCandidateCost : List CandidateSuccess → Option Nat
   | [] => none
   | success :: rest => some <| rest.foldl
-      (fun cost candidate => min cost candidate.cost) success.cost
+      (fun cost candidate => min cost candidate.attempt.cost) success.attempt.cost
 
 def bestCandidateSuccesses (successes : List CandidateSuccess) :
     List CandidateSuccess :=
   match minimumCandidateCost successes with
   | none => []
-  | some cost => successes.filter fun success => success.cost == cost
+  | some cost => successes.filter fun success => success.attempt.cost == cost
 
 def selectCandidateSearch (name : String)
     (allCandidates : List ProgramFunctionSignature)
     (search : CandidateSearch) :
-    Except Error (Ty × State) :=
+    Except Error CandidateAttemptResult :=
   match bestCandidateSuccesses search.successes with
   | [] =>
       match firstBlockingFailure? search.failures with
@@ -557,38 +689,65 @@ def selectCandidateSearch (name : String)
   | [success] =>
       match firstBlockingFailure? search.failures with
       | some error => .error error
-      | none => .ok (success.result, success.state)
+      | none => .ok success.attempt
   | successes =>
       .error (.ambiguousOverload name
         (successes.map fun success => success.signature.id))
 
 def selectFunctionCandidateFrom (context : Context) (name : String)
     (candidates : List ProgramFunctionSignature)
-    (argumentTypes : List Ty) (numericVariables : List TypeVarId)
-    (expected : Option Ty) (state : State) :
-    Except Error (Ty × State) :=
+    (arguments : List InferredExpression) (numericOrigins : List NumericOrigin)
+    (call : ExpressionId) (expected : Option Ty) (state : State) :
+    Except Error CandidateAttemptResult :=
   let search := collectCandidateAttempts
-    (tryFunctionCandidate context argumentTypes numericVariables expected state)
+    (tryFunctionCandidate context arguments numericOrigins call expected state)
     candidates
   selectCandidateSearch name candidates search
 
 def selectFunctionCandidate (context : Context) (name : String)
-    (argumentTypes : List Ty) (numericVariables : List TypeVarId)
-    (expected : Option Ty) (state : State) :
-    Except Error (Ty × State) := do
+    (arguments : List InferredExpression) (numericOrigins : List NumericOrigin)
+    (call : ExpressionId) (expected : Option Ty) (state : State) :
+    Except Error CandidateAttemptResult := do
   selectFunctionCandidateFrom context name (← functionsNamed context name)
-    argumentTypes numericVariables expected state
+    arguments numericOrigins call expected state
 
-def applyFunctionType (context : Context) (calleeType argumentType : Ty)
-    (expected : Option Ty) (state : State) : Except Error (Ty × State) :=
+structure IndirectApplicationResult where
+  result : InferredExpression
+  argumentCoercions : List CoercionStep
+  callCoercions : List CoercionStep
+  state : State
+
+/-- Apply an indirectly obtained function type.  The existing bundled-argument
+acceptance behavior is preserved; any coercion of that bundle is attributed to
+the call occurrence because there is no synthetic tuple expression node. -/
+def applyFunctionType (context : Context) (call : ExpressionId)
+    (calleeType : Ty) (arguments : List InferredExpression)
+    (expected : Option Ty) (state : State) :
+    Except Error IndirectApplicationResult :=
+  let argumentType := Ty.productMany (arguments.map (·.type))
   match functionParts? (state.resolve calleeType) with
   | some (parameter, result) => do
-      let (_, state) ← withExpected context state argumentType (some parameter)
-      withExpected context state result expected
+      let fittedArgument ← withExpected context state
+        { id := call, type := argumentType } (some parameter)
+      let fittedResult ← withExpected context fittedArgument.state
+        { id := call, type := result } expected
+      pure {
+        result := fittedResult.expression
+        argumentCoercions := fittedArgument.coercions
+        callCoercions := fittedResult.coercions
+        state := fittedResult.state
+      }
   | none => do
       let (resultType, state) := state.fresh
       let state ← unify state calleeType (.function argumentType resultType)
-      withExpected context state resultType expected
+      let fittedResult ← withExpected context state
+        { id := call, type := resultType } expected
+      pure {
+        result := fittedResult.expression
+        argumentCoercions := []
+        callCoercions := fittedResult.coercions
+        state := fittedResult.state
+      }
 
 def calleeIdentifier? : Syntax.Expr → Option String
   | ⟨_, .identifier name⟩ => some name.value

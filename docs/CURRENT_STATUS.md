@@ -35,9 +35,9 @@ grammar; this does not block use of the Lean parser API.
 An initial executable whole-program static-semantics path now consumes that
 canonical syntax.  It loads a workspace, constructs declaration and type
 environments, resolves signatures and predicates, infers the supported source
-fragment, and returns checked functions with trait evidence.  This checker is
-an internal Lean API; it does not yet lower source programs to Semantic Core or
-publish a source Oracle.
+fragment, and returns checked functions with occurrence-addressed typed bodies
+and trait evidence.  This checker is an internal Lean API; it does not yet
+lower source programs to Semantic Core or publish a source Oracle.
 
 ## What works now
 
@@ -5635,29 +5635,34 @@ End-to-end regressions cover ordered multi-step coercions, speculative overload
 rollback without ID gaps, inference-to-finalization continuity and distinct IDs
 for repeated equal predicates.
 
-The current checker does not yet retain the selected overload, local binder
-identity, coercion insertion site or ordered requirement IDs at each expression
-occurrence in its result.  The additive typed-IR schema for those facts is now
-implemented: declaration-owned occurrence IDs have category-safe expression,
-statement and root wrappers; nodes retain typed binders, complete generic
-declaration instantiations, requirement IDs and ordered coercion steps; and
-final substitution preserves every identity while closing embedded types,
-schemes and predicates.  The selected generic instantiation also retains its
-exact rigid-parameter substitution.  Small checked laws and an executable
-carrier regression cover identity preservation, category-safe lookup and
-substitution through declaration and coercion metadata.
+The source traversal now populates that typed-IR schema.  Every supported
+expression and statement receives a declaration-owned occurrence identity;
+function inputs, lambda parameters and nested lets retain stable binder
+identities across lexical shadowing; and roots use category-safe expression or
+statement wrappers.  Direct calls retain the selected declaration, exact
+generic-parameter substitution and instantiated predicates, while indirect
+calls retain their semantic callee occurrence.  Ordered coercion steps are
+attached to the argument or result occurrence where they are required,
+operator and signature obligations are attached to their introducing node,
+and literal-defaulting obligations return to the originating literal.  Losing
+overload candidates cannot contribute nodes, requirements or allocator state.
 
-The next carrier step threads this node table through inference and attaches
-the already allocated requirement IDs to their exact occurrences.  A
-whole-program reference to an obligation is the owning declaration paired with
-its function-local requirement ID.
+Finalization applies the inference substitution through node types, binder
+schemes, declaration instantiations, predicates and coercion endpoints without
+changing any identity.  The checked function exposes this closed node table as
+its typed body together with the canonical solved-requirement list.  End-to-end
+regressions cover nested shadowing, generic overload selection, rejected
+candidates, a two-edge coercion path, operator evidence, literal defaulting,
+category-safe lookup and a one-owner correspondence between attached and
+solved requirement identities.  Small checked laws cover allocator and
+substitution identity preservation; general preservation and ownership
+completeness theorems remain deferred under the executable-first proof policy.
 
-The inference state is prepared for that traversal: it owns the declaration,
-stable input and nested local binders, monotone local/occurrence allocators and
-an append-ordered typed-node table.  Lexical restoration changes only the
-visible type/binder scope and cannot rewind identities, requirements or nodes.
-Allocation/restoration laws and executable shadowing/node-table regressions are
-checked.  Expression and statement traversal still needs to populate the table.
+The next frontend boundary is to use this resolved typed body as the input to
+explicit conversion/specialization and Semantic Core elaboration, while adding
+constructors, members and place-aware statements in dependency order.  A
+whole-program reference to an obligation remains the owning declaration paired
+with its function-local requirement identity.
 
 ## What is not yet claimed
 

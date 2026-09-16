@@ -10,9 +10,9 @@ open TypeSystem
 
 namespace Detail
 
-def defaultNumericVariable (context : Context) (metavariable : TypeVarId)
+def defaultNumericVariable (context : Context) (origin : NumericOrigin)
     (state : State) : Except Error State := do
-  let type := state.resolve (.variable metavariable)
+  let type := state.resolve (.variable origin.metavariable)
   if type = .word then
     pure state
   else
@@ -20,26 +20,33 @@ def defaultNumericVariable (context : Context) (metavariable : TypeVarId)
     | .variable _ => unify state type .word
     | _ =>
         match ← conventionalTrait? context ["FromLiteral", "Numeric"] with
-        | some trait => pure (state.addRequirement {
-            trait, subject := type, arguments := []
-          })
+        | some trait =>
+            let (requirement, state) := state.addRequirementWithId {
+              trait, subject := type, arguments := []
+            }
+            pure (state.modifyExpressionNode origin.expression fun node => {
+              node with requirements := node.requirements ++ [requirement]
+            })
         | none => throw (.nonNumericLiteral type)
 
 def defaultNumerics (context : Context) :
-    List TypeVarId → State → Except Error State
+    List NumericOrigin → State → Except Error State
   | [], state => .ok state
-  | metavariable :: rest, state => do
-      let state ← defaultNumericVariable context metavariable state
+  | origin :: rest, state => do
+      let state ← defaultNumericVariable context origin state
       defaultNumerics context rest state
 
-def finalize (context : Context) (type : Ty) (state : State) :
+def finalize (context : Context) (type : Ty) (state : State)
+    (roots : List NodeId) :
     Except Error Result := do
   let state ← defaultNumerics context state.numericVariables state
   let solvedRequirements ← solveRequirements context state state.requirements
+  let substitution := state.inference.substitution
   pure {
     type := state.resolve type
-    substitution := state.inference.substitution
+    substitution
     solvedRequirements
+    typedSource := (state.toTypedSource roots).applySubstitution substitution
   }
 
 end Detail
@@ -48,17 +55,18 @@ end Detail
 def inferExpression (context : Context) (expression : Syntax.Expr)
     (locals : TypeSystem.Environment := []) (fuel : Nat := 1024) :
     Except Error Result := do
-  let (type, state) ← Detail.inferExprFuel fuel context expression none
+  let (expression, state) ← Detail.inferExprFuel fuel context expression none
     (.initial context.scope.genericOwner locals)
-  Detail.finalize context type state
+  Detail.finalize context expression.type state [.expression expression.id]
 
 /-- Check one source expression against an expected semantic source type. -/
 def checkExpression (context : Context) (expression : Syntax.Expr) (expected : Ty)
     (locals : TypeSystem.Environment := []) (fuel : Nat := 1024) :
     Except Error Result := do
-  let (type, state) ← Detail.inferExprFuel fuel context expression (some expected)
+  let (expression, state) ← Detail.inferExprFuel fuel context expression
+    (some expected)
     (.initial context.scope.genericOwner locals)
-  Detail.finalize context type state
+  Detail.finalize context expression.type state [.expression expression.id]
 
 private def functionLocals (signature : ProgramFunctionSignature) :
     TypeSystem.Environment :=
@@ -89,12 +97,14 @@ def checkFunctionBody (environment : ProgramEnvironment)
     expected state
   let state ← Detail.unify body.state body.type expected
   let result ← Detail.finalize context expected state
+    (body.statements.map NodeId.statement)
   pure {
     declaration := signature.id
     type := signature.scheme.body
     inferredBodyType := result.type
     substitution := result.substitution
     solvedRequirements := result.solvedRequirements
+    typedBody := result.typedSource
   }
 
 private def checkFunctionBodiesAux (environment : ProgramEnvironment)
