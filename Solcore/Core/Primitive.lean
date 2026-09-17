@@ -21,6 +21,12 @@ def sub (left right : Word) : Word :=
 def mul (left right : Word) : Word :=
   left * right
 
+set_option doc.verso true in
+/-- Add the mathematical operand values before reducing by the explicit modulus;
+a zero modulus produces zero. This differs from wrapping the sum modulo
+{lean}`wordModulus` before taking a remainder. The multiplication counterpart
+uses the same full-intermediate-result convention.
+-/
 def addMod (left right modulus : Word) : Word :=
   if modulus.val = 0 then zero
   else ofNatModulo ((left.val + right.val) % modulus.val)
@@ -49,6 +55,11 @@ decreasing_by
 def pow (base exponent : Word) : Word :=
   ofNatModulo (modularPowLoop base.val 1 exponent.val)
 
+set_option doc.verso true in
+/-- Unsigned Word division is total: a zero divisor produces zero. This function
+operates on values; a Core binary expression still evaluates both operands
+in order before applying it.
+-/
 def udiv (left right : Word) : Word :=
   if right.val = 0 then zero else left / right
 
@@ -85,6 +96,11 @@ def shiftLeft (value shift : Word) : Word :=
 def shiftRight (value shift : Word) : Word :=
   if shift.val < 256 then value >>> shift else zero
 
+set_option doc.verso true in
+/-- Arithmetic right shift extends the sign bit. Oversized shifts produce zero
+for nonnegative values and all one bits for negative values. Logical right
+shift instead fills with zero and produces zero for oversized shifts.
+-/
 def shiftArithmeticRight (value shift : Word) : Word :=
   if shift.val < 256 then
     if value.val < 2 ^ 255 then
@@ -98,6 +114,10 @@ def shiftArithmeticRight (value shift : Word) : Word :=
   else
     maximum
 
+set_option doc.verso true in
+/-- Select a byte using index zero for the most significant byte. An index of
+32 or greater produces zero. The result is a Word containing that byte.
+-/
 def byteAt (index value : Word) : Word :=
   if index.val < 32 then
     ofNatModulo ((value.val / 2 ^ (8 * (31 - index.val))) % 256)
@@ -327,6 +347,11 @@ private def wordSgtWithSwappedValues (left right : Expr) : Expr :=
 def wordNe (left right : Expr) : Expr :=
   .unary .boolNot (.binary .wordEq left right)
 
+set_option doc.verso true in
+/-- Convert a Boolean expression to Word one or zero by expanding to a
+conditional. The operand occurs once. This builder introduces no new Core or
+machine constructor; its semantics comes from the existing conditional rules.
+-/
 def boolToWord (value : Expr) : Expr :=
   .ifE value (.word (Word.ofNatModulo 1)) (.word Word.zero)
 

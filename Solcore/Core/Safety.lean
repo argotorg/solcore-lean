@@ -449,6 +449,12 @@ theorem RuntimeEnvironmentHasTypes.weaken
     intro _ _ _ _ _ _ _ valueIH environmentIH
     exact .cons valueIH environmentIH
 
+set_option doc.verso true in
+/-- A store typing records the element type of each allocated location.
+{lean}`StoreHasTypes` connects those types to the store's actual contents.
+Allocation can extend the typing; a typed write preserves existing locations
+and their element types.
+-/
 structure StoreHasTypes (world : StoreTyping) (store : Store) : Prop where
   length_eq : world.length = store.length
   lookup :
@@ -693,6 +699,15 @@ theorem BranchesHaveType.branch_exists
 
 /-! ## Preservation for the state-threaded evaluator -/
 
+set_option doc.verso true in
+/-- Given a successful evaluation, expression typing, a matching runtime
+environment, and a well-typed initial store, the result has the expected type
+and the final store remains well typed under an extension of the initial store
+typing. This tracks newly allocated locations as well as the returned value.
+
+The successful evaluation is a premise; preservation alone is not a
+termination theorem.
+-/
 theorem evaluation_preserves_type
     {definitions : DataEnvironment}
     {environment : Environment} {context : Context}
@@ -1795,6 +1810,16 @@ theorem reducible_environment_evaluates
   exact ⟨finalWorld, finalStore, value, extension, finalStoreTyping,
     evaluation, valueReducible.runtimeHasType⟩
 
+set_option doc.verso true in
+/-- A typed expression evaluates to a value of its expected type when the data
+definitions are well formed and the runtime environment and local store match
+their typings. The final store remains well typed, possibly under an extended
+store typing that accounts for newly allocated locations.
+
+The conclusion includes an evaluation, so this is an existence result as well
+as a typing guarantee. It applies to the pure Core runtime typing used here;
+host-enabled execution has a separate boundary.
+-/
 theorem well_typed_evaluates
     {definitions : DataEnvironment}
     {context : Context} {expr : Expr} {type : Ty}
@@ -1827,6 +1852,15 @@ theorem closed_well_typed_evaluates
   exact ⟨finalWorld, finalStore, value,
     finalStoreTyping, evaluation, valueTyping⟩
 
+set_option doc.verso true in
+/-- A closed, well-typed pure Core expression with well-formed data definitions
+has a successful fuel budget, a result of the expected type, and a well-typed
+final store. The initial environment and store are empty.
+
+This is a termination result for this Core boundary. The restriction to
+first-order cell payloads matters; allowing function-valued mutable cells
+would require revisiting the termination argument.
+-/
 theorem closed_well_typed_runStateful_completes
     {definitions : DataEnvironment}
     {expr : Expr} {type : Ty}
@@ -2771,6 +2805,14 @@ theorem initial_state_has_type
     StateHasType (State.initial expr) type definitions :=
   .eval .nil .nil typing .nil
 
+set_option doc.verso true in
+/-- A run starting from a {lean}`StateHasType` state cannot produce a raw
+machine fault, for any fuel budget. State typing includes the required
+relationships among control, environment, continuation, and local store.
+
+This does not exclude exhaustion of an insufficient budget. Defined contract
+reverts and host failures belong to separate execution boundaries.
+-/
 theorem well_typed_runStateful_never_faults
     {definitions : DataEnvironment}
     {fuel : Nat} {state faultState : State}

@@ -8,7 +8,14 @@ set_option autoImplicit false
 
 namespace Solcore.Semantics.BalancedTopLevelExecution
 
-/-- A pre-execution transfer rejection with an exact identity commit. -/
+set_option doc.verso true in
+/-- A root balance-preflight rejection leaves the initial world unchanged and
+commits an empty rollback-scoped journal. Its stored equations certify those
+facts and its committed delta connects the identical endpoints.
+
+This represents rejection before contract execution, rather than a contract
+that ran and then reverted.
+-/
 structure RejectedResult (initialWorld : WorldState) where
   failure : BalanceTransferFailure
   finalWorld : WorldState

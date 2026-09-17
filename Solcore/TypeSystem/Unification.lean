@@ -73,7 +73,16 @@ def unifyWithFuel (fuel : Nat) (constraints : List Constraint) :
     Except Error Substitution :=
   loop fuel [] constraints
 
-/-- First-order unification with an occurs check. -/
+set_option doc.verso true in
+/-- First-order unification with an occurs check and an explicit bounded search.
+The occurs check prevents solving a variable by a type containing that same
+variable, which would require an infinite type.
+
+The default fuel is a bounded polynomial budget. Exhaustion reports
+{lean}`Error.exhausted`; it is not evidence that the constraints are inconsistent.
+This executable kernel alone does not establish a broad source type-system
+soundness-and-completeness theorem.
+-/
 def unify (constraints : List Constraint) : Except Error Substitution :=
   unifyWithFuel (defaultFuel constraints) constraints
 

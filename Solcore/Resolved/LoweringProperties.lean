@@ -62,6 +62,11 @@ theorem Expr.lower?_sound {scope : List LocalId} {expr : Expr} {core : Core.Expr
       cases result
       exact .ifE (conditionIH conditionLowered) (thenIH thenLowered) (elseIH elseLowered)
 
+set_option doc.verso true in
+/-- Executable lowering returns the given Core expression exactly when the
+{lean}`Lowers` relation holds under the supplied scope. A missing reference
+fails lowering rather than receiving a default positional index.
+-/
 theorem Expr.lower?_iff {scope : List LocalId} {expr : Expr} {core : Core.Expr} :
     expr.lower? scope = some core ↔ Lowers scope expr core :=
   ⟨Expr.lower?_sound, Lowers.complete⟩

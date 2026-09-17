@@ -34,9 +34,15 @@ inductive TypeConstructorId where
   | declaration (id : Resolved.DeclarationId)
   deriving Repr, DecidableEq
 
-/--
-Semantic source types.  `variable` is flexible; `parameter` is rigid.
-Nominal arguments are represented by left-associated `application` nodes.
+set_option doc.verso true in
+/-- Source types distinguish flexible inference variables from rigid generic
+parameters. An inference variable is a question the checker may solve; a generic
+parameter belongs to a declaration and stands for a type supplied at use.
+Nominal arguments are represented by left-associated applications.
+
+The language also represents functions, products, mappings, proxy types, and
+compile-time forms. Representation here does not establish that every form
+has a runtime Core elaboration.
 -/
 inductive Ty where
   | variable (id : TypeVarId)

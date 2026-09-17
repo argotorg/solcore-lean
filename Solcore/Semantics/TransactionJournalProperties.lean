@@ -39,7 +39,11 @@ namespace Solcore.Semantics.TransactionJournal
     (journal.recordCreatedContract address).logList = journal.logList := by
   rfl
 
-/-- Sequential log recording retains duplicates in chronological order. -/
+set_option doc.verso true in
+/-- Sequential recording appends the two logs in chronological order and retains
+duplicates. The log observation is a sequence, not a set that may be sorted
+or deduplicated without changing the result.
+-/
 theorem logList_record_two
     (journal : TransactionJournal)
     (first second : CheckedCoreWordLog) :

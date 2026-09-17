@@ -9,7 +9,15 @@ universe u
 
 namespace FrameOutcome
 
-/-- Resolve return and revert states while leaving trap disposition open. -/
+set_option doc.verso true in
+/-- Resolve a frame's return to the working world and its revert to the
+checkpoint. A trap yields {lean}`none`: this generic helper leaves trap
+disposition to its caller.
+
+That open trap disposition must not be confused with the root execution policy,
+which selects rollback on trap. The checkpoint and working world are explicit
+inputs; selecting one does not imply the other was never computed.
+-/
 def resolvedWorldState?
     {TrapReason : Type u}
     (checkpoint working : WorldState)

@@ -21,6 +21,12 @@ universe u v w
       some (workingWorld, effectWorking) := by
   rfl
 
+set_option doc.verso true in
+/-- Revert selects the checkpoint world and rollback journal together, while
+retaining the working trace component. This keeps speculative logs from being
+committed alongside restored state. A trace can retain attempted work without
+making it a committed contract effect.
+-/
 @[simp] theorem resolvedWorldStateAndEffects?_reverted
     {RollbackState : Type u} {TraceState : Type v}
     {TrapReason : Type w}

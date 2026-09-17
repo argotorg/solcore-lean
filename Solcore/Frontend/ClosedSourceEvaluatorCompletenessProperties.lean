@@ -21,7 +21,15 @@ private theorem eventually_step {P : Nat → Prop} (threshold : Nat)
   | zero => omega
   | succ n => exact step n (by omega)
 
-/-- Every finite expression derivation is found at all sufficiently large depths. -/
+set_option doc.verso true in
+/-- Given a finite source-expression evaluation derivation, all sufficiently
+large evaluator budgets return its result and final store. The bound depends
+on the derivation rather than just source size.
+
+The evaluation derivation is a premise. This is not an unconditional
+termination theorem for arbitrary source expressions, nor an exact Core
+transition-cost theorem.
+-/
 theorem evaluateClosedSourceExpression?_eventually_complete
     {owner names captured initialStore source value finalStore}
     (evaluated : ClosedSourceExpressionEvaluates owner names captured initialStore source value finalStore) :

@@ -14,7 +14,16 @@ structure Account where private mk ::
   private balanceValue : Core.Word
   private nonceValue : Core.Word
 
-/-- Semantic lookup for an explicitly present or absent account. -/
+set_option doc.verso true in
+/-- A world maps addresses to explicitly present or absent accounts. Accounts
+contain balances, nonces, optional checked code, and sparse Word storage.
+Storage keys and values are Words, unlike a Core-local cell's location and type.
+
+A missing slot in a present account reads as zero. Writing zero removes the
+sparse entry without changing that observed value. An absent account remains
+a different case: world-level reads and writes retain presence information
+through optional results.
+-/
 structure WorldState where private mk ::
   private accounts : Address → Option Account
 

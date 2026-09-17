@@ -4,6 +4,12 @@ namespace Solcore.Core
 
 def wordModulus : Nat := 2 ^ 256
 
+set_option doc.verso true in
+/-- An unsigned natural number less than {lean}`wordModulus`, which is
+{lean}`2 ^ 256`. Arithmetic on this finite type wraps at that boundary.
+Signed operations interpret these same bits; they do not add a separate
+signed runtime type.
+-/
 abbrev Word := Fin wordModulus
 
 namespace Word
@@ -22,6 +28,15 @@ structure DataTypeId where
   index : Nat
   deriving Repr, BEq, DecidableEq
 
+set_option doc.verso true in
+/-- Core types include unit, Boolean, Word, products, sums, functions, local
+cells, and named data. Unit carries no interesting information. A product
+carries both components; a sum carries one alternative with a tag.
+
+Functions evaluate to closures containing a body and captured environment.
+A cell value refers to an entry in a separate local store. Boolean values
+remain distinct from Word-valued flags such as zero and one.
+-/
 inductive Ty where
   | unit
   | bool
@@ -44,6 +59,11 @@ structure DataDefinition where
 
 abbrev DataEnvironment := List DataDefinition
 
+set_option doc.verso true in
+/-- The types admitted as local cell contents: unit, Boolean, Word, and products
+and sums recursively built from them. Functions, cells, and named data are
+excluded. A Core type is therefore not automatically a permitted cell payload.
+-/
 inductive CellPayload : Ty → Prop where
   | unit : CellPayload .unit
   | bool : CellPayload .bool
@@ -504,6 +524,16 @@ end TernaryOp
 
 abbrev Location := Nat
 
+set_option doc.verso true in
+/-- Core expressions use positions in an environment: zero is the newest binding,
+one the next, and so on. A let evaluates its initializer under the old
+environment, then extends that environment for its body.
+
+Evaluation order is part of the dynamic meaning. Binary primitives and pairs
+evaluate left, then right. Function application evaluates the function and its
+argument before entering the body with the argument followed by the captured
+environment. A conditional evaluates only its selected branch.
+-/
 inductive Expr where
   | unit
   | bool (value : Bool)
@@ -521,6 +551,15 @@ inductive Expr where
   | loadCell (reference : Expr)
   | storeCell (reference value : Expr)
   | construct (constructor : ConstructorId) (payload : Expr)
+  /-- Named-data matching uses an exhaustive branch list in constructor-table
+  order and an explicit result type. The selected constructor's single payload
+  becomes environment position zero. The result annotation also supports
+  elimination of an empty data type.
+
+  Data definitions may be recursive or mutually recursive while constructed
+  runtime values remain finite. Source wildcards, nested patterns, guards,
+  and source arm ordering need a separate frontend translation.
+  -/
   | matchData
       (dataType : DataTypeId)
       (resultType : Ty)

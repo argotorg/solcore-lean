@@ -284,6 +284,12 @@ theorem typed_hostApplication_emits
   | emitLogWord =>
       exact typed_emitLogWord_emits valueTyping
 
+set_option doc.verso true in
+/-- A typed host-aware machine state can finish, take an ordinary transition,
+or emit a host request. The host request is a permitted next action, not a
+stuck computation. This theorem does not promise that every requested contract
+call succeeds or supply an implementation of the host.
+-/
 theorem host_state_progress
     {definitions : DataEnvironment}
     {state : State} {resultType : Ty}
@@ -402,6 +408,11 @@ theorem host_state_progress
                   | false => exact .inr (.inl ⟨_, .core .chooseFalse⟩)
                   | true => exact .inr (.inl ⟨_, .core .chooseTrue⟩)
 
+set_option doc.verso true in
+/-- A typed host-aware machine state cannot immediately produce a raw machine
+fault. The guarantee concerns the machine's next action; a defined failed call,
+revert, or other host outcome is a separate semantic result.
+-/
 theorem well_typed_host_state_never_faults
     {definitions : DataEnvironment}
     {state : State} {resultType : Ty} {error : MachineFault}

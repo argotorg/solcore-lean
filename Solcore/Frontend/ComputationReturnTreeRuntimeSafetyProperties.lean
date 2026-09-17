@@ -10,6 +10,23 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
+set_option doc.verso true in
+/-- A computation return tree inherits runtime safety from its child contracts.
+The premises require child typing, membership in a Core fragment preserved by
+weakening, evaluation invariant under insertion, source/Core correspondence,
+and costs realized by machine paths under every continuation.
+
+Given an elaborated body and a runtime environment whose identities match the
+input context and whose values share a store typing with the initial store,
+the result includes a typed value, a well-typed final store under an extended
+store typing, and source evaluation with an exact cost. It also gives a Core
+path under any continuation. From the initial state, execution succeeds
+exactly when the budget reaches that cost, and exhausts exactly below it.
+
+The child contracts are premises, not guarantees supplied for arbitrary source
+expressions. The path under a pending continuation stops at the returned value;
+it does not assert completion of the surrounding computation.
+-/
 theorem ComputationReturnTreeElaborates.runtime_typed_execution
     {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}
     {ChildEval : LocalNameTable → Resolved.Environment → Core.Store → Syntax.Expr → Core.Value → Core.Store → Prop}

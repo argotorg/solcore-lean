@@ -104,6 +104,15 @@ theorem Evaluates.ofCore
     Evaluates environment initialStore expr value finalStore :=
   evaluation_of_core_scope lowered rfl evaluation
 
+set_option doc.verso true in
+/-- Successful lowering under the identities of a named environment connects
+named evaluation to Core evaluation using that environment's values, in both
+directions. Both sides have the same initial store, result value, and final
+store.
+
+Lowering is a premise. This theorem covers the local Resolved expression
+fragment, not general source compilation or an external compiler.
+-/
 theorem Lowers.evaluates_iff
     {environment : Environment} {initialStore finalStore : Core.Store}
     {expr : Expr} {core : Core.Expr} {value : Core.Value}

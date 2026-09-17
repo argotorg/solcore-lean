@@ -33,6 +33,13 @@ theorem Steps.final_unique {leftSteps rightSteps : Nat} {start : State}
               obtain ⟨sameSteps, sameValue, sameStore⟩ := ih leftTail rightTail
               exact ⟨congrArg (fun count => count + 1) sameSteps, sameValue, sameStore⟩
 
+set_option doc.verso true in
+/-- For a known path of {lean}`steps` transitions to a final state, the runner
+returns that value and store exactly when the fuel covers the path length.
+
+The terminating path is a premise. An exhausted run alone does not provide
+such a path or establish its length.
+-/
 theorem Steps.runStateful_done_iff {steps fuel : Nat} {start : State}
     {value : Value} {finalStore : Store}
     (path : Steps steps start (State.final value finalStore)) :

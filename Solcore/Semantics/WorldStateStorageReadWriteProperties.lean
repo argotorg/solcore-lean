@@ -7,7 +7,11 @@ set_option autoImplicit false
 
 namespace Solcore.Semantics
 
-/-- Reading the written slot observes the new value after a successful write. -/
+set_option doc.verso true in
+/-- Reading the written slot observes the new value after a successful world
+storage write. Account presence is retained in the optional result: a missing
+account does not become an account with a zero-valued slot.
+-/
 @[simp] theorem WorldState.readStorage?_writeStorage?_same
     (state : WorldState) (address : Address)
     (slot value : Core.Word) :
@@ -33,7 +37,11 @@ namespace Solcore.Semantics
           (account.storageWrite slot value))]
       rw [Account.storageRead_storageWrite_same]
 
-/-- Writing another slot preserves the selected slot read. -/
+set_option doc.verso true in
+/-- Writing a different slot preserves the selected slot's read, provided the
+addressed account exists. The inequality premise identifies the read that is
+unaffected; account absence remains explicit in the optional result.
+-/
 @[simp] theorem WorldState.readStorage?_writeStorage?_other_slot
     (state : WorldState) (address : Address)
     (writtenSlot value readSlot : Core.Word)
@@ -64,7 +72,11 @@ namespace Solcore.Semantics
         readSlot different]
       simp [present]
 
-/-- Writing another address preserves the selected address read. -/
+set_option doc.verso true in
+/-- Writing a different address preserves the selected address and slot's read.
+The inequality premise separates the accounts, and the optional result retains
+the requirement that the written account exists.
+-/
 @[simp] theorem WorldState.readStorage?_writeStorage?_other_address
     (state : WorldState) (writtenAddress readAddress : Address)
     (writtenSlot value readSlot : Core.Word)

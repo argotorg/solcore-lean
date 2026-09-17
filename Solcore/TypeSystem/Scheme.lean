@@ -37,7 +37,12 @@ private def freshSubstitution :
           freshSubstitution variables (next + 1)
             ((metavariable, .variable ⟨next⟩) :: substitution)
 
-/-- Instantiate every quantified variable with a distinct fresh metavariable. -/
+set_option doc.verso true in
+/-- Instantiate quantified variables of a rank-1 scheme with distinct fresh
+inference variables. Separate uses can then solve their fresh variables
+independently: using a generic function with a Word must not constrain an
+unrelated Boolean use. The caller supplies the next fresh variable index.
+-/
 def instantiate (scheme : Scheme) (next : Nat) : Ty × Nat :=
   let (substitution, next) := freshSubstitution scheme.quantified next []
   (substitution.apply scheme.body, next)

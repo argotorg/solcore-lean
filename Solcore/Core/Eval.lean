@@ -9,6 +9,15 @@ namespace Solcore.Core
 The big-step relation threads the local store explicitly. Environments remain
 ordinary lexical values: closures capture cell references, not a store snapshot.
 -/
+set_option doc.verso true in
+/-- Successful evaluation relates an environment, an initial local store, an
+expression, its result value, and its final store. Read it as: in these inputs,
+this expression evaluates to this value and leaves this store.
+
+The relation describes successful evaluation, not a timeout or a raw fault.
+Environments retain lexical values; closures capture cell references rather
+than a store snapshot. The store is threaded through the evaluation rules.
+-/
 inductive Evaluates : Environment → Store → Expr → Value → Store → Prop where
   | unit {environment : Environment} {store : Store} :
       Evaluates environment store .unit .unit store
@@ -184,6 +193,13 @@ inductive Evaluates : Environment → Store → Expr → Value → Store → Pro
       Evaluates environment initialStore
         (.ifE condition thenBranch elseBranch) result finalStore
 
+set_option doc.verso true in
+/-- Two evaluations of the same expression in the same environment and initial
+local store agree on both their result value and final store.
+
+The inputs must be identical. This theorem neither compares different initial
+worlds nor establishes correspondence with another execution model.
+-/
 theorem evaluation_deterministic
     {environment : Environment} {initialStore : Store} {expr : Expr}
     {left right : Value} {leftStore rightStore : Store}

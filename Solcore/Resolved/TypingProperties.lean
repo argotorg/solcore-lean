@@ -105,7 +105,12 @@ theorem Lowers.preserves_type {context : Context} {expr : Expr} {core : Core.Exp
   have same : other = core := otherLowered.deterministic lowered
   simpa only [same] using otherTyped
 
-/-- Successful elaboration neither creates nor loses local typing derivations. -/
+set_option doc.verso true in
+/-- Given lowering under the identities of a resolved typing context, named
+typing and Core typing under that context's types are equivalent. This is the
+static bridge for the local Resolved fragment; evaluation correspondence is
+a separate property.
+-/
 theorem Lowers.typing_iff {context : Context} {expr : Expr} {core : Core.Expr}
     {type : Core.Ty} (lowered : Lowers (LocalScope.ids context) expr core) :
     HasType context expr type ↔ Core.HasType (LocalScope.values context) core type :=

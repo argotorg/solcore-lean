@@ -1001,6 +1001,14 @@ theorem steps_from_initial_sound
       cases continuation
       exact evaluation
 
+set_option doc.verso true in
+/-- A completed run from an initial state gives a declarative {lean}`Evaluates`
+derivation with exactly the same value and final store.
+
+The inputs are the expression, environment, initial local store, and fuel.
+There is no separate typing premise: a completed raw run still obeys the
+dynamic rules. Exhausted and faulted runs are outside this conclusion.
+-/
 theorem runStateful_evaluation_sound
     {fuel : Nat} {environment : Environment}
     {initialStore finalStore : Store} {expr : Expr} {value : Value}
@@ -1039,6 +1047,13 @@ theorem evaluation_run_stateful_complete
         .done value finalStore :=
   evaluation_runStateful_complete evaluation
 
+set_option doc.verso true in
+/-- Given a declarative {lean}`Evaluates` derivation, there is a fuel threshold
+such that every budget at least that large returns its value and final store.
+
+The evaluation derivation is a premise. This theorem does not infer termination
+from an exhausted run, or promise success for every supplied budget.
+-/
 theorem evaluation_runStateful_complete_with_sufficient_fuel
     {environment : Environment} {initialStore finalStore : Store}
     {expr : Expr} {value : Value}

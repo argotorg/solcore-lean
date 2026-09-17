@@ -47,6 +47,12 @@ inductive Frame where
   | ifBranches (thenBranch : Expr) (elseBranch : Expr) (environment : Environment)
   deriving Repr, BEq, DecidableEq
 
+set_option doc.verso true in
+/-- An expression-machine state records the current expression or returned value,
+a continuation of pending work, and the local store. Environments travel with
+expressions and saved frames. A continuation remembers what to do after the
+current computation finishes; it is not an EVM operand stack.
+-/
 structure State where
   control : Control
   continuation : List Frame
@@ -630,6 +636,15 @@ def StatefulRunResult.erase : StatefulRunResult → RunResult
   | .outOfFuel _ => .outOfFuel
   | .fault error _ => .fault error
 
+set_option doc.verso true in
+/-- Run the expression machine for a budget of abstract transitions, retaining
+the final or suspended state information. Results distinguish completion with
+a value and store, a raw fault with its state, and exhaustion with a checkpoint.
+
+Inspecting a final state consumes no further transition. Exhaustion means the
+budget did not finish this run; it neither proves divergence nor rejects the
+source program. This fuel is not EVM gas.
+-/
 def runStateful : Nat → State → StatefulRunResult
   | fuel, state =>
       match advance state with

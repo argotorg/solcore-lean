@@ -227,7 +227,15 @@ private def sealCandidates
           else
             remaining
 
-/-- Enumerate deterministic, distinct, rechecked strict shrink candidates. -/
+set_option doc.verso true in
+/-- Enumerate deterministic, distinct, rechecked shrink candidates. Each carries
+strict decrease in a lexicographic measure: expression nodes first, literal
+weight second, together with a nonincreasing node count.
+
+A candidate need not preserve the original result or an external discrepancy.
+The experiment harness must rerun its failure predicate and retain only
+candidates that still demonstrate the issue.
+-/
 def shrink (source : CheckedWordProgram) : List ShrinkCandidate :=
   let sourceComplexity := complexity source.program.body
   sealCandidates source sourceComplexity <|

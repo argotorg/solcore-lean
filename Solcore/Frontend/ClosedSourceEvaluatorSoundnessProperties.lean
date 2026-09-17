@@ -223,7 +223,15 @@ private theorem simultaneous_sound (budget : Nat) :
                         exact .wordMatch (ih.1 _ _ _ _ _ _ _ scrutineeResult)
                           (chooseRuntimeWordMatch?_iff.mp choice) (ih.2 _ _ _ _ _ _ _ branch)
 
-/-- Every computed expression endpoint has an independent closed derivation. -/
+set_option doc.verso true in
+/-- Successful bounded evaluation gives an independent
+{lean}`ClosedSourceExpressionEvaluates` derivation with the same owner, names,
+captured values, initial store, result, and final store. The corresponding body
+theorem provides this direction for source bodies.
+
+This is conditional on a successful result. It does not classify every failed
+optional result as a typing error or establish termination of arbitrary source.
+-/
 theorem evaluateClosedSourceExpression?_sound
     {budget owner names captured initialStore source value finalStore}
     (accepted : evaluateClosedSourceExpression? budget owner names captured initialStore source =

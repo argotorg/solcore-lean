@@ -10,8 +10,12 @@ laws. Body determinism is subsequently derived through exact compatibility. -/
 set_option autoImplicit false
 namespace Solcore.Frontend
 
-/-- Successful expression value/store uniqueness by joint expression/body induction,
-without an external child law, typing or termination assumption. -/
+set_option doc.verso true in
+/-- Two successful source-expression evaluations with the same owner, names,
+captured values, initial store, and expression agree on the result and final
+store. No external child law, typing premise, or termination assumption is
+needed. Expression and body cases are handled together.
+-/
 theorem ClosedSourceExpressionEvaluates.deterministic
     {owner names captured initialStore source left right leftStore rightStore}
     (first : ClosedSourceExpressionEvaluates owner names captured initialStore source left leftStore)

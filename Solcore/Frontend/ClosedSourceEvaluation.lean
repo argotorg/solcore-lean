@@ -13,8 +13,15 @@ namespace Solcore.Frontend
 
 mutual
 
-/-- Seventeen original expression evaluation rules, recursively closed with original body evaluation.
-Owner is an index so calls can switch to the closure's saved lexical scope. -/
+/-- Successful evaluation of original source expressions, retaining their owner,
+name table, ordered captured values, initial store, result, and final store.
+Source closures retain source bodies and lexical context.
+
+Here "closed" means the recursive expression/body judgments no longer require
+external callbacks, not that the lexical environment must be empty. Core and
+host values are inert data in this relation; it adds no store-mutation,
+staging, typing, or unconditional termination claim.
+-/
 inductive ClosedSourceExpressionEvaluates :
     Resolved.DeclarationId → List (String × Resolved.LocalId) →
     List (Resolved.LocalId × RuntimeValue) → List RuntimeValue →
