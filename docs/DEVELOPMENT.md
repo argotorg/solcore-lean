@@ -148,8 +148,11 @@ actual result.
 ## Documentation policy
 
 - README contains purpose, usage, and a link to the reader guide.
-- The Verso manual teaches semantics and theorem contracts through checked examples.
-- API explanations live in source docstrings and are reused in the manual.
+- Definitions and theorem contracts, including assumptions and limits, live in
+  docstrings beside existing Lean declarations. The Verso manual imports that
+  prose with `includeDocstring` or `docstring`.
+- The manual owns reading order, connections, and checked examples. Its guarantee
+  map links to the explanations instead of maintaining parallel summaries.
 - Current status is the only revision-local implementation ledger.
 - Architecture describes stable responsibilities.
 - ADRs contain durable decisions and rationale.

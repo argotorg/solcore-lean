@@ -25,17 +25,10 @@ UTF-8 byte spans, tokens, comments, syntax, and diagnostics. Ordinary malformed
 source produces retained diagnostics. Getting a parser output therefore does
 not mean the file is diagnostic-free, well scoped, or well typed.
 
-The parser proof families cover provenance, progress and fuel adequacy,
-public totality, and ordinary grammar correspondence at their stated
-boundaries. Some exactness results identify the AST and endpoint without
-asserting equality of every diagnostic trace or internal parser state.
-Read those conclusions literally.
-
-For example,
+For the parser's precise totality contracts, read the source documentation of
 [`productionParse_exists_ok`](https://github.com/Y-Nak/solcore-lean/blob/main/Solcore/Syntax/Parser/CanonicalParserTotalityProperties.lean)
-states that every source file produces an ordinary parse output. The companion
-already-tokenized theorem requires a lexical carrier valid for that source.
-Neither conclusion asserts that the output has no diagnostics.
+and its already-tokenized companion. Distinguish a theorem that guarantees an
+output from one that guarantees the output is free of diagnostics.
 
 The canonical syntax work is separate from the frozen Surface v1 parser behind
 Oracle v4. The [canonical syntax plan](https://github.com/Y-Nak/solcore-lean/blob/main/docs/M2_PLAN.md)
@@ -75,9 +68,8 @@ scope. This keeps the binder out of its own initializer and handles shadowing
 without capturing the wrong value.
 
 {name Solcore.Resolved.Expr.lower?_iff}`Expr.lower?_iff`
-connects the executable optional lowering result to the declarative
-{name Solcore.Resolved.Lowers}`Lowers` relation. Failure retains a real boundary:
-a missing reference is not assigned a default position.
+
+{includeDocstring Solcore.Resolved.Expr.lower?_iff}
 
 The scope rule is executable even when the binder identity is left abstract:
 
@@ -94,21 +86,18 @@ example (binder : Resolved.LocalId) :
 # The semantic bridge that is proven
 
 {name Solcore.Resolved.Lowers.evaluates_iff}`Lowers.evaluates_iff`
-assumes a successful lowering under the identities of a named environment.
-It relates named evaluation to Core evaluation using the environment's values.
-Both sides have the same initial store, result value, and final store.
 
-This is stronger than merely showing that lowering produces a well-typed term.
-It says that the lowered computation means the same thing at this boundary.
-The separate
+{includeDocstring Solcore.Resolved.Lowers.evaluates_iff}
+
 {name Solcore.Resolved.Lowers.typing_iff}`Lowers.typing_iff`
-connects the corresponding typing judgments.
 
-The local resolved fragment contains literals, variables, pairs, selected
-primitives, lets, and conditionals. It is not the whole source language.
+{includeDocstring Solcore.Resolved.Lowers.typing_iff}
+
+{includeDocstring Solcore.Resolved.Expr}
+
 {name Solcore.Resolved.Evaluates.store_eq}`Evaluates.store_eq`
-shows that this fragment preserves the store. That fact follows from its
-constructors; it should not be generalized to later source paths with effects.
+
+{includeDocstring Solcore.Resolved.Evaluates.store_eq}
 
 # Renaming and inserting a binding
 
@@ -129,29 +118,16 @@ local bridge.
 
 # The larger executable frontend
 
-The newer whole-program path loads modules, assigns declaration identities,
-resolves namespaces and imports, and checks a supported source profile. Its
-type machinery includes rigid parameters, flexible variables, substitutions,
-rank-1 schemes, occurs-checking unification, and evidence-producing trait and
-coercion search. Search budget exhaustion is distinct from no solution.
+The {ref "source-types"}[source type chapter] follows checking and
+specialization beyond this local bridge. To assess a complete frontend path,
+ask which source forms it accepts, what evidence each stage retains, and which
+theorem relates the produced Core object to the original source meaning.
 
-Typed occurrences retain chosen declarations, instantiated types, local
-identities, and links to obligations and coercions. Specialization builds a
-finite plan keyed by declarations and concrete type arguments. A budget can
-bound type-growing recursion even when repeated identical keys are recognized.
-The acyclic linker accepts a narrower executable boundary than the planner.
+Operator spelling also needs care. An overloaded call with eager arguments
+and a Core conditional builder can have different evaluation behavior even
+when their printed operator names resemble one another.
 
-Accepted elaborations retain equations showing their resolved lowering and
-independent Core re-inference. These checked carriers are valuable guarantees
-about the produced object. They are not a substitute for a general theorem
-that all source-language meanings are preserved through the complete frontend.
-General source execution and a public source Oracle remain separate work.
-
-Operator spelling also needs care. Source operators may resolve to ordinary
-overloaded functions with eager arguments. A Core short-circuit builder's
-conditional semantics does not automatically describe every source spelling
-that resembles it.
-
-See [source elaboration](https://github.com/Y-Nak/solcore-lean/blob/main/Solcore/Frontend/SourceCoreElaboration.lean)
+The source documentation in
+[source elaboration](https://github.com/Y-Nak/solcore-lean/blob/main/Solcore/Frontend/SourceCoreElaboration.lean)
 and the [feature matrix](https://github.com/Y-Nak/solcore-lean/blob/main/docs/FEATURE_MATRIX.md)
-for the exact admitted forms and current linking restrictions.
+record the admitted forms and current linking restrictions.

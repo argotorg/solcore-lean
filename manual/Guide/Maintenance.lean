@@ -29,10 +29,17 @@ reference documents have narrower jobs:
 
 # Keep explanations close to their guarantees
 
-API descriptions belong in source docstrings and can be included directly in
-the guide. Native rich docstrings check inline Lean references during library
-compilation. The guide adds the reader's motivation, examples, assumptions,
-and connections between declarations.
+Definitions and theorem contracts belong in docstrings beside the existing
+Lean declarations. Use `includeDocstring` to render that prose in a chapter;
+use `docstring` when the full signature also helps the reader. Assumptions and
+limits belong with the contract, so editor documentation and the guide share
+the same explanation. Native rich docstrings check inline Lean references
+during library compilation.
+
+The guide owns the reading order, motivation, worked examples, and connections
+between declarations. The guarantee map is a reading index, not a second
+collection of theorem summaries. Avoid copying source explanations into a
+chapter or adding declarations solely to hold guide prose.
 
 A checked example should assert the behavior being explained. Merely defining
 an expression does not check the claimed result. A theorem reference checks

@@ -115,16 +115,14 @@ def generatedSize : Except GenerationError Nat := do
 ```
 
 {name Solcore.Synthesis.CoreV3.CheckedWordProgram.wellTyped}`CheckedWordProgram.wellTyped`
-projects declarative typing evidence from an admitted generated program. The
-carrier also records its Word result, empty data-definition table, and fragment
-admission. This is a carefully bounded testing input, not arbitrary source or
-contract generation.
 
-{name Solcore.Synthesis.CoreV3.shrink}`shrink` returns rechecked candidates
-with strict decrease in a lexicographic complexity measure: node count first,
-literal weight second. A smaller candidate need not preserve the original
-result or a compiler discrepancy. The experiment harness must rerun its failure
-predicate and retain only candidates that still demonstrate the issue.
+{includeDocstring Solcore.Synthesis.CoreV3.CheckedWordProgram.wellTyped}
+
+{includeDocstring Solcore.Synthesis.CoreV3.CheckedWordProgram}
+
+{name Solcore.Synthesis.CoreV3.shrink}`shrink`
+
+{includeDocstring Solcore.Synthesis.CoreV3.shrink}
 
 # What comparison can establish
 

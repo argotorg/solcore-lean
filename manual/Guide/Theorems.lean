@@ -56,16 +56,14 @@ Lean writes `P → Q` for “if P, then Q,” `P ↔ Q` for both directions, and
 whole values on its two sides. If a result includes a final store, equality
 includes that store, not just the returned number.
 
-For example,
-{name Solcore.Core.Program.checkDetailedIn_iff_wellTyped}`Program.checkDetailedIn_iff_wellTyped`
-connects a successful diagnostic checker result to declarative program
-validity. The `↔` matters: this is both acceptance soundness and acceptance
-completeness for this checker and specification.
+For example, here is the source documentation of the checker equivalence:
 
-{name Solcore.Core.evaluation_deterministic}`evaluation_deterministic`
-says that two evaluations of the same expression in the same environment and
-initial local store agree on the value and final store. It does not compare
-runs with different inputs, or a Core run with EVM bytecode execution.
+{docstring Solcore.Core.Program.checkDetailedIn_iff_wellTyped}
+
+The `↔` in its statement is the signal to look for both directions. Compare
+that with a uniqueness result:
+
+{docstring Solcore.Core.evaluation_deterministic}
 
 # Follow the assumptions all the way down
 

@@ -44,29 +44,17 @@ Why `var 1` in the last line? The inner let binds the write's unit result at
 position zero. The cell reference moves to position one. Changing the cell
 contents does not change which lexical position holds the reference.
 
-The store has a typing that records each allocated location's element type.
-{name Solcore.Core.StoreHasTypes}`StoreHasTypes` connects those types to actual
-contents. Allocation extends this typing; writes preserve the allocated
-locations and their types.
-{name Solcore.Core.evaluation_preserves_type}`evaluation_preserves_type`
-tracks the final store as well as the result value.
+{includeDocstring Solcore.Core.StoreHasTypes}
 
-{name Solcore.Core.CellPayload}`CellPayload` admits unit, Boolean, Word, and
-products and sums recursively built from those types. Functions, cells, and
-named data are not admitted cell payloads in this profile. The model makes
-this restriction explicit rather than treating every Core type as storable.
+{name Solcore.Core.evaluation_preserves_type}`evaluation_preserves_type`
+
+{includeDocstring Solcore.Core.evaluation_preserves_type}
+
+{includeDocstring Solcore.Core.CellPayload}
 
 # Persistent storage belongs to an account
 
-{name Solcore.Semantics.WorldState}`WorldState` maps addresses to accounts.
-Accounts contain balance, nonce, optional checked code, and sparse Word storage.
-A storage key and value are both Words. This is distinct from a local cell's
-location and type.
-
-For a present account, reading an unwritten slot returns zero. Writing zero
-removes the sparse entry without changing the value a later read observes.
-An absent account is a different case: world-level reads and writes retain
-presence information through optional results.
+{includeDocstring Solcore.Semantics.WorldState}
 
 ```lean
 open Solcore.Semantics
@@ -78,13 +66,16 @@ example (slot value : Word) :
 ```
 
 {name Solcore.Semantics.WorldState.readStorage?_writeStorage?_same}`WorldState.readStorage?_writeStorage?_same`
-expresses read-after-write at the world boundary, including the condition that
-the account exists. The companion theorems
+
+{includeDocstring Solcore.Semantics.WorldState.readStorage?_writeStorage?_same}
+
 {name Solcore.Semantics.WorldState.readStorage?_writeStorage?_other_slot}`WorldState.readStorage?_writeStorage?_other_slot`
-and
+
+{includeDocstring Solcore.Semantics.WorldState.readStorage?_writeStorage?_other_slot}
+
 {name Solcore.Semantics.WorldState.readStorage?_writeStorage?_other_address}`WorldState.readStorage?_writeStorage?_other_address`
-show that a write preserves reads at a different slot or address. Their
-inequality premises identify exactly which observations are unaffected.
+
+{includeDocstring Solcore.Semantics.WorldState.readStorage?_writeStorage?_other_address}
 
 # A checkpoint determines what survives
 

@@ -65,14 +65,19 @@ ignored by Git. CI runs the same build script and retains HTML as an artifact.
   example that merely type-checks does not assert its expected result.
 - Use the `name` role for declaration references. It resolves the actual name
   and supplies signature hover information; plain backticks do not do this.
-- Use `{docstring Solcore.Core.Program.checkDetailedIn}` to include an existing
-  signature and source docstring. Keep API explanations in the source so the
-  guide and editor documentation share the same text. Avoid enabling missing
-  docstrings globally to hide gaps.
+- Put definitions and theorem contracts, including assumptions and limits, in
+  docstrings beside the existing declarations. Use
+  `{includeDocstring Solcore.Core.Program.checkDetailedIn}` to render the prose
+  without a long signature, or `docstring` to include both. The guide and editor
+  documentation then share the same text. Missing docstrings are build errors;
+  do not enable missing docstrings globally to hide gaps.
+- Keep reading order, connections, and worked examples in the guide. The
+  guarantee map links to chapters rather than duplicating their contracts.
+  Do not introduce declarations solely to hold guide prose.
 - For checked references in source documentation, scope `set_option doc.verso
   true in` to the declaration and use the native `{lean}` role in its docstring.
   Lean checks these references during library compilation without an external
-  Verso dependency. The checker, its specification, and its correctness theorem
+  Verso dependency. The checker, evaluation and safety theorems, and language definitions
   demonstrate this pattern. Ordinary Markdown docstrings elsewhere still work.
 - The pinned manual renderer imports rich source docstrings through Markdown.
   Use it for the prose and inline references demonstrated here; verify rendered

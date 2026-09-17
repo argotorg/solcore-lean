@@ -2,6 +2,7 @@ import VersoManual
 import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
 import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
 import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ComputationReturnTreeRuntimeSafetyProperties
 
 open Verso.Genre Manual
 open Verso.Genre.Manual.InlineLean
@@ -20,35 +21,21 @@ the entire frontend as either proven or unproven.
 
 # Original syntax can have an independent meaning
 
-{name Solcore.Frontend.ClosedSourceExpressionEvaluates}`ClosedSourceExpressionEvaluates`
-and
-{name Solcore.Frontend.ClosedSourceBodyEvaluates}`ClosedSourceBodyEvaluates`
-relate original source expressions and bodies to values and stores. They retain
-ownership, name tables, and ordered captured values. Source closures retain
-source bodies and their lexical context, rather than being identified by their
-printed lambda text alone.
-
-Here “closed” means that the recursive judgments no longer require external
-callbacks. It does not mean the lexical environment must be empty. Confusing
-those two meanings would incorrectly strengthen the theorem's assumptions.
+{includeDocstring Solcore.Frontend.ClosedSourceExpressionEvaluates}
 
 # What the executable evaluator guarantees
 
 {name Solcore.Frontend.evaluateClosedSourceExpression?_sound}`evaluateClosedSourceExpression?_sound`
-says that a successful bounded evaluation gives the independent source
-evaluation relation with the same value and final store. The corresponding
-body theorem provides the same direction for a body.
+
+{includeDocstring Solcore.Frontend.evaluateClosedSourceExpression?_sound}
 
 {name Solcore.Frontend.evaluateClosedSourceExpression?_eventually_complete}`evaluateClosedSourceExpression?_eventually_complete`
-says that, given a derivation of this source evaluation, all sufficiently large
-budgets produce its result. This is conditional on that derivation. It does
-not claim that every arbitrary source expression terminates or is supported.
+
+{includeDocstring Solcore.Frontend.evaluateClosedSourceExpression?_eventually_complete}
 
 {name Solcore.Frontend.ClosedSourceExpressionEvaluates.deterministic}`ClosedSourceExpressionEvaluates.deterministic`
-ensures two such evaluations agree on value and final store. Separate theorem
-families address store preservation, environment ownership, and budget
-monotonicity. These statements are about the independent source relation, not
-merely running a Core evaluator twice.
+
+{includeDocstring Solcore.Frontend.ClosedSourceExpressionEvaluates.deterministic}
 
 # Composition requires child guarantees
 
@@ -57,17 +44,9 @@ the child expressions they contain. A body with local bindings and terminal
 returns can inherit typing, evaluation correspondence, and cost properties
 only when its child elaborators and evaluators provide the required contracts.
 
-A representative
-[computation return-tree theorem](https://github.com/Y-Nak/solcore-lean/blob/main/Solcore/Frontend/ComputationReturnTreeRuntimeSafetyProperties.lean)
-assumes child typing, membership in a suitable Core fragment, behavior under
-weakening and insertion, evaluation correspondence, and compatible step costs.
-With a matching typed runtime environment and store, its conclusion includes a
-typed result, a well-typed final store, source evaluation, a Core path under
-any continuation, and exact success/exhaustion thresholds.
+{name Solcore.Frontend.ComputationReturnTreeElaborates.runtime_typed_execution}`ComputationReturnTreeElaborates.runtime_typed_execution`
 
-That is a strong compositional theorem. The many child assumptions are the
-reason it can be reused; they are not obligations that can be omitted when
-summarizing it as “source execution is safe.”
+{includeDocstring Solcore.Frontend.ComputationReturnTreeElaborates.runtime_typed_execution}
 
 # Relating the proof families to the active frontend
 

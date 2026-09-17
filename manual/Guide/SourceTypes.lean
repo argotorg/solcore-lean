@@ -19,15 +19,7 @@ limits of its current proofs.
 
 # Unknown types and generic types are different
 
-{name Solcore.TypeSystem.Ty}`TypeSystem.Ty` distinguishes flexible inference
-variables from rigid generic parameters. An inference variable is a question
-the checker can solve. A generic parameter belongs to a declaration and stands
-for the type supplied by a caller; the checker cannot simply redefine it to
-make the function body work.
-
-Source types additionally describe functions, products, nominal applications,
-mappings, proxy types, and compile-time forms. Their presence in this datatype
-does not mean every form already has a runtime Core elaboration.
+{includeDocstring Solcore.TypeSystem.Ty}
 
 # Unification solves equality constraints
 
@@ -48,25 +40,16 @@ example : Unification.unifyTypes Ty.word Ty.word =
   rfl
 ```
 
-The occurs check prevents solving a variable by a type containing that same
-variable, which would require an infinite type. The executable search also has
-a budget. Its `exhausted` result must not be treated as a proof that the
-constraints are inconsistent.
-
-These examples demonstrate the executable kernel. They do not claim a broad
-soundness-and-completeness metatheory for the entire source type system.
+{includeDocstring Solcore.TypeSystem.Unification.unify}
 
 # Schemes allow repeated independent uses
 
-A {name Solcore.TypeSystem.Scheme}`Scheme` quantifies inference variables in
-a rank-1 type. Instantiation replaces its quantified variables with fresh
-ones so separate uses can solve them independently. A declaration scheme
-similarly instantiates rigid declaration parameters at use sites.
+{includeDocstring Solcore.TypeSystem.Scheme.instantiate}
 
-Freshness is necessary: using one generic function with a Word should not
-accidentally constrain a separate Boolean use. Higher-rank types, higher-kinded
-types, polymorphic recursion, and local let-polymorphism require boundaries
-beyond the current executable profiles.
+{includeDocstring Solcore.TypeSystem.DeclarationScheme.instantiate}
+
+The [feature matrix](https://github.com/Y-Nak/solcore-lean/blob/main/docs/FEATURE_MATRIX.md)
+records the supported source profiles and remaining polymorphism boundaries.
 
 # Overloads and traits retain evidence
 
