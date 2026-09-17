@@ -617,7 +617,14 @@ theorem inferDetailed_iff_typing
       HasType context expr type definitions := by
   rw [inferDetailed_iff_infer, typing_iff_infer]
 
-/-- Check a Core program with diagnostics under an initial typing context. -/
+set_option doc.verso true in
+/-- Check {lean}`program` under the initial typing context {lean}`context`,
+returning its declared result type on success or a {lean}`CheckError` on failure.
+
+Checks the data-definition table, the declared result type, and the body's
+inferred type, in that order. Success corresponds to {lean}`Program.WellTypedIn`.
+This function checks typing; it does not evaluate the program.
+-/
 def Program.checkDetailedIn
     (program : Program)
     (context : Context) : Except CheckError Ty :=
@@ -699,6 +706,14 @@ theorem Program.checkDetailedIn_iff_checkIn
       ]
   · simp [Program.checkDetailedIn, Program.checkIn, definitionsAccepted]
 
+set_option doc.verso true in
+/-- The diagnostic checker {lean}`Program.checkDetailedIn` succeeds with
+{lean}`program.resultType` exactly when {lean}`program.WellTypedIn context` holds.
+
+The forward implication turns a successful checker result into declarative
+typing evidence. The reverse implication ensures that every program satisfying
+the specification is accepted in the same context.
+-/
 theorem Program.checkDetailedIn_iff_wellTyped
     {program : Program}
     {context : Context} :

@@ -853,7 +853,14 @@ theorem typing_deterministic
 
 namespace Program
 
-/-- Declarative program validity under an initial typing context. -/
+set_option doc.verso true in
+/-- Declarative validity of {lean}`program` under the initial typing
+context {lean}`context`.
+
+The data-definition table and declared result type must be well formed.
+The body must have the declared result type according to {lean}`HasType`,
+using the program's data definitions and the supplied context.
+-/
 structure WellTypedIn (program : Program) (context : Context) : Prop where
   dataDefinitionsWellFormed : program.dataDefinitions.WellFormed
   resultTypeWellFormed : Ty.WellFormed program.dataDefinitions program.resultType
