@@ -1,0 +1,19 @@
+name = "solcore-manual"
+version = "0.1.0"
+defaultTargets = ["Guide"]
+
+[leanOptions]
+warningAsError = true
+
+[[require]]
+name = "verso"
+git = "https://github.com/leanprover/verso"
+rev = "e09d21a5f7f66c9fc985b73197708298569bf583" # v4.32.0
+
+[[require]]
+name = "solcore-lean"
+path = ".."
+
+[[lean_lib]]
+name = "Guide"
+globs = ["Guide", "Guide.*"]
