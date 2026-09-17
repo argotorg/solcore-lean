@@ -18,8 +18,19 @@ The repository provides:
 Oracle v5 consumes Semantic Core rather than source text. The canonical source
 lexer and parser are available as a Lean library and cover complete files,
 declarations, types, expressions, patterns, statements, inline Yul, comments,
-diagnostics, and recovery. Name resolution, source type checking, elaboration,
-and end-to-end source execution are not yet implemented.
+diagnostics, and recovery. Restricted internal name resolution, source checking,
+specialization, and elaboration into checked Core are also available. Oracle v5
+remains a Core-input interface; general end-to-end source execution is not a
+public interface. See [Current status](docs/CURRENT_STATUS.md) for the supported
+frontend fragments.
+
+## Understand the model
+
+Read the [semantics and proven guarantees guide](manual/README.md) for an
+accessible tour of expressions, typing, evaluation, state, contract rollback,
+and source lowering. Its examples and declaration references are checked
+against the library. The [documentation index](docs/README.md) points to exact
+wire contracts, implementation status, and contributing instructions.
 
 ## Requirements
 

@@ -1,127 +1,63 @@
 # Documentation guide
 
-This directory explains the public Solcore specification, the executable
-semantics behind it, and the limits of the current implementation. Start with
-the document that matches what you are trying to do; the decision records are
-background material, not a progress log.
+Start with the **[Solcore semantics and proven guarantees guide](../manual/README.md)**.
+It explains the language through checked examples and the meaning of its
+theorems: values and bindings, checking, execution and fuel, state, contract
+rollback, source lowering, and reproducible Oracle experiments. It assumes no
+experience reading Lean proofs.
 
-## Recommended reading order
+## Choose a reading path
 
-| If you want to… | Start here |
+| Your question | Read |
 | --- | --- |
-| Build the repository or run the Oracle | [Root README](../README.md) |
-| Generate reproducible checked Core inputs | [Root README](../README.md#use-as-a-lean-library) |
-| See exactly what works today | [Current status](CURRENT_STATUS.md) |
-| Send checked-contract requests | [Oracle v5 wire catalog](ORACLE_V5_WIRE.md) |
-| Produce or consume Semantic Core | [Core Wire v3 catalog](CORE_WIRE_V3.md) |
-| Understand the semantic layers | [Architecture](ARCHITECTURE.md) |
-| Understand what is normative | [Specification charter](SPEC_CHARTER.md) |
-| Compare with the Haskell or Rust compiler | [Compatibility matrix](COMPATIBILITY_MATRIX.md) |
-| Follow canonical source frontend work | [Canonical syntax plan](M2_PLAN.md) |
-| Build and review a change | [Development guide](DEVELOPMENT.md) |
+| What does a program mean? | [Values and expressions](../manual/Guide/Language.lean), then [execution](../manual/Guide/Execution.lean) |
+| What is proven, and under what assumptions? | [Reading theorems](../manual/Guide/Theorems.lean) and the [guarantee map](../manual/Guide/Guarantees.lean) |
+| What survives return, revert, or trap? | [State](../manual/Guide/State.lean) and [contracts](../manual/Guide/Contracts.lean) |
+| How does source reach Core? | [Frontend guide](../manual/Guide/Frontend.lean) |
+| How do I run an experiment? | [Oracle guide](../manual/Guide/Oracle.lean) and [root usage instructions](../README.md) |
+| Where are the architectural boundaries? | [Architecture](ARCHITECTURE.md) |
+| What works at this revision? | [Current status](CURRENT_STATUS.md) and [feature matrix](FEATURE_MATRIX.md) |
+| What are the exact public bytes? | [Core Wire v3](CORE_WIRE_V3.md) and [Oracle v5](ORACLE_V5_WIRE.md) |
+| Which rules are authoritative? | [Specification charter](SPEC_CHARTER.md) |
+| What has been compared with Rust or Haskell? | [Compatibility evidence](COMPATIBILITY_MATRIX.md) |
+| How do I build or contribute? | [Development](DEVELOPMENT.md) |
 
-The [feature matrix](FEATURE_MATRIX.md) is a detailed inventory. Use it when
-you need to locate the status of one specific language or runtime feature;
-use Current status for the concise supported boundary.
+The chapter links above open their checked source. Follow the manual's build
+instructions for the rendered site with navigation, search, and signature
+hovers.
 
-## Public interfaces
+## Public boundaries
 
-The command-line Oracle is versioned additively. Older inputs keep their
-original meaning when a new version is added.
-
-| Oracle | Input language | Purpose |
+| Oracle | Input | Purpose |
 | --- | --- | --- |
-| v1 | Legacy request envelope | Compatibility and capability discovery |
-| v2 | Semantic Core v1 | Historical Core checking and evaluation |
-| v3 | Semantic Core v2 | Frozen Core checking and evaluation |
-| v4 | Surface v1 | Restricted single-file parsing |
-| v5 | Semantic Core v3 plus an explicit scenario | Core checking and checked-contract execution |
+| v1 | Legacy envelope | Compatibility and capability discovery |
+| v2 | Core v1 | Historical Core checking and evaluation |
+| v3 | Core v2 | Frozen Core checking and evaluation |
+| v4 | Surface v1 | Restricted historical parsing |
+| v5 | Core v3 and an explicit scenario | Core checking and checked-contract execution |
 
-Oracle v5 is the current checked-contract interface. It is public and
-executable. Its `capabilities`, `coreCheck`, and `execute` queries share one
-strict request envelope and return query-compatible total results.
+Oracle v5 begins at Core. Canonical parsing, restricted source checking,
+specialization, and elaboration are separate Lean interfaces; they do not
+silently extend a published source protocol. See Current status for their
+precise admitted fragments.
 
-The older machine-readable schemas are kept under [`schema/`](../schema).
-Core v3 and Oracle v5 are documented by their closed wire catalogs:
+Published formats retain their original meaning. Older schemas live in
+[`schema/`](../schema); Core v3 and Oracle v5 have closed wire catalogs.
+Use the catalogs for exact object fields, scalar encodings, resource limits,
+canonical ordering, and rejection priority.
 
-- [Semantic Core Wire v3](CORE_WIRE_V3.md)
-- [Oracle v5 requests and responses](ORACLE_V5_WIRE.md)
+## Reference and history
 
-Both catalogs define exact objects, scalar encodings, limits, canonical order,
-and error priority. Do not infer a public field from an internal Lean type.
+Each document has one primary job. The manual teaches semantics and explains
+guarantees. Architecture records stable responsibilities. Current status is the
+revision-local ledger; the feature matrix indexes coverage. Wire catalogs and
+the charter define public contracts and authority.
 
-## How Oracle v5 fits together
+[Decision records](adr) preserve the rationale for selected rules. Historical
+statements about what was incomplete do not override later publications or the
+current ledger. [M1](M1_PLAN.md) and [M2](M2_PLAN.md) describe implementation
+sequencing and milestone boundaries; they are not the introductory reading path.
 
-The v5 path is deliberately independent of concrete source syntax:
-
-```text
-Oracle v5 JSON
-  → strict and resource-bounded decoding
-  → Semantic Core v3 checking
-  → checked-contract admission
-  → explicit world and environment validation
-  → top-level execution with commit or rollback
-  → total execution and state observation
-```
-
-Well-typedness is required before execution. The request also supplies the
-initial accounts, storage, balances, code references, nested-call registry,
-creation policy, invocation data, fuel, and requested state probes. This makes
-the initial conditions and observable result reproducible.
-
-The current runtime includes depth-one checked calls, value transfer, checked
-creation, ordered Word logs, and the static Word ABI. A top-level return commits
-the working state. Preflight rejection, revert, and trap select the checkpoint.
-Fuel exhaustion is an inconclusive response, not a fabricated terminal state.
-
-For exact JSON fields and rejection order, use the Oracle v5 catalog rather
-than this overview.
-
-## Source parsing is separate
-
-Oracle v4 and Surface v1 are frozen historical interfaces. Current Solcore
-syntax is modeled afresh under `Solcore.Syntax` from the implementation pinned
-by ADR-0153. The replacement does not reuse or extend the old Surface AST and
-parser.
-
-The complete executable canonical lexer and parser remain separate from
-Semantic Core and Oracle v5. They are available through the public Lean
-library. Name resolution, source type checking, and elaboration into checked
-Core are subsequent stages. This separation lets frontend work proceed without
-changing the meaning of any published Oracle protocol.
-
-## Semantics and verification
-
-The [architecture](ARCHITECTURE.md) explains the separation among source
-syntax, resolved input, Semantic Core, contract runtime state, and observable
-results. It also explains why runtime state and Core-local mutable cells are
-different stores.
-
-The [specification charter](SPEC_CHARTER.md) defines authority. In short,
-versioned Lean definitions and their published wire contracts define Solcore;
-the Haskell and Rust implementations provide comparison evidence rather than
-language authority.
-
-The [compatibility matrix](COMPATIBILITY_MATRIX.md) records which comparisons
-are meaningful today. Oracle v5 provides a deterministic Core execution and
-observation boundary, but there is not yet an end-to-end source elaborator or
-external compiler adapter. Agreement at a different layer must not be reported
-as full source-language conformance.
-
-## Decision records
-
-The [`adr/`](adr) directory contains accepted design decisions and their
-rationale. Read an ADR when you need to understand why a representation,
-evaluation rule, rollback policy, or publication boundary was chosen.
-
-An ADR describes the scope and state of the decision when it was written.
-Statements such as “not yet public” in an older ADR are historical and do not
-override a later publication. Use [Current status](CURRENT_STATUS.md) for the
-revision-local answer and the wire catalogs for an exact public contract.
-
-## Contributing to the specification
-
-The [development guide](DEVELOPMENT.md) covers build checks, proof and test
-expectations, compatibility rules, and review hygiene. Public changes require
-an additive versioned boundary; existing Core, Surface, and Oracle versions are
-never silently reinterpreted.
+Keep proof scripts in source and detailed inventories in their reference homes.
+The guide should explain what a theorem lets a reader conclude and which
+assumptions must hold before using it.

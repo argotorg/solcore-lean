@@ -1,5 +1,8 @@
 # Current status
 
+This is the detailed revision-local implementation ledger. For an accessible explanation of semantics and theorem guarantees, start with the
+[checked guide](../manual/README.md).
+
 This page describes what works at the current revision and where its public
 boundary ends. It is not an implementation-history ledger.
 
@@ -5915,7 +5918,8 @@ The repository checks different kinds of claims at different layers:
 - strict wire tests fix canonical JSON shapes and deterministic error priority;
 - metadata validation checks published profiles, digests, and capability output;
   and
-- the kernel audit checks the compiled declaration trust boundary.
+- the kernel-policy script scans its listed semantic source directories for
+  forbidden constructs; compiled theorem axiom reports are separate checks.
 
 These checks establish the behavior of the formal model that is present. They
 do not establish source-language conformance for features that have no current

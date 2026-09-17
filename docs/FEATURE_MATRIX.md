@@ -1,7 +1,11 @@
 # Feature matrix
 
-This is the human-readable implementation ledger. It does not enable a profile
-or alter a published protocol.
+This is the feature-by-feature coverage reference. For an accessible explanation of semantics and theorem guarantees, start with the
+[checked guide](../manual/README.md).
+
+This matrix indexes feature coverage. [Current status](CURRENT_STATUS.md) owns
+the detailed revision-local implementation narrative. The matrix does not
+enable a profile or alter a published protocol.
 
 Status meanings:
 

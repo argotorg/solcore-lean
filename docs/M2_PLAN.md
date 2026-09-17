@@ -1,5 +1,8 @@
 # Canonical syntax implementation plan
 
+This plan records canonical frontend milestones and implementation sequencing. For an accessible explanation of semantics and theorem guarantees, start with the
+[checked guide](../manual/README.md).
+
 This plan covers the active source frontend. The old parser target is replaced
 by the stabilized canonical syntax introduced by `solcore-rs` PR #20.
 

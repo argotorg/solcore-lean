@@ -1,5 +1,8 @@
 # Semantic Core implementation policy
 
+This plan records milestone sequencing and its historical boundary. For an accessible explanation of semantics and theorem guarantees, start with the
+[checked guide](../manual/README.md).
+
 This file retains its historical name so existing links remain valid. It now
 describes the current implementation policy and the boundary that has been
 completed. It is not a chronological ledger, a commit plan, or a promise that

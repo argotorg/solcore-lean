@@ -28,7 +28,7 @@ settings, or different EVM revisions do not belong to this baseline.
 | Canonical Syntax | Complete executable Lean lexer/parser against pinned PR #20; 23 embedded fixtures and an external 490-file fixed-revision corpus audit | Lexical and parsed-syntax behavior can be compared; source semantic conformance cannot yet be claimed |
 | Workspace identity | Internal Lean values | Logical identity behavior is specified but has no external adapter |
 | Frozen Multi frontend | Internal certified one-file API | Frozen lexical, parse, structural, location, and token behavior can be investigated |
-| Resolution and elaboration | No Lean implementation | No source semantic comparison exists |
+| Resolution and elaboration | Restricted internal Lean implementation; no external compiler semantic adapter | No general cross-compiler source semantic conformance claim exists |
 | Checked-contract runtime / Oracle v5 `execute` | Public Core/scenario, normalized observation, and reproducible pure-Core fixture generation; no external compiler adapter | Lean execution is reproducible, but no end-to-end or cross-compiler conformance claim exists |
 
 Oracle v5 publishes the checked-contract model: a finite package, initial

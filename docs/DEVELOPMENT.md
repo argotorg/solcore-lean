@@ -16,6 +16,10 @@ The metadata check protects profile digests, schemas, standard-library hashes,
 and golden bytes. The kernel-policy check scans semantic roots for disallowed
 escape hatches.
 
+For the checked guide, run `./manual/build.sh`. It compiles the chapters and
+renders HTML to validate references. See the [manual instructions](../manual/README.md)
+for previewing, authoring, and dependency updates.
+
 To verify canonical standard-library bytes against an upstream checkout:
 
     node scripts/verify-metadata.mjs --canonical-source-root <solcore-checkout>/std
@@ -133,9 +137,9 @@ version.
 
 ## Kernel policy
 
-scripts/check-kernel.mjs scans Core, Semantics, Standard, Syntax, Surface, and
-Workspace Lean sources. It rejects the language escape hatches named in that
-script, including appearances in comments.
+[scripts/check-kernel.mjs](../scripts/check-kernel.mjs) scans the semantic source
+roots listed in the script. It rejects the language escape hatches named there,
+including appearances in comments.
 
 This policy is separate from Lean's foundations. Critical theorem axiom reports
 may contain propext, Quot.sound, or Classical.choice and should report the
@@ -143,7 +147,9 @@ actual result.
 
 ## Documentation policy
 
-- README contains only purpose and usage.
+- README contains purpose, usage, and a link to the reader guide.
+- The Verso manual teaches semantics and theorem contracts through checked examples.
+- API explanations live in source docstrings and are reused in the manual.
 - Current status is the only revision-local implementation ledger.
 - Architecture describes stable responsibilities.
 - ADRs contain durable decisions and rationale.
