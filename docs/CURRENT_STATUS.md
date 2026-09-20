@@ -44,7 +44,10 @@ exact requirement/evidence validation.  Checked trait/implementation catalogs
 now retain and signature-check their methods.  Deliberately narrow runtime
 evidence paths execute selected monomorphic arithmetic and bitwise methods
 (`Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`, `BitAnd.band`,
-`BitXor.bxor`, `BitOr.bor`), `Eq<T>.eq` and `Ord<T>.gt`.  Target-compatible
+`BitXor.bxor`, `BitOr.bor`), `Eq<T>.eq` and `Ord<T>.gt`.  The standard
+`Ord<T> where T: Eq` header is accepted when its closed instantiated
+supertrait predicate is only a static method-body assumption; consuming that
+assumption inside the method remains staged.  Target-compatible
 ordering, logical and logical-negation operators now select ordinary visible
 functions `ne`, `lt`, `le`, `ge`, `and`, `or` and `not` through the same
 overload, evidence, specialization and direct-call path; source `!=` and `!`
@@ -5801,6 +5804,13 @@ exactly one matching
 solved operator requirement and closed implementation witness.  The selected
 trait must have one type parameter and one non-generic method; its selected
 implementation and method must be monomorphic, premise-free and `where`-free.
+Closed trait-declaration predicates are instantiated from the evidence goal in
+declaration-parameter order and become static assumptions while the method body
+is checked.  They are not prerequisites of the implementation rule itself:
+`Ord<Word>` under `trait Ord<T> where T: Eq` can therefore execute a
+requirement-free body without a separate `Eq<Word>` implementation.  A body
+which actually consumes that superclass assumption still stops at the explicit
+standalone method-lowering boundary.
 The method body is checked against its instantiated two-operand signature, its
 operands are bound left to right, and the body is capture-free inlined into the
 linked Core term.  `Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`,
@@ -5844,8 +5854,9 @@ Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
 direct-call cycles, seed roots with unresolved assumptions, unconsumed
 non-call/operator/literal requirements outside the supported binary and
 conversion profiles and indirect calls reject explicitly.  Other runtime
-operators, generic or premise-bearing implementation methods, multi-method or
-`where`-constrained profiles remain explicit boundaries.  Implementation
+operators, generic or premise-bearing evidence and implementation methods,
+multi-method or implementation/method-level `where`-constrained profiles remain
+explicit boundaries.  Implementation
 method bodies themselves
 must fit the standalone tail-normal Core-lowerable subset: calls, coercions and
 required operations inside a method body still reject.  Nominal source types
@@ -5858,9 +5869,10 @@ both conditional paths, all method-authoritative strict Word binary profiles,
 and the direct, forwarded-generic and call-result conversion profiles, and
 cover the staged failure cases.
 
-The next frontend boundary is expansion to broader implementation shapes,
-including the standard `Ord<T> where T: Eq` premise, and method bodies that
-themselves contain evidence-bearing operations.  Recursive source calls require
+The next frontend boundary is superclass evidence which can be consumed by
+implementation method calls and required operations, followed by broader
+implementation shapes.  Required unary trait execution such as `BitNot.bnot`
+also still needs a policy-bearing lowering path.  Recursive source calls require
 a separate named or global recursive-function representation rather than cyclic
 inlining.
 Automatic entry discovery, constructors, members and place-aware statements

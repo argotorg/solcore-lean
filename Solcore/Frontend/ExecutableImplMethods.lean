@@ -4,11 +4,13 @@ import Solcore.Frontend.ProgramChecking
 Checked source bodies for the first executable implementation-method profile.
 
 This boundary intentionally accepts only explicitly sized, monomorphic,
-premise-free implementation evidence whose trait, implementation, and sole
-method carry no additional predicates.  It validates the retained method
-catalog defensively, projects the implementation method to an ordinary
-synthetic function, and runs the existing source body checker before exposing
-it to runtime lowering.
+premise-free implementation evidence whose implementation and sole method
+carry no additional predicates.  Trait-level predicates are instantiated at
+the closed evidence goal and retained as static assumptions of the synthetic
+method; executing a body which consumes them remains a downstream policy.  The
+boundary validates the retained method catalog defensively, projects the
+implementation method to an ordinary synthetic function, and runs the existing
+source body checker before exposing it to runtime lowering.
 -/
 
 set_option autoImplicit false
@@ -58,8 +60,13 @@ inductive Error where
   | duplicateTraits (trait : Resolved.DeclarationId) (count : Nat)
   | traitArityMismatch
       (trait : Resolved.DeclarationId) (expected actual : Nat)
+  /-- Retained for source compatibility with the former all-predicates gate.
+  The current profile instantiates closed trait predicates instead. -/
   | traitPredicatesPresent
       (trait : Resolved.DeclarationId) (predicates : List ProgramPredicate)
+  | traitPredicateNotClosed
+      (trait : Resolved.DeclarationId) (predicate : ProgramPredicate)
+      (reason : NonClosedType)
   | missingImplementationMethod
       (implementation : Resolved.DeclarationId) (expectedName : String)
   | multipleImplementationMethods
@@ -141,8 +148,9 @@ private def firstNonClosedGoalType (goal : ProgramPredicate) :
     goal.arguments.findSome? firstNonClosedType
 
 /-- Select and check the sole executable method justified by one closed piece
-of trait evidence.  Runtime dictionaries, generic implementations, recursive
-premises, and predicate-bearing declarations remain explicit later profiles. -/
+of trait evidence.  Trait declaration predicates become closed static method
+assumptions; runtime dictionaries, generic implementations, recursive evidence
+premises, and implementation/method predicates remain explicit later profiles. -/
 def checkMonomorphicPremiseFreeMethodWithArity
     (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
     (expectedTraitArity : Nat) (expectedName : String) :
@@ -169,8 +177,14 @@ def checkMonomorphicPremiseFreeMethodWithArity
   let trait ← exactTrait program goal.trait
   unless trait.parameters.length = expectedTraitArity do
     throw (.traitArityMismatch trait.id expectedTraitArity trait.parameters.length)
-  unless trait.wherePredicates.isEmpty do
-    throw (.traitPredicatesPresent trait.id trait.wherePredicates)
+  let traitParameterSubstitution : ParameterSubstitution :=
+    trait.parameters.zip (goal.subject :: goal.arguments)
+  let traitPredicates := trait.wherePredicates.map
+    (ProgramPredicate.applyParameters traitParameterSubstitution)
+  for predicate in traitPredicates do
+    match firstNonClosedGoalType predicate with
+    | some reason => throw (.traitPredicateNotClosed trait.id predicate reason)
+    | none => pure ()
   let implementationMethod ←
     onlyImplementationMethod implementation expectedName
   let traitMethod ← onlyTraitMethod trait expectedName
@@ -194,7 +208,15 @@ def checkMonomorphicPremiseFreeMethodWithArity
   unless implementationMethod.traitMethod = traitMethod.id do
     throw (.methodAssociationMismatch implementationMethod.id traitMethod.id
       implementationMethod.traitMethod)
-  let synthetic := implementation.functionSignatureOfMethod implementationMethod
+  let baseSynthetic :=
+    implementation.functionSignatureOfMethod implementationMethod
+  let synthetic := {
+    baseSynthetic with
+    scheme := {
+      baseSynthetic.scheme with
+      predicates := traitPredicates ++ baseSynthetic.scheme.predicates
+    }
+  }
   let checked ← SourceInference.checkFunctionBody program.environment
     program.signatures synthetic |>.mapError Error.sourceInference
   pure {

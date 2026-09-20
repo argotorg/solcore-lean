@@ -275,7 +275,14 @@ must carry exactly one
 solved operator requirement whose closed implementation evidence agrees with
 the typed occurrence.  The selected declaration must be a one-parameter trait
 with exactly one non-generic method and one monomorphic, premise-free,
-`where`-free implementation with exactly one conforming method.  Its body is
+`where`-free implementation with exactly one conforming method.  Closed
+predicates on the trait declaration are instantiated from the evidence goal in
+declaration-parameter order and become static assumptions of the synthetic
+method signature.  They do not become premises of implementation search: the
+standard `trait Ord<T> where T: Eq` header may therefore execute an
+`Ord<Word>.gt` body which does not consume `Eq<Word>`, even when no separate Eq
+implementation exists.  Consuming that assumption in a method body is still an
+explicit downstream boundary.  Its body is
 checked against the instantiated two-operand signature and capture-free inlined
 after the operands have been bound left to right.  `Add.add`, `Sub.sub`,
 `Mul.mul`, `Div.div`, `Mod.mod`, `BitAnd.band`, `BitXor.bxor` and `BitOr.bor`
@@ -315,8 +322,8 @@ endpoint conversion supplies the runtime result.
 Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
 assumptions, non-call/operator/literal requirements outside the supported
 binary and conversion profiles and indirect calls all reject explicitly.
-Other evidence-dependent operators, generic or premise-bearing implementation
-methods, multi-method or
+Other evidence-dependent operators, generic or premise-bearing evidence and
+implementation methods, multi-method or implementation/method-level
 `where`-constrained profiles are not assigned an invented runtime meaning.
 Selected implementation method bodies must themselves remain in the standalone
 tail-normal Core-lowerable fragment: calls, coercions and required operations
@@ -330,9 +337,9 @@ placements, runtime input mismatches, malformed plans and each principal
 staged boundary; small checked laws retain the runtime input gate and budget
 result.
 
-The next internal boundary is expansion to broader implementation shapes,
-including premise-bearing standard `Ord`, and method bodies
-that themselves contain evidence-bearing operations.  Recursive calls require
+The next internal boundary is superclass evidence consumed by implementation
+method calls and required operations, required-unary lowering for profiles such
+as `BitNot.bnot`, and then broader implementation shapes.  Recursive calls require
 a separate named or global recursive Core representation rather than cyclic
 inlining.
 Selection-bearing constructor,

@@ -116,6 +116,132 @@ private def testTwoParameterTraitMethodCheck : IO Unit := do
       Core.infer? elaborated.inputs.values elaborated.core = some .bool))
     "checked Coerce method did not retain a Word input and Bool result"
 
+private def testTraitPredicateInstantiation : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {}",
+    "trait Ord<T> where T: Eq {",
+    "  function gt(left: T, right: T) returns (Bool);",
+    "}",
+    "impl Ord<Word> {",
+    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "}"
+  ])
+  let implementation ← onlyImplementation program
+  let eq ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Eq" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Eq trait, found {traits.length}")
+  let ord ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Ord" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Ord trait, found {traits.length}")
+  let eqWord : ProgramPredicate := {
+    trait := eq.id
+    subject := .word
+    arguments := []
+  }
+  let method ← match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity
+      program (evidenceFor implementation) 1 "gt" with
+    | .ok method => pure method
+    | .error error => throw (IO.userError
+        s!"trait-constrained Ord.gt method was rejected: {reprStr error}")
+  assertTrue (decide (implementation.head.trait = ord.id ∧
+      implementation.head.subject = .word ∧
+      implementation.wherePredicates = [] ∧
+      method.synthetic.scheme.parameters = [] ∧
+      method.synthetic.scheme.predicates = [eqWord] ∧
+      method.synthetic.parameterTypes = [.word, .word] ∧
+      method.synthetic.returnTypes = [.bool] ∧
+      method.checked.type = .function (.product .word .word) .bool ∧
+      method.checked.inferredBodyType = .bool ∧
+      method.checked.solvedRequirements = []))
+    "Ord.gt did not retain the instantiated Eq<Word> static assumption"
+  let elaborated ← match SourceCoreElaboration.elaborateFunction method.checked with
+    | .ok elaborated => pure elaborated
+    | .error error => throw (IO.userError
+        s!"requirement-free Ord.gt body did not lower to Core: {reprStr error}")
+  assertTrue (decide (elaborated.inputs.values = [.word, .word] ∧
+      elaborated.returnType = .bool ∧
+      Core.infer? elaborated.inputs.values elaborated.core = some .bool))
+    "trait predicate assumptions changed the closed Ord.gt runtime body"
+
+private def testTraitPredicateParameterOrder : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Rel<Left, Right> {}",
+    "trait Route<From, To> where From: Rel<To> {",
+    "  function route(value: From) returns (To);",
+    "}",
+    "impl Route<Word, Bool> {",
+    "  function route(value: Word) returns (Bool) { return true; }",
+    "}"
+  ])
+  let implementation ← onlyImplementation program
+  let rel ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Rel" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Rel trait, found {traits.length}")
+  let relWordBool : ProgramPredicate := {
+    trait := rel.id
+    subject := .word
+    arguments := [.bool]
+  }
+  let method ← match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity
+      program (evidenceFor implementation) 2 "route" with
+    | .ok method => pure method
+    | .error error => throw (IO.userError
+        s!"two-parameter trait predicate was rejected: {reprStr error}")
+  assertTrue (decide (implementation.head.subject = .word ∧
+      implementation.head.arguments = [.bool] ∧
+      method.synthetic.scheme.predicates = [relWordBool]))
+    "trait subject and argument parameters were instantiated out of order"
+
+private def testUnclosedTraitPredicateRejection : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {}",
+    "trait Ord<T> where T: Eq {",
+    "  function gt(left: T, right: T) returns (Bool);",
+    "}",
+    "impl Ord<Word> {",
+    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "}"
+  ])
+  let implementation ← onlyImplementation program
+  let ord ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Ord" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Ord trait, found {traits.length}")
+  let foreignParameter : TypeSystem.TypeParameterId := {
+    owner := ord.id
+    index := ord.parameters.length + 7
+  }
+  let openPredicate ← match ord.wherePredicates with
+    | [predicate] => pure { predicate with subject := .parameter foreignParameter }
+    | predicates => throw (IO.userError
+        s!"expected one Ord trait predicate, found {predicates.length}")
+  let tamperedOrd := { ord with wherePredicates := [openPredicate] }
+  let tamperedProgram : CheckedProgram := {
+    program with
+    signatures := {
+      program.signatures with
+      traits := program.signatures.traits.map fun trait =>
+        if trait.id = ord.id then tamperedOrd else trait
+    }
+  }
+  match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity
+      tamperedProgram (evidenceFor implementation) 1 "gt" with
+  | .error (.traitPredicateNotClosed trait predicate (.rigid parameter)) =>
+      assertTrue (decide (trait = ord.id ∧ predicate = openPredicate ∧
+          parameter = foreignParameter))
+        "unclosed trait-predicate rejection lost its trait or rigid parameter"
+  | .error error => throw (IO.userError
+      s!"unclosed trait predicate had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "unclosed trait predicate crossed the executable-method boundary")
+
 private def testEmptyMarkerRejection : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Marker<T> {}",
@@ -226,6 +352,53 @@ private def testWherePredicateRejection : IO Unit := do
   | .ok _ => throw (IO.userError
       "where-constrained implementation was executable")
 
+private def testMethodPredicateRejections : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {}",
+    "trait Guard<T> {",
+    "  function guard(value: T) returns (T) where T: Eq;",
+    "}",
+    "impl Guard<Word> {",
+    "  function guard(value: Word) returns (Word) where Word: Eq { return value; }",
+    "}"
+  ])
+  let implementation ← onlyImplementation program
+  let implementationMethod ← match implementation.methods with
+    | [method] => pure method
+    | methods => throw (IO.userError
+        s!"expected one Guard implementation method, found {methods.length}")
+  match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program
+      (evidenceFor implementation) 1 "guard" with
+  | .error (.implementationMethodPredicatesPresent id [_]) =>
+      assertTrue (decide (id = implementationMethod.id))
+        "method-predicate rejection named the wrong implementation method"
+  | .error error => throw (IO.userError
+      s!"where-constrained implementation method had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "where-constrained implementation method was executable")
+  let strippedImplementation : ProgramImplementationSignature := {
+    implementation with
+    methods := implementation.methods.map fun method => {
+      method with wherePredicates := []
+    }
+  }
+  let strippedProgram : CheckedProgram := {
+    program with
+    signatures := {
+      program.signatures with
+      implementations := [strippedImplementation]
+    }
+  }
+  match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity
+      strippedProgram (evidenceFor strippedImplementation) 1 "guard" with
+  | .error (.traitMethodPredicatesPresent id [_]) =>
+      assertTrue (decide (id = implementationMethod.traitMethod))
+        "method-predicate rejection named the wrong trait method"
+  | .error error => throw (IO.userError
+      s!"where-constrained trait method had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "where-constrained trait method was executable")
+
 private def testBodyIsActuallyChecked : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Add<T> { function add(left: T, right: T) returns (T); }",
@@ -249,10 +422,14 @@ the first profile's explicit staged boundaries. -/
 def testExecutableImplMethods : IO Unit := do
   testSuccessfulMethodCheck
   testTwoParameterTraitMethodCheck
+  testTraitPredicateInstantiation
+  testTraitPredicateParameterOrder
+  testUnclosedTraitPredicateRejection
   testEmptyMarkerRejection
   testDefensiveProfileRejections
   testGenericImplementationRejection
   testWherePredicateRejection
+  testMethodPredicateRejections
   testBodyIsActuallyChecked
 
 end Tests.ExecutableImplMethods

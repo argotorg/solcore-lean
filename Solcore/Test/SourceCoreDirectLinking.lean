@@ -808,7 +808,7 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
     "trait Eq<T> {",
     "  function eq(left: T, right: T) returns (Bool);",
     "}",
-    "trait Ord<T> {",
+    "trait Ord<T> where T: Eq {",
     "  function gt(left: T, right: T) returns (Bool);",
     "}",
     "impl Eq<Word> {",
@@ -981,6 +981,107 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
       [.word (word 1), .word (word 2)] 2048 =
         some (.done (.bool true) [])))
     "source > did not execute the selected nonstandard Ord.gt method body"
+
+private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Ord<T> where T: Eq {",
+    "  function gt(left: T, right: T) returns (Bool);",
+    "}",
+    "impl Ord<Word> {",
+    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "}",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "  return left > right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Bool) {",
+    "  return greaterWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let greater ← signatureNamed program "greaterWithEvidence"
+  let function ← functionFor program greater
+  let binary ← match firstBinaryNode? function.typedBody.nodes with
+    | some binary => pure binary
+    | none => throw (IO.userError
+        "trait-predicate fixture lost its Ord binary occurrence")
+  let solved ← match binary.requirements.filterMap fun requirement =>
+      function.solvedRequirements.find? fun row => row.id == requirement with
+    | [solved] => pure solved
+    | requirements => throw (IO.userError
+        s!"trait-predicate fixture expected one Ord requirement, found {requirements.length}")
+  let implementation ← match program.signatures.implementations with
+    | [implementation] => pure implementation
+    | implementations => throw (IO.userError
+        s!"trait-predicate fixture expected one Ord impl, found {implementations.length}")
+  let evidenceMatches := match solved.evidence with
+    | .assumption predicate => decide (predicate = solved.predicate)
+    | _ => false
+  assertTrue (evidenceMatches && decide (implementation.wherePredicates = []))
+    "generic > did not retain its premise-free Ord assumption"
+  let outcome ← runOrThrow "static trait predicate assumption" program
+    [monomorphicRequest entry] 2
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"static trait predicate: expected a complete plan, found {reprStr other}")
+  let specializedGreater := plan.specializations.find? fun specialized =>
+    specialized.declaration == greater.id
+  assertTrue (specializedGreater.any fun specialized =>
+      decide (specialized.assumptions = [implementation.head]))
+    "Ord specialization lost its sole explicit Ord<Word> assumption"
+  let linked ← linkOrThrow "static trait predicate assumption" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "static trait predicate: linked root was absent")
+  assertTrue (decide (linkedEntry.run?
+      [.word (word 9), .word (word 1)] 2048 =
+        some (.done (.bool true) [])))
+    "Ord.gt required an Eq implementation even though its body did not consume Eq"
+
+private def testConsumedTraitPredicateBoundary : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Ord<T> where T: Eq {",
+    "  function gt(left: T, right: T) returns (Bool);",
+    "}",
+    "function consumeEq<T>(value: T) returns (Bool) where T: Eq { return true; }",
+    "impl Ord<Word> {",
+    "  function gt(left: Word, right: Word) returns (Bool) { return consumeEq(left); }",
+    "}",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "  return left > right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Bool) {",
+    "  return greaterWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let greater ← signatureNamed program "greaterWithEvidence"
+  let implementation ← match program.signatures.implementations with
+    | [implementation] => pure implementation
+    | implementations => throw (IO.userError
+        s!"consumed trait predicate: expected one Ord impl, found {implementations.length}")
+  let outcome ← runOrThrow "consumed trait predicate boundary" program
+    [monomorphicRequest entry] 2
+  match SourceCoreDirectLinking.link program outcome with
+  | .error (.implMethodSourceCore key _ method error) =>
+      assertTrue (decide (key.declaration = greater.id ∧
+          method.implementation = implementation.id ∧
+          method.methodIndex = 0) &&
+          (error.reason matches .requirementsPresent [_]))
+        "consumed trait predicate lost its explicit method-lowering boundary"
+  | result => throw (IO.userError
+      s!"a consumed trait predicate crossed the standalone method boundary: {reprStr result}")
 
 private def testNamedLogicalNotWithEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -1662,6 +1763,8 @@ def testSourceCoreDirectLinking : IO Unit := do
   testImplementationMethodLoweringBoundary
   testStrictRuntimeBinaryEvidence
   testNamedOperatorFunctionsAndOrd
+  testTraitPredicateIsStaticMethodAssumption
+  testConsumedTraitPredicateBoundary
   testNamedLogicalNotWithEvidence
   testNamedLogicalNotExpectedType
   testNamedLogicalNotMismatchDoesNotFallback
