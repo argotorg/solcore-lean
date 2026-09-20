@@ -552,11 +552,16 @@ private def exactRuntimeCoercionEvidence (caller : SpecializedFunction)
       throw (.runtimeCoercionEvidenceUnresolved caller.key node.id
         step.requirement predicate)
 
+private abbrev ExecutableMethodElaborator :=
+  ExecutableImplMethods.CheckedMethod →
+    Except Error SourceCoreElaboration.ElaboratedFunction
+
 /-- Turn one closed unary-operator witness into a checked, capture-free inline
 plan.  The selected implementation method, rather than the operand's builtin
 Core operation, is the runtime authority. -/
 private def requiredUnaryPlan (program : CheckedProgram)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (elaborateMethod : ExecutableMethodElaborator)
     (caller : SpecializedFunction) (available : List PredicateEvidence)
     (node : ExpressionNode) (operator : Syntax.UnaryOp) :
     Except Error (SourceCoreElaboration.RequiredUnaryPlan Error) := do
@@ -576,9 +581,7 @@ private def requiredUnaryPlan (program : CheckedProgram)
   if trait.name != profile.traitName then
     throw (.runtimeUnaryTraitNameMismatch caller.key node.id
       profile.traitName trait.name)
-  let elaborated ←
-    (SourceCoreElaboration.elaborateFunction method.checked).mapError fun error =>
-      .implMethodSourceCore caller.key node.id method.id error
+  let elaborated ← elaborateMethod method
   let operandType ←
     (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
       predicate.subject).mapError Error.sourceCore
@@ -610,6 +613,7 @@ The implementation method body, not the specialized operand type, is the
 runtime authority. -/
 private def requiredBinaryPlan (program : CheckedProgram)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (elaborateMethod : ExecutableMethodElaborator)
     (caller : SpecializedFunction) (available : List PredicateEvidence)
     (node : ExpressionNode) (operator : Syntax.BinaryOp) :
     Except Error (SourceCoreElaboration.RequiredBinaryPlan Error) := do
@@ -629,9 +633,7 @@ private def requiredBinaryPlan (program : CheckedProgram)
   if trait.name != profile.traitName then
     throw (.runtimeBinaryTraitNameMismatch caller.key node.id
       profile.traitName trait.name)
-  let elaborated ←
-    (SourceCoreElaboration.elaborateFunction method.checked).mapError fun error =>
-      .implMethodSourceCore caller.key node.id method.id error
+  let elaborated ← elaborateMethod method
   let operandType ←
     (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
       predicate.subject).mapError Error.sourceCore
@@ -664,6 +666,7 @@ inline conversion.  Endpoint types validate the selected method; they never
 invent the conversion's runtime behavior. -/
 private def coercionPlan (program : CheckedProgram)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (elaborateMethod : ExecutableMethodElaborator)
     (caller : SpecializedFunction) (available : List PredicateEvidence)
     (node : ExpressionNode) (step : CoercionStep) :
     Except Error (SourceCoreElaboration.CoercionPlan Error) := do
@@ -683,9 +686,7 @@ private def coercionPlan (program : CheckedProgram)
     (ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program evidence
       2 "coerce").mapError fun error =>
         .executableImplMethod caller.key node.id error
-  let elaborated ←
-    (SourceCoreElaboration.elaborateFunction method.checked).mapError fun error =>
-      .implMethodSourceCore caller.key node.id method.id error
+  let elaborated ← elaborateMethod method
   let sourceType ←
     (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
       step.source).mapError Error.sourceCore
@@ -708,6 +709,176 @@ private def coercionPlan (program : CheckedProgram)
       let body := aliasInputs elaborated.inputs temporaries elaborated.resolved
       pure (bindValues (temporaries.zip [value]) body)
   }
+
+private def specializedExecutableMethod
+    (method : ExecutableImplMethods.CheckedMethod) : SpecializedFunction := {
+  key := {
+    declaration := method.checked.declaration
+    arguments := []
+  }
+  declaration := method.checked.declaration
+  parameterSubstitution := []
+  assumptions := method.synthetic.scheme.predicates
+  function := method.checked
+}
+
+/-- Resolve only those static method assumptions for which the whole-program
+catalog has coherent closed evidence.  An unused unresolved trait-header
+assumption remains harmless; attempting to consume it still fails through the
+ordinary missing-assumption evidence gate. -/
+private def availableMethodAssumptionEvidence (program : CheckedProgram) :
+    List ProgramPredicate → List PredicateEvidence
+  | [] => []
+  | predicate :: rest =>
+      let tail := availableMethodAssumptionEvidence program rest
+      match (TypedTraitResolution.resolve program.signatures.implRules 32
+          predicate).outcome with
+      | .success evidence@(.byImpl goal _ _) =>
+          if goal = predicate then .implementation evidence :: tail else tail
+      | .noSolution
+      | .inconclusive _ => tail
+
+private def validateDetachedCallMetadata (program : CheckedProgram)
+    (caller : SpecializedFunction) (node : ExpressionNode)
+    (callee : ExpressionId) (instantiation : DeclarationInstantiation) :
+    Except Error SpecializedFunction := do
+  let (reference, calleeType) ←
+    match caller.function.typedBody.lookupExpression? callee with
+    | none => throw (.malformedCall (.missingCalleeNode node.id callee))
+    | some { type, form := .reference _ (.declaration reference), .. } =>
+        pure (reference, type)
+    | some _ => throw (.malformedCall
+        (.calleeNotDeclarationReference node.id callee))
+  if instantiation.declaration != reference.declaration then
+    throw (.malformedCall (.calleeInstantiationDeclarationMismatch node.id
+      instantiation.declaration reference.declaration))
+  if instantiation != reference then
+    throw (.malformedCall (.calleeInstantiationMetadataMismatch node.id
+      instantiation reference))
+  if calleeType != instantiation.type then
+    throw (.malformedCall (.calleeNodeTypeMismatch node.id calleeType
+      instantiation.type))
+  let specialized ←
+    (SourceSpecializationWorklist.resolveRequest program {
+      declaration := instantiation.declaration
+      parameterSubstitution := instantiation.parameterSubstitution
+    }).mapError Error.malformedCall
+  if specialized.function.type != instantiation.type then
+    throw (.malformedCall (.specializedCalleeTypeMismatch node.id
+      instantiation.type specialized.function.type))
+  if specialized.assumptions != instantiation.predicates then
+    throw (.malformedCall (.specializedCalleeAssumptionsMismatch node.id
+      instantiation.predicates specialized.assumptions))
+  pure specialized
+
+/-- Link a checked function reached from an implementation method without
+requiring it to have appeared in the top-level specialization plan.  Direct
+call metadata is reconstructed from the program catalog, and recursive method
+or function expansion consumes the same finite fuel. -/
+private def buildDetachedDraftFuel (program : CheckedProgram)
+    (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (visiting : List SpecializationKey)
+    (assumptionEvidence : List PredicateEvidence)
+    (validateIncoming : Bool) (fuel : Nat)
+    (specialized : SpecializedFunction) :
+    Except Error SourceCoreElaboration.BodyDraft :=
+  if visiting.contains specialized.key then
+    .error (.recursiveCallCycle specialized.key)
+  else
+    match fuel with
+    | 0 => .error (.linkDepthLimit specialized.key)
+    | remaining + 1 => do
+        if validateIncoming then
+          validateAssumptionEvidence specialized.key specialized.assumptions
+            assumptionEvidence
+        else
+          pure ()
+        let elaborateMethodAt : ExpressionId → ExecutableMethodElaborator :=
+          fun occurrence method => do
+            let methodSpecialized := specializedExecutableMethod method
+            let methodEvidence := availableMethodAssumptionEvidence program
+              methodSpecialized.assumptions
+            let result : Except Error
+                SourceCoreElaboration.ElaboratedFunction := do
+              let draft ← buildDetachedDraftFuel program temporaryOwner
+                temporaryBase (specialized.key :: visiting) methodEvidence false
+                remaining methodSpecialized
+              draft.finalizeWith Error.sourceCore
+            match result with
+            | .ok elaborated => pure elaborated
+            | .error (.sourceCore error) =>
+                throw (.implMethodSourceCore specialized.key occurrence
+                  method.id error)
+            | .error error => throw error
+        SourceCoreElaboration.lowerFunctionBodyWithRuntimePolicies
+          Error.sourceCore
+          (fun _ node callee arguments resolution => do
+            let instantiation ← match resolution with
+              | .indirect _ => throw (.indirectCall node.id)
+              | .declaration instantiation => pure instantiation
+            let calleeEvidence ← exactCallRequirementEvidence specialized node
+              assumptionEvidence instantiation
+            let resolvedCallee ← validateDetachedCallMetadata program specialized
+              node callee instantiation
+            let calleeDraft ← buildDetachedDraftFuel program temporaryOwner
+              temporaryBase (specialized.key :: visiting) calleeEvidence true
+              remaining resolvedCallee
+            let loweredCallee ← calleeDraft.finalizeWith Error.sourceCore
+            if loweredCallee.inputs.length != arguments.length then
+              throw (.argumentArityMismatch node.id loweredCallee.inputs.length
+                arguments.length)
+            let callResult ← (SourceCoreElaboration.lowerType
+              (.occurrence node.id.occurrence) node.type).mapError
+                Error.sourceCore
+            if callResult != loweredCallee.returnType then
+              throw (.callResultTypeMismatch node.id loweredCallee.returnType
+                callResult)
+            pure {
+              argumentTypes := loweredCallee.inputs.values
+              consumedRequirements := node.requirements
+              build := fun loweredArguments => do
+                if loweredArguments.length != loweredCallee.inputs.length then
+                  throw (.argumentArityMismatch node.id
+                    loweredCallee.inputs.length loweredArguments.length)
+                let temporaries := freshTemporaries temporaryOwner
+                  temporaryBase loweredArguments.length
+                let body := aliasInputs loweredCallee.inputs temporaries
+                  loweredCallee.resolved
+                pure (bindValues (temporaries.zip loweredArguments) body)
+            })
+          (fun _ node operator _ =>
+            requiredUnaryPlan program temporaryOwner temporaryBase
+              (elaborateMethodAt node.id) specialized assumptionEvidence node
+              operator)
+          (fun _ node _ operator _ =>
+            requiredBinaryPlan program temporaryOwner temporaryBase
+              (elaborateMethodAt node.id) specialized assumptionEvidence node
+              operator)
+          (fun _ node step =>
+            coercionPlan program temporaryOwner temporaryBase
+              (elaborateMethodAt node.id) specialized assumptionEvidence node
+              step)
+          specialized.function
+termination_by fuel
+
+private def elaborateDetachedMethod (program : CheckedProgram)
+    (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (caller : SpecializedFunction) (visiting : List SpecializationKey)
+    (fuel : Nat) (occurrence : ExpressionId)
+    (method : ExecutableImplMethods.CheckedMethod) :
+    Except Error SourceCoreElaboration.ElaboratedFunction :=
+  let specialized := specializedExecutableMethod method
+  let available := availableMethodAssumptionEvidence program
+    specialized.assumptions
+  let result : Except Error SourceCoreElaboration.ElaboratedFunction := do
+    let draft ← buildDetachedDraftFuel program temporaryOwner temporaryBase
+      (caller.key :: visiting) available false fuel specialized
+    draft.finalizeWith Error.sourceCore
+  match result with
+  | .ok elaborated => pure elaborated
+  | .error (.sourceCore error) =>
+      .error (.implMethodSourceCore caller.key occurrence method.id error)
+  | .error error => .error error
 
 private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
@@ -768,14 +939,20 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
                 pure (bindValues (temporaries.zip loweredArguments) body)
             })
           (fun _ node operator _ =>
-            requiredUnaryPlan program temporaryOwner temporaryBase specialized
-              assumptionEvidence node operator)
+            requiredUnaryPlan program temporaryOwner temporaryBase
+              (elaborateDetachedMethod program temporaryOwner temporaryBase
+                specialized visiting remaining node.id)
+              specialized assumptionEvidence node operator)
           (fun _ node _ operator _ =>
-            requiredBinaryPlan program temporaryOwner temporaryBase specialized
-              assumptionEvidence node operator)
+            requiredBinaryPlan program temporaryOwner temporaryBase
+              (elaborateDetachedMethod program temporaryOwner temporaryBase
+                specialized visiting remaining node.id)
+              specialized assumptionEvidence node operator)
           (fun _ node step =>
-            coercionPlan program temporaryOwner temporaryBase specialized
-              assumptionEvidence node step)
+            coercionPlan program temporaryOwner temporaryBase
+              (elaborateDetachedMethod program temporaryOwner temporaryBase
+                specialized visiting remaining node.id)
+              specialized assumptionEvidence node step)
           specialized.function
 termination_by fuel
 
@@ -787,8 +964,11 @@ private def linkSeeds (program : CheckedProgram) (plan : Plan)
       let specialized ← exactSpecialization plan key
       unless specialized.assumptions.isEmpty do
         throw (.unresolvedAssumptions key specialized.assumptions)
+      let expansionFuel := plan.specializations.length +
+        program.functions.length +
+        program.signatures.implementations.length + 1
       let draft ← buildDraftFuel program plan key.declaration temporaryBase
-        [] [] (plan.specializations.length + 1) key
+        [] [] expansionFuel key
       let elaborated ← draft.finalizeWith Error.sourceCore
       pure ({ key, elaborated } ::
         (← linkSeeds program plan temporaryBase rest))

@@ -56,8 +56,11 @@ therefore follow `ne` and `not` rather than invented traits.  The same
 method-authoritative boundary
 executes a closed
 `Coerce<From, To>.coerce` profile at direct-call arguments, through forwarded
-generic evidence, and on call results.  Other runtime evidence remains outside
-this path.  It is not yet a general source compiler or a public source Oracle.
+generic evidence, and on call results.  Supported implementation methods may
+themselves call cataloged functions and consume a coherently resolved
+trait-header assumption through the same finite policies.  Other runtime
+evidence remains outside this path.  It is not yet a general source compiler or
+a public source Oracle.
 
 ## What works now
 
@@ -5819,8 +5822,8 @@ declaration-parameter order and become static assumptions while the method body
 is checked.  They are not prerequisites of the implementation rule itself:
 `Ord<Word>` under `trait Ord<T> where T: Eq` can therefore execute a
 requirement-free body without a separate `Eq<Word>` implementation.  A body
-which actually consumes that superclass assumption still stops at the explicit
-standalone method-lowering boundary.
+which consumes that superclass assumption resolves a coherent closed witness
+on demand; absent evidence rejects without changing the unused-assumption case.
 The method body is checked against its instantiated two-operand signature, its
 operands are bound left to right, and the body is capture-free inlined into the
 linked Core term.  `Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`,
@@ -5866,22 +5869,27 @@ non-call/operator/literal requirements outside the supported unary, binary and
 conversion profiles and indirect calls reject explicitly.  Other runtime
 operators, generic or premise-bearing evidence and implementation methods,
 multi-method or implementation/method-level `where`-constrained profiles remain
-explicit boundaries.  Implementation
-method bodies themselves
-must fit the standalone tail-normal Core-lowerable subset: calls, coercions and
-required operations inside a method body still reject.  Nominal source types
-also remain outside the closed Core type projection.
+explicit boundaries.  Selected implementation methods now have their own
+finite detached linker.  It reconstructs direct-call metadata against the
+whole-program catalog even when a method-only helper is absent from the
+top-level specialization plan, threads proof evidence into constrained generic
+helpers, and recursively applies the supported unary, binary and coercion
+policies.  Trait-header assumptions are resolved only when consumed.  Cycles
+and exhausted expansion fuel reject explicitly, and nominal source types remain
+outside the closed Core type projection.
 Thus the worklist may close same-key self or mutual recursion, but the current
 linker does not assign those cycles an executable meaning.  Small checked laws
 fix the runtime input-type gate and budget-exhaustion boundary; end-to-end
 regressions execute proof-only constrained and nested generic calls as well as
 both conditional paths, method-authoritative `BitNot.bnot`, all strict Word
 binary profiles, and the direct, forwarded-generic and call-result conversion
-profiles, and cover the staged failure cases.
+profiles.  Further regressions execute an ordinary helper found only from an
+implementation method and the chain `Ord.gt` method → constrained Eq helper →
+`Eq.eq`; the same consumed superclass rejects when no Eq implementation exists.
 
-The next frontend boundary is superclass evidence which can be consumed by
-implementation method calls and required operations, followed by broader
-implementation shapes and additional runtime-evidence profiles.  Recursive source calls require
+The next frontend boundary is broader implementation shapes—generic or
+premise-bearing evidence, implementation/method-level predicates and
+multi-method traits—and additional runtime-evidence profiles.  Recursive source calls require
 a separate named or global recursive-function representation rather than cyclic
 inlining.
 Automatic entry discovery, constructors, members and place-aware statements
@@ -5898,10 +5906,9 @@ Solcore source text. In particular, it does not yet provide:
   pipeline;
 - execution of cyclic or indirect source call graphs, runtime
   evidence-dependent operator/literal/non-call forms outside the narrow
-  strict arithmetic/bitwise, `Eq<T>`, premise-free `Ord<T>` and
-  `Coerce<From, To>` profiles, general impl methods, generic or symbolic
-  conversion execution, or method bodies containing calls,
-  coercions, or required operations;
+  `BitNot<T>`, strict arithmetic/bitwise, `Eq<T>`, closed standard `Ord<T>` and
+  `Coerce<From, To>` profiles, generic/premise-bearing or multi-method impl
+  execution, and generic or symbolic conversion execution;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;

@@ -557,7 +557,7 @@ private def testRuntimeEvidenceBoundaries (program : CheckedProgram) : IO Unit :
       some (.done (.word (word 7)) [])))
     "call-result coercion did not coexist with its proof-only signature evidence"
 
-private def testImplementationMethodLoweringBoundary : IO Unit := do
+private def testImplementationMethodDirectCall : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
@@ -576,22 +576,58 @@ private def testImplementationMethodLoweringBoundary : IO Unit := do
     "}"
   ])
   let entry ← signatureNamed program "entry"
-  let addWithEvidence ← signatureNamed program "addWithEvidence"
-  let implementation ← match program.signatures.implementations with
-    | [implementation] => pure implementation
-    | implementations => throw (IO.userError
-        s!"method boundary: expected one implementation, found {implementations.length}")
-  let outcome ← runOrThrow "implementation method call boundary" program
+  let helper ← signatureNamed program "helper"
+  let outcome ← runOrThrow "implementation method direct call" program
+    [monomorphicRequest entry] 2
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"implementation method call: incomplete plan {reprStr other}")
+  assertTrue (!(plan.specializations.any fun specialized =>
+      specialized.declaration == helper.id))
+    "method-only helper unexpectedly appeared in the top-level worklist"
+  let linked ← linkOrThrow "implementation method direct call" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "implementation method direct call: linked root was absent")
+  assertTrue (decide (linkedEntry.run?
+      [.word (word 50), .word (word 8)] 2048 =
+        some (.done (.word (word 50)) [])))
+    "implementation method did not execute its detached direct-call helper"
+
+private def testImplementationMethodCallCycle : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "}",
+    "impl Add<Word> {",
+    "  function add(left: Word, right: Word) returns (Word) {",
+    "    return helper(left);",
+    "  }",
+    "}",
+    "function helper(value: Word) returns (Word) { return helper(value); }",
+    "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
+    "  return left + right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Word) {",
+    "  return addWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let helper ← signatureNamed program "helper"
+  let outcome ← runOrThrow "implementation method call cycle" program
     [monomorphicRequest entry] 2
   match SourceCoreDirectLinking.link program outcome with
-  | .error (.implMethodSourceCore key _ method error) =>
-      assertTrue (decide (key.declaration = addWithEvidence.id ∧
-          method.implementation = implementation.id ∧
-          method.methodIndex = 0) &&
-          (error.reason matches .unsupportedExpression .call))
-        "unsupported implementation-method call lost its exact boundary metadata"
+  | .error (.recursiveCallCycle key) =>
+      assertTrue (decide (key.declaration = helper.id ∧ key.arguments = []))
+        "detached method-call cycle lost its canonical helper key"
   | result => throw (IO.userError
-      s!"an implementation-method call crossed the standalone Core boundary: {reprStr result}")
+      s!"a recursive implementation-method helper was executable: {reprStr result}")
 
 private def testStrictRuntimeBinaryEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -1132,7 +1168,7 @@ private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
         some (.done (.bool true) [])))
     "Ord.gt required an Eq implementation even though its body did not consume Eq"
 
-private def testConsumedTraitPredicateBoundary : IO Unit := do
+private def testMissingConsumedTraitPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
     "  function eq(left: T, right: T) returns (Bool);",
@@ -1152,7 +1188,11 @@ private def testConsumedTraitPredicateBoundary : IO Unit := do
     "}"
   ])
   let entry ← signatureNamed program "entry"
-  let greater ← signatureNamed program "greaterWithEvidence"
+  let eq ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Eq" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"consumed trait predicate: expected one Eq trait, found {traits.length}")
   let implementation ← match program.signatures.implementations with
     | [implementation] => pure implementation
     | implementations => throw (IO.userError
@@ -1160,14 +1200,64 @@ private def testConsumedTraitPredicateBoundary : IO Unit := do
   let outcome ← runOrThrow "consumed trait predicate boundary" program
     [monomorphicRequest entry] 2
   match SourceCoreDirectLinking.link program outcome with
-  | .error (.implMethodSourceCore key _ method error) =>
-      assertTrue (decide (key.declaration = greater.id ∧
-          method.implementation = implementation.id ∧
-          method.methodIndex = 0) &&
-          (error.reason matches .requirementsPresent [_]))
-        "consumed trait predicate lost its explicit method-lowering boundary"
+  | .error (.missingAssumptionEvidence key _ _ predicate) =>
+      assertTrue (decide (key.declaration = implementation.id ∧
+          predicate.trait = eq.id ∧ predicate.subject = .word ∧
+          predicate.arguments = []))
+        "missing superclass evidence lost its implementation-method predicate"
   | result => throw (IO.userError
-      s!"a consumed trait predicate crossed the standalone method boundary: {reprStr result}")
+      s!"a consumed trait predicate without evidence was accepted: {reprStr result}")
+
+private def testConsumedTraitPredicateEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Ord<T> where T: Eq {",
+    "  function gt(left: T, right: T) returns (Bool);",
+    "}",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "}",
+    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "  return left == right;",
+    "}",
+    "impl Ord<Word> {",
+    "  function gt(left: Word, right: Word) returns (Bool) {",
+    "    return equalWithEvidence(left, right);",
+    "  }",
+    "}",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "  return left > right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Bool) {",
+    "  return greaterWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let equal ← signatureNamed program "equalWithEvidence"
+  let outcome ← runOrThrow "consumed trait predicate evidence" program
+    [monomorphicRequest entry] 2
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"consumed trait predicate: incomplete plan {reprStr other}")
+  assertTrue (!(plan.specializations.any fun specialized =>
+      specialized.declaration == equal.id))
+    "superclass helper unexpectedly appeared in the top-level worklist"
+  let linked ← linkOrThrow "consumed trait predicate evidence" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "consumed trait predicate: linked root was absent")
+  assertTrue (decide (linkedEntry.run?
+      [.word (word 9), .word (word 9)] 4096 =
+        some (.done (.bool false) [])))
+    "Ord.gt did not forward Eq superclass evidence through its method helper"
 
 private def testNamedLogicalNotWithEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -1846,12 +1936,14 @@ def testSourceCoreDirectLinking : IO Unit := do
   testCycle program
   testProofOnlyEvidence program
   testRuntimeEvidenceBoundaries program
-  testImplementationMethodLoweringBoundary
+  testImplementationMethodDirectCall
+  testImplementationMethodCallCycle
   testStrictRuntimeBinaryEvidence
   testRuntimeBitNotEvidence
   testNamedOperatorFunctionsAndOrd
   testTraitPredicateIsStaticMethodAssumption
-  testConsumedTraitPredicateBoundary
+  testMissingConsumedTraitPredicateEvidence
+  testConsumedTraitPredicateEvidence
   testNamedLogicalNotWithEvidence
   testNamedLogicalNotExpectedType
   testNamedLogicalNotMismatchDoesNotFallback
