@@ -571,7 +571,7 @@ private def requiredUnaryPlan (program : CheckedProgram)
   let (requirement, predicate, evidence) ←
     exactRuntimeUnaryEvidence caller node available
   let method ←
-    (ExecutableImplMethods.checkMonomorphicMethodWithArity program evidence
+    (ExecutableImplMethods.checkMethodWithArity program evidence
       1 profile.methodName).mapError fun error =>
         .executableImplMethod caller.key node.id error
   let trait ← match program.signatures.trait? predicate.trait with
@@ -623,7 +623,7 @@ private def requiredBinaryPlan (program : CheckedProgram)
   let (requirement, predicate, evidence) ←
     exactRuntimeBinaryEvidence caller node available
   let method ←
-    (ExecutableImplMethods.checkMonomorphicMethodWithArity program evidence
+    (ExecutableImplMethods.checkMethodWithArity program evidence
       1 profile.methodName).mapError fun error =>
         .executableImplMethod caller.key node.id error
   let trait ← match program.signatures.trait? predicate.trait with
@@ -683,7 +683,7 @@ private def coercionPlan (program : CheckedProgram)
     throw (.runtimeCoercionPredicateMismatch caller.key node.id
       step.requirement step.source step.target predicate)
   let method ←
-    (ExecutableImplMethods.checkMonomorphicMethodWithArity program evidence
+    (ExecutableImplMethods.checkMethodWithArity program evidence
       2 "coerce").mapError fun error =>
         .executableImplMethod caller.key node.id error
   let elaborated ← elaborateMethod method
@@ -711,21 +711,15 @@ private def coercionPlan (program : CheckedProgram)
   }
 
 private def specializedExecutableMethod
-    (method : ExecutableImplMethods.CheckedMethod) : SpecializedFunction := {
-  key := {
-    declaration := method.checked.declaration
-    arguments := []
-  }
-  declaration := method.checked.declaration
-  parameterSubstitution := []
-  assumptions := method.synthetic.scheme.predicates
-  function := method.checked
-}
+    (method : ExecutableImplMethods.CheckedMethod) : SpecializedFunction :=
+  method.specialized
 
 /-- Resolve only those static method assumptions for which the whole-program
 catalog has coherent closed evidence.  An unused unresolved trait-header
 assumption remains harmless; attempting to consume it still fails through the
-ordinary missing-assumption evidence gate. -/
+ordinary missing-assumption evidence gate.  Structurally identical witnesses
+shared by trait-header and implementation predicates collapse to one candidate;
+different witnesses for the same goal remain observably ambiguous. -/
 private def resolvedMethodTraitEvidence (program : CheckedProgram) :
     List ProgramPredicate → List PredicateEvidence
   | [] => []
@@ -738,10 +732,19 @@ private def resolvedMethodTraitEvidence (program : CheckedProgram) :
       | .noSolution
       | .inconclusive _ => tail
 
+private def deduplicateExactEvidence
+    (evidence : List PredicateEvidence) : List PredicateEvidence :=
+  evidence.foldl (fun unique candidate =>
+    if unique.any fun existing => existing == candidate then
+      unique
+    else
+      unique ++ [candidate]) []
+
 private def availableMethodAssumptionEvidence (program : CheckedProgram)
     (method : ExecutableImplMethods.CheckedMethod) : List PredicateEvidence :=
-  resolvedMethodTraitEvidence program method.traitPredicates ++
-    method.implementationPremises.map PredicateEvidence.implementation
+  deduplicateExactEvidence (
+    resolvedMethodTraitEvidence program method.traitPredicates ++
+      method.implementationPremises.map PredicateEvidence.implementation)
 
 private def validateDetachedCallMetadata (program : CheckedProgram)
     (caller : SpecializedFunction) (node : ExpressionNode)

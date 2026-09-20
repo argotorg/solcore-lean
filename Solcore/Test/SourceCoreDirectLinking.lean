@@ -1259,6 +1259,46 @@ private def testConsumedTraitPredicateEvidence : IO Unit := do
         some (.done (.bool false) [])))
     "Ord.gt did not forward Eq superclass evidence through its method helper"
 
+private def testGenericTraitPredicateEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Ord<T> where T: Eq {",
+    "  function gt(left: T, right: T) returns (Bool);",
+    "}",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "}",
+    "impl<T> Ord<T> {",
+    "  function gt(left: T, right: T) returns (Bool) {",
+    "    return left == right;",
+    "  }",
+    "}",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "  return left > right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Bool) {",
+    "  return greaterWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let outcome ← runOrThrow "generic trait predicate evidence" program
+    [monomorphicRequest entry] 2
+  let linked ← linkOrThrow "generic trait predicate evidence" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "generic trait predicate: linked root was absent")
+  assertTrue (decide (linkedEntry.run?
+      [.word (word 9), .word (word 9)] 4096 =
+        some (.done (.bool false) [])))
+    "generic Ord<T> body did not specialize its trait-header Eq<T> assumption"
+
 private def testImplementationPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
@@ -1309,6 +1349,62 @@ private def testImplementationPredicateEvidence : IO Unit := do
       [.word (word 9), .word (word 9)] 4096 =
         some (.done (.word (word 92)) [])))
     "Add method did not consume its selected Eq implementation premise"
+
+private def testGenericImplementationPredicateEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Add<T> where T: Eq {",
+    "  function add(left: T, right: T) returns (T);",
+    "}",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "}",
+    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "  return left == right;",
+    "}",
+    "impl<T> Add<T> where T: Eq {",
+    "  function add(left: T, right: T) returns (T) {",
+    "    return equalWithEvidence(left, right) ? left : right;",
+    "  }",
+    "}",
+    "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
+    "  return left + right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Word) {",
+    "  return addWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let add ← signatureNamed program "addWithEvidence"
+  let equal ← signatureNamed program "equalWithEvidence"
+  let outcome ← runOrThrow "generic implementation predicate evidence" program
+    [monomorphicRequest entry] 2
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"generic implementation predicate: incomplete plan {reprStr other}")
+  assertTrue (plan.specializations.any fun specialized =>
+      specialized.declaration == add.id)
+    "generic Add caller was absent from the top-level specialization plan"
+  assertTrue (!(plan.specializations.any fun specialized =>
+      specialized.declaration == equal.id))
+    "generic implementation helper unexpectedly appeared in the top-level plan"
+  let linked ← linkOrThrow "generic implementation predicate evidence" program
+    outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "generic implementation predicate: linked root was absent")
+  assertTrue (decide (linkedEntry.run?
+      [.word (word 91), .word (word 92)] 4096 =
+        some (.done (.word (word 92)) [])))
+    "generic Add<T> method did not specialize or deduplicate its Eq<T> evidence"
 
 private def testNamedLogicalNotWithEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -1995,7 +2091,9 @@ def testSourceCoreDirectLinking : IO Unit := do
   testTraitPredicateIsStaticMethodAssumption
   testMissingConsumedTraitPredicateEvidence
   testConsumedTraitPredicateEvidence
+  testGenericTraitPredicateEvidence
   testImplementationPredicateEvidence
+  testGenericImplementationPredicateEvidence
   testNamedLogicalNotWithEvidence
   testNamedLogicalNotExpectedType
   testNamedLogicalNotMismatchDoesNotFallback

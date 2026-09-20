@@ -79,6 +79,13 @@ example : matchImplHead? showBoxRule (showPredicate (box .word)) =
     some [equality .word] := by
   rfl
 
+example : matchImplHeadWithParameters? [showBoxParameter] showBoxRule
+    (showPredicate (box .word)) = some {
+      parameterSubstitution := [(showBoxParameter, .word)]
+      wherePredicates := [equality .word]
+    } := by
+  rfl
+
 example : matchImplHead? showBoxRule (equality (box .word)) = none := by
   rfl
 
@@ -130,5 +137,11 @@ def testTypedTraitResolution : IO Unit := do
   assertTrue (decide (matchImplHead? showBoxRule (showPredicate (box .word)) =
       some [equality .word]))
     "typed head matcher did not expose instantiated where predicates"
+  assertTrue (decide (matchImplHeadWithParameters? [showBoxParameter]
+      showBoxRule (showPredicate (box .word)) = some {
+        parameterSubstitution := [(showBoxParameter, .word)]
+        wherePredicates := [equality .word]
+      }))
+    "detailed head matching did not retain the canonical ground parameter"
 
 end Tests.TypedTraitResolution

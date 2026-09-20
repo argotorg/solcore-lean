@@ -1,7 +1,7 @@
 import Solcore.Frontend.ExecutableImplMethods
 import Solcore.Frontend.SourceCoreElaboration
 
-/-! Executable regressions for checked monomorphic implementation methods. -/
+/-! Executable regressions for checked and ground-specialized implementation methods. -/
 
 set_option autoImplicit false
 
@@ -316,7 +316,34 @@ private def testDefensiveProfileRejections : IO Unit := do
       s!"non-closed evidence goal had the wrong rejection: {reprStr error}")
   | .ok _ => throw (IO.userError "non-closed evidence goal was accepted")
 
-private def testGenericImplementationRejection : IO Unit := do
+private def testAmbiguousEvidenceRejection : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Add<T> { function add(left: T, right: T) returns (T); }",
+    "impl Add<Word> {",
+    "  function add(left: Word, right: Word) returns (Word) { return left; }",
+    "}",
+    "impl Add<Word> {",
+    "  function add(left: Word, right: Word) returns (Word) { return right; }",
+    "}"
+  ])
+  let (first, second) ← match program.signatures.implementations with
+    | [first, second] => pure (first, second)
+    | implementations => throw (IO.userError
+        s!"expected two overlapping implementations, found {implementations.length}")
+  let forged : TypedTraitResolution.Evidence :=
+    .byImpl first.head first.id []
+  match ExecutableImplMethods.checkMethodWithArity program forged 1 "add" with
+  | .error (.evidenceResolutionInconclusive
+      (.ambiguous goal firstId secondId)) =>
+      assertTrue (decide (goal = first.head ∧ firstId = first.id ∧
+          secondId = second.id))
+        "ambiguous evidence rejection lost its goal or implementation order"
+  | .error error => throw (IO.userError
+      s!"forged overlapping evidence had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "forged evidence bypassed an ambiguous implementation catalog")
+
+private def testGenericImplementationSpecialization : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Identity<T> { function identity(value: T) returns (T); }",
     "impl<T> Identity<T> {",
@@ -324,14 +351,86 @@ private def testGenericImplementationRejection : IO Unit := do
     "}"
   ])
   let implementation ← onlyImplementation program
-  match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program
-      (evidenceFor implementation) 1 "identity" with
-  | .error (.implementationParametersPresent id [_]) =>
-      assertTrue (decide (id = implementation.id))
-        "generic rejection named the wrong implementation"
+  let identity ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Identity" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Identity trait, found {traits.length}")
+  let goal : ProgramPredicate := {
+    trait := identity.id
+    subject := .word
+    arguments := []
+  }
+  let evidence ← match (TypedTraitResolution.resolve
+      program.signatures.implRules 32 goal).outcome with
+    | .success evidence => pure evidence
+    | outcome => throw (IO.userError
+        s!"generic Identity<Word> did not resolve: {reprStr outcome}")
+  let method ← match ExecutableImplMethods.checkMethodWithArity program evidence
+      1 "identity" with
+    | .ok method => pure method
+    | .error error => throw (IO.userError
+        s!"ground generic implementation was rejected: {reprStr error}")
+  let parameter ← match implementation.parameters with
+    | [parameter] => pure parameter
+    | parameters => throw (IO.userError
+        s!"expected one implementation parameter, found {parameters.length}")
+  assertTrue (decide (
+      method.specialized.parameterSubstitution = [(parameter, .word)] ∧
+      method.specialized.key.declaration = implementation.id ∧
+      method.specialized.key.arguments = [.word] ∧
+      method.specialized.assumptions = [] ∧
+      method.synthetic.scheme.parameters = [] ∧
+      method.synthetic.parameterTypes = [.word] ∧
+      method.synthetic.returnTypes = [.word] ∧
+      method.checked.type = .function .word .word ∧
+      method.checked.inferredBodyType = .word))
+    "generic implementation did not close at its evidence goal"
+  let elaborated ← match SourceCoreElaboration.elaborateFunction method.checked with
+    | .ok elaborated => pure elaborated
+    | .error error => throw (IO.userError
+        s!"specialized generic Identity method did not lower: {reprStr error}")
+  assertTrue (decide (elaborated.inputs.values = [.word] ∧
+      elaborated.returnType = .word ∧
+      Core.infer? elaborated.inputs.values elaborated.core = some .word))
+    "specialized generic Identity method lost its closed Core type"
+
+private def testUndeterminedImplementationParameterRejection : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Identity<T> { function identity(value: T) returns (T); }",
+    "impl<T, U> Identity<T> {",
+    "  function identity(value: T) returns (T) { return value; }",
+    "}"
+  ])
+  let implementation ← onlyImplementation program
+  let identity ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Identity" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Identity trait, found {traits.length}")
+  let goal : ProgramPredicate := {
+    trait := identity.id
+    subject := .word
+    arguments := []
+  }
+  let evidence ← match (TypedTraitResolution.resolve
+      program.signatures.implRules 32 goal).outcome with
+    | .success evidence => pure evidence
+    | outcome => throw (IO.userError
+        s!"phantom Identity<Word> head did not resolve: {reprStr outcome}")
+  let phantom ← match implementation.parameters with
+    | [_, phantom] => pure phantom
+    | parameters => throw (IO.userError
+        s!"expected two implementation parameters, found {parameters.length}")
+  match ExecutableImplMethods.checkMethodWithArity program evidence 1
+      "identity" with
+  | .error (.implementationParameterNotDetermined id parameter (.flexible _)) =>
+      assertTrue (decide (id = implementation.id ∧ parameter = phantom))
+        "undetermined-parameter rejection lost the implementation or phantom"
   | .error error => throw (IO.userError
-      s!"generic implementation had the wrong rejection: {reprStr error}")
-  | .ok _ => throw (IO.userError "generic implementation was executable")
+      s!"phantom implementation had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "an implementation parameter absent from its evidence was invented")
 
 private def testImplementationPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -472,7 +571,9 @@ def testExecutableImplMethods : IO Unit := do
   testUnclosedTraitPredicateRejection
   testEmptyMarkerRejection
   testDefensiveProfileRejections
-  testGenericImplementationRejection
+  testAmbiguousEvidenceRejection
+  testGenericImplementationSpecialization
+  testUndeterminedImplementationParameterRejection
   testImplementationPredicateEvidence
   testMethodPredicateRejections
   testBodyIsActuallyChecked

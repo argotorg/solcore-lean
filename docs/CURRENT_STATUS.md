@@ -42,13 +42,14 @@ the closed builtin subset to independently rechecked Semantic Core entries.
 Proof-only direct-call signature predicates may be discharged statically after
 exact requirement/evidence validation.  Checked trait/implementation catalogs
 now retain and signature-check their methods.  Deliberately narrow runtime
-evidence paths execute selected monomorphic arithmetic and bitwise methods
+evidence paths execute selected ground arithmetic and bitwise methods
 (`Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`, `BitAnd.band`,
 `BitXor.bxor`, `BitOr.bor`), unary `BitNot<T>.bnot`, `Eq<T>.eq` and
 `Ord<T>.gt`.  The standard
 `Ord<T> where T: Eq` header is accepted when its closed instantiated
 supertrait predicate is only a static method-body assumption; consuming that
-assumption inside the method remains staged.  Target-compatible
+assumption inside the method resolves coherent evidence on demand.
+Target-compatible
 ordering, logical and logical-negation operators now select ordinary visible
 functions `ne`, `lt`, `le`, `ge`, `and`, `or` and `not` through the same
 overload, evidence, specialization and direct-call path; source `!=` and `!`
@@ -58,7 +59,10 @@ executes a closed
 `Coerce<From, To>.coerce` profile at direct-call arguments, through forwarded
 generic evidence, and on call results.  Supported implementation methods may
 themselves call cataloged functions and consume a coherently resolved
-trait-header assumption through the same finite policies.  Other runtime
+trait-header assumption or an exact closed implementation `where` premise
+through the same finite policies.  Generic implementations are checked under
+their rigid parameters and then closed with the parameter substitution
+recovered from the selected evidence goal.  Other runtime
 evidence remains outside this path.  It is not yet a general source compiler or
 a public source Oracle.
 
@@ -5806,8 +5810,9 @@ The runtime unary profile is executable for trait-backed `BitNot<T>.bnot`.
 The unary occurrence must own exactly one solved requirement, and a generic
 caller's assumption must resolve to one forwarded closed implementation
 witness.  Source Core retains operand traversal and type checking while the
-linker selects, checks and capture-free inlines the sole monomorphic `bnot`
-method.  Its method body is authoritative: the executable regression returns
+linker selects, checks and capture-free inlines the sole ground-specialized
+`bnot` method.  Its method body is authoritative: the executable regression
+returns
 `91`, rather than the builtin Word complement.  A concrete Word `~` remains an
 evidence-free builtin operation, preserving the target's builtin fast path.
 
@@ -5816,10 +5821,17 @@ operators, equality and greater-than ordering.  A required occurrence must have
 exactly one matching
 solved operator requirement and closed implementation witness.  The selected
 trait must have one type parameter and one non-generic method; its selected
-implementation must be monomorphic, and its method must be predicate-free.
+implementation may be generic only when the closed evidence goal determines
+every declaration parameter, and its method must be predicate-free.  The body
+is checked under the rigid implementation parameters and then closed by the
+existing source specializer; its detached-link key retains the canonical ground
+argument sequence.
 Closed implementation-level `where` predicates are checked positionally
 against the selected evidence premises and retained as static assumptions of
 the synthetic method.
+The entire closed evidence tree is also re-resolved against the current impl
+catalog at the standard finite depth and must match structurally; forged
+same-goal witnesses cannot bypass no-solution or ambiguity.
 Closed trait-declaration predicates are instantiated from the evidence goal in
 declaration-parameter order and become static assumptions while the method body
 is checked.  They are not prerequisites of the implementation rule itself:
@@ -5857,8 +5869,9 @@ requirement whose predicate and evidence goal are exactly
 `Coerce<From, To>` for that edge.  An unresolved assumption rejects unless a
 unique matching closed implementation witness was forwarded from the caller.
 The selected two-parameter trait must have the sole method `coerce`, and the
-selected implementation and method must satisfy the same monomorphic,
-closed-implementation-predicate and predicate-free-method profile.  The method is checked at one `From` input
+selected implementation and method must satisfy the same ground-specialized,
+closed-implementation-predicate and predicate-free-method profile.  The method
+is checked at one `From` input
 and one `To` result and then capture-free inlined; endpoint types validate the
 method but never invent its behavior.  Regressions execute a direct Bool-to-Word
 argument conversion, the same conversion justified by evidence forwarded into
@@ -5870,8 +5883,8 @@ Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
 direct-call cycles, seed roots with unresolved assumptions, unconsumed
 non-call/operator/literal requirements outside the supported unary, binary and
 conversion profiles and indirect calls reject explicitly.  Other runtime
-operators, generic implementation methods, multi-method traits and
-method-level `where`-constrained profiles remain
+operators, implementation parameters not determined by the selected evidence,
+multi-method traits and method-level `where`-constrained profiles remain
 explicit boundaries.  Selected implementation methods now have their own
 finite detached linker.  It reconstructs direct-call metadata against the
 whole-program catalog even when a method-only helper is absent from the
@@ -5892,10 +5905,23 @@ implementation method and the chain `Ord.gt` method → constrained Eq helper �
 Another regression executes `Add<Word> where Word: Eq`, passes the exact
 selected Eq premise into a detached method, and consumes it through a generic
 helper before returning the method-authoritative result `92`.
+The corresponding generic regression selects
+`impl<T> Add<T> where T: Eq` at `T = Word`, specializes every retained typed-IR
+and evidence position, and executes the same nested Eq path.  Equal trait-header
+and implementation assumptions are deduplicated only when their evidence trees
+are identical.  Structurally different witnesses are never collapsed:
+noncanonical roots reject, and any remaining conflict is ambiguous when
+consumed.  A phantom
+implementation parameter absent from the evidence-bearing head is rejected
+instead of being invented.
+A separate generic `Ord<T>` regression consumes only its trait-header `Eq<T>`
+assumption, confirming that generic checking keeps the predicate open until the
+method specialization closes it to `Eq<Word>`.
 
-The next frontend boundary is broader implementation shapes—generic
-implementations, method-level predicates and multi-method traits—and additional
-runtime-evidence profiles.  Recursive source calls require
+The next frontend boundary is broader implementation shapes—method-level
+predicates, multi-method traits, and generic parameters not recoverable from
+the current evidence language—and additional runtime-evidence profiles.
+Recursive source calls require
 a separate named or global recursive-function representation rather than cyclic
 inlining.
 Automatic entry discovery, constructors, members and place-aware statements
@@ -5913,7 +5939,7 @@ Solcore source text. In particular, it does not yet provide:
 - execution of cyclic or indirect source call graphs, runtime
   evidence-dependent operator/literal/non-call forms outside the narrow
   `BitNot<T>`, strict arithmetic/bitwise, `Eq<T>`, closed standard `Ord<T>` and
-  `Coerce<From, To>` profiles, generic or multi-method impl
+  `Coerce<From, To>` profiles, underdetermined-generic or multi-method impl
   execution, and generic or symbolic conversion execution;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;

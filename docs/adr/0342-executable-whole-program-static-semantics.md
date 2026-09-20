@@ -16,7 +16,10 @@ through nested constrained calls.  Trait and implementation method declarations
 are retained in checked catalogs with exact signature conformance.  Narrow
 runtime-evidence slices execute `BitNot<T>.bnot`, the strict arithmetic/bitwise
 trait methods, `Eq<T>.eq` and `Ord<T>.gt` by selecting, checking and
-capture-free inlining the closed implementation method body.  Target-compatible
+capture-free inlining a ground implementation method specialization.  Generic
+implementation bodies are checked under rigid parameters and closed from the
+selected evidence goal through the existing source specializer.
+Target-compatible
 `!=`, `<`, `<=`, `>=`,
 `&&`, `||` and `!` select ordinary `ne`, `lt`, `le`, `ge`, `and`, `or` and
 `not` functions and reuse the direct-call specialization/linking path.  A
@@ -24,7 +27,8 @@ conversion slice validates each closed coercion edge by exact requirement
 identity and executes the selected `Coerce<From, To>.coerce` method body for
 direct-call arguments, forwarded generic evidence and call results.  A finite
 detached linker now lets those selected methods call cataloged functions and
-consume coherent trait-header evidence through the same policies.
+consume coherent trait-header or exact implementation-premise evidence through
+the same policies.
 Other runtime evidence, recursive or indirect source calls, automatic entry
 discovery and a public source pipeline remain staged extensions.
 
@@ -275,9 +279,10 @@ statically and never become Core values or impl-method calls.
 The runtime unary trait-evidence consumer is connected for `BitNot<T>.bnot`.
 A required unary occurrence owns exactly one solved requirement, and any
 assumption marker must resolve to a unique incoming closed implementation
-witness.  The selected one-parameter trait and sole monomorphic `bnot` method
-are signature-checked, its operand is recursively lowered at the declared Core
-type, and its checked body is capture-free inlined.  The implementation body is
+witness.  The selected one-parameter trait, its sole `bnot` method and the
+ground implementation specialization are signature-checked.  The operand is
+recursively lowered at the declared Core type, and the checked body is
+capture-free inlined.  The implementation body is
 authoritative; a regression returning `91` distinguishes it from builtin Word
 complement, while concrete Word `~` retains its evidence-free builtin path.
 
@@ -286,8 +291,11 @@ bitwise operators, equality and greater-than ordering.  A required occurrence
 must carry exactly one
 solved operator requirement whose closed implementation evidence agrees with
 the typed occurrence.  The selected declaration must be a one-parameter trait
-with exactly one non-generic method and one monomorphic implementation with
-exactly one conforming predicate-free method.  Closed implementation-level
+with exactly one non-generic method.  Its implementation may be generic only
+when every declaration parameter is determined by the closed evidence goal;
+the implementation has exactly one conforming predicate-free method.  The
+generic checked body and all retained typed-IR/evidence positions are then
+closed by `SourceSpecialization`.  Closed implementation-level
 predicates must match the selected evidence premises positionally and are
 retained as static method assumptions.  Closed predicates on the trait
 declaration are instantiated from the evidence goal in
@@ -305,6 +313,12 @@ must return the operand type; `Eq.eq` and `Ord.gt` must return Bool.  The
 implementation body, not a builtin operator
 opcode, is authoritative; each regression returns a distinguishable non-builtin
 result.
+
+Before an implementation method is exposed, its complete closed evidence tree
+is re-resolved against the current catalog at the standard finite depth and
+must be structurally identical to the unique selected result.  Publicly
+constructible evidence therefore cannot choose one side of an ambiguous catalog
+or smuggle a different same-goal premise into execution.
 
 The source checker follows the target's mixed operator dispatch table.  `!=`,
 `<`, `<=`, `>=`, `&&`, `||` and unary `!` resolve visible ordinary functions
@@ -325,9 +339,9 @@ one solved requirement whose predicate and evidence goal are precisely
 `Coerce<From, To>` for the typed edge.  An assumption is accepted only when a
 unique matching closed implementation witness was forwarded into the current
 generic specialization.  The selected trait has two parameters and the sole
-method `coerce`; the implementation must be monomorphic, its predicates must be
-closed and backed by exact selected premises, and the method must be
-predicate-free and signature-conforming.  The checked method must
+method `coerce`; the implementation must have a ground specialization, its
+predicates must be closed and backed by exact selected premises, and the method
+must be predicate-free and signature-conforming.  The checked method must
 lower from one `From` input to one `To` result before it is capture-free inlined.
 Executable regressions cover a direct call-argument conversion, a conversion
 inside a generic callee justified by forwarded evidence, and conversion of a
@@ -338,7 +352,7 @@ endpoint conversion supplies the runtime result.
 Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
 assumptions, non-call/operator/literal requirements outside the supported
 unary, binary and conversion profiles and indirect calls all reject explicitly.
-Other evidence-dependent operators, generic implementation methods,
+Other evidence-dependent operators, underdetermined generic implementations,
 multi-method traits and method-level `where`-constrained profiles are not
 assigned an invented runtime meaning.
 Selected implementation methods instead enter a finite detached linker.  It
@@ -363,8 +377,21 @@ order, and makes the detached method consume that exact witness through a
 generic helper.  The observed Word result is `92`, so this path also confirms
 that the implementation body remains authoritative.
 
-The next internal boundary is broader generic and multi-method implementation
-shapes, method-level predicates, and additional runtime-evidence profiles.  Recursive calls require
+A generic companion selects `impl<T> Add<T> where T: Eq` at `T = Word`.  Its
+canonical detached-link key retains the Word argument, the selected Eq premise
+survives specialization and is consumed through the same helper, and an
+identical trait-header witness is deduplicated.  Structurally different evidence
+is never collapsed: a noncanonical root rejects, while a remaining conflict is
+ambiguous when consumed.  A declaration parameter absent from the evidence-bearing
+head remains open and is rejected explicitly rather than assigned an arbitrary
+runtime type.
+A separate generic `Ord<T>` fixture consumes only the trait-header `Eq<T>`
+assumption, so generic body checking retains `Eq<T>` until specialization closes
+it to `Eq<Word>`.
+
+The next internal boundary is multi-method implementation shapes, method-level
+predicates, generic arguments not represented by the current evidence language,
+and additional runtime-evidence profiles.  Recursive calls require
 a separate named or global recursive Core representation rather than cyclic
 inlining.
 Selection-bearing constructor,

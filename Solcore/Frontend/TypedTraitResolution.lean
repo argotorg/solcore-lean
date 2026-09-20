@@ -29,6 +29,15 @@ abbrev Evidence := TraitResolution.Evidence TraitId Ty ImplId
 /-- Final typed trait-resolution outcome. -/
 abbrev Outcome := TraitResolution.Outcome TraitId Ty ImplId
 
+/-- The shared result of freshening and matching an implementation head.
+`parameterSubstitution` follows the parameter order requested by the caller;
+its range may remain open when a parameter is not determined by the head.
+`wherePredicates` has the same head unifier applied in source order. -/
+structure HeadMatch where
+  parameterSubstitution : ParameterSubstitution
+  wherePredicates : List Predicate
+  deriving Repr, BEq, DecidableEq
+
 /-- Apply a flexible-variable substitution to every type position in a trait
 predicate. Trait identity is already resolved and therefore unchanged. -/
 def applySubstitution (substitution : Substitution)
@@ -121,21 +130,35 @@ private def parameterFresheningSubstitution :
         parameterFresheningSubstitution parameters (next + 1)
       ((parameterId, .variable ⟨next⟩) :: rest, finalNext)
 
+private structure FreshenedRule where
+  rule : ImplRule
+  parameterVariables : ParameterSubstitution
+
+private def freshenRuleForParameters (parameters : List TypeParameterId)
+    (rule : ImplRule) (goal : Predicate) : FreshenedRule :=
+  let firstFresh := max (ruleNextVariable rule) (predicateNextVariable goal)
+  let (parameterVariables, afterParameters) :=
+    parameterFresheningSubstitution parameters firstFresh
+  let parameterHead := applyParameterSubstitution parameterVariables rule.head
+  let parameterWhere :=
+    rule.wherePredicates.map (applyParameterSubstitution parameterVariables)
+  let (substitution, _) :=
+    fresheningSubstitution (ruleVariables rule) afterParameters
+  {
+    rule := {
+      rule with
+      head := applySubstitution substitution parameterHead
+      wherePredicates := parameterWhere.map (applySubstitution substitution)
+    }
+    parameterVariables := parameterVariables.map fun entry =>
+      (entry.1, substitution.apply entry.2)
+  }
+
 /-- Instantiate rigid implementation parameters and freshen flexible variables
 away from variables already present in both the goal and the stored rule. Each
 mapping is shared across the head and every where predicate. -/
 def freshenRuleFor (rule : ImplRule) (goal : Predicate) : ImplRule :=
-  let firstFresh := max (ruleNextVariable rule) (predicateNextVariable goal)
-  let (parameterSubstitution, afterParameters) :=
-    parameterFresheningSubstitution (ruleParameters rule) firstFresh
-  let parameterHead := applyParameterSubstitution parameterSubstitution rule.head
-  let parameterWhere :=
-    rule.wherePredicates.map (applyParameterSubstitution parameterSubstitution)
-  let (substitution, _) :=
-    fresheningSubstitution (ruleVariables rule) afterParameters
-  { rule with
-    head := applySubstitution substitution parameterHead
-    wherePredicates := parameterWhere.map (applySubstitution substitution) }
+  (freshenRuleForParameters (ruleParameters rule) rule goal).rule
 
 private def argumentConstraints? : List Ty → List Ty → Option (List Constraint)
   | [], [] => some []
@@ -154,18 +177,36 @@ def headConstraints? (implementation goal : Predicate) :
   else
     none
 
-/-- Freshen, match the complete implementation head, and instantiate its where
-predicates. A trait/arity mismatch or unification failure is not a candidate. -/
-def matchImplHead? (rule : ImplRule) (goal : Predicate) :
-    Option (List Predicate) := do
-  let freshened := freshenRuleFor rule goal
-  let constraints ← headConstraints? freshened.head goal
+/-- Freshen a caller-supplied canonical parameter sequence, match the complete
+implementation head, and expose both its inferred parameter substitution and
+instantiated where predicates.  A trait/arity mismatch, unification failure,
+or attempt to bind a caller-owned goal variable is not a match. -/
+def matchImplHeadWithParameters? (parameters : List TypeParameterId)
+    (rule : ImplRule) (goal : Predicate) : Option HeadMatch := do
+  let freshened := freshenRuleForParameters parameters rule goal
+  let constraints ← headConstraints? freshened.rule.head goal
   let substitution ← (Unification.unify constraints).toOption
   let goalVariables := predicateVariables goal
   if substitution.domain.any goalVariables.contains then
     none
   else
-    pure (freshened.wherePredicates.map (applySubstitution substitution))
+    let matchedHead := applySubstitution substitution freshened.rule.head
+    if matchedHead != goal then
+      none
+    else
+      pure {
+        parameterSubstitution := freshened.parameterVariables.map fun entry =>
+          (entry.1, substitution.apply entry.2)
+        wherePredicates := freshened.rule.wherePredicates.map
+          (applySubstitution substitution)
+      }
+
+/-- Freshen, match the complete implementation head, and instantiate its where
+predicates. A trait/arity mismatch or unification failure is not a candidate. -/
+def matchImplHead? (rule : ImplRule) (goal : Predicate) :
+    Option (List Predicate) :=
+  (matchImplHeadWithParameters? (ruleParameters rule) rule goal).map
+    (·.wherePredicates)
 
 /-- Typed head matcher accepted by the generic tabled-resolution kernel. -/
 def headMatcher : TraitResolution.HeadMatcher TraitId Ty ImplId :=
