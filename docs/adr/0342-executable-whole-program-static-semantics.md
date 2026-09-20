@@ -14,9 +14,10 @@ It statically discharges proof-only call-signature predicates after exact
 requirement/evidence validation and forwards closed implementation witnesses
 through nested constrained calls.  Trait and implementation method declarations
 are retained in checked catalogs with exact signature conformance.  Narrow
-runtime-evidence slices execute the strict arithmetic/bitwise trait methods and
-`Eq<T>.eq` and `Ord<T>.gt` by selecting, checking and capture-free inlining the
-closed implementation method body.  Target-compatible `!=`, `<`, `<=`, `>=`,
+runtime-evidence slices execute `BitNot<T>.bnot`, the strict arithmetic/bitwise
+trait methods, `Eq<T>.eq` and `Ord<T>.gt` by selecting, checking and
+capture-free inlining the closed implementation method body.  Target-compatible
+`!=`, `<`, `<=`, `>=`,
 `&&`, `||` and `!` select ordinary `ne`, `lt`, `le`, `ge`, `and`, `or` and
 `not` functions and reuse the direct-call specialization/linking path.  A
 conversion slice validates each closed coercion edge by exact requirement
@@ -99,7 +100,7 @@ The first profile may reject rather than guess for:
   `Coerce<From, To>.coerce` profile;
 - budget-exhausted specialization outcomes and every direct-call cycle;
 - seed roots with unresolved assumptions, runtime evidence outside the narrow
-  strict arithmetic/bitwise, `Eq<T>`, premise-free `Ord<T>` and
+  `BitNot<T>`, strict arithmetic/bitwise, `Eq<T>`, closed standard `Ord<T>` and
   `Coerce<From, To>` profiles, indirect calls and general impl-method execution
   at the Core-linking boundary;
 - constructor/operator export selectors and the remaining module-reference
@@ -269,6 +270,15 @@ caller's assumption marker is replaced only by a unique incoming implementation
 witness for the same goal.  The validated call requirements are then consumed
 statically and never become Core values or impl-method calls.
 
+The runtime unary trait-evidence consumer is connected for `BitNot<T>.bnot`.
+A required unary occurrence owns exactly one solved requirement, and any
+assumption marker must resolve to a unique incoming closed implementation
+witness.  The selected one-parameter trait and sole monomorphic `bnot` method
+are signature-checked, its operand is recursively lowered at the declared Core
+type, and its checked body is capture-free inlined.  The implementation body is
+authoritative; a regression returning `91` distinguishes it from builtin Word
+complement, while concrete Word `~` retains its evidence-free builtin path.
+
 The runtime binary trait-evidence consumer is connected for strict arithmetic,
 bitwise operators, equality and greater-than ordering.  A required occurrence
 must carry exactly one
@@ -321,7 +331,7 @@ endpoint conversion supplies the runtime result.
 
 Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
 assumptions, non-call/operator/literal requirements outside the supported
-binary and conversion profiles and indirect calls all reject explicitly.
+unary, binary and conversion profiles and indirect calls all reject explicitly.
 Other evidence-dependent operators, generic or premise-bearing evidence and
 implementation methods, multi-method or implementation/method-level
 `where`-constrained profiles are not assigned an invented runtime meaning.
@@ -331,15 +341,15 @@ inside those bodies still reject, as do nominal types with no `Core.Ty`
 projection.  The worklist can therefore close
 same-key recursive graphs for finite planning without claiming they are
 executable in the current Core.  Executable regressions cover proof-only
-constrained and nested generic calls, both conditional paths, the
-method-authoritative strict Word binary profiles, all three conversion
-placements, runtime input mismatches, malformed plans and each principal
-staged boundary; small checked laws retain the runtime input gate and budget
-result.
+constrained and nested generic calls, both conditional paths,
+method-authoritative `BitNot.bnot` and strict Word binary profiles, all three
+conversion placements, runtime input mismatches, malformed plans and each
+principal staged boundary; small checked laws retain the runtime input gate and
+budget result.
 
 The next internal boundary is superclass evidence consumed by implementation
-method calls and required operations, required-unary lowering for profiles such
-as `BitNot.bnot`, and then broader implementation shapes.  Recursive calls require
+method calls and required operations, additional runtime-evidence profiles, and
+then broader implementation shapes.  Recursive calls require
 a separate named or global recursive Core representation rather than cyclic
 inlining.
 Selection-bearing constructor,

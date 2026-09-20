@@ -719,6 +719,92 @@ private def testStrictRuntimeBinaryEvidence : IO Unit := do
         some (.done expected [])))
       s!"{name} did not execute its selected strict binary method body"
 
+private def testRuntimeBitNotEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait BitNot<T> {",
+    "  function bnot(value: T) returns (T);",
+    "}",
+    "impl BitNot<Word> {",
+    "  function bnot(value: Word) returns (Word) { return 91; }",
+    "}",
+    "function bitNotWithEvidence<T>(value: T) returns (T) where T: BitNot {",
+    "  return ~value;",
+    "}",
+    "function evidenceEntry(value: Word) returns (Word) {",
+    "  return bitNotWithEvidence(value);",
+    "}",
+    "function builtinEntry(value: Word) returns (Word) { return ~value; }"
+  ])
+  let bitNotWithEvidence ← signatureNamed program "bitNotWithEvidence"
+  let genericFunction ← functionFor program bitNotWithEvidence
+  let unary ← match firstUnaryNode? genericFunction.typedBody.nodes with
+    | some unary => pure unary
+    | none => throw (IO.userError
+        "BitNot evidence fixture lost its unary occurrence")
+  let solved ← match unary.requirements.filterMap fun requirement =>
+      genericFunction.solvedRequirements.find? fun row =>
+        row.id == requirement with
+    | [solved] => pure solved
+    | requirements => throw (IO.userError
+        s!"BitNot unary expected one solved requirement, found {requirements.length}")
+  let assumptionMatches := match solved.evidence with
+    | .assumption predicate => predicate == solved.predicate
+    | _ => false
+  assertTrue ((match unary.form with
+      | .unary .bitNot _ => true
+      | _ => false) && unary.requirements.length == 1 && assumptionMatches)
+    "generic ~ did not retain its BitNot assumption and occurrence metadata"
+
+  let evidenceEntry ← signatureNamed program "evidenceEntry"
+  let evidenceOutcome ← runOrThrow "BitNot evidence" program
+    [monomorphicRequest evidenceEntry] 2
+  let evidencePlan ← match evidenceOutcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"BitNot evidence: expected a complete plan, found {reprStr other}")
+  let specializedGeneric := evidencePlan.specializations.find? fun specialized =>
+    specialized.declaration == bitNotWithEvidence.id
+  let implementation ← match program.signatures.implementations with
+    | [implementation] => pure implementation
+    | implementations => throw (IO.userError
+        s!"BitNot evidence expected one implementation, found {implementations.length}")
+  assertTrue (specializedGeneric.any fun specialized => decide (
+      specialized.key.arguments = [.word] ∧
+      specialized.assumptions = [implementation.head]))
+    "BitNot specialization lost its closed implementation assumption"
+  let evidenceLinked ← linkOrThrow "BitNot evidence" program evidenceOutcome
+  let evidenceKey : SourceSpecialization.SpecializationKey := {
+    declaration := evidenceEntry.id
+    arguments := []
+  }
+  let linkedEvidence ← match evidenceLinked.findEntry? evidenceKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "BitNot evidence: linked root was absent")
+  assertTrue (decide (linkedEvidence.run? [.word (word 7)] 2048 =
+      some (.done (.word (word 91)) [])))
+    "BitNot evidence did not execute the selected nonstandard bnot method body"
+
+  let builtinEntry ← signatureNamed program "builtinEntry"
+  let builtinFunction ← functionFor program builtinEntry
+  let builtinUnary ← match firstUnaryNode? builtinFunction.typedBody.nodes with
+    | some unary => pure unary
+    | none => throw (IO.userError "builtin ~ occurrence was absent")
+  assertTrue (builtinUnary.requirements.isEmpty)
+    "concrete Word ~ unexpectedly acquired BitNot evidence"
+  let builtinOutcome ← runOrThrow "builtin bit-not" program
+    [monomorphicRequest builtinEntry] 1
+  let builtinLinked ← linkOrThrow "builtin bit-not" program builtinOutcome
+  let builtinKey : SourceSpecialization.SpecializationKey := {
+    declaration := builtinEntry.id
+    arguments := []
+  }
+  let linkedBuiltin ← match builtinLinked.findEntry? builtinKey with
+    | some entry => pure entry
+    | none => throw (IO.userError "builtin bit-not: linked root was absent")
+  assertTrue (decide (linkedBuiltin.run? [.word (word 7)] 2048 =
+      some (.done (.word (word 7).bitNot) [])))
+    "concrete Word ~ stopped using the builtin compatibility operation"
+
 private structure NamedOperatorCase where
   entryName : String
   callee : ProgramFunctionSignature
@@ -1762,6 +1848,7 @@ def testSourceCoreDirectLinking : IO Unit := do
   testRuntimeEvidenceBoundaries program
   testImplementationMethodLoweringBoundary
   testStrictRuntimeBinaryEvidence
+  testRuntimeBitNotEvidence
   testNamedOperatorFunctionsAndOrd
   testTraitPredicateIsStaticMethodAssumption
   testConsumedTraitPredicateBoundary

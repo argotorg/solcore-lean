@@ -44,7 +44,8 @@ exact requirement/evidence validation.  Checked trait/implementation catalogs
 now retain and signature-check their methods.  Deliberately narrow runtime
 evidence paths execute selected monomorphic arithmetic and bitwise methods
 (`Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`, `BitAnd.band`,
-`BitXor.bxor`, `BitOr.bor`), `Eq<T>.eq` and `Ord<T>.gt`.  The standard
+`BitXor.bxor`, `BitOr.bor`), unary `BitNot<T>.bnot`, `Eq<T>.eq` and
+`Ord<T>.gt`.  The standard
 `Ord<T> where T: Eq` header is accepted when its closed instantiated
 supertrait predicate is only a static method-body assumption; consuming that
 assumption inside the method remains staged.  Target-compatible
@@ -5798,6 +5799,15 @@ ambiguous evidence is never erased.  Once validated, those call-owned
 requirements are consumed statically and do not become Core values or method
 calls.
 
+The runtime unary profile is executable for trait-backed `BitNot<T>.bnot`.
+The unary occurrence must own exactly one solved requirement, and a generic
+caller's assumption must resolve to one forwarded closed implementation
+witness.  Source Core retains operand traversal and type checking while the
+linker selects, checks and capture-free inlines the sole monomorphic `bnot`
+method.  Its method body is authoritative: the executable regression returns
+`91`, rather than the builtin Word complement.  A concrete Word `~` remains an
+evidence-free builtin operation, preserving the target's builtin fast path.
+
 The runtime binary profile is executable for strict arithmetic, bitwise
 operators, equality and greater-than ordering.  A required occurrence must have
 exactly one matching
@@ -5852,7 +5862,7 @@ the selected method body—not a hard-coded endpoint conversion—is executed.
 
 Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
 direct-call cycles, seed roots with unresolved assumptions, unconsumed
-non-call/operator/literal requirements outside the supported binary and
+non-call/operator/literal requirements outside the supported unary, binary and
 conversion profiles and indirect calls reject explicitly.  Other runtime
 operators, generic or premise-bearing evidence and implementation methods,
 multi-method or implementation/method-level `where`-constrained profiles remain
@@ -5865,14 +5875,13 @@ Thus the worklist may close same-key self or mutual recursion, but the current
 linker does not assign those cycles an executable meaning.  Small checked laws
 fix the runtime input-type gate and budget-exhaustion boundary; end-to-end
 regressions execute proof-only constrained and nested generic calls as well as
-both conditional paths, all method-authoritative strict Word binary profiles,
-and the direct, forwarded-generic and call-result conversion profiles, and
-cover the staged failure cases.
+both conditional paths, method-authoritative `BitNot.bnot`, all strict Word
+binary profiles, and the direct, forwarded-generic and call-result conversion
+profiles, and cover the staged failure cases.
 
 The next frontend boundary is superclass evidence which can be consumed by
 implementation method calls and required operations, followed by broader
-implementation shapes.  Required unary trait execution such as `BitNot.bnot`
-also still needs a policy-bearing lowering path.  Recursive source calls require
+implementation shapes and additional runtime-evidence profiles.  Recursive source calls require
 a separate named or global recursive-function representation rather than cyclic
 inlining.
 Automatic entry discovery, constructors, members and place-aware statements

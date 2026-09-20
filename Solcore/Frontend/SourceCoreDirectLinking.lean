@@ -17,12 +17,12 @@ Direct-call signature predicates are proof-only in the current executable
 fragment.  Each call must account positionally for its exact requirement IDs;
 implementation evidence is threaded into the callee, while assumption evidence
 must be discharged by a unique incoming witness with the same goal.  Evidence
-never becomes a runtime Core value.  Deliberately narrow required-binary and
-coercion profiles use closed arithmetic, bitwise, `Eq<T>`, `Ord<T>` and
-`Coerce<From, To>` evidence to select, check, and inline the sole monomorphic
-implementation method.  Operators backed by ordinary prelude functions are
-represented as ordinary direct calls before this layer.  Every other
-runtime-evidence shape remains an explicit staged boundary.
+never becomes a runtime Core value.  Deliberately narrow required-unary,
+required-binary, and coercion profiles use closed `BitNot<T>`, arithmetic,
+bitwise, `Eq<T>`, `Ord<T>` and `Coerce<From, To>` evidence to select, check, and
+inline the sole monomorphic implementation method.  Operators backed by
+ordinary prelude functions are represented as ordinary direct calls before this
+layer.  Every other runtime-evidence shape remains an explicit staged boundary.
 
 The current Core has no recursive binding construct.  Accordingly, recursive
 specialization cycles are rejected explicitly rather than assigned an
@@ -83,6 +83,28 @@ inductive Error where
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (requirement : RequirementId)
       (expected actual : ProgramPredicate)
+  | unaryRequirementCountMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : Nat)
+  | unaryRequirementEvidenceGoalMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | unsupportedRuntimeUnary
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (operator : Syntax.UnaryOp)
+  | runtimeUnaryEvidenceUnresolved
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (predicate : ProgramPredicate)
+  | runtimeUnaryTraitNameMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : String)
+  | runtimeUnaryInputTypesMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : List Core.Ty)
+  | runtimeUnaryResultTypeMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : Core.Ty)
   | binaryRequirementCountMismatch
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (expected actual : Nat)
@@ -436,6 +458,44 @@ private def exactCallRequirementEvidence (caller : SpecializedFunction)
       callRequirementEvidence caller node.id available node.requirements
         instantiation.predicates
 
+private def exactRuntimeUnaryEvidence (caller : SpecializedFunction)
+    (node : ExpressionNode) (available : List PredicateEvidence) :
+    Except Error (RequirementId × ProgramPredicate ×
+      TypedTraitResolution.Evidence) := do
+  let requirement ← match node.requirements with
+    | [requirement] => pure requirement
+    | requirements =>
+        throw (.unaryRequirementCountMismatch caller.key node.id 1
+          requirements.length)
+  let solved ← exactSolvedRequirement caller node.id requirement
+  let goal := solved.evidence.goal
+  if goal != solved.predicate then
+    throw (.unaryRequirementEvidenceGoalMismatch caller.key node.id
+      requirement solved.predicate goal)
+  let evidence ← actualRequirementEvidence caller node.id requirement
+    available solved.evidence
+  match evidence with
+  | .implementation implementation =>
+      pure (requirement, solved.predicate, implementation)
+  | .assumption predicate =>
+      throw (.runtimeUnaryEvidenceUnresolved caller.key node.id requirement
+        predicate)
+
+private structure RuntimeUnaryProfile where
+  traitName : String
+  methodName : String
+
+private def runtimeUnaryProfile? :
+    Syntax.UnaryOp → Option RuntimeUnaryProfile
+  | operator =>
+      match SourceInference.Detail.unaryOperatorDispatch operator with
+      | .traitMethod traitName methodName => some { traitName, methodName }
+      | .function _ => none
+
+private def runtimeUnaryResultType (operator : Syntax.UnaryOp)
+    (operandType : Core.Ty) : Core.Ty :=
+  if operator == .logicalNot then .bool else operandType
+
 private def exactRuntimeBinaryEvidence (caller : SpecializedFunction)
     (node : ExpressionNode) (available : List PredicateEvidence) :
     Except Error (RequirementId × ProgramPredicate ×
@@ -491,6 +551,59 @@ private def exactRuntimeCoercionEvidence (caller : SpecializedFunction)
   | .assumption predicate =>
       throw (.runtimeCoercionEvidenceUnresolved caller.key node.id
         step.requirement predicate)
+
+/-- Turn one closed unary-operator witness into a checked, capture-free inline
+plan.  The selected implementation method, rather than the operand's builtin
+Core operation, is the runtime authority. -/
+private def requiredUnaryPlan (program : CheckedProgram)
+    (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (caller : SpecializedFunction) (available : List PredicateEvidence)
+    (node : ExpressionNode) (operator : Syntax.UnaryOp) :
+    Except Error (SourceCoreElaboration.RequiredUnaryPlan Error) := do
+  let profile ← match runtimeUnaryProfile? operator with
+    | some profile => pure profile
+    | none => throw (.unsupportedRuntimeUnary caller.key node.id operator)
+  let (requirement, predicate, evidence) ←
+    exactRuntimeUnaryEvidence caller node available
+  let method ←
+    (ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program evidence
+      1 profile.methodName).mapError fun error =>
+        .executableImplMethod caller.key node.id error
+  let trait ← match program.signatures.trait? predicate.trait with
+    | some trait => pure trait
+    | none => throw (.executableImplMethod caller.key node.id
+        (.missingTrait predicate.trait))
+  if trait.name != profile.traitName then
+    throw (.runtimeUnaryTraitNameMismatch caller.key node.id
+      profile.traitName trait.name)
+  let elaborated ←
+    (SourceCoreElaboration.elaborateFunction method.checked).mapError fun error =>
+      .implMethodSourceCore caller.key node.id method.id error
+  let operandType ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      predicate.subject).mapError Error.sourceCore
+  let expectedInputs := [operandType]
+  if elaborated.inputs.values != expectedInputs then
+    throw (.runtimeUnaryInputTypesMismatch caller.key node.id expectedInputs
+      elaborated.inputs.values)
+  let expectedResult := runtimeUnaryResultType operator operandType
+  if elaborated.returnType != expectedResult then
+    throw (.runtimeUnaryResultTypeMismatch caller.key node.id expectedResult
+      elaborated.returnType)
+  let nodeResult ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      node.type).mapError Error.sourceCore
+  if elaborated.returnType != nodeResult then
+    throw (.runtimeUnaryResultTypeMismatch caller.key node.id nodeResult
+      elaborated.returnType)
+  pure {
+    operandType
+    consumedRequirements := [requirement]
+    build := fun operand =>
+      let temporaries := freshTemporaries temporaryOwner temporaryBase 1
+      let body := aliasInputs elaborated.inputs temporaries elaborated.resolved
+      pure (bindValues (temporaries.zip [operand]) body)
+  }
 
 /-- Turn one closed operator witness into a checked, capture-free inline plan.
 The implementation method body, not the specialized operand type, is the
@@ -611,7 +724,8 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
         let specialized ← exactSpecialization plan key
         validateAssumptionEvidence specialized.key specialized.assumptions
           assumptionEvidence
-        SourceCoreElaboration.lowerFunctionBodyWithAllPolicies Error.sourceCore
+        SourceCoreElaboration.lowerFunctionBodyWithRuntimePolicies
+          Error.sourceCore
           (fun _ node _ arguments resolution => do
             let instantiation ← match resolution with
               | .indirect _ => throw (.indirectCall node.id)
@@ -653,6 +767,9 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
                   callee.resolved
                 pure (bindValues (temporaries.zip loweredArguments) body)
             })
+          (fun _ node operator _ =>
+            requiredUnaryPlan program temporaryOwner temporaryBase specialized
+              assumptionEvidence node operator)
           (fun _ node _ operator _ =>
             requiredBinaryPlan program temporaryOwner temporaryBase specialized
               assumptionEvidence node operator)

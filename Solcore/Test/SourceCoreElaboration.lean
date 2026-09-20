@@ -193,6 +193,15 @@ private def requiredWordBinaryPolicy (consumed : List RequirementId) :
     build := fun left right => pure (.binary .wordAdd left right)
   }
 
+private def requiredWordUnaryPolicy (consumed : List RequirementId) :
+    SourceCoreElaboration.RequiredUnaryElaborator
+      SourceCoreElaboration.Error :=
+  fun _ _ _ _ => pure {
+    operandType := .word
+    consumedRequirements := consumed
+    build := fun operand => pure (.unary .wordNot operand)
+  }
+
 private def solvedWordRequirement (declaration : Resolved.DeclarationId)
     (requirement : RequirementId) : SolvedRequirement :=
   let predicate : ProgramPredicate := {
@@ -335,6 +344,76 @@ private def testRequiredBinaryPolicy : IO Unit := do
           | .unconsumedRequirements [actual] => actual == leftover
           | _ => false)
         s!"required binary leftover reported the wrong error: {reprStr error}"
+
+private def testRequiredUnaryPolicy : IO Unit := do
+  let program ← checkedProgram
+    "function required(x: Word) returns (Word) { return ~x; }"
+  let function ← checkedNamed program "required"
+  let (_, expression) ← rootIds function
+  let requirement : RequirementId := ⟨111⟩
+  let predicate : ProgramPredicate := {
+    trait := function.declaration
+    subject := .word
+    arguments := []
+  }
+  let required : CheckedFunction := {
+    function with
+    solvedRequirements := [{
+      id := requirement
+      predicate
+      evidence := .assumption predicate
+    }]
+    typedBody := changeExpression function.typedBody expression fun node => {
+      node with requirements := [requirement]
+    }
+  }
+  expectError "required unary default policy" required
+    (.occurrence expression.occurrence)
+    fun reason => match reason with
+      | .requirementsPresent [actual] => actual == requirement
+      | _ => false
+  match SourceCoreElaboration.lowerFunctionBodyWithAllPolicies id
+      SourceCoreElaboration.rejectCalls
+      SourceCoreElaboration.rejectRequiredBinaries
+      SourceCoreElaboration.rejectCoercions required with
+  | .ok _ => throw (IO.userError
+      "required unary crossed the compatibility policy boundary")
+  | .error error =>
+      assertTrue (decide (error.site = .occurrence expression.occurrence) &&
+          match error.reason with
+          | .requirementsPresent [actual] => actual == requirement
+          | _ => false)
+        s!"required unary compatibility rejection changed: {reprStr error}"
+  let draft ← match
+      SourceCoreElaboration.lowerFunctionBodyWithRuntimePolicies id
+        SourceCoreElaboration.rejectCalls
+        (requiredWordUnaryPolicy [requirement])
+        SourceCoreElaboration.rejectRequiredBinaries
+        SourceCoreElaboration.rejectCoercions required with
+    | .ok draft => pure draft
+    | .error error => throw (IO.userError
+        s!"required unary policy did not lower: {reprStr error}")
+  let lowered ← match draft.finalize with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"required unary policy did not finalize: {reprStr error}")
+  assertTrue (decide (Core.runStateful 100
+      (.initial lowered.core [.word (word 4)]) =
+        .done (.word (word 4).bitNot) []))
+    "required unary policy changed operand traversal or runtime meaning"
+  match SourceCoreElaboration.lowerFunctionBodyWithRuntimePolicies id
+      SourceCoreElaboration.rejectCalls (requiredWordUnaryPolicy [])
+      SourceCoreElaboration.rejectRequiredBinaries
+      SourceCoreElaboration.rejectCoercions required with
+  | .ok _ => throw (IO.userError
+      "required unary policy accepted mismatched requirement identities")
+  | .error error =>
+      assertTrue (decide (error.site = .occurrence expression.occurrence) &&
+          match error.reason with
+          | .unaryRequirementsMismatch [expected] [] =>
+              expected == requirement
+          | _ => false)
+        s!"required unary mismatch reported the wrong error: {reprStr error}"
 
 private def testCallAwareCompatibility : IO Unit := do
   let program ← checkedProgram (String.intercalate "\n" [
@@ -638,6 +717,7 @@ def testSourceCoreElaboration : IO Unit := do
   testUninitializedLetRejected
   testRequirementsAndCoercions function
   testRequiredBinaryPolicy
+  testRequiredUnaryPolicy
   testCallAwareCompatibility
   testCoercionPolicy
   testMalformedCoercionPolicies
