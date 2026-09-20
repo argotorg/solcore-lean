@@ -3,11 +3,11 @@ import Solcore.Frontend.ProgramChecking
 /-!
 Checked source bodies for the first executable implementation-method profile.
 
-This boundary intentionally accepts only explicitly sized, monomorphic,
-premise-free implementation evidence whose implementation and sole method
-carry no additional predicates.  Trait-level predicates are instantiated at
-the closed evidence goal and retained as static assumptions of the synthetic
-method; executing a body which consumes them remains a downstream policy.  The
+This boundary intentionally accepts only explicitly sized, monomorphic
+implementation evidence whose sole method carries no additional predicates.
+Closed implementation-level predicates must correspond exactly to the
+evidence premises, while trait-level predicates are instantiated at the closed
+evidence goal.  Both become static assumptions of the synthetic method.  The
 boundary validates the retained method catalog defensively, projects the
 implementation method to an ordinary synthetic function, and runs the existing
 source body checker before exposing it to runtime lowering.
@@ -24,6 +24,9 @@ source checker under its synthetic callable signature. -/
 structure CheckedMethod where
   id : ProgramImplMethodId
   traitMethod : ProgramTraitMethodSignature
+  traitPredicates : List ProgramPredicate
+  implementationPredicates : List ProgramPredicate
+  implementationPremises : List TypedTraitResolution.Evidence
   synthetic : ProgramFunctionSignature
   checked : SourceInference.CheckedFunction
   deriving Repr
@@ -40,6 +43,11 @@ inductive NonClosedType where
 inductive Error where
   | evidencePremisesPresent
       (implementation : Resolved.DeclarationId) (count : Nat)
+  | evidencePremiseCountMismatch
+      (implementation : Resolved.DeclarationId) (expected actual : Nat)
+  | evidencePremiseGoalMismatch
+      (implementation : Resolved.DeclarationId) (index : Nat)
+      (expected actual : ProgramPredicate)
   | evidenceGoalArityMismatch
       (trait : Resolved.DeclarationId) (expected actual : Nat)
   | evidenceGoalNotClosed
@@ -56,6 +64,9 @@ inductive Error where
   | implementationPredicatesPresent
       (implementation : Resolved.DeclarationId)
       (predicates : List ProgramPredicate)
+  | implementationPredicateNotClosed
+      (implementation : Resolved.DeclarationId) (predicate : ProgramPredicate)
+      (reason : NonClosedType)
   | missingTrait (trait : Resolved.DeclarationId)
   | duplicateTraits (trait : Resolved.DeclarationId) (count : Nat)
   | traitArityMismatch
@@ -147,17 +158,37 @@ private def firstNonClosedGoalType (goal : ProgramPredicate) :
   (firstNonClosedType goal.subject).orElse fun _ =>
     goal.arguments.findSome? firstNonClosedType
 
+private def validateEvidencePremiseGoals
+    (implementation : Resolved.DeclarationId) :
+    Nat → List ProgramPredicate → List TypedTraitResolution.Evidence →
+      Except Error Unit
+  | _, [], [] => pure ()
+  | index, predicate :: predicates, evidence :: rest => do
+      let .byImpl actual _ _ := evidence
+      unless actual = predicate do
+        throw (.evidencePremiseGoalMismatch implementation index predicate actual)
+      validateEvidencePremiseGoals implementation (index + 1) predicates rest
+  | _, _, _ => pure ()
+
+private def validateEvidencePremises
+    (implementation : Resolved.DeclarationId)
+    (predicates : List ProgramPredicate)
+    (evidence : List TypedTraitResolution.Evidence) : Except Error Unit := do
+  unless predicates.length = evidence.length do
+    throw (.evidencePremiseCountMismatch implementation predicates.length
+      evidence.length)
+  validateEvidencePremiseGoals implementation 0 predicates evidence
+
 /-- Select and check the sole executable method justified by one closed piece
-of trait evidence.  Trait declaration predicates become closed static method
-assumptions; runtime dictionaries, generic implementations, recursive evidence
-premises, and implementation/method predicates remain explicit later profiles. -/
-def checkMonomorphicPremiseFreeMethodWithArity
+of trait evidence.  Trait declaration predicates and exact closed
+implementation premises become static method assumptions; runtime dictionaries,
+generic implementations, and method-level predicates remain explicit later
+profiles. -/
+def checkMonomorphicMethodWithArity
     (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
     (expectedTraitArity : Nat) (expectedName : String) :
     Except Error CheckedMethod := do
   let .byImpl goal implementationId premises := evidence
-  unless premises.isEmpty do
-    throw (.evidencePremisesPresent implementationId premises.length)
   let goalArity := goal.arguments.length + 1
   unless goalArity = expectedTraitArity do
     throw (.evidenceGoalArityMismatch goal.trait expectedTraitArity goalArity)
@@ -171,9 +202,12 @@ def checkMonomorphicPremiseFreeMethodWithArity
   unless implementation.head = goal do
     throw (.implementationHeadMismatch implementation.id goal
       implementation.head)
-  unless implementation.wherePredicates.isEmpty do
-    throw (.implementationPredicatesPresent implementation.id
-      implementation.wherePredicates)
+  for predicate in implementation.wherePredicates do
+    match firstNonClosedGoalType predicate with
+    | some reason => throw (.implementationPredicateNotClosed implementation.id
+        predicate reason)
+    | none => pure ()
+  validateEvidencePremises implementation.id implementation.wherePredicates premises
   let trait ← exactTrait program goal.trait
   unless trait.parameters.length = expectedTraitArity do
     throw (.traitArityMismatch trait.id expectedTraitArity trait.parameters.length)
@@ -222,15 +256,34 @@ def checkMonomorphicPremiseFreeMethodWithArity
   pure {
     id := implementationMethod.id
     traitMethod
+    traitPredicates
+    implementationPredicates := implementation.wherePredicates
+    implementationPremises := premises
     synthetic
     checked
   }
+
+/-- Compatibility name retained from the original no-premise profile.  Closed
+monomorphic implementation predicates and their exact evidence premises are now
+accepted by this entry. -/
+def checkMonomorphicPremiseFreeMethodWithArity
+    (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
+    (expectedTraitArity : Nat) (expectedName : String) :
+    Except Error CheckedMethod :=
+  checkMonomorphicMethodWithArity program evidence expectedTraitArity
+    expectedName
+
+/-- Canonical one-parameter entry for the current monomorphic method profile. -/
+def checkMonomorphicMethod
+    (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
+    (expectedName : String) : Except Error CheckedMethod :=
+  checkMonomorphicMethodWithArity program evidence 1 expectedName
 
 /-- Compatibility entry for the original one-parameter runtime trait profile.
 Consumers of multi-parameter traits must opt into the explicit-arity entry. -/
 def checkMonomorphicPremiseFreeMethod
     (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
     (expectedName : String) : Except Error CheckedMethod :=
-  checkMonomorphicPremiseFreeMethodWithArity program evidence 1 expectedName
+  checkMonomorphicMethod program evidence expectedName
 
 end Solcore.Frontend.ExecutableImplMethods

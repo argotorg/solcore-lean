@@ -571,7 +571,7 @@ private def requiredUnaryPlan (program : CheckedProgram)
   let (requirement, predicate, evidence) ←
     exactRuntimeUnaryEvidence caller node available
   let method ←
-    (ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program evidence
+    (ExecutableImplMethods.checkMonomorphicMethodWithArity program evidence
       1 profile.methodName).mapError fun error =>
         .executableImplMethod caller.key node.id error
   let trait ← match program.signatures.trait? predicate.trait with
@@ -623,7 +623,7 @@ private def requiredBinaryPlan (program : CheckedProgram)
   let (requirement, predicate, evidence) ←
     exactRuntimeBinaryEvidence caller node available
   let method ←
-    (ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program evidence
+    (ExecutableImplMethods.checkMonomorphicMethodWithArity program evidence
       1 profile.methodName).mapError fun error =>
         .executableImplMethod caller.key node.id error
   let trait ← match program.signatures.trait? predicate.trait with
@@ -683,7 +683,7 @@ private def coercionPlan (program : CheckedProgram)
     throw (.runtimeCoercionPredicateMismatch caller.key node.id
       step.requirement step.source step.target predicate)
   let method ←
-    (ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program evidence
+    (ExecutableImplMethods.checkMonomorphicMethodWithArity program evidence
       2 "coerce").mapError fun error =>
         .executableImplMethod caller.key node.id error
   let elaborated ← elaborateMethod method
@@ -726,17 +726,22 @@ private def specializedExecutableMethod
 catalog has coherent closed evidence.  An unused unresolved trait-header
 assumption remains harmless; attempting to consume it still fails through the
 ordinary missing-assumption evidence gate. -/
-private def availableMethodAssumptionEvidence (program : CheckedProgram) :
+private def resolvedMethodTraitEvidence (program : CheckedProgram) :
     List ProgramPredicate → List PredicateEvidence
   | [] => []
   | predicate :: rest =>
-      let tail := availableMethodAssumptionEvidence program rest
+      let tail := resolvedMethodTraitEvidence program rest
       match (TypedTraitResolution.resolve program.signatures.implRules 32
           predicate).outcome with
       | .success evidence@(.byImpl goal _ _) =>
           if goal = predicate then .implementation evidence :: tail else tail
       | .noSolution
       | .inconclusive _ => tail
+
+private def availableMethodAssumptionEvidence (program : CheckedProgram)
+    (method : ExecutableImplMethods.CheckedMethod) : List PredicateEvidence :=
+  resolvedMethodTraitEvidence program method.traitPredicates ++
+    method.implementationPremises.map PredicateEvidence.implementation
 
 private def validateDetachedCallMetadata (program : CheckedProgram)
     (caller : SpecializedFunction) (node : ExpressionNode)
@@ -797,7 +802,7 @@ private def buildDetachedDraftFuel (program : CheckedProgram)
           fun occurrence method => do
             let methodSpecialized := specializedExecutableMethod method
             let methodEvidence := availableMethodAssumptionEvidence program
-              methodSpecialized.assumptions
+              method
             let result : Except Error
                 SourceCoreElaboration.ElaboratedFunction := do
               let draft ← buildDetachedDraftFuel program temporaryOwner
@@ -868,8 +873,7 @@ private def elaborateDetachedMethod (program : CheckedProgram)
     (method : ExecutableImplMethods.CheckedMethod) :
     Except Error SourceCoreElaboration.ElaboratedFunction :=
   let specialized := specializedExecutableMethod method
-  let available := availableMethodAssumptionEvidence program
-    specialized.assumptions
+  let available := availableMethodAssumptionEvidence program method
   let result : Except Error SourceCoreElaboration.ElaboratedFunction := do
     let draft ← buildDetachedDraftFuel program temporaryOwner temporaryBase
       (caller.key :: visiting) available false fuel specialized

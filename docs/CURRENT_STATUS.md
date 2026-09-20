@@ -5816,7 +5816,10 @@ operators, equality and greater-than ordering.  A required occurrence must have
 exactly one matching
 solved operator requirement and closed implementation witness.  The selected
 trait must have one type parameter and one non-generic method; its selected
-implementation and method must be monomorphic, premise-free and `where`-free.
+implementation must be monomorphic, and its method must be predicate-free.
+Closed implementation-level `where` predicates are checked positionally
+against the selected evidence premises and retained as static assumptions of
+the synthetic method.
 Closed trait-declaration predicates are instantiated from the evidence goal in
 declaration-parameter order and become static assumptions while the method body
 is checked.  They are not prerequisites of the implementation rule itself:
@@ -5855,7 +5858,7 @@ requirement whose predicate and evidence goal are exactly
 unique matching closed implementation witness was forwarded from the caller.
 The selected two-parameter trait must have the sole method `coerce`, and the
 selected implementation and method must satisfy the same monomorphic,
-premise-free, `where`-free profile.  The method is checked at one `From` input
+closed-implementation-predicate and predicate-free-method profile.  The method is checked at one `From` input
 and one `To` result and then capture-free inlined; endpoint types validate the
 method but never invent its behavior.  Regressions execute a direct Bool-to-Word
 argument conversion, the same conversion justified by evidence forwarded into
@@ -5867,8 +5870,8 @@ Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
 direct-call cycles, seed roots with unresolved assumptions, unconsumed
 non-call/operator/literal requirements outside the supported unary, binary and
 conversion profiles and indirect calls reject explicitly.  Other runtime
-operators, generic or premise-bearing evidence and implementation methods,
-multi-method or implementation/method-level `where`-constrained profiles remain
+operators, generic implementation methods, multi-method traits and
+method-level `where`-constrained profiles remain
 explicit boundaries.  Selected implementation methods now have their own
 finite detached linker.  It reconstructs direct-call metadata against the
 whole-program catalog even when a method-only helper is absent from the
@@ -5886,10 +5889,13 @@ binary profiles, and the direct, forwarded-generic and call-result conversion
 profiles.  Further regressions execute an ordinary helper found only from an
 implementation method and the chain `Ord.gt` method → constrained Eq helper →
 `Eq.eq`; the same consumed superclass rejects when no Eq implementation exists.
+Another regression executes `Add<Word> where Word: Eq`, passes the exact
+selected Eq premise into a detached method, and consumes it through a generic
+helper before returning the method-authoritative result `92`.
 
-The next frontend boundary is broader implementation shapes—generic or
-premise-bearing evidence, implementation/method-level predicates and
-multi-method traits—and additional runtime-evidence profiles.  Recursive source calls require
+The next frontend boundary is broader implementation shapes—generic
+implementations, method-level predicates and multi-method traits—and additional
+runtime-evidence profiles.  Recursive source calls require
 a separate named or global recursive-function representation rather than cyclic
 inlining.
 Automatic entry discovery, constructors, members and place-aware statements
@@ -5907,7 +5913,7 @@ Solcore source text. In particular, it does not yet provide:
 - execution of cyclic or indirect source call graphs, runtime
   evidence-dependent operator/literal/non-call forms outside the narrow
   `BitNot<T>`, strict arithmetic/bitwise, `Eq<T>`, closed standard `Ord<T>` and
-  `Coerce<From, To>` profiles, generic/premise-bearing or multi-method impl
+  `Coerce<From, To>` profiles, generic or multi-method impl
   execution, and generic or symbolic conversion execution;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;

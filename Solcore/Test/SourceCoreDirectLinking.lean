@@ -1259,6 +1259,57 @@ private def testConsumedTraitPredicateEvidence : IO Unit := do
         some (.done (.bool false) [])))
     "Ord.gt did not forward Eq superclass evidence through its method helper"
 
+private def testImplementationPredicateEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "}",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "}",
+    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "  return left == right;",
+    "}",
+    "impl Add<Word> where Word: Eq {",
+    "  function add(left: Word, right: Word) returns (Word) {",
+    "    return equalWithEvidence(left, right) ? 91 : 92;",
+    "  }",
+    "}",
+    "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
+    "  return left + right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Word) {",
+    "  return addWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let equal ← signatureNamed program "equalWithEvidence"
+  let outcome ← runOrThrow "implementation predicate evidence" program
+    [monomorphicRequest entry] 2
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"implementation predicate: incomplete plan {reprStr other}")
+  assertTrue (!(plan.specializations.any fun specialized =>
+      specialized.declaration == equal.id))
+    "implementation-predicate helper unexpectedly appeared in the top-level worklist"
+  let linked ← linkOrThrow "implementation predicate evidence" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "implementation predicate: linked root was absent")
+  assertTrue (decide (linkedEntry.run?
+      [.word (word 9), .word (word 9)] 4096 =
+        some (.done (.word (word 92)) [])))
+    "Add method did not consume its selected Eq implementation premise"
+
 private def testNamedLogicalNotWithEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Marker<T> {}",
@@ -1944,6 +1995,7 @@ def testSourceCoreDirectLinking : IO Unit := do
   testTraitPredicateIsStaticMethodAssumption
   testMissingConsumedTraitPredicateEvidence
   testConsumedTraitPredicateEvidence
+  testImplementationPredicateEvidence
   testNamedLogicalNotWithEvidence
   testNamedLogicalNotExpectedType
   testNamedLogicalNotMismatchDoesNotFallback

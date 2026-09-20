@@ -266,12 +266,12 @@ private def testDefensiveProfileRejections : IO Unit := do
     .byImpl implementation.head implementation.id [premise]
   match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program evidence
       1 "add" with
-  | .error (.evidencePremisesPresent id 1) =>
+  | .error (.evidencePremiseCountMismatch id 0 1) =>
       assertTrue (decide (id = implementation.id))
-        "premise rejection named the wrong implementation"
+        "unexpected-premise rejection named the wrong implementation"
   | .error error => throw (IO.userError
-      s!"premise-bearing evidence had the wrong rejection: {reprStr error}")
-  | .ok _ => throw (IO.userError "premise-bearing evidence was executable")
+      s!"unexpected evidence premise had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError "an evidence premise without a predicate was executable")
   let duplicateProgram : CheckedProgram := {
     program with
     signatures := {
@@ -333,24 +333,69 @@ private def testGenericImplementationRejection : IO Unit := do
       s!"generic implementation had the wrong rejection: {reprStr error}")
   | .ok _ => throw (IO.userError "generic implementation was executable")
 
-private def testWherePredicateRejection : IO Unit := do
+private def testImplementationPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {}",
     "trait Add<T> { function add(left: T, right: T) returns (T); }",
+    "impl Eq<Word> {}",
     "impl Add<Word> where Word: Eq {",
     "  function add(left: Word, right: Word) returns (Word) { return left; }",
     "}"
   ])
-  let implementation ← onlyImplementation program
-  match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program
-      (evidenceFor implementation) 1 "add" with
-  | .error (.implementationPredicatesPresent id [_]) =>
-      assertTrue (decide (id = implementation.id))
-        "where-predicate rejection named the wrong implementation"
+  let add ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Add" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Add trait, found {traits.length}")
+  let implementation ← match program.signatures.implementations.filter
+      fun implementation => implementation.head.trait == add.id with
+    | [implementation] => pure implementation
+    | implementations => throw (IO.userError
+        s!"expected one Add implementation, found {implementations.length}")
+  let evidence ← match (TypedTraitResolution.resolve
+      program.signatures.implRules 32 implementation.head).outcome with
+    | .success evidence => pure evidence
+    | outcome => throw (IO.userError
+        s!"Add implementation evidence did not resolve: {reprStr outcome}")
+  let method ← match ExecutableImplMethods.checkMonomorphicMethodWithArity
+      program evidence 1 "add" with
+    | .ok method => pure method
+    | .error error => throw (IO.userError
+        s!"closed implementation predicate was rejected: {reprStr error}")
+  let premiseMatches := match implementation.wherePredicates,
+      method.implementationPremises with
+    | [expected], [.byImpl actual _ []] => expected == actual
+    | _, _ => false
+  assertTrue (premiseMatches && decide (
+      method.traitPredicates = [] ∧
+      method.implementationPredicates = implementation.wherePredicates ∧
+      method.synthetic.scheme.predicates = implementation.wherePredicates ∧
+      method.checked.solvedRequirements = []))
+    "implementation premise was not retained in exact predicate order"
+  match SourceCoreElaboration.elaborateFunction method.checked with
+  | .ok _ => pure ()
   | .error error => throw (IO.userError
-      s!"where-constrained implementation had the wrong rejection: {reprStr error}")
+      s!"unused closed implementation premise blocked lowering: {reprStr error}")
+  let expectedPremise ← match implementation.wherePredicates with
+    | [predicate] => pure predicate
+    | predicates => throw (IO.userError
+        s!"expected one Add implementation predicate, found {predicates.length}")
+  let wrongGoal := implementation.head
+  let wrongEvidence : TypedTraitResolution.Evidence :=
+    .byImpl implementation.head implementation.id [
+      .byImpl wrongGoal implementation.id []
+    ]
+  match ExecutableImplMethods.checkMonomorphicMethodWithArity program
+      wrongEvidence 1 "add" with
+  | .error (.evidencePremiseGoalMismatch id 0 expected actual) =>
+      assertTrue (decide (id = implementation.id ∧
+          expected = expectedPremise ∧
+          actual = wrongGoal))
+        "premise-goal rejection lost its exact predicate position"
+  | .error error => throw (IO.userError
+      s!"wrong implementation premise had the wrong rejection: {reprStr error}")
   | .ok _ => throw (IO.userError
-      "where-constrained implementation was executable")
+      "mismatched implementation premise evidence was executable")
 
 private def testMethodPredicateRejections : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -428,7 +473,7 @@ def testExecutableImplMethods : IO Unit := do
   testEmptyMarkerRejection
   testDefensiveProfileRejections
   testGenericImplementationRejection
-  testWherePredicateRejection
+  testImplementationPredicateEvidence
   testMethodPredicateRejections
   testBodyIsActuallyChecked
 

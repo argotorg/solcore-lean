@@ -286,9 +286,11 @@ bitwise operators, equality and greater-than ordering.  A required occurrence
 must carry exactly one
 solved operator requirement whose closed implementation evidence agrees with
 the typed occurrence.  The selected declaration must be a one-parameter trait
-with exactly one non-generic method and one monomorphic, premise-free,
-`where`-free implementation with exactly one conforming method.  Closed
-predicates on the trait declaration are instantiated from the evidence goal in
+with exactly one non-generic method and one monomorphic implementation with
+exactly one conforming predicate-free method.  Closed implementation-level
+predicates must match the selected evidence premises positionally and are
+retained as static method assumptions.  Closed predicates on the trait
+declaration are instantiated from the evidence goal in
 declaration-parameter order and become static assumptions of the synthetic
 method signature.  They do not become premises of implementation search: the
 standard `trait Ord<T> where T: Eq` header may therefore execute an
@@ -323,8 +325,9 @@ one solved requirement whose predicate and evidence goal are precisely
 `Coerce<From, To>` for the typed edge.  An assumption is accepted only when a
 unique matching closed implementation witness was forwarded into the current
 generic specialization.  The selected trait has two parameters and the sole
-method `coerce`; the implementation and method must be monomorphic,
-premise-free, `where`-free and signature-conforming.  The checked method must
+method `coerce`; the implementation must be monomorphic, its predicates must be
+closed and backed by exact selected premises, and the method must be
+predicate-free and signature-conforming.  The checked method must
 lower from one `From` input to one `To` result before it is capture-free inlined.
 Executable regressions cover a direct call-argument conversion, a conversion
 inside a generic callee justified by forwarded evidence, and conversion of a
@@ -335,9 +338,9 @@ endpoint conversion supplies the runtime result.
 Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
 assumptions, non-call/operator/literal requirements outside the supported
 unary, binary and conversion profiles and indirect calls all reject explicitly.
-Other evidence-dependent operators, generic or premise-bearing evidence and
-implementation methods, multi-method or implementation/method-level
-`where`-constrained profiles are not assigned an invented runtime meaning.
+Other evidence-dependent operators, generic implementation methods,
+multi-method traits and method-level `where`-constrained profiles are not
+assigned an invented runtime meaning.
 Selected implementation methods instead enter a finite detached linker.  It
 reconstructs method-local direct-call metadata against the program catalog,
 including callees absent from the top-level specialization plan, forwards exact
@@ -354,8 +357,14 @@ conversion placements, an implementation-only direct-call helper, and an
 malformed plans and each principal staged boundary remain covered; small
 checked laws retain the runtime input gate and budget result.
 
-The next internal boundary is broader generic, premise-bearing and multi-method
-implementation shapes plus additional runtime-evidence profiles.  Recursive calls require
+A further executable regression selects `Add<Word> where Word: Eq`, validates
+its single Eq evidence premise against the implementation predicate in source
+order, and makes the detached method consume that exact witness through a
+generic helper.  The observed Word result is `92`, so this path also confirms
+that the implementation body remains authoritative.
+
+The next internal boundary is broader generic and multi-method implementation
+shapes, method-level predicates, and additional runtime-evidence profiles.  Recursive calls require
 a separate named or global recursive Core representation rather than cyclic
 inlining.
 Selection-bearing constructor,
