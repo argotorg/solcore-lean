@@ -165,11 +165,16 @@ from left to right, nested acyclic calls are supported, caller and callee
 requirement ledgers stay separate, and an otherwise runtime caller may alias a
 closed staged result.  Runtime, staged-integer and general staged expansion
 share one specialization-key stack and decreasing link-depth fuel, while both
-conditional branches remain eager.  Predicate/coercion execution, marked
-implementation methods, indirect calls, mutation, nominal or functional
-values, staged materialization inside a reusable runtime callee with a
-`Comptime`-classified input, every form of recursion and compile-time Fibonacci
-remain later.
+conditional branches remain eager.  ADR-0360 now passes exact call-site-known
+Unit/Bool/Word/product values into the private staged environment of a
+runtime-callee draft.  An explicitly marked input can therefore feed a nested
+marked-result call, while every runtime Core input, argument alias, function
+type and specialization key remains unchanged.  Drafts remain per occurrence,
+caller requirements stay owned by ordinary actual lowering, and an independent
+staged call may still materialize when another marked input is unavailable.
+Predicate/coercion execution, marked implementation methods, indirect calls,
+mutation, nominal or functional values, value-indexed memoization, every form
+of recursion and compile-time Fibonacci remain later.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5988,10 +5993,29 @@ stack and decreasing link-depth fuel as runtime and staged-integer expansion;
 local source-node fuel separately bounds each callee's malformed graphs.  Both
 expression and statement conditionals still evaluate guard, then and else, so
 a call, failure or cycle in an unselected written branch also rejects.
+
+ADR-0360 removes the remaining runtime-draft gap for known
+Core-representable marked inputs.  At each exact planned call occurrence, the
+linker queries a lazy caller-owned staged-value oracle only for explicitly
+marked callee parameters.  A successful Unit, Bool, Word or product value is
+checked against the input type and bound to the callee's stable input identity;
+an unavailable value is omitted.  This lets a nested marked-result call depend
+on a known literal or alias while still permitting input-independent staged
+calls and closed staged lets when some marked input is unavailable.
+
+The known binding is only a private draft-time hint.  Runtime Core inputs,
+left-to-right argument temporaries and callee-input aliases, function types and
+type-only specialization keys remain unchanged.  Drafts are constructed per
+call occurrence rather than memoized by key, so distinct values at the same
+specialization cannot contaminate each other.  Oracle evaluation transfers no
+requirement ledger: ordinary actual lowering owns caller requirements exactly
+once, and the callee continues to reconcile only its declaration-owned rows.
+The same active-key stack, link fuel and eager conditional policy still apply.
+
 Predicate-bearing calls, coercions, marked implementation methods, indirect
-calls, mutation, nominal/function/proxy/index values, staged materialization
-inside a reusable runtime callee with a `Comptime`-classified input, direct and
-mutual recursion, selected-branch recursion, and compile-time Fibonacci remain
+calls, mutation, nominal/function/proxy/index values, unsupported
+`Comptime`-classified source forms, value-indexed memoization, direct and mutual
+recursion, selected-branch recursion, and compile-time Fibonacci remain
 deferred.
 
 Terminal typed matches apply the same validation to each numeric pattern,

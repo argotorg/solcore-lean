@@ -215,7 +215,7 @@ runtime call lowering rejects a runtime-dependent actual or an
 unsupported/deferred form at a marked parameter and any marked result not
 materialized by ADR-0359, while an actual proved closed is accepted.  The unmarked pure
 bare-`integer` partial-evaluation path remains intentionally compatible.
-General staged-value evaluation formed the later ADR-0357–0359 boundary below;
+General staged-value evaluation formed the later ADR-0357–0360 boundary below;
 predicate/coercion support, staged implementation methods, selected-branch
 recursion and compile-time programs such as Fibonacci remain later.
 Integer-returning functions also remain invalid runtime roots because Core has
@@ -261,9 +261,21 @@ active specialization-key stack and decreasing link-depth fuel.  Expression
 and statement branches remain eager, so calls, failures and cycles in an
 unselected branch still reject.  Runtime or deferred actuals, predicates,
 coercions, marked implementation methods, indirect calls, mutation and all
-forms of recursion remain the next boundaries.  A reusable runtime callee with
-a `Comptime`-classified input also retains the legacy lowering path until the
-linker can supply a known/unavailable staged-input environment to its draft.
+forms of recursion remain the next boundaries.
+
+ADR-0360 supplies the known/unavailable staged-input environment at an exact
+runtime call occurrence.  A lazy caller-owned value query evaluates only an
+explicitly marked actual which is both ADR-0357 `Comptime` and closed relative
+to the caller's current staged environment.  A successful Unit, Bool, Word or
+product value is checked positionally and seeds the callee's stable input
+identity; unavailable inputs are omitted, so independent staged calls and
+closed lets remain materializable without guessing a dependent value.  Every
+runtime Core input and alias, function type and type-only specialization key is
+retained, and the draft remains per occurrence rather than cached by value.
+Ordinary actual lowering still owns the caller requirement ledger exactly once,
+while the callee reconciles only its own rows.  Predicate/coercion execution,
+marked implementation methods, unsupported staged value shapes,
+value-specialization memoization and recursion remain later.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
