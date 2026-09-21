@@ -93,19 +93,78 @@ private def coercionSource : String := String.intercalate "\n" [
   "function entry() returns (Word) { return staged(); }"
 ]
 
-private def testResultCoercionRejected : IO Unit := do
+private def testResultCoercionExecuted : IO Unit := do
   let moduleId ← mainModule
-  match prepare (workspace coercionSource) (Seed.named moduleId "entry")
-      (limits 2) with
-  | .error (.linking (.sourceCore error)) =>
-      match error.reason with
-      | .coercionsPresent coercions =>
-          assertTrue (!coercions.isEmpty)
-            "result-coercion rejection lost its coercion path"
-      | reason => throw (IO.userError
-          s!"marked result coercion failed for the wrong reason: {reprStr reason}")
-  | result => throw (IO.userError
-      s!"a coerced marked result escaped staged evaluation: {reprStr result}")
+  let prepared ← match prepare (workspace coercionSource)
+      (Seed.named moduleId "entry") (limits 2) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"marked result coercion failed: {reprStr error}")
+  let store : Core.Store := [.bool false, .word (word 29)]
+  assertTrue (decide (prepared.entry.elaborated.resolved = .word (word 41) ∧
+      prepared.run? [] 4096 store =
+        some (.done (.word (word 41)) store)))
+    "marked result coercion was not staged or changed the store"
+
+private def argumentAndResultCoercionSource : String := String.intercalate "\n" [
+  "trait Coerce<From, To> {",
+  "  function coerce(value: From) returns (To);",
+  "}",
+  "impl Coerce<Bool, Word> {",
+  "  function coerce(value: Bool) returns (Word) {",
+  "    return value ? 41 : 7;",
+  "  }",
+  "}",
+  "function stagedFlag(comptime value: Word) returns (comptime<Bool>) {",
+  "  return false;",
+  "}",
+  "function entry() returns (Word) { return stagedFlag(true); }"
+]
+
+private def testArgumentAndResultCoercions : IO Unit := do
+  let moduleId ← mainModule
+  let prepared ← match prepare (workspace argumentAndResultCoercionSource)
+      (Seed.named moduleId "entry") (limits 2) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"staged argument/result coercions failed: {reprStr error}")
+  let store : Core.Store := [.word (word 17), .bool true]
+  assertTrue (decide (prepared.entry.elaborated.resolved = .word (word 7) ∧
+      prepared.run? [] 4096 store = some (.done (.word (word 7)) store)))
+    "argument/result coercion composition produced the wrong value or store"
+
+private def genericCoercionSource : String := String.intercalate "\n" [
+  "trait Coerce<From, To> {",
+  "  function coerce(value: From) returns (To);",
+  "}",
+  "impl Coerce<Bool, Word> {",
+  "  function coerce(value: Bool) returns (Word) {",
+  "    return value ? 41 : 7;",
+  "  }",
+  "}",
+  "function convert<T>(comptime value: T) returns (comptime<Word>)",
+  "    where T: Coerce<Word> {",
+  "  return value;",
+  "}",
+  "function relay<T>(comptime value: T) returns (comptime<Word>)",
+  "    where T: Coerce<Word> {",
+  "  return convert(value);",
+  "}",
+  "function entry() returns (Word) { return relay(true); }"
+]
+
+private def testGenericCoercionEvidenceForwarded : IO Unit := do
+  let moduleId ← mainModule
+  let prepared ← match prepare (workspace genericCoercionSource)
+      (Seed.named moduleId "entry") (limits 3) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"generic staged coercion evidence failed: {reprStr error}")
+  let store : Core.Store := [.bool false, .word (word 23)]
+  assertTrue (decide (prepared.entry.elaborated.resolved = .word (word 41) ∧
+      prepared.run? [] 4096 store =
+        some (.done (.word (word 41)) store)))
+    "generic coercion evidence was not forwarded through the staged call"
 
 private def expectRecursiveCall (label content root : String)
     (budget : Nat) : IO Unit := do
@@ -398,13 +457,15 @@ private def testUnavailableKnownInputsRejected : IO Unit := do
   | result => throw (IO.userError
       s!"deferred actual was promoted to a known comptime input: {reprStr result}")
 
-/-- Fix proof-only evidence forwarding, the remaining coercion boundary, eager
+/-- Fix proof-only evidence forwarding, staged coercion execution, eager
 recursion rejection, ordinary evidence-let compatibility, known/unavailable
 runtime-draft staging, mixed runtime inputs, structural values, and successful
 finite evaluation of a sufficiently budgeted acyclic chain. -/
 def testSourceStagedValueCallsTamper : IO Unit := do
   testPredicateEvidenceForwarded
-  testResultCoercionRejected
+  testResultCoercionExecuted
+  testArgumentAndResultCoercions
+  testGenericCoercionEvidenceForwarded
   testRecursiveRejections
   testDeepAcyclicCall
   testOrdinaryEvidenceLetPreserved
