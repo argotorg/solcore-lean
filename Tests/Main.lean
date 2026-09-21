@@ -1257,6 +1257,7 @@ import Solcore.Test.ImportedResolutionConsumers
 import Solcore.Test.ProgramLoading
 import Solcore.Test.TraitResolution
 import Solcore.Test.TypedTraitResolution
+import Solcore.Test.ProgramIdentity
 import Solcore.Test.ProgramSignatures
 import Solcore.Test.ExecutableImplMethods
 import Solcore.Test.SourceInference
@@ -6045,6 +6046,7 @@ def staticSemanticsSpineTests : IO Unit := do
   Tests.ImportedResolutionConsumers.testImportedResolutionConsumers
   testProgramLoading
   TypedTraitResolution.testTypedTraitResolution
+  ProgramIdentity.testProgramIdentity
   testProgramSignatures
   ExecutableImplMethods.testExecutableImplMethods
   SourceInference.testSourceInference

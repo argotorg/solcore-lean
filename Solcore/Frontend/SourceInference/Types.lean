@@ -61,7 +61,7 @@ inductive Error where
   | noTraitImplementation (predicate : ProgramPredicate)
   | inconclusiveTrait
       (reason : TraitResolution.InconclusiveReason
-        Resolved.DeclarationId Ty Resolved.DeclarationId)
+        ProgramTraitId Ty ProgramImplId)
   | ambiguousOperatorTrait
       (name : String) (candidates : List Resolved.DeclarationId)
   | missingOperatorTraitCatalog (trait : Resolved.DeclarationId)

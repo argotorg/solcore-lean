@@ -89,6 +89,14 @@ conversion metadata and end-to-end `Int.fromInteger` execution are the next
 steps, so whole-program inference still retains its temporary
 `FromLiteral`/`Numeric` compatibility behavior.
 
+Program-wide trait and implementation evidence now uses collision-free
+builtin-or-source identities (ADR-0345).  Source declaration IDs coerce only
+into the tagged identity; source-only catalog consumers must project them back
+explicitly and reject builtin evidence.  This reserves honest identities for
+the builtin `Int` trait and its `integer`/Word implementations without
+inventing source declarations.  The identities are installed, but their
+primitive resolution rules are the next slice.
+
 ## What works now
 
 ### Resolved local-expression semantics

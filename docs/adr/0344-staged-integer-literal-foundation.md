@@ -62,8 +62,8 @@ This ADR does not yet:
   `integerSub`, or `integerMul`; or
 - execute user-defined `Int` instances.
 
-The next step is a collision-free sum identity for source and builtin
-trait/implementation evidence.  Literal inference can then retain an exact
+ADR-0345 supplies the collision-free sum identity for source and builtin
+trait/implementation evidence.  Literal inference can next retain an exact
 `integer -> target` conversion plan, and Source Core can consume the builtin
 Word plan without ever emitting `integer` at runtime.
 

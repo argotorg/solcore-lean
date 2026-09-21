@@ -66,10 +66,16 @@ the current executable compatibility profile.  The exact lowercase
 `integer` intrinsic is a distinct staged source type at the lowest lookup
 priority and is rejected if it reaches runtime Core.  A separate modulo-Word
 projection now matches primitive `wordFromInteger`, while the older strict
-Word projection remains scoped to its monomorphic adapter.  Collision-free
-builtin `Int` evidence and retained `Int.fromInteger` conversion metadata are
-the next dependency before whole-program literal execution can switch away
-from `FromLiteral`/`Numeric`.
+Word projection remains scoped to its monomorphic adapter.
+
+ADR-0345 supplies the collision-free identity dependency.  Program predicates,
+implementation rules and evidence distinguish compiler builtins from source
+declarations, with no fabricated declaration IDs or reverse coercion.  Existing
+source catalogs and execution are unchanged, and source-only method/linker
+boundaries reject builtin tags explicitly.  Installing the primitive
+`Int<integer>` and `Int<Word>` rules, then retaining exact `Int.fromInteger`
+conversion metadata, are the next steps before whole-program literal execution
+can switch away from `FromLiteral`/`Numeric`.
 
 This is an executable-first milestone rather than a completed proof campaign.
 The first typed-carrier step now assigns contiguous function-local identities to

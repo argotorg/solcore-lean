@@ -55,13 +55,14 @@ inductive Error where
       (implementation : Resolved.DeclarationId) (index : Nat)
       (expected actual : ProgramPredicate)
   | evidenceGoalArityMismatch
-      (trait : Resolved.DeclarationId) (expected actual : Nat)
+      (trait : ProgramTraitId) (expected actual : Nat)
   | evidenceGoalNotClosed
       (goal : ProgramPredicate) (reason : NonClosedType)
   | evidenceResolutionNoSolution (goal : ProgramPredicate)
   | evidenceResolutionInconclusive
       (reason : TraitResolution.InconclusiveReason
-        Resolved.DeclarationId Ty Resolved.DeclarationId)
+        ProgramTraitId Ty ProgramImplId)
+  | builtinImplementationNotExecutable (implementation : BuiltinImplId)
   | evidenceNotSelected
       (implementation : Resolved.DeclarationId) (goal : ProgramPredicate)
   | missingImplementation (implementation : Resolved.DeclarationId)
@@ -85,6 +86,7 @@ inductive Error where
       (implementation : Resolved.DeclarationId) (predicate : ProgramPredicate)
       (reason : NonClosedType)
   | missingTrait (trait : Resolved.DeclarationId)
+  | builtinTraitNotExecutable (trait : BuiltinTraitId)
   | duplicateTraits (trait : Resolved.DeclarationId) (count : Nat)
   | traitArityMismatch
       (trait : Resolved.DeclarationId) (expected actual : Nat)
@@ -133,7 +135,7 @@ inductive Error where
   | methodEvidenceResolutionInconclusive
       (method : ProgramImplMethodId) (index : Nat)
       (reason : TraitResolution.InconclusiveReason
-        Resolved.DeclarationId Ty Resolved.DeclarationId)
+        ProgramTraitId Ty ProgramImplId)
   | methodEvidenceNotSelected
       (method : ProgramImplMethodId) (index : Nat) (goal : ProgramPredicate)
   | implementationMethodOwnerMismatch
@@ -307,6 +309,12 @@ def checkMethodWithEvidenceAndArity
     (expectedTraitArity : Nat) (expectedName : String) :
     Except Error CheckedMethod := do
   let .byImpl goal implementationId premises := evidence
+  let implementationId ← match implementationId with
+    | .declaration id => pure id
+    | .builtin id => throw (.builtinImplementationNotExecutable id)
+  let traitId ← match goal.trait with
+    | .declaration id => pure id
+    | .builtin id => throw (.builtinTraitNotExecutable id)
   let goalArity := goal.arguments.length + 1
   unless goalArity = expectedTraitArity do
     throw (.evidenceGoalArityMismatch goal.trait expectedTraitArity goalArity)
@@ -328,7 +336,7 @@ def checkMethodWithEvidenceAndArity
     | none => pure ()
   validateEvidencePremises implementation.id headMatch.wherePredicates premises
   validateSelectedEvidence program implementation.id goal evidence
-  let trait ← exactTrait program goal.trait
+  let trait ← exactTrait program traitId
   unless trait.parameters.length = expectedTraitArity do
     throw (.traitArityMismatch trait.id expectedTraitArity trait.parameters.length)
   let traitParameterSubstitution : ParameterSubstitution :=

@@ -34,7 +34,7 @@ inductive ProgramCheckError where
   | inconclusive
       (declaration : Resolved.DeclarationId)
       (reason : TraitResolution.InconclusiveReason
-        Resolved.DeclarationId TypeSystem.Ty Resolved.DeclarationId)
+        ProgramTraitId TypeSystem.Ty ProgramImplId)
   deriving Repr
 
 /-- The observable result of checking one raw workspace. -/

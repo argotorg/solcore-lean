@@ -1,4 +1,5 @@
 import Solcore.Frontend.ProgramTypeResolution
+import Solcore.Frontend.ProgramIdentity
 import Solcore.Frontend.TraitResolution
 import Solcore.TypeSystem.Scheme
 
@@ -17,12 +18,11 @@ namespace Solcore.Frontend
 /-- The concrete trait-predicate representation used by whole-program source
 checking. -/
 abbrev ProgramPredicate :=
-  TraitResolution.Predicate Resolved.DeclarationId TypeSystem.Ty
+  TraitResolution.Predicate ProgramTraitId TypeSystem.Ty
 
 /-- A source implementation after its trait and every type have resolved. -/
 abbrev ProgramImplRule :=
-  TraitResolution.ImplRule Resolved.DeclarationId TypeSystem.Ty
-    Resolved.DeclarationId
+  TraitResolution.ImplRule ProgramTraitId TypeSystem.Ty ProgramImplId
 
 /-- A declaration type together with its source-level trait requirements.
 `parameters` are rigid and are instantiated only when the declaration is used. -/

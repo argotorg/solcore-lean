@@ -1,3 +1,4 @@
+import Solcore.Frontend.ProgramIdentity
 import Solcore.Frontend.TraitResolution
 import Solcore.TypeSystem.Unification
 
@@ -8,10 +9,10 @@ namespace Solcore.Frontend.TypedTraitResolution
 open TypeSystem
 
 /-- Resolved trait identity used by the typed class-resolution bridge. -/
-abbrev TraitId := Resolved.DeclarationId
+abbrev TraitId := ProgramTraitId
 
 /-- Resolved implementation identity used in generated evidence. -/
-abbrev ImplId := Resolved.DeclarationId
+abbrev ImplId := ProgramImplId
 
 /-- A trait obligation over semantic source types. -/
 abbrev Predicate := TraitResolution.Predicate TraitId Ty

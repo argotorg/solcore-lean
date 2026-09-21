@@ -550,7 +550,8 @@ private def testImplementationPredicateEvidence : IO Unit := do
     | traits => throw (IO.userError
         s!"expected one Add trait, found {traits.length}")
   let implementation ← match program.signatures.implementations.filter
-      fun implementation => implementation.head.trait == add.id with
+      fun implementation =>
+        implementation.head.trait == ProgramTraitId.declaration add.id with
     | [implementation] => pure implementation
     | implementations => throw (IO.userError
         s!"expected one Add implementation, found {implementations.length}")
@@ -633,7 +634,8 @@ private def testMethodPredicateEvidence : IO Unit := do
     | traits => throw (IO.userError
         s!"expected one Guard trait, found {traits.length}")
   let implementation ← match program.signatures.implementations.filter
-      fun implementation => implementation.head.trait == guard.id with
+      fun implementation =>
+        implementation.head.trait == ProgramTraitId.declaration guard.id with
     | [implementation] => pure implementation
     | implementations => throw (IO.userError
         s!"expected one Guard implementation, found {implementations.length}")
@@ -807,6 +809,31 @@ private def testBodyIsActuallyChecked : IO Unit := do
   | .ok _ => throw (IO.userError
       "invalid implementation method body bypassed source checking")
 
+private def testBuiltinIdentityRejection : IO Unit := do
+  let program ← checkedProgramOf successSource
+  let implementation ← onlyImplementation program
+  let builtinImplementationEvidence : TypedTraitResolution.Evidence :=
+    .byImpl implementation.head (.builtin .intWord) []
+  match ExecutableImplMethods.checkMethodWithArity program
+      builtinImplementationEvidence 1 "add" with
+  | .error (.builtinImplementationNotExecutable .intWord) => pure ()
+  | .error error => throw (IO.userError
+      s!"builtin implementation had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "a builtin implementation entered the source method catalog")
+  let builtinGoal : ProgramPredicate := {
+    implementation.head with trait := .builtin .int
+  }
+  let builtinTraitEvidence : TypedTraitResolution.Evidence :=
+    .byImpl builtinGoal implementation.id []
+  match ExecutableImplMethods.checkMethodWithArity program
+      builtinTraitEvidence 1 "add" with
+  | .error (.builtinTraitNotExecutable .int) => pure ()
+  | .error error => throw (IO.userError
+      s!"builtin trait had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "a builtin trait entered the source trait catalog")
+
 /-- Exercise executable method selection, body checking, Core lowering, and
 the first profile's explicit staged boundaries. -/
 def testExecutableImplMethods : IO Unit := do
@@ -824,5 +851,6 @@ def testExecutableImplMethods : IO Unit := do
   testImplementationPredicateEvidence
   testMethodPredicateEvidence
   testBodyIsActuallyChecked
+  testBuiltinIdentityRejection
 
 end Tests.ExecutableImplMethods

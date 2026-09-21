@@ -717,10 +717,14 @@ private def requiredUnaryPlan (program : CheckedProgram)
     | none => throw (.unsupportedRuntimeUnary caller.key node.id operator)
   let (_, predicate, evidence) ←
     exactRuntimeUnaryPrimaryEvidence caller node available
-  let trait ← match program.signatures.trait? predicate.trait with
+  let traitId ← match predicate.trait with
+    | .declaration id => pure id
+    | .builtin id => throw (.executableImplMethod caller.key node.id
+        (.builtinTraitNotExecutable id))
+  let trait ← match program.signatures.trait? traitId with
     | some trait => pure trait
     | none => throw (.executableImplMethod caller.key node.id
-        (.missingTrait predicate.trait))
+        (.missingTrait traitId))
   if trait.name != profile.traitName then
     throw (.runtimeUnaryTraitNameMismatch caller.key node.id
       profile.traitName trait.name)
@@ -773,10 +777,14 @@ private def requiredBinaryPlan (program : CheckedProgram)
     | none => throw (.unsupportedRuntimeBinary caller.key node.id operator)
   let (_, predicate, evidence) ←
     exactRuntimeBinaryPrimaryEvidence caller node available
-  let trait ← match program.signatures.trait? predicate.trait with
+  let traitId ← match predicate.trait with
+    | .declaration id => pure id
+    | .builtin id => throw (.executableImplMethod caller.key node.id
+        (.builtinTraitNotExecutable id))
+  let trait ← match program.signatures.trait? traitId with
     | some trait => pure trait
     | none => throw (.executableImplMethod caller.key node.id
-        (.missingTrait predicate.trait))
+        (.missingTrait traitId))
   if trait.name != profile.traitName then
     throw (.runtimeBinaryTraitNameMismatch caller.key node.id
       profile.traitName trait.name)
@@ -827,10 +835,14 @@ private def coercionPlan (program : CheckedProgram)
     Except Error (SourceCoreElaboration.CoercionPlan Error) := do
   let (predicate, evidence) ←
     exactRuntimeCoercionPrimaryEvidence caller node step available
-  let trait ← match program.signatures.trait? predicate.trait with
+  let traitId ← match predicate.trait with
+    | .declaration id => pure id
+    | .builtin id => throw (.executableImplMethod caller.key node.id
+        (.builtinTraitNotExecutable id))
+  let trait ← match program.signatures.trait? traitId with
     | some trait => pure trait
     | none => throw (.executableImplMethod caller.key node.id
-        (.missingTrait predicate.trait))
+        (.missingTrait traitId))
   if trait.name != "Coerce" then
     throw (.runtimeCoercionTraitNameMismatch caller.key node.id
       step.requirement "Coerce" trait.name)

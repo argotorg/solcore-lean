@@ -42,7 +42,8 @@ private def checkedNamed (environment : ProgramEnvironment)
 
 private def traitNameOf (environment : ProgramEnvironment)
     (predicate : ProgramPredicate) : Option String := do
-  let declaration ← environment.declaration? predicate.trait
+  let trait ← predicate.trait.declaration?
+  let declaration ← environment.declaration? trait
   declaration.name
 
 private def testLambdaLetTupleConditional : IO Unit := do

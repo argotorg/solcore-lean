@@ -73,7 +73,7 @@ private def testSuccessfulCollection : IO Unit := do
         "resolved generic function scheme changed"
       match signature.scheme.predicates with
       | [predicate] =>
-          assertTrue (decide (predicate.trait = eqTrait.id ∧
+          assertTrue (decide (predicate.trait = .declaration eqTrait.id ∧
               predicate.subject = parameter ∧ predicate.arguments = []))
             "function where predicate changed"
       | predicates => throw (IO.userError
@@ -94,13 +94,16 @@ private def testSuccessfulCollection : IO Unit := do
       s!"function signatures changed: {reprStr functions}")
   match signatures.implRules with
   | [rule] =>
+      let some implementation := rule.id.declaration?
+        | throw (IO.userError "source impl rule lost its declaration identity")
       let parameter : TypeSystem.Ty :=
-        .parameter { owner := rule.id, index := 0 }
-      assertTrue (decide (rule.head.trait = convertTrait.id ∧
+        .parameter { owner := implementation, index := 0 }
+      assertTrue (decide (rule.id = .declaration implementation ∧
+          rule.head.trait = .declaration convertTrait.id ∧
           rule.head.subject = TypeSystem.Ty.nominal box.id [parameter] ∧
           rule.head.arguments = [.word] ∧
           rule.wherePredicates = [{
-            trait := eqTrait.id
+            trait := .declaration eqTrait.id
             subject := parameter
             arguments := []
           }]))
