@@ -10,6 +10,7 @@ set_option autoImplicit false
 namespace Tests.SourceSpecialization
 
 open Solcore Solcore.Frontend Solcore.Frontend.SourceInference
+open Solcore.Frontend.SourceStageAnalysis
 open Solcore.TypeSystem
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
@@ -118,14 +119,29 @@ private def testIdentity (program : CheckedProgram) : IO Unit := do
         s!"identity lost its parameter: {reprStr parameters}")
   let specialized ← specializeOrThrow "identity" signature function
     [(parameter, .bool)]
+  let boolInput ← match specialized.function.typedBody.inputs with
+    | [input] => pure input
+    | inputs => throw (IO.userError
+        s!"Bool identity retained {inputs.length} inputs")
   assertTrue (decide (specialized.key.arguments = [.bool] ∧
-      specialized.parameterSubstitution = [(parameter, .bool)]))
+      specialized.parameterSubstitution = [(parameter, .bool)] ∧
+      specialized.stageAnalysis.binderStage? boolInput.id = some .runtime))
     "identity did not retain its Bool specialization key"
   let elaborated ← elaborateOrThrow "identity" specialized.function
   assertTrue (decide (Core.infer? elaborated.inputs.values elaborated.core =
       some .bool ∧ Core.runStateful 16
         (.initial elaborated.core [.bool true]) = .done (.bool true) []))
     "Bool identity did not typecheck and execute"
+  let integerSpecialized ← specializeOrThrow "integer identity" signature function
+    [(parameter, .integer)]
+  let integerInput ← match integerSpecialized.function.typedBody.inputs with
+    | [input] => pure input
+    | inputs => throw (IO.userError
+        s!"integer identity retained {inputs.length} inputs")
+  assertTrue (decide
+      (integerSpecialized.stageAnalysis.binderStage? integerInput.id =
+        some .comptime))
+    "specialization did not recompute an integer input as comptime-only"
 
 private def testStagedIdentityMarkers (program : CheckedProgram) : IO Unit := do
   let (signature, function) ← checkedNamed program "stagedIdentity"
@@ -151,7 +167,9 @@ private def testStagedIdentityMarkers (program : CheckedProgram) : IO Unit := do
         s!"specialized stagedIdentity retained {inputs.length} inputs")
   assertTrue (decide (specialized.function.type = .function .word .word ∧
       specializedInput.scheme = .mono .word ∧ specializedInput.comptime ∧
-      specialized.function.returnComptime))
+      specialized.function.returnComptime ∧
+      specialized.stageAnalysis.binderStage? specializedInput.id =
+        some .comptime))
     "specialization changed comptime flags or left them in semantic types"
 
 private def testPhantomParameter (program : CheckedProgram) : IO Unit := do

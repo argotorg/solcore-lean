@@ -365,15 +365,29 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
   | result => throw (IO.userError
       s!"deferred call crossed a comptime parameter: {reprStr result}")
 
-  let deferredLocalArgumentSource := String.intercalate "\n" [
+  let runtimeLocalArgumentSource := String.intercalate "\n" [
     "function identity(comptime value: Word) returns (Word) { return value; }",
     "function main(value: Word) returns (Word) {",
     "  let alias: Word = value;",
     "  return identity(alias);",
     "}"
   ]
-  match prepare (workspace deferredLocalArgumentSource)
+  match prepare (workspace runtimeLocalArgumentSource)
       (Seed.named moduleId "main") (limits 2) with
+  | .error (.linking (.runtimeArgumentToComptimeParameter _ _ 0 _)) => pure ()
+  | result => throw (IO.userError
+      s!"runtime-dependent local crossed a comptime parameter: {reprStr result}")
+
+  let deferredLocalArgumentSource := String.intercalate "\n" [
+    "function identity(comptime value: Word) returns (Word) { return value; }",
+    "function producer(value: Word) returns (Word) { return value; }",
+    "function main(value: Word) returns (Word) {",
+    "  let alias: Word = producer(value);",
+    "  return identity(alias);",
+    "}"
+  ]
+  match prepare (workspace deferredLocalArgumentSource)
+      (Seed.named moduleId "main") (limits 3) with
   | .error (.linking (.comptimeArgumentDeferred _ _ 0 _)) => pure ()
   | result => throw (IO.userError
       s!"deferred local crossed a comptime parameter: {reprStr result}")

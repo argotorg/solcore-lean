@@ -433,9 +433,10 @@ private def testMalformedTypedMetadata (program : CheckedProgram) : IO Unit := d
   match SourceSpecializationWorklist.run
       (replaceFunction program missingNodeFunction)
       [monomorphicRequest select] 2 with
-  | .error (.missingCalleeNode actualCall actualCallee) =>
-      assertTrue (actualCall == call && actualCallee == callee)
-        "missing-callee error lost the exact expression identities"
+  | .error (.specialization declaration
+      (.stageAnalysis (.missingNode actualCallee))) =>
+      assertTrue (declaration == select.id && actualCallee == callee.occurrence)
+        "stage-analysis missing-node error lost its declaration or callee identity"
   | result => throw (IO.userError
       s!"missing callee node was not rejected: {reprStr result}")
   let missingDeclarationProgram : CheckedProgram := {

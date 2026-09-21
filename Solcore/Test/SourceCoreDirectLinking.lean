@@ -368,20 +368,15 @@ private def testCaptureAvoidance (program : CheckedProgram) : IO Unit := do
     typedBody := renameInput selectFunction.typedBody calleeLeft callerFlag
   }
   let collidingProgram := replaceFunction program collidingSelect
-  let outcome ← runOrThrow "capture avoidance" collidingProgram
-    [monomorphicRequest entry] 4
-  let linked ← linkOrThrow "capture avoidance" collidingProgram outcome
-  let entryKey : SourceSpecialization.SpecializationKey := {
-    declaration := entry.id
-    arguments := []
-  }
-  let linkedEntry ← match linked.findEntry? entryKey with
-    | some linkedEntry => pure linkedEntry
-    | none => throw (IO.userError "capture avoidance lost the linked root")
-  let fortyOne := Core.Value.word (word 41)
-  assertTrue (decide (linkedEntry.run? [fortyOne, .bool false] 512 =
-      some (.done fortyOne [])))
-    "callee input alias captured a later caller argument"
+  match SourceSpecializationWorklist.run collidingProgram
+      [monomorphicRequest entry] 4 with
+  | .error (.specialization declaration
+      (.stageAnalysis (.binderOwnerMismatch expectedOwner actualBinder))) =>
+      assertTrue (decide (declaration = select.id ∧
+          expectedOwner = select.id ∧ actualBinder = callerFlag))
+        "stage analysis lost the declaration or exact cross-owner binder"
+  | result => throw (IO.userError
+      s!"cross-owner input identity was not rejected: {reprStr result}")
 
 private def testCycle (program : CheckedProgram) : IO Unit := do
   let loop ← signatureNamed program "loop"
