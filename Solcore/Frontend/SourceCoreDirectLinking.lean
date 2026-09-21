@@ -195,6 +195,21 @@ inductive Error where
   | stagedIntegerCallPredicatesUnsupported
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (predicates : List ProgramPredicate)
+  | runtimeRootComptimeParameter
+      (key : SpecializationKey) (index : Nat) (binder : Resolved.LocalId)
+  | runtimeRootComptimeResult (key : SpecializationKey)
+  | runtimeArgumentToComptimeParameter
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (parameterIndex : Nat) (argument : ExpressionId)
+  | comptimeArgumentDeferred
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (parameterIndex : Nat) (argument : ExpressionId)
+  | runtimeCallComptimeResult
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (callee : SpecializationKey)
+  | detachedComptimeUnsupported
+      (key : SpecializationKey)
+      (parameterComptime : List Bool) (returnComptime : Bool)
   | indirectCall (occurrence : ExpressionId)
   | recursiveCallCycle (key : SpecializationKey)
   | linkDepthLimit (key : SpecializationKey)
@@ -242,6 +257,10 @@ private def liftWorklistValidation : WorklistError → Error
   | error@(.calleeNodeTypeMismatch _ _ _) => .malformedCall error
   | error@(.specializedCalleeTypeMismatch _ _ _) => .malformedCall error
   | error@(.specializedCalleeAssumptionsMismatch _ _ _) =>
+      .malformedCall error
+  | error@(.specializedCalleeParameterComptimeMismatch _ _ _) =>
+      .malformedCall error
+  | error@(.specializedCalleeReturnComptimeMismatch _ _ _) =>
       .malformedCall error
   | .indirectCall occurrence => .indirectCall occurrence
   | error => .worklist error
@@ -380,6 +399,125 @@ private def exactCallEdge (plan : Plan) (caller : SpecializationKey)
   | [edge] => .ok edge
   | edges => .error (.duplicateCallEdges caller occurrence edges.length)
 
+/-- Recheck the staging bits carried by a call occurrence against the
+canonical specialized callee.  The ordinary type and predicate checks do not
+imply these equalities because staging metadata is intentionally kept outside
+`Ty`. -/
+private def validateCallComptimeMetadata (node : ExpressionNode)
+    (instantiation : DeclarationInstantiation)
+    (callee : SpecializedFunction) : Except Error Unit := do
+  let canonicalParameters :=
+    callee.function.typedBody.inputs.map (·.comptime)
+  if instantiation.parameterComptime != canonicalParameters then
+    throw (.malformedCall
+      (.specializedCalleeParameterComptimeMismatch node.id
+        instantiation.parameterComptime canonicalParameters))
+  if instantiation.returnComptime != callee.function.returnComptime then
+    throw (.malformedCall
+      (.specializedCalleeReturnComptimeMismatch node.id
+        instantiation.returnComptime callee.function.returnComptime))
+
+/-- Conservative staging classification at the final runtime-link boundary.
+Only expressions proved closed by this small classifier may cross a marked
+parameter.  Runtime dependencies receive the precise runtime error; calls and
+other unsupported forms remain distinguishable as deferred and reject rather
+than silently entering ordinary Core lowering. -/
+private inductive ArgumentStage where
+  | comptime
+  | runtime
+  | deferred
+  deriving Repr, DecidableEq
+
+private def combineArgumentStages (stages : List ArgumentStage) :
+    ArgumentStage :=
+  if stages.any fun stage => stage == .runtime then
+    .runtime
+  else if stages.all fun stage => stage == .comptime then
+    .comptime
+  else
+    .deferred
+
+private def classifyArgumentStageFuel (caller : SpecializedFunction) :
+    Nat → ExpressionId → Except Error ArgumentStage
+  | 0, expression =>
+      .error (.sourceCore {
+        site := .occurrence expression.occurrence
+        reason := .expressionDepthLimit
+      })
+  | fuel + 1, expression => do
+      let source := caller.function.typedBody
+      let node ← match source.lookupNode? expression.occurrence with
+        | none => throw (.sourceCore {
+            site := .occurrence expression.occurrence
+            reason := .missingNode
+          })
+        | some (.statement _) => throw (.sourceCore {
+            site := .occurrence expression.occurrence
+            reason := .expectedExpressionNode
+          })
+        | some (.expression node) => pure node
+      let recurse := classifyArgumentStageFuel caller fuel
+      match node.form with
+      | .reference _ (.local binder) =>
+          match source.inputs.find? fun input => decide (input.id = binder) with
+          | some input =>
+              pure (if input.comptime then .comptime else .runtime)
+          | none => pure .deferred
+      | .group inner
+      | .unary _ inner => recurse inner
+      | .binary left _ right => do
+          let leftStage ← recurse left
+          let rightStage ← recurse right
+          pure (combineArgumentStages [leftStage, rightStage])
+      | .conditional condition thenBranch elseBranch => do
+          let conditionStage ← recurse condition
+          let thenStage ← recurse thenBranch
+          let elseStage ← recurse elseBranch
+          pure (combineArgumentStages
+            [conditionStage, thenStage, elseStage])
+      | .tuple elements => do
+          let stages ← elements.mapM recurse
+          pure (combineArgumentStages stages)
+      | .literal _
+      | .integerLiteral _ _
+      | .reference _ (.builtinBoolean _) => pure .comptime
+      | .reference _ (.declaration _)
+      | .reference _ (.builtinFunction _)
+      | .lambda _ _ _
+      | .call _ _ _
+      | .proxy _
+      | .index _ _ => pure .deferred
+
+private def validateRuntimeCallArguments (caller : SpecializedFunction)
+    (node : ExpressionNode) : Nat → List TypedBinder → List ExpressionId →
+      Except Error Unit
+  | _, [], [] => pure ()
+  | index, input :: inputs, argument :: arguments => do
+      if input.comptime then
+        let stage ← classifyArgumentStageFuel caller
+          (caller.function.typedBody.nodes.length + 1) argument
+        match stage with
+        | .comptime => pure ()
+        | .runtime =>
+          throw (.runtimeArgumentToComptimeParameter caller.key node.id index
+            argument)
+        | .deferred =>
+          throw (.comptimeArgumentDeferred caller.key node.id index argument)
+      validateRuntimeCallArguments caller node (index + 1) inputs arguments
+  | _, inputs, arguments =>
+      throw (.argumentArityMismatch node.id inputs.length arguments.length)
+
+/-- A runtime call may consume an argument proved closed at a marked parameter,
+but must reject runtime dependencies and deferred forms, and must not leak a
+marked result back into ordinary Core lowering. -/
+private def validateRuntimeCallBoundary (caller : SpecializedFunction)
+    (node : ExpressionNode) (arguments : List ExpressionId)
+    (callee : SpecializedFunction) : Except Error Unit := do
+  validateRuntimeCallArguments caller node 0
+    callee.function.typedBody.inputs arguments
+  if callee.function.returnComptime then
+    throw (.runtimeCallComptimeResult caller.key node.id callee.key)
+
 private def firstDuplicateRequirement :
     List RequirementId → Option RequirementId
   | [] => none
@@ -508,6 +646,7 @@ private def stagedIntegerCallPlan (program : CheckedProgram) (plan : Plan)
       declaration := instantiation.declaration
       parameterSubstitution := instantiation.parameterSubstitution
     }).mapError (fun error => Error.malformedCall error)
+  validateCallComptimeMetadata node instantiation resolvedCallee
   if edge.callee != resolvedCallee.key then
     throw (.callEdgeCalleeMismatch caller.key node.id edge.callee
       resolvedCallee.key)
@@ -1005,6 +1144,7 @@ private def validateDetachedCallMetadata (program : CheckedProgram)
   if specialized.assumptions != instantiation.predicates then
     throw (.malformedCall (.specializedCalleeAssumptionsMismatch node.id
       instantiation.predicates specialized.assumptions))
+  validateCallComptimeMetadata node instantiation specialized
   pure specialized
 
 /-- Link a checked function reached from an implementation method without
@@ -1018,7 +1158,13 @@ private def buildDetachedDraftFuel (program : CheckedProgram)
     (validateIncoming : Bool) (fuel : Nat)
     (specialized : SpecializedFunction) :
     Except Error SourceCoreElaboration.BodyDraft :=
-  if visiting.contains specialized.key then
+  let parameterComptime :=
+    specialized.function.typedBody.inputs.map (·.comptime)
+  if (parameterComptime.any fun marked => marked) ||
+      specialized.function.returnComptime then
+    .error (.detachedComptimeUnsupported specialized.key parameterComptime
+      specialized.function.returnComptime)
+  else if visiting.contains specialized.key then
     .error (.recursiveCallCycle specialized.key)
   else
     match fuel with
@@ -1061,6 +1207,8 @@ private def buildDetachedDraftFuel (program : CheckedProgram)
               assumptionEvidence instantiation
             let resolvedCallee ← validateDetachedCallMetadata program specialized
               node callee instantiation
+            validateRuntimeCallBoundary specialized node arguments
+              resolvedCallee
             let calleeDraft ← buildDetachedDraftFuel program temporaryOwner
               temporaryBase (specialized.key :: visiting) calleeEvidence true
               remaining resolvedCallee
@@ -1156,6 +1304,9 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
                 declaration := instantiation.declaration
                 parameterSubstitution := instantiation.parameterSubstitution
               }).mapError (fun error => Error.malformedCall error)
+            validateCallComptimeMetadata node instantiation resolvedCallee
+            validateRuntimeCallBoundary specialized node arguments
+              resolvedCallee
             if edge.callee != resolvedCallee.key then
               throw (.callEdgeCalleeMismatch key node.id edge.callee
                 resolvedCallee.key)
@@ -1236,6 +1387,13 @@ termination_by fuel
 
 end
 
+private def firstComptimeInput : Nat → List TypedBinder →
+    Option (Nat × Resolved.LocalId)
+  | _, [] => none
+  | index, input :: inputs =>
+      if input.comptime then some (index, input.id)
+      else firstComptimeInput (index + 1) inputs
+
 private def linkSeeds (program : CheckedProgram) (plan : Plan)
     (temporaryBase : Nat) : List SpecializationKey →
       Except Error (List LinkedEntry)
@@ -1244,6 +1402,12 @@ private def linkSeeds (program : CheckedProgram) (plan : Plan)
       let specialized ← exactSpecialization plan key
       unless specialized.assumptions.isEmpty do
         throw (.unresolvedAssumptions key specialized.assumptions)
+      match firstComptimeInput 0 specialized.function.typedBody.inputs with
+      | some (index, binder) =>
+          throw (.runtimeRootComptimeParameter key index binder)
+      | none => pure ()
+      if specialized.function.returnComptime then
+        throw (.runtimeRootComptimeResult key)
       let expansionFuel := plan.specializations.length +
         program.functions.length +
         program.signatures.implementations.length + 1
