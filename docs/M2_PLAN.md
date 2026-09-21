@@ -304,9 +304,35 @@ and must project back into Unit, Bool, Word or a supported product.  Caller or
 callee requirements and detached-method requirements remain in their own
 ledgers, and whole-program method/call expansion retains the shared active-key
 stack and decreasing link-depth fuel.  Marked arguments, marked results and
-callee-local conversions are covered; bare-`integer` coercions, staged required
-unary/binary operations and direct marked implementation-method execution
-remain later slices.
+callee-local conversions are covered; bare-`integer` coercions remain a later
+slice.
+
+ADR-0363 reuses the ordinary checked `requiredUnaryPlan` and
+`requiredBinaryPlan` for requirement-bearing Core-representable staged
+expressions.  Source Core validates exact primary-plus-method consumption and
+Core endpoints, evaluates binary children left to right, then rechecks actual
+operand and result carriers.  The selected method body executes through the
+same independently lowered, structurally bounded, empty-store boundary as a
+staged coercion.  Generic assumption evidence and ordered method predicates
+retain the ordinary runtime authority; a failed method plan never falls back to
+a builtin.  Nonstandard Add and BitNot results, nested evidence forwarding and
+a method-level Eq predicate are executable, while requirement-free builtin
+operations retain compatibility.
+
+ADR-0364 narrows marked implementation-method execution to the root selected
+by a staged coercion or required operator.  The validated trait/implementation
+parameter and result markers may be erased only after closed staged operands
+exist and before the result crosses the checked staged-carrier boundary.
+Ordinary runtime adapters retain `detachedComptimeUnsupported`, and nested
+method/function expansion does not inherit the permission.  Marked Add and
+Coerce regressions execute at staging time, while corresponding runtime paths
+reject with their exact marker contracts.
+
+ADR-0361–0364 complete roadmap phase 4, evidence-aware staging.  Phase 5 is
+staged recursion.  It must retain explicit whole-program fuel/cycle policy;
+selected-branch recursion, compile-time Fibonacci, mutation/effects, indirect
+calls, unsupported carriers, value-indexed memoization and broad metatheory
+remain outside the current executable boundary.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,

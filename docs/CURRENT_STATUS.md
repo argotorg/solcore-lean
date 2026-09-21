@@ -186,10 +186,16 @@ requirements, forwards concrete evidence through nested generic relays, and
 runs the resulting closed typed method application under structural fuel with
 an empty-store and staged-carrier boundary.  Caller/callee and detached-method
 ledgers remain separate, and linking shares the existing active-key stack and
-decreasing link fuel.  Required-operator execution, direct staged invocation
-of marked implementation methods, indirect calls, mutation, nominal or
-functional values, value-indexed memoization, every form of recursion and
-compile-time Fibonacci remain later.
+decreasing link fuel.  ADR-0363 applies the same authority to requirement-
+bearing unary and binary nodes: exact primary-plus-method evidence selects the
+implementation body, operands evaluate left to right, and method results cross
+the same independently typed empty-store boundary.  ADR-0364 permits the one
+selected staged method root to carry validated `comptime` parameter/result
+markers while ordinary runtime dispatch continues to reject it.  Together
+ADR-0361–0364 complete the evidence-aware staging phase.  Indirect calls,
+mutation, nominal or functional values, value-indexed memoization, every form
+of recursion and compile-time Fibonacci remain later; staged recursion is the
+next roadmap phase.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -6040,12 +6046,13 @@ calls while retaining value-only materialization, independent declaration-owned
 requirement ledgers, store preservation, and the shared active-key stack and
 link fuel.
 
-These predicates are proof-only: staging does not execute them or reify
-evidence into Core.  Coercions, required unary/binary operations, marked
-implementation methods, indirect calls, mutation, nominal/function/proxy/index
-values, unsupported `Comptime`-classified source forms, value-indexed
-memoization, direct and mutual recursion, selected-branch recursion, and
-compile-time Fibonacci remain deferred.
+ADR-0361's signature predicates remain proof-only: staging does not execute
+them or reify evidence into Core.  ADR-0362–0364 separately use selected
+evidence for the supported coercion and operator profiles described below.
+Indirect calls, mutation, nominal/function/proxy/index values, unsupported
+`Comptime`-classified source forms, value-indexed memoization, direct and mutual
+recursion, selected-branch recursion, and compile-time Fibonacci remain
+deferred.
 
 ADR-0362 adds exact coercion execution to the Core-representable staged-value
 path.  A node with a typed coercion path first evaluates its coercion-cleared
@@ -6076,9 +6083,44 @@ or callee ledger remains separate from the detached method ledger, while
 detached linking and nested calls retain the shared active-key stack and
 decreasing link fuel.  Regressions cover marked-result conversion, composed
 marked-argument and result conversions, and nested generic evidence forwarding.
-Bare-`integer` coercions, staged required unary/binary execution, direct staged
-invocation of marked implementation methods, indirect calls and recursion
-remain later boundaries.
+Bare-`integer` coercions remain a separate later boundary.
+
+ADR-0363 executes requirement-bearing unary and binary expressions in the
+Core-representable staged-value evaluator.  Source Core validates the policy's
+exact consumed requirement list and Core operand/result types, evaluates unary
+operands once and binary operands strictly left to right, then checks both the
+actual input carriers and returned carrier.  Child requirements precede the
+operator's primary-plus-method requirements before the owning function
+reconciles its ledger.
+
+The linker adapts the ordinary `requiredUnaryPlan` and `requiredBinaryPlan`, so
+trait/method name selection, canonical primary evidence, ordered method
+predicates, specialized method arity/types, generic assumption closure, and
+detached method-local reconciliation are identical to runtime dispatch.  The
+already evaluated values form a closed capture-free application which runs
+through the same independent type reconstruction, structural fuel, empty-store
+and staged-carrier checks used for staged coercions.  Nonstandard `Add.add` and
+`BitNot.bnot` regressions materialize `92` and `94`, including a method-level
+`Eq` predicate and nested generic evidence forwarding.  Requirement-free
+builtin operations retain their old results.
+
+ADR-0364 admits a validated `comptime` contract only for the selected method
+root of a staged coercion or required operator.  Trait/implementation marker
+conformance is rechecked by `ExecutableImplMethods`; staged operands are
+already closed and the result must still pass the isolated carrier boundary.
+The permission is not inherited by direct callees or nested selected methods.
+Ordinary runtime coercion/operator adapters continue to use the rejecting
+detached elaborator, and regressions observe `detachedComptimeUnsupported` with
+the exact marker vector and result flag.  Marked `Add.add` and
+`Coerce.coerce` staged roots materialize nonstandard results while preserving
+the caller store.
+
+This completes roadmap phase 4, evidence-aware staging.  Arbitrary trait
+methods, effects, indirect calls, mutation, nominal/function/proxy/index
+values, unsupported staged carriers, value-indexed memoization, direct and
+mutual recursion, selected-branch recursion, and compile-time Fibonacci remain
+deferred.  Phase 5 starts with staged recursion while retaining explicit fuel
+and cycle policy.
 
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
