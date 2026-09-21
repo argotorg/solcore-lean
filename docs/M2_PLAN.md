@@ -210,12 +210,12 @@ reference's separate function contract.  A resolved parameter row carries its
 marked item among multiple results and a nested outer wrapper reject.  The bits
 survive typed inputs, checked functions, declaration instantiations,
 specialization, trait/implementation method matching, worklist reconstruction,
-and linking.  Runtime roots cannot expose marked inputs or results; a runtime
-call rejects a runtime-dependent actual or an unsupported/deferred form at a
-marked parameter and rejects a marked result, while an actual proved closed is
-accepted.  The unmarked pure
+and linking.  Runtime roots cannot expose marked inputs or results; ordinary
+runtime call lowering rejects a runtime-dependent actual or an
+unsupported/deferred form at a marked parameter and any marked result not
+materialized by ADR-0359, while an actual proved closed is accepted.  The unmarked pure
 bare-`integer` partial-evaluation path remains intentionally compatible.
-General staged-value evaluation formed the later ADR-0357–0358 boundary below;
+General staged-value evaluation formed the later ADR-0357–0359 boundary below;
 predicate/coercion support, staged implementation methods, selected-branch
 recursion and compile-time programs such as Fibonacci remain later.
 Integer-returning functions also remain invalid runtime roots because Core has
@@ -249,9 +249,21 @@ initialized lexical lets, blocks, terminal returns and eager two-return-branch
 statement conditionals, and reconciles every consumed requirement exactly.
 Every interpreted expression must have the specialization-owned `Comptime`
 fact; `Runtime`, `Deferred` and missing facts remain distinct failures.
-Declaration-call and linker integration, mutation, indirect calls,
-predicate/coercion execution, staged methods and recursion remain the next
-boundaries.
+
+ADR-0359 connects that carrier to the canonical specialization-plan linker for
+marked-result direct calls.  Unit, Bool, Word and product results now
+materialize as closed resolved constants, including nested acyclic calls and a
+staged helper call through an ordinary let in a runtime-root caller.  Arguments
+are evaluated once from left to right; callers retain only their own ordered
+requirements while each callee reconciles its separate declaration-owned
+ledger.  General staged calls share the runtime and staged-integer linker's
+active specialization-key stack and decreasing link-depth fuel.  Expression
+and statement branches remain eager, so calls, failures and cycles in an
+unselected branch still reject.  Runtime or deferred actuals, predicates,
+coercions, marked implementation methods, indirect calls, mutation and all
+forms of recursion remain the next boundaries.  A reusable runtime callee with
+a `Comptime`-classified input also retains the legacy lowering path until the
+linker can supply a known/unavailable staged-input environment to its draft.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,

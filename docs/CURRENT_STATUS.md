@@ -142,8 +142,8 @@ function contracts.  Resolved parameter rows retain their `comptime` bits,
 `returns (comptime<T>)` becomes bare result `T` plus a separate result bit, and
 the same metadata survives checked binders, declaration instantiations,
 specialization, trait/implementation method conformance, worklist validation,
-and linking.  Marked runtime roots, marked results reaching runtime call
-lowering, and runtime-dependent actuals passed to marked parameters reject;
+and linking.  Marked runtime roots, marked results that are not materialized
+before ordinary runtime call lowering, and runtime-dependent actuals passed to marked parameters reject;
 unsupported/deferred argument forms also reject explicitly, while actuals
 proved closed are admitted.  The unmarked pure bare-`integer` path remains an
 intentional partial-evaluation compatibility rule.  ADR-0357 adds the first
@@ -159,9 +159,17 @@ values.  It covers positional inputs, stable-ID initialized lets, groups,
 tuples, requirement-free/coercion-free builtin operators, eager expression and
 statement conditionals, blocks and terminal returns, with exact requirement
 reconciliation.  The arbitrary-precision integer evaluator stays separate.
-Direct-call linker integration for this general carrier, predicate/coercion
-execution, indirect calls, mutation, nominal or functional values,
-selected-branch recursion and compile-time Fibonacci remain later.
+ADR-0359 now carries those values across authoritative marked-result direct
+call edges and materializes them as closed constants.  Arguments evaluate once
+from left to right, nested acyclic calls are supported, caller and callee
+requirement ledgers stay separate, and an otherwise runtime caller may alias a
+closed staged result.  Runtime, staged-integer and general staged expansion
+share one specialization-key stack and decreasing link-depth fuel, while both
+conditional branches remain eager.  Predicate/coercion execution, marked
+implementation methods, indirect calls, mutation, nominal or functional
+values, staged materialization inside a reusable runtime callee with a
+`Comptime`-classified input, every form of recursion and compile-time Fibonacci
+remain later.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5913,9 +5921,10 @@ bits, while a singleton `returns (comptime<T>)` is normalized to bare `T` plus
 one result bit.  Checked binders, checked functions, call/reference
 instantiations, specialization, trait/implementation conformance, worklist
 reconstruction and direct linking all preserve and compare those bits.
-Marked runtime roots reject; a runtime call rejects a marked result or a
-runtime-dependent actual at a marked parameter, while unsupported/deferred
-argument forms reject explicitly and actuals proved closed are accepted.  The
+Marked runtime roots reject; ordinary runtime call lowering rejects a marked
+result not handled by ADR-0359 or a runtime-dependent actual at a marked
+parameter, while unsupported/deferred argument forms reject explicitly and
+actuals proved closed are accepted.  The
 unmarked pure bare-integer rule remains an intentional
 partial-evaluation path.
 
@@ -5953,10 +5962,37 @@ is evaluated exactly once before its binder becomes visible; local reads do
 not consume its requirements again.  The returned value must match the checked
 source result type, and the complete consumed-requirement ledger must match the
 function's solved rows exactly.  The existing arbitrary-precision integer
-evaluator remains a separate compatibility path.  Direct declaration-call and
-linker integration, predicates and coercions, indirect calls, mutation,
-nominal/function/proxy/index values, staged implementation methods,
-selected-branch recursion, and compile-time Fibonacci remain deferred.
+evaluator remains a separate compatibility path.
+
+ADR-0359 supplies the first whole-program direct-call integration for that
+carrier.  A call is evaluated only through its exact canonical specialization
+edge, with a specialization-owned `Comptime` fact for the call and every
+actual, a canonical marked result, exact input and result types, and no
+predicate or coercion execution.  Actuals evaluate exactly once from left to
+right and bind positionally to the callee's stable input identities.  The
+caller records its argument requirements in source order, followed by the
+currently empty call-owned segment; each callee instead reconciles its own
+declaration-owned solved-requirement table before returning only a value.
+Numerically overlapping requirement IDs therefore never cross ledgers.
+
+The result is reified with `SourceStagedValue.toResolved`, yielding a closed
+Unit, Bool, Word or right-associated product constant at the caller occurrence.
+Nested finite acyclic calls are admitted.  An ordinary runtime function may
+bind such a result to an ordinary runtime alias, but marked functions remain
+invalid runtime roots and runtime or `Deferred` actuals cannot be staged merely
+because a callee ignores them.  The unmarked pure bare-`integer` rule remains a
+separate compatibility path.
+
+General staged calls reuse the same canonical `SpecializationKey` visiting
+stack and decreasing link-depth fuel as runtime and staged-integer expansion;
+local source-node fuel separately bounds each callee's malformed graphs.  Both
+expression and statement conditionals still evaluate guard, then and else, so
+a call, failure or cycle in an unselected written branch also rejects.
+Predicate-bearing calls, coercions, marked implementation methods, indirect
+calls, mutation, nominal/function/proxy/index values, staged materialization
+inside a reusable runtime callee with a `Comptime`-classified input, direct and
+mutual recursion, selected-branch recursion, and compile-time Fibonacci remain
+deferred.
 
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
