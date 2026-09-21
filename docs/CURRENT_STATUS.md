@@ -99,14 +99,14 @@ default.
 Validated builtin `Int<Word>` literal evidence now lowers through the source
 pipeline to a Word constant modulo `2^256`; the primitive conversion is erased
 rather than dispatched as a runtime method.  A literal retained as `integer`
-still rejects before Semantic Core unless it belongs to the closed staged
-intrinsic tree described below, and the manually assembled legacy `.literal`
-typed-IR form retains its strict in-range Word behavior.  Custom builtin `Int`
+still rejects before Semantic Core unless it belongs to the closed staging
+boundary described below, and the manually assembled legacy `.literal` typed-IR
+form retains its strict in-range Word behavior.  Custom builtin `Int`
 implementation execution remains a later boundary.
 
 Direct bare `wordFromInteger`, `wordToInteger`, `integerAdd`, `integerSub`,
 `integerMul`, `integerEq`, and `integerLt` compiler functions now provide the
-closed numeric staging slice (ADR-0349–0353).  They have collision-free builtin
+closed numeric staging slice (ADR-0349–0354).  They have collision-free builtin
 identities, derive exact lookup from one ordered supported catalog, and are
 selected only after local and visible source functions fail to supply any
 same-name candidate.  Source Core evaluates a closed
@@ -120,8 +120,13 @@ staged trees and every surviving `integer` value still reject explicitly.
 Closed staged conditionals now evaluate their Bool guard and both integer or
 Word branches eagerly in source order, preserve all three requirement streams,
 and select a value only after every child succeeds.  Ordinary runtime
-conditionals remain Core conditionals; let-bound staged values are the next
-vertical slice.
+conditionals remain Core conditionals.  An initialized monomorphic let whose
+final binder type is exactly `integer` now evaluates its initializer once under
+the preceding staged environment, binds the exact Lean `Int` by stable local
+identity, and disappears before Core.  Repeated local uses do not duplicate the
+initializer requirements.  Runtime lets remain Core lets; comptime parameters,
+ordinary calls, recursion, and general `comptime<T>` are the next staging
+boundary.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5844,8 +5849,16 @@ evaluates the guard, then branch, and else branch eagerly, preserves consumed
 requirements in that order, and selects the integer or Word value only after
 all three succeed.  This follows the pinned `MastCond` all-children evaluation
 boundary while adding value selection for the closed fragment.  It does not
-fold ordinary runtime Core conditionals.  Let-bound staged values and local
-references remain the next staging slice.
+fold ordinary runtime Core conditionals.  Initialized monomorphic lets whose
+final binder type is exactly `integer` now use a separate staged environment.
+Their initializer is evaluated once under the old environment, its requirements
+are consumed before the statement tail, and only then is its stable binder and
+Lean `Int` value made available to later staged expressions.  Local lookup
+rechecks owner, identity, spelling, empty requirements/coercions, and exact
+integer type, but consumes no initializer evidence again.  The staged let emits
+no Core binding; non-integer runtime lets retain the existing `letE` path.
+Comptime parameters, ordinary calls, recursion, and general `comptime<T>`
+remain the next staging boundary.
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
 requirements even after an early wildcard, and build one hidden let followed by
@@ -5858,7 +5871,8 @@ result stores checked equations both for exact `Resolved.Expr.lower?` output
 and for independent `Core.infer?` reconstruction of its declared return type.
 Missing or category-wrong node edges,
 duplicate inputs or active local IDs, polymorphic locals, unresolved source
-types, staged `integer` targets, unsupported legacy literal forms, typed-node
+types, staged `integer` targets outside the closed evaluator/environment,
+unsupported legacy literal forms, typed-node
 mismatches, malformed coercion paths, uninitialized lets, missing else
 branches, fallthrough, non-tail control
 statements and unconsumed requirements all produce located elaboration errors.

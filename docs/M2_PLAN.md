@@ -111,10 +111,10 @@ let-bound no-catalog Word-domain operators retain only targets that were open
 literal origins before contextual unification until a call parameter, return
 type, or later monomorphic use closes them; Bool-domain logical operators and
 unrelated or merely co-located literals are not admitted, and visible operator
-catalogs remain authoritative.  Signed compile-time `integer` evaluation and
-custom builtin `Int` execution remain later except for the closed direct
-integer/Word conversion, arithmetic, and comparison trees implemented by
-ADR-0349 through ADR-0353.
+catalogs remain authoritative.  General signed compile-time `integer`
+evaluation and custom builtin `Int` execution remain later.  ADR-0349 through
+ADR-0354 implement the closed integer/Word conversion, arithmetic, comparison,
+conditional, and let-binding boundary.
 
 ADR-0348 connects the first pattern slice to that carrier architecture.
 Terminal single-scrutinee matches retain ordered numeric-pattern builtin-`Int`
@@ -175,6 +175,18 @@ value.  Runtime-dependent or malformed unselected branches still reject, and
 ordinary runtime conditionals retain Core `ifE` meaning.  The next ADR adds an
 environment for let-bound staged values and local references; parameters,
 ordinary calls, recursion, and general `comptime<T>` evaluation remain later.
+
+ADR-0354 adds that environment for initialized, monomorphic lets whose fully
+resolved binder type is exactly `integer`.  Mirroring the pinned
+`markIntegerComptime` and `MastLet` behavior, lowering evaluates the initializer
+once under the preceding environment, adds the stable binder only after
+success, and erases the binding before Core.  A later local reference retrieves
+the stored Lean `Int` by declaration-owned identity and exact spelling without
+re-consuming the initializer's requirements.  This supports the pinned
+`integer-basic.solc` chain and its Word result `100`, while leaving ordinary
+non-integer lets on the runtime `letE` path.  Comptime parameters, ordinary
+calls, recursion, and the general `comptime<T>` contract form the next staging
+boundary.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
