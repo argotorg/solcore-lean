@@ -140,25 +140,25 @@ private def testCandidateForkCommitsOnlySelectedIds : IO Unit := do
   assertTrue (aligned run [predicate ready .word, predicate equality token])
     "failed or higher-cost candidates consumed committed requirement identities"
 
-private def testFinalizeContinuesInferenceIds : IO Unit := do
+private def testIntegerLiteralOwnsImmediateRequirementId : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
-    "trait Add<T> {",
-    "  function add(left: T, right: T) returns (T);",
-    "}",
-    "trait Numeric<T> {}",
-    "enum Box { Only }",
-    "impl Add<Box> {",
-    "  function add(left: Box, right: Box) returns (Box) { return left; }",
-    "}",
-    "impl Numeric<Box> {}",
-    "function compute(value: Box) returns (Box) { return value + 1; }"
+    "function compute(value: Word) returns (Word) { return value + 1; }"
   ])
   let compute ← checkedNamed fixture "compute"
-  let box ← namedType fixture.environment "Box"
-  let addition ← namedTrait fixture.environment "Add"
-  let numeric ← namedTrait fixture.environment "Numeric"
-  assertTrue (aligned compute [predicate addition box, predicate numeric box])
-    "final numeric defaulting did not continue inference-time requirement IDs"
+  let integer := ProgramSignatures.builtinIntPredicate TypeSystem.Ty.word
+  assertTrue (aligned compute [integer])
+    "integer literal did not retain its inference-time builtin Int requirement ID"
+  match compute.typedBody.nodes.filterMap fun
+      | .expression node => match node.form with
+          | .integerLiteral _ resolution => some (node, resolution)
+          | _ => none
+      | .statement _ => none with
+  | [(node, resolution)] =>
+      assertTrue (decide (resolution.requirement = ⟨0⟩ ∧
+          node.requirements = [resolution.requirement]))
+        "integer literal requirement was allocated twice or attached late"
+  | literals => throw (IO.userError
+      s!"expected one integer carrier, found {literals.length}")
 
 private def testRepeatedPredicatesKeepDistinctIds : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
@@ -182,11 +182,11 @@ private def testRepeatedPredicatesKeepDistinctIds : IO Unit := do
     "repeated identical predicates were merged or shared a requirement identity"
 
 /-- Exercise identity order across coercion paths, transactional overload
-selection, and final numeric defaulting. -/
+selection, and immediate integer-literal requirement allocation. -/
 def testSourceRequirementIdentity : IO Unit := do
   testAssumptionAndImplementationKeepPathIds
   testCandidateForkCommitsOnlySelectedIds
-  testFinalizeContinuesInferenceIds
+  testIntegerLiteralOwnsImmediateRequirementId
   testRepeatedPredicatesKeepDistinctIds
 
 end Tests.SourceRequirementIdentity

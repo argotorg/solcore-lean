@@ -38,12 +38,6 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
   externalLibraries := []
 }
 
-private def hasImplementationEvidence
-    (function : SourceInference.CheckedFunction) : Bool :=
-  function.evidence.any fun evidence => match evidence with
-    | .implementation _ => true
-    | .assumption _ => false
-
 private def testSuccessfulProgram : IO Unit := do
   let checked ← match checkProgram successfulWorkspace with
     | .ok checked => pure checked
@@ -61,10 +55,34 @@ private def testSuccessfulProgram : IO Unit := do
   match paired.find? fun pair => pair.1.name == "run" with
   | none => throw (IO.userError "checked run function was not retained")
   | some (_, function) =>
+      let equality ← match checked.environment.traitsNamed "Eq" with
+        | [declaration] => pure declaration.id
+        | declarations => throw (IO.userError
+            s!"expected one Eq trait, found {declarations.length}")
+      let equalityPredicate : ProgramPredicate := {
+        trait := equality
+        subject := .word
+        arguments := []
+      }
+      let integerPredicate :=
+        ProgramSignatures.builtinIntPredicate TypeSystem.Ty.word
       assertTrue (decide (function.inferredBodyType = TypeSystem.Ty.word))
-        "overload selection or numeric literal defaulting changed run's type"
-      assertTrue (hasImplementationEvidence function)
+        "overload selection or integer-literal resolution changed run's type"
+      assertTrue (function.solvedRequirements.any fun solved =>
+          solved.predicate == equalityPredicate &&
+            match solved.evidence with
+            | .implementation
+                (.byImpl goal (.declaration _) premises) =>
+                goal == equalityPredicate && premises.isEmpty
+            | _ => false)
         "generic where predicate did not retain implementation evidence"
+      assertTrue (function.solvedRequirements.any fun solved =>
+          solved.predicate == integerPredicate &&
+            match solved.evidence with
+            | .implementation (.byImpl goal (.builtin .intWord) premises) =>
+                goal == integerPredicate && premises.isEmpty
+            | _ => false)
+        "nested literal did not retain builtin Int<Word> evidence"
 
 private def importedTypeWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc"

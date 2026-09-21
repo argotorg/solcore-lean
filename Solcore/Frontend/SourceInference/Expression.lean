@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.Resolution
+import Solcore.Frontend.WordLiteral
 
 /-! Fuel-bounded inference for canonical expressions and simple bodies. -/
 
@@ -42,9 +43,18 @@ def bindLambdaParameters (context : Context) :
           (index + 1) (name :: seen) state
         pure (binder :: binders, type :: types, state)
 
-def typeDependsOnNumeric (state : State) (type : Ty) : Bool :=
-  type.freeVariables.any fun metavariable =>
-    isNumericVariable state (.variable metavariable)
+/-- Keep every literal created in the current argument subtree, plus an older
+literal whose still-flexible target flows through an argument type.  The
+second case covers monomorphic let-bound literals without making unrelated
+earlier literals affect overload ranking. -/
+def relevantIntegerLiterals (state : State) (start : Nat)
+    (arguments : List InferredExpression) : List IntegerLiteralOrigin :=
+  let introduced := state.integerLiterals.drop start
+  state.integerLiterals.filter fun origin =>
+    introduced.contains origin ||
+      (state.resolve (.variable origin.metavariable)).freeVariables.any
+        fun metavariable => arguments.any fun argument =>
+          (state.resolve argument.type).freeVariables.contains metavariable
 
 def generalizeValue (state : State) (locals : TypeSystem.Environment)
     (type : Ty) : Scheme :=
@@ -70,13 +80,6 @@ def attachExpressionCoercions (state : State)
       type := entry.coercions.foldl (fun _ step => step.target) node.type
       requirements := node.requirements ++ coercionRequirements entry.coercions
       coercions := node.coercions ++ entry.coercions
-    }) state
-
-def attachNumericRequirements (state : State)
-    (entries : List RequirementAttachment) : State :=
-  entries.foldl (fun state entry =>
-    state.modifyExpressionNode entry.expression fun node => {
-      node with requirements := node.requirements ++ [entry.requirement]
     }) state
 
 def recordExpression (source : Syntax.Expr) (expression : InferredExpression)
@@ -108,7 +111,6 @@ def recordSelectedCallResult (source callee : Syntax.Expr) (name : String)
     (state : State) :
     InferredExpression × State :=
   let state := attachExpressionCoercions state attempt.argumentCoercions
-  let state := attachNumericRequirements state attempt.numericRequirements
   let (calleeId, state) := state.allocateExpressionId
   let calleeExpression : InferredExpression := {
     id := calleeId
@@ -159,18 +161,27 @@ mutual
       | .literal literal =>
           match literal.value with
           | value@(.decimal _) | value@(.hexadecimal _) => do
+              let rawValue ← match numericLiteralValue? value with
+                | some rawValue => pure rawValue
+                | none => throw (.unsupportedLiteral "malformed integer")
               let (type, state) := state.fresh
-              let metavariable := match type with
-                | .variable metavariable => metavariable
-                | _ => ⟨state.inference.next⟩
+              let .variable metavariable := type
+                | throw (.unsupportedLiteral "integer target allocation")
+              let (requirement, state) := state.addRequirementWithId
+                (ProgramSignatures.builtinIntPredicate type)
               let state := {
-                state with numericVariables := state.numericVariables ++ [{
+                state with integerLiterals := state.integerLiterals ++ [{
                   metavariable
                   expression := id
+                  requirement
                 }]
               }
               recordExpressionWithExpected context expression id type
-                (.literal value) [] expected state
+                (.integerLiteral value {
+                  rawValue
+                  targetType := type
+                  requirement
+                }) [requirement] expected state
           | .string _ => .error (.unsupportedLiteral "string")
       | .identifier name =>
           match state.lookupBinder? name.value with
@@ -215,21 +226,22 @@ mutual
             (Ty.productMany (elements.map (·.type)))
             (.tuple (elements.map (·.id))) [] expected state
       | .unary operator operand => do
-          let numericStart := state.numericVariables.length
+          let integerLiteralStart := state.integerLiterals.length
           let (operand, state) ← inferExprFuel fuel context operand none state
-          let numericVariables := state.numericVariables.drop numericStart
+          let integerLiterals :=
+            relevantIntegerLiterals state integerLiteralStart [operand]
           match unaryOperatorDispatch operator.value with
           | .function name =>
               match ← functionsNamed context name with
               | [] =>
                   let inferred ← inferUnaryOperator context operator.value
-                    operand.type state
+                    operand.type expected state
                   recordExpressionWithExpected context expression id
                     inferred.type (.unary operator.value operand.id)
                     inferred.requirements expected inferred.state
               | candidates =>
                   let attempt ← selectFunctionCandidateFrom context name
-                    candidates [operand] numericVariables id expected state
+                    candidates [operand] integerLiterals id expected state
                   let callee : Syntax.Expr := {
                     span := operator.span
                     value := .identifier { span := operator.span, value := name }
@@ -238,27 +250,29 @@ mutual
                     [operand] attempt
           | .traitMethod _ _ =>
               let inferred ← inferUnaryOperator context operator.value
-                operand.type state
+                operand.type expected state
               recordExpressionWithExpected context expression id inferred.type
                 (.unary operator.value operand.id) inferred.requirements expected
                 inferred.state
       | .binary left operator right => do
-          let numericStart := state.numericVariables.length
+          let integerLiteralStart := state.integerLiterals.length
           let (left, state) ← inferExprFuel fuel context left none state
           let (right, state) ← inferExprFuel fuel context right none state
-          let numericVariables := state.numericVariables.drop numericStart
+          let integerLiterals :=
+            relevantIntegerLiterals state integerLiteralStart [left, right]
           match binaryOperatorDispatch operator.value with
           | .function name =>
               match ← functionsNamed context name with
               | [] =>
                   let inferred ← inferBinaryOperator context operator.value
-                    left.type right.type state
+                    left.type right.type expected state
                   recordExpressionWithExpected context expression id inferred.type
                     (.binary left.id operator.value right.id)
                     inferred.requirements expected inferred.state
               | candidates =>
                   let attempt ← selectFunctionCandidateFrom context name
-                    candidates [left, right] numericVariables id (some .bool) state
+                    candidates [left, right] integerLiterals id (some .bool)
+                      state
                   let fitted ← withExpected context attempt.state
                     attempt.result expected
                   let callee : Syntax.Expr := {
@@ -270,7 +284,7 @@ mutual
                     fitted.state
           | .traitMethod _ _ =>
               let inferred ← inferBinaryOperator context operator.value
-                left.type right.type state
+                left.type right.type expected state
               recordExpressionWithExpected context expression id inferred.type
                 (.binary left.id operator.value right.id) inferred.requirements
                 expected inferred.state
@@ -313,10 +327,11 @@ mutual
             (.lambda parameters (state.resolve resultType)
               bodyResult.statements) [] expected state
       | .call callee arguments => do
-          let numericStart := state.numericVariables.length
+          let integerLiteralStart := state.integerLiterals.length
           let (arguments, state) ← inferExprsFuel fuel context
             arguments.elements state
-          let numericVariables := state.numericVariables.drop numericStart
+          let integerLiterals :=
+            relevantIntegerLiterals state integerLiteralStart arguments
           match calleeQualifiedIdentifier? callee with
           | some (namespacePath, name) =>
               let namespaceName := namespacePath.head!
@@ -334,7 +349,7 @@ mutual
                       let displayName :=
                         String.intercalate "." (namespacePath ++ [name])
                       let attempt ← selectFunctionCandidateFrom context
-                        displayName candidates arguments numericVariables id
+                        displayName candidates arguments integerLiterals id
                         expected state
                       pure <| recordSelectedCall expression callee displayName
                         arguments attempt
@@ -351,7 +366,7 @@ mutual
                   match state.lookupBinder? name with
                   | none =>
                       let attempt ← selectFunctionCandidate context name arguments
-                        numericVariables id expected state
+                        integerLiterals id expected state
                       pure <| recordSelectedCall expression callee name arguments
                         attempt
                   | some _ =>
@@ -426,10 +441,7 @@ mutual
                 pure (initializer.type, some initializer.id, state)
           let locals := state.locals.apply state.inference.substitution
           let valueType := state.resolve valueType
-          let scheme := if typeDependsOnNumeric state valueType then
-              Scheme.mono valueType
-            else
-              generalizeValue state locals valueType
+          let scheme := generalizeValue state locals valueType
           let (binder, state) := ({ state with locals }).allocateBinder
             name.value scheme (some name.span)
           let state := state.recordNode (.statement {

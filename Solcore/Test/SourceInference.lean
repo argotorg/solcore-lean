@@ -85,31 +85,144 @@ private def testAmbiguousOverload : IO Unit := do
         | _ => false) "ambiguous overload was not reported explicitly"
   | .ok _ => throw (IO.userError "ambiguous overload was selected")
 
-private def testNumericExpectedType : IO Unit := do
+private def testIntegerLiteralExpectedType : IO Unit := do
   let source := "function bad() returns (Bool) { return 1; }"
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
-        | .body { error := .nonNumericLiteral .bool, .. } => true
-        | _ => false) "a numeric literal silently checked as Bool"
-  | .ok _ => throw (IO.userError "a numeric literal checked as Bool")
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            decide (predicate.trait = .builtin .int ∧
+              predicate.subject = TypeSystem.Ty.bool ∧
+              predicate.arguments = [])
+        | _ => false) "an integer literal silently checked as Bool"
+  | .ok _ => throw (IO.userError "an integer literal checked as Bool")
 
-private def testTraitBackedLiteral : IO Unit := do
+private def testSourceNamedLiteralTraitsDoNotAuthorize : IO Unit := do
   let source := String.intercalate "\n" [
+    "trait Int<T> {}",
     "trait FromLiteral<T> {}",
+    "trait Numeric<T> {}",
     "enum Box { Only }",
+    "impl Int<Box> {}",
     "impl FromLiteral<Box> {}",
+    "impl Numeric<Box> {}",
     "function literal() returns (Box) { return 1; }"
   ]
-  let checked ← check source
+  match SourceInference.loadAndCheckProgram (workspace source) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            predicate.trait == .builtin .int &&
+              predicate.subject != TypeSystem.Ty.word &&
+              predicate.arguments.isEmpty
+        | _ => false)
+        "source traits named Int/FromLiteral/Numeric authorized a nominal literal"
+  | .ok _ => throw (IO.userError
+      "source traits named Int/FromLiteral/Numeric authorized a nominal literal")
+
+private def testUnconstrainedIntegerLiteralRejected : IO Unit := do
+  let source := "function bad() { 1; return; }"
+  match SourceInference.loadAndCheckProgram (workspace source) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .unresolvedIntegerLiteralTarget _ type, .. } =>
+            !type.freeVariables.isEmpty
+        | _ => false)
+        "an unconstrained integer literal did not retain its flexible target"
+  | .ok _ => throw (IO.userError
+      "an unconstrained integer literal defaulted to Word")
+
+private def testLetBoundIntegerLiteralClosesLater : IO Unit := do
+  let checked ← check
+    "function closeLater() returns (Word) { let value = 1; return value; }"
+  let function ← match checked with
+    | [function] => pure function
+    | functions => throw (IO.userError
+        s!"let-bound literal fixture checked {functions.length} functions")
+  assertTrue (function.solvedRequirements.length == 1 &&
+      function.solvedRequirements.all fun solved =>
+        solved.predicate == ProgramSignatures.builtinIntPredicate .word)
+    "a later return context did not close the let-bound literal as Word"
+
+private def testLiteralRequirementPreservesIndependentPolymorphism : IO Unit := do
+  let checked ← check (String.intercalate "\n" [
+    "function run(flag: Bool) returns ((Word, Word), (Word, Bool)) {",
+    "  let f = lam(value) { return (1, value); };",
+    "  return (f(2), f(flag));",
+    "}"
+  ])
+  let function ← match checked with
+    | [function] => pure function
+    | functions => throw (IO.userError
+        s!"mixed literal-polymorphism fixture checked {functions.length} functions")
+  assertTrue (decide (function.inferredBodyType =
+      TypeSystem.Ty.product (.product .word .word) (.product .word .bool)) &&
+      function.solvedRequirements.length == 2 &&
+      function.solvedRequirements.all fun solved =>
+        solved.predicate == ProgramSignatures.builtinIntPredicate .word)
+    "an integer literal monomorphized an independent let-bound type variable"
+
+private def testContextualIntegerLiteralOperators : IO Unit := do
+  let checked ← check (String.intercalate "\n" [
+    "function addLiterals() returns (Word) { return 1 + 1; }",
+    "function complementLiteral() returns (Word) { return ~1; }"
+  ])
+  let intWordRequirements (function : SourceInference.CheckedFunction) :=
+    function.solvedRequirements.filter fun solved =>
+      solved.predicate == ProgramSignatures.builtinIntPredicate .word
   match checked with
-  | [function] =>
-      assertTrue (decide (function.predicates.length = 1) &&
-          function.evidence.any fun evidence => match evidence with
-            | .implementation _ => true
-            | .assumption _ => false)
-        "trait-backed non-Word literal lost its predicate or evidence"
-  | _ => throw (IO.userError "literal fixture lost its checked function")
+  | [addition, complement] =>
+      assertTrue (decide (addition.inferredBodyType = TypeSystem.Ty.word ∧
+          (intWordRequirements addition).length = 2))
+        "Word context did not close both addition literals through builtin Int"
+      assertTrue (decide (complement.inferredBodyType = TypeSystem.Ty.word ∧
+          (intWordRequirements complement).length = 1))
+        "Word context did not close the complemented literal through builtin Int"
+  | functions => throw (IO.userError
+      s!"contextual operator fixture checked {functions.length} functions")
+
+private def testBooleanOperatorResultDoesNotTypeOperands : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "function compare() returns (Bool) { return 1 == 1; }"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace source) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .unresolvedIntegerLiteralTarget _ (.variable _),
+            .. } => true
+        | _ => false)
+        "a Bool-valued comparison forced its integer operands to Bool"
+  | .ok _ => throw (IO.userError
+      "an unconstrained integer comparison acquired an operand type")
+
+private def testGroundOperatorResultKeepsCoercion : IO Unit := do
+  let checked ← check (String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "}",
+    "trait Coerce<From, To> {}",
+    "enum Box { Only }",
+    "impl Add<Box> {",
+    "  function add(left: Box, right: Box) returns (Box) { return left; }",
+    "}",
+    "impl Coerce<Box, Word> {}",
+    "function convert(left: Box, right: Box) returns (Word) {",
+    "  return left + right;",
+    "}"
+  ])
+  let function ← match checked.getLast? with
+    | some function => pure function
+    | none => throw (IO.userError "ground operator fixture checked no function")
+  assertTrue (decide (function.inferredBodyType = TypeSystem.Ty.word ∧
+      function.solvedRequirements.length = 2) &&
+      (function.solvedRequirements.any fun solved =>
+        solved.predicate.arguments == []) &&
+      (function.solvedRequirements.any fun solved =>
+        solved.predicate.arguments == [TypeSystem.Ty.word]))
+    "a ground operator result lost its Add evidence or result coercion"
 
 private def testUnsupportedStatement : IO Unit := do
   let source :=
@@ -394,12 +507,18 @@ private def testAmbiguousCoercionTrait : IO Unit := do
   | .ok _ => throw (IO.userError "ambiguous Coerce declaration was selected")
 
 /-- Exercise parsed lambdas, local schemes, tuples, grouping, conditionals,
-operators, numeric expected/default behavior, and explicit deferrals. -/
+operators, contextual integer literals, and explicit deferrals. -/
 def testSourceInference : IO Unit := do
   testLambdaLetTupleConditional
   testAmbiguousOverload
-  testNumericExpectedType
-  testTraitBackedLiteral
+  testIntegerLiteralExpectedType
+  testSourceNamedLiteralTraitsDoNotAuthorize
+  testUnconstrainedIntegerLiteralRejected
+  testLetBoundIntegerLiteralClosesLater
+  testLiteralRequirementPreservesIndependentPolymorphism
+  testContextualIntegerLiteralOperators
+  testBooleanOperatorResultDoesNotTypeOperands
+  testGroundOperatorResultKeepsCoercion
   testUnsupportedStatement
   testTraitBackedCoercion
   testMissingCoercion

@@ -10,36 +10,23 @@ open TypeSystem
 
 namespace Detail
 
-def defaultNumericVariable (context : Context) (origin : NumericOrigin)
-    (state : State) : Except Error State := do
+def validateIntegerLiteralTarget (origin : IntegerLiteralOrigin)
+    (state : State) : Except Error Unit := do
   let type := state.resolve (.variable origin.metavariable)
-  if type = .word then
-    pure state
-  else
-    match type with
-    | .variable _ => unify state type .word
-    | _ =>
-        match ← conventionalTrait? context ["FromLiteral", "Numeric"] with
-        | some trait =>
-            let (requirement, state) := state.addRequirementWithId {
-              trait, subject := type, arguments := []
-            }
-            pure (state.modifyExpressionNode origin.expression fun node => {
-              node with requirements := node.requirements ++ [requirement]
-            })
-        | none => throw (.nonNumericLiteral type)
+  if type.freeVariables.isEmpty then pure ()
+  else throw (.unresolvedIntegerLiteralTarget origin.expression type)
 
-def defaultNumerics (context : Context) :
-    List NumericOrigin → State → Except Error State
-  | [], state => .ok state
-  | origin :: rest, state => do
-      let state ← defaultNumericVariable context origin state
-      defaultNumerics context rest state
+def validateIntegerLiteralTargets (state : State) :
+    List IntegerLiteralOrigin → Except Error Unit
+  | [] => .ok ()
+  | origin :: rest => do
+      validateIntegerLiteralTarget origin state
+      validateIntegerLiteralTargets state rest
 
 def finalize (context : Context) (type : Ty) (state : State)
     (roots : List NodeId) :
     Except Error Result := do
-  let state ← defaultNumerics context state.numericVariables state
+  validateIntegerLiteralTargets state state.integerLiterals
   let solvedRequirements ← solveRequirements context state state.requirements
   let substitution := state.inference.substitution
   pure {

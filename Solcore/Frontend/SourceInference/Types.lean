@@ -33,11 +33,6 @@ structure Requirement where
   predicate : ProgramPredicate
   deriving Repr, BEq, DecidableEq
 
-/-- Append-only checkpoint used by speculative candidate evaluation. -/
-structure RequirementMark where
-  count : Nat
-  deriving Repr, BEq, DecidableEq
-
 /-- A normalized obligation paired with the evidence selected at finalization. -/
 structure SolvedRequirement where
   id : RequirementId
@@ -91,7 +86,13 @@ inductive Error where
   | coercionDepthLimit (source target : Ty) (limit : Nat)
   | importVisibility (errors : List ProgramImportError)
   | operatorNotSupported (operator : String) (operand : Ty)
-  | nonNumericLiteral (type : Ty)
+  | unresolvedIntegerLiteralTarget
+      (expression : ExpressionId) (type : Ty)
+  | missingIntegerLiteralRequirement
+      (expression : ExpressionId) (requirement : RequirementId)
+  | integerLiteralRequirementPredicateMismatch
+      (expression : ExpressionId) (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
   | unsupportedLiteral (kind : String)
   | unsupportedExpression (kind : String)
   | unsupportedStatement (kind : String)
@@ -117,17 +118,19 @@ structure LexicalScope where
 /-- The identity and current semantic type of one inferred expression.
 
 Resolution helpers carry these together so that every coercion, overload
-requirement, and numeric-defaulting requirement can be returned to the exact
+requirement, and integer-literal requirement can be returned to the exact
 source occurrence that introduced it. -/
 structure InferredExpression where
   id : ExpressionId
   type : Ty
   deriving Repr, BEq, DecidableEq
 
-/-- A flexible numeric-literal type together with its source occurrence. -/
-structure NumericOrigin where
+/-- A flexible builtin-`Int` target together with its source occurrence and
+the unique requirement allocated when that integer literal was recorded. -/
+structure IntegerLiteralOrigin where
   metavariable : TypeVarId
   expression : ExpressionId
+  requirement : RequirementId
   deriving Repr, BEq, DecidableEq
 
 /-- Mutable inference information threaded through a source body. -/
@@ -140,12 +143,12 @@ structure State where
   nextLocal : Nat
   nextOccurrence : Nat := 0
   nodes : List Node := []
-  numericVariables : List NumericOrigin := []
+  integerLiterals : List IntegerLiteralOrigin := []
   nextRequirement : Nat := 0
   requirements : List Requirement := []
   deriving Repr, DecidableEq
 
-/-- Final source-expression result after numeric defaulting and trait search. -/
+/-- Final source-expression result after literal validation and trait search. -/
 structure Result where
   type : Ty
   substitution : Substitution
@@ -348,16 +351,6 @@ def addRequirementsWithIds : State → List ProgramPredicate →
 
 def addRequirements (state : State) (predicates : List ProgramPredicate) : State :=
   (state.addRequirementsWithIds predicates).2
-
-def requirementMark (state : State) : RequirementMark :=
-  ⟨state.requirements.length⟩
-
-def requirementsSince (state : State) (mark : RequirementMark) :
-    List Requirement :=
-  state.requirements.drop mark.count
-
-def requirementCountSince (state : State) (mark : RequirementMark) : Nat :=
-  state.requirements.length - mark.count
 
 end State
 

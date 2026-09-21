@@ -79,14 +79,6 @@ def operatorTrait? (context : Context) (name : String) :
     Except Error (Option Resolved.DeclarationId) :=
   conventionalTraitWithArity? context name 1
 
-def conventionalTrait?
-    (context : Context) : List String → Except Error (Option Resolved.DeclarationId)
-  | [] => .ok none
-  | name :: rest => do
-      match ← operatorTrait? context name with
-      | some trait => pure (some trait)
-      | none => conventionalTrait? context rest
-
 structure CoercionEdge where
   source : Ty
   target : Ty
@@ -376,8 +368,8 @@ def commitCoercionPlan : State → List PlannedCoercionStep →
         target := step.target
       } :: steps, state)
 
-def isNumericVariable (state : State) (type : Ty) : Bool :=
-  state.numericVariables.any fun origin =>
+def isIntegerLiteralVariable (state : State) (type : Ty) : Bool :=
+  state.integerLiterals.any fun origin =>
     decide (state.resolve (.variable origin.metavariable) = state.resolve type)
 
 /-- The target language deliberately mixes trait-backed operators with ordinary
@@ -473,19 +465,21 @@ structure OperatorInferenceResult where
   state : State
 
 def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
-    (left right : Ty) (state : State) :
+    (left right : Ty) (expected : Option Ty) (state : State) :
     Except Error OperatorInferenceResult := do
   let state ← unify state left right
+  let state ← match expected with
+    | some expected =>
+        let operand := state.resolve left
+        if binaryResultIsBool operator || operand.freeVariables.isEmpty ||
+            !isIntegerLiteralVariable state operand then
+          pure state
+        else
+          unify state operand expected
+    | none => pure state
   let operand := state.resolve left
   let builtin := binaryBuiltinType operator
   if operand = builtin then
-    pure {
-      type := if binaryResultIsBool operator then .bool else builtin
-      requirements := []
-      state
-    }
-  else if operand.freeVariables.isEmpty = false && isNumericVariable state operand then
-    let state ← unify state operand builtin
     pure {
       type := if binaryResultIsBool operator then .bool else builtin
       requirements := []
@@ -511,16 +505,22 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
         | none => throw (.operatorNotSupported traitName operand)
 
 def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
-    (operandType : Ty) (state : State) :
+    (operandType : Ty) (expected : Option Ty) (state : State) :
     Except Error OperatorInferenceResult := do
+  let state ← match expected with
+    | some expected =>
+        let operand := state.resolve operandType
+        if operator == .logicalNot || operand.freeVariables.isEmpty ||
+            !isIntegerLiteralVariable state operand then
+          pure state
+        else
+          unify state operand expected
+    | none => pure state
   let operand := state.resolve operandType
   let builtin := match operator with
     | .logicalNot => Ty.bool
     | .bitNot => Ty.word
   if operand = builtin then
-    pure { type := builtin, requirements := [], state }
-  else if operand.freeVariables.isEmpty = false && isNumericVariable state operand then
-    let state ← unify state operand builtin
     pure { type := builtin, requirements := [], state }
   else
     match unaryOperatorDispatch operator with
@@ -637,65 +637,6 @@ def fitArguments (context : Context) :
               })
   | _, _, _ => .ok none
 
-structure RequirementAttachment where
-  expression : ExpressionId
-  requirement : RequirementId
-  deriving Repr, BEq, DecidableEq
-
-structure CandidateNumericResult where
-  state : State
-  cost : Nat
-  requirements : List RequirementAttachment
-
-def defaultCandidateNumericVariable (context : Context)
-    (origin : NumericOrigin) (state : State) :
-    Except Error CandidateNumericResult := do
-  let type := state.resolve (.variable origin.metavariable)
-  if type = .word then
-    pure { state, cost := 0, requirements := [] }
-  else
-    match type with
-    | .variable _ =>
-        pure {
-          state := ← unify state type .word
-          cost := 0
-          requirements := []
-        }
-    | _ =>
-        match ← conventionalTrait? context ["FromLiteral", "Numeric"] with
-        | none => throw (.nonNumericLiteral type)
-        | some trait =>
-            let predicate : ProgramPredicate := {
-              trait
-              subject := type
-              arguments := []
-            }
-            let (requirement, state) := state.addRequirementWithId predicate
-            pure {
-              state
-              cost := 1
-              requirements := [{ expression := origin.expression, requirement }]
-            }
-
-def defaultCandidateNumerics (context : Context) :
-    List NumericOrigin → State → Except Error CandidateNumericResult
-  | [], state => .ok { state, cost := 0, requirements := [] }
-  | origin :: rest, state => do
-      let head ← defaultCandidateNumericVariable context origin state
-      let tail ← defaultCandidateNumerics context rest head.state
-      pure {
-        state := tail.state
-        cost := head.cost + tail.cost
-        requirements := head.requirements ++ tail.requirements
-      }
-
-def removeCandidateNumerics (state : State)
-    (origins : List NumericOrigin) : State := {
-  state with
-  numericVariables := state.numericVariables.filter fun origin =>
-    !origins.contains origin
-}
-
 def validateCandidatePredicates (context : Context) (state : State) :
     List ProgramPredicate → Except Error Unit
   | [] => .ok ()
@@ -707,22 +648,45 @@ def validateCandidatePredicates (context : Context) (state : State) :
       else
         validateCandidatePredicates context state rest
 
+def validateCandidateIntegerLiterals (context : Context) (state : State) :
+    List IntegerLiteralOrigin → Except Error Bool
+  | [] => .ok false
+  | origin :: rest => do
+      let requirement ← match state.requirements.find? fun requirement =>
+          requirement.id == origin.requirement with
+        | some requirement => pure requirement
+        | none => throw (.missingIntegerLiteralRequirement
+            origin.expression origin.requirement)
+      let expected := ProgramSignatures.builtinIntPredicate
+        (.variable origin.metavariable)
+      if requirement.predicate != expected then
+        throw (.integerLiteralRequirementPredicateMismatch
+          origin.expression origin.requirement expected requirement.predicate)
+      let target := state.resolve (.variable origin.metavariable)
+      let deferred := match target with
+        | .variable _ => true
+        | _ => false
+      if !deferred then
+        let _ ← solvePredicate context state requirement.predicate
+      let tailDeferred ← validateCandidateIntegerLiterals context state rest
+      pure (deferred || tailDeferred)
+
 structure CandidateAttemptResult where
   instantiation : DeclarationInstantiation
   result : InferredExpression
   argumentCoercions : List ExpressionCoercions
   callCoercions : List CoercionStep
   signatureRequirements : List RequirementId
-  numericRequirements : List RequirementAttachment
+  hasDeferredIntegerLiterals : Bool
   state : State
   cost : Nat
 
 def tryFunctionCandidate (context : Context)
-    (arguments : List InferredExpression) (numericOrigins : List NumericOrigin)
+    (arguments : List InferredExpression)
+    (integerLiteralOrigins : List IntegerLiteralOrigin)
     (call : ExpressionId) (expected : Option Ty) (state : State)
     (signature : ProgramFunctionSignature) :
     Except Error (Option CandidateAttemptResult) :=
-  let requirementMark := state.requirementMark
   let instantiated := signature.scheme.instantiate state.inference.next
   match functionParts? instantiated.body with
   | none => .ok none
@@ -740,14 +704,13 @@ def tryFunctionCandidate (context : Context)
               | none => pure none
               | some fittedResult =>
                   let resultCost := fittedResult.coercions.length
-                  let numeric ←
-                    defaultCandidateNumerics context numericOrigins fittedResult.state
-                  let state := removeCandidateNumerics numeric.state numericOrigins
-                  let introducedRequirements :=
-                    state.requirementsSince requirementMark
+                  let hasDeferredIntegerLiterals ←
+                    validateCandidateIntegerLiterals context fittedResult.state
+                      integerLiteralOrigins
+                  let state := fittedResult.state
                   validateCandidatePredicates context state
                     (instantiated.predicates ++
-                      introducedRequirements.map (·.predicate))
+                      state.requirements.map (·.predicate))
                   let (signatureRequirements, state) :=
                     state.addRequirementsWithIds instantiated.predicates
                   pure (some {
@@ -760,9 +723,9 @@ def tryFunctionCandidate (context : Context)
                     argumentCoercions := fittedArguments.coercions
                     callCoercions := fittedResult.coercions
                     signatureRequirements
-                    numericRequirements := numeric.requirements
+                    hasDeferredIntegerLiterals
                     state
-                    cost := fittedArguments.cost + resultCost + numeric.cost
+                    cost := fittedArguments.cost + resultCost
                   })
 
 structure CandidateSuccess where
@@ -794,16 +757,14 @@ def firstBlockingFailure? : List Error → Option Error
   | [] => none
   | error :: rest =>
       match error with
-      | .noTraitImplementation _
-      | .nonNumericLiteral _ => firstBlockingFailure? rest
+      | .noTraitImplementation _ => firstBlockingFailure? rest
       | _ => some error
 
 def firstNoSolution? : List Error → Option Error
   | [] => none
   | error :: rest =>
       match error with
-      | .noTraitImplementation _
-      | .nonNumericLiteral _ => some error
+      | .noTraitImplementation _ => some error
       | _ => firstNoSolution? rest
 
 def minimumCandidateCost : List CandidateSuccess → Option Nat
@@ -813,9 +774,12 @@ def minimumCandidateCost : List CandidateSuccess → Option Nat
 
 def bestCandidateSuccesses (successes : List CandidateSuccess) :
     List CandidateSuccess :=
-  match minimumCandidateCost successes with
+  let ground := successes.filter fun success =>
+    !success.attempt.hasDeferredIntegerLiterals
+  let preferred := if ground.isEmpty then successes else ground
+  match minimumCandidateCost preferred with
   | none => []
-  | some cost => successes.filter fun success => success.attempt.cost == cost
+  | some cost => preferred.filter fun success => success.attempt.cost == cost
 
 def selectCandidateSearch (name : String)
     (allCandidates : List ProgramFunctionSignature)
@@ -839,20 +803,23 @@ def selectCandidateSearch (name : String)
 
 def selectFunctionCandidateFrom (context : Context) (name : String)
     (candidates : List ProgramFunctionSignature)
-    (arguments : List InferredExpression) (numericOrigins : List NumericOrigin)
+    (arguments : List InferredExpression)
+    (integerLiteralOrigins : List IntegerLiteralOrigin)
     (call : ExpressionId) (expected : Option Ty) (state : State) :
     Except Error CandidateAttemptResult :=
   let search := collectCandidateAttempts
-    (tryFunctionCandidate context arguments numericOrigins call expected state)
+    (tryFunctionCandidate context arguments integerLiteralOrigins call expected
+      state)
     candidates
   selectCandidateSearch name candidates search
 
 def selectFunctionCandidate (context : Context) (name : String)
-    (arguments : List InferredExpression) (numericOrigins : List NumericOrigin)
+    (arguments : List InferredExpression)
+    (integerLiteralOrigins : List IntegerLiteralOrigin)
     (call : ExpressionId) (expected : Option Ty) (state : State) :
     Except Error CandidateAttemptResult := do
   selectFunctionCandidateFrom context name (← functionsNamed context name)
-    arguments numericOrigins call expected state
+    arguments integerLiteralOrigins call expected state
 
 structure IndirectApplicationResult where
   result : InferredExpression

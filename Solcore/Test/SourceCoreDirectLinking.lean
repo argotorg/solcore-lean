@@ -2532,38 +2532,29 @@ private def testBuiltinIntegerLiteralLinking : IO Unit := do
             "linked integer fixture root is not a valued return")
     | _ => throw (IO.userError
         "linked integer fixture does not have one statement root")
-  let source ← match function.typedBody.lookupExpression? expression with
-    | some { form := .literal source, .. } => pure source
+  let node ← match function.typedBody.lookupExpression? expression with
+    | some node => pure node
+    | none => throw (IO.userError
+        "linked integer fixture lost its expression node")
+  let resolution ← match node.form with
+    | .integerLiteral _ resolution =>
+        if node.type == TypeSystem.Ty.word &&
+            resolution.rawValue == Core.wordModulus + 1 &&
+            resolution.targetType == TypeSystem.Ty.word &&
+            node.requirements == [resolution.requirement] then
+          pure resolution
+        else
+          throw (IO.userError
+            "linked integer fixture has inconsistent inferred carrier metadata")
     | _ => throw (IO.userError
-        "linked integer fixture lost its source literal")
-  let requirement : RequirementId := ⟨412⟩
-  let resolution : IntegerLiteralResolution := {
-    rawValue := Core.wordModulus + 1
-    targetType := .word
-    requirement
-  }
-  let predicate := resolution.predicate
-  let replacement : CheckedFunction := {
-    function with
-    solvedRequirements := [{
-      id := requirement
-      predicate
+        "linked integer fixture lost its inferred carrier")
+  assertTrue (function.solvedRequirements == [{
+      id := resolution.requirement
+      predicate := resolution.predicate
       evidence := .implementation
-        (.byImpl predicate (.builtin .intWord) [])
-    }]
-    typedBody := {
-      function.typedBody with
-      nodes := function.typedBody.nodes.map fun
-        | .expression node =>
-            if node.id == expression then .expression {
-              node with
-              form := .integerLiteral source resolution
-              requirements := [requirement]
-            } else .expression node
-        | .statement node => .statement node
-    }
-  }
-  let program := replaceFunction program replacement
+        (.byImpl resolution.predicate (.builtin .intWord) [])
+    }])
+    "linked integer fixture lost its exact builtin Int<Word> solution"
   let outcome ← runOrThrow "builtin integer literal" program
     [monomorphicRequest signature] 1
   let linked ← linkOrThrow "builtin integer literal" program outcome

@@ -58,10 +58,18 @@ private def testMappingIndexInfersValue : IO Unit := do
     "  return values[1];",
     "}"
   ])
-  assertTrue (checked.all fun function =>
-      function.inferredBodyType == TypeSystem.Ty.bool &&
-        function.predicates.isEmpty && function.evidence.isEmpty)
-    "mapping indexing did not infer the mapped value without extra evidence"
+  match checked with
+  | [read, readLiteral] =>
+      assertTrue (decide (read.inferredBodyType = .bool ∧
+          read.solvedRequirements = []))
+        "ordinary mapping indexing acquired unrelated evidence"
+      assertTrue (decide (readLiteral.inferredBodyType = .bool ∧
+          readLiteral.predicates = [
+            ProgramSignatures.builtinIntPredicate .word
+          ]))
+        "literal mapping key lost its sole builtin Int<Word> obligation"
+  | functions => throw (IO.userError
+      s!"mapping fixture checked {functions.length} functions")
 
 private def testMappingKeyUsesCoercion : IO Unit := do
   let checked ← check (String.intercalate "\n" [

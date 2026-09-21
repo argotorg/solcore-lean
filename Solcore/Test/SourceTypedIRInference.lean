@@ -4,7 +4,7 @@ import Solcore.Frontend.SourceInference
 End-to-end coverage for the occurrence-addressed typed source produced by
 source inference.  The fixture deliberately combines lexical shadowing,
 generic overload selection, rejected overload candidates, a two-edge coercion
-path, an operator obligation, and final numeric-literal defaulting.
+path, an operator obligation, and an explicit builtin-Int literal carrier.
 -/
 
 set_option autoImplicit false
@@ -172,7 +172,7 @@ private def testTypedInferenceFacts (fixture : Fixture)
   let ready ← namedTrait fixture.environment "Ready"
   let coerce ← namedTrait fixture.environment "Coerce"
   let addition ← namedTrait fixture.environment "Add"
-  let numeric ← namedTrait fixture.environment "Numeric"
+  let integer := ProgramSignatures.builtinIntPredicate word
   let genericChoose ← namedFunctionWhere fixture.environment "choose" fun declaration =>
     !declaration.genericParameters.isEmpty
   let accept ← namedFunctionWhere fixture.environment "accept" fun _ => true
@@ -196,7 +196,7 @@ private def testTypedInferenceFacts (fixture : Fixture)
       | some { form := .block nested, .. },
           some { form := .expression outerReference true, .. },
           some { form := .returnStmt (some _), .. } =>
-          assertTrue (nested.length == 3 && nested.all fun id =>
+          assertTrue (nested.length == 4 && nested.all fun id =>
               !(source.roots.contains (.statement id)))
             "nested block statements leaked into the top-level root list"
           match source.lookupExpression? outerReference with
@@ -210,17 +210,17 @@ private def testTypedInferenceFacts (fixture : Fixture)
   | roots => throw (IO.userError
       s!"expected three ordered top-level statement roots, found {roots.length}")
 
+  let integerSolved ← findSolved run integer
   let readySolved ← findSolved run (predicate ready word)
   let firstCoercion ← findSolved run (predicate coerce word [mid])
   let secondCoercion ← findSolved run (predicate coerce mid [box])
   let addSolved ← findSolved run (predicate addition box)
-  let numericSolved ← findSolved run (predicate numeric box)
   assertTrue (decide (run.predicates = [
+      integer,
       predicate ready word,
       predicate coerce word [mid],
       predicate coerce mid [box],
-      predicate addition box,
-      predicate numeric box
+      predicate addition box
     ]))
     "speculative overload requirements leaked or committed requirements reordered"
 
@@ -284,12 +284,18 @@ private def testTypedInferenceFacts (fixture : Fixture)
       s!"expected one addition node, found {nodes.length}")
 
   match (expressionNodes source).filter fun node =>
-      node.requirements.contains numericSolved.id with
-  | [{ form := .literal _, type, requirements, .. }] =>
-      assertTrue (decide (type = box ∧ requirements = [numericSolved.id]))
-        "the Box literal lost its Numeric<Box> requirement"
+      node.requirements.contains integerSolved.id with
+  | [{ form := .integerLiteral (.decimal "1") resolution,
+        type, requirements, .. }] =>
+      assertTrue (decide (type = word ∧
+          resolution.rawValue = 1 ∧
+          resolution.targetType = word ∧
+          resolution.requirement = integerSolved.id ∧
+          resolution.predicate = integer ∧
+          requirements = [integerSolved.id]))
+        "the Word literal lost its exact builtin Int carrier"
   | nodes => throw (IO.userError
-      s!"expected one Numeric<Box> literal owner, found {nodes.length}")
+      s!"expected one Int<Word> literal owner, found {nodes.length}")
 
   let attached := (expressionNodes source).flatMap (·.requirements)
   let solvedIds := run.solvedRequirements.map (·.id)
@@ -340,7 +346,6 @@ def testSourceTypedIRInference : IO Unit := do
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
     "}",
-    "trait Numeric<T> {}",
     "enum Mid { Only }",
     "enum Box { Only }",
     "enum Flag { Only }",
@@ -350,7 +355,6 @@ def testSourceTypedIRInference : IO Unit := do
     "impl Add<Box> {",
     "  function add(left: Box, right: Box) returns (Box) { return left; }",
     "}",
-    "impl Numeric<Box> {}",
     "function choose(value: Box) returns (Bool) { return true; }",
     "function choose(value: Flag) returns (Bool) { return true; }",
     "function choose<T>(value: T) returns (Bool) where T: Ready {",
@@ -360,11 +364,12 @@ def testSourceTypedIRInference : IO Unit := do
     "function run(item: Word, box: Box) returns (Box) {",
     "  {",
     "    let item = item;",
+    "    let one: Word = 1;",
     "    choose(item);",
     "    accept(item);",
     "  }",
     "  item;",
-    "  return box + 1;",
+    "  return box + box;",
     "}"
   ])
   let run ← checkedNamed fixture "run"

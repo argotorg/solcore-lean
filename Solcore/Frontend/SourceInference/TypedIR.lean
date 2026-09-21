@@ -116,7 +116,9 @@ def occurrenceId : NodeId → OccurrenceId
 end NodeId
 
 /-- Typed expression shape.  Recursive children are occurrence identities, so
-the carrier is compact and does not duplicate subtrees. -/
+the carrier is compact and does not duplicate subtrees.  Source inference uses
+`integerLiteral` for integer syntax; `literal` remains only as the strict Word
+compatibility form for manually assembled typed IR. -/
 inductive ExpressionForm where
   | literal (literal : Syntax.CoreLiteralValue)
   | integerLiteral
