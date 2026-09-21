@@ -116,12 +116,17 @@ inductive ErrorReason where
       (function : BuiltinFunctionId) (requirements : List RequirementId)
   | builtinFunctionCoercionsPresent
       (function : BuiltinFunctionId) (coercions : List CoercionStep)
+  | builtinBooleanSpellingMismatch
+      (value : Bool) (expected actual : String)
   | stagedIntegerTypeMismatch (expected actual : Ty)
   | stagedIntegerExpressionNotClosed
   | stagedIntegerDepthLimit
   | stagedWordTypeMismatch (expected actual : Ty)
   | stagedWordExpressionNotClosed
   | stagedWordDepthLimit
+  | stagedBoolTypeMismatch (expected actual : Ty)
+  | stagedBoolExpressionNotClosed
+  | stagedBoolDepthLimit
   | matchHiddenOwnerMismatch
       (expected actual : Resolved.DeclarationId)
   | duplicateMatchHidden (id : Resolved.LocalId)
@@ -498,6 +503,14 @@ structure StagedWordEvaluation where
   consumedRequirements : List RequirementId
   deriving Repr, DecidableEq
 
+/-- A closed staged Bool and the exact literal obligations consumed while
+computing it.  Boolean staging is deliberately limited to builtin constants,
+signed integer comparisons, transparent groups, and closed conditionals. -/
+structure StagedBoolEvaluation where
+  value : Bool
+  consumedRequirements : List RequirementId
+  deriving Repr, DecidableEq
+
 private inductive StagedIntegerBinaryOperation where
   | add
   | sub
@@ -520,15 +533,19 @@ private inductive StagedIntegerComparison where
   | eq
   | lt
 
-private def StagedIntegerComparison.function :
-    StagedIntegerComparison → BuiltinFunctionId
-  | .eq => .integerEq
-  | .lt => .integerLt
+private def stagedIntegerComparison? :
+    BuiltinFunctionId → Option StagedIntegerComparison
+  | .integerEq => some .eq
+  | .integerLt => some .lt
+  | _ => none
 
 private def applyStagedIntegerComparison :
     StagedIntegerComparison → Int → Int → Bool
   | .eq, left, right => decide (left = right)
   | .lt, left, right => decide (left < right)
+
+private def builtinBooleanSpelling (value : Bool) : String :=
+  if value then "true" else "false"
 
 private def validateBuiltinFunctionArgumentTypesWith {error : Type}
     (lift : Error → error) (source : TypedSource)
@@ -677,6 +694,23 @@ private def evaluateStagedIntegerFuelWith {error : Type}
                   fuel inner
               else
                 failWith lift site (.requirementsPresent node.requirements)
+          | .conditional condition thenBranch elseBranch => do
+              unless node.requirements.isEmpty do
+                failWith lift site (.requirementsPresent node.requirements)
+              let condition ← evaluateStagedBoolFuelWith lift
+                solvedRequirements source fuel condition
+              let thenBranch ← evaluateStagedIntegerFuelWith lift
+                solvedRequirements source fuel thenBranch
+              let elseBranch ← evaluateStagedIntegerFuelWith lift
+                solvedRequirements source fuel elseBranch
+              pure {
+                value := if condition.value then thenBranch.value
+                  else elseBranch.value
+                consumedRequirements :=
+                  condition.consumedRequirements ++
+                  thenBranch.consumedRequirements ++
+                  elseBranch.consumedRequirements
+              }
           | _ =>
               failWith lift site .stagedIntegerExpressionNotClosed
 
@@ -729,8 +763,98 @@ private def evaluateStagedWordFuelWith {error : Type}
                   inner
               else
                 failWith lift site (.requirementsPresent node.requirements)
+          | .conditional condition thenBranch elseBranch => do
+              unless node.requirements.isEmpty do
+                failWith lift site (.requirementsPresent node.requirements)
+              let condition ← evaluateStagedBoolFuelWith lift
+                solvedRequirements source fuel condition
+              let thenBranch ← evaluateStagedWordFuelWith lift
+                solvedRequirements source fuel thenBranch
+              let elseBranch ← evaluateStagedWordFuelWith lift
+                solvedRequirements source fuel elseBranch
+              pure {
+                value := if condition.value then thenBranch.value
+                  else elseBranch.value
+                consumedRequirements :=
+                  condition.consumedRequirements ++
+                  thenBranch.consumedRequirements ++
+                  elseBranch.consumedRequirements
+              }
           | _ =>
               failWith lift site .stagedWordExpressionNotClosed
+
+private def evaluateStagedBoolFuelWith {error : Type}
+    (lift : Error → error) (solvedRequirements : List SolvedRequirement)
+    (source : TypedSource) :
+    Nat → ExpressionId → Except error StagedBoolEvaluation
+  | 0, id =>
+      failWith lift (.occurrence id.occurrence) .stagedBoolDepthLimit
+  | fuel + 1, id => do
+      let node ← (lookupExpression source id).mapError lift
+      let site := ErrorSite.occurrence id.occurrence
+      match node.form with
+      | .call callee arguments (.builtinFunction function) =>
+          match stagedIntegerComparison? function with
+          | some comparison => do
+              validateBuiltinFunctionCallWith lift source node callee arguments
+                function
+              match arguments with
+              | [left, right] =>
+                  let left ← evaluateStagedIntegerFuelWith lift
+                    solvedRequirements source fuel left
+                  let right ← evaluateStagedIntegerFuelWith lift
+                    solvedRequirements source fuel right
+                  pure {
+                    value := applyStagedIntegerComparison comparison left.value
+                      right.value
+                    consumedRequirements := left.consumedRequirements ++
+                      right.consumedRequirements
+                  }
+              | _ =>
+                  failWith lift site
+                    (.builtinFunctionArgumentArityMismatch function 2
+                      arguments.length)
+          | none => do
+              unless node.coercions.isEmpty do
+                failWith lift site (.coercionsPresent node.coercions)
+              if node.type != Ty.bool then
+                failWith lift site (.stagedBoolTypeMismatch .bool node.type)
+              unless node.requirements.isEmpty do
+                failWith lift site (.requirementsPresent node.requirements)
+              failWith lift site .stagedBoolExpressionNotClosed
+      | form => do
+          unless node.coercions.isEmpty do
+            failWith lift site (.coercionsPresent node.coercions)
+          if node.type != Ty.bool then
+            failWith lift site (.stagedBoolTypeMismatch .bool node.type)
+          unless node.requirements.isEmpty do
+            failWith lift site (.requirementsPresent node.requirements)
+          match form with
+          | .reference name (.builtinBoolean value) =>
+              let expected := builtinBooleanSpelling value
+              if name = expected then
+                pure { value, consumedRequirements := [] }
+              else
+                failWith lift site
+                  (.builtinBooleanSpellingMismatch value expected name)
+          | .group inner =>
+              evaluateStagedBoolFuelWith lift solvedRequirements source fuel
+                inner
+          | .conditional condition thenBranch elseBranch => do
+              let condition ← evaluateStagedBoolFuelWith lift solvedRequirements
+                source fuel condition
+              let thenBranch ← evaluateStagedBoolFuelWith lift
+                solvedRequirements source fuel thenBranch
+              let elseBranch ← evaluateStagedBoolFuelWith lift
+                solvedRequirements source fuel elseBranch
+              pure {
+                value := if condition.value then thenBranch.value
+                  else elseBranch.value
+                consumedRequirements := condition.consumedRequirements ++
+                  thenBranch.consumedRequirements ++
+                  elseBranch.consumedRequirements
+              }
+          | _ => failWith lift site .stagedBoolExpressionNotClosed
 
 end
 
@@ -753,6 +877,16 @@ def evaluateStagedWord (solvedRequirements : List SolvedRequirement)
   evaluateStagedWordFuelWith (fun error => error) solvedRequirements source
     (source.nodes.length + 1) id
 
+/-- Evaluate the closed staged-Bool fragment used by integer and Word
+conditionals.  All three conditional children are validated under the same
+finite node-derived depth bound even though only one branch supplies the
+result, preserving declaration-wide exact requirement accounting. -/
+def evaluateStagedBool (solvedRequirements : List SolvedRequirement)
+    (source : TypedSource) (id : ExpressionId) :
+    Except Error StagedBoolEvaluation :=
+  evaluateStagedBoolFuelWith (fun error => error) solvedRequirements source
+    (source.nodes.length + 1) id
+
 private def lowerWordFromIntegerWith {error : Type} (lift : Error → error)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
     (fuel : Nat) (node : ExpressionNode) (callee : ExpressionId)
@@ -772,29 +906,15 @@ private def lowerWordFromIntegerWith {error : Type} (lift : Error → error)
         (.builtinFunctionArgumentArityMismatch .wordFromInteger 1
           arguments.length)
 
-private def lowerStagedIntegerComparisonWith {error : Type}
-    (lift : Error → error)
+private def lowerStagedBoolWith {error : Type} (lift : Error → error)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
-    (fuel : Nat) (node : ExpressionNode) (callee : ExpressionId)
-    (arguments : List ExpressionId) (comparison : StagedIntegerComparison) :
-    Except error LoweredExpression := do
-  let function := comparison.function
-  validateBuiltinFunctionCallWith lift source node callee arguments function
-  match arguments with
-  | [left, right] =>
-      let left ← evaluateStagedIntegerFuelWith lift solvedRequirements source
-        fuel left
-      let right ← evaluateStagedIntegerFuelWith lift solvedRequirements source
-        fuel right
-      pure {
-        resolved := .bool
-          (applyStagedIntegerComparison comparison left.value right.value)
-        consumedRequirements := left.consumedRequirements ++
-          right.consumedRequirements
-      }
-  | _ =>
-      failWith lift (.occurrence node.id.occurrence)
-        (.builtinFunctionArgumentArityMismatch function 2 arguments.length)
+    (fuel : Nat) (id : ExpressionId) : Except error LoweredExpression := do
+  let evaluated ← evaluateStagedBoolFuelWith lift solvedRequirements source fuel
+    id
+  pure {
+    resolved := .bool evaluated.value
+    consumedRequirements := evaluated.consumedRequirements
+  }
 
 private def eraseRequirement? (target : RequirementId) :
     List RequirementId → Option (List RequirementId)
@@ -1130,12 +1250,10 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
       | .call callee arguments (.builtinFunction .wordFromInteger) =>
           lowerWordFromIntegerWith lift solvedRequirements source fuel node
             callee arguments
-      | .call callee arguments (.builtinFunction .integerEq) =>
-          lowerStagedIntegerComparisonWith lift solvedRequirements source fuel
-            node callee arguments .eq
-      | .call callee arguments (.builtinFunction .integerLt) =>
-          lowerStagedIntegerComparisonWith lift solvedRequirements source fuel
-            node callee arguments .lt
+      | .call _ _ (.builtinFunction .integerEq) =>
+          lowerStagedBoolWith lift solvedRequirements source (fuel + 1) id
+      | .call _ _ (.builtinFunction .integerLt) =>
+          lowerStagedBoolWith lift solvedRequirements source (fuel + 1) id
       | _ =>
           match node.coercions with
           | [] =>
