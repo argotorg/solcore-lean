@@ -290,6 +290,24 @@ link-depth fuel.  Staged coercions, required unary/binary implementation-method
 operations, marked implementation methods, indirect calls and recursion remain
 later boundaries.
 
+ADR-0362 executes exact `Coerce<From, To>.coerce` paths for
+Core-representable staged values.  The staged evaluator clears only the current
+node's path while evaluating its base, validates each policy plan against the
+typed source/target endpoints and exact primary-plus-method requirement list,
+then checks the carrier type before and after every source-ordered step.  It
+reuses the ordinary authoritative coercion plan, including canonical evidence,
+selected-method signature checks, constrained method evidence, and nested
+generic witness forwarding; endpoint types never replace the selected method
+body's behavior.  Each closed application lowers and re-infers in the empty
+Core context, runs under a structural bound with an empty-store requirement,
+and must project back into Unit, Bool, Word or a supported product.  Caller or
+callee requirements and detached-method requirements remain in their own
+ledgers, and whole-program method/call expansion retains the shared active-key
+stack and decreasing link-depth fuel.  Marked arguments, marked results and
+callee-local conversions are covered; bare-`integer` coercions, staged required
+unary/binary operations and direct marked implementation-method execution
+remain later slices.
+
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
 expression and statement nodes; complete selected declaration instantiations;

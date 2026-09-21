@@ -178,8 +178,16 @@ bare-`integer` and Unit/Bool/Word/product staged-call paths.  Call-owned
 requirements are checked in specialized predicate order, assumption rows are
 closed by unique incoming implementation witnesses, and concrete evidence is
 forwarded through nested generic relays without becoming a Core value.  Caller
-and callee ledgers remain separate.  Staged coercion or required-operator
-execution, marked implementation methods, indirect calls, mutation, nominal or
+and callee ledgers remain separate.  ADR-0362 now executes exact
+Core-representable coercion paths on staged call arguments, results, and
+callee-local expressions.  It reuses the ordinary authoritative
+`Coerce.coerce` plan, validates exact endpoints and primary-plus-method
+requirements, forwards concrete evidence through nested generic relays, and
+runs the resulting closed typed method application under structural fuel with
+an empty-store and staged-carrier boundary.  Caller/callee and detached-method
+ledgers remain separate, and linking shares the existing active-key stack and
+decreasing link fuel.  Required-operator execution, direct staged invocation
+of marked implementation methods, indirect calls, mutation, nominal or
 functional values, value-indexed memoization, every form of recursion and
 compile-time Fibonacci remain later.
 
@@ -6038,6 +6046,39 @@ implementation methods, indirect calls, mutation, nominal/function/proxy/index
 values, unsupported `Comptime`-classified source forms, value-indexed
 memoization, direct and mutual recursion, selected-branch recursion, and
 compile-time Fibonacci remain deferred.
+
+ADR-0362 adds exact coercion execution to the Core-representable staged-value
+path.  A node with a typed coercion path first evaluates its coercion-cleared
+base, then applies each edge in source order.  Source Core checks the policy's
+declared Core endpoints against the retained source endpoints, checks its
+consumed requirements against the edge's exact primary-plus-method list, checks
+the carrier type before and after every edge, and finally checks the node's
+authoritative post-coercion type.  Base requirements precede coercion
+requirements, and the owning function reconciles that complete ledger once.
+
+The linker deliberately reuses the existing authoritative `Coerce.coerce`
+plan.  The primary predicate, ordered method predicates, solved evidence,
+selected implementation, and one-input/one-result method signature therefore
+receive the same validation as ordinary lowering.  A generic assumption must
+again close to a unique concrete witness, allowing evidence to pass through a
+nested generic staged relay before a callee-local conversion executes.  The
+selected method body, rather than its endpoint types, defines the converted
+value.
+
+Each conversion reifies its input carrier as a closed resolved constant,
+builds the capture-free selected method application, lowers it in an empty
+context, and independently re-infers the exact target Core type.  Core
+execution uses a structural bound over the complete resolved term, begins with
+an empty store, requires an empty final store, and projects the result back only
+into Unit, Bool, Word, or a recursively supported product.  Faults, fuel
+exhaustion, store changes, and values outside that carrier reject.  The caller
+or callee ledger remains separate from the detached method ledger, while
+detached linking and nested calls retain the shared active-key stack and
+decreasing link fuel.  Regressions cover marked-result conversion, composed
+marked-argument and result conversions, and nested generic evidence forwarding.
+Bare-`integer` coercions, staged required unary/binary execution, direct staged
+invocation of marked implementation methods, indirect calls and recursion
+remain later boundaries.
 
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
