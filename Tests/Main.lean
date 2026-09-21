@@ -1271,6 +1271,8 @@ import Solcore.Test.SourceTypedIRInference
 import Solcore.Test.SourceStageClassification
 import Solcore.Test.SourceStagedValues
 import Solcore.Test.SourceStagedValuesTamper
+import Solcore.Test.SourceStagedValueCalls
+import Solcore.Test.SourceStagedValueCallsTamper
 import Solcore.Test.SourceSpecialization
 import Solcore.Test.SourceSpecializationWorklist
 import Solcore.Test.SourceCoreElaboration
@@ -6073,6 +6075,8 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceStageClassification.testSourceStageClassification
   SourceStagedValues.testSourceStagedValues
   SourceStagedValuesTamper.testSourceStagedValuesTamper
+  SourceStagedValueCalls.testSourceStagedValueCalls
+  SourceStagedValueCallsTamper.testSourceStagedValueCallsTamper
   SourceSpecialization.testSourceSpecialization
   SourceSpecializationWorklist.testSourceSpecializationWorklist
   SourceCoreElaboration.testSourceCoreElaboration

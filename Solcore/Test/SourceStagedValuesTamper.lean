@@ -30,6 +30,12 @@ private def fixtureSource : String := String.intercalate "\n" [
   "function stagedChoice() returns (comptime<Word>) {",
   "  return true ? 1 : 2;",
   "}",
+  "function stagedIdentity(comptime value: Word) returns (comptime<Word>) {",
+  "  return value;",
+  "}",
+  "function stagedCaller() returns (comptime<Word>) {",
+  "  return stagedIdentity(1);",
+  "}",
   "function unrelated() returns (comptime<Word>) { return 3; }"
 ]
 
@@ -165,6 +171,75 @@ private def testGuardTypePrecedesBranchStage
           error.reason = .stagedValueTypeMismatch .bool .word))
         s!"branch-stage error preceded guard-type error: {reprStr error}"
 
+private def evaluateCallerWith
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (plan : SourceCoreElaboration.StagedValueCallPlan
+      SourceCoreElaboration.Error) :
+    Except SourceCoreElaboration.Error SourceStagedValue.Value :=
+  SourceCoreElaboration.evaluateStagedValueFunctionWith
+    (fun error => error) (fun _ _ _ _ => pure plan) specialized []
+
+private def testCallPolicyValidation (program : CheckedProgram) : IO Unit := do
+  let specialized ← specializedNamed program "stagedCaller"
+  let call ← returnedExpression specialized
+  let valid : SourceCoreElaboration.StagedValueCallPlan
+      SourceCoreElaboration.Error := {
+    argumentTypes := [.word]
+    resultType := .word
+    consumedRequirements := []
+    invoke := fun
+      | [.word value] => pure (.word value)
+      | values => .error {
+          site := .occurrence call.occurrence
+          reason := .stagedValueArgumentArityMismatch 1 values.length
+        }
+  }
+  match evaluateCallerWith specialized valid with
+  | .ok (.word value) =>
+      assertTrue (value == Core.Word.ofNatModulo 1)
+        "valid staged call policy changed its argument value"
+  | result => throw (IO.userError
+      s!"valid staged call policy failed: {reprStr result}")
+
+  let wrongRequirements := {
+    valid with consumedRequirements := [{ index := 999 }]
+  }
+  match evaluateCallerWith specialized wrongRequirements with
+  | .error error =>
+      assertTrue (decide (error.site = .occurrence call.occurrence ∧
+          error.reason = .stagedValueCallRequirementsMismatch []
+            [{ index := 999 }]))
+        s!"wrong staged call requirement diagnostic: {reprStr error}"
+  | result => throw (IO.userError
+      s!"staged call accepted forged requirements: {reprStr result}")
+
+  let wrongArity := { valid with argumentTypes := [] }
+  match evaluateCallerWith specialized wrongArity with
+  | .error error =>
+      assertTrue (decide (error.site = .occurrence call.occurrence ∧
+          error.reason = .stagedValueCallArgumentArityMismatch 0 1))
+        s!"wrong staged call plan-arity diagnostic: {reprStr error}"
+  | result => throw (IO.userError
+      s!"staged call accepted a forged plan arity: {reprStr result}")
+
+  let wrongResultType := { valid with resultType := .bool }
+  match evaluateCallerWith specialized wrongResultType with
+  | .error error =>
+      assertTrue (decide (error.site = .occurrence call.occurrence ∧
+          error.reason = .stagedValueCallResultTypeMismatch .word .bool))
+        s!"wrong staged call result-plan diagnostic: {reprStr error}"
+  | result => throw (IO.userError
+      s!"staged call accepted a forged result type: {reprStr result}")
+
+  let wrongValue := { valid with invoke := fun _ => pure (.bool true) }
+  match evaluateCallerWith specialized wrongValue with
+  | .error error =>
+      assertTrue (decide (error.site = .occurrence call.occurrence ∧
+          error.reason = .stagedValueTypeMismatch .word .bool))
+        s!"wrong staged call result-value diagnostic: {reprStr error}"
+  | result => throw (IO.userError
+      s!"staged call accepted a forged result value: {reprStr result}")
+
 /-- Fix the defensive ADR-0358 rejection and validation-order boundaries. -/
 def testSourceStagedValuesTamper : IO Unit := do
   let program ← checkedProgram
@@ -172,5 +247,6 @@ def testSourceStagedValuesTamper : IO Unit := do
   testForgedKeyRejected program
   testTotalArityReported program
   testGuardTypePrecedesBranchStage program
+  testCallPolicyValidation program
 
 end Tests.SourceStagedValuesTamper
