@@ -174,6 +174,25 @@ private def testCoercionPathValidation : IO Unit := do
   assertTrue (decide (exact.rawType = .unit ∧ exact.hasValidCoercionPath))
     "an uncoerced expression did not use its stored type as its raw type"
 
+private def testIntegerLiteralFlexibleSubstitution : IO Unit := do
+  let resolution : IntegerLiteralResolution := {
+    rawValue := 42
+    targetType := variable0
+    requirement := requirementId
+  }
+  let substitution : TypeSystem.Substitution := [(⟨0⟩, .word)]
+  match (ExpressionForm.integerLiteral (.decimal "42") resolution)
+      |>.applySubstitution substitution with
+  | .integerLiteral source closed =>
+      assertTrue (decide (source = .decimal "42" ∧
+          closed.rawValue = 42 ∧
+          closed.targetType = .word ∧
+          closed.requirement = requirementId ∧
+          closed.predicate = ProgramSignatures.builtinIntPredicate .word))
+        "flexible substitution changed integer literal provenance or missed its target"
+  | _ => throw (IO.userError
+      "flexible substitution changed the integer-literal expression form")
+
 private def testInferenceStateScaffolding : IO Unit := do
   let locals : TypeSystem.Environment :=
     [("first", .mono .word), ("second", .mono .bool)]
@@ -235,6 +254,7 @@ private def testInferenceStateScaffolding : IO Unit := do
 def testSourceTypedIR : IO Unit := do
   testFinalSubstitutionPreservesIdentity
   testCoercionPathValidation
+  testIntegerLiteralFlexibleSubstitution
   testInferenceStateScaffolding
 
 end Tests.SourceTypedIR

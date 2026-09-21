@@ -8,6 +8,34 @@ namespace Solcore.Frontend.SourceSpecialization
 
 open SourceInference TypeSystem
 
+@[simp] theorem applyIntegerLiteralResolution_rawValue
+    (substitution : ParameterSubstitution)
+    (resolution : IntegerLiteralResolution) :
+    (applyIntegerLiteralResolution substitution resolution).rawValue =
+      resolution.rawValue := by
+  rfl
+
+@[simp] theorem applyIntegerLiteralResolution_targetType
+    (substitution : ParameterSubstitution)
+    (resolution : IntegerLiteralResolution) :
+    (applyIntegerLiteralResolution substitution resolution).targetType =
+      substitution.apply resolution.targetType := by
+  rfl
+
+@[simp] theorem applyIntegerLiteralResolution_requirement
+    (substitution : ParameterSubstitution)
+    (resolution : IntegerLiteralResolution) :
+    (applyIntegerLiteralResolution substitution resolution).requirement =
+      resolution.requirement := by
+  rfl
+
+theorem applyIntegerLiteralResolution_predicate
+    (substitution : ParameterSubstitution)
+    (resolution : IntegerLiteralResolution) :
+    (applyIntegerLiteralResolution substitution resolution).predicate =
+      ProgramPredicate.applyParameters substitution resolution.predicate := by
+  rfl
+
 @[simp] theorem applyScheme_quantified
     (substitution : ParameterSubstitution) (scheme : Scheme) :
     (applyScheme substitution scheme).quantified = scheme.quantified := by

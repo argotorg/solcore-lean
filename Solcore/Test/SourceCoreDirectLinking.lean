@@ -2517,6 +2517,68 @@ private def testMalformedCoercionEvidence
   | result => throw (IO.userError
       s!"a coercion predicate/path mismatch was accepted: {reprStr result}")
 
+private def testBuiltinIntegerLiteralLinking : IO Unit := do
+  let spelling :=
+    "115792089237316195423570985008687907853269984665640564039457584007913129639937"
+  let program ← checkedProgramOf
+    ("function literal() returns (Word) { return " ++ spelling ++ "; }")
+  let signature ← signatureNamed program "literal"
+  let function ← functionFor program signature
+  let expression ← match function.typedBody.roots with
+    | [.statement statement] =>
+        match function.typedBody.lookupStatement? statement with
+        | some { form := .returnStmt (some expression), .. } => pure expression
+        | _ => throw (IO.userError
+            "linked integer fixture root is not a valued return")
+    | _ => throw (IO.userError
+        "linked integer fixture does not have one statement root")
+  let source ← match function.typedBody.lookupExpression? expression with
+    | some { form := .literal source, .. } => pure source
+    | _ => throw (IO.userError
+        "linked integer fixture lost its source literal")
+  let requirement : RequirementId := ⟨412⟩
+  let resolution : IntegerLiteralResolution := {
+    rawValue := Core.wordModulus + 1
+    targetType := .word
+    requirement
+  }
+  let predicate := resolution.predicate
+  let replacement : CheckedFunction := {
+    function with
+    solvedRequirements := [{
+      id := requirement
+      predicate
+      evidence := .implementation
+        (.byImpl predicate (.builtin .intWord) [])
+    }]
+    typedBody := {
+      function.typedBody with
+      nodes := function.typedBody.nodes.map fun
+        | .expression node =>
+            if node.id == expression then .expression {
+              node with
+              form := .integerLiteral source resolution
+              requirements := [requirement]
+            } else .expression node
+        | .statement node => .statement node
+    }
+  }
+  let program := replaceFunction program replacement
+  let outcome ← runOrThrow "builtin integer literal" program
+    [monomorphicRequest signature] 1
+  let linked ← linkOrThrow "builtin integer literal" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := signature.id
+    arguments := []
+  }
+  let entry ← match linked.findEntry? key with
+    | some entry => pure entry
+    | none => throw (IO.userError
+        "builtin integer literal lost its linked entry")
+  assertTrue (decide (entry.run? [] 16 =
+      some (.done (.word (word 1)) [])))
+    "direct linking bypassed or changed builtin Int<Word> modulo lowering"
+
 /-- Exercise complete acyclic generic linking, capture-free argument staging,
 runtime input validation, finite-budget and recursion boundaries, proof-only
 trait-evidence forwarding, strict and named operator authority, Ord dispatch,
@@ -2557,5 +2619,6 @@ def testSourceCoreDirectLinking : IO Unit := do
   testCoercionMethodPredicateEvidence
   testMalformedRequirementMetadata program
   testMalformedCoercionEvidence program
+  testBuiltinIntegerLiteralLinking
 
 end Tests.SourceCoreDirectLinking

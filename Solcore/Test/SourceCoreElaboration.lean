@@ -833,6 +833,249 @@ private def testStagedIntegerTypeRejected : IO Unit := do
   expectError "staged integer" function (.binder input.id)
     fun reason => reason == .unsupportedType TypeSystem.Ty.integer
 
+private def intPredicate (target : TypeSystem.Ty) : ProgramPredicate :=
+  ProgramSignatures.builtinIntPredicate target
+
+private def intEvidence (target : TypeSystem.Ty)
+    (implementation : ProgramImplId := .builtin .intWord)
+    (premises : List TypedTraitResolution.Evidence := []) :
+    PredicateEvidence :=
+  .implementation (.byImpl (intPredicate target) implementation premises)
+
+private def integerLiteralCarrier (function : CheckedFunction)
+    (expression : ExpressionId) (source : Syntax.CoreLiteralValue)
+    (resolution : IntegerLiteralResolution)
+    (solved : List SolvedRequirement) : CheckedFunction := {
+  function with
+  solvedRequirements := solved
+  typedBody := changeExpression function.typedBody expression fun node => {
+    node with
+    type := resolution.targetType
+    form := .integerLiteral source resolution
+    requirements := [resolution.requirement]
+  }
+}
+
+private def checkedLiteralCarrier (spelling : String) (rawValue : Nat) :
+    IO (CheckedFunction × ExpressionId × Syntax.CoreLiteralValue ×
+      IntegerLiteralResolution) := do
+  let program ← checkedProgram
+    ("function literal() returns (Word) { return " ++ spelling ++ "; }")
+  let function ← checkedNamed program "literal"
+  let (_, expression) ← rootIds function
+  let source ← match function.typedBody.lookupExpression? expression with
+    | some { form := .literal source, .. } => pure source
+    | _ => throw (IO.userError
+        "manual integer-literal fixture lost its legacy source literal")
+  let resolution : IntegerLiteralResolution := {
+    rawValue
+    targetType := .word
+    requirement := ⟨101⟩
+  }
+  let solved : SolvedRequirement := {
+    id := resolution.requirement
+    predicate := resolution.predicate
+    evidence := intEvidence .word
+  }
+  pure (integerLiteralCarrier function expression source resolution [solved],
+    expression, source, resolution)
+
+private def expectIntegerLiteralError (label : String)
+    (function : CheckedFunction) (expression : ExpressionId)
+    (accept : SourceCoreElaboration.ErrorReason → Bool) : IO Unit :=
+  expectError label function (.occurrence expression.occurrence) accept
+
+private def testIntegerLiteralCarrierExecution : IO Unit := do
+  let modulusSpelling :=
+    "115792089237316195423570985008687907853269984665640564039457584007913129639936"
+  let (zeroFunction, _, _, _) ←
+    checkedLiteralCarrier modulusSpelling Core.wordModulus
+  let zero ← match SourceCoreElaboration.elaborateFunction zeroFunction with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"2^256 integer carrier did not lower: {reprStr error}")
+  assertTrue (decide (zero.resolved = .word (word 0) ∧
+      zero.core = .word (word 0) ∧
+      Core.runStateful 8 (.initial zero.core []) =
+        .done (.word (word 0)) []))
+    "Int.fromInteger Word projection did not reduce 2^256 modulo 2^256"
+  let successorSpelling :=
+    "115792089237316195423570985008687907853269984665640564039457584007913129639937"
+  let (oneFunction, _, _, _) ←
+    checkedLiteralCarrier successorSpelling (Core.wordModulus + 1)
+  let one ← match SourceCoreElaboration.elaborateFunction oneFunction with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"2^256+1 integer carrier did not lower: {reprStr error}")
+  assertTrue (decide (one.resolved = .word (word 1) ∧
+      one.core = .word (word 1) ∧
+      Core.runStateful 8 (.initial one.core []) =
+        .done (.word (word 1)) []))
+    "Int.fromInteger Word projection did not reduce 2^256+1 to one"
+
+private def testIntegerLiteralCoercionComposition : IO Unit := do
+  let (function, expression, _, resolution) ←
+    checkedLiteralCarrier "17" 17
+  let (statement, _) ← rootIds function
+  let coercionRequirement : RequirementId := ⟨103⟩
+  let coercionPredicate : ProgramPredicate := {
+    trait := function.declaration
+    subject := .word
+    arguments := [.bool]
+  }
+  let coercedExpression := withExpression function expression fun node => {
+    node with
+    type := .bool
+    requirements := [resolution.requirement, coercionRequirement]
+    coercions := [{
+      requirement := coercionRequirement
+      source := .word
+      target := .bool
+    }]
+  }
+  let coerced : CheckedFunction := {
+    coercedExpression with
+    type := .function .unit .bool
+    inferredBodyType := .bool
+    solvedRequirements := function.solvedRequirements ++ [{
+      id := coercionRequirement
+      predicate := coercionPredicate
+      evidence := .assumption coercionPredicate
+    }]
+    typedBody := changeStatement coercedExpression.typedBody statement fun node => {
+      node with type := .bool
+    }
+  }
+  let draft ← match
+      SourceCoreElaboration.lowerFunctionBodyWithAllPolicies id
+        SourceCoreElaboration.rejectCalls
+        SourceCoreElaboration.rejectRequiredBinaries
+        executableCoercionPolicy coerced with
+    | .ok draft => pure draft
+    | .error error => throw (IO.userError
+        s!"integer literal did not compose with its coercion path: {reprStr error}")
+  let lowered ← match draft.finalize with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"coerced integer literal did not finalize: {reprStr error}")
+  assertTrue (decide (Core.runStateful 16 (.initial lowered.core []) =
+      .done (.bool true) []))
+    "coercion preparation did not validate the integer carrier at its raw Word type"
+
+private def testMalformedIntegerLiteralCarriers : IO Unit := do
+  let (function, expression, source, resolution) ←
+    checkedLiteralCarrier "17" 17
+  let expected := resolution.predicate
+  let solved : SolvedRequirement := {
+    id := resolution.requirement
+    predicate := expected
+    evidence := intEvidence .word
+  }
+  let changeNode (change : ExpressionNode → ExpressionNode) :=
+    withExpression function expression change
+  let targetMismatch := changeNode fun node => {
+    node with form := .integerLiteral source {
+      resolution with targetType := .bool
+    }
+  }
+  expectIntegerLiteralError "integer target/node mismatch" targetMismatch
+    expression fun reason =>
+      reason == .integerLiteralTargetTypeMismatch .bool .word
+  let requirementsMismatch := changeNode fun node => {
+    node with requirements := []
+  }
+  expectIntegerLiteralError "integer requirement attachment"
+    requirementsMismatch expression fun reason =>
+      reason == .integerLiteralRequirementsMismatch
+        [resolution.requirement] []
+  let extraRequirement : RequirementId := ⟨102⟩
+  let extraRequirements := changeNode fun node => {
+    node with requirements := [resolution.requirement, extraRequirement]
+  }
+  expectIntegerLiteralError "integer extra requirement attachment"
+    extraRequirements expression fun reason =>
+      reason == .integerLiteralRequirementsMismatch
+        [resolution.requirement] [resolution.requirement, extraRequirement]
+  let malformedSource := changeNode fun node => {
+    node with form := .integerLiteral (.decimal "1x") resolution
+  }
+  expectIntegerLiteralError "integer source decoding" malformedSource
+    expression fun reason => reason ==
+      .invalidIntegerLiteralSource (.decimal "1x")
+  let rawMismatch := changeNode fun node => {
+    node with form := .integerLiteral source {
+      resolution with rawValue := 18
+    }
+  }
+  expectIntegerLiteralError "integer decoded value" rawMismatch expression
+    fun reason => reason == .integerLiteralRawValueMismatch 17 18
+  let missing : CheckedFunction := { function with solvedRequirements := [] }
+  expectIntegerLiteralError "integer missing solved row" missing expression
+    fun reason => reason ==
+      .missingIntegerLiteralRequirement resolution.requirement
+  let duplicate : CheckedFunction := {
+    function with solvedRequirements := [solved, solved]
+  }
+  expectIntegerLiteralError "integer duplicate solved row" duplicate expression
+    fun reason => reason ==
+      .duplicateIntegerLiteralRequirements resolution.requirement 2
+  let wrongPredicate := intPredicate .bool
+  let predicateMismatch : CheckedFunction := {
+    function with solvedRequirements := [{
+      solved with predicate := wrongPredicate
+    }]
+  }
+  expectIntegerLiteralError "integer predicate" predicateMismatch expression
+    fun reason => reason == .integerLiteralPredicateMismatch
+      resolution.requirement expected wrongPredicate
+  let evidenceGoalMismatch : CheckedFunction := {
+    function with solvedRequirements := [{
+      solved with evidence := intEvidence .bool
+    }]
+  }
+  expectIntegerLiteralError "integer evidence goal" evidenceGoalMismatch
+    expression fun reason => reason == .integerLiteralEvidenceGoalMismatch
+      resolution.requirement expected (intPredicate .bool)
+  let assumption : CheckedFunction := {
+    function with solvedRequirements := [{
+      solved with evidence := .assumption expected
+    }]
+  }
+  expectIntegerLiteralError "integer assumption evidence" assumption expression
+    fun reason => reason ==
+      .unresolvedIntegerLiteralEvidence resolution.requirement
+  let wrongImplementation : ProgramImplId := .builtin .intInteger
+  let implementationMismatch : CheckedFunction := {
+    function with solvedRequirements := [{
+      solved with evidence := intEvidence .word wrongImplementation
+    }]
+  }
+  expectIntegerLiteralError "integer implementation" implementationMismatch
+    expression fun reason => reason == .integerLiteralImplementationMismatch
+      resolution.requirement (.builtin .intWord) wrongImplementation
+  let premise : TypedTraitResolution.Evidence :=
+    .byImpl expected (.builtin .intWord) []
+  let premisesPresent : CheckedFunction := {
+    function with solvedRequirements := [{
+      solved with evidence := intEvidence .word (.builtin .intWord) [premise]
+    }]
+  }
+  expectIntegerLiteralError "integer premises" premisesPresent expression
+    fun reason => reason == .integerLiteralPremiseCountMismatch
+      resolution.requirement 0 1
+  let stagedResolution : IntegerLiteralResolution := {
+    resolution with targetType := .integer
+  }
+  let stagedPredicate := stagedResolution.predicate
+  let staged := integerLiteralCarrier function expression source
+    stagedResolution [{
+      id := stagedResolution.requirement
+      predicate := stagedPredicate
+      evidence := intEvidence .integer (.builtin .intInteger)
+    }]
+  expectIntegerLiteralError "staged integer literal" staged expression
+    fun reason => reason == .unsupportedType TypeSystem.Ty.integer
+
 /-- Exercise the complete first source-to-Core lowering profile and every
 staged boundary that must reject explicitly. -/
 def testSourceCoreElaboration : IO Unit := do
@@ -851,5 +1094,8 @@ def testSourceCoreElaboration : IO Unit := do
   testTypeMismatchAndUnconsumedRequirement function
   testOverflowLiteral
   testStagedIntegerTypeRejected
+  testIntegerLiteralCarrierExecution
+  testIntegerLiteralCoercionComposition
+  testMalformedIntegerLiteralCarriers
 
 end Tests.SourceCoreElaboration

@@ -78,6 +78,26 @@ inductive ErrorReason where
   | blockFallthrough
   | conditionalBranchFallthrough (branch : ConditionalBranch)
   | invalidWordLiteral (literal : Syntax.CoreLiteralValue)
+  | integerLiteralTargetTypeMismatch (target node : Ty)
+  | integerLiteralRequirementsMismatch
+      (expected actual : List RequirementId)
+  | invalidIntegerLiteralSource (literal : Syntax.CoreLiteralValue)
+  | integerLiteralRawValueMismatch (decoded recorded : Nat)
+  | missingIntegerLiteralRequirement (requirement : RequirementId)
+  | duplicateIntegerLiteralRequirements
+      (requirement : RequirementId) (count : Nat)
+  | integerLiteralPredicateMismatch
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | integerLiteralEvidenceGoalMismatch
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | unresolvedIntegerLiteralEvidence (requirement : RequirementId)
+  | integerLiteralImplementationMismatch
+      (requirement : RequirementId)
+      (expected actual : ProgramImplId)
+  | integerLiteralPremiseCountMismatch
+      (requirement : RequirementId) (expected actual : Nat)
   | unknownLocal (id : Resolved.LocalId)
   | expressionDepthLimit
   | statementDepthLimit
@@ -321,6 +341,81 @@ private def ensureTypeWith {error : Type} (lift : Error → error)
   else
     failWith lift site (.typedNodeTypeMismatch expected actual)
 
+private def exactIntegerLiteralRequirementWith {error : Type}
+    (lift : Error → error) (site : ErrorSite)
+    (solvedRequirements : List SolvedRequirement)
+    (requirement : RequirementId) : Except error SolvedRequirement :=
+  let candidates := solvedRequirements.filter fun solved =>
+    decide (solved.id = requirement)
+  match candidates with
+  | [] => failWith lift site (.missingIntegerLiteralRequirement requirement)
+  | [solved] => pure solved
+  | solved =>
+      failWith lift site
+        (.duplicateIntegerLiteralRequirements requirement solved.length)
+
+/-- Validate the complete builtin `Int.fromInteger` contract before erasing it
+to the runtime Word constant.  In particular, no caller-supplied lowering
+policy can manufacture or replace the evidence owned by this typed form. -/
+private def lowerIntegerLiteralWith {error : Type} (lift : Error → error)
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue)
+    (resolution : IntegerLiteralResolution) :
+    Except error LoweredExpression := do
+  let site := ErrorSite.occurrence node.id.occurrence
+  if resolution.targetType != node.type then
+    failWith lift site
+      (.integerLiteralTargetTypeMismatch resolution.targetType node.type)
+  else if node.requirements != [resolution.requirement] then
+    failWith lift site
+      (.integerLiteralRequirementsMismatch [resolution.requirement]
+        node.requirements)
+  else
+    let decoded ← match numericLiteralValue? source with
+      | none => failWith lift site (.invalidIntegerLiteralSource source)
+      | some value => pure value
+    if decoded != resolution.rawValue then
+      failWith lift site
+        (.integerLiteralRawValueMismatch decoded resolution.rawValue)
+    else
+      -- This keeps `Int<integer>` staged: `lowerType` rejects `integer`
+      -- before any runtime constant can be constructed.
+      ensureTypeWith lift site .word resolution.targetType
+      let expected := resolution.predicate
+      let solved ← exactIntegerLiteralRequirementWith lift site
+        solvedRequirements resolution.requirement
+      if solved.predicate != expected then
+        failWith lift site
+          (.integerLiteralPredicateMismatch resolution.requirement expected
+            solved.predicate)
+      else if solved.evidence.goal != expected then
+        failWith lift site
+          (.integerLiteralEvidenceGoalMismatch resolution.requirement expected
+            solved.evidence.goal)
+      else
+        match solved.evidence with
+        | .assumption _ =>
+            failWith lift site
+              (.unresolvedIntegerLiteralEvidence resolution.requirement)
+        | .implementation (.byImpl _ implementation premises) =>
+            let expectedImplementation : ProgramImplId :=
+              .builtin .intWord
+            if implementation != expectedImplementation then
+              failWith lift site
+                (.integerLiteralImplementationMismatch
+                  resolution.requirement expectedImplementation
+                  implementation)
+            else if !premises.isEmpty then
+              failWith lift site
+                (.integerLiteralPremiseCountMismatch
+                  resolution.requirement 0 premises.length)
+            else
+              pure {
+                resolved := .word
+                  (Core.Word.ofNatModulo resolution.rawValue)
+                consumedRequirements := [resolution.requirement]
+              }
+
 private def eraseRequirement? (target : RequirementId) :
     List RequirementId → Option (List RequirementId)
   | [] => none
@@ -449,11 +544,14 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (scope : Resolved.Context)
     (recurse : ExpressionId → Except error LoweredExpression)
     (node : ExpressionNode) : Except error LoweredExpression :=
   let id := node.id
   match node.form with
+  | .integerLiteral source resolution =>
+      lowerIntegerLiteralWith lift solvedRequirements node source resolution
   | .call callee arguments resolution => do
       let plan ← onCall scope node callee arguments resolution
       if plan.consumedRequirements != node.requirements then
@@ -570,6 +668,9 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
               | none =>
                   failWith lift (.occurrence id.occurrence)
                     (.invalidWordLiteral literal)
+          | .integerLiteral _ _ =>
+              failWith lift (.occurrence id.occurrence)
+                (.requirementsPresent node.requirements)
           | .reference _ (.local binder) =>
               if scope.ids.contains binder then
                 pure {
@@ -632,6 +733,7 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
+    (solvedRequirements : List SolvedRequirement)
     (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
     (id : ExpressionId) :
     Except error LoweredExpression :=
@@ -640,11 +742,11 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
   | fuel + 1 => do
       let node ← (lookupExpression source id).mapError lift
       let recurse := lowerExpressionFuelWith lift onCall onRequiredUnary
-        onRequiredBinary onCoercion fuel source scope
+        onRequiredBinary onCoercion solvedRequirements fuel source scope
       match node.coercions with
       | [] =>
           lowerExpressionNodeWith lift onCall onRequiredUnary onRequiredBinary
-            source scope recurse node
+            solvedRequirements source scope recurse node
       | first :: rest => do
           let prepared ← prepareCoercionPathWith lift node first rest
           let plans ← checkedCoercionPlansWith lift onCoercion scope node
@@ -656,7 +758,7 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
             coercions := []
           }
           let base ← lowerExpressionNodeWith lift onCall onRequiredUnary
-            onRequiredBinary source scope recurse baseNode
+            onRequiredBinary solvedRequirements source scope recurse baseNode
           applyCoercionPlans base.resolved base.consumedRequirements plans
 
 private def lowerExpressionAsWith {error : Type} (lift : Error → error)
@@ -664,13 +766,14 @@ private def lowerExpressionAsWith {error : Type} (lift : Error → error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
+    (solvedRequirements : List SolvedRequirement)
     (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
     (expected : Core.Ty) (id : ExpressionId) :
     Except error LoweredExpression := do
   let node ← (lookupExpression source id).mapError lift
   ensureTypeWith lift (.occurrence id.occurrence) expected node.type
   lowerExpressionFuelWith lift onCall onRequiredUnary onRequiredBinary
-    onCoercion fuel source scope id
+    onCoercion solvedRequirements fuel source scope id
 
 private def statementRoots : List NodeId → Except Error (List StatementId)
   | [] => .ok []
@@ -690,7 +793,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
-    (onCoercion : CoercionElaborator error) :
+    (onCoercion : CoercionElaborator error)
+    (solvedRequirements : List SolvedRequirement) :
     Nat → TypedSource → Resolved.Context → Core.Ty → ErrorSite →
       ErrorReason → List StatementId → Except error LoweredExpression
   | _, _, _, _, fallthroughSite, fallthroughReason, [] =>
@@ -716,10 +820,10 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
             | none => failWith lift site .uninitializedLet
             | some initializer =>
                 lowerExpressionAsWith lift onCall onRequiredUnary
-                  onRequiredBinary onCoercion fuel source scope binderType
-                  initializer
+                  onRequiredBinary onCoercion solvedRequirements fuel source
+                  scope binderType initializer
           let body ← lowerStatementsFuelWith lift onCall onRequiredUnary
-            onRequiredBinary onCoercion fuel source
+            onRequiredBinary onCoercion solvedRequirements fuel source
             ((binder.id, binderType) :: scope) expected fallthroughSite
             fallthroughReason rest
           pure {
@@ -743,7 +847,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
                 failWith lift site (.typedNodeTypeMismatch expected .unit)
           | some value =>
               lowerExpressionAsWith lift onCall onRequiredUnary
-                onRequiredBinary onCoercion fuel source scope expected value
+                onRequiredBinary onCoercion solvedRequirements fuel source
+                scope expected value
     | .ifThen condition thenBody elseBody => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .ifThen)
@@ -753,16 +858,16 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           | some elseBody => do
               ensureTypeWith lift site expected node.type
               let condition ← lowerExpressionAsWith lift onCall
-                onRequiredUnary onRequiredBinary onCoercion fuel source scope
-                .bool condition
+                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
+                fuel source scope .bool condition
               let thenBranch ← lowerStatementsFuelWith lift onCall
-                onRequiredUnary onRequiredBinary onCoercion fuel source scope
-                expected site (.conditionalBranchFallthrough .thenBranch)
-                thenBody
+                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
+                fuel source scope expected site
+                (.conditionalBranchFallthrough .thenBranch) thenBody
               let elseBranch ← lowerStatementsFuelWith lift onCall
-                onRequiredUnary onRequiredBinary onCoercion fuel source scope
-                expected site (.conditionalBranchFallthrough .elseBranch)
-                elseBody
+                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
+                fuel source scope expected site
+                (.conditionalBranchFallthrough .elseBranch) elseBody
               pure {
                 resolved := .ifE condition.resolved thenBranch.resolved
                   elseBranch.resolved
@@ -776,7 +881,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
         else
           ensureTypeWith lift site expected node.type
           lowerStatementsFuelWith lift onCall onRequiredUnary onRequiredBinary
-            onCoercion fuel source scope expected site .blockFallthrough body
+            onCoercion solvedRequirements fuel source scope expected site
+            .blockFallthrough body
     | .expression _ _ =>
         failWith lift site (.unsupportedStatement .expression)
 
@@ -870,8 +976,9 @@ def lowerFunctionBodyWithRuntimePolicies {error : Type} (lift : Error → error)
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
     let lowered ← lowerStatementsFuelWith lift onCall onRequiredUnary
-      onRequiredBinary onCoercion (source.nodes.length + 1) source inputs
-      expected fallthroughSite .statementListFallthrough roots
+      onRequiredBinary onCoercion function.solvedRequirements
+      (source.nodes.length + 1) source inputs expected fallthroughSite
+      .statementListFallthrough roots
     let solvedRequirements :=
       function.solvedRequirements.map fun requirement => requirement.id
     let unconsumedRequirements ←

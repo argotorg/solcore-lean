@@ -41,6 +41,31 @@ structure CoercionStep where
   target : Ty
   deriving Repr, BEq, DecidableEq
 
+/-- The fully explicit semantic plan for one source integer literal.  The
+source spelling remains on `ExpressionForm`, while this carrier records the
+decoded mathematical value, selected result type, and the exact builtin `Int`
+obligation which justifies constructing that result. -/
+structure IntegerLiteralResolution where
+  rawValue : Nat
+  targetType : Ty
+  requirement : RequirementId
+  deriving Repr, BEq, DecidableEq
+
+namespace IntegerLiteralResolution
+
+/-- The builtin `Int<Target>` goal owned by this literal occurrence. -/
+def predicate (resolution : IntegerLiteralResolution) : ProgramPredicate :=
+  ProgramSignatures.builtinIntPredicate resolution.targetType
+
+/-- Close flexible type variables without changing the decoded value or the
+stable requirement identity. -/
+def applySubstitution (substitution : Substitution)
+    (resolution : IntegerLiteralResolution) : IntegerLiteralResolution := {
+  resolution with targetType := substitution.apply resolution.targetType
+}
+
+end IntegerLiteralResolution
+
 /-- Metadata for applying an indirectly obtained function type.  A source
 argument list is bundled into one product before it is compared with the
 function parameter, so any coercion of that bundle belongs here rather than to
@@ -94,6 +119,9 @@ end NodeId
 the carrier is compact and does not duplicate subtrees. -/
 inductive ExpressionForm where
   | literal (literal : Syntax.CoreLiteralValue)
+  | integerLiteral
+      (source : Syntax.CoreLiteralValue)
+      (resolution : IntegerLiteralResolution)
   | reference (name : String) (resolution : ReferenceResolution)
   | group (inner : ExpressionId)
   | tuple (elements : List ExpressionId)
@@ -282,6 +310,8 @@ expression shape.  Child occurrence identities remain stable. -/
 def applySubstitution (substitution : Substitution) : ExpressionForm → ExpressionForm :=
   fun form => match form with
     | .literal value => .literal value
+    | .integerLiteral source resolution =>
+        .integerLiteral source (resolution.applySubstitution substitution)
     | .reference name resolution =>
         .reference name (resolution.applySubstitution substitution)
     | .group inner => .group inner

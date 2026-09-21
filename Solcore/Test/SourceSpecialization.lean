@@ -168,6 +168,93 @@ private def testIndirectMetadataSpecialization
   | _ => throw (IO.userError
       s!"expected one specialized indirect call, found {calls.length}")
 
+private def returnedExpression (function : CheckedFunction) : IO ExpressionId :=
+  match function.typedBody.roots with
+  | [.statement statement] =>
+      match function.typedBody.lookupStatement? statement with
+      | some { form := .returnStmt (some expression), .. } => pure expression
+      | _ => throw (IO.userError
+          "integer-specialization fixture root is not a valued return")
+  | _ => throw (IO.userError
+      "integer-specialization fixture does not have one statement root")
+
+private def replaceExpression (function : CheckedFunction)
+    (id : ExpressionId) (change : ExpressionNode → ExpressionNode) :
+    CheckedFunction := {
+  function with typedBody := {
+    function.typedBody with
+    nodes := function.typedBody.nodes.map fun
+      | .expression node =>
+          if node.id = id then .expression { change node with id }
+          else .expression node
+      | .statement node => .statement node
+  }
+}
+
+private def testIntegerLiteralMetadataSpecialization
+    (program : CheckedProgram) : IO Unit := do
+  let (signature, function) ← checkedNamed program "identity"
+  let parameter ← match signature.scheme.parameters with
+    | [parameter] => pure parameter
+    | parameters => throw (IO.userError
+        s!"identity lost its integer-metadata parameter: {reprStr parameters}")
+  let expression ← returnedExpression function
+  let requirement : RequirementId := ⟨211⟩
+  let resolution : IntegerLiteralResolution := {
+    rawValue := 9
+    targetType := .parameter parameter
+    requirement
+  }
+  let predicate := resolution.predicate
+  let carrier := replaceExpression function expression fun node => {
+    node with
+    form := .integerLiteral (.decimal "9") resolution
+    requirements := [requirement]
+  }
+  let carrier : CheckedFunction := {
+    carrier with solvedRequirements := [{
+      id := requirement
+      predicate
+      evidence := .implementation
+        (.byImpl predicate (.builtin .intWord) [])
+    }]
+  }
+  let specialized ← specializeOrThrow "integer metadata" signature carrier
+    [(parameter, .word)]
+  let closedNode ← match specialized.function.typedBody.lookupExpression?
+      expression with
+    | some node => pure node
+    | none => throw (IO.userError
+        "specialization lost the integer-literal expression")
+  match closedNode.form with
+  | .integerLiteral source closed =>
+      assertTrue (decide (source = .decimal "9" ∧
+          closed.rawValue = 9 ∧ closed.targetType = .word ∧
+          closed.requirement = requirement ∧
+          closed.predicate = ProgramSignatures.builtinIntPredicate .word ∧
+          specialized.function.solvedRequirements.map (·.predicate) =
+            [ProgramSignatures.builtinIntPredicate .word] ∧
+          specialized.function.solvedRequirements.map (·.evidence.goal) =
+            [ProgramSignatures.builtinIntPredicate .word]))
+        "rigid specialization did not close integer metadata and evidence together"
+  | _ => throw (IO.userError
+      "rigid specialization changed the integer-literal expression form")
+  let elaborated ← elaborateOrThrow "integer metadata" specialized.function
+  assertTrue (decide (Core.runStateful 16
+      (.initial elaborated.core [.word (word 99)]) =
+        .done (.word (word 9)) []))
+    "specialized integer literal did not execute through builtin Int<Word>"
+  let unknown : TypeParameterId := ⟨signature.id, 99⟩
+  let hidden := replaceExpression function expression fun node => {
+    node with form := .integerLiteral (.decimal "9") {
+      resolution with targetType := .parameter unknown
+    }
+  }
+  expectError "hidden integer target"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction signature hidden
+      [(parameter, .word)])
+    (.undeclaredObservedParameter unknown)
+
 private def testValidationErrors (program : CheckedProgram) : IO Unit := do
   let (signature, function) ← checkedNamed program "select"
   let (identitySignature, identityFunction) ← checkedNamed program "identity"
@@ -249,6 +336,7 @@ def testSourceSpecialization : IO Unit := do
   testIdentity program
   testPhantomParameter program
   testIndirectMetadataSpecialization program
+  testIntegerLiteralMetadataSpecialization program
   testValidationErrors program
 
 end Tests.SourceSpecialization

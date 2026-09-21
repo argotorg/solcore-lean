@@ -112,9 +112,17 @@ def applyCallResolution (substitution : ParameterSubstitution) :
   | .declaration instantiation =>
       .declaration (applyInstantiation substitution instantiation)
 
+def applyIntegerLiteralResolution (substitution : ParameterSubstitution)
+    (resolution : IntegerLiteralResolution) : IntegerLiteralResolution := {
+  resolution with targetType := substitution.apply resolution.targetType
+}
+
 def applyExpressionForm (substitution : ParameterSubstitution) :
     ExpressionForm → ExpressionForm
   | .literal literal => .literal literal
+  | .integerLiteral source resolution =>
+      .integerLiteral source
+        (applyIntegerLiteralResolution substitution resolution)
   | .reference name resolution =>
       .reference name (applyReferenceResolution substitution resolution)
   | .group inner => .group inner
@@ -286,6 +294,7 @@ private def callResolutionTypes : CallResolution → List Ty
 
 private def expressionFormTypes : ExpressionForm → List Ty
   | .reference _ resolution => referenceTypes resolution
+  | .integerLiteral _ resolution => [resolution.targetType]
   | .lambda _ returnType _ => [returnType]
   | .call _ _ resolution => callResolutionTypes resolution
   | .proxy inner => [inner]

@@ -6,6 +6,35 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend.SourceInference
 
+@[simp] theorem IntegerLiteralResolution.applySubstitution_rawValue
+    (substitution : TypeSystem.Substitution)
+    (resolution : IntegerLiteralResolution) :
+    (resolution.applySubstitution substitution).rawValue =
+      resolution.rawValue := by
+  rfl
+
+@[simp] theorem IntegerLiteralResolution.applySubstitution_targetType
+    (substitution : TypeSystem.Substitution)
+    (resolution : IntegerLiteralResolution) :
+    (resolution.applySubstitution substitution).targetType =
+      substitution.apply resolution.targetType := by
+  rfl
+
+@[simp] theorem IntegerLiteralResolution.applySubstitution_requirement
+    (substitution : TypeSystem.Substitution)
+    (resolution : IntegerLiteralResolution) :
+    (resolution.applySubstitution substitution).requirement =
+      resolution.requirement := by
+  rfl
+
+theorem IntegerLiteralResolution.applySubstitution_predicate
+    (substitution : TypeSystem.Substitution)
+    (resolution : IntegerLiteralResolution) :
+    (resolution.applySubstitution substitution).predicate =
+      TypedTraitResolution.applySubstitution substitution
+        resolution.predicate := by
+  rfl
+
 @[simp] theorem CoercionStep.applySubstitution_requirement
     (substitution : TypeSystem.Substitution) (step : CoercionStep) :
     (step.applySubstitution substitution).requirement = step.requirement := by
