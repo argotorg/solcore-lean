@@ -64,9 +64,9 @@ consumed by a supported staged boundary remains an unsupported runtime
 
 - ADR-0351 adds exact `integerMul` for source-generated occurrence trees and
   defers synthetic shared-DAG resource hardening explicitly.
-- `wordToInteger` requires a separately specified closed Word evaluator and
-  purity boundary.  General runtime Word expressions must not be evaluated at
-  compile time accidentally.
+- ADR-0352 connects `wordToInteger` through a separately specified closed Word
+  evaluator; general runtime Word expressions remain outside that purity
+  boundary.
 - Staged locals, parameters, integer-valued conditionals, ordinary calls,
   recursion, and general compile-time control flow remain unsupported.
 - Indirect compiler-function invocation, output coercions, and custom execution

@@ -58,8 +58,8 @@ call edge.
 
 ## Deferred boundaries
 
-- `wordToInteger` still requires a separately specified closed Word evaluator
-  and purity boundary.
+- ADR-0352 connects `wordToInteger` through a separately specified closed Word
+  evaluator and retains the runtime Word purity boundary.
 - Staged locals, parameters, integer-valued conditionals, ordinary calls,
   recursion, and general compile-time control flow remain unsupported.
 - Indirect compiler-function invocation, output coercions, and custom execution

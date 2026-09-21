@@ -149,6 +149,18 @@ private def expectEvaluationErrorAt (label : String) (function : CheckedFunction
       assertTrue (decide (error.site = site) && accept error.reason)
         s!"{label}: wrong staged-evaluation error {reprStr error}"
 
+private def expectWordEvaluationErrorAt (label : String)
+    (function : CheckedFunction) (id : ExpressionId)
+    (site : SourceCoreElaboration.ErrorSite)
+    (accept : SourceCoreElaboration.ErrorReason → Bool) : IO Unit := do
+  match SourceCoreElaboration.evaluateStagedWord
+      function.solvedRequirements function.typedBody id with
+  | .ok evaluated => throw (IO.userError
+      s!"{label}: malformed staged Word metadata evaluated to {reprStr evaluated}")
+  | .error error =>
+      assertTrue (decide (error.site = site) && accept error.reason)
+        s!"{label}: wrong staged-Word error {reprStr error}"
+
 private def testCheckedBaseline (fixture : Fixture) : IO Unit := do
   let lowered ← match
       SourceCoreElaboration.elaborateFunction fixture.function with
@@ -627,6 +639,7 @@ private def mismatchedBuiltin : BuiltinFunctionId → BuiltinFunctionId
   | .integerEq => .integerLt
   | .integerLt => .integerEq
   | .integerMul => .integerAdd
+  | .wordToInteger => .wordFromInteger
   | .integerSub => .integerAdd
   | .wordFromInteger => .integerAdd
 
@@ -835,6 +848,537 @@ private def testExpandedBuiltinTampering : IO Unit := do
     testExpandedBinaryBaseline fixture
     testExpandedBinaryContract fixture
 
+private structure WordToFixture where
+  function : CheckedFunction
+  root : ExpressionId
+  conversion : ExpressionId
+  callee : ExpressionId
+  word : ExpressionId
+  resolution : IntegerLiteralResolution
+
+private def wordToFixture : IO WordToFixture := do
+  let successor := toString (Core.wordModulus + 1)
+  let content := "function convert() returns (Word) { return wordFromInteger(wordToInteger(" ++
+    successor ++ ")); }"
+  let program ← match checkProgram (workspace content) with
+    | .ok program => pure program
+    | .error errors => throw (IO.userError
+        s!"wordToInteger tamper fixture failed checking: {reprStr errors}")
+  let function ← match program.functions with
+    | [function] => pure function
+    | functions => throw (IO.userError
+        s!"wordToInteger fixture produced {functions.length} functions")
+  let root ← match function.typedBody.roots with
+    | [.statement statement] =>
+        match function.typedBody.lookupStatement? statement with
+        | some { form := .returnStmt (some root), .. } => pure root
+        | _ => throw (IO.userError
+            "wordToInteger fixture lost its valued return")
+    | _ => throw (IO.userError "wordToInteger fixture lost its root")
+  let conversion ← match function.typedBody.lookupExpression? root with
+    | some node =>
+        match node.form with
+        | .call _ [conversion] (.builtinFunction .wordFromInteger) =>
+            pure conversion
+        | _ => throw (IO.userError
+            "wordToInteger fixture lost outer wordFromInteger")
+    | none => throw (IO.userError "wordToInteger fixture lost root node")
+  let (callee, word) ←
+    match function.typedBody.lookupExpression? conversion with
+    | some node =>
+        match node.form with
+        | .call callee [word] (.builtinFunction .wordToInteger) =>
+            pure (callee, word)
+        | _ => throw (IO.userError
+            "wordToInteger fixture lost conversion call")
+    | none => throw (IO.userError
+        "wordToInteger fixture lost conversion node")
+  let resolution ← match function.typedBody.lookupExpression? word with
+    | some node =>
+        match node.form with
+        | .integerLiteral _ resolution => pure resolution
+        | _ => throw (IO.userError
+            "wordToInteger fixture lost Word literal")
+    | none => throw (IO.userError
+        "wordToInteger fixture lost Word literal node")
+  pure { function, root, conversion, callee, word, resolution }
+
+private def withWordToExpression (fixture : WordToFixture)
+    (id : ExpressionId) (change : ExpressionNode → ExpressionNode) :
+    CheckedFunction := {
+  fixture.function with
+  typedBody := changeExpression fixture.function.typedBody id change
+}
+
+private def testWordToBaseline (fixture : WordToFixture) : IO Unit := do
+  let requirement := fixture.resolution.requirement
+  assertTrue (decide (fixture.resolution.targetType = Ty.word ∧
+      fixture.function.solvedRequirements.map (·.id) = [requirement] ∧
+      fixture.function.solvedRequirements.all fun solved =>
+        solved.predicate == ProgramSignatures.builtinIntPredicate Ty.word &&
+          match solved.evidence with
+          | .implementation (.byImpl goal (.builtin .intWord) []) =>
+              goal == solved.predicate
+          | _ => false))
+    "wordToInteger fixture lost exact Int<Word> evidence"
+  match SourceCoreElaboration.evaluateStagedWord
+      fixture.function.solvedRequirements fixture.function.typedBody
+      fixture.word with
+  | .ok evaluated =>
+      assertTrue (decide (evaluated.value = Core.Word.ofNatModulo 1 ∧
+          evaluated.consumedRequirements = [requirement]))
+        "staged Word baseline did not reduce modulo 2^256"
+  | .error error => throw (IO.userError
+      s!"staged Word baseline did not evaluate: {reprStr error}")
+  match SourceCoreElaboration.evaluateStagedInteger
+      fixture.function.solvedRequirements fixture.function.typedBody
+      fixture.conversion with
+  | .ok evaluated =>
+      assertTrue (decide (evaluated.value = (1 : Int) ∧
+          evaluated.consumedRequirements = [requirement]))
+        "wordToInteger baseline did not preserve unsigned Word value"
+  | .error error => throw (IO.userError
+      s!"wordToInteger baseline did not evaluate: {reprStr error}")
+
+private def testWordToCallContract (fixture : WordToFixture) : IO Unit := do
+  let callSite := SourceCoreElaboration.ErrorSite.occurrence
+    fixture.conversion.occurrence
+  let calleeSite := SourceCoreElaboration.ErrorSite.occurrence
+    fixture.callee.occurrence
+  let wordSite := SourceCoreElaboration.ErrorSite.occurrence
+    fixture.word.occurrence
+  let requirement := fixture.resolution.requirement
+  let coercion : CoercionStep := {
+    requirement
+    source := Ty.word
+    target := Ty.integer
+  }
+  let expect label function site accept :=
+    expectEvaluationErrorAt ("wordToInteger " ++ label) function
+      fixture.conversion site accept
+
+  let wrongResolution :=
+    withWordToExpression fixture fixture.conversion fun node => {
+      node with form := match node.form with
+        | .call callee arguments _ =>
+            .call callee arguments (.builtinFunction .integerAdd)
+        | form => form
+    }
+  expect "call resolution" wrongResolution callSite fun reason =>
+    reason == .builtinFunctionArgumentArityMismatch .integerAdd 2 1
+
+  let nonReference := withWordToExpression fixture fixture.callee fun node => {
+    node with form := .group fixture.word
+  }
+  expect "callee reference shape" nonReference calleeSite fun reason =>
+    reason == .builtinFunctionCalleeNotReference .wordToInteger
+
+  let wrongIdentity := withWordToExpression fixture fixture.callee fun node => {
+    node with form := (.reference BuiltinFunctionId.wordToInteger.spelling
+      (.builtinFunction .wordFromInteger))
+  }
+  expect "callee identity" wrongIdentity calleeSite fun reason =>
+    reason == .builtinFunctionCalleeIdentityMismatch .wordToInteger
+      .wordFromInteger
+
+  let wrongSpelling := withWordToExpression fixture fixture.callee fun node => {
+    node with form := (.reference "forgedWordToInteger"
+      (.builtinFunction .wordToInteger))
+  }
+  expect "callee spelling" wrongSpelling calleeSite fun reason =>
+    reason == .builtinFunctionCalleeSpellingMismatch .wordToInteger
+      BuiltinFunctionId.wordToInteger.spelling "forgedWordToInteger"
+
+  let wrongCalleeType :=
+    withWordToExpression fixture fixture.callee fun node => {
+      node with type := Ty.bool
+    }
+  expect "callee type" wrongCalleeType calleeSite fun reason =>
+    reason == .builtinFunctionCalleeTypeMismatch .wordToInteger
+      BuiltinFunctionId.wordToInteger.type Ty.bool
+
+  let wrongCallType :=
+    withWordToExpression fixture fixture.conversion fun node => {
+      node with type := Ty.word
+    }
+  expect "call result type" wrongCallType callSite fun reason =>
+    reason == .builtinFunctionCallTypeMismatch .wordToInteger
+      Ty.integer Ty.word
+
+  let wrongArity := withWordToExpression fixture fixture.conversion fun node => {
+    node with form := match node.form with
+      | .call callee _ resolution => .call callee [] resolution
+      | form => form
+  }
+  expect "call arity" wrongArity callSite fun reason =>
+    reason == .builtinFunctionArgumentArityMismatch .wordToInteger 1 0
+
+  let wrongArgumentType := withWordToExpression fixture fixture.word fun node => {
+    node with type := Ty.integer
+  }
+  expect "argument type" wrongArgumentType wordSite fun reason =>
+    reason == .builtinFunctionArgumentTypeMismatch .wordToInteger 0
+      Ty.word Ty.integer
+
+  let callRequirements :=
+    withWordToExpression fixture fixture.conversion fun node => {
+      node with requirements := [requirement]
+    }
+  expect "call requirements" callRequirements callSite fun reason =>
+    reason == .builtinFunctionRequirementsPresent .wordToInteger [requirement]
+
+  let callCoercions :=
+    withWordToExpression fixture fixture.conversion fun node => {
+      node with coercions := [coercion]
+    }
+  expect "call coercions" callCoercions callSite fun reason =>
+    reason == .builtinFunctionCoercionsPresent .wordToInteger [coercion]
+
+  let calleeRequirements :=
+    withWordToExpression fixture fixture.callee fun node => {
+      node with requirements := [requirement]
+    }
+  expect "callee requirements" calleeRequirements calleeSite fun reason =>
+    reason == .requirementsPresent [requirement]
+
+  let calleeCoercions :=
+    withWordToExpression fixture fixture.callee fun node => {
+      node with coercions := [coercion]
+    }
+  expect "callee coercions" calleeCoercions calleeSite fun reason =>
+    reason == .coercionsPresent [coercion]
+
+private def testWordLiteralTampering (fixture : WordToFixture) : IO Unit := do
+  let site := SourceCoreElaboration.ErrorSite.occurrence fixture.word.occurrence
+  let requirement := fixture.resolution.requirement
+  let expect label function accept :=
+    expectWordEvaluationErrorAt ("staged Word literal " ++ label) function
+      fixture.word site accept
+
+  let wrongType := withWordToExpression fixture fixture.word fun node => {
+    node with type := Ty.integer
+  }
+  expect "node type" wrongType fun reason =>
+    reason == .stagedWordTypeMismatch Ty.word Ty.integer
+
+  let wrongTarget := withWordToExpression fixture fixture.word fun node => {
+    node with form := match node.form with
+      | .integerLiteral source resolution =>
+          .integerLiteral source { resolution with targetType := Ty.integer }
+      | form => form
+  }
+  expect "target type" wrongTarget fun reason =>
+    reason == .integerLiteralTargetTypeMismatch Ty.integer Ty.word
+
+  let detached := withWordToExpression fixture fixture.word fun node => {
+    node with requirements := []
+  }
+  expect "requirement attachment" detached fun reason =>
+    reason == .integerLiteralRequirementsMismatch [requirement] []
+
+  let rawMismatch := withWordToExpression fixture fixture.word fun node => {
+    node with form := match node.form with
+      | .integerLiteral source resolution =>
+          .integerLiteral source { resolution with
+            rawValue := resolution.rawValue + 1 }
+      | form => form
+  }
+  expect "raw value" rawMismatch fun reason =>
+    reason == .integerLiteralRawValueMismatch
+      fixture.resolution.rawValue (fixture.resolution.rawValue + 1)
+
+  let expected := fixture.resolution.predicate
+  let forgedEvidence : CheckedFunction := {
+    fixture.function with
+    solvedRequirements := fixture.function.solvedRequirements.map fun solved =>
+      if solved.id = requirement then {
+        solved with evidence := (.implementation
+          (.byImpl expected (.builtin .intInteger) []))
+      } else solved
+  }
+  expect "intInteger evidence" forgedEvidence fun reason =>
+    reason == .integerLiteralImplementationMismatch requirement
+      (.builtin .intWord) (.builtin .intInteger)
+
+  let groupCycle := withWordToExpression fixture fixture.word fun node => {
+    node with form := .group fixture.word, requirements := []
+  }
+  expect "group cycle" groupCycle fun reason =>
+    reason == .stagedWordDepthLimit
+
+private def testCrossDomainCycle (fixture : WordToFixture) : IO Unit := do
+  let cyclic := withWordToExpression fixture fixture.conversion fun node => {
+    node with form := match node.form with
+      | .call callee _ resolution => .call callee [fixture.root] resolution
+      | form => form
+  }
+  match SourceCoreElaboration.evaluateStagedInteger cyclic.solvedRequirements
+      cyclic.typedBody fixture.conversion with
+  | .ok evaluated => throw (IO.userError
+      s!"cross-domain cycle evaluated to {reprStr evaluated}")
+  | .error error =>
+      let expectedSite := decide (error.site =
+          .occurrence fixture.conversion.occurrence) ||
+        decide (error.site = .occurrence fixture.root.occurrence)
+      let expectedReason := error.reason == .stagedIntegerDepthLimit ||
+        error.reason == .stagedWordDepthLimit
+      assertTrue (expectedSite && expectedReason)
+        s!"cross-domain cycle produced the wrong error {reprStr error}"
+
+private structure NestedWordFromFixture where
+  function : CheckedFunction
+  conversion : ExpressionId
+  wordCall : ExpressionId
+  callee : ExpressionId
+  integerArgument : ExpressionId
+
+private def nestedWordFromFixture : IO NestedWordFromFixture := do
+  let content :=
+    "function roundtrip() returns (Word) { return wordFromInteger(wordToInteger(wordFromInteger(integerSub(0, 1)))); }"
+  let program ← match checkProgram (workspace content) with
+    | .ok program => pure program
+    | .error errors => throw (IO.userError
+        s!"nested wordFromInteger fixture failed checking: {reprStr errors}")
+  let function ← match program.functions with
+    | [function] => pure function
+    | functions => throw (IO.userError
+        s!"nested wordFromInteger fixture produced {functions.length} functions")
+  let root ← match function.typedBody.roots with
+    | [.statement statement] =>
+        match function.typedBody.lookupStatement? statement with
+        | some { form := .returnStmt (some root), .. } => pure root
+        | _ => throw (IO.userError "nested wordFromInteger lost return")
+    | _ => throw (IO.userError "nested wordFromInteger lost root")
+  let conversion ← match function.typedBody.lookupExpression? root with
+    | some node =>
+        match node.form with
+        | .call _ [conversion] (.builtinFunction .wordFromInteger) =>
+            pure conversion
+        | _ => throw (IO.userError "nested fixture lost outer wordFromInteger")
+    | none => throw (IO.userError "nested fixture lost outer node")
+  let wordCall ← match function.typedBody.lookupExpression? conversion with
+    | some node =>
+        match node.form with
+        | .call _ [word] (.builtinFunction .wordToInteger) => pure word
+        | _ => throw (IO.userError "nested fixture lost wordToInteger")
+    | none => throw (IO.userError "nested fixture lost conversion node")
+  let (callee, integerArgument) ←
+    match function.typedBody.lookupExpression? wordCall with
+    | some node =>
+        match node.form with
+        | .call callee [argument] (.builtinFunction .wordFromInteger) =>
+            pure (callee, argument)
+        | _ => throw (IO.userError "nested fixture lost inner wordFromInteger")
+    | none => throw (IO.userError "nested fixture lost inner Word node")
+  pure { function, conversion, wordCall, callee, integerArgument }
+
+private def withNestedWordFromExpression (fixture : NestedWordFromFixture)
+    (id : ExpressionId) (change : ExpressionNode → ExpressionNode) :
+    CheckedFunction := {
+  fixture.function with
+  typedBody := changeExpression fixture.function.typedBody id change
+}
+
+private def testNestedWordFromMetadata
+    (fixture : NestedWordFromFixture) : IO Unit := do
+  let callSite := SourceCoreElaboration.ErrorSite.occurrence
+    fixture.wordCall.occurrence
+  let calleeSite := SourceCoreElaboration.ErrorSite.occurrence
+    fixture.callee.occurrence
+  let argumentSite := SourceCoreElaboration.ErrorSite.occurrence
+    fixture.integerArgument.occurrence
+  let requirement ← match fixture.function.solvedRequirements with
+    | requirement :: _ => pure requirement.id
+    | [] => throw (IO.userError
+        "nested wordFromInteger fixture lost literal requirements")
+  let coercion : CoercionStep := {
+    requirement
+    source := Ty.integer
+    target := Ty.word
+  }
+  let expect label function site accept :=
+    expectWordEvaluationErrorAt ("nested wordFromInteger " ++ label)
+      function fixture.wordCall site accept
+  match SourceCoreElaboration.evaluateStagedWord
+      fixture.function.solvedRequirements fixture.function.typedBody
+      fixture.wordCall with
+  | .ok evaluated =>
+      assertTrue (decide (evaluated.value = Core.Word.maximum ∧
+          evaluated.consumedRequirements =
+            fixture.function.solvedRequirements.map (·.id)))
+        "nested wordFromInteger baseline changed modulo or evidence order"
+  | .error error => throw (IO.userError
+      s!"nested wordFromInteger baseline did not evaluate: {reprStr error}")
+
+  let wrongResolution :=
+    withNestedWordFromExpression fixture fixture.wordCall fun node => {
+      node with form := match node.form with
+        | .call callee arguments _ =>
+            .call callee arguments (.builtinFunction .wordToInteger)
+        | form => form
+    }
+  expect "call resolution" wrongResolution callSite fun reason =>
+    reason == .stagedWordExpressionNotClosed
+
+  let nonReference :=
+    withNestedWordFromExpression fixture fixture.callee fun node => {
+      node with form := .group fixture.integerArgument
+    }
+  expect "callee reference shape" nonReference calleeSite fun reason =>
+    reason == .builtinFunctionCalleeNotReference .wordFromInteger
+
+  let wrongIdentity :=
+    withNestedWordFromExpression fixture fixture.callee fun node => {
+      node with form := (.reference BuiltinFunctionId.wordFromInteger.spelling
+        (.builtinFunction .wordToInteger))
+    }
+  expect "callee identity" wrongIdentity calleeSite fun reason =>
+    reason == .builtinFunctionCalleeIdentityMismatch .wordFromInteger
+      .wordToInteger
+
+  let wrongSpelling :=
+    withNestedWordFromExpression fixture fixture.callee fun node => {
+      node with form := (.reference "forgedNestedWordFrom"
+        (.builtinFunction .wordFromInteger))
+    }
+  expect "callee spelling" wrongSpelling calleeSite fun reason =>
+    reason == .builtinFunctionCalleeSpellingMismatch .wordFromInteger
+      BuiltinFunctionId.wordFromInteger.spelling "forgedNestedWordFrom"
+
+  let wrongCalleeType :=
+    withNestedWordFromExpression fixture fixture.callee fun node => {
+      node with type := Ty.bool
+    }
+  expect "callee type" wrongCalleeType calleeSite fun reason =>
+    reason == .builtinFunctionCalleeTypeMismatch .wordFromInteger
+      BuiltinFunctionId.wordFromInteger.type Ty.bool
+
+  let wrongCallType :=
+    withNestedWordFromExpression fixture fixture.wordCall fun node => {
+      node with type := Ty.integer
+    }
+  expect "call result type" wrongCallType callSite fun reason =>
+    reason == .builtinFunctionCallTypeMismatch .wordFromInteger
+      Ty.word Ty.integer
+
+  let wrongArity :=
+    withNestedWordFromExpression fixture fixture.wordCall fun node => {
+      node with form := match node.form with
+        | .call callee _ resolution => .call callee [] resolution
+        | form => form
+    }
+  expect "call arity" wrongArity callSite fun reason =>
+    reason == .builtinFunctionArgumentArityMismatch .wordFromInteger 1 0
+
+  let wrongArgumentType :=
+    withNestedWordFromExpression fixture fixture.integerArgument fun node => {
+      node with type := Ty.word
+    }
+  expect "argument type" wrongArgumentType argumentSite fun reason =>
+    reason == .builtinFunctionArgumentTypeMismatch .wordFromInteger 0
+      Ty.integer Ty.word
+
+  let callRequirements :=
+    withNestedWordFromExpression fixture fixture.wordCall fun node => {
+      node with requirements := [requirement]
+    }
+  expect "call requirements" callRequirements callSite fun reason =>
+    reason == .builtinFunctionRequirementsPresent .wordFromInteger [requirement]
+
+  let callCoercions :=
+    withNestedWordFromExpression fixture fixture.wordCall fun node => {
+      node with coercions := [coercion]
+    }
+  expect "call coercions" callCoercions callSite fun reason =>
+    reason == .builtinFunctionCoercionsPresent .wordFromInteger [coercion]
+
+  let calleeRequirements :=
+    withNestedWordFromExpression fixture fixture.callee fun node => {
+      node with requirements := [requirement]
+    }
+  expect "callee requirements" calleeRequirements calleeSite fun reason =>
+    reason == .requirementsPresent [requirement]
+
+  let calleeCoercions :=
+    withNestedWordFromExpression fixture fixture.callee fun node => {
+      node with coercions := [coercion]
+    }
+  expect "callee coercions" calleeCoercions calleeSite fun reason =>
+    reason == .coercionsPresent [coercion]
+
+private def testWordRequirementAccounting : IO Unit := do
+  let content :=
+    "function duplicateWord() returns (Word) { return wordFromInteger(integerAdd(wordToInteger(1), wordToInteger(2))); }"
+  let program ← match checkProgram (workspace content) with
+    | .ok program => pure program
+    | .error errors => throw (IO.userError
+        s!"Word requirement fixture failed checking: {reprStr errors}")
+  let function ← match program.functions with
+    | [function] => pure function
+    | functions => throw (IO.userError
+        s!"Word requirement fixture produced {functions.length} functions")
+  let root ← match function.typedBody.roots with
+    | [.statement statement] =>
+        match function.typedBody.lookupStatement? statement with
+        | some { form := .returnStmt (some root), .. } => pure root
+        | _ => throw (IO.userError "Word requirement fixture lost return")
+    | _ => throw (IO.userError "Word requirement fixture lost root")
+  let add ← match function.typedBody.lookupExpression? root with
+    | some node =>
+        match node.form with
+        | .call _ [add] (.builtinFunction .wordFromInteger) => pure add
+        | _ => throw (IO.userError "Word requirement fixture lost outer call")
+    | none => throw (IO.userError "Word requirement fixture lost root node")
+  let (leftConversion, rightConversion, addCallee) ←
+    match function.typedBody.lookupExpression? add with
+    | some node =>
+        match node.form with
+        | .call callee [left, right] (.builtinFunction .integerAdd) =>
+            pure (left, right, callee)
+        | _ => throw (IO.userError "Word requirement fixture lost integerAdd")
+    | none => throw (IO.userError "Word requirement fixture lost add node")
+  let wordArgument (conversion : ExpressionId) : IO ExpressionId :=
+    match function.typedBody.lookupExpression? conversion with
+    | some node =>
+        match node.form with
+        | .call _ [word] (.builtinFunction .wordToInteger) => pure word
+        | _ => throw (IO.userError "Word requirement fixture lost conversion")
+    | none => throw (IO.userError "Word requirement fixture lost conversion node")
+  let leftWord ← wordArgument leftConversion
+  let rightWord ← wordArgument rightConversion
+  let wordRequirement (word : ExpressionId) : IO RequirementId :=
+    match function.typedBody.lookupExpression? word with
+    | some node =>
+        match node.form with
+        | .integerLiteral _ resolution => pure resolution.requirement
+        | _ => throw (IO.userError "Word requirement fixture lost literal")
+    | none => throw (IO.userError "Word requirement fixture lost literal node")
+  let leftRequirement ← wordRequirement leftWord
+  let rightRequirement ← wordRequirement rightWord
+  let expectedRequirements := [leftRequirement, rightRequirement]
+  assertTrue (decide (leftConversion ≠ rightConversion ∧
+      leftWord ≠ rightWord ∧
+      function.solvedRequirements.map (·.id) = expectedRequirements))
+    "Word requirement fixture lost distinct source-order evidence"
+  match SourceCoreElaboration.evaluateStagedInteger function.solvedRequirements
+      function.typedBody add with
+  | .ok evaluated =>
+      assertTrue (decide (evaluated.value = (3 : Int) ∧
+          evaluated.consumedRequirements = expectedRequirements))
+        "Word requirement baseline changed consumption order"
+  | .error error => throw (IO.userError
+      s!"Word requirement baseline did not evaluate: {reprStr error}")
+  let duplicated : CheckedFunction := {
+    function with
+    typedBody := changeExpression function.typedBody add fun node => {
+      node with form := (.call addCallee [leftConversion, leftConversion]
+        (.builtinFunction .integerAdd))
+    }
+  }
+  expectElaborationErrorAt "duplicated staged Word literal edge" duplicated
+    (.declaration function.declaration) fun reason =>
+      reason == .duplicateConsumedRequirement leftRequirement
+
 /-- Reject forged builtin identities and staged literal evidence before Core. -/
 def testSourceStagedIntegerIntrinsicsTamper : IO Unit := do
   let checked ← fixture
@@ -845,6 +1389,14 @@ def testSourceStagedIntegerIntrinsicsTamper : IO Unit := do
   testLiteralEvidence checked
   testCyclesAndRequirementAccounting checked
   testExpandedBuiltinTampering
+  let wordTo ← wordToFixture
+  testWordToBaseline wordTo
+  testWordToCallContract wordTo
+  testWordLiteralTampering wordTo
+  testCrossDomainCycle wordTo
+  let nestedWordFrom ← nestedWordFromFixture
+  testNestedWordFromMetadata nestedWordFrom
+  testWordRequirementAccounting
   IO.println "staged integer intrinsic tamper checks GREEN"
 
 end Tests.SourceStagedIntegerIntrinsicsTamper

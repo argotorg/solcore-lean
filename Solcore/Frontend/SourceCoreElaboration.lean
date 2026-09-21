@@ -119,6 +119,9 @@ inductive ErrorReason where
   | stagedIntegerTypeMismatch (expected actual : Ty)
   | stagedIntegerExpressionNotClosed
   | stagedIntegerDepthLimit
+  | stagedWordTypeMismatch (expected actual : Ty)
+  | stagedWordExpressionNotClosed
+  | stagedWordDepthLimit
   | matchHiddenOwnerMismatch
       (expected actual : Resolved.DeclarationId)
   | duplicateMatchHidden (id : Resolved.LocalId)
@@ -488,6 +491,13 @@ structure StagedIntegerEvaluation where
   consumedRequirements : List RequirementId
   deriving Repr, DecidableEq
 
+/-- A closed staged Word and the exact literal obligations consumed while
+computing it.  The value is already canonical in `[0, 2^256)`. -/
+structure StagedWordEvaluation where
+  value : Core.Word
+  consumedRequirements : List RequirementId
+  deriving Repr, DecidableEq
+
 private inductive StagedIntegerBinaryOperation where
   | add
   | sub
@@ -587,6 +597,8 @@ private def validateBuiltinFunctionCallWith {error : Type}
   | _ =>
       failWith lift calleeSite (.builtinFunctionCalleeNotReference function)
 
+mutual
+
 private def evaluateStagedIntegerFuelWith {error : Type}
     (lift : Error → error) (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) :
@@ -597,6 +609,21 @@ private def evaluateStagedIntegerFuelWith {error : Type}
       let node ← (lookupExpression source id).mapError lift
       let site := ErrorSite.occurrence id.occurrence
       match node.form with
+      | .call callee arguments (.builtinFunction .wordToInteger) => do
+          validateBuiltinFunctionCallWith lift source node callee arguments
+            .wordToInteger
+          match arguments with
+          | [argument] =>
+              let evaluated ← evaluateStagedWordFuelWith lift
+                solvedRequirements source fuel argument
+              pure {
+                value := Int.ofNat evaluated.value.val
+                consumedRequirements := evaluated.consumedRequirements
+              }
+          | _ =>
+              failWith lift site
+                (.builtinFunctionArgumentArityMismatch .wordToInteger 1
+                  arguments.length)
       | .call callee arguments (.builtinFunction function) =>
           match stagedIntegerBinaryOperation? function with
           | some operation => do
@@ -653,13 +680,77 @@ private def evaluateStagedIntegerFuelWith {error : Type}
           | _ =>
               failWith lift site .stagedIntegerExpressionNotClosed
 
-/-- Evaluate exactly the closed staged-integer arithmetic fragment accepted by
-runtime erasure.  The bound comes from the finite typed-node table, so malformed
-cycles produce a located failure rather than nontermination. -/
+private def evaluateStagedWordFuelWith {error : Type}
+    (lift : Error → error) (solvedRequirements : List SolvedRequirement)
+    (source : TypedSource) :
+    Nat → ExpressionId → Except error StagedWordEvaluation
+  | 0, id =>
+      failWith lift (.occurrence id.occurrence) .stagedWordDepthLimit
+  | fuel + 1, id => do
+      let node ← (lookupExpression source id).mapError lift
+      let site := ErrorSite.occurrence id.occurrence
+      match node.form with
+      | .call callee arguments (.builtinFunction .wordFromInteger) => do
+          validateBuiltinFunctionCallWith lift source node callee arguments
+            .wordFromInteger
+          match arguments with
+          | [argument] =>
+              let evaluated ← evaluateStagedIntegerFuelWith lift
+                solvedRequirements source fuel argument
+              pure {
+                value := Core.Word.ofIntModulo evaluated.value
+                consumedRequirements := evaluated.consumedRequirements
+              }
+          | _ =>
+              failWith lift site
+                (.builtinFunctionArgumentArityMismatch .wordFromInteger 1
+                  arguments.length)
+      | form => do
+          unless node.coercions.isEmpty do
+            failWith lift site (.coercionsPresent node.coercions)
+          if node.type != Ty.word then
+            failWith lift site (.stagedWordTypeMismatch .word node.type)
+          match form with
+          | .integerLiteral literal resolution =>
+              let validated ← validateIntegerLiteralResolutionWith lift site
+                solvedRequirements node.type node.requirements literal resolution
+                (.builtin .intWord)
+                (fun target =>
+                  if target = Ty.word then pure ()
+                  else failWith lift site
+                    (.stagedWordTypeMismatch .word target))
+              pure {
+                value := Core.Word.ofNatModulo validated.rawValue
+                consumedRequirements := validated.consumedRequirements
+              }
+          | .group inner =>
+              if node.requirements.isEmpty then
+                evaluateStagedWordFuelWith lift solvedRequirements source fuel
+                  inner
+              else
+                failWith lift site (.requirementsPresent node.requirements)
+          | _ =>
+              failWith lift site .stagedWordExpressionNotClosed
+
+end
+
+/-- Evaluate exactly the closed staged-integer fragment accepted by runtime
+erasure, including conversions through the closed staged-Word fragment.  The
+bound comes from the finite typed-node table, so malformed cycles produce a
+located failure rather than nontermination. -/
 def evaluateStagedInteger (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (id : ExpressionId) :
     Except Error StagedIntegerEvaluation :=
   evaluateStagedIntegerFuelWith (fun error => error) solvedRequirements source
+    (source.nodes.length + 1) id
+
+/-- Evaluate exactly the closed staged-Word fragment accepted by
+`wordToInteger`.  Cross-domain cycles share the same finite node-derived fuel
+as staged-integer evaluation. -/
+def evaluateStagedWord (solvedRequirements : List SolvedRequirement)
+    (source : TypedSource) (id : ExpressionId) :
+    Except Error StagedWordEvaluation :=
+  evaluateStagedWordFuelWith (fun error => error) solvedRequirements source
     (source.nodes.length + 1) id
 
 private def lowerWordFromIntegerWith {error : Type} (lift : Error → error)

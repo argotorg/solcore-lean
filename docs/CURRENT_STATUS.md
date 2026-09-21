@@ -104,17 +104,19 @@ intrinsic tree described below, and the manually assembled legacy `.literal`
 typed-IR form retains its strict in-range Word behavior.  Custom builtin `Int`
 implementation execution remains a later boundary.
 
-Direct bare `wordFromInteger`, `integerAdd`, `integerSub`, `integerMul`,
-`integerEq`, and `integerLt` compiler functions now provide the closed signed
-staged-integer execution slice (ADR-0349–0351).  They have collision-free
-builtin identities, derive exact lookup from one ordered supported catalog, and
-are selected only after local and visible source functions fail to supply any
+Direct bare `wordFromInteger`, `wordToInteger`, `integerAdd`, `integerSub`,
+`integerMul`, `integerEq`, and `integerLt` compiler functions now provide the
+closed numeric staging slice (ADR-0349–0352).  They have collision-free builtin
+identities, derive exact lookup from one ordered supported catalog, and are
+selected only after local and visible source functions fail to supply any
 same-name candidate.  Source Core evaluates a closed
 literal/group/add/subtract/multiply tree as an unbounded Lean `Int`, validates
 every builtin `Int<integer>` row, erases `wordFromInteger` using signed modulo
 `2^256`, and erases equality or ordering directly to Bool without first
-applying modulo.  Runtime-dependent staged trees and every surviving `integer`
-value still reject explicitly.
+applying modulo.  A separate closed Word evaluator admits exact `Int<Word>`
+literals, groups, and nested `wordFromInteger`, then `wordToInteger` exposes the
+canonical unsigned Word payload as a nonnegative `Int`.  Runtime-dependent
+staged trees and every surviving `integer` value still reject explicitly.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5693,10 +5695,10 @@ The first source-body checker handles locals, functions and overload sets,
 calls, lambdas, tuples, groups, conditionals, supported unary/binary operators,
 proxy values, mapping read indexes, blocks, lets, returns, expression statements,
 statement conditionals and terminal single-scrutinee numeric/wildcard matches.
-The exact bare compiler functions `wordFromInteger`, `integerAdd`,
-`integerSub`, `integerMul`, `integerEq`, and `integerLt` are lowest-priority
-call fallbacks with fixed monomorphic signatures; visible same-name source
-functions shadow them without type-directed fallback.
+The exact bare compiler functions `wordFromInteger`, `wordToInteger`,
+`integerAdd`, `integerSub`, `integerMul`, `integerEq`, and `integerLt` are
+lowest-priority call fallbacks with fixed monomorphic signatures; visible
+same-name source functions shadow them without type-directed fallback.
 Proxy payloads reuse general source type-name
 resolution.  Mapping reads infer key/value types by unification, check the key
 with the ordinary coercion boundary, and pass the mapped value through the
@@ -5824,6 +5826,12 @@ the exact signed operands before modulo and emit one Bool constant.  The
 compiler call and callee metadata, fixed arity/types, spelling, empty call
 requirements/coercions and every consumed `intInteger` literal row are checked
 again at this boundary.  Compiler calls add no source specialization edge.
+A mutually fuel-bounded closed Word evaluator additionally accepts
+`Int<Word>` literal carriers, transparent groups, and direct
+`wordFromInteger`.  `wordToInteger` converts that canonical unsigned Word to a
+nonnegative Lean `Int`; it does not sign-extend, so converting a Word produced
+from `-1` yields `2^256 - 1`.  Runtime Word locals, general Word operators, and
+ordinary Word-returning calls remain outside this staging boundary.
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
 requirements even after an early wildcard, and build one hidden let followed by

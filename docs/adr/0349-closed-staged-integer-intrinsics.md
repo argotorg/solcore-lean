@@ -77,8 +77,8 @@ depth bound.
 
 - ADR-0350 connects `integerAdd`, `integerEq`, and `integerLt`, and ADR-0351
   connects exact `integerMul`, to the same closed evaluation boundary.
-  `wordToInteger` and the remaining reference compiler-function work are still
-  deferred with their purity constraints made explicit.
+  ADR-0352 connects `wordToInteger` through a separate closed Word evaluator
+  and completes the pinned integer compiler-function catalog.
 - Staged locals, parameters, conditionals, ordinary function calls, recursion,
   and general compile-time control flow remain unsupported.  A staged subtree
   depending on runtime data rejects as not closed.

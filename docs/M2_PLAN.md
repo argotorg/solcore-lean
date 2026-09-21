@@ -113,8 +113,8 @@ type, or later monomorphic use closes them; Bool-domain logical operators and
 unrelated or merely co-located literals are not admitted, and visible operator
 catalogs remain authoritative.  Signed compile-time `integer` evaluation and
 custom builtin `Int` execution remain later except for the closed direct
-add/subtract/multiply/comparison/conversion tree implemented by ADR-0349 through
-ADR-0351.
+integer/Word conversion, arithmetic, and comparison trees implemented by
+ADR-0349 through ADR-0352.
 
 ADR-0348 connects the first pattern slice to that carrier architecture.
 Terminal single-scrutinee matches retain ordered numeric-pattern builtin-`Int`
@@ -147,8 +147,7 @@ ADR-0350 extends that closed evaluator with exact signed `integerAdd` and with
 `integerEq`/`integerLt` Bool erasure.  Compiler-function lookup now derives from
 one ordered supported catalog, while local and visible source names keep their
 existing priority.  Comparisons observe the unbounded signed operands before
-any Word modulo projection.  `wordToInteger` remains behind a closed Word purity
-boundary.
+any Word modulo projection.
 
 ADR-0351 adds exact signed `integerMul` to the same closed tree.  Source-produced
 typed IR allocates a fresh identity for every written occurrence, so result bit
@@ -157,6 +156,14 @@ fixed bit cap is imposed on that reference-compatible source path.  Manually
 forged shared DAGs may still amplify work before exact-once evidence
 reconciliation rejects them; graph-wide validation or a total-work budget
 remains explicit hardening.
+
+ADR-0352 completes the pinned seven-function integer compiler catalog with
+`wordToInteger`.  A mutually fuel-bounded Word evaluator admits only exact
+`Int<Word>` literal carriers, transparent groups, and nested
+`wordFromInteger`; the conversion exposes the canonical unsigned Word payload
+as nonnegative `Int`.  Runtime Word locals, general Word operators, and ordinary
+Word-returning calls remain outside the staging purity boundary.  Cross-domain
+cycles terminate under the shared decreasing fuel.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
