@@ -106,7 +106,7 @@ implementation execution remains a later boundary.
 
 Direct bare `wordFromInteger`, `wordToInteger`, `integerAdd`, `integerSub`,
 `integerMul`, `integerEq`, and `integerLt` compiler functions now provide the
-closed numeric staging slice (ADR-0349–0354).  They have collision-free builtin
+closed numeric staging slice (ADR-0349–0355).  They have collision-free builtin
 identities, derive exact lookup from one ordered supported catalog, and are
 selected only after local and visible source functions fail to supply any
 same-name candidate.  Source Core evaluates a closed
@@ -124,9 +124,25 @@ conditionals remain Core conditionals.  An initialized monomorphic let whose
 final binder type is exactly `integer` now evaluates its initializer once under
 the preceding staged environment, binds the exact Lean `Int` by stable local
 identity, and disappears before Core.  Repeated local uses do not duplicate the
-initializer requirements.  Runtime lets remain Core lets; comptime parameters,
-ordinary calls, recursion, and general `comptime<T>` are the next staging
-boundary.
+initializer requirements.  Runtime lets remain Core lets.
+
+The first whole-program staged-call profile is also executable.  A canonical
+complete specialization plan may evaluate a direct, predicate-free and
+coercion-free call whose fully specialized inputs and single result are exact
+bare `integer`.  Arguments evaluate left to right in the caller; their `Int`
+values are bound positionally to the callee's validated stable input identities.
+The callee reconciles its own requirements before returning only a value, so
+numerically overlapping function-local requirement IDs cannot cross ledgers.
+Runtime and staged expansion share the same specialization-key visiting stack
+and decreasing link-depth fuel.  Both conditional branches remain eager, and
+self-, mutual-, or unselected-branch recursion rejects.  Integer-returning
+functions still reject as runtime roots because Core has no runtime `integer`.
+This is a provisional type-directed rule: raw parameter `comptime` syntax is
+not yet retained in the checked signature carrier.  A written `comptime<T>`
+result is represented structurally as `Ty.comptime T`, but Lean has no separate
+canonical counterpart of the reference's result flag.  Reference-style marker
+semantics, general `comptime<T>`, predicate/coercion support, selected-branch
+recursion, and compile-time Fibonacci remain later.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5857,8 +5873,31 @@ Lean `Int` value made available to later staged expressions.  Local lookup
 rechecks owner, identity, spelling, empty requirements/coercions, and exact
 integer type, but consumes no initializer evidence again.  The staged let emits
 no Core binding; non-integer runtime lets retain the existing `letE` path.
-Comptime parameters, ordinary calls, recursion, and general `comptime<T>`
-remain the next staging boundary.
+A provisional whole-program policy now accepts direct calls between fully
+specialized, monomorphic bare-`integer` inputs and one bare-`integer` result,
+provided the call is predicate-free and coercion-free.  The worklist and linker
+reconstruct the complete canonical plan and exact occurrence edge, including
+edges in an unselected conditional branch.  Source Core evaluates arguments
+left to right, binds their `Int` values to the callee's declaration-owned input
+IDs, and evaluates integer lets plus tail returns, terminal blocks, and terminal
+statement conditionals.  Caller obligations stay in caller order; the callee
+reconciles its own requirement table locally before returning an `Int`.
+Runtime and staged calls use one specialization-key visiting stack and one
+decreasing link-depth fuel, while per-source node fuel bounds malformed local
+graphs.  Eager branch validation means recursion in an unselected branch still
+rejects, as do all other direct or mutual cycles.  An integer function remains
+invalid as a runtime root.
+
+This bare-integer rule does not yet reproduce the pinned reference's staging
+markers.  The reference retains per-parameter and result comptime flags and
+requires a comptime result plus comptime actuals before classifying a call as
+comptime.  Lean syntax retains the raw parameter marker, but signature
+resolution currently discards it.  A written `comptime<T>` result remains
+structurally visible as `Ty.comptime T`, but the checked/specialized carriers
+have no separate canonical counterpart of the reference's result flag.
+Reference-style marker retention and enforcement, general `comptime<T>`,
+predicates and coercions, indirect calls, selected-branch recursion, and
+compile-time Fibonacci remain deferred.
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
 requirements even after an early wildcard, and build one hidden let followed by

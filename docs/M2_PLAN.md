@@ -113,8 +113,8 @@ type, or later monomorphic use closes them; Bool-domain logical operators and
 unrelated or merely co-located literals are not admitted, and visible operator
 catalogs remain authoritative.  General signed compile-time `integer`
 evaluation and custom builtin `Int` execution remain later.  ADR-0349 through
-ADR-0354 implement the closed integer/Word conversion, arithmetic, comparison,
-conditional, and let-binding boundary.
+ADR-0355 implement the closed integer/Word conversion, arithmetic, comparison,
+conditional, let-binding, and provisional direct-call boundary.
 
 ADR-0348 connects the first pattern slice to that carrier architecture.
 Terminal single-scrutinee matches retain ordered numeric-pattern builtin-`Int`
@@ -185,8 +185,34 @@ the stored Lean `Int` by declaration-owned identity and exact spelling without
 re-consuming the initializer's requirements.  This supports the pinned
 `integer-basic.solc` chain and its Word result `100`, while leaving ordinary
 non-integer lets on the runtime `letE` path.  Comptime parameters, ordinary
-calls, recursion, and the general `comptime<T>` contract form the next staging
-boundary.
+calls, recursion, and the general `comptime<T>` contract formed the next staging
+boundary; ADR-0355 below connects only its acyclic bare-integer direct-call
+subset.
+
+ADR-0355 implements the first deliberately narrower part of that call
+boundary: a complete canonical specialization plan may execute a direct,
+predicate-free and coercion-free call whose fully specialized inputs and single
+result are exact bare `integer`.  Caller arguments are closed and evaluated
+left to right, then paired with the callee's validated stable input identities.
+The callee evaluates integer lets and tail-normal returns, blocks, and statement
+conditionals in its own staged environment.  Its requirement IDs are reconciled
+against its own solved table and never enter the caller's ledger.  Runtime and
+staged call expansion share one specialization-key visiting stack and decreasing
+link-depth fuel, while node-table fuel separately bounds malformed local graphs.
+Both conditional branches remain eager, so recursion in an unselected branch
+still rejects; every written edge remains in the worklist and specialization
+budget.
+
+This is a provisional type-directed rule, not the pinned reference's full
+comptime contract.  The reference retains separate parameter and result
+comptime flags.  The current Lean signature/checking carrier discards the raw
+parameter marker; a written `comptime<T>` result is represented structurally as
+`Ty.comptime T`, but there is no separate canonical counterpart of the
+reference's result flag.  Reference-style marker retention and enforcement,
+general `comptime<T>`, predicate/coercion support, selected-branch recursion and
+compile-time programs such as Fibonacci remain later.  Integer-returning
+functions also remain invalid runtime roots because Core has no runtime
+`integer` representation.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
