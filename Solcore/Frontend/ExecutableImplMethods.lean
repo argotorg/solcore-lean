@@ -147,6 +147,10 @@ inductive Error where
   | methodAssociationMismatch
       (method : ProgramImplMethodId)
       (expected actual : ProgramTraitMethodId)
+  | methodComptimeMismatch
+      (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
+      (expectedParameters actualParameters : List Bool)
+      (expectedReturn actualReturn : Bool)
   | sourceInference (error : SourceInference.Error)
   | specialization (error : SourceSpecialization.Error)
   | specializedAssumptionsMismatch
@@ -366,6 +370,12 @@ def checkMethodWithEvidenceAndArity
   unless implementationMethod.traitMethod = traitMethod.id do
     throw (.methodAssociationMismatch implementationMethod.id traitMethod.id
       implementationMethod.traitMethod)
+  unless traitMethod.parameterComptime =
+        implementationMethod.parameterComptime &&
+      traitMethod.returnComptime = implementationMethod.returnComptime do
+    throw (.methodComptimeMismatch implementationMethod.id traitMethod.id
+      traitMethod.parameterComptime implementationMethod.parameterComptime
+      traitMethod.returnComptime implementationMethod.returnComptime)
   let genericMethodPredicates := traitMethod.wherePredicates.map
     (ProgramPredicate.applyParameters genericTraitParameterSubstitution)
   unless genericMethodPredicates = implementationMethod.wherePredicates do
