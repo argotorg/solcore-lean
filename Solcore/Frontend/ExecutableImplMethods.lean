@@ -285,8 +285,10 @@ private def closedSyntheticSignature
     (specialized : SourceSpecialization.SpecializedFunction) :
     ProgramFunctionSignature := {
   generic with
-  parameterTypes := generic.parameterTypes.map
-    specialized.parameterSubstitution.apply
+  parameters := generic.parameters.map fun parameter => {
+    parameter with
+    type := specialized.parameterSubstitution.apply parameter.type
+  }
   returnTypes := generic.returnTypes.map
     specialized.parameterSubstitution.apply
   scheme := {

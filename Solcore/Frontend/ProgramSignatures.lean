@@ -131,16 +131,41 @@ def instantiate (scheme : ConstrainedDeclarationScheme) (next : Nat) :
 
 end ConstrainedDeclarationScheme
 
+/-- One named-function parameter after resolving its source type.  Staging is
+kept independently from the ordinary semantic type so later consumers can
+enforce the execution boundary without wrapping runtime values in `Ty.comptime`. -/
+structure ProgramFunctionParameter where
+  name : String
+  type : TypeSystem.Ty
+  comptime : Bool
+  deriving Repr, BEq, DecidableEq
+
 /-- A resolved top-level function signature plus its source body. -/
 structure ProgramFunctionSignature where
   id : Resolved.DeclarationId
   name : String
-  parameterNames : List String
-  parameterTypes : List TypeSystem.Ty
+  parameters : List ProgramFunctionParameter
   returnTypes : List TypeSystem.Ty
+  returnComptime : Bool
   scheme : ConstrainedDeclarationScheme
   source : Syntax.FunctionDecl
   deriving Repr
+
+namespace ProgramFunctionSignature
+
+/-- Source-order parameter names, retained as a compatibility projection. -/
+def parameterNames (signature : ProgramFunctionSignature) : List String :=
+  signature.parameters.map (·.name)
+
+/-- Bare semantic parameter types, retained as a compatibility projection. -/
+def parameterTypes (signature : ProgramFunctionSignature) : List TypeSystem.Ty :=
+  signature.parameters.map (·.type)
+
+/-- Source-order staging markers for the function parameters. -/
+def parameterComptime (signature : ProgramFunctionSignature) : List Bool :=
+  signature.parameters.map (·.comptime)
+
+end ProgramFunctionSignature
 
 /-- Stable identity of a trait method, kept distinct from every declaration and
 implementation method identity. -/
@@ -161,12 +186,28 @@ predicates may mention the enclosing trait's rigid type parameters. -/
 structure ProgramTraitMethodSignature where
   id : ProgramTraitMethodId
   name : String
-  parameterNames : List String
-  parameterTypes : List TypeSystem.Ty
+  parameters : List ProgramFunctionParameter
   returnTypes : List TypeSystem.Ty
+  returnComptime : Bool
   wherePredicates : List ProgramPredicate
   source : Syntax.TraitMethod
   deriving Repr
+
+namespace ProgramTraitMethodSignature
+
+/-- Source-order parameter names, retained as a compatibility projection. -/
+def parameterNames (signature : ProgramTraitMethodSignature) : List String :=
+  signature.parameters.map (·.name)
+
+/-- Bare semantic parameter types, retained as a compatibility projection. -/
+def parameterTypes (signature : ProgramTraitMethodSignature) : List TypeSystem.Ty :=
+  signature.parameters.map (·.type)
+
+/-- Source-order staging markers for the trait method parameters. -/
+def parameterComptime (signature : ProgramTraitMethodSignature) : List Bool :=
+  signature.parameters.map (·.comptime)
+
+end ProgramTraitMethodSignature
 
 /-- One resolved implementation method and the trait method selected by its
 name.  Its source body is retained for later runtime-evidence lowering. -/
@@ -174,12 +215,28 @@ structure ProgramImplMethodSignature where
   id : ProgramImplMethodId
   traitMethod : ProgramTraitMethodId
   name : String
-  parameterNames : List String
-  parameterTypes : List TypeSystem.Ty
+  parameters : List ProgramFunctionParameter
   returnTypes : List TypeSystem.Ty
+  returnComptime : Bool
   wherePredicates : List ProgramPredicate
   source : Syntax.ImplMethod
   deriving Repr
+
+namespace ProgramImplMethodSignature
+
+/-- Source-order parameter names, retained as a compatibility projection. -/
+def parameterNames (signature : ProgramImplMethodSignature) : List String :=
+  signature.parameters.map (·.name)
+
+/-- Bare semantic parameter types, retained as a compatibility projection. -/
+def parameterTypes (signature : ProgramImplMethodSignature) : List TypeSystem.Ty :=
+  signature.parameters.map (·.type)
+
+/-- Source-order staging markers for the implementation method parameters. -/
+def parameterComptime (signature : ProgramImplMethodSignature) : List Bool :=
+  signature.parameters.map (·.comptime)
+
+end ProgramImplMethodSignature
 
 /-- Resolved signature catalog for one trait, preserving method source order. -/
 structure ProgramTraitSignature where
@@ -220,9 +277,9 @@ def functionSignatureOfMethod
     (method : ProgramImplMethodSignature) : ProgramFunctionSignature := {
   id := implementation.id
   name := method.name
-  parameterNames := method.parameterNames
-  parameterTypes := method.parameterTypes
+  parameters := method.parameters
   returnTypes := method.returnTypes
+  returnComptime := method.returnComptime
   scheme := {
     parameters := implementation.parameters
     predicates := implementation.wherePredicates ++ method.wherePredicates
@@ -324,6 +381,11 @@ inductive ProgramSignatureError where
   | malformedFunctionParameter
       (declaration : Resolved.DeclarationId) (parameterIndex : Nat)
   | malformedType (declaration : Resolved.DeclarationId)
+  | nestedComptimeReturn
+      (declaration : Resolved.DeclarationId) (returnIndex : Nat)
+  | comptimeReturnMustBeSingleton
+      (declaration : Resolved.DeclarationId)
+      (returnIndex returnCount : Nat)
   | unknownTrait
       (declaration : Resolved.DeclarationId) (name : String)
   | ambiguousTrait
@@ -354,6 +416,10 @@ inductive ProgramSignatureError where
       (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
       (expectedParameters actualParameters : List TypeSystem.Ty)
       (expectedReturns actualReturns : List TypeSystem.Ty)
+  | implMethodComptimeMismatch
+      (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
+      (expectedParameters actualParameters : List Bool)
+      (expectedReturn actualReturn : Bool)
   | implMethodPredicateMismatch
       (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
       (expected actual : List ProgramPredicate)
@@ -366,6 +432,8 @@ private def programSignatureErrorDeclaration :
   | .duplicateFunctionParameter declaration _ _ _ => declaration
   | .malformedFunctionParameter declaration _ => declaration
   | .malformedType declaration => declaration
+  | .nestedComptimeReturn declaration _ => declaration
+  | .comptimeReturnMustBeSingleton declaration _ _ => declaration
   | .unknownTrait declaration _ => declaration
   | .ambiguousTrait declaration _ _ => declaration
   | .traitArityMismatch declaration _ _ _ => declaration
@@ -378,6 +446,7 @@ private def programSignatureErrorDeclaration :
   | .missingImplMethod implementation _ _ => implementation
   | .extraImplMethod method _ => method.implementation
   | .implMethodSignatureMismatch method _ _ _ _ _ => method.implementation
+  | .implMethodComptimeMismatch method _ _ _ _ _ => method.implementation
   | .implMethodPredicateMismatch method _ _ _ => method.implementation
   | .traitCatalogUnavailable implementation _ => implementation
 
@@ -419,6 +488,43 @@ private def resolveSignatureTypes
       let type ← resolveSignatureType environment declaration scope source
       let types ← resolveSignatureTypes environment declaration scope rest
       pure (type :: types)
+
+private def firstTopLevelComptimeReturn? :
+    List Syntax.TypeExpr → Nat → Option Nat
+  | [], _ => none
+  | source :: rest, index =>
+      match source.value with
+      | .comptime _ _ _ => some index
+      | _ => firstTopLevelComptimeReturn? rest (index + 1)
+
+/-- Resolve a named function's results while separating the source staging
+marker from its ordinary semantic result type.  The current surface contract
+admits the marker only around one result and deliberately rejects a second
+outer marker instead of silently retaining `Ty.comptime` in the function type. -/
+private def resolveFunctionReturns
+    (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
+    (scope : ProgramTypeScope) (sources : List Syntax.TypeExpr) :
+    Except ProgramSignatureError (List TypeSystem.Ty × Bool) := do
+  match sources with
+  | [source] =>
+      match source.value with
+      | .comptime _ _ inner =>
+          match inner.value with
+          | .comptime _ _ _ =>
+              throw (.nestedComptimeReturn declaration.id 0)
+          | _ =>
+              let type ← resolveSignatureType environment declaration scope inner
+              pure ([type], true)
+      | _ =>
+          let type ← resolveSignatureType environment declaration scope source
+          pure ([type], false)
+  | sources =>
+      match firstTopLevelComptimeReturn? sources 0 with
+      | some index =>
+          throw (.comptimeReturnMustBeSingleton declaration.id index sources.length)
+      | none =>
+          let types ← resolveSignatureTypes environment declaration scope sources
+          pure (types, false)
 
 private def traitCandidates
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
@@ -477,19 +583,18 @@ private def resolveWhereClause
       loop clause.predicates.toList
 
 private structure ResolvedFunctionParameters where
-  names : List String
-  types : List TypeSystem.Ty
+  parameters : List ProgramFunctionParameter
 
 private def resolveFunctionParameters
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
     (scope : ProgramTypeScope) :
     List Syntax.FunctionParameter → Nat → List (String × Nat) →
       Except ProgramSignatureError ResolvedFunctionParameters
-  | [], _, _ => .ok { names := [], types := [] }
+  | [], _, _ => .ok { parameters := [] }
   | parameter :: rest, index, seen =>
       match parameter.value with
       | .error => .error (.malformedFunctionParameter declaration.id index)
-      | .typed _ name sourceType =>
+      | .typed comptime name sourceType =>
           match seen.find? fun previous => previous.1 == name.value with
           | some previous =>
               .error (.duplicateFunctionParameter declaration.id name.value
@@ -499,8 +604,11 @@ private def resolveFunctionParameters
               let resolvedRest ← resolveFunctionParameters environment declaration
                 scope rest (index + 1) ((name.value, index) :: seen)
               pure {
-                names := name.value :: resolvedRest.names
-                types := type :: resolvedRest.types
+                parameters := {
+                  name := name.value
+                  type
+                  comptime := comptime.isSome
+                } :: resolvedRest.parameters
               }
 
 private def functionSignatureOfDeclaration
@@ -516,18 +624,19 @@ private def functionSignatureOfDeclaration
     signature.parameters.elements 0 []
   let returnSources := signature.returnsClause.map
     (fun clause => clause.types.elements) |>.getD []
-  let returnTypes ← resolveSignatureTypes environment declaration scope returnSources
+  let (returnTypes, returnComptime) ← resolveFunctionReturns environment declaration
+    scope returnSources
   let predicates ← resolveWhereClause environment declaration scope
     signature.whereClause
   let body := TypeSystem.Ty.function
-    (TypeSystem.Ty.productMany parameters.types)
+    (TypeSystem.Ty.productMany (parameters.parameters.map (·.type)))
     (TypeSystem.Ty.productMany returnTypes)
   pure {
     id := declaration.id
     name := signature.name.value
-    parameterNames := parameters.names
-    parameterTypes := parameters.types
+    parameters := parameters.parameters
     returnTypes
+    returnComptime
     scheme := {
       parameters := declarationParameters declaration
       predicates
@@ -537,9 +646,9 @@ private def functionSignatureOfDeclaration
   }
 
 private structure ResolvedMethodShape where
-  parameterNames : List String
-  parameterTypes : List TypeSystem.Ty
+  parameters : List ProgramFunctionParameter
   returnTypes : List TypeSystem.Ty
+  returnComptime : Bool
   wherePredicates : List ProgramPredicate
 
 private def resolveMethodShape
@@ -550,13 +659,14 @@ private def resolveMethodShape
     signature.parameters.elements 0 []
   let returnSources := signature.returnsClause.map
     (fun clause => clause.types.elements) |>.getD []
-  let returnTypes ← resolveSignatureTypes environment declaration scope returnSources
+  let (returnTypes, returnComptime) ← resolveFunctionReturns environment declaration
+    scope returnSources
   let wherePredicates ← resolveWhereClause environment declaration scope
     signature.whereClause
   pure {
-    parameterNames := parameters.names
-    parameterTypes := parameters.types
+    parameters := parameters.parameters
     returnTypes
+    returnComptime
     wherePredicates
   }
 
@@ -585,9 +695,9 @@ private def traitMethodsOfDeclaration
           pure ({
             id
             name
-            parameterNames := shape.parameterNames
-            parameterTypes := shape.parameterTypes
+            parameters := shape.parameters
             returnTypes := shape.returnTypes
+            returnComptime := shape.returnComptime
             wherePredicates := shape.wherePredicates
             source
           } :: methods)
@@ -616,11 +726,23 @@ private def traitSignatureOfDeclaration
 private structure UnmatchedProgramImplMethod where
   id : ProgramImplMethodId
   name : String
-  parameterNames : List String
-  parameterTypes : List TypeSystem.Ty
+  parameters : List ProgramFunctionParameter
   returnTypes : List TypeSystem.Ty
+  returnComptime : Bool
   wherePredicates : List ProgramPredicate
   source : Syntax.ImplMethod
+
+namespace UnmatchedProgramImplMethod
+
+private def parameterTypes
+    (method : UnmatchedProgramImplMethod) : List TypeSystem.Ty :=
+  method.parameters.map (·.type)
+
+private def parameterComptime
+    (method : UnmatchedProgramImplMethod) : List Bool :=
+  method.parameters.map (·.comptime)
+
+end UnmatchedProgramImplMethod
 
 private def unmatchedImplMethodsOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
@@ -647,9 +769,9 @@ private def unmatchedImplMethodsOfDeclaration
           pure ({
             id
             name
-            parameterNames := shape.parameterNames
-            parameterTypes := shape.parameterTypes
+            parameters := shape.parameters
             returnTypes := shape.returnTypes
+            returnComptime := shape.returnComptime
             wherePredicates := shape.wherePredicates
             source
           } :: methods)
@@ -671,11 +793,17 @@ private def validateRequiredImplMethods
         (ProgramPredicate.applyParameters substitution)
       if expectedParameters = implMethod.parameterTypes &&
           expectedReturns = implMethod.returnTypes then
-        if expectedPredicates = implMethod.wherePredicates then
-          validateRequiredImplMethods implementation substitution rest implMethods
+        if traitMethod.parameterComptime = implMethod.parameterComptime &&
+            traitMethod.returnComptime = implMethod.returnComptime then
+          if expectedPredicates = implMethod.wherePredicates then
+            validateRequiredImplMethods implementation substitution rest implMethods
+          else
+            throw (.implMethodPredicateMismatch implMethod.id traitMethod.id
+              expectedPredicates implMethod.wherePredicates)
         else
-          throw (.implMethodPredicateMismatch implMethod.id traitMethod.id
-            expectedPredicates implMethod.wherePredicates)
+          throw (.implMethodComptimeMismatch implMethod.id traitMethod.id
+            traitMethod.parameterComptime implMethod.parameterComptime
+            traitMethod.returnComptime implMethod.returnComptime)
       else
         throw (.implMethodSignatureMismatch implMethod.id traitMethod.id
           expectedParameters implMethod.parameterTypes
@@ -695,9 +823,9 @@ private def attachTraitMethods
         id := implMethod.id
         traitMethod := traitMethod.id
         name := implMethod.name
-        parameterNames := implMethod.parameterNames
-        parameterTypes := implMethod.parameterTypes
+        parameters := implMethod.parameters
         returnTypes := implMethod.returnTypes
+        returnComptime := implMethod.returnComptime
         wherePredicates := implMethod.wherePredicates
         source := implMethod.source
       } :: methods)
