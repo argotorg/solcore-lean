@@ -338,7 +338,7 @@ mutual
                       instantiated.body
                       (.reference name.value (.declaration
                         (DeclarationInstantiation.ofInstantiated
-                          signature.id instantiated)))
+                          signature instantiated)))
                       requirements expected state
                 | candidates =>
                     .error (.ambiguousOverload name.value (candidates.map (·.id)))

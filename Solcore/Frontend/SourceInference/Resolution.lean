@@ -785,7 +785,7 @@ def tryFunctionCandidate (context : Context)
                     state.addRequirementsWithIds instantiated.predicates
                   pure (some {
                     instantiation :=
-                      DeclarationInstantiation.ofInstantiated signature.id instantiated
+                      DeclarationInstantiation.ofInstantiated signature instantiated
                     result := {
                       fittedResult.expression with
                       type := state.resolve fittedResult.expression.type

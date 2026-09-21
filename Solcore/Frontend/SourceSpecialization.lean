@@ -30,6 +30,10 @@ inductive Error where
   | typedBodyOwnerMismatch
       (expected actual : Resolved.DeclarationId)
   | signatureTypeMismatch (signature function : Ty)
+  | parameterComptimeMismatch
+      (signature typedBody : List Bool)
+  | returnComptimeMismatch
+      (signature function : Bool)
   | declaredParameterOwnerMismatch
       (expected : Resolved.DeclarationId) (parameter : TypeParameterId)
   | duplicateDeclaredParameter (parameter : TypeParameterId)
@@ -519,6 +523,14 @@ def specializeFunction (signature : ProgramFunctionSignature)
     throw (.typedBodyOwnerMismatch function.declaration function.typedBody.owner)
   if signature.scheme.body != function.type then
     throw (.signatureTypeMismatch signature.scheme.body function.type)
+  let bodyParameterComptime :=
+    function.typedBody.inputs.map (·.comptime)
+  if signature.parameterComptime != bodyParameterComptime then
+    throw (.parameterComptimeMismatch
+      signature.parameterComptime bodyParameterComptime)
+  if signature.returnComptime != function.returnComptime then
+    throw (.returnComptimeMismatch
+      signature.returnComptime function.returnComptime)
   validateEvidenceGoals function.solvedRequirements
   let declared := signature.scheme.parameters
   validateDeclaredParameters signature.id declared

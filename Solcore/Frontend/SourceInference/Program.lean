@@ -94,6 +94,7 @@ def checkFunctionBody (environment : ProgramEnvironment)
   }
   let expected := Ty.productMany signature.returnTypes
   let state := State.initial context.scope.genericOwner (functionLocals signature)
+    signature.parameterComptime
   let body ← Detail.inferStatementsFuel fuel context signature.source.value.body.value
     expected state
   let state ← Detail.unify body.state body.type expected
@@ -103,6 +104,7 @@ def checkFunctionBody (environment : ProgramEnvironment)
     declaration := signature.id
     type := signature.scheme.body
     inferredBodyType := result.type
+    returnComptime := signature.returnComptime
     substitution := result.substitution
     solvedRequirements := result.solvedRequirements
     typedBody := result.typedSource

@@ -22,6 +22,9 @@ structure TypedBinder where
   id : Resolved.LocalId
   name : String
   scheme : Scheme
+  /-- Whether this declaration input is required during staged evaluation.
+  Ordinary lexical binders leave this false. -/
+  comptime : Bool := false
   span : Option Syntax.SourceSpan := none
   deriving Repr, BEq, DecidableEq
 
@@ -31,6 +34,9 @@ structure DeclarationInstantiation where
   parameterSubstitution : ParameterSubstitution
   type : Ty
   predicates : List ProgramPredicate
+  /-- Staging markers copied from the canonical declaration signature. -/
+  parameterComptime : List Bool := []
+  returnComptime : Bool := false
   deriving Repr, BEq, DecidableEq
 
 /-- One evidence-bearing edge in an inserted coercion path. -/
@@ -264,14 +270,17 @@ end TypedBinder
 
 namespace DeclarationInstantiation
 
-/-- Retain the complete result of instantiating one resolved declaration. -/
-def ofInstantiated (declaration : Resolved.DeclarationId)
+/-- Retain the complete result of instantiating one resolved declaration,
+including staging metadata which is independent of type substitution. -/
+def ofInstantiated (signature : ProgramFunctionSignature)
     (instantiated : InstantiatedConstrainedDeclaration) :
     DeclarationInstantiation := {
-  declaration
+  declaration := signature.id
   parameterSubstitution := instantiated.parameterSubstitution
   type := instantiated.body
   predicates := instantiated.predicates
+  parameterComptime := signature.parameterComptime
+  returnComptime := signature.returnComptime
 }
 
 /-- Close every flexible type position retained by an instantiation. -/

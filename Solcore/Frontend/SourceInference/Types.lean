@@ -180,6 +180,10 @@ structure CheckedFunction where
   declaration : Resolved.DeclarationId
   type : Ty
   inferredBodyType : Ty
+  /-- Whether the canonical source result is available during staged
+  evaluation.  This marker is intentionally independent of its semantic
+  result type. -/
+  returnComptime : Bool := false
   substitution : Substitution
   solvedRequirements : List SolvedRequirement
   typedBody : TypedSource
@@ -225,16 +229,19 @@ inductive ProgramCheckError where
 namespace State
 
 private def initialBinders (owner : Resolved.DeclarationId)
-    (locals : TypeSystem.Environment) : List TypedBinder :=
+    (locals : TypeSystem.Environment) (inputComptime : List Bool) :
+    List TypedBinder :=
   locals.mapIdx fun index entry => {
     id := { owner, binderIndex := index }
     name := entry.1
     scheme := entry.2
+    comptime := inputComptime.getD index false
   }
 
 def initial (owner : Resolved.DeclarationId)
-    (locals : TypeSystem.Environment := []) : State :=
-  let binders := initialBinders owner locals
+    (locals : TypeSystem.Environment := [])
+    (inputComptime : List Bool := []) : State :=
+  let binders := initialBinders owner locals inputComptime
   {
     owner
     inference := .initial locals.nextVariable

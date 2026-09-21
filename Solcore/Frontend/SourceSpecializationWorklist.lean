@@ -91,6 +91,12 @@ inductive Error where
   | specializedCalleeAssumptionsMismatch
       (call : ExpressionId)
       (instantiationPredicates specializedAssumptions : List ProgramPredicate)
+  | specializedCalleeParameterComptimeMismatch
+      (call : ExpressionId)
+      (instantiation specialized : List Bool)
+  | specializedCalleeReturnComptimeMismatch
+      (call : ExpressionId)
+      (instantiation specialized : Bool)
   | invalidExpressionCoercionPath
       (expression : ExpressionId) (source target : Ty)
       (coercions : List CoercionStep)
@@ -182,6 +188,14 @@ private def directCall (program : CheckedProgram)
   if specialized.assumptions != instantiation.predicates then
     throw (.specializedCalleeAssumptionsMismatch node.id
       instantiation.predicates specialized.assumptions)
+  let specializedParameterComptime :=
+    specialized.function.typedBody.inputs.map (·.comptime)
+  if instantiation.parameterComptime != specializedParameterComptime then
+    throw (.specializedCalleeParameterComptimeMismatch node.id
+      instantiation.parameterComptime specializedParameterComptime)
+  if instantiation.returnComptime != specialized.function.returnComptime then
+    throw (.specializedCalleeReturnComptimeMismatch node.id
+      instantiation.returnComptime specialized.function.returnComptime)
   pure (request, {
     caller
     occurrence := node.id
