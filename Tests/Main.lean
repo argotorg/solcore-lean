@@ -1273,6 +1273,7 @@ import Solcore.Test.SourceStagedValues
 import Solcore.Test.SourceStagedValuesTamper
 import Solcore.Test.SourceStagedValueCalls
 import Solcore.Test.SourceStagedValueCallsTamper
+import Solcore.Test.SourceStagedRequiredOperators
 import Solcore.Test.SourceSpecialization
 import Solcore.Test.SourceSpecializationWorklist
 import Solcore.Test.SourceCoreElaboration
@@ -6077,6 +6078,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceStagedValuesTamper.testSourceStagedValuesTamper
   SourceStagedValueCalls.testSourceStagedValueCalls
   SourceStagedValueCallsTamper.testSourceStagedValueCallsTamper
+  SourceStagedRequiredOperators.testSourceStagedRequiredOperators
   SourceSpecialization.testSourceSpecialization
   SourceSpecializationWorklist.testSourceSpecializationWorklist
   SourceCoreElaboration.testSourceCoreElaboration

@@ -177,6 +177,15 @@ inductive Error where
   | stagedCoercionInputTypeMismatch
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (requirement : RequirementId) (expected actual : Core.Ty)
+  | stagedUnaryInputTypeMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (expected actual : Core.Ty)
+  | stagedBinaryLeftInputTypeMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (expected actual : Core.Ty)
+  | stagedBinaryRightInputTypeMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (expected actual : Core.Ty)
   | stagedEvidenceExecutionOutOfFuel
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (requirement : RequirementId)
@@ -1151,6 +1160,73 @@ private def executeClosedStagedValue (caller : SpecializedFunction)
       | none => throw (.stagedEvidenceResultOutsideCarrier caller.key node.id
           requirement result)
 
+/-- Adapt the ordinary checked unary implementation plan to the staged-value
+domain.  Evidence selection, method checking, detached linking, and method
+requirement accounting remain exactly the runtime plan's responsibility; only
+closed value execution is added here. -/
+private def stagedValueRequiredUnaryPlan (program : CheckedProgram)
+    (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (elaborateMethod : ExecutableMethodElaborator)
+    (caller : SpecializedFunction) (available : List PredicateEvidence)
+    (node : ExpressionNode) (operator : Syntax.UnaryOp) :
+    Except Error (SourceCoreElaboration.StagedValueRequiredUnaryPlan Error) := do
+  let runtimePlan ← requiredUnaryPlan program temporaryOwner temporaryBase
+    elaborateMethod caller available node operator
+  let requirement ← match node.requirements with
+    | requirement :: _ => pure requirement
+    | [] => throw (.unaryRequirementCountMismatch caller.key node.id 1 0)
+  let resultType ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      node.type).mapError Error.sourceCore
+  pure {
+    operandType := runtimePlan.operandType
+    resultType
+    consumedRequirements := runtimePlan.consumedRequirements
+    invoke := fun value => do
+      let actualInput := SourceStagedValue.coreType value
+      if actualInput != runtimePlan.operandType then
+        throw (.stagedUnaryInputTypeMismatch caller.key node.id requirement
+          runtimePlan.operandType actualInput)
+      let resolved ← runtimePlan.build (SourceStagedValue.toResolved value)
+      executeClosedStagedValue caller node requirement resultType resolved
+  }
+
+/-- Adapt the ordinary checked binary implementation plan to staged execution.
+Operands remain left-to-right in Source Core; the runtime builder only receives
+the two already evaluated closed values. -/
+private def stagedValueRequiredBinaryPlan (program : CheckedProgram)
+    (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (elaborateMethod : ExecutableMethodElaborator)
+    (caller : SpecializedFunction) (available : List PredicateEvidence)
+    (node : ExpressionNode) (operator : Syntax.BinaryOp) :
+    Except Error (SourceCoreElaboration.StagedValueRequiredBinaryPlan Error) := do
+  let runtimePlan ← requiredBinaryPlan program temporaryOwner temporaryBase
+    elaborateMethod caller available node operator
+  let requirement ← match node.requirements with
+    | requirement :: _ => pure requirement
+    | [] => throw (.binaryRequirementCountMismatch caller.key node.id 1 0)
+  let resultType ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      node.type).mapError Error.sourceCore
+  pure {
+    leftType := runtimePlan.leftType
+    rightType := runtimePlan.rightType
+    resultType
+    consumedRequirements := runtimePlan.consumedRequirements
+    invoke := fun left right => do
+      let actualLeft := SourceStagedValue.coreType left
+      if actualLeft != runtimePlan.leftType then
+        throw (.stagedBinaryLeftInputTypeMismatch caller.key node.id requirement
+          runtimePlan.leftType actualLeft)
+      let actualRight := SourceStagedValue.coreType right
+      if actualRight != runtimePlan.rightType then
+        throw (.stagedBinaryRightInputTypeMismatch caller.key node.id requirement
+          runtimePlan.rightType actualRight)
+      let resolved ← runtimePlan.build
+        (SourceStagedValue.toResolved left) (SourceStagedValue.toResolved right)
+      executeClosedStagedValue caller node requirement resultType resolved
+  }
+
 /-- Reuse the ordinary checked coercion plan for staged values, then execute
 the resulting closed local Core term.  Only the bounded staged carrier may
 cross back out, and even an otherwise successful method is rejected if it
@@ -1461,6 +1537,16 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
                 (elaborateDetachedMethod program temporaryOwner temporaryBase
                   specialized visiting remaining node.id)
                 specialized assumptionEvidence node step
+            onStagedValueRequiredUnary := fun node operator _ =>
+              stagedValueRequiredUnaryPlan program temporaryOwner temporaryBase
+                (elaborateDetachedMethod program temporaryOwner temporaryBase
+                  specialized visiting remaining node.id)
+                specialized assumptionEvidence node operator
+            onStagedValueRequiredBinary := fun node _ operator _ =>
+              stagedValueRequiredBinaryPlan program temporaryOwner temporaryBase
+                (elaborateDetachedMethod program temporaryOwner temporaryBase
+                  specialized visiting remaining node.id)
+                specialized assumptionEvidence node operator
           }
           (fun _ node operator _ =>
             requiredUnaryPlan program temporaryOwner temporaryBase
@@ -1533,6 +1619,16 @@ private def evaluateStagedValueFunctionFuel (program : CheckedProgram)
               (elaborateDetachedMethod program temporaryOwner temporaryBase
                 specialized visiting remaining node.id)
               specialized assumptionEvidence node step)
+          (fun node operator _ =>
+            stagedValueRequiredUnaryPlan program temporaryOwner temporaryBase
+              (elaborateDetachedMethod program temporaryOwner temporaryBase
+                specialized visiting remaining node.id)
+              specialized assumptionEvidence node operator)
+          (fun node _ operator _ =>
+            stagedValueRequiredBinaryPlan program temporaryOwner temporaryBase
+              (elaborateDetachedMethod program temporaryOwner temporaryBase
+                specialized visiting remaining node.id)
+              specialized assumptionEvidence node operator)
           specialized arguments
 termination_by fuel
 
