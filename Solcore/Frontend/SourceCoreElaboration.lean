@@ -151,6 +151,10 @@ inductive ErrorReason where
       (operator : Syntax.UnaryOp) (actual : Ty)
   | stagedValueInvalidBinaryOperands
       (operator : Syntax.BinaryOp) (left right : Ty)
+  | stagedValueCallRequirementsMismatch
+      (expected actual : List RequirementId)
+  | stagedValueCallArgumentArityMismatch (expected actual : Nat)
+  | stagedValueCallResultTypeMismatch (expected actual : Ty)
   | stagedValueArgumentArityMismatch (expected actual : Nat)
   | stagedValueFunctionTypeMismatch (expected actual : Ty)
   | stagedValueSpecializationKeyMismatch
@@ -279,6 +283,28 @@ left-to-right evaluation, and caller-local requirement accounting. -/
 abbrev StagedIntegerCallElaborator (error : Type) :=
   ExpressionNode → ExpressionId → List ExpressionId →
   DeclarationInstantiation → Except error (StagedIntegerCallPlan error)
+
+/-- A general staged call policy fixes source argument/result types and the
+caller-local requirements it consumes before receiving already evaluated
+Core-representable values in source order. -/
+structure StagedValueCallPlan (error : Type) where
+  argumentTypes : List Ty
+  resultType : Ty
+  consumedRequirements : List RequirementId
+  invoke : List SourceStagedValue.Value →
+    Except error SourceStagedValue.Value
+
+/-- Whole-program hook for direct calls in the bounded staged-value domain. -/
+abbrev StagedValueCallElaborator (error : Type) :=
+  ExpressionNode → ExpressionId → List ExpressionId →
+  DeclarationInstantiation → Except error (StagedValueCallPlan error)
+
+/-- Optional bridge used only by whole-program specialization consumers.
+Source Core retains ownership of the lexical staged environment and of every
+stage, type, traversal, and requirement-ledger check. -/
+structure StagedValueLoweringPolicy (error : Type) where
+  analysis : SourceStageAnalysis.Analysis
+  onStagedValueCall : StagedValueCallElaborator error
 
 /-- A policy for a requirement-bearing unary expression declares the exact
 type at which Source Core must check its operand, identifies the requirements
@@ -564,6 +590,37 @@ structure StagedBoolEvaluation where
   value : Bool
   consumedRequirements : List RequirementId
   deriving Repr, DecidableEq
+
+/-- A Core-representable staged value together with the exact source
+requirements consumed while producing it.  The separate bare-integer
+evaluator remains the compatibility path for unbounded compile-time integers. -/
+structure StagedValueEvaluation where
+  value : SourceStagedValue.Value
+  consumedRequirements : List RequirementId
+  deriving Repr, DecidableEq
+
+private structure StagedValueBinding where
+  binder : TypedBinder
+  value : SourceStagedValue.Value
+
+private abbrev StagedValueEnvironment := List StagedValueBinding
+
+private def StagedValueEnvironment.contains
+    (environment : StagedValueEnvironment) (id : Resolved.LocalId) : Bool :=
+  environment.any fun binding => decide (binding.binder.id = id)
+
+private def StagedValueEnvironment.lookup?
+    (environment : StagedValueEnvironment) (id : Resolved.LocalId) :
+    Option StagedValueBinding :=
+  environment.find? fun binding => decide (binding.binder.id = id)
+
+/-- Internal late-bound evaluator used by the runtime lowerer.  Public callers
+provide only the stage analysis and direct-call policy; this callback is built
+inside Source Core after the staged evaluator has been defined. -/
+private structure RawStagedValueLoweringPolicy (error : Type) where
+  analysis : SourceStageAnalysis.Analysis
+  evaluate : StagedValueEnvironment → ExpressionId →
+    Except error StagedValueEvaluation
 
 private structure StagedIntegerBinding where
   binder : TypedBinder
@@ -1020,6 +1077,16 @@ private def rejectStagedIntegerCallsWith {error : Type}
     failWith lift (.occurrence node.id.occurrence)
       .stagedIntegerExpressionNotClosed
 
+private def rejectStagedValueCallsWith {error : Type}
+    (lift : Error → error) : StagedValueCallElaborator error :=
+  fun node _ _ _ =>
+    if !node.requirements.isEmpty then
+      failWith lift (.occurrence node.id.occurrence)
+        (.requirementsPresent node.requirements)
+    else
+      failWith lift (.occurrence node.id.occurrence)
+        (.unsupportedExpression .call)
+
 /-- Evaluate staged integer expressions with an explicit whole-program direct
 call policy.  Structural expression fuel remains source-local; recursive call
 fuel and specialization-cycle tracking belong to the policy's owner. -/
@@ -1434,12 +1501,14 @@ coercion-cleared view of the base node. -/
 private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (stagedValuePolicy : Option (RawStagedValueLoweringPolicy error))
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
     (solvedRequirements : List SolvedRequirement)
     (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
     (environment : StagedIntegerEnvironment)
+    (stagedValueEnvironment : StagedValueEnvironment)
     (id : ExpressionId) :
     Except error LoweredExpression :=
   match fuel with
@@ -1447,9 +1516,40 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
   | fuel + 1 => do
       let node ← (lookupExpression source id).mapError lift
       let recurse := lowerExpressionFuelWith lift onCall onStagedIntegerCall
-        onRequiredUnary onRequiredBinary onCoercion solvedRequirements fuel
-        source scope environment
+        stagedValuePolicy onRequiredUnary onRequiredBinary onCoercion
+        solvedRequirements fuel source scope environment stagedValueEnvironment
+      let lowerOrdinary :=
+        match node.coercions with
+        | [] =>
+            lowerExpressionNodeWith lift onCall onRequiredUnary
+              onRequiredBinary solvedRequirements source scope recurse node
+        | first :: rest => do
+            let prepared ← prepareCoercionPathWith lift node first rest
+            let plans ← checkedCoercionPlansWith lift onCoercion scope node
+              (first :: rest)
+            let baseNode := {
+              node with
+              type := prepared.rawType
+              requirements := prepared.remainingRequirements
+              coercions := []
+            }
+            let base ← lowerExpressionNodeWith lift onCall onRequiredUnary
+              onRequiredBinary solvedRequirements source scope recurse baseNode
+            applyCoercionPlans base.resolved base.consumedRequirements plans
       match node.form with
+      | .call _ _ (.declaration instantiation) =>
+          match stagedValuePolicy with
+          | some policy =>
+              if instantiation.returnComptime &&
+                  policy.analysis.expressionStage? id = some .comptime then
+                let evaluated ← policy.evaluate stagedValueEnvironment id
+                pure {
+                  resolved := SourceStagedValue.toResolved evaluated.value
+                  consumedRequirements := evaluated.consumedRequirements
+                }
+              else
+                lowerOrdinary
+          | none => lowerOrdinary
       | .call callee arguments (.builtinFunction .wordFromInteger) =>
           lowerWordFromIntegerWith lift onStagedIntegerCall solvedRequirements
             source environment fuel node callee arguments
@@ -1459,34 +1559,19 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
       | .call _ _ (.builtinFunction .integerLt) =>
           lowerStagedBoolWith lift onStagedIntegerCall solvedRequirements source
             environment (fuel + 1) id
-      | _ =>
-          match node.coercions with
-          | [] =>
-              lowerExpressionNodeWith lift onCall onRequiredUnary
-                onRequiredBinary solvedRequirements source scope recurse node
-          | first :: rest => do
-              let prepared ← prepareCoercionPathWith lift node first rest
-              let plans ← checkedCoercionPlansWith lift onCoercion scope node
-                (first :: rest)
-              let baseNode := {
-                node with
-                type := prepared.rawType
-                requirements := prepared.remainingRequirements
-                coercions := []
-              }
-              let base ← lowerExpressionNodeWith lift onCall onRequiredUnary
-                onRequiredBinary solvedRequirements source scope recurse baseNode
-              applyCoercionPlans base.resolved base.consumedRequirements plans
+      | _ => lowerOrdinary
 
 private def lowerExpressionAsWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (stagedValuePolicy : Option (RawStagedValueLoweringPolicy error))
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
     (solvedRequirements : List SolvedRequirement)
     (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
     (environment : StagedIntegerEnvironment)
+    (stagedValueEnvironment : StagedValueEnvironment)
     (expected : Core.Ty) (id : ExpressionId) :
     Except error LoweredExpression := do
   let node ← (lookupExpression source id).mapError lift
@@ -1498,9 +1583,41 @@ private def lowerExpressionAsWith {error : Type} (lift : Error → error)
             node.type)
   | _ => pure ()
   ensureTypeWith lift (.occurrence id.occurrence) expected node.type
-  lowerExpressionFuelWith lift onCall onStagedIntegerCall onRequiredUnary
-    onRequiredBinary onCoercion solvedRequirements fuel source scope
-    environment id
+  lowerExpressionFuelWith lift onCall onStagedIntegerCall stagedValuePolicy
+    onRequiredUnary onRequiredBinary onCoercion solvedRequirements fuel source
+    scope environment stagedValueEnvironment id
+
+/-- Decide whether an ordinary let initializer belongs to the general staged
+value cache profile before evaluation.  This keeps an unsupported runtime
+operator or coercion on the ordinary lowering path without treating a genuine
+staged-evaluation or whole-program policy error as a cache miss. -/
+private def stagedValueCacheEligible
+    (analysis : SourceStageAnalysis.Analysis) (source : TypedSource)
+    (environment : StagedValueEnvironment) : Nat → ExpressionId → Bool
+  | 0, _ => false
+  | fuel + 1, id =>
+      match analysis.expressionStage? id, source.lookupExpression? id with
+      | some .comptime, some node =>
+          let recurse := stagedValueCacheEligible analysis source environment fuel
+          match node.form with
+          | .integerLiteral _ _ => node.coercions.isEmpty
+          | .call _ _ (.declaration instantiation) =>
+              instantiation.returnComptime
+          | form =>
+              node.requirements.isEmpty && node.coercions.isEmpty &&
+                match form with
+                | .literal _ => true
+                | .reference _ (.local binder) => environment.contains binder
+                | .reference _ (.builtinBoolean _) => true
+                | .group inner => recurse inner
+                | .tuple elements => elements.all recurse
+                | .unary _ operand => recurse operand
+                | .binary left _ right => recurse left && recurse right
+                | .conditional condition thenBranch elseBranch =>
+                    recurse condition && recurse thenBranch &&
+                      recurse elseBranch
+                | _ => false
+      | _, _ => false
 
 private inductive MatchPatternLeaf where
   | wildcard
@@ -1576,18 +1693,21 @@ fuel, while expression edges consume the remaining fuel independently. -/
 private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (stagedValuePolicy : Option (RawStagedValueLoweringPolicy error))
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
     (solvedRequirements : List SolvedRequirement) :
     Nat → TypedSource → Resolved.Context → StagedIntegerEnvironment →
-      Core.Ty → ErrorSite → ErrorReason → List StatementId →
+      StagedValueEnvironment → Core.Ty → ErrorSite → ErrorReason →
+      List StatementId →
       Except error LoweredExpression
-  | _, _, _, _, _, fallthroughSite, fallthroughReason, [] =>
+  | _, _, _, _, _, _, fallthroughSite, fallthroughReason, [] =>
       failWith lift fallthroughSite fallthroughReason
-  | 0, _, _, _, _, _, _, id :: _ =>
+  | 0, _, _, _, _, _, _, _, id :: _ =>
       failWith lift (.occurrence id.occurrence) .statementDepthLimit
-  | fuel + 1, source, scope, environment, expected, fallthroughSite,
+  | fuel + 1, source, scope, environment, stagedValueEnvironment, expected,
+      fallthroughSite,
       fallthroughReason, id :: rest => do
     let node ← (lookupStatement source id).mapError lift
     let site := ErrorSite.occurrence id.occurrence
@@ -1605,10 +1725,11 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
                 evaluateStagedIntegerFuelWith lift onStagedIntegerCall
                   solvedRequirements source environment fuel initializer
           let body ← lowerStatementsFuelWith lift onCall
-            onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
-            solvedRequirements fuel source scope
-            ({ binder, value := initializer.value } :: environment) expected
-            fallthroughSite fallthroughReason rest
+            onStagedIntegerCall stagedValuePolicy onRequiredUnary
+            onRequiredBinary onCoercion solvedRequirements fuel source scope
+            ({ binder, value := initializer.value } :: environment)
+            stagedValueEnvironment expected fallthroughSite fallthroughReason
+            rest
           pure {
             resolved := body.resolved
             consumedRequirements := initializer.consumedRequirements ++
@@ -1620,22 +1741,60 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
         else
           let binderType ← (lowerType (.binder binder.id)
             binder.scheme.body).mapError lift
-          let initializer ← match initializer with
+          let initializerId ← match initializer with
             | none => failWith lift site .uninitializedLet
-            | some initializer =>
-                lowerExpressionAsWith lift onCall onStagedIntegerCall
-                  onRequiredUnary onRequiredBinary onCoercion
-                  solvedRequirements fuel source scope environment binderType
-                  initializer
-          let body ← lowerStatementsFuelWith lift onCall
-            onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
-            solvedRequirements fuel source ((binder.id, binderType) :: scope)
-            environment expected fallthroughSite fallthroughReason rest
-          pure {
-            resolved := .letE binder.id initializer.resolved body.resolved
-            consumedRequirements := initializer.consumedRequirements ++
-              body.consumedRequirements
-          }
+            | some initializer => pure initializer
+          let lowerOrdinary : Except error LoweredExpression := do
+            let initializer ← lowerExpressionAsWith lift onCall
+              onStagedIntegerCall stagedValuePolicy onRequiredUnary
+              onRequiredBinary onCoercion solvedRequirements fuel source scope
+              environment stagedValueEnvironment binderType initializerId
+            let body ← lowerStatementsFuelWith lift onCall
+              onStagedIntegerCall stagedValuePolicy onRequiredUnary
+              onRequiredBinary onCoercion solvedRequirements fuel source
+              ((binder.id, binderType) :: scope) environment
+              stagedValueEnvironment expected fallthroughSite fallthroughReason
+              rest
+            pure {
+              resolved := .letE binder.id initializer.resolved body.resolved
+              consumedRequirements := initializer.consumedRequirements ++
+                body.consumedRequirements
+            }
+          match stagedValuePolicy with
+          | some policy =>
+              if policy.analysis.binderStage? binder.id = some .comptime &&
+                  policy.analysis.expressionStage? initializerId =
+                    some .comptime &&
+                  stagedValueCacheEligible policy.analysis source
+                    stagedValueEnvironment (source.nodes.length + 1)
+                    initializerId then
+                if binder.id.owner != source.owner then
+                  failWith lift (.binder binder.id)
+                    (.ownerMismatch source.owner binder.id.owner)
+                let evaluated ← policy.evaluate stagedValueEnvironment
+                  initializerId
+                let actualType :=
+                  SourceStagedValue.sourceType evaluated.value
+                if actualType != binder.scheme.body then
+                  failWith lift (.binder binder.id)
+                    (.stagedValueTypeMismatch binder.scheme.body actualType)
+                let body ← lowerStatementsFuelWith lift onCall
+                  onStagedIntegerCall stagedValuePolicy onRequiredUnary
+                  onRequiredBinary onCoercion solvedRequirements fuel source
+                  ((binder.id, binderType) :: scope) environment
+                  ({ binder, value := evaluated.value } ::
+                    stagedValueEnvironment)
+                  expected fallthroughSite fallthroughReason rest
+                pure {
+                  resolved := .letE binder.id
+                    (SourceStagedValue.toResolved evaluated.value)
+                    body.resolved
+                  consumedRequirements := evaluated.consumedRequirements ++
+                    body.consumedRequirements
+                }
+              else
+                lowerOrdinary
+          | none => lowerOrdinary
     | .returnStmt value => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .returnStmt)
@@ -1652,8 +1811,9 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
                 failWith lift site (.typedNodeTypeMismatch expected .unit)
           | some value =>
               lowerExpressionAsWith lift onCall onStagedIntegerCall
-                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
-                fuel source scope environment expected value
+                stagedValuePolicy onRequiredUnary onRequiredBinary onCoercion
+                solvedRequirements fuel source scope environment
+                stagedValueEnvironment expected value
     | .ifThen condition thenBody elseBody => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .ifThen)
@@ -1663,15 +1823,18 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           | some elseBody => do
               ensureTypeWith lift site expected node.type
               let condition ← lowerExpressionAsWith lift onCall
-                onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
-                solvedRequirements fuel source scope environment .bool condition
+                onStagedIntegerCall stagedValuePolicy onRequiredUnary
+                onRequiredBinary onCoercion solvedRequirements fuel source scope
+                environment stagedValueEnvironment .bool condition
               let thenBranch ← lowerStatementsFuelWith lift onCall
-                onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
-                solvedRequirements fuel source scope environment expected site
+                onStagedIntegerCall stagedValuePolicy onRequiredUnary
+                onRequiredBinary onCoercion solvedRequirements fuel source scope
+                environment stagedValueEnvironment expected site
                 (.conditionalBranchFallthrough .thenBranch) thenBody
               let elseBranch ← lowerStatementsFuelWith lift onCall
-                onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
-                solvedRequirements fuel source scope environment expected site
+                onStagedIntegerCall stagedValuePolicy onRequiredUnary
+                onRequiredBinary onCoercion solvedRequirements fuel source scope
+                environment stagedValueEnvironment expected site
                 (.conditionalBranchFallthrough .elseBranch) elseBody
               pure {
                 resolved := .ifE condition.resolved thenBranch.resolved
@@ -1686,8 +1849,9 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
         else
           ensureTypeWith lift site expected node.type
           lowerStatementsFuelWith lift onCall onStagedIntegerCall
-            onRequiredUnary onRequiredBinary onCoercion solvedRequirements fuel
-            source scope environment expected site .blockFallthrough body
+            stagedValuePolicy onRequiredUnary onRequiredBinary onCoercion
+            solvedRequirements fuel source scope environment
+            stagedValueEnvironment expected site .blockFallthrough body
     | .matchWith resolution => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .matchWith)
@@ -1706,8 +1870,9 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
             (lowerType (.occurrence resolution.scrutinee.occurrence)
               scrutineeNode.type).mapError lift
           let scrutinee ← lowerExpressionAsWith lift onCall
-            onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
-            solvedRequirements fuel source scope environment scrutineeCoreType
+            onStagedIntegerCall stagedValuePolicy onRequiredUnary
+            onRequiredBinary onCoercion solvedRequirements fuel source scope
+            environment stagedValueEnvironment scrutineeCoreType
             resolution.scrutinee
           let expectedRequirements := resolution.cases.flatMap fun arm =>
             arm.pattern.requirements
@@ -1719,17 +1884,19 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
               let pattern ← lowerMatchPatternWith lift site solvedRequirements
                 scrutineeNode.type arm.pattern
               let branch ← lowerStatementsFuelWith lift onCall
-                onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
-                solvedRequirements fuel source scope environment expected site
+                onStagedIntegerCall stagedValuePolicy onRequiredUnary
+                onRequiredBinary onCoercion solvedRequirements fuel source scope
+                environment stagedValueEnvironment expected site
                 .blockFallthrough arm.body
               pure { pattern, branch }
             let fallback ← match resolution.defaultBody with
               | none => pure none
               | some body => do
                   let lowered ← lowerStatementsFuelWith lift onCall
-                    onStagedIntegerCall onRequiredUnary onRequiredBinary
-                    onCoercion solvedRequirements fuel source scope environment
-                    expected site .blockFallthrough body
+                    onStagedIntegerCall stagedValuePolicy onRequiredUnary
+                    onRequiredBinary onCoercion solvedRequirements fuel source
+                    scope environment stagedValueEnvironment expected site
+                    .blockFallthrough body
                   pure (some lowered)
             let folded := foldLoweredMatchCases resolution.hiddenScrutinee
               loweredCases (fallback.map (·.resolved))
@@ -1928,29 +2095,6 @@ def reconcileConsumedRequirements
     Except Error (List RequirementId) :=
   reconcileConsumedRequirementsAux declaration [] solved consumed
 
-/-- A Core-representable staged value together with the exact source
-requirements consumed while producing it.  The separate bare-integer
-evaluator remains the compatibility path for unbounded compile-time integers. -/
-structure StagedValueEvaluation where
-  value : SourceStagedValue.Value
-  consumedRequirements : List RequirementId
-  deriving Repr, DecidableEq
-
-private structure StagedValueBinding where
-  binder : TypedBinder
-  value : SourceStagedValue.Value
-
-private abbrev StagedValueEnvironment := List StagedValueBinding
-
-private def StagedValueEnvironment.contains
-    (environment : StagedValueEnvironment) (id : Resolved.LocalId) : Bool :=
-  environment.any fun binding => decide (binding.binder.id = id)
-
-private def StagedValueEnvironment.lookup?
-    (environment : StagedValueEnvironment) (id : Resolved.LocalId) :
-    Option StagedValueBinding :=
-  environment.find? fun binding => decide (binding.binder.id = id)
-
 private def requireStagedExpressionWith {error : Type}
     (lift : Error → error) (analysis : SourceStageAnalysis.Analysis)
     (id : ExpressionId) : Except error Unit :=
@@ -2068,7 +2212,9 @@ private def evaluateStagedValueListWith {error : Type}
       pure (value :: values)
 
 private def evaluateStagedValueFuelWith {error : Type}
-    (lift : Error → error) (analysis : SourceStageAnalysis.Analysis)
+    (lift : Error → error)
+    (onStagedValueCall : StagedValueCallElaborator error)
+    (analysis : SourceStageAnalysis.Analysis)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
     (environment : StagedValueEnvironment) :
     Nat → ExpressionId → Except error StagedValueEvaluation
@@ -2080,7 +2226,7 @@ private def evaluateStagedValueFuelWith {error : Type}
       let site := ErrorSite.occurrence id.occurrence
       unless node.coercions.isEmpty do
         failWith lift site (.coercionsPresent node.coercions)
-      let recurse := evaluateStagedValueFuelWith lift analysis
+      let recurse := evaluateStagedValueFuelWith lift onStagedValueCall analysis
         solvedRequirements source environment fuel
       match node.form with
       | .integerLiteral literal resolution => do
@@ -2097,6 +2243,41 @@ private def evaluateStagedValueFuelWith {error : Type}
             value := .word (Core.Word.ofNatModulo validated.rawValue)
             consumedRequirements := validated.consumedRequirements
           }
+      | .call callee arguments (.declaration instantiation) => do
+          let plan ← onStagedValueCall node callee arguments instantiation
+          if plan.consumedRequirements != node.requirements then
+            failWith lift site
+              (.stagedValueCallRequirementsMismatch node.requirements
+                plan.consumedRequirements)
+          else if plan.argumentTypes.length != arguments.length then
+            failWith lift site
+              (.stagedValueCallArgumentArityMismatch
+                plan.argumentTypes.length arguments.length)
+          else if plan.resultType != node.type then
+            failWith lift site
+              (.stagedValueCallResultTypeMismatch node.type plan.resultType)
+          else
+            let evaluatedArguments ←
+              (plan.argumentTypes.zip arguments).mapM fun pair => do
+                let argumentNode ←
+                  (lookupExpression source pair.2).mapError lift
+                if argumentNode.type != pair.1 then
+                  failWith lift (.occurrence pair.2.occurrence)
+                    (.stagedValueTypeMismatch pair.1 argumentNode.type)
+                else
+                  let evaluated ← recurse pair.2
+                  ensureStagedValueTypeWith lift
+                    (.occurrence pair.2.occurrence) pair.1 evaluated.value
+                  pure evaluated
+            let value ← plan.invoke
+              (evaluatedArguments.map fun argument => argument.value)
+            ensureStagedValueTypeWith lift site plan.resultType value
+            pure {
+              value
+              consumedRequirements := evaluatedArguments.flatMap
+                (fun argument => argument.consumedRequirements) ++
+                plan.consumedRequirements
+            }
       | form => do
           unless node.requirements.isEmpty do
             failWith lift site (.requirementsPresent node.requirements)
@@ -2225,8 +2406,20 @@ def evaluateStagedValueWith {error : Type} (lift : Error → error)
     (analysis : SourceStageAnalysis.Analysis)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
     (id : ExpressionId) : Except error StagedValueEvaluation :=
-  evaluateStagedValueFuelWith lift analysis solvedRequirements source []
-    (source.nodes.length + 1) id
+  evaluateStagedValueFuelWith lift (rejectStagedValueCallsWith lift) analysis
+    solvedRequirements source [] (source.nodes.length + 1) id
+
+/-- Evaluate one staged expression in a declaration-owned lexical environment
+while delegating only direct source calls to a whole-program consumer. -/
+private def evaluateStagedValueInEnvironmentWith {error : Type}
+    (lift : Error → error)
+    (onStagedValueCall : StagedValueCallElaborator error)
+    (analysis : SourceStageAnalysis.Analysis)
+    (solvedRequirements : List SolvedRequirement) (source : TypedSource)
+    (environment : StagedValueEnvironment) (id : ExpressionId) :
+    Except error StagedValueEvaluation :=
+  evaluateStagedValueFuelWith lift onStagedValueCall analysis
+    solvedRequirements source environment (source.nodes.length + 1) id
 
 /-- Standalone closed staged-value evaluation. -/
 def evaluateStagedValue (analysis : SourceStageAnalysis.Analysis)
@@ -2255,7 +2448,9 @@ private def bindStagedValueInputsWith {error : Type}
         (.stagedValueArgumentArityMismatch binders.length values.length)
 
 private def evaluateStagedValueStatementsFuelWith {error : Type}
-    (lift : Error → error) (analysis : SourceStageAnalysis.Analysis)
+    (lift : Error → error)
+    (onStagedValueCall : StagedValueCallElaborator error)
+    (analysis : SourceStageAnalysis.Analysis)
     (solvedRequirements : List SolvedRequirement) :
     Nat → TypedSource → StagedValueEnvironment → ErrorSite → ErrorReason →
       List StatementId → Except error StagedValueEvaluation
@@ -2278,13 +2473,14 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
         let initializer ← match initializer with
           | none => failWith lift site .uninitializedLet
           | some initializer =>
-              evaluateStagedValueFuelWith lift analysis solvedRequirements
-                source environment fuel initializer
+              evaluateStagedValueFuelWith lift onStagedValueCall analysis
+                solvedRequirements source environment fuel initializer
         ensureStagedValueTypeWith lift (.binder binder.id)
           binder.scheme.body initializer.value
-        let body ← evaluateStagedValueStatementsFuelWith lift analysis
-          solvedRequirements fuel source ({ binder, value := initializer.value } ::
-            environment) fallthroughSite fallthroughReason rest
+        let body ← evaluateStagedValueStatementsFuelWith lift
+          onStagedValueCall analysis solvedRequirements fuel source
+          ({ binder, value := initializer.value } :: environment)
+          fallthroughSite fallthroughReason rest
         pure {
           value := body.value
           consumedRequirements := initializer.consumedRequirements ++
@@ -2300,8 +2496,9 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
             else
               failWith lift site .stagedValueStatementNotClosed
         | some value => do
-            let evaluated ← evaluateStagedValueFuelWith lift analysis
-              solvedRequirements source environment fuel value
+            let evaluated ← evaluateStagedValueFuelWith lift
+              onStagedValueCall analysis solvedRequirements source environment
+              fuel value
             ensureStagedValueTypeWith lift site node.type evaluated.value
             pure evaluated
     | .ifThen condition thenBody elseBody => do
@@ -2310,14 +2507,14 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
         let elseBody ← match elseBody with
           | some body => pure body
           | none => failWith lift site .missingElseBranch
-        let condition ← evaluateStagedValueFuelWith lift analysis
-          solvedRequirements source environment fuel condition
+        let condition ← evaluateStagedValueFuelWith lift onStagedValueCall
+          analysis solvedRequirements source environment fuel condition
         let conditionValue ← stagedBoolWith lift site condition.value
-        let thenBranch ← evaluateStagedValueStatementsFuelWith lift analysis
-          solvedRequirements fuel source environment site
+        let thenBranch ← evaluateStagedValueStatementsFuelWith lift
+          onStagedValueCall analysis solvedRequirements fuel source environment site
           (.conditionalBranchFallthrough .thenBranch) thenBody
-        let elseBranch ← evaluateStagedValueStatementsFuelWith lift analysis
-          solvedRequirements fuel source environment site
+        let elseBranch ← evaluateStagedValueStatementsFuelWith lift
+          onStagedValueCall analysis solvedRequirements fuel source environment site
           (.conditionalBranchFallthrough .elseBranch) elseBody
         let selected := if conditionValue then thenBranch.value
           else elseBranch.value
@@ -2332,84 +2529,96 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
     | .block body => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .block)
-        let evaluated ← evaluateStagedValueStatementsFuelWith lift analysis
-          solvedRequirements fuel source environment site .blockFallthrough body
+        let evaluated ← evaluateStagedValueStatementsFuelWith lift
+          onStagedValueCall analysis solvedRequirements fuel source environment
+          site .blockFallthrough body
         ensureStagedValueTypeWith lift site node.type evaluated.value
         pure evaluated
     | .matchWith _ => failWith lift site .stagedValueStatementNotClosed
     | .expression _ _ =>
         failWith lift site (.unsupportedStatement .expression)
 
-/-- Execute the Core-representable, call-free staged subset of one exact source
-specialization.  Stable input identities and the specialization-owned stage
-table are both checked before evaluation, and the function-local requirement
-ledger is reconciled exactly once. -/
-def evaluateStagedValueFunction
+/-- Execute the Core-representable staged subset of one exact source
+specialization with an explicit whole-program direct-call policy.  Stable input
+identities and the specialization-owned stage table are checked before
+evaluation, and the function-local requirement ledger is reconciled exactly
+once. -/
+def evaluateStagedValueFunctionWith {error : Type}
+    (lift : Error → error)
+    (onStagedValueCall : StagedValueCallElaborator error)
     (specialized : SourceSpecialization.SpecializedFunction)
     (arguments : List SourceStagedValue.Value) :
-    Except Error SourceStagedValue.Value := do
+    Except error SourceStagedValue.Value := do
   let function := specialized.function
   let source := function.typedBody
   if source.owner != specialized.declaration then
-    fail (.declaration specialized.declaration)
+    failWith lift (.declaration specialized.declaration)
       (.ownerMismatch specialized.declaration source.owner)
   else if function.declaration != specialized.declaration then
-    fail (.declaration specialized.declaration)
+    failWith lift (.declaration specialized.declaration)
       (.ownerMismatch specialized.declaration function.declaration)
   else if specialized.key.declaration != specialized.declaration then
-    fail (.declaration specialized.declaration)
+    failWith lift (.declaration specialized.declaration)
       (.stagedValueSpecializationKeyMismatch specialized.declaration
         specialized.key.declaration)
   else if specialized.key.arguments !=
       specialized.parameterSubstitution.map Prod.snd then
-    fail (.declaration specialized.declaration)
+    failWith lift (.declaration specialized.declaration)
       (.stagedValueSpecializationArgumentsMismatch
         (specialized.parameterSubstitution.map Prod.snd)
         specialized.key.arguments)
   else if source.inputs.length != arguments.length then
-    fail (.declaration function.declaration)
+    failWith lift (.declaration function.declaration)
       (.stagedValueArgumentArityMismatch source.inputs.length arguments.length)
   else
     let expectedAnalysis ← match SourceStageAnalysis.analyzeFunction function with
       | .ok analysis => pure analysis
       | .error error =>
-          fail (.declaration function.declaration)
+          failWith lift (.declaration function.declaration)
             (.stagedValueAnalysisFailure error)
     if expectedAnalysis != specialized.stageAnalysis then
-      fail (.declaration function.declaration)
+      failWith lift (.declaration function.declaration)
         (.stagedValueAnalysisMismatch expectedAnalysis
           specialized.stageAnalysis)
-    let environment ← bindStagedValueInputsWith (fun error => error)
+    let environment ← bindStagedValueInputsWith lift
       specialized.stageAnalysis source [] source.inputs arguments
     let expectedType := Ty.function
       (Ty.productMany (source.inputs.map fun binder => binder.scheme.body))
       function.inferredBodyType
     if function.type != expectedType then
-      fail (.declaration function.declaration)
+      failWith lift (.declaration function.declaration)
         (.stagedValueFunctionTypeMismatch expectedType function.type)
-    let roots ← statementRoots source.roots
+    let roots ← (statementRoots source.roots).mapError lift
     let fallthroughSite := match finalStatement? roots with
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
-    let evaluated ← evaluateStagedValueStatementsFuelWith
-      (fun error => error) specialized.stageAnalysis
+    let evaluated ← evaluateStagedValueStatementsFuelWith lift
+      onStagedValueCall specialized.stageAnalysis
       function.solvedRequirements (source.nodes.length + 1) source environment
       fallthroughSite .statementListFallthrough roots
-    ensureStagedValueTypeWith (fun error => error)
+    ensureStagedValueTypeWith lift
       (.declaration function.declaration) function.inferredBodyType
       evaluated.value
     let solvedRequirements :=
       function.solvedRequirements.map fun requirement => requirement.id
     if evaluated.consumedRequirements != solvedRequirements then
-      fail (.declaration function.declaration)
+      failWith lift (.declaration function.declaration)
         (.stagedValueRequirementsMismatch solvedRequirements
           evaluated.consumedRequirements)
-    let unconsumed ← reconcileConsumedRequirements function.declaration
-      solvedRequirements evaluated.consumedRequirements
+    let unconsumed ← (reconcileConsumedRequirements function.declaration
+      solvedRequirements evaluated.consumedRequirements).mapError lift
     unless unconsumed.isEmpty do
-      fail (.declaration function.declaration)
+      failWith lift (.declaration function.declaration)
         (.unconsumedRequirements unconsumed)
     pure evaluated.value
+
+/-- Standalone staged-value execution retains the closed-call boundary. -/
+def evaluateStagedValueFunction
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (arguments : List SourceStagedValue.Value) :
+    Except Error SourceStagedValue.Value :=
+  evaluateStagedValueFunctionWith (fun error => error)
+    (rejectStagedValueCallsWith (fun error => error)) specialized arguments
 
 /-- Execute one checked integer-returning function in the closed staged domain.
 Inputs are paired internally with the declaration-owned typed binders, so a
@@ -2464,13 +2673,11 @@ def evaluateStagedIntegerFunction (function : CheckedFunction)
   evaluateStagedIntegerFunctionWith (fun error => error)
     rejectStagedIntegerCalls function arguments
 
-/-- Lower a checked function body while separately delegating runtime calls and
-closed staged-integer calls.  Both policies receive only their own fixed
-builders; Source Core retains every recursive traversal and requirement gate. -/
-def lowerFunctionBodyWithRuntimeAndStagedPolicies {error : Type}
+private def lowerFunctionBodyWithRawStagedValuePolicy {error : Type}
     (lift : Error → error)
     (onCall : CallElaborator error)
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (stagedValuePolicy : Option (RawStagedValueLoweringPolicy error))
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
@@ -2494,9 +2701,9 @@ def lowerFunctionBodyWithRuntimeAndStagedPolicies {error : Type}
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
     let lowered ← lowerStatementsFuelWith lift onCall onStagedIntegerCall
-      onRequiredUnary onRequiredBinary onCoercion function.solvedRequirements
-      (source.nodes.length + 1) source inputs [] expected fallthroughSite
-      .statementListFallthrough roots
+      stagedValuePolicy onRequiredUnary onRequiredBinary onCoercion
+      function.solvedRequirements (source.nodes.length + 1) source inputs [] []
+      expected fallthroughSite .statementListFallthrough roots
     let solvedRequirements :=
       function.solvedRequirements.map fun requirement => requirement.id
     let unconsumedRequirements ←
@@ -2510,6 +2717,85 @@ def lowerFunctionBodyWithRuntimeAndStagedPolicies {error : Type}
       rootOccurrence
       unconsumedRequirements
     }
+
+/-- Lower a checked function body while separately delegating runtime calls and
+closed staged-integer calls.  Both policies receive only their own fixed
+builders; Source Core retains every recursive traversal and requirement gate. -/
+def lowerFunctionBodyWithRuntimeAndStagedPolicies {error : Type}
+    (lift : Error → error)
+    (onCall : CallElaborator error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (onRequiredUnary : RequiredUnaryElaborator error)
+    (onRequiredBinary : RequiredBinaryElaborator error)
+    (onCoercion : CoercionElaborator error)
+    (function : CheckedFunction) :
+    Except error BodyDraft :=
+  lowerFunctionBodyWithRawStagedValuePolicy lift onCall onStagedIntegerCall
+    none onRequiredUnary onRequiredBinary onCoercion function
+
+/-- Lower one exact specialization while materializing direct calls whose
+marked result and authoritative ADR-0357 occurrence are both compile-time.
+The general value evaluator, lexical environment, and requirement accounting
+remain internal to Source Core.  Specializations with compile-time inputs keep
+the legacy lowering path because this runtime draft has no concrete values for
+those inputs. -/
+def lowerSpecializedFunctionBodyWithRuntimeAndStagedPolicies
+    {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (stagedValuePolicy : StagedValueLoweringPolicy error)
+    (onRequiredUnary : RequiredUnaryElaborator error)
+    (onRequiredBinary : RequiredBinaryElaborator error)
+    (onCoercion : CoercionElaborator error)
+    (specialized : SourceSpecialization.SpecializedFunction) :
+    Except error BodyDraft := do
+  let function := specialized.function
+  let source := function.typedBody
+  if source.owner != specialized.declaration then
+    failWith lift (.declaration specialized.declaration)
+      (.ownerMismatch specialized.declaration source.owner)
+  else if function.declaration != specialized.declaration then
+    failWith lift (.declaration specialized.declaration)
+      (.ownerMismatch specialized.declaration function.declaration)
+  else if specialized.key.declaration != specialized.declaration then
+    failWith lift (.declaration specialized.declaration)
+      (.stagedValueSpecializationKeyMismatch specialized.declaration
+        specialized.key.declaration)
+  else if specialized.key.arguments !=
+      specialized.parameterSubstitution.map Prod.snd then
+    failWith lift (.declaration specialized.declaration)
+      (.stagedValueSpecializationArgumentsMismatch
+        (specialized.parameterSubstitution.map Prod.snd)
+        specialized.key.arguments)
+  else
+    let expectedAnalysis ← match SourceStageAnalysis.analyzeFunction function with
+      | .ok analysis => pure analysis
+      | .error error =>
+          failWith lift (.declaration function.declaration)
+            (.stagedValueAnalysisFailure error)
+    if expectedAnalysis != specialized.stageAnalysis then
+      failWith lift (.declaration function.declaration)
+        (.stagedValueAnalysisMismatch expectedAnalysis
+          specialized.stageAnalysis)
+    if stagedValuePolicy.analysis != specialized.stageAnalysis then
+      failWith lift (.declaration function.declaration)
+        (.stagedValueAnalysisMismatch specialized.stageAnalysis
+          stagedValuePolicy.analysis)
+    let hasComptimeInput := source.inputs.any fun binder =>
+      specialized.stageAnalysis.binderStage? binder.id == some .comptime
+    let rawPolicy := if hasComptimeInput then
+        none
+      else
+        some {
+          analysis := specialized.stageAnalysis
+          evaluate := fun environment id =>
+            evaluateStagedValueInEnvironmentWith lift
+              stagedValuePolicy.onStagedValueCall specialized.stageAnalysis
+              function.solvedRequirements source environment id
+        }
+    lowerFunctionBodyWithRawStagedValuePolicy lift onCall
+      onStagedIntegerCall rawPolicy onRequiredUnary onRequiredBinary onCoercion
+      function
 
 /-- Compatibility wrapper retaining the previous closed staged-call boundary
 while exposing the established runtime call/evidence/coercion policies. -/
