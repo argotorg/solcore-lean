@@ -277,6 +277,19 @@ while the callee reconciles only its own rows.  Predicate/coercion execution,
 marked implementation methods, unsupported staged value shapes,
 value-specialization memoization and recursion remain later.
 
+ADR-0361 admits proof-only signature predicates on both direct staged-call
+paths without adding staged trait-operation execution.  The linker checks the
+call occurrence's requirement count, order, uniqueness, predicates and evidence
+goals against the specialized signature, replaces generic assumption rows with
+unique incoming implementation witnesses, and forwards those concrete rows to
+the callee in predicate order.  This works through nested generic
+Unit/Bool/Word/product calls and nested bare-`integer` calls.  Caller and callee
+requirement ledgers remain declaration-local, evidence is never reified into
+Core, and all three expansion modes retain one active-key stack and decreasing
+link-depth fuel.  Staged coercions, required unary/binary implementation-method
+operations, marked implementation methods, indirect calls and recursion remain
+later boundaries.
+
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
 expression and statement nodes; complete selected declaration instantiations;

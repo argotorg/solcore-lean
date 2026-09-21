@@ -127,10 +127,11 @@ identity, and disappears before Core.  Repeated local uses do not duplicate the
 initializer requirements.  Runtime lets remain Core lets.
 
 The first whole-program staged-call profile is also executable.  A canonical
-complete specialization plan may evaluate a direct, predicate-free and
-coercion-free call whose fully specialized inputs and single result are exact
-bare `integer`.  Arguments evaluate left to right in the caller; their `Int`
-values are bound positionally to the callee's validated stable input identities.
+complete specialization plan may evaluate a direct, coercion-free call whose
+fully specialized inputs and single result are exact bare `integer`; exact
+proof-only signature predicates are admitted when concrete evidence closes
+them.  Arguments evaluate left to right in the caller; their `Int` values are
+bound positionally to the callee's validated stable input identities.
 The callee reconciles its own requirements before returning only a value, so
 numerically overlapping function-local requirement IDs cannot cross ledgers.
 Runtime and staged expansion share the same specialization-key visiting stack
@@ -172,9 +173,15 @@ marked-result call, while every runtime Core input, argument alias, function
 type and specialization key remains unchanged.  Drafts remain per occurrence,
 caller requirements stay owned by ordinary actual lowering, and an independent
 staged call may still materialize when another marked input is unavailable.
-Predicate/coercion execution, marked implementation methods, indirect calls,
-mutation, nominal or functional values, value-indexed memoization, every form
-of recursion and compile-time Fibonacci remain later.
+ADR-0361 now admits exact proof-only signature predicates on both the
+bare-`integer` and Unit/Bool/Word/product staged-call paths.  Call-owned
+requirements are checked in specialized predicate order, assumption rows are
+closed by unique incoming implementation witnesses, and concrete evidence is
+forwarded through nested generic relays without becoming a Core value.  Caller
+and callee ledgers remain separate.  Staged coercion or required-operator
+execution, marked implementation methods, indirect calls, mutation, nominal or
+functional values, value-indexed memoization, every form of recursion and
+compile-time Fibonacci remain later.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5907,7 +5914,8 @@ integer type, but consumes no initializer evidence again.  The staged let emits
 no Core binding; non-integer runtime lets retain the existing `letE` path.
 A provisional whole-program policy now accepts direct calls between fully
 specialized, monomorphic bare-`integer` inputs and one bare-`integer` result,
-provided the call is predicate-free and coercion-free.  The worklist and linker
+provided the call is coercion-free.  Exact proof-only signature predicates are
+validated and forwarded as concrete evidence.  The worklist and linker
 reconstruct the complete canonical plan and exact occurrence edge, including
 edges in an unselected conditional branch.  Source Core evaluates arguments
 left to right, binds their `Int` values to the callee's declaration-owned input
@@ -6012,11 +6020,24 @@ requirement ledger: ordinary actual lowering owns caller requirements exactly
 once, and the callee continues to reconcile only its declaration-owned rows.
 The same active-key stack, link fuel and eager conditional policy still apply.
 
-Predicate-bearing calls, coercions, marked implementation methods, indirect
-calls, mutation, nominal/function/proxy/index values, unsupported
-`Comptime`-classified source forms, value-indexed memoization, direct and mutual
-recursion, selected-branch recursion, and compile-time Fibonacci remain
-deferred.
+ADR-0361 removes the empty-signature-predicate restriction from both direct
+staged-call evaluators.  For every specialized call predicate, the linker
+checks the exact call-owned requirement identity, order, uniqueness, solved
+predicate and evidence goal.  A generic assumption row is replaced by the
+unique matching concrete witness available at the caller, then forwarded in
+predicate order to the specialized callee.  Callee entry rejects any remaining
+assumption and validates the evidence goals before evaluation.  This supports
+nested constrained generic Word calls and nested constrained bare-`integer`
+calls while retaining value-only materialization, independent declaration-owned
+requirement ledgers, store preservation, and the shared active-key stack and
+link fuel.
+
+These predicates are proof-only: staging does not execute them or reify
+evidence into Core.  Coercions, required unary/binary operations, marked
+implementation methods, indirect calls, mutation, nominal/function/proxy/index
+values, unsupported `Comptime`-classified source forms, value-indexed
+memoization, direct and mutual recursion, selected-branch recursion, and
+compile-time Fibonacci remain deferred.
 
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
