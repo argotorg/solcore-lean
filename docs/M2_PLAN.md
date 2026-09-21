@@ -113,7 +113,7 @@ type, or later monomorphic use closes them; Bool-domain logical operators and
 unrelated or merely co-located literals are not admitted, and visible operator
 catalogs remain authoritative.  Signed compile-time `integer` evaluation and
 custom builtin `Int` execution remain later except for the closed direct
-`integerSub`/`wordFromInteger` tree implemented by ADR-0349.
+add/subtract/comparison/conversion tree implemented by ADR-0349 and ADR-0350.
 
 ADR-0348 connects the first pattern slice to that carrier architecture.
 Terminal single-scrutinee matches retain ordered numeric-pattern builtin-`Int`
@@ -138,9 +138,17 @@ The specialization worklist records no source edge for those calls.  Source
 Core evaluates only closed literal/group/nested-subtraction trees as unbounded
 Lean `Int`, revalidates every premise-free builtin `Int<integer>` obligation,
 and erases the outer conversion to a Word constant modulo `2^256`.  Staged
-locals, runtime-dependent conditionals, ordinary calls, recursion, other
-integer primitives and every surviving runtime `integer` remain explicit later
-boundaries.
+locals, runtime-dependent conditionals, ordinary calls, recursion, and every
+surviving runtime `integer` remain explicit later boundaries; ADR-0350 below
+connects the next closed primitive subset without broadening those boundaries.
+
+ADR-0350 extends that closed evaluator with exact signed `integerAdd` and with
+`integerEq`/`integerLt` Bool erasure.  Compiler-function lookup now derives from
+one ordered supported catalog, while local and visible source names keep their
+existing priority.  Comparisons observe the unbounded signed operands before
+any Word modulo projection.  `integerMul` remains behind an explicit value-size
+or total-work policy, and `wordToInteger` remains behind a closed Word purity
+boundary.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,

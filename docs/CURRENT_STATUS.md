@@ -104,14 +104,16 @@ intrinsic tree described below, and the manually assembled legacy `.literal`
 typed-IR form retains its strict in-range Word behavior.  Custom builtin `Int`
 implementation execution remains a later boundary.
 
-Direct bare `integerSub` and `wordFromInteger` compiler functions now provide
-the first signed staged-integer execution slice (ADR-0349).  They have
-collision-free builtin identities and are selected only after local and visible
-source functions fail to supply any same-name candidate.  Source Core evaluates
-a closed literal/group/`integerSub` tree as an unbounded Lean `Int`, validates
-every builtin `Int<integer>` row, and erases the outer `wordFromInteger` to one
-Word constant using signed modulo `2^256`.  Runtime-dependent staged trees and
-every surviving `integer` value still reject explicitly.
+Direct bare `wordFromInteger`, `integerAdd`, `integerSub`, `integerEq`, and
+`integerLt` compiler functions now provide the closed signed staged-integer
+execution slice (ADR-0349 and ADR-0350).  They have collision-free builtin
+identities, derive exact lookup from one ordered supported catalog, and are
+selected only after local and visible source functions fail to supply any
+same-name candidate.  Source Core evaluates a closed literal/group/add/subtract
+tree as an unbounded Lean `Int`, validates every builtin `Int<integer>` row,
+erases `wordFromInteger` using signed modulo `2^256`, and erases equality or
+ordering directly to Bool without first applying modulo.  Runtime-dependent
+staged trees and every surviving `integer` value still reject explicitly.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5690,9 +5692,10 @@ The first source-body checker handles locals, functions and overload sets,
 calls, lambdas, tuples, groups, conditionals, supported unary/binary operators,
 proxy values, mapping read indexes, blocks, lets, returns, expression statements,
 statement conditionals and terminal single-scrutinee numeric/wildcard matches.
-The exact bare compiler functions `integerSub` and `wordFromInteger` are
-lowest-priority call fallbacks with fixed monomorphic signatures; visible
-same-name source functions shadow them without type-directed fallback.
+The exact bare compiler functions `wordFromInteger`, `integerAdd`,
+`integerSub`, `integerEq`, and `integerLt` are lowest-priority call fallbacks
+with fixed monomorphic signatures; visible same-name source functions shadow
+them without type-directed fallback.
 Proxy payloads reuse general source type-name
 resolution.  Mapping reads infer key/value types by unification, check the key
 with the ordinary coercion boundary, and pass the mapped value through the
@@ -5813,12 +5816,13 @@ requirement/predicate/evidence goal, require the premise-free builtin `intWord`
 implementation, and lower with `Word.ofNatModulo` before any output coercion.
 An `Int<integer>` carrier remains staged and is rejected before runtime Core.
 The exception is a closed direct compiler-intrinsic tree: integer literals and
-nested `integerSub` calls are validated and evaluated as Lean `Int`, then an
-outer `wordFromInteger` projects the signed result modulo `2^256` and emits one
-Word constant.  The compiler call and callee metadata, fixed arity/types,
-spelling, empty call requirements/coercions and every consumed `intInteger`
-literal row are checked again at this boundary.  Compiler calls add no source
-specialization edge.
+nested `integerAdd`/`integerSub` calls are validated and evaluated as Lean
+`Int`.  An outer `wordFromInteger` projects the signed result modulo `2^256`
+and emits one Word constant, while `integerEq` and `integerLt` compare the exact
+signed operands before modulo and emit one Bool constant.  The compiler call
+and callee metadata, fixed arity/types, spelling, empty call
+requirements/coercions and every consumed `intInteger` literal row are checked
+again at this boundary.  Compiler calls add no source specialization edge.
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
 requirements even after an early wildcard, and build one hidden let followed by

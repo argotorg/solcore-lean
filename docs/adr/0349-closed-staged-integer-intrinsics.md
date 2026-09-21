@@ -75,8 +75,10 @@ depth bound.
 
 ## Deferred boundaries
 
-- `integerAdd`, `integerMul`, comparisons, and the remaining reference
-  compiler-function catalog are not yet connected.
+- ADR-0350 connects `integerAdd`, `integerEq`, and `integerLt` to the same
+  closed evaluation boundary.  `integerMul`, `wordToInteger`, and the remaining
+  reference compiler-function work are still deferred there with their resource
+  and purity constraints made explicit.
 - Staged locals, parameters, conditionals, ordinary function calls, recursion,
   and general compile-time control flow remain unsupported.  A staged subtree
   depending on runtime data rejects as not closed.

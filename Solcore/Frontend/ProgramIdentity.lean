@@ -18,7 +18,29 @@ namespace Solcore.Frontend
 inductive BuiltinFunctionId where
   | integerSub
   | wordFromInteger
+  | integerAdd
+  | integerEq
+  | integerLt
   deriving Repr, BEq, DecidableEq
+
+namespace BuiltinFunctionId
+
+/-- Compiler functions implemented by the current frontend, in stable
+append-only introduction order.  Name lookup derives from this list so
+extending the identity type cannot silently leave a separate hand-written
+lookup chain stale. -/
+def all : List BuiltinFunctionId :=
+  [.integerSub, .wordFromInteger, .integerAdd, .integerEq, .integerLt]
+
+/-- Every compiler-function identity occurs in the lookup catalog. -/
+theorem all_complete (function : BuiltinFunctionId) : function ∈ all := by
+  cases function <;> simp [all]
+
+/-- The append-only compiler-function catalog contains no repeated identity. -/
+theorem all_nodup : all.Nodup := by
+  simp [all]
+
+end BuiltinFunctionId
 
 /-- Compiler-provided traits that do not have source declaration identities. -/
 inductive BuiltinTraitId where

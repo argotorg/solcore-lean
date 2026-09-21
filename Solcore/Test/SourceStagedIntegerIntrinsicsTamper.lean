@@ -531,6 +531,287 @@ private def testCyclesAndRequirementAccounting (fixture : Fixture) : IO Unit := 
       reason == .duplicateConsumedRequirement
         fixture.leftResolution.requirement
 
+private structure BinaryFixture where
+  function : CheckedFunction
+  functionId : BuiltinFunctionId
+  root : ExpressionId
+  call : ExpressionId
+  callee : ExpressionId
+  left : ExpressionId
+  right : ExpressionId
+  leftResolution : IntegerLiteralResolution
+  rightResolution : IntegerLiteralResolution
+
+private def binaryFixture (content : String)
+    (expected : BuiltinFunctionId) : IO BinaryFixture := do
+  let program ← match checkProgram (workspace content) with
+    | .ok program => pure program
+    | .error errors => throw (IO.userError
+        s!"{expected.spelling} tamper fixture failed checking: {reprStr errors}")
+  let function ← match program.functions with
+    | [function] => pure function
+    | functions => throw (IO.userError
+        s!"{expected.spelling} fixture produced {functions.length} functions")
+  let root ← match function.typedBody.roots with
+    | [.statement statement] =>
+        match function.typedBody.lookupStatement? statement with
+        | some { form := .returnStmt (some root), .. } => pure root
+        | _ => throw (IO.userError
+            s!"{expected.spelling} fixture lost its valued return")
+    | roots => throw (IO.userError
+        s!"{expected.spelling} fixture retained {roots.length} roots")
+  let call ← if expected = .integerAdd then
+      match function.typedBody.lookupExpression? root with
+      | some node =>
+          match node.form with
+          | .call _ [argument] (.builtinFunction .wordFromInteger) =>
+              pure argument
+          | _ => throw (IO.userError
+              "integerAdd fixture lost its wordFromInteger boundary")
+      | none => throw (IO.userError "integerAdd fixture lost its root")
+    else
+      pure root
+  let (callee, left, right) ←
+    match function.typedBody.lookupExpression? call with
+    | some node =>
+        match node.form with
+        | .call callee [left, right] (.builtinFunction actual) =>
+            unless actual = expected do
+              throw (IO.userError
+                s!"expected {expected.spelling}, found {actual.spelling}")
+            pure (callee, left, right)
+        | _ => throw (IO.userError
+            s!"{expected.spelling} fixture lost its binary call")
+    | none => throw (IO.userError
+        s!"{expected.spelling} fixture lost its call expression")
+  let literalResolution (id : ExpressionId) : IO IntegerLiteralResolution :=
+    match function.typedBody.lookupExpression? id with
+    | some node =>
+        match node.form with
+        | .integerLiteral _ resolution => pure resolution
+        | _ => throw (IO.userError
+            s!"{expected.spelling} fixture argument is not a literal")
+    | none => throw (IO.userError
+        s!"{expected.spelling} fixture lost a literal expression")
+  pure {
+    function
+    functionId := expected
+    root
+    call
+    callee
+    left
+    right
+    leftResolution := ← literalResolution left
+    rightResolution := ← literalResolution right
+  }
+
+private def withBinaryExpression (fixture : BinaryFixture)
+    (id : ExpressionId) (change : ExpressionNode → ExpressionNode) :
+    CheckedFunction := {
+  fixture.function with
+  typedBody := changeExpression fixture.function.typedBody id change
+}
+
+private def expectBinaryErrorAt (fixture : BinaryFixture) (label : String)
+    (function : CheckedFunction) (site : SourceCoreElaboration.ErrorSite)
+    (accept : SourceCoreElaboration.ErrorReason → Bool) : IO Unit := do
+  if fixture.functionId = .integerAdd then
+    expectEvaluationErrorAt label function fixture.call site accept
+  else
+    expectElaborationErrorAt label function site accept
+
+private def mismatchedBuiltin : BuiltinFunctionId → BuiltinFunctionId
+  | .integerAdd => .integerSub
+  | .integerEq => .integerLt
+  | .integerLt => .integerEq
+  | .integerSub => .integerAdd
+  | .wordFromInteger => .integerAdd
+
+private def testExpandedBinaryBaseline (fixture : BinaryFixture) : IO Unit := do
+  let leftRequirement := fixture.leftResolution.requirement
+  let rightRequirement := fixture.rightResolution.requirement
+  assertTrue (decide (fixture.function.solvedRequirements.map (·.id) =
+      [leftRequirement, rightRequirement]))
+    s!"{fixture.functionId.spelling}: literal requirement order changed"
+  let lowered ← match SourceCoreElaboration.elaborateFunction fixture.function with
+    | .ok lowered => pure lowered
+    | .error error => throw (IO.userError
+        s!"{fixture.functionId.spelling}: checked fixture did not lower: {reprStr error}")
+  match fixture.functionId with
+  | .integerAdd =>
+      assertTrue (decide (lowered.resolved =
+          .word (Core.Word.ofNatModulo 3) ∧ lowered.core =
+          .word (Core.Word.ofNatModulo 3)))
+        "integerAdd baseline did not erase to Word 3"
+      match SourceCoreElaboration.evaluateStagedInteger
+          fixture.function.solvedRequirements fixture.function.typedBody
+          fixture.call with
+      | .ok evaluated =>
+          assertTrue (decide (evaluated.value = (3 : Int) ∧
+              evaluated.consumedRequirements =
+                [leftRequirement, rightRequirement]))
+            "integerAdd baseline changed exact value or evidence order"
+      | .error error => throw (IO.userError
+          s!"integerAdd baseline did not evaluate: {reprStr error}")
+  | .integerEq =>
+      assertTrue (decide (lowered.resolved = .bool false ∧
+          lowered.core = .bool false))
+        "integerEq baseline did not erase to Bool false"
+  | .integerLt =>
+      assertTrue (decide (lowered.resolved = .bool true ∧
+          lowered.core = .bool true))
+        "integerLt baseline did not erase to Bool true"
+  | function => throw (IO.userError
+      s!"unexpected expanded tamper fixture {function.spelling}")
+
+private def testExpandedBinaryContract (fixture : BinaryFixture) : IO Unit := do
+  let callSite := SourceCoreElaboration.ErrorSite.occurrence
+    fixture.call.occurrence
+  let calleeSite := SourceCoreElaboration.ErrorSite.occurrence
+    fixture.callee.occurrence
+  let leftSite := SourceCoreElaboration.ErrorSite.occurrence
+    fixture.left.occurrence
+  let requirement := fixture.leftResolution.requirement
+  let coercion : CoercionStep := {
+    requirement
+    source := Ty.integer
+    target := Ty.word
+  }
+  let replacement := mismatchedBuiltin fixture.functionId
+  let expect label function site accept :=
+    expectBinaryErrorAt fixture
+      s!"{fixture.functionId.spelling} {label}" function site accept
+
+  let wrongResolution := withBinaryExpression fixture fixture.call fun node => {
+    node with form := match node.form with
+      | .call callee arguments _ =>
+          .call callee arguments (.builtinFunction replacement)
+      | form => form
+  }
+  expect "call resolution identity" wrongResolution calleeSite fun reason =>
+    reason == .builtinFunctionCalleeIdentityMismatch replacement
+      fixture.functionId
+
+  let nonReference := withBinaryExpression fixture fixture.callee fun node => {
+    node with form := .group fixture.left
+  }
+  expect "callee reference shape" nonReference calleeSite fun reason =>
+    reason == .builtinFunctionCalleeNotReference fixture.functionId
+
+  let wrongIdentity := withBinaryExpression fixture fixture.callee fun node => {
+    node with form := (.reference fixture.functionId.spelling
+      (.builtinFunction replacement))
+  }
+  expect "callee builtin identity" wrongIdentity calleeSite fun reason =>
+    reason == .builtinFunctionCalleeIdentityMismatch fixture.functionId
+      replacement
+
+  let forgedSpelling := "forged" ++ fixture.functionId.spelling
+  let wrongSpelling := withBinaryExpression fixture fixture.callee fun node => {
+    node with form := (.reference forgedSpelling
+      (.builtinFunction fixture.functionId))
+  }
+  expect "callee spelling" wrongSpelling calleeSite fun reason =>
+    reason == .builtinFunctionCalleeSpellingMismatch fixture.functionId
+      fixture.functionId.spelling forgedSpelling
+
+  let wrongCalleeType := withBinaryExpression fixture fixture.callee fun node => {
+    node with type := Ty.bool
+  }
+  expect "callee type" wrongCalleeType calleeSite fun reason =>
+    reason == .builtinFunctionCalleeTypeMismatch fixture.functionId
+      fixture.functionId.type Ty.bool
+
+  let wrongCallType := withBinaryExpression fixture fixture.call fun node => {
+    node with type := Ty.word
+  }
+  expect "call result type" wrongCallType callSite fun reason =>
+    reason == .builtinFunctionCallTypeMismatch fixture.functionId
+      fixture.functionId.returnType Ty.word
+
+  let wrongArity := withBinaryExpression fixture fixture.call fun node => {
+    node with form := match node.form with
+      | .call callee _ resolution =>
+          .call callee [fixture.left] resolution
+      | form => form
+  }
+  expect "call arity" wrongArity callSite fun reason =>
+    reason == .builtinFunctionArgumentArityMismatch fixture.functionId 2 1
+
+  let wrongArgumentType := withBinaryExpression fixture fixture.left fun node => {
+    node with type := Ty.bool
+  }
+  expect "argument type" wrongArgumentType leftSite fun reason =>
+    reason == .builtinFunctionArgumentTypeMismatch fixture.functionId 0
+      Ty.integer Ty.bool
+
+  let callRequirements := withBinaryExpression fixture fixture.call fun node => {
+    node with requirements := [requirement]
+  }
+  expect "call requirements" callRequirements callSite fun reason =>
+    reason == .builtinFunctionRequirementsPresent fixture.functionId
+      [requirement]
+
+  let callCoercions := withBinaryExpression fixture fixture.call fun node => {
+    node with coercions := [coercion]
+  }
+  expect "call coercions" callCoercions callSite fun reason =>
+    reason == .builtinFunctionCoercionsPresent fixture.functionId [coercion]
+
+  let calleeRequirements :=
+    withBinaryExpression fixture fixture.callee fun node => {
+      node with requirements := [requirement]
+    }
+  expect "callee requirements" calleeRequirements calleeSite fun reason =>
+    reason == .requirementsPresent [requirement]
+
+  let calleeCoercions :=
+    withBinaryExpression fixture fixture.callee fun node => {
+      node with coercions := [coercion]
+    }
+  expect "callee coercions" calleeCoercions calleeSite fun reason =>
+    reason == .coercionsPresent [coercion]
+
+  let cyclic := if fixture.functionId = .integerAdd then
+      withBinaryExpression fixture fixture.call fun node => {
+        node with form := match node.form with
+          | .call callee _ resolution =>
+              .call callee [fixture.call, fixture.right] resolution
+          | form => form
+      }
+    else
+      withBinaryExpression fixture fixture.left fun node => {
+        node with form := .group fixture.left, requirements := []
+      }
+  let cycleSite := if fixture.functionId = .integerAdd then callSite else leftSite
+  expect "staged argument cycle" cyclic cycleSite fun reason =>
+    reason == .stagedIntegerDepthLimit
+
+  let duplicated := withBinaryExpression fixture fixture.call fun node => {
+    node with form := match node.form with
+      | .call callee _ resolution =>
+          .call callee [fixture.left, fixture.left] resolution
+      | form => form
+  }
+  expectElaborationErrorAt
+    s!"{fixture.functionId.spelling} duplicated literal edge" duplicated
+    (.declaration fixture.function.declaration) fun reason =>
+      reason == .duplicateConsumedRequirement requirement
+
+private def testExpandedBuiltinTampering : IO Unit := do
+  let add ← binaryFixture
+    "function add() returns (Word) { return wordFromInteger(integerAdd(1, 2)); }"
+    .integerAdd
+  let equality ← binaryFixture
+    "function equality() returns (Bool) { return integerEq(1, 2); }"
+    .integerEq
+  let less ← binaryFixture
+    "function less() returns (Bool) { return integerLt(1, 2); }"
+    .integerLt
+  for fixture in [add, equality, less] do
+    testExpandedBinaryBaseline fixture
+    testExpandedBinaryContract fixture
+
 /-- Reject forged builtin identities and staged literal evidence before Core. -/
 def testSourceStagedIntegerIntrinsicsTamper : IO Unit := do
   let checked ← fixture
@@ -540,6 +821,7 @@ def testSourceStagedIntegerIntrinsicsTamper : IO Unit := do
   testLiteralCarrier checked
   testLiteralEvidence checked
   testCyclesAndRequirementAccounting checked
+  testExpandedBuiltinTampering
   IO.println "staged integer intrinsic tamper checks GREEN"
 
 end Tests.SourceStagedIntegerIntrinsicsTamper

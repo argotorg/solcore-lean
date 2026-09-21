@@ -21,16 +21,29 @@ namespace BuiltinFunctionId
 def spelling : BuiltinFunctionId → String
   | .integerSub => "integerSub"
   | .wordFromInteger => "wordFromInteger"
+  | .integerAdd => "integerAdd"
+  | .integerEq => "integerEq"
+  | .integerLt => "integerLt"
+
+/-- Exact compiler-function spellings remain pairwise distinct. -/
+theorem all_spellings_nodup : (all.map spelling).Nodup := by
+  simp [all, spelling]
 
 /-- Fixed source parameter types of one compiler-provided function. -/
 def parameterTypes : BuiltinFunctionId → List TypeSystem.Ty
   | .integerSub => [TypeSystem.Ty.integer, TypeSystem.Ty.integer]
   | .wordFromInteger => [TypeSystem.Ty.integer]
+  | .integerAdd
+  | .integerEq
+  | .integerLt => [TypeSystem.Ty.integer, TypeSystem.Ty.integer]
 
 /-- Fixed source result type of one compiler-provided function. -/
 def returnType : BuiltinFunctionId → TypeSystem.Ty
   | .integerSub => TypeSystem.Ty.integer
   | .wordFromInteger => TypeSystem.Ty.word
+  | .integerAdd => TypeSystem.Ty.integer
+  | .integerEq
+  | .integerLt => TypeSystem.Ty.bool
 
 /-- Exact monomorphic function type of one compiler-provided function. -/
 def type (function : BuiltinFunctionId) : TypeSystem.Ty :=
@@ -45,12 +58,7 @@ end BuiltinFunctionId
 
 /-- Resolve the deliberately small exact bare compiler-function namespace. -/
 def builtinFunctionNamed? (name : String) : Option BuiltinFunctionId :=
-  if name = BuiltinFunctionId.integerSub.spelling then
-    some .integerSub
-  else if name = BuiltinFunctionId.wordFromInteger.spelling then
-    some .wordFromInteger
-  else
-    none
+  BuiltinFunctionId.all.find? fun function => function.spelling == name
 
 /-- The concrete trait-predicate representation used by whole-program source
 checking. -/

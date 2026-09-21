@@ -481,11 +481,41 @@ private def lowerIntegerLiteralWith {error : Type} (lift : Error → error)
 
 /-- A closed staged integer and the exact literal obligations consumed while
 computing it.  The signed value remains visible for direct executable tests;
-only `wordFromInteger` projects it into runtime Core. -/
+only an explicit conversion or comparison projects the tree into runtime
+Core. -/
 structure StagedIntegerEvaluation where
   value : Int
   consumedRequirements : List RequirementId
   deriving Repr, DecidableEq
+
+private inductive StagedIntegerBinaryOperation where
+  | add
+  | sub
+
+private def stagedIntegerBinaryOperation? :
+    BuiltinFunctionId → Option StagedIntegerBinaryOperation
+  | .integerAdd => some .add
+  | .integerSub => some .sub
+  | _ => none
+
+private def applyStagedIntegerBinary :
+    StagedIntegerBinaryOperation → Int → Int → Int
+  | .add, left, right => left + right
+  | .sub, left, right => left - right
+
+private inductive StagedIntegerComparison where
+  | eq
+  | lt
+
+private def StagedIntegerComparison.function :
+    StagedIntegerComparison → BuiltinFunctionId
+  | .eq => .integerEq
+  | .lt => .integerLt
+
+private def applyStagedIntegerComparison :
+    StagedIntegerComparison → Int → Int → Bool
+  | .eq, left, right => decide (left = right)
+  | .lt, left, right => decide (left < right)
 
 private def validateBuiltinFunctionArgumentTypesWith {error : Type}
     (lift : Error → error) (source : TypedSource)
@@ -564,24 +594,35 @@ private def evaluateStagedIntegerFuelWith {error : Type}
       let node ← (lookupExpression source id).mapError lift
       let site := ErrorSite.occurrence id.occurrence
       match node.form with
-      | .call callee arguments (.builtinFunction .integerSub) => do
-          validateBuiltinFunctionCallWith lift source node callee arguments
-            .integerSub
-          match arguments with
-          | [left, right] =>
-              let left ← evaluateStagedIntegerFuelWith lift
-                solvedRequirements source fuel left
-              let right ← evaluateStagedIntegerFuelWith lift
-                solvedRequirements source fuel right
-              pure {
-                value := left.value - right.value
-                consumedRequirements := left.consumedRequirements ++
-                  right.consumedRequirements
-              }
-          | _ =>
-              failWith lift site
-                (.builtinFunctionArgumentArityMismatch .integerSub 2
-                  arguments.length)
+      | .call callee arguments (.builtinFunction function) =>
+          match stagedIntegerBinaryOperation? function with
+          | some operation => do
+              validateBuiltinFunctionCallWith lift source node callee arguments
+                function
+              match arguments with
+              | [left, right] =>
+                  let left ← evaluateStagedIntegerFuelWith lift
+                    solvedRequirements source fuel left
+                  let right ← evaluateStagedIntegerFuelWith lift
+                    solvedRequirements source fuel right
+                  pure {
+                    value := applyStagedIntegerBinary operation left.value
+                      right.value
+                    consumedRequirements := left.consumedRequirements ++
+                      right.consumedRequirements
+                  }
+              | _ =>
+                  failWith lift site
+                    (.builtinFunctionArgumentArityMismatch function 2
+                      arguments.length)
+          | none => do
+              unless node.coercions.isEmpty do
+                failWith lift site (.coercionsPresent node.coercions)
+              if node.type != Ty.integer then
+                failWith lift site
+                  (.stagedIntegerTypeMismatch .integer node.type)
+              else
+                failWith lift site .stagedIntegerExpressionNotClosed
       | form => do
           unless node.coercions.isEmpty do
             failWith lift site (.coercionsPresent node.coercions)
@@ -609,9 +650,9 @@ private def evaluateStagedIntegerFuelWith {error : Type}
           | _ =>
               failWith lift site .stagedIntegerExpressionNotClosed
 
-/-- Evaluate exactly the closed staged-integer fragment accepted by runtime
-erasure.  The bound comes from the finite typed-node table, so malformed cycles
-produce a located failure rather than nontermination. -/
+/-- Evaluate exactly the closed staged-integer arithmetic fragment accepted by
+runtime erasure.  The bound comes from the finite typed-node table, so malformed
+cycles produce a located failure rather than nontermination. -/
 def evaluateStagedInteger (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (id : ExpressionId) :
     Except Error StagedIntegerEvaluation :=
@@ -636,6 +677,30 @@ private def lowerWordFromIntegerWith {error : Type} (lift : Error → error)
       failWith lift (.occurrence node.id.occurrence)
         (.builtinFunctionArgumentArityMismatch .wordFromInteger 1
           arguments.length)
+
+private def lowerStagedIntegerComparisonWith {error : Type}
+    (lift : Error → error)
+    (solvedRequirements : List SolvedRequirement) (source : TypedSource)
+    (fuel : Nat) (node : ExpressionNode) (callee : ExpressionId)
+    (arguments : List ExpressionId) (comparison : StagedIntegerComparison) :
+    Except error LoweredExpression := do
+  let function := comparison.function
+  validateBuiltinFunctionCallWith lift source node callee arguments function
+  match arguments with
+  | [left, right] =>
+      let left ← evaluateStagedIntegerFuelWith lift solvedRequirements source
+        fuel left
+      let right ← evaluateStagedIntegerFuelWith lift solvedRequirements source
+        fuel right
+      pure {
+        resolved := .bool
+          (applyStagedIntegerComparison comparison left.value right.value)
+        consumedRequirements := left.consumedRequirements ++
+          right.consumedRequirements
+      }
+  | _ =>
+      failWith lift (.occurrence node.id.occurrence)
+        (.builtinFunctionArgumentArityMismatch function 2 arguments.length)
 
 private def eraseRequirement? (target : RequirementId) :
     List RequirementId → Option (List RequirementId)
@@ -971,6 +1036,12 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
       | .call callee arguments (.builtinFunction .wordFromInteger) =>
           lowerWordFromIntegerWith lift solvedRequirements source fuel node
             callee arguments
+      | .call callee arguments (.builtinFunction .integerEq) =>
+          lowerStagedIntegerComparisonWith lift solvedRequirements source fuel
+            node callee arguments .eq
+      | .call callee arguments (.builtinFunction .integerLt) =>
+          lowerStagedIntegerComparisonWith lift solvedRequirements source fuel
+            node callee arguments .lt
       | _ =>
           match node.coercions with
           | [] =>
