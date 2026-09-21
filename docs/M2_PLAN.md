@@ -215,9 +215,9 @@ call rejects a runtime-dependent actual or an unsupported/deferred form at a
 marked parameter and rejects a marked result, while an actual proved closed is
 accepted.  The unmarked pure
 bare-`integer` partial-evaluation path remains intentionally compatible.
-General staged-value evaluation, predicate/coercion support, staged
-implementation methods, selected-branch recursion and compile-time programs
-such as Fibonacci remain later.
+General staged-value evaluation formed the later ADR-0357–0358 boundary below;
+predicate/coercion support, staged implementation methods, selected-branch
+recursion and compile-time programs such as Fibonacci remain later.
 Integer-returning functions also remain invalid runtime roots because Core has
 no runtime `integer` representation.
 
@@ -236,7 +236,20 @@ inputs.  A marked/effectively-comptime result
 body analyzes every input as comptime.  Specialization recomputes the side
 table for each concrete key, allowing a generic type to refine to a
 comptime-only type, and the final direct linker consumes those exact facts for
-marked-parameter rejection.  General staged values, mutation, indirect calls,
+marked-parameter rejection.
+
+ADR-0358 adds the bounded value-evaluation foundation on top of that sidecar.
+One closed carrier represents Unit, Bool, canonical Word and right-associated
+products and projects exactly to `Core.Value`; the existing arbitrary-precision
+integer evaluator remains separate.  A standalone evaluator admits exact
+literals and Boolean constants, stable-ID locals, groups, tuples,
+requirement-free and coercion-free builtin unary/binary operations, and eager
+expression conditionals.  Its function entry binds positional inputs, threads
+initialized lexical lets, blocks, terminal returns and eager two-return-branch
+statement conditionals, and reconciles every consumed requirement exactly.
+Every interpreted expression must have the specialization-owned `Comptime`
+fact; `Runtime`, `Deferred` and missing facts remain distinct failures.
+Declaration-call and linker integration, mutation, indirect calls,
 predicate/coercion execution, staged methods and recursion remain the next
 boundaries.
 

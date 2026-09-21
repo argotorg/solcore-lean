@@ -153,9 +153,15 @@ unary/binary expressions, tuples and conditionals, classifies marked or
 uncoerced comptime-only direct-call results from all actual arguments, and
 stores the recomputed side table on each concrete specialization.  The
 restricted linker now consumes that table for marked arguments instead of
-running a private classifier.  This is dependence classification, not general
-staged-value evaluation: predicate/coercion execution, indirect calls, selected-branch
-recursion and compile-time Fibonacci remain later.
+running a private classifier.  ADR-0358 consumes its `Comptime` facts in a
+standalone evaluator for exact Unit, Bool, Word and right-associated product
+values.  It covers positional inputs, stable-ID initialized lets, groups,
+tuples, requirement-free/coercion-free builtin operators, eager expression and
+statement conditionals, blocks and terminal returns, with exact requirement
+reconciliation.  The arbitrary-precision integer evaluator stays separate.
+Direct-call linker integration for this general carrier, predicate/coercion
+execution, indirect calls, mutation, nominal or functional values,
+selected-branch recursion and compile-time Fibonacci remain later.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5924,9 +5930,34 @@ uncoerced comptime-only result with all-comptime actuals and otherwise remain
 deferred.  Traversal follows roots and lexical statement structure rather than
 flat node-table order, and each concrete specialization owns its recomputed
 facts.  The linker queries those facts to distinguish a definite runtime
-argument from a deferred one.  General staged-value evaluation, predicates and coercions, indirect
-calls, staged implementation methods, selected-branch recursion, and
-compile-time Fibonacci remain deferred.
+argument from a deferred one.
+
+ADR-0358 adds a standalone evaluator for the Core-representable part of that
+`Comptime` set.  `SourceStagedValue.Value` contains exactly Unit, Bool,
+canonical Word and right-associated products, with exact source-type checking
+and a total projection to closed `Core.Value`.  Evaluation uses the retained
+ADR-0357 table; the function entry independently recomputes it only to require
+exact equality and reject a stale or forged specialization sidecar.  `Runtime`,
+`Deferred` and missing facts reject distinctly.  It admits checked Word literals and Boolean
+constants, stable-ID local references, groups, tuples, and requirement-free,
+coercion-free builtin unary and binary operations.  Tuple elements are
+evaluated left to right.  Expression conditionals evaluate guard, then and else
+before selecting a value, so an unselected branch still contributes failures
+and requirements.
+
+The corresponding standalone function evaluator validates positional input
+arity and types, then threads initialized lets, lexical blocks, terminal
+returns and eager two-return-branch statement conditionals through the same
+stable-ID value environment.  A let initializer uses the old environment and
+is evaluated exactly once before its binder becomes visible; local reads do
+not consume its requirements again.  The returned value must match the checked
+source result type, and the complete consumed-requirement ledger must match the
+function's solved rows exactly.  The existing arbitrary-precision integer
+evaluator remains a separate compatibility path.  Direct declaration-call and
+linker integration, predicates and coercions, indirect calls, mutation,
+nominal/function/proxy/index values, staged implementation methods,
+selected-branch recursion, and compile-time Fibonacci remain deferred.
+
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
 requirements even after an early wildcard, and build one hidden let followed by
