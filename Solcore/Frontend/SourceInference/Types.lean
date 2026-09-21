@@ -93,6 +93,13 @@ inductive Error where
   | integerLiteralRequirementPredicateMismatch
       (expression : ExpressionId) (requirement : RequirementId)
       (expected actual : ProgramPredicate)
+  | matchScrutineeArityMismatch (expected actual : Nat)
+  | unsupportedPattern (span : Syntax.SourceSpan) (kind : String)
+  | nonNumericPatternType (span : Syntax.SourceSpan) (type : Ty)
+  | nonReturningMatchArm (span : Syntax.SourceSpan)
+  | nonReturningMatchDefault (span : Syntax.SourceSpan)
+  | nonExhaustiveMatch (span : Syntax.SourceSpan)
+  | nonTerminalMatch (span : Syntax.SourceSpan)
   | unsupportedLiteral (kind : String)
   | unsupportedExpression (kind : String)
   | unsupportedStatement (kind : String)
@@ -133,6 +140,15 @@ structure IntegerLiteralOrigin where
   requirement : RequirementId
   deriving Repr, BEq, DecidableEq
 
+/-- A numeric pattern's fresh builtin-`Int` target.  Unlike expression
+literal origins, a target which is still flexible after the whole body has
+been inferred is defaulted to Word during finalization. -/
+structure IntegerPatternOrigin where
+  metavariable : TypeVarId
+  span : Syntax.SourceSpan
+  requirement : RequirementId
+  deriving Repr, BEq, DecidableEq
+
 /-- Mutable inference information threaded through a source body. -/
 structure State where
   owner : Resolved.DeclarationId
@@ -144,6 +160,7 @@ structure State where
   nextOccurrence : Nat := 0
   nodes : List Node := []
   integerLiterals : List IntegerLiteralOrigin := []
+  integerPatterns : List IntegerPatternOrigin := []
   nextRequirement : Nat := 0
   requirements : List Requirement := []
   deriving Repr, DecidableEq
@@ -277,6 +294,16 @@ def allocateBinder (state : State) (name : String) (scheme : Scheme)
     localBinders := binder :: state.localBinders
     nextLocal := state.nextLocal + 1
   })
+
+/-- Reserve one stable declaration-owned local identity without making it
+source-visible.  Terminal match lowering uses this identity for its once-only
+scrutinee binding; lexical lookup must never observe it. -/
+def allocateHiddenLocal (state : State) : Resolved.LocalId × State :=
+  let id : Resolved.LocalId := {
+    owner := state.owner
+    binderIndex := state.nextLocal
+  }
+  (id, { state with nextLocal := state.nextLocal + 1 })
 
 private def allocateOccurrence (state : State) : OccurrenceId × State :=
   let id : OccurrenceId := { owner := state.owner, index := state.nextOccurrence }

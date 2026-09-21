@@ -335,6 +335,7 @@ private def localIdsInNode : Node → List Resolved.LocalId
   | .statement node =>
       match node.form with
       | .letDecl binder _ => [binder.id]
+      | .matchWith resolution => [resolution.hiddenScrutinee]
       | _ => []
 
 private def sourceLocalIds (source : TypedSource) : List Resolved.LocalId :=

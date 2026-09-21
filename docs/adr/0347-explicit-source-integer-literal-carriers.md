@@ -152,9 +152,11 @@ invariant checks at the lowering boundary.
   not an extension point for this primitive carrier.
 - Negative compile-time integers and staged evaluation of signed integer
   arithmetic remain deferred.  The current carrier decodes nonnegative decimal
-  and hexadecimal spellings to `Nat`; unary minus is not folded into it.
-- Pattern literals do not use this expression carrier and retain their existing
-  pattern-specific boundary.
+  and hexadecimal spellings to `Nat`; the source grammar has no unary minus,
+  and signed values produced by staged integer primitives are not evaluated.
+- ADR-0348 adds a separate typed carrier and executable boundary for terminal
+  single-scrutinee numeric-pattern matches.  Pattern literals do not reuse this
+  expression carrier; broader pattern forms remain deferred there.
 - Additional synthetic corruption tests for inference-state origin/requirement
   invariants remain useful follow-up work.  The lowering suite already rejects
   malformed target, attachment, spelling/value, solved-row, predicate, evidence,

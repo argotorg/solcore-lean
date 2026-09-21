@@ -100,8 +100,16 @@ pipeline to a Word constant modulo `2^256`; the primitive conversion is erased
 rather than dispatched as a runtime method.  A literal retained as `integer`
 still rejects before Semantic Core, and the manually assembled legacy
 `.literal` typed-IR form retains its strict in-range Word behavior.  Signed
-compile-time integer evaluation, pattern-literal integration, and custom
-builtin `Int` implementation execution remain later boundaries.
+compile-time integer evaluation and custom builtin `Int` implementation
+execution remain later boundaries.
+
+Terminal single-scrutinee integer-pattern matches are now connected to the
+same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
+numeric pattern owns a fresh builtin-`Int` requirement which defaults to Word
+only if it remains open after every branch has been inferred; wildcards do not
+default their scrutinee.  Bare/grouped numeric patterns and wildcards, optional
+defaults, ordered first-match selection, modulo-Word pattern values and
+once-only scrutinee evaluation execute through the public source runner.
 
 Program-wide trait and implementation evidence now uses collision-free
 builtin-or-source identities (ADR-0345).  Source declaration IDs coerce only
@@ -5670,8 +5678,9 @@ missing, extra or signature-incompatible implementation methods.
 
 The first source-body checker handles locals, functions and overload sets,
 calls, lambdas, tuples, groups, conditionals, supported unary/binary operators,
-proxy values, mapping read indexes, blocks, lets, returns, expression statements
-and statement conditionals.  Proxy payloads reuse general source type-name
+proxy values, mapping read indexes, blocks, lets, returns, expression statements,
+statement conditionals and terminal single-scrutinee numeric/wildcard matches.
+Proxy payloads reuse general source type-name
 resolution.  Mapping reads infer key/value types by unification, check the key
 with the ordinary coercion boundary, and pass the mapped value through the
 surrounding expected type.  These two forms are type-checking boundaries only;
@@ -5706,7 +5715,10 @@ This is deliberately an executable-first profile with reduced proof density.
 Constructor/operator export selectors and the remaining module-reference edge
 cases are explicit errors; the initial no-import and canonical-path lookup
 fallbacks remain for compatibility.  Dot construction, general fields, arrays,
-assignment, match, loops, assembly and loop control reject as unsupported.
+assignment, general match forms, loops, assembly and loop control reject as
+unsupported.  The match slice rejects multiple scrutinees, binder/constructor/
+comptime/tuple/string patterns, nonterminal use, uncovered literal-only cases,
+and falling-through branches.
 Higher-rank and higher-kinded polymorphism,
 polymorphic recursion, coinductive trait cycles and overlap policy beyond
 explicit ambiguity are deferred.  Generic or symbolic intermediate coercion
@@ -5723,9 +5735,10 @@ runtime trait evidence beyond the strict arithmetic/bitwise, `Eq<T>`, `Ord<T>` a
 semantics are not claimed.
 
 The occurrence-addressed typed and resolved source IR is implemented as the
-architecture boundary before constructor/member selection, match, assignment or
-broader executable conversion.  Each inferred trait, coercion, or builtin
-integer-literal obligation receives a contiguous function-local identity, and
+architecture boundary before constructor/member selection, broader matches,
+assignment or broader executable conversion.  Each inferred trait, coercion,
+or builtin integer-literal obligation receives a contiguous function-local
+identity, and
 finalization retains that identity together with the normalized predicate and
 its matching evidence in one canonical solved-requirement record.  Literal
 requirements are allocated once on their originating occurrence; overload
@@ -5786,6 +5799,12 @@ forms instead re-decode the retained spelling, validate its raw value and exact
 requirement/predicate/evidence goal, require the premise-free builtin `intWord`
 implementation, and lower with `Word.ofNatModulo` before any output coercion.
 An `Int<integer>` carrier remains staged and is rejected before runtime Core.
+Terminal typed matches apply the same validation to each numeric pattern,
+lower every written arm/default under the original source scope, reconcile all
+requirements even after an early wildcard, and build one hidden let followed by
+source-order Word equality tests.  The hidden declaration-owned identity is
+reserved from direct-link temporaries, so calls in the scrutinee cannot capture
+it.
 
 Stable input identities determine the positional Core context.  Every accepted
 result stores checked equations both for exact `Resolved.Expr.lower?` output

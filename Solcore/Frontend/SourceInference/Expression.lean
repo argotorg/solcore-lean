@@ -148,6 +148,88 @@ def recordIndirectCall (source : Syntax.Expr) (callee : InferredExpression)
       coercionRequirements result.callCoercions)
     result.callCoercions result.state
 
+/-- Result of checking every explicit case in source order. -/
+structure MatchCasesResult where
+  cases : List TypedMatchCase
+  hasWildcard : Bool
+  state : State
+
+private def patternResolutionIsWildcard : MatchPatternResolution → Bool
+  | .wildcard => true
+  | .integerLiteral _ _ => false
+
+/-- Check the deliberately small executable pattern profile.  Numeric patterns
+own a fresh builtin-`Int` target and requirement and are constrained by the
+scrutinee's already inferred numeric type.  Their origins are retained so only
+targets still open after the whole body is inferred default to Word; wildcards
+never create such an origin. -/
+def inferMatchPatternFuel (fuel : Nat) (context : Context)
+    (pattern : Syntax.Pattern)
+    (expected : Ty) (state : State) :
+    Except Error (TypedMatchPattern × State) :=
+  match fuel with
+  | 0 => .error .nestingLimit
+  | fuel + 1 => match pattern.value with
+  | .wildcard marker =>
+      pure ({
+        source := .wildcard pattern.span marker
+        type := expected
+        resolution := .wildcard
+      }, state)
+  | .literal literal =>
+      match literal.value with
+      | value@(.decimal _) | value@(.hexadecimal _) => do
+          let rawValue ← match numericLiteralValue? value with
+            | some rawValue => pure rawValue
+            | none => throw (.unsupportedPattern pattern.span
+                "malformed integer literal")
+          let (target, state) := state.fresh
+          let .variable metavariable := target
+            | throw (.unsupportedPattern pattern.span
+                "integer target allocation")
+          let (requirement, state) := state.addRequirementWithId
+            (ProgramSignatures.builtinIntPredicate target)
+          let origin : IntegerPatternOrigin := {
+            metavariable
+            span := pattern.span
+            requirement
+          }
+          let state := {
+            state with integerPatterns := state.integerPatterns ++ [origin]
+          }
+          let normalizedExpected := state.resolve expected
+          let state ← match normalizedExpected with
+            | .variable _ | .constructor (.builtin .word)
+            | .constructor (.builtin .integer) =>
+                unify state target normalizedExpected
+            | _ => throw (Error.nonNumericPatternType pattern.span
+                normalizedExpected)
+          pure ({
+            source := .integerLiteral pattern.span literal
+            type := expected
+            resolution := .integerLiteral value {
+              rawValue
+              targetType := target
+              requirement
+            }
+            requirements := [requirement]
+          }, state)
+      | .string _ =>
+          .error (.unsupportedPattern pattern.span "string literal")
+  | .group inner => do
+      let (typed, state) ← inferMatchPatternFuel fuel context inner expected state
+      pure ({ typed with source := .group pattern.span typed.source }, state)
+  | .binder _ => .error (.unsupportedPattern pattern.span "binder")
+  | .constructor .. => .error (.unsupportedPattern pattern.span "constructor")
+  | .comptime .. => .error (.unsupportedPattern pattern.span "comptime")
+  | .tuple .. => .error (.unsupportedPattern pattern.span "tuple")
+  | .error => .error (.unsupportedPattern pattern.span "parser recovery")
+
+private def statementIsMatch (statement : Syntax.Statement) : Bool :=
+  match statement.value with
+  | .matchWith .. => true
+  | _ => false
+
 mutual
 
   def inferExprFuel (fuel : Nat) (context : Context)
@@ -416,6 +498,37 @@ mutual
               inferExprsFuel fuel context rest state
             pure (expression :: expressions, state)
 
+  def inferMatchCasesFuel (fuel : Nat) (context : Context)
+      (scrutineeType expectedReturn : Ty) (outerScope : LexicalScope) :
+      List Syntax.MatchCase → State → Except Error MatchCasesResult
+    | cases, state =>
+      match fuel with
+      | 0 => .error .nestingLimit
+      | fuel + 1 =>
+        match cases with
+        | [] => .ok { cases := [], hasWildcard := false, state }
+        | arm :: rest => do
+            let (pattern, state) ← inferMatchPatternFuel fuel context
+              arm.value.pattern scrutineeType state
+            let body ← inferStatementsFuel fuel context arm.value.body.value
+              expectedReturn state
+            if !body.sawReturn then
+              throw (.nonReturningMatchArm arm.span)
+            else
+              let state := body.state.restoreLexicalScope outerScope
+              let tail ← inferMatchCasesFuel fuel context scrutineeType
+                expectedReturn outerScope rest state
+              pure {
+                cases := {
+                  span := arm.span
+                  pattern
+                  body := body.statements
+                } :: tail.cases
+                hasWildcard := patternResolutionIsWildcard pattern.resolution ||
+                  tail.hasWildcard
+                state := tail.state
+              }
+
   def inferStatementFuel (fuel : Nat) (context : Context)
       (statement : Syntax.Statement) (expectedReturn : Ty) (state : State) :
       Except Error StatementResult :=
@@ -560,7 +673,52 @@ mutual
           }
       | .assignValue .. => .error (.unsupportedStatement "assignment")
       | .assignBitNot .. => .error (.unsupportedStatement "bit-not assignment")
-      | .matchWith .. => .error (.unsupportedStatement "match")
+      | .matchWith scrutinees arms => do
+          let sources := scrutinees.elements.toList
+          let scrutineeSource ← match sources with
+            | [scrutinee] => pure scrutinee
+            | _ => throw (.matchScrutineeArityMismatch 1 sources.length)
+          let (scrutinee, state) ← inferExprFuel fuel context scrutineeSource
+            none state
+          let (hiddenScrutinee, state) := state.allocateHiddenLocal
+          let outerScope := state.lexicalScope
+          let checked ← inferMatchCasesFuel fuel context scrutinee.type
+            expectedReturn outerScope arms.value.cases state
+          let (defaultBody, state) ← match arms.value.defaultBody with
+            | none => pure (none, checked.state)
+            | some body => do
+                let inferred ← inferStatementsFuel fuel context body.value
+                  expectedReturn checked.state
+                if !inferred.sawReturn then
+                  throw (.nonReturningMatchDefault body.span)
+                else
+                  pure (some inferred.statements,
+                    inferred.state.restoreLexicalScope outerScope)
+          if !checked.hasWildcard && defaultBody.isNone then
+            throw (.nonExhaustiveMatch statement.span)
+          else
+            let requirements := checked.cases.flatMap fun arm =>
+              arm.pattern.requirements
+            let type := state.resolve expectedReturn
+            let state := state.recordNode (.statement {
+              id
+              span := statement.span
+              type
+              form := .matchWith {
+                scrutinee := scrutinee.id
+                hiddenScrutinee
+                cases := checked.cases
+                defaultBody
+                requirements
+              }
+            })
+            pure {
+              id
+              type
+              hasValue := true
+              sawReturn := true
+              state
+            }
       | .forLoop .. => .error (.unsupportedStatement "for loop")
       | .whileLoop .. => .error (.unsupportedStatement "while loop")
       | .assembly .. => .error (.unsupportedStatement "assembly")
@@ -581,28 +739,31 @@ mutual
             sawReturn := false
             state
           }
-        | statement :: rest => do
-            let head ← inferStatementFuel fuel context statement
-              expectedReturn state
-            match rest with
-            | [] => pure {
-                statements := [head.id]
-                type := if head.sawReturn || head.hasValue then head.type
-                  else .unit
-                sawReturn := head.sawReturn
-                state := head.state
-              }
-            | _ => do
-                let tail ← inferStatementsFuel fuel context rest
-                  expectedReturn head.state
-                pure {
-                  statements := head.id :: tail.statements
-                  type := if tail.sawReturn then tail.type
-                    else if head.sawReturn then head.type
-                    else tail.type
-                  sawReturn := head.sawReturn || tail.sawReturn
-                  state := tail.state
+        | statement :: rest =>
+            if statementIsMatch statement && !rest.isEmpty then
+              .error (.nonTerminalMatch statement.span)
+            else do
+              let head ← inferStatementFuel fuel context statement
+                expectedReturn state
+              match rest with
+              | [] => pure {
+                  statements := [head.id]
+                  type := if head.sawReturn || head.hasValue then head.type
+                    else .unit
+                  sawReturn := head.sawReturn
+                  state := head.state
                 }
+              | _ => do
+                  let tail ← inferStatementsFuel fuel context rest
+                    expectedReturn head.state
+                  pure {
+                    statements := head.id :: tail.statements
+                    type := if tail.sawReturn then tail.type
+                      else if head.sawReturn then head.type
+                      else tail.type
+                    sawReturn := head.sawReturn || tail.sawReturn
+                    state := tail.state
+                  }
 
 end
 

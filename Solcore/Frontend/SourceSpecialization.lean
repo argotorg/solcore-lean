@@ -117,6 +117,31 @@ def applyIntegerLiteralResolution (substitution : ParameterSubstitution)
   resolution with targetType := substitution.apply resolution.targetType
 }
 
+def applyMatchPatternResolution (substitution : ParameterSubstitution) :
+    MatchPatternResolution → MatchPatternResolution
+  | .wildcard => .wildcard
+  | .integerLiteral source resolution =>
+      .integerLiteral source
+        (applyIntegerLiteralResolution substitution resolution)
+
+def applyTypedMatchPattern (substitution : ParameterSubstitution)
+    (pattern : TypedMatchPattern) : TypedMatchPattern := {
+  pattern with
+  type := substitution.apply pattern.type
+  resolution := applyMatchPatternResolution substitution pattern.resolution
+}
+
+def applyTypedMatchCase (substitution : ParameterSubstitution)
+    (arm : TypedMatchCase) : TypedMatchCase := {
+  arm with pattern := applyTypedMatchPattern substitution arm.pattern
+}
+
+def applyMatchResolution (substitution : ParameterSubstitution)
+    (resolution : MatchResolution) : MatchResolution := {
+  resolution with
+  cases := resolution.cases.map (applyTypedMatchCase substitution)
+}
+
 def applyExpressionForm (substitution : ParameterSubstitution) :
     ExpressionForm → ExpressionForm
   | .literal literal => .literal literal
@@ -164,6 +189,8 @@ def applyStatementForm (substitution : ParameterSubstitution) :
   | .ifThen condition thenBody elseBody =>
       .ifThen condition thenBody elseBody
   | .block body => .block body
+  | .matchWith resolution =>
+      .matchWith (applyMatchResolution substitution resolution)
 
 def applyStatementNode (substitution : ParameterSubstitution)
     (node : StatementNode) : StatementNode := {
@@ -312,6 +339,11 @@ private def statementFormTypes : StatementForm → List Ty
   | .expression _ _
   | .ifThen _ _ _
   | .block _ => []
+  | .matchWith resolution =>
+      resolution.cases.flatMap fun arm =>
+        arm.pattern.type :: match arm.pattern.resolution with
+          | .wildcard => []
+          | .integerLiteral _ literal => [literal.targetType]
 
 private def nodeTypes : Node → List Ty
   | .expression node =>

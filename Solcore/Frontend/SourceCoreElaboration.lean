@@ -44,6 +44,7 @@ inductive NonTailStatement where
   | returnStmt
   | ifThen
   | block
+  | matchWith
   deriving Repr, BEq, DecidableEq
 
 /-- Identify the branch of a tail conditional that can fall through. -/
@@ -98,6 +99,16 @@ inductive ErrorReason where
       (expected actual : ProgramImplId)
   | integerLiteralPremiseCountMismatch
       (requirement : RequirementId) (expected actual : Nat)
+  | matchHiddenOwnerMismatch
+      (expected actual : Resolved.DeclarationId)
+  | duplicateMatchHidden (id : Resolved.LocalId)
+  | matchPatternTypeMismatch (expected actual : Ty)
+  | matchPatternSourceMismatch
+  | matchPatternRequirementsMismatch
+      (expected actual : List RequirementId)
+  | matchRequirementsMismatch
+      (expected actual : List RequirementId)
+  | matchWithoutFallback
   | unknownLocal (id : Resolved.LocalId)
   | expressionDepthLimit
   | statementDepthLimit
@@ -355,21 +366,22 @@ private def exactIntegerLiteralRequirementWith {error : Type}
         (.duplicateIntegerLiteralRequirements requirement solved.length)
 
 /-- Validate the complete builtin `Int.fromInteger` contract before erasing it
-to the runtime Word constant.  In particular, no caller-supplied lowering
-policy can manufacture or replace the evidence owned by this typed form. -/
-private def lowerIntegerLiteralWith {error : Type} (lift : Error → error)
-    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+to the runtime Word constant.  Expression and pattern carriers share this
+primitive validation, including exact attachment and evidence checks. -/
+private def lowerIntegerLiteralResolutionWith {error : Type}
+    (lift : Error → error) (site : ErrorSite)
+    (solvedRequirements : List SolvedRequirement) (nodeType : Ty)
+    (attachedRequirements : List RequirementId)
     (source : Syntax.CoreLiteralValue)
     (resolution : IntegerLiteralResolution) :
     Except error LoweredExpression := do
-  let site := ErrorSite.occurrence node.id.occurrence
-  if resolution.targetType != node.type then
+  if resolution.targetType != nodeType then
     failWith lift site
-      (.integerLiteralTargetTypeMismatch resolution.targetType node.type)
-  else if node.requirements != [resolution.requirement] then
+      (.integerLiteralTargetTypeMismatch resolution.targetType nodeType)
+  else if attachedRequirements != [resolution.requirement] then
     failWith lift site
       (.integerLiteralRequirementsMismatch [resolution.requirement]
-        node.requirements)
+        attachedRequirements)
   else
     let decoded ← match numericLiteralValue? source with
       | none => failWith lift site (.invalidIntegerLiteralSource source)
@@ -415,6 +427,15 @@ private def lowerIntegerLiteralWith {error : Type} (lift : Error → error)
                   (Core.Word.ofNatModulo resolution.rawValue)
                 consumedRequirements := [resolution.requirement]
               }
+
+/-- Expression-node wrapper for the shared integer-literal validator. -/
+private def lowerIntegerLiteralWith {error : Type} (lift : Error → error)
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue)
+    (resolution : IntegerLiteralResolution) :
+    Except error LoweredExpression :=
+  lowerIntegerLiteralResolutionWith lift (.occurrence node.id.occurrence)
+    solvedRequirements node.type node.requirements source resolution
 
 private def eraseRequirement? (target : RequirementId) :
     List RequirementId → Option (List RequirementId)
@@ -775,6 +796,63 @@ private def lowerExpressionAsWith {error : Type} (lift : Error → error)
   lowerExpressionFuelWith lift onCall onRequiredUnary onRequiredBinary
     onCoercion solvedRequirements fuel source scope id
 
+private inductive MatchPatternLeaf where
+  | wildcard
+  | integerLiteral (literal : Syntax.CoreLiteral)
+
+private def matchPatternLeaf : MatchPatternSource → MatchPatternLeaf
+  | .wildcard _ _ => .wildcard
+  | .integerLiteral _ literal => .integerLiteral literal
+  | .group _ inner => matchPatternLeaf inner
+
+private structure LoweredMatchPattern where
+  tag : Option Core.Word
+  consumedRequirements : List RequirementId
+
+private structure LoweredMatchCase where
+  pattern : LoweredMatchPattern
+  branch : LoweredExpression
+
+private def lowerMatchPatternWith {error : Type} (lift : Error → error)
+    (site : ErrorSite) (solvedRequirements : List SolvedRequirement)
+    (scrutineeType : Ty) (pattern : TypedMatchPattern) :
+    Except error LoweredMatchPattern := do
+  if pattern.type != scrutineeType then
+    failWith lift site
+      (.matchPatternTypeMismatch scrutineeType pattern.type)
+  else
+    match matchPatternLeaf pattern.source, pattern.resolution with
+    | .wildcard, .wildcard =>
+        if pattern.requirements.isEmpty then
+          pure { tag := none, consumedRequirements := [] }
+        else
+          failWith lift site
+            (.matchPatternRequirementsMismatch [] pattern.requirements)
+    | .integerLiteral literal, .integerLiteral source resolution =>
+        if literal.value != source then
+          failWith lift site .matchPatternSourceMismatch
+        else
+          let lowered ← lowerIntegerLiteralResolutionWith lift site
+            solvedRequirements pattern.type pattern.requirements source
+            resolution
+          match lowered.resolved with
+          | .word word => pure {
+              tag := some word
+              consumedRequirements := lowered.consumedRequirements
+            }
+          | _ => failWith lift site .matchPatternSourceMismatch
+    | _, _ => failWith lift site .matchPatternSourceMismatch
+
+private def foldLoweredMatchCases (hidden : Resolved.LocalId)
+    (cases : List LoweredMatchCase) (fallback : Option Resolved.Expr) :
+    Option Resolved.Expr :=
+  cases.foldr (fun arm tail =>
+    match arm.pattern.tag with
+    | none => some arm.branch.resolved
+    | some word => tail.map fun rest =>
+        .ifE (.binary .wordEq (.var hidden) (.word word))
+          arm.branch.resolved rest) fallback
+
 private def statementRoots : List NodeId → Except Error (List StatementId)
   | [] => .ok []
   | .statement id :: rest => do
@@ -883,6 +961,61 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           lowerStatementsFuelWith lift onCall onRequiredUnary onRequiredBinary
             onCoercion solvedRequirements fuel source scope expected site
             .blockFallthrough body
+    | .matchWith resolution => do
+        if !rest.isEmpty then
+          failWith lift site (.nonTailStatement .matchWith)
+        else if resolution.hiddenScrutinee.owner != source.owner then
+          failWith lift site (.matchHiddenOwnerMismatch source.owner
+            resolution.hiddenScrutinee.owner)
+        else if scope.ids.contains resolution.hiddenScrutinee then
+          failWith lift site (.duplicateMatchHidden
+            resolution.hiddenScrutinee)
+        else
+          ensureTypeWith lift site expected node.type
+          let scrutineeNode ←
+            (lookupExpression source resolution.scrutinee).mapError lift
+          let scrutineeCoreType ←
+            (lowerType (.occurrence resolution.scrutinee.occurrence)
+              scrutineeNode.type).mapError lift
+          let scrutinee ← lowerExpressionAsWith lift onCall onRequiredUnary
+            onRequiredBinary onCoercion solvedRequirements fuel source scope
+            scrutineeCoreType resolution.scrutinee
+          let expectedRequirements := resolution.cases.flatMap fun arm =>
+            arm.pattern.requirements
+          if resolution.requirements != expectedRequirements then
+            failWith lift site (.matchRequirementsMismatch
+              expectedRequirements resolution.requirements)
+          else
+            let loweredCases ← resolution.cases.mapM fun arm => do
+              let pattern ← lowerMatchPatternWith lift site solvedRequirements
+                scrutineeNode.type arm.pattern
+              let branch ← lowerStatementsFuelWith lift onCall
+                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
+                fuel source scope expected site .blockFallthrough arm.body
+              pure { pattern, branch }
+            let fallback ← match resolution.defaultBody with
+              | none => pure none
+              | some body => do
+                  let lowered ← lowerStatementsFuelWith lift onCall
+                    onRequiredUnary onRequiredBinary onCoercion
+                    solvedRequirements fuel source scope expected site
+                    .blockFallthrough body
+                  pure (some lowered)
+            let folded := foldLoweredMatchCases resolution.hiddenScrutinee
+              loweredCases (fallback.map (·.resolved))
+            let selected ← match folded with
+              | some selected => pure selected
+              | none => failWith lift site .matchWithoutFallback
+            pure {
+              resolved := .letE resolution.hiddenScrutinee
+                scrutinee.resolved selected
+              consumedRequirements :=
+                scrutinee.consumedRequirements ++
+                loweredCases.flatMap (fun arm =>
+                  arm.pattern.consumedRequirements ++
+                    arm.branch.consumedRequirements) ++
+                fallback.toList.flatMap (·.consumedRequirements)
+            }
     | .expression _ _ =>
         failWith lift site (.unsupportedStatement .expression)
 

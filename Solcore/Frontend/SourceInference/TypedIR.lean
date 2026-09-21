@@ -66,6 +66,33 @@ def applySubstitution (substitution : Substitution)
 
 end IntegerLiteralResolution
 
+/-- The exact supported projection of one source match pattern.  Keeping this
+small source carrier separate from the semantic classification preserves every
+written group and span without admitting unsupported pattern syntax. -/
+inductive MatchPatternSource where
+  | wildcard (span marker : Syntax.SourceSpan)
+  | integerLiteral (span : Syntax.SourceSpan) (literal : Syntax.CoreLiteral)
+  | group (span : Syntax.SourceSpan) (inner : MatchPatternSource)
+  deriving Repr, BEq, DecidableEq
+
+/-- The supported semantic classification of one source match pattern. -/
+inductive MatchPatternResolution where
+  | wildcard
+  | integerLiteral
+      (source : Syntax.CoreLiteralValue)
+      (resolution : IntegerLiteralResolution)
+  deriving Repr, BEq, DecidableEq
+
+/-- A source-preserving pattern carrier for the initial executable match
+profile.  Numeric patterns own their exact builtin-`Int` requirement just as
+expression literals do, while wildcard patterns own no requirement. -/
+structure TypedMatchPattern where
+  source : MatchPatternSource
+  type : Ty
+  resolution : MatchPatternResolution
+  requirements : List RequirementId := []
+  deriving Repr, BEq, DecidableEq
+
 /-- Metadata for applying an indirectly obtained function type.  A source
 argument list is bundled into one product before it is compared with the
 function parameter, so any coercion of that bundle belongs here rather than to
@@ -99,6 +126,28 @@ structure ExpressionId where
 /-- Category-safe identity of one statement occurrence. -/
 structure StatementId where
   occurrence : OccurrenceId
+  deriving Repr, BEq, DecidableEq
+
+/-- One checked source match arm.  Branch statements remain occurrence edges
+into the common typed-source table; the original arm and pattern spans remain
+available through `span` and `pattern.source`. -/
+structure TypedMatchCase where
+  span : Syntax.SourceSpan
+  pattern : TypedMatchPattern
+  body : List StatementId
+  deriving Repr, BEq, DecidableEq
+
+/-- Complete metadata for a terminal single-scrutinee match.  The hidden local
+is allocated from the declaration's stable local-ID stream during inference so
+Core lowering can evaluate the scrutinee exactly once without risking capture.
+`requirements` is the exact source-order concatenation of the pattern-owned
+requirements and is checked again before lowering. -/
+structure MatchResolution where
+  scrutinee : ExpressionId
+  hiddenScrutinee : Resolved.LocalId
+  cases : List TypedMatchCase
+  defaultBody : Option (List StatementId)
+  requirements : List RequirementId := []
   deriving Repr, BEq, DecidableEq
 
 /-- Category-preserving identity of either typed source-node kind. -/
@@ -169,6 +218,7 @@ inductive StatementForm where
       (thenBody : List StatementId)
       (elseBody : Option (List StatementId))
   | block (body : List StatementId)
+  | matchWith (resolution : MatchResolution)
   deriving Repr, BEq, DecidableEq
 
 /-- One typed statement occurrence and its inferred result type. -/
@@ -357,6 +407,46 @@ def applySubstitution (substitution : Substitution)
 
 end ExpressionNode
 
+namespace MatchPatternResolution
+
+def applySubstitution (substitution : Substitution) :
+    MatchPatternResolution → MatchPatternResolution
+  | .wildcard => .wildcard
+  | .integerLiteral source resolution =>
+      .integerLiteral source (resolution.applySubstitution substitution)
+
+end MatchPatternResolution
+
+namespace TypedMatchPattern
+
+def applySubstitution (substitution : Substitution)
+    (pattern : TypedMatchPattern) : TypedMatchPattern := {
+  pattern with
+  type := substitution.apply pattern.type
+  resolution := pattern.resolution.applySubstitution substitution
+}
+
+end TypedMatchPattern
+
+namespace TypedMatchCase
+
+def applySubstitution (substitution : Substitution)
+    (arm : TypedMatchCase) : TypedMatchCase := {
+  arm with pattern := arm.pattern.applySubstitution substitution
+}
+
+end TypedMatchCase
+
+namespace MatchResolution
+
+def applySubstitution (substitution : Substitution)
+    (resolution : MatchResolution) : MatchResolution := {
+  resolution with
+  cases := resolution.cases.map (TypedMatchCase.applySubstitution substitution)
+}
+
+end MatchResolution
+
 namespace StatementForm
 
 /-- Apply a final substitution to binder schemes embedded in a statement. -/
@@ -370,6 +460,8 @@ def applySubstitution (substitution : Substitution) : StatementForm → Statemen
     | .ifThen condition thenBody elseBody =>
         .ifThen condition thenBody elseBody
     | .block body => .block body
+    | .matchWith resolution =>
+        .matchWith (resolution.applySubstitution substitution)
 
 end StatementForm
 
