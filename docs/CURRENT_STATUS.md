@@ -79,17 +79,29 @@ restricted linking into a reusable checked entry; `run` additionally checks
 the runtime input types and executes it.  This interface performs no automatic
 entry discovery, exposes no multi-root policy, and adds no source Oracle.
 
-The target-compatible numeric-literal foundation has started (ADR-0344).
-`integer` is now a distinct, exact-lowercase, lowest-priority source intrinsic
-which source checking may retain but Semantic Core explicitly rejects.  The
-unbounded numeric decoder also has a separate modulo-Word projection matching
-primitive `wordFromInteger`; the older strict in-range projection remains
-unchanged for its monomorphic adapter.  Premise-free builtin `Int<Word>` and
-`Int<integer>` evidence is now installed ahead of source rules through the
-combined resolution view (ADR-0346), while source catalogs remain source-only.
-Typed literal conversion metadata and end-to-end `Int.fromInteger` execution
-are the next steps, so whole-program inference still retains its temporary
-`FromLiteral`/`Numeric` compatibility behavior.
+The target-compatible expression integer-literal slice is implemented
+(ADR-0344–0347).  Each decimal or hexadecimal occurrence now retains its source
+spelling, arbitrary-size natural value, fresh target type, and one immediately
+allocated builtin `Int<target>` requirement.  Inference does not default an
+unconstrained expression literal to Word and does not consult source traits
+named `Int`, `FromLiteral`, or `Numeric`.  Overload selection prefers viable
+ground candidates to deferred open candidates, while nested and let-bound
+literal origins remain available for later contextual closure and final
+all-requirement validation.  No-catalog Word-domain operators such as nested
+`accept(1 + 1)` and `accept(~1)` retain only targets that were open literal
+origins before contextual unification until the surrounding call closes them;
+Bool-domain logical operators and unrelated or merely co-located literals are
+not admitted, and a visible operator catalog remains authoritative.  Word and
+staged `integer` are equally supported builtin targets, so an otherwise equal Word/`integer`
+overload pair is ambiguous rather than ordered by a hidden default.
+
+Validated builtin `Int<Word>` literal evidence now lowers through the source
+pipeline to a Word constant modulo `2^256`; the primitive conversion is erased
+rather than dispatched as a runtime method.  A literal retained as `integer`
+still rejects before Semantic Core, and the manually assembled legacy
+`.literal` typed-IR form retains its strict in-range Word behavior.  Signed
+compile-time integer evaluation, pattern-literal integration, and custom
+builtin `Int` implementation execution remain later boundaries.
 
 Program-wide trait and implementation evidence now uses collision-free
 builtin-or-source identities (ADR-0345).  Source declaration IDs coerce only
@@ -5664,13 +5676,24 @@ resolution.  Mapping reads infer key/value types by unification, check the key
 with the ordinary coercion boundary, and pass the mapped value through the
 surrounding expected type.  These two forms are type-checking boundaries only;
 no executable read or proxy term is claimed yet.
-Decimal and hexadecimal literals use inference variables and default
-deterministically to Word when unconstrained.  Candidate-local defaulting gives
-Word zero cost, while trait-backed literal interpretations and selected
-coercion edges add cost.  Each coercion edge costs one regardless of how many
-proof obligations it carries; only minimum-cost overloads compete and equal
-minima remain ambiguous.  Function arguments are fitted independently at the
-source arity, while one tuple-valued argument remains whole.  Expected-type
+Each decimal or hexadecimal expression literal immediately owns a fresh target
+variable, one builtin `Int<target>` requirement, and an explicit carrier for its
+source spelling and arbitrary-size natural value.  Candidate fitting reuses and
+specializes that existing row; it never defaults an unconstrained literal to
+Word.  Viable ground candidates outrank candidates whose literal targets remain
+deferred.  If no ground candidate succeeds, deferred candidates remain eligible
+for closure by an outer context.  Each coercion edge then costs one regardless
+of how many proof obligations it carries; only minimum-cost candidates inside
+the preferred rank compete and equal minima remain ambiguous.  Word and staged
+`integer` have equal builtin support, so neither is a hidden tie-breaker, and an
+unresolved target fails finalization.  Function arguments are fitted
+independently at the source arity, while one tuple-valued argument remains
+whole.  A missing Word-domain operator catalog may preserve an open operator
+only when its target was an open carried integer-literal origin before
+contextual unification; outer call/return context and later let use can close
+it.  Existing operator catalogs remain authoritative, and Bool-domain logical
+operators, unrelated open generics, merely co-located literals and nominal
+targets do not gain this fallback.  Expected-type
 mismatches try a direct `Coerce<From, To>` obligation first and then search
 concrete coercion edges breadth first to a context bound of four by default.
 The unique shortest path retains its predicates and implementation or local
@@ -5699,17 +5722,18 @@ runtime trait evidence beyond the strict arithmetic/bitwise, `Eq<T>`, `Ord<T>` a
 `Coerce<From, To>` profiles, general conversion execution and general source
 semantics are not claimed.
 
-Before adding constructor/member selection, match, assignment or broader
-executable conversion, the next architecture boundary is an
-occurrence-addressed typed and resolved source IR.  Its first carrier layer is
-implemented: each inferred
-trait or coercion obligation receives a contiguous function-local identity, and
+The occurrence-addressed typed and resolved source IR is implemented as the
+architecture boundary before constructor/member selection, match, assignment or
+broader executable conversion.  Each inferred trait, coercion, or builtin
+integer-literal obligation receives a contiguous function-local identity, and
 finalization retains that identity together with the normalized predicate and
-its matching evidence in one canonical solved-requirement record.  Allocation
-well-formedness and solver order preservation have small checked proofs.
-End-to-end regressions cover ordered multi-step coercions, speculative overload
-rollback without ID gaps, inference-to-finalization continuity and distinct IDs
-for repeated equal predicates.
+its matching evidence in one canonical solved-requirement record.  Literal
+requirements are allocated once on their originating occurrence; overload
+forks reuse them and cannot leak duplicate rows.  Allocation well-formedness and
+solver order preservation have small checked proofs.  End-to-end regressions
+cover ordered multi-step coercions, speculative overload rollback without ID
+gaps, inference-to-finalization continuity and distinct IDs for repeated equal
+predicates.
 
 The source traversal now populates that typed-IR schema.  Every retained
 semantic expression and statement receives a declaration-owned occurrence identity;
@@ -5724,9 +5748,9 @@ occurrence plus separate before/after types and an ordered coercion path for the
 bundled arguments, so argument conversion cannot be confused with conversion
 of the call result.  Ordered output coercion steps are attached to the argument
 or result occurrence where they are required, operator and signature
-obligations are attached to their introducing node, and literal-defaulting
-obligations return to the originating literal.  Losing overload candidates
-cannot contribute nodes, requirements or allocator state.
+obligations are attached to their introducing node, and each builtin-`Int`
+literal obligation is owned by its originating `.integerLiteral` node.  Losing
+overload candidates cannot contribute nodes, requirements or allocator state.
 Transparent callee groups and qualified-name field chains are normalized to one
 semantic direct-callee reference carrying the complete selected name and outer
 callee span; this table is therefore not a one-node-per-parser-AST trace.
@@ -5742,8 +5766,9 @@ canonical solved-requirement list.  Specialization and worklist admission
 recheck exact coercion endpoints and adjacency before downstream consumers use
 the carrier.  End-to-end regressions cover nested shadowing, generic overload
 selection, rejected candidates, a two-edge coercion path, indirect bundle
-metadata, operator evidence, literal defaulting, category-safe lookup and a
-one-owner correspondence between attached and solved requirement identities.
+metadata, operator evidence, integer-literal carrier/evidence closure,
+ground/deferred ranking, category-safe lookup and a one-owner correspondence
+between attached and solved requirement identities.
 Small checked laws cover allocator and substitution identity preservation;
 general preservation and ownership completeness theorems remain deferred under
 the executable-first proof policy.
@@ -5755,16 +5780,21 @@ Closed builtin Unit, Bool, Word and product types, local references, groups,
 tuples, builtin unary/binary operators and expression conditionals pass through
 `Resolved.Expr` to an open Semantic Core expression.  Let initializers use the
 old scope, their tails use the stable binder-prepended scope, and both
-conditional branches begin from the same outer scope.  Numeric spellings are
-range-checked at this boundary.
+conditional branches begin from the same outer scope.  The manual legacy
+`.literal` form still range-checks a strict Word.  Inferred `.integerLiteral`
+forms instead re-decode the retained spelling, validate its raw value and exact
+requirement/predicate/evidence goal, require the premise-free builtin `intWord`
+implementation, and lower with `Word.ofNatModulo` before any output coercion.
+An `Int<integer>` carrier remains staged and is rejected before runtime Core.
 
 Stable input identities determine the positional Core context.  Every accepted
 result stores checked equations both for exact `Resolved.Expr.lower?` output
 and for independent `Core.infer?` reconstruction of its declared return type.
 Missing or category-wrong node edges,
 duplicate inputs or active local IDs, polymorphic locals, unresolved source
-types, non-Word literals, typed-node mismatches, malformed coercion paths,
-uninitialized lets, missing else branches, fallthrough, non-tail control
+types, staged `integer` targets, unsupported legacy literal forms, typed-node
+mismatches, malformed coercion paths, uninitialized lets, missing else
+branches, fallthrough, non-tail control
 statements and unconsumed requirements all produce located elaboration errors.
 The standalone function elaborator still rejects calls and coercions; the
 validated plan linker described below supplies the policies which give those

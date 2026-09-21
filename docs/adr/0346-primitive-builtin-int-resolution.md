@@ -47,6 +47,16 @@ does not add builtin method execution or change Core lowering.  The staged
 `integer` type must still be eliminated by a later specialization step before
 runtime Core.
 
+## Follow-up: ADR-0347
+
+ADR-0347 implements the deferred expression-literal carrier, inference, and
+Word lowering.  It allocates a unique builtin `Int<fresh alpha>` requirement at
+literal creation, closes that same row through substitution and overload
+selection, and validates exact `intWord` evidence before dedicated modulo-Word
+erasure.  `Int<Word>` and `Int<integer>` remain equal primitive possibilities,
+not an ordered default.  General builtin-method execution and runtime
+`integer` values remain unsupported.
+
 ## Verification
 
 Focused tests fix the exact builtin-first combined rule order, both primitive

@@ -198,7 +198,7 @@ private def testStageClassification : IO Unit := do
   | .ok _ => throw (IO.userError "unknown body variable was accepted")
 
 /-- Exercise the complete raw-workspace pipeline, including generics,
-overloads, calls, predicates, implementation evidence, and numeric literals. -/
+overloads, calls, predicates, implementation evidence, and integer literals. -/
 def testProgramChecking : IO Unit := do
   testSuccessfulProgram
   testImportedTypeProgram

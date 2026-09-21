@@ -50,6 +50,16 @@ ADR-0346 prepends primitive `Int<Word>` and `Int<integer>` rules to a combined
 resolution view without changing source catalog counts.  Literal inference
 and Core execution remain separate later changes.
 
+## Follow-up: ADR-0347
+
+ADR-0347 now uses these tagged identities end to end for expression literals.
+The literal carrier owns builtin `Int` evidence, and the dedicated lowering
+path accepts only the exact premise-free builtin `intWord` implementation before
+erasing the conversion to a modular Word constant.  This does not relax the
+general source-method boundary: source catalogs still reject builtin identities,
+and source traits merely named `Int`, `FromLiteral`, or `Numeric` cannot
+authorize the compiler primitive.
+
 ## Verification
 
 Regression tests prove declaration projection, constructor injectivity,

@@ -68,6 +68,16 @@ profile.  Literal inference can next retain an exact
 `integer -> target` conversion plan, and Source Core can consume the builtin
 Word plan without ever emitting `integer` at runtime.
 
+## Follow-up: ADR-0347
+
+ADR-0347 implements the expression-literal work deferred above.  Whole-program
+inference now allocates one builtin `Int<fresh alpha>` requirement at literal
+creation, retains an explicit spelling/value/target/requirement carrier, and
+lowers a validated builtin `Int<Word>` plan modulo `2^256`.  It deliberately
+leaves `integer` staged, preserves the strict legacy Word adapter, and does not
+add signed compile-time integer evaluation, pattern-literal integration, or
+custom builtin `Int` execution.
+
 ## Verification
 
 Regression tests cover exact lowercase resolution, arity and case errors,

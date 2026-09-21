@@ -44,14 +44,17 @@ re-exports and qualified module-binding traversal; rigid parameters, flexible
 variables, substitutions and rank-1 schemes feed occurs-checking unification;
 and resolved function, trait and impl signatures feed bounded
 evidence-producing tabled class resolution.  The supported source expression
-and statement fragment performs minimum-cost overload selection after
-candidate-local numeric defaulting, source-arity-preserving per-argument
+and statement fragment immediately gives each decimal or hexadecimal literal a
+fresh target and one builtin `Int<target>` requirement, with no unconstrained
+Word default.  Overload selection prefers ground candidates to deferred
+literal-target candidates and then minimizes coercion-edge cost inside that
+rank.  The same fragment performs source-arity-preserving per-argument
 coercion, bounded evidence-producing shortest-path `Coerce<From, To>` search,
-operator-trait checking, proxy-value type resolution, mapping read-index
-inference and deterministic numeric-literal defaulting.  The whole-program
-entry point accumulates function failures while preserving no-solution versus
-inconclusive trait outcomes.  Proxy and mapping-index support is currently a
-type-checking boundary, not executable lowering.
+operator-trait checking, proxy-value type resolution and mapping read-index
+inference.  The whole-program entry point accumulates function failures while
+preserving no-solution versus inconclusive trait outcomes.  Proxy and
+mapping-index support is currently a type-checking boundary, not executable
+lowering.
 
 ADR-0343 now composes the implemented vertical slice into one public Lean
 boundary.  An explicit declaration ID or exact module/name seed flows from a
@@ -61,11 +64,11 @@ execution.  Checking fuel, specialization budget and execution fuel remain
 independent.  Automatic entry discovery, multiple public roots and a source
 Oracle remain later policies rather than being guessed by this API.
 
-ADR-0344 begins the target-compatible numeric-literal path without changing
-the current executable compatibility profile.  The exact lowercase
+ADR-0344 supplied the staged and decoding prerequisites for the
+target-compatible numeric-literal path.  The exact lowercase
 `integer` intrinsic is a distinct staged source type at the lowest lookup
 priority and is rejected if it reaches runtime Core.  A separate modulo-Word
-projection now matches primitive `wordFromInteger`, while the older strict
+projection matches primitive `wordFromInteger`, while the older strict
 Word projection remains scoped to its monomorphic adapter.
 
 ADR-0345 supplies the collision-free identity dependency.  Program predicates,
@@ -78,25 +81,40 @@ ADR-0346 installs premise-free primitive `Int<Word>` then `Int<integer>` rules
 as a stable prefix of the general resolution view.  Source trait,
 implementation and rule catalogs retain their original counts; a source trait
 spelled `Int` remains disjoint and independently resolvable.  Coercion graph
-enumeration stays source-only.  Retaining exact `Int.fromInteger` conversion
-metadata is the next step before whole-program literal execution can switch
-away from `FromLiteral`/`Numeric`.
+enumeration stays source-only.
+
+ADR-0347 completes the first expression-literal vertical slice.  Every inferred
+literal retains its exact spelling, decoded `Nat`, substitutable target and one
+stable builtin-`Int` requirement.  Source traits named `Int`, `FromLiteral`, or
+`Numeric` cannot satisfy that compiler obligation.  Context closes the target;
+Word and staged `integer` have equal primitive support and remain ambiguous
+without a distinguishing context.  Exact premise-free builtin `intWord`
+evidence lowers to a Word modulo `2^256`, while `integer` continues to reject
+before runtime Core and the manual legacy `.literal` form stays strict.
 
 This is an executable-first milestone rather than a completed proof campaign.
-The first typed-carrier step now assigns contiguous function-local identities to
-obligations and preserves each identity with its normalized predicate and
-evidence through finalization.  Allocation and solve-order preservation have
-small proofs, and transactional candidate tests establish that losing overloads
-do not leak identities.
+The typed carrier assigns contiguous function-local identities to obligations
+and preserves each identity with its normalized predicate and evidence through
+finalization.  An integer-literal requirement is allocated once at occurrence
+creation, attached to that `.integerLiteral` node, and reused by transactional
+candidate forks; losing overloads do not duplicate or leak it.  Allocation,
+solve-order and carrier-substitution preservation have small proofs.
 
 The occurrence-addressed typed/resolved source IR, ground specialization
 worklist and initial monomorphic Core linker are now implemented.  They retain
 expression and binder identities, chosen overloads, instantiated types,
 obligation identities and ordered coercion steps, including ordered method
-predicates on the supported unary, binary and conversion profiles.  The next
-vertical work should extend runtime evidence only where it agrees with the
-target language, then broaden constructors, patterns/match, member selection
-and place-aware assignment on the same carrier.  Constructor and
+predicates on the supported unary, binary and conversion profiles.  Primitive
+builtin `Int<Word>` literal evidence now also executes through dedicated,
+validated modulo-Word erasure rather than general method dispatch.  Nested and
+let-bound no-catalog Word-domain operators retain only targets that were open
+literal origins before contextual unification until a call parameter, return
+type, or later monomorphic use closes them; Bool-domain logical operators and
+unrelated or merely co-located literals are not admitted, and visible operator
+catalogs remain authoritative.  Signed compile-time `integer` evaluation and
+custom builtin `Int` execution remain later.  Subsequent vertical work can
+broaden constructors, patterns/match, member selection and place-aware
+assignment on the same carrier.  Constructor and
 operator export selectors, cyclic
 aliases, polymorphic recursion, higher-rank/higher-kinded types, generic or
 symbolic coercion intermediates, coinductive trait/coercion cycles and a complete
@@ -104,21 +122,18 @@ overlap policy remain explicit edge-case work.  Broad diagnostic and static-
 semantics soundness/completeness theorem families do not block these executable
 stages.
 
-The additive IR carrier portion is complete.  It defines declaration-owned,
-category-safe occurrence IDs; typed binder, expression and statement nodes;
-complete selected declaration instantiations; requirement/coercion links; node
-lookup; and final substitution that preserves identities.  Exact generic
-parameter substitutions are retained at instantiation time.  The active next
-step is traversal wiring: populate the node table, allocate local binder IDs,
-commit only the selected overload's metadata and attach numeric/coercion
-requirements to their originating expression nodes.
-
-The state portion of that step is implemented.  Each inference run now carries
-its declaration owner, stable input/local binders, independent monotone binder
-and shared expression/statement occurrence streams, and an append-ordered node
-table.  Nested-scope restoration deliberately preserves all allocators and
-semantic facts.  The remaining work is to make the expression/statement and
-resolution traversals emit and annotate those nodes.
+The additive IR carrier and traversal are complete for the supported fragment.
+They define declaration-owned, category-safe occurrence IDs; typed binder,
+expression and statement nodes; complete selected declaration instantiations;
+requirement/coercion links; node lookup; and final substitution that preserves
+identities.  Each inference run carries its declaration owner, stable
+input/local binders, monotone binder and shared expression/statement occurrence
+streams, an append-ordered node table, and retained integer-literal origins.
+Nested-scope restoration preserves all allocators and semantic facts.  The
+traversal commits only selected overload metadata, attaches coercion and
+operator requirements to their owners, and emits one explicit
+`.integerLiteral` carrier whose source/raw value/requirement survive
+substitution, specialization and validated Word lowering.
 
 The first semantic slice, ADR-0154, introduces structured resolved declaration
 and local identities, exact local-table lookup, and a monomorphic local
