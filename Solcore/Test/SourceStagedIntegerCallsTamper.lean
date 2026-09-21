@@ -20,7 +20,7 @@ private def workspace (content : String) : Workspace.RawWorkspace := {
 }
 
 private def source : String := String.intercalate "\n" [
-  "function combine(left: integer, right: integer) returns (integer) {",
+  "function combine(comptime left: integer, comptime right: integer) returns (comptime<integer>) {",
   "  let sum: integer = integerAdd(left, right);",
   "  return sum;",
   "}",
@@ -409,7 +409,7 @@ private def testPredicateRejection : IO Unit := do
   let predicateSource := String.intercalate "\n" [
     "trait Marker<T> {}",
     "impl Marker<integer> {}",
-    "function marked(value: integer) returns (integer) where integer: Marker {",
+    "function marked(comptime value: integer) returns (comptime<integer>) where integer: Marker {",
     "  return value;",
     "}",
     "function entry() returns (Word) {",

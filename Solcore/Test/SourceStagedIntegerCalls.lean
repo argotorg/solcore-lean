@@ -81,14 +81,20 @@ private def specializationKey (signature : ProgramFunctionSignature) :
 }
 
 private def positiveSource : String := String.intercalate "\n" [
-  "function dec(x: integer) returns (integer) {",
+  "function dec(comptime x: integer) returns (comptime<integer>) {",
   "  return integerSub(x, 1);",
   "}",
-  "function dec2(x: integer) returns (integer) {",
+  "function dec2(x: integer) returns (comptime<integer>) {",
   "  return dec(dec(x));",
+  "}",
+  "function legacyDec(x: integer) returns (integer) {",
+  "  return integerSub(x, 1);",
   "}",
   "function baseline() returns (Word) {",
   "  return wordFromInteger(dec(10));",
+  "}",
+  "function legacyFallback() returns (Word) {",
+  "  return wordFromInteger(legacyDec(10));",
   "}",
   "function repeated() returns (Word) {",
   "  return wordFromInteger(integerAdd(dec(10), dec(4)));",
@@ -128,16 +134,26 @@ private def testTypedCarrierAndStandaloneBoundary : IO Unit := do
   let decSignature ← signatureNamed program "dec"
   let dec ← functionNamed program "dec"
   assertTrue (decSignature.parameterTypes == [Ty.integer] &&
+      decSignature.parameterComptime == [true] &&
       decSignature.returnTypes == [Ty.integer] &&
+      decSignature.returnComptime &&
+      dec.returnComptime &&
       dec.type == Ty.function Ty.integer Ty.integer)
-    "integer parameter/result disappeared from the function signature"
+    "comptime parameter/result contract disappeared or entered the function type"
   let input ← match dec.typedBody.inputs with
     | [input] => pure input
     | inputs => throw (IO.userError
         s!"dec retained {inputs.length} typed inputs")
-  assertTrue (input.scheme == .mono Ty.integer &&
+  assertTrue (input.scheme == .mono Ty.integer && input.comptime &&
       input.id.owner == dec.declaration)
-    "integer parameter lost its exact monomorphic binder"
+    "integer parameter lost its exact monomorphic comptime binder"
+
+  let dec2Signature ← signatureNamed program "dec2"
+  let dec2 ← functionNamed program "dec2"
+  assertTrue (dec2Signature.parameterComptime == [false] &&
+      dec2Signature.returnComptime && dec2.returnComptime &&
+      dec2.typedBody.inputs.map (·.comptime) == [false])
+    "comptime result incorrectly forced an explicit parameter marker"
 
   let baseline ← functionNamed program "baseline"
   let call ← match directCalls baseline with
@@ -149,6 +165,8 @@ private def testTypedCarrierAndStandaloneBoundary : IO Unit := do
       assertTrue (instantiation.declaration == decSignature.id &&
           instantiation.parameterSubstitution.isEmpty &&
           instantiation.predicates.isEmpty &&
+          instantiation.parameterComptime == [true] &&
+          instantiation.returnComptime &&
           instantiation.type == Ty.function Ty.integer Ty.integer &&
           call.type == Ty.integer && call.requirements.isEmpty &&
           call.coercions.isEmpty)
@@ -290,17 +308,18 @@ private def testRequirementLedgerIsolation : IO Unit := do
 
 private def testPublicExecution : IO Unit := do
   assertPreparedWord "baseline" (Core.Word.ofNatModulo 9)
+  assertPreparedWord "legacyFallback" (Core.Word.ofNatModulo 9)
   assertPreparedWord "nested" (Core.Word.ofNatModulo 8)
   assertPreparedWord "eagerBranches" (Core.Word.ofNatModulo 9)
 
 private def testIntegerRootBoundary : IO Unit := do
   let program ← checkedProgram positiveSource
-  let dec ← functionNamed program "dec"
-  let input ← match dec.typedBody.inputs with
+  let legacyDec ← functionNamed program "legacyDec"
+  let input ← match legacyDec.typedBody.inputs with
     | [input] => pure input
     | _ => throw (IO.userError "integer root fixture lost its input")
   let moduleId ← mainModule
-  match prepare (workspace positiveSource) (Seed.named moduleId "dec")
+  match prepare (workspace positiveSource) (Seed.named moduleId "legacyDec")
       (limits 1) with
   | .error (.linking (.sourceCore error)) =>
       assertTrue (decide (error.site = .binder input.id) &&
@@ -308,6 +327,82 @@ private def testIntegerRootBoundary : IO Unit := do
         s!"integer root failed at the wrong boundary: {reprStr error}"
   | result => throw (IO.userError
       s!"integer source function escaped as a runtime root: {reprStr result}")
+
+private def testRuntimeComptimeBoundaries : IO Unit := do
+  let moduleId ← mainModule
+  let closedParameterSource := String.intercalate "\n" [
+    "function identity(comptime value: Word) returns (Word) { return value; }",
+    "function main() returns (Word) { return identity(7); }"
+  ]
+  let prepared ← match prepare (workspace closedParameterSource)
+      (Seed.named moduleId "main") (limits 2) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"closed comptime argument was rejected: {reprStr error}")
+  let seven := Core.Word.ofNatModulo 7
+  assertTrue (decide (prepared.inputTypes = [] ∧
+      prepared.run? [] 64 = some (.done (.word seven) [])))
+    "closed literal did not satisfy a comptime parameter"
+
+  let runtimeArgumentSource := String.intercalate "\n" [
+    "function identity(comptime value: Word) returns (Word) { return value; }",
+    "function main(value: Word) returns (Word) { return identity(value); }"
+  ]
+  match prepare (workspace runtimeArgumentSource) (Seed.named moduleId "main")
+      (limits 2) with
+  | .error (.linking (.runtimeArgumentToComptimeParameter _ _ 0 _)) => pure ()
+  | result => throw (IO.userError
+      s!"runtime argument crossed a comptime parameter: {reprStr result}")
+
+  let deferredRuntimeArgumentSource := String.intercalate "\n" [
+    "function identity(comptime value: Word) returns (Word) { return value; }",
+    "function producer(value: Word) returns (Word) { return value; }",
+    "function main(value: Word) returns (Word) { return identity(producer(value)); }"
+  ]
+  match prepare (workspace deferredRuntimeArgumentSource)
+      (Seed.named moduleId "main") (limits 3) with
+  | .error (.linking (.comptimeArgumentDeferred _ _ 0 _)) => pure ()
+  | result => throw (IO.userError
+      s!"deferred call crossed a comptime parameter: {reprStr result}")
+
+  let deferredLocalArgumentSource := String.intercalate "\n" [
+    "function identity(comptime value: Word) returns (Word) { return value; }",
+    "function main(value: Word) returns (Word) {",
+    "  let alias: Word = value;",
+    "  return identity(alias);",
+    "}"
+  ]
+  match prepare (workspace deferredLocalArgumentSource)
+      (Seed.named moduleId "main") (limits 2) with
+  | .error (.linking (.comptimeArgumentDeferred _ _ 0 _)) => pure ()
+  | result => throw (IO.userError
+      s!"deferred local crossed a comptime parameter: {reprStr result}")
+
+  let markedRootParameter :=
+    "function identity(comptime value: Word) returns (Word) { return value; }"
+  match prepare (workspace markedRootParameter)
+      (Seed.named moduleId "identity") (limits 1) with
+  | .error (.linking (.runtimeRootComptimeParameter _ 0 _)) => pure ()
+  | result => throw (IO.userError
+      s!"comptime parameter escaped as a runtime root: {reprStr result}")
+
+  let markedRootResult :=
+    "function constant() returns (comptime<Word>) { return 7; }"
+  match prepare (workspace markedRootResult)
+      (Seed.named moduleId "constant") (limits 1) with
+  | .error (.linking (.runtimeRootComptimeResult _)) => pure ()
+  | result => throw (IO.userError
+      s!"comptime result escaped as a runtime root: {reprStr result}")
+
+  let markedRuntimeResult := String.intercalate "\n" [
+    "function constant() returns (comptime<Word>) { return 7; }",
+    "function main() returns (Word) { return constant(); }"
+  ]
+  match prepare (workspace markedRuntimeResult) (Seed.named moduleId "main")
+      (limits 2) with
+  | .error (.linking (.runtimeCallComptimeResult _ _ _)) => pure ()
+  | result => throw (IO.userError
+      s!"comptime result crossed runtime call lowering: {reprStr result}")
 
 private def expectRecursiveCall (label source root expected : String)
     (budget : Nat) : IO Unit := do
@@ -325,7 +420,7 @@ private def expectRecursiveCall (label source root expected : String)
 
 private def testRecursiveRejections : IO Unit := do
   let selfSource := String.intercalate "\n" [
-    "function loop(x: integer) returns (integer) { return loop(x); }",
+    "function loop(comptime x: integer) returns (comptime<integer>) { return loop(x); }",
     "function main() returns (Word) { return wordFromInteger(loop(1)); }"
   ]
   let selfProgram ← checkedProgram selfSource
@@ -343,8 +438,8 @@ private def testRecursiveRejections : IO Unit := do
   expectRecursiveCall "self recursion" selfSource "main" "loop" 2
 
   let mutualSource := String.intercalate "\n" [
-    "function left(x: integer) returns (integer) { return right(x); }",
-    "function right(x: integer) returns (integer) { return left(x); }",
+    "function left(comptime x: integer) returns (comptime<integer>) { return right(x); }",
+    "function right(comptime x: integer) returns (comptime<integer>) { return left(x); }",
     "function main() returns (Word) { return wordFromInteger(left(1)); }"
   ]
   let mutualProgram ← checkedProgram mutualSource
@@ -359,8 +454,8 @@ private def testRecursiveRejections : IO Unit := do
   expectRecursiveCall "mutual recursion" mutualSource "main" "left" 3
 
   let deadSource := String.intercalate "\n" [
-    "function dec(x: integer) returns (integer) { return integerSub(x, 1); }",
-    "function loop(x: integer) returns (integer) { return loop(x); }",
+    "function dec(comptime x: integer) returns (comptime<integer>) { return integerSub(x, 1); }",
+    "function loop(comptime x: integer) returns (comptime<integer>) { return loop(x); }",
     "function main() returns (Word) {",
     "  return wordFromInteger(true ? dec(10) : loop(0));",
     "}"
@@ -375,6 +470,7 @@ def testSourceStagedIntegerCalls : IO Unit := do
   testRequirementLedgerIsolation
   testPublicExecution
   testIntegerRootBoundary
+  testRuntimeComptimeBoundaries
   testRecursiveRejections
   IO.println "staged integer source-call checks GREEN"
 

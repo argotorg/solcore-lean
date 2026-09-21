@@ -111,6 +111,72 @@ private def testSuccessfulCollection : IO Unit := do
         "impl head/where predicate resolution changed"
   | rules => throw (IO.userError s!"impl rules changed: {reprStr rules}")
 
+private def testComptimeMarkerCollection : IO Unit := do
+  let source ← parsed "comptime_signatures.solc" (String.intercalate "\n" [
+    "trait Stage<T> {",
+    "  function stage(comptime value: T) returns (comptime<T>);",
+    "}",
+    "impl Stage<Word> {",
+    "  function stage(comptime value: Word) returns (comptime<Word>) {",
+    "    return value;",
+    "  }",
+    "}",
+    "function choose<T>(comptime value: T, other: Word) returns (comptime<T>) {",
+    "  return value;",
+    "}"
+  ])
+  let environment ← catalog [source]
+  let stage ← declarationNamed environment "Stage"
+  let choose ← declarationNamed environment "choose"
+  let signatures ← match buildProgramSignatures environment with
+    | .ok signatures => pure signatures
+    | .error errors => throw (IO.userError
+        s!"comptime signature failure: {reprStr errors}")
+  let chooseSignature ← match signatures.functions with
+    | [signature] => pure signature
+    | functions => throw (IO.userError
+        s!"comptime function catalog changed: {reprStr functions}")
+  let parameter : TypeSystem.Ty :=
+    .parameter { owner := choose.id, index := 0 }
+  assertTrue (decide (chooseSignature.parameterNames = ["value", "other"] ∧
+      chooseSignature.parameterTypes = [parameter, .word] ∧
+      chooseSignature.parameterComptime = [true, false] ∧
+      chooseSignature.returnTypes = [parameter] ∧
+      chooseSignature.returnComptime ∧
+      chooseSignature.scheme.body =
+        .function (.product parameter .word) parameter))
+    "function comptime markers were dropped or embedded in semantic types"
+  let traitSignature ← match signatures.trait? stage.id with
+    | some signature => pure signature
+    | none => throw (IO.userError "missing staged trait signature")
+  let traitMethod ← match traitSignature.methods with
+    | [method] => pure method
+    | methods => throw (IO.userError
+        s!"staged trait method catalog changed: {reprStr methods}")
+  let traitParameter : TypeSystem.Ty :=
+    .parameter { owner := stage.id, index := 0 }
+  assertTrue (decide (traitMethod.parameterTypes = [traitParameter] ∧
+      traitMethod.parameterComptime = [true] ∧
+      traitMethod.returnTypes = [traitParameter] ∧
+      traitMethod.returnComptime))
+    "trait method comptime markers were not normalized"
+  let implementation ← match signatures.implementations with
+    | [implementation] => pure implementation
+    | implementations => throw (IO.userError
+        s!"staged implementation catalog changed: {reprStr implementations}")
+  let implMethod ← match implementation.methods with
+    | [method] => pure method
+    | methods => throw (IO.userError
+        s!"staged implementation method catalog changed: {reprStr methods}")
+  let synthetic := implementation.functionSignatureOfMethod implMethod
+  assertTrue (decide (implMethod.parameterTypes = [.word] ∧
+      implMethod.parameterComptime = [true] ∧
+      implMethod.returnTypes = [.word] ∧ implMethod.returnComptime ∧
+      synthetic.parameterComptime = [true] ∧
+      synthetic.returnComptime ∧
+      synthetic.scheme.body = .function .word .word))
+    "implementation method comptime markers did not reach its function view"
+
 private def testBuiltinIntResolutionProfile : IO Unit := do
   let source ← parsed "source_int.solc" (String.intercalate "\n" [
     "trait Int<T> {}",
@@ -329,6 +395,16 @@ private def testFailures : IO Unit := do
   ]) fun error => match error with
     | .traitArityMismatch _ _ 2 1 => true
     | _ => false
+  expectSingleError
+    "function nested() returns (comptime<comptime<Word>>) { return 0; }"
+    fun error => match error with
+      | .nestedComptimeReturn _ 0 => true
+      | _ => false
+  expectSingleError
+    "function mixed() returns (Word, comptime<Word>) { return (0, 0); }"
+    fun error => match error with
+      | .comptimeReturnMustBeSingleton _ 1 2 => true
+      | _ => false
 
 private def testMethodFailures : IO Unit := do
   expectSingleError (String.intercalate "\n" [
@@ -354,6 +430,17 @@ private def testMethodFailures : IO Unit := do
     | .implMethodSignatureMismatch { methodIndex := 0, .. }
         { methodIndex := 0, .. } [.word, .word] [.bool, .bool]
         [.word] [.bool] => true
+    | _ => false
+  expectSingleError (String.intercalate "\n" [
+    "trait Stage<T> {",
+    "  function stage(comptime value: T) returns (comptime<T>);",
+    "}",
+    "impl Stage<Word> {",
+    "  function stage(value: Word) returns (Word) { return value; }",
+    "}"
+  ]) fun error => match error with
+    | .implMethodComptimeMismatch { methodIndex := 0, .. }
+        { methodIndex := 0, .. } [true] [false] true false => true
     | _ => false
   expectSingleError (String.intercalate "\n" [
     "trait Marker<T> {}",
@@ -401,6 +488,7 @@ end ProgramSignatures
 /-- Run the first source-connected signature and trait-rule vertical slice. -/
 def testProgramSignatures : IO Unit := do
   ProgramSignatures.testSuccessfulCollection
+  ProgramSignatures.testComptimeMarkerCollection
   ProgramSignatures.testBuiltinIntResolutionProfile
   ProgramSignatures.testMethodCatalog
   ProgramSignatures.testFailures

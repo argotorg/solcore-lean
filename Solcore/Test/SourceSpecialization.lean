@@ -26,6 +26,7 @@ private def checkedProgram : IO CheckedProgram := do
   let content := String.intercalate "\n" [
     "function select<A, B>(left: A, right: B) returns (A) { return left; }",
     "function identity<T>(value: T) returns (T) { return value; }",
+    "function stagedIdentity<T>(comptime value: T) returns (comptime<T>) { return value; }",
     "function phantom<T, U>(value: T) returns (T) { return value; }",
     "function apply<T>(f: function(T) returns (T), value: T) returns (T) { return f(value); }"
   ]
@@ -125,6 +126,33 @@ private def testIdentity (program : CheckedProgram) : IO Unit := do
       some .bool ∧ Core.runStateful 16
         (.initial elaborated.core [.bool true]) = .done (.bool true) []))
     "Bool identity did not typecheck and execute"
+
+private def testStagedIdentityMarkers (program : CheckedProgram) : IO Unit := do
+  let (signature, function) ← checkedNamed program "stagedIdentity"
+  let parameter ← match signature.scheme.parameters with
+    | [parameter] => pure parameter
+    | parameters => throw (IO.userError
+        s!"stagedIdentity lost its parameter: {reprStr parameters}")
+  let input ← match function.typedBody.inputs with
+    | [input] => pure input
+    | inputs => throw (IO.userError
+        s!"stagedIdentity retained {inputs.length} inputs")
+  assertTrue (decide (signature.parameterComptime = [true] ∧
+      signature.returnComptime ∧ input.comptime ∧
+      function.returnComptime ∧
+      signature.scheme.body = .function (.parameter parameter)
+        (.parameter parameter)))
+    "generic comptime contract did not reach the checked carrier"
+  let specialized ← specializeOrThrow "stagedIdentity" signature function
+    [(parameter, .word)]
+  let specializedInput ← match specialized.function.typedBody.inputs with
+    | [input] => pure input
+    | inputs => throw (IO.userError
+        s!"specialized stagedIdentity retained {inputs.length} inputs")
+  assertTrue (decide (specialized.function.type = .function .word .word ∧
+      specializedInput.scheme = .mono .word ∧ specializedInput.comptime ∧
+      specialized.function.returnComptime))
+    "specialization changed comptime flags or left them in semantic types"
 
 private def testPhantomParameter (program : CheckedProgram) : IO Unit := do
   let (signature, function) ← checkedNamed program "phantom"
@@ -292,6 +320,23 @@ private def testValidationErrors (program : CheckedProgram) : IO Unit := do
     | [first, second] => pure (first, second)
     | inputs => throw (IO.userError
         s!"select lost its two input binders: {inputs.length}")
+  let markedInput : TypedBinder := { firstInput with comptime := true }
+  let wrongParameterComptime : CheckedFunction := {
+    function with typedBody := {
+      function.typedBody with inputs := [markedInput, secondInput]
+    }
+  }
+  expectError "parameter comptime mismatch"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction
+      signature wrongParameterComptime [(a, .word), (b, .bool)])
+    (.parameterComptimeMismatch [false, false] [true, false])
+  let wrongReturnComptime : CheckedFunction := {
+    function with returnComptime := true
+  }
+  expectError "return comptime mismatch"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction
+      signature wrongReturnComptime [(a, .word), (b, .bool)])
+    (.returnComptimeMismatch false true)
   let openVariable : TypeVarId := ⟨78⟩
   let bound : TypeVarId := ⟨79⟩
   let openInput : TypedBinder := {
@@ -334,6 +379,7 @@ def testSourceSpecialization : IO Unit := do
   let program ← checkedProgram
   testSelect program
   testIdentity program
+  testStagedIdentityMarkers program
   testPhantomParameter program
   testIndirectMetadataSpecialization program
   testIntegerLiteralMetadataSpecialization program

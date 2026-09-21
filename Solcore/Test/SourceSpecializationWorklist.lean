@@ -120,6 +120,35 @@ private def setIndirectMetadata (nodes : List Node) (target : ExpressionId)
         node
   | .statement _ => node
 
+private def setDirectInstantiationMarkers (nodes : List Node)
+    (call callee : ExpressionId) (parameterComptime : List Bool)
+    (returnComptime : Bool) : List Node :=
+  nodes.map fun node => match node with
+  | .expression expression =>
+      if expression.id == callee then
+        match expression.form with
+        | .reference name (.declaration instantiation) =>
+            .expression {
+              expression with
+              form := .reference name (.declaration {
+                instantiation with parameterComptime, returnComptime
+              })
+            }
+        | _ => node
+      else if expression.id == call then
+        match expression.form with
+        | .call target arguments (.declaration instantiation) =>
+            .expression {
+              expression with
+              form := .call target arguments (.declaration {
+                instantiation with parameterComptime, returnComptime
+              })
+            }
+        | _ => node
+      else
+        node
+  | .statement _ => node
+
 private def eraseExpression (nodes : List Node)
     (target : ExpressionId) : List Node :=
   nodes.filter fun node => match node with
@@ -361,6 +390,39 @@ private def testMalformedTypedMetadata (program : CheckedProgram) : IO Unit := d
         "invalid output coercion path lost its expression occurrence"
   | result => throw (IO.userError
       s!"an output coercion not ending at node.type was accepted: {reprStr result}")
+  let wrongParameterComptime : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setDirectInstantiationMarkers function.typedBody.nodes
+        call callee [true, false] false
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program wrongParameterComptime)
+      [monomorphicRequest select] 2 with
+  | .error (.specializedCalleeParameterComptimeMismatch
+      actual [true, false] [false, false]) =>
+      assertTrue (actual == call)
+        "callee parameter-marker mismatch lost the owning call occurrence"
+  | result => throw (IO.userError
+      s!"tampered callee parameter markers were not rejected: {reprStr result}")
+  let wrongReturnComptime : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setDirectInstantiationMarkers function.typedBody.nodes
+        call callee [false, false] true
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program wrongReturnComptime)
+      [monomorphicRequest select] 2 with
+  | .error (.specializedCalleeReturnComptimeMismatch actual true false) =>
+      assertTrue (actual == call)
+        "callee result-marker mismatch lost the owning call occurrence"
+  | result => throw (IO.userError
+      s!"tampered callee result marker was not rejected: {reprStr result}")
   let missingNodeFunction : CheckedFunction := {
     function with
     typedBody := {
