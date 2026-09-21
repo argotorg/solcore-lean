@@ -317,12 +317,30 @@ abbrev StagedValueCallElaborator (error : Type) :=
   ExpressionNode → ExpressionId → List ExpressionId →
   DeclarationInstantiation → Except error (StagedValueCallPlan error)
 
+/-- One executable coercion step in the staged-value domain.  The Core
+endpoints and exact requirement row are declared before the policy receives a
+value, keeping typed-path validation and caller-local accounting in Source
+Core. -/
+structure StagedValueCoercionPlan (error : Type) where
+  sourceType : Core.Ty
+  targetType : Core.Ty
+  consumedRequirements : List RequirementId
+  invoke : SourceStagedValue.Value →
+    Except error SourceStagedValue.Value
+
+/-- Whole-program hook for evidence-bearing coercions encountered while
+evaluating a Core-representable staged expression. -/
+abbrev StagedValueCoercionElaborator (error : Type) :=
+  ExpressionNode → CoercionStep →
+  Except error (StagedValueCoercionPlan error)
+
 /-- Optional bridge used only by whole-program specialization consumers.
 Source Core retains ownership of the lexical staged environment and of every
 stage, type, traversal, and requirement-ledger check. -/
 structure StagedValueLoweringPolicy (error : Type) where
   analysis : SourceStageAnalysis.Analysis
   onStagedValueCall : StagedValueCallElaborator error
+  onStagedValueCoercion : StagedValueCoercionElaborator error
 
 /-- A policy for a requirement-bearing unary expression declares the exact
 type at which Source Core must check its operand, identifies the requirements
@@ -1105,6 +1123,12 @@ private def rejectStagedValueCallsWith {error : Type}
       failWith lift (.occurrence node.id.occurrence)
         (.unsupportedExpression .call)
 
+private def rejectStagedValueCoercionsWith {error : Type}
+    (lift : Error → error) : StagedValueCoercionElaborator error :=
+  fun node _ =>
+    failWith lift (.occurrence node.id.occurrence)
+      (.coercionsPresent node.coercions)
+
 /-- Evaluate staged integer expressions with an explicit whole-program direct
 call policy.  Structural expression fuel remains source-local; recursive call
 fuel and specialization-cycle tracking belong to the policy's owner. -/
@@ -1322,6 +1346,64 @@ private def applyCoercionPlans {error : Type}
       applyCoercionPlans resolved
         (consumed ++ plan.consumedRequirements) rest
 
+private structure CheckedStagedValueCoercionPlan (error : Type) where
+  requirement : RequirementId
+  plan : StagedValueCoercionPlan error
+
+/-- Validate staged coercion policy metadata against the same canonical path
+used by ordinary lowering. -/
+private def checkedStagedValueCoercionPlansWith {error : Type}
+    (lift : Error → error)
+    (onCoercion : StagedValueCoercionElaborator error)
+    (node : ExpressionNode) :
+    List CoercionStep →
+      Except error (List (CheckedStagedValueCoercionPlan error))
+  | [] => pure []
+  | step :: rest => do
+      let sourceType ←
+        (lowerType (.occurrence node.id.occurrence) step.source).mapError lift
+      let targetType ←
+        (lowerType (.occurrence node.id.occurrence) step.target).mapError lift
+      let plan ← onCoercion node step
+      if plan.sourceType != sourceType then
+        failWith lift (.occurrence node.id.occurrence)
+          (.coercionPlanSourceTypeMismatch step.requirement sourceType
+            plan.sourceType)
+      else if plan.targetType != targetType then
+        failWith lift (.occurrence node.id.occurrence)
+          (.coercionPlanTargetTypeMismatch step.requirement targetType
+            plan.targetType)
+      else if plan.consumedRequirements != step.requirements then
+        failWith lift (.occurrence node.id.occurrence)
+          (.coercionPlanRequirementsMismatch step.requirement
+            step.requirements plan.consumedRequirements)
+      else
+        pure ({ requirement := step.requirement, plan } ::
+          (← checkedStagedValueCoercionPlansWith lift onCoercion node rest))
+
+/-- Execute a validated staged coercion path in source order, checking both
+value endpoints and retaining the exact requirement discharge order. -/
+private def applyStagedValueCoercionPlansWith {error : Type}
+    (lift : Error → error) (site : ErrorSite)
+    (value : SourceStagedValue.Value) (consumed : List RequirementId) :
+    List (CheckedStagedValueCoercionPlan error) →
+      Except error StagedValueEvaluation
+  | [] => pure { value, consumedRequirements := consumed }
+  | checked :: rest => do
+      let actualSource := SourceStagedValue.coreType value
+      if actualSource != checked.plan.sourceType then
+        failWith lift site
+          (.coercionPlanSourceTypeMismatch checked.requirement
+            checked.plan.sourceType actualSource)
+      let value ← checked.plan.invoke value
+      let actualTarget := SourceStagedValue.coreType value
+      if actualTarget != checked.plan.targetType then
+        failWith lift site
+          (.coercionPlanTargetTypeMismatch checked.requirement
+            checked.plan.targetType actualTarget)
+      applyStagedValueCoercionPlansWith lift site value
+        (consumed ++ checked.plan.consumedRequirements) rest
+
 /-- Lower one coercion-cleared expression node.  Recursive edges return to the
 outer traversal, so every child independently receives its own coercion policy
 without reapplying the current node's path. -/
@@ -1516,9 +1598,9 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
 
 /-- Decide whether a compile-time-classified expression is closed relative to
 the staged values currently known while building a reusable runtime draft.
-Unsupported runtime operators and coercions stay on ordinary lowering, while a
-marked direct call remains eligible so its own policy can report predicates or
-result coercions precisely. -/
+Evidence-bearing base operations remain on ordinary lowering, while a nonempty
+coercion path is eligible for the staged policy and retains its own exact
+requirement checks. -/
 private def stagedValueCacheEligible
     (analysis : SourceStageAnalysis.Analysis) (source : TypedSource)
     (environment : StagedValueEnvironment) : Nat → ExpressionId → Bool
@@ -1532,7 +1614,7 @@ private def stagedValueCacheEligible
           | .call _ arguments (.declaration instantiation) =>
               instantiation.returnComptime && arguments.all recurse
           | form =>
-              node.requirements.isEmpty && node.coercions.isEmpty &&
+              (node.requirements.isEmpty || !node.coercions.isEmpty) &&
                 match form with
                 | .literal _ => true
                 | .reference _ (.local binder) => environment.contains binder
@@ -2170,15 +2252,7 @@ private def stagedBoolWith {error : Type} (lift : Error → error)
   | value => failWith lift site
       (.stagedValueTypeMismatch .bool (SourceStagedValue.sourceType value))
 
-private def stagedValueOfCore? : Core.Value → Option SourceStagedValue.Value
-  | .unit => some .unit
-  | .bool value => some (.bool value)
-  | .word value => some (.word value)
-  | .pair left right => do
-      let left ← stagedValueOfCore? left
-      let right ← stagedValueOfCore? right
-      pure (.product left right)
-  | _ => none
+private abbrev stagedValueOfCore? := SourceStagedValue.ofCore?
 
 private def stagedProductValue : List SourceStagedValue.Value →
     SourceStagedValue.Value
@@ -2248,23 +2322,14 @@ private def evaluateStagedValueListWith {error : Type}
       let values ← evaluateStagedValueListWith evaluate rest
       pure (value :: values)
 
-private def evaluateStagedValueFuelWith {error : Type}
+private def evaluateStagedValueNodeWith {error : Type}
     (lift : Error → error)
     (onStagedValueCall : StagedValueCallElaborator error)
-    (analysis : SourceStageAnalysis.Analysis)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
-    (environment : StagedValueEnvironment) :
-    Nat → ExpressionId → Except error StagedValueEvaluation
-  | 0, id =>
-      failWith lift (.occurrence id.occurrence) .stagedValueDepthLimit
-  | fuel + 1, id => do
-      requireStagedExpressionWith lift analysis id
-      let node ← (lookupExpression source id).mapError lift
-      let site := ErrorSite.occurrence id.occurrence
-      unless node.coercions.isEmpty do
-        failWith lift site (.coercionsPresent node.coercions)
-      let recurse := evaluateStagedValueFuelWith lift onStagedValueCall analysis
-        solvedRequirements source environment fuel
+    (environment : StagedValueEnvironment)
+    (recurse : ExpressionId → Except error StagedValueEvaluation)
+    (node : ExpressionNode) : Except error StagedValueEvaluation := do
+      let site := ErrorSite.occurrence node.id.occurrence
       match node.form with
       | .integerLiteral literal resolution => do
           if node.type != Ty.word then
@@ -2437,25 +2502,65 @@ private def evaluateStagedValueFuelWith {error : Type}
           | .integerLiteral _ _ =>
               failWith lift site .stagedValueStatementNotClosed
 
+private def evaluateStagedValueFuelWith {error : Type}
+    (lift : Error → error)
+    (onStagedValueCall : StagedValueCallElaborator error)
+    (onStagedValueCoercion : StagedValueCoercionElaborator error)
+    (analysis : SourceStageAnalysis.Analysis)
+    (solvedRequirements : List SolvedRequirement) (source : TypedSource)
+    (environment : StagedValueEnvironment) :
+    Nat → ExpressionId → Except error StagedValueEvaluation
+  | 0, id =>
+      failWith lift (.occurrence id.occurrence) .stagedValueDepthLimit
+  | fuel + 1, id => do
+      requireStagedExpressionWith lift analysis id
+      let node ← (lookupExpression source id).mapError lift
+      let site := ErrorSite.occurrence id.occurrence
+      let recurse := evaluateStagedValueFuelWith lift onStagedValueCall
+        onStagedValueCoercion analysis solvedRequirements source environment fuel
+      match node.coercions with
+      | [] =>
+          evaluateStagedValueNodeWith lift onStagedValueCall solvedRequirements
+            source environment recurse node
+      | first :: rest => do
+          let prepared ← prepareCoercionPathWith lift node first rest
+          let plans ← checkedStagedValueCoercionPlansWith lift
+            onStagedValueCoercion node (first :: rest)
+          let baseNode := {
+            node with
+            type := prepared.rawType
+            requirements := prepared.remainingRequirements
+            coercions := []
+          }
+          let base ← evaluateStagedValueNodeWith lift onStagedValueCall
+            solvedRequirements source environment recurse baseNode
+          let evaluated ← applyStagedValueCoercionPlansWith lift site
+            base.value base.consumedRequirements plans
+          ensureStagedValueTypeWith lift site node.type evaluated.value
+          pure evaluated
+
 /-- Evaluate a closed, Core-representable expression only when ADR-0357 has
 classified that exact occurrence as compile-time available. -/
 def evaluateStagedValueWith {error : Type} (lift : Error → error)
     (analysis : SourceStageAnalysis.Analysis)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
     (id : ExpressionId) : Except error StagedValueEvaluation :=
-  evaluateStagedValueFuelWith lift (rejectStagedValueCallsWith lift) analysis
-    solvedRequirements source [] (source.nodes.length + 1) id
+  evaluateStagedValueFuelWith lift (rejectStagedValueCallsWith lift)
+    (rejectStagedValueCoercionsWith lift) analysis solvedRequirements source []
+    (source.nodes.length + 1) id
 
 /-- Evaluate one staged expression in a declaration-owned lexical environment
 while delegating only direct source calls to a whole-program consumer. -/
 private def evaluateStagedValueInEnvironmentWith {error : Type}
     (lift : Error → error)
     (onStagedValueCall : StagedValueCallElaborator error)
+    (onStagedValueCoercion : StagedValueCoercionElaborator error)
     (analysis : SourceStageAnalysis.Analysis)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
     (environment : StagedValueEnvironment) (id : ExpressionId) :
     Except error StagedValueEvaluation :=
-  evaluateStagedValueFuelWith lift onStagedValueCall analysis
+  evaluateStagedValueFuelWith lift onStagedValueCall onStagedValueCoercion
+    analysis
     solvedRequirements source environment (source.nodes.length + 1) id
 
 /-- Standalone closed staged-value evaluation. -/
@@ -2513,6 +2618,7 @@ private def bindKnownStagedValueInputsWith {error : Type}
 private def evaluateStagedValueStatementsFuelWith {error : Type}
     (lift : Error → error)
     (onStagedValueCall : StagedValueCallElaborator error)
+    (onStagedValueCoercion : StagedValueCoercionElaborator error)
     (analysis : SourceStageAnalysis.Analysis)
     (solvedRequirements : List SolvedRequirement) :
     Nat → TypedSource → StagedValueEnvironment → ErrorSite → ErrorReason →
@@ -2536,12 +2642,14 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
         let initializer ← match initializer with
           | none => failWith lift site .uninitializedLet
           | some initializer =>
-              evaluateStagedValueFuelWith lift onStagedValueCall analysis
-                solvedRequirements source environment fuel initializer
+              evaluateStagedValueFuelWith lift onStagedValueCall
+                onStagedValueCoercion analysis solvedRequirements source
+                environment fuel initializer
         ensureStagedValueTypeWith lift (.binder binder.id)
           binder.scheme.body initializer.value
         let body ← evaluateStagedValueStatementsFuelWith lift
-          onStagedValueCall analysis solvedRequirements fuel source
+          onStagedValueCall onStagedValueCoercion analysis solvedRequirements
+          fuel source
           ({ binder, value := initializer.value } :: environment)
           fallthroughSite fallthroughReason rest
         pure {
@@ -2560,8 +2668,8 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
               failWith lift site .stagedValueStatementNotClosed
         | some value => do
             let evaluated ← evaluateStagedValueFuelWith lift
-              onStagedValueCall analysis solvedRequirements source environment
-              fuel value
+              onStagedValueCall onStagedValueCoercion analysis
+              solvedRequirements source environment fuel value
             ensureStagedValueTypeWith lift site node.type evaluated.value
             pure evaluated
     | .ifThen condition thenBody elseBody => do
@@ -2571,14 +2679,17 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
           | some body => pure body
           | none => failWith lift site .missingElseBranch
         let condition ← evaluateStagedValueFuelWith lift onStagedValueCall
-          analysis solvedRequirements source environment fuel condition
+          onStagedValueCoercion analysis solvedRequirements source environment
+          fuel condition
         let conditionValue ← stagedBoolWith lift site condition.value
         let thenBranch ← evaluateStagedValueStatementsFuelWith lift
-          onStagedValueCall analysis solvedRequirements fuel source environment site
-          (.conditionalBranchFallthrough .thenBranch) thenBody
+          onStagedValueCall onStagedValueCoercion analysis solvedRequirements
+          fuel source environment site (.conditionalBranchFallthrough .thenBranch)
+          thenBody
         let elseBranch ← evaluateStagedValueStatementsFuelWith lift
-          onStagedValueCall analysis solvedRequirements fuel source environment site
-          (.conditionalBranchFallthrough .elseBranch) elseBody
+          onStagedValueCall onStagedValueCoercion analysis solvedRequirements
+          fuel source environment site (.conditionalBranchFallthrough .elseBranch)
+          elseBody
         let selected := if conditionValue then thenBranch.value
           else elseBranch.value
         ensureStagedValueTypeWith lift site node.type thenBranch.value
@@ -2593,8 +2704,8 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .block)
         let evaluated ← evaluateStagedValueStatementsFuelWith lift
-          onStagedValueCall analysis solvedRequirements fuel source environment
-          site .blockFallthrough body
+          onStagedValueCall onStagedValueCoercion analysis solvedRequirements
+          fuel source environment site .blockFallthrough body
         ensureStagedValueTypeWith lift site node.type evaluated.value
         pure evaluated
     | .matchWith _ => failWith lift site .stagedValueStatementNotClosed
@@ -2606,9 +2717,10 @@ specialization with an explicit whole-program direct-call policy.  Stable input
 identities and the specialization-owned stage table are checked before
 evaluation, and the function-local requirement ledger is reconciled exactly
 once. -/
-def evaluateStagedValueFunctionWith {error : Type}
+def evaluateStagedValueFunctionWithPolicies {error : Type}
     (lift : Error → error)
     (onStagedValueCall : StagedValueCallElaborator error)
+    (onStagedValueCoercion : StagedValueCoercionElaborator error)
     (specialized : SourceSpecialization.SpecializedFunction)
     (arguments : List SourceStagedValue.Value) :
     Except error SourceStagedValue.Value := do
@@ -2656,7 +2768,7 @@ def evaluateStagedValueFunctionWith {error : Type}
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
     let evaluated ← evaluateStagedValueStatementsFuelWith lift
-      onStagedValueCall specialized.stageAnalysis
+      onStagedValueCall onStagedValueCoercion specialized.stageAnalysis
       function.solvedRequirements (source.nodes.length + 1) source environment
       fallthroughSite .statementListFallthrough roots
     ensureStagedValueTypeWith lift
@@ -2674,6 +2786,16 @@ def evaluateStagedValueFunctionWith {error : Type}
       failWith lift (.declaration function.declaration)
         (.unconsumedRequirements unconsumed)
     pure evaluated.value
+
+/-- Compatibility entry point retaining explicit staged-coercion rejection. -/
+def evaluateStagedValueFunctionWith {error : Type}
+    (lift : Error → error)
+    (onStagedValueCall : StagedValueCallElaborator error)
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (arguments : List SourceStagedValue.Value) :
+    Except error SourceStagedValue.Value :=
+  evaluateStagedValueFunctionWithPolicies lift onStagedValueCall
+    (rejectStagedValueCoercionsWith lift) specialized arguments
 
 /-- Standalone staged-value execution retains the closed-call boundary. -/
 def evaluateStagedValueFunction
@@ -2852,7 +2974,8 @@ def lowerSpecializedFunctionBodyWithKnownStagedInputsAndRuntimePolicies
       analysis := specialized.stageAnalysis
       evaluate := fun environment id =>
         evaluateStagedValueInEnvironmentWith lift
-          stagedValuePolicy.onStagedValueCall specialized.stageAnalysis
+          stagedValuePolicy.onStagedValueCall
+          stagedValuePolicy.onStagedValueCoercion specialized.stageAnalysis
           function.solvedRequirements source environment id
     }
     lowerFunctionBodyWithRawStagedValuePolicy lift onCall

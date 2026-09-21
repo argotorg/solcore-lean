@@ -45,6 +45,19 @@ def toCore : Value → Core.Value
   | .word value => .word value
   | .product left right => .pair (toCore left) (toCore right)
 
+/-- Project a Core value back into the deliberately small staged carrier.
+Closures, cells, sums, nominal data, and host functions stay outside the
+compile-time source boundary. -/
+def ofCore? : Core.Value → Option Value
+  | .unit => some .unit
+  | .bool value => some (.bool value)
+  | .word value => some (.word value)
+  | .pair left right => do
+      let left ← ofCore? left
+      let right ← ofCore? right
+      pure (.product left right)
+  | _ => none
+
 /-- Reification to Core preserves the carrier's exact structural type. -/
 @[simp] theorem toCore_type (value : Value) :
     (toCore value).type = coreType value := by

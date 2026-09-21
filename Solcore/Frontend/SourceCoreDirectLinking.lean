@@ -174,6 +174,21 @@ inductive Error where
   | runtimeCoercionResultTypeMismatch
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (requirement : RequirementId) (expected actual : Core.Ty)
+  | stagedCoercionInputTypeMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (expected actual : Core.Ty)
+  | stagedEvidenceExecutionOutOfFuel
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+  | stagedEvidenceExecutionFault
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (fault : Core.MachineFault)
+  | stagedEvidenceStoreChanged
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (store : Core.Store)
+  | stagedEvidenceResultOutsideCarrier
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (value : Core.Value)
   | implMethodSourceCore
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (method : ProgramImplMethodId)
@@ -232,6 +247,25 @@ structure LinkedEntry where
 structure LinkedProgram where
   entries : List LinkedEntry
   deriving Repr
+
+/-- A structural execution bound for the closed resolved fragment emitted by
+Source Core.  Both branches are counted for conditionals, so the selected
+runtime path is bounded without depending on its value. -/
+private def stagedResolvedExecutionFuel : Resolved.Expr → Nat
+  | .unit | .bool _ | .word _ | .var _ => 1
+  | .pair left right =>
+      stagedResolvedExecutionFuel left + stagedResolvedExecutionFuel right + 3
+  | .unary _ operand => stagedResolvedExecutionFuel operand + 2
+  | .binary _ left right =>
+      stagedResolvedExecutionFuel left + stagedResolvedExecutionFuel right + 3
+  | .wordLt left right =>
+      stagedResolvedExecutionFuel left + stagedResolvedExecutionFuel right + 9
+  | .letE _ value body =>
+      stagedResolvedExecutionFuel value + stagedResolvedExecutionFuel body + 2
+  | .ifE condition thenBranch elseBranch =>
+      stagedResolvedExecutionFuel condition +
+        stagedResolvedExecutionFuel thenBranch +
+        stagedResolvedExecutionFuel elseBranch + 2
 
 /-- Run a linked entry only when the supplied runtime values have exactly the
 source input types and order retained by elaboration. -/
@@ -1078,6 +1112,71 @@ private def coercionPlan (program : CheckedProgram)
       pure (bindValues (temporaries.zip [value]) body)
   }
 
+/-- Independently lower, type-check, and execute one closed resolved term
+selected by evidence.  This is shared by staged coercions and the following
+required-operation slices; it admits only the staged carrier and enforces an
+empty final store. -/
+private def executeClosedStagedValue (caller : SpecializedFunction)
+    (node : ExpressionNode) (requirement : RequirementId)
+    (expectedType : Core.Ty) (resolved : Resolved.Expr) :
+    Except Error SourceStagedValue.Value := do
+  let core ← match resolved.lower? [] with
+    | some core => pure core
+    | none => throw (.sourceCore {
+        site := .occurrence node.id.occurrence
+        reason := .resolvedLoweringFailed
+      })
+  let inferred ← match Core.infer? [] core with
+    | some inferred => pure inferred
+    | none => throw (.sourceCore {
+        site := .occurrence node.id.occurrence
+        reason := .coreInferenceFailed
+      })
+  if inferred != expectedType then
+    throw (.sourceCore {
+      site := .occurrence node.id.occurrence
+      reason := .returnTypeMismatch expectedType inferred
+    })
+  match Core.runStateful (stagedResolvedExecutionFuel resolved)
+      (Core.State.initial core) with
+  | .outOfFuel _ =>
+      throw (.stagedEvidenceExecutionOutOfFuel caller.key node.id requirement)
+  | .fault fault _ =>
+      throw (.stagedEvidenceExecutionFault caller.key node.id requirement fault)
+  | .done result store =>
+      unless store.isEmpty do
+        throw (.stagedEvidenceStoreChanged caller.key node.id requirement store)
+      match SourceStagedValue.ofCore? result with
+      | some value => pure value
+      | none => throw (.stagedEvidenceResultOutsideCarrier caller.key node.id
+          requirement result)
+
+/-- Reuse the ordinary checked coercion plan for staged values, then execute
+the resulting closed local Core term.  Only the bounded staged carrier may
+cross back out, and even an otherwise successful method is rejected if it
+changes the Core store. -/
+private def stagedValueCoercionPlan (program : CheckedProgram)
+    (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (elaborateMethod : ExecutableMethodElaborator)
+    (caller : SpecializedFunction) (available : List PredicateEvidence)
+    (node : ExpressionNode) (step : CoercionStep) :
+    Except Error (SourceCoreElaboration.StagedValueCoercionPlan Error) := do
+  let runtimePlan ← coercionPlan program temporaryOwner temporaryBase
+    elaborateMethod caller available node step
+  pure {
+    sourceType := runtimePlan.sourceType
+    targetType := runtimePlan.targetType
+    consumedRequirements := runtimePlan.consumedRequirements
+    invoke := fun value => do
+      let actualInput := SourceStagedValue.coreType value
+      if actualInput != runtimePlan.sourceType then
+        throw (.stagedCoercionInputTypeMismatch caller.key node.id
+          step.requirement runtimePlan.sourceType actualInput)
+      let resolved ← runtimePlan.build (SourceStagedValue.toResolved value)
+      executeClosedStagedValue caller node step.requirement
+        runtimePlan.targetType resolved
+  }
+
 private def specializedExecutableMethod
     (method : ExecutableImplMethods.CheckedMethod) : SpecializedFunction :=
   method.specialized
@@ -1353,10 +1452,15 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
             onStagedValueCall := fun node callee _ instantiation =>
               stagedValueCallPlan program plan specialized assumptionEvidence
                 (fun calleeKey calleeEvidence arguments =>
-                  evaluateStagedValueFunctionFuel program plan
-                    (key :: visiting) calleeEvidence remaining calleeKey
-                    arguments)
+                  evaluateStagedValueFunctionFuel program plan temporaryOwner
+                    temporaryBase (key :: visiting) calleeEvidence remaining
+                    calleeKey arguments)
                 node callee instantiation
+            onStagedValueCoercion := fun node step =>
+              stagedValueCoercionPlan program temporaryOwner temporaryBase
+                (elaborateDetachedMethod program temporaryOwner temporaryBase
+                  specialized visiting remaining node.id)
+                specialized assumptionEvidence node step
           }
           (fun _ node operator _ =>
             requiredUnaryPlan program temporaryOwner temporaryBase
@@ -1401,7 +1505,8 @@ private def evaluateStagedIntegerFunctionFuel (program : CheckedProgram)
 termination_by fuel
 
 private def evaluateStagedValueFunctionFuel (program : CheckedProgram)
-    (plan : Plan) (visiting : List SpecializationKey)
+    (plan : Plan) (temporaryOwner : Resolved.DeclarationId)
+    (temporaryBase : Nat) (visiting : List SpecializationKey)
     (assumptionEvidence : List PredicateEvidence) (fuel : Nat)
     (key : SpecializationKey) (arguments : List SourceStagedValue.Value) :
     Except Error SourceStagedValue.Value :=
@@ -1414,14 +1519,20 @@ private def evaluateStagedValueFunctionFuel (program : CheckedProgram)
         let specialized ← exactSpecialization plan key
         validateAssumptionEvidence specialized.key specialized.assumptions
           assumptionEvidence
-        SourceCoreElaboration.evaluateStagedValueFunctionWith
+        SourceCoreElaboration.evaluateStagedValueFunctionWithPolicies
           Error.sourceCore
           (fun node callee _ instantiation =>
             stagedValueCallPlan program plan specialized assumptionEvidence
               (fun calleeKey calleeEvidence values =>
-                evaluateStagedValueFunctionFuel program plan
-                  (key :: visiting) calleeEvidence remaining calleeKey values)
+                evaluateStagedValueFunctionFuel program plan temporaryOwner
+                  temporaryBase (key :: visiting) calleeEvidence remaining
+                  calleeKey values)
               node callee instantiation)
+          (fun node step =>
+            stagedValueCoercionPlan program temporaryOwner temporaryBase
+              (elaborateDetachedMethod program temporaryOwner temporaryBase
+                specialized visiting remaining node.id)
+              specialized assumptionEvidence node step)
           specialized arguments
 termination_by fuel
 
