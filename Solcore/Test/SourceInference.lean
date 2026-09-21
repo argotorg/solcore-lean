@@ -181,6 +181,149 @@ private def testContextualIntegerLiteralOperators : IO Unit := do
   | functions => throw (IO.userError
       s!"contextual operator fixture checked {functions.length} functions")
 
+private def testNestedIntegerLiteralOperatorsCloseLater : IO Unit := do
+  let checked ← check (String.intercalate "\n" [
+    "function accept(value: Word) returns (Word) { return value; }",
+    "function nestedAdd() returns (Word) { return accept(1 + 1); }",
+    "function nestedNot() returns (Word) { return accept(~1); }",
+    "function letAdd() returns (Word) {",
+    "  let value = 1 + 1;",
+    "  return accept(value);",
+    "}",
+    "function letNot() returns (Word) {",
+    "  let value = ~1;",
+    "  return accept(value);",
+    "}"
+  ])
+  let validate (label : String) (literalCount : Nat)
+      (acceptsOperator : SourceInference.ExpressionForm → Bool)
+      (function : SourceInference.CheckedFunction) : IO Unit := do
+    let literals := function.typedBody.nodes.filterMap fun
+      | .expression { form := .integerLiteral _ resolution, .. } =>
+          some resolution
+      | _ => none
+    let hasWordOperator := function.typedBody.nodes.any fun
+      | .expression node =>
+          node.type == TypeSystem.Ty.word && acceptsOperator node.form
+      | .statement _ => false
+    assertTrue (decide (function.inferredBodyType = TypeSystem.Ty.word) &&
+        literals.length == literalCount &&
+        (literals.all fun resolution =>
+          resolution.targetType == TypeSystem.Ty.word) &&
+        function.solvedRequirements.length == literalCount &&
+        (function.solvedRequirements.all fun solved =>
+          solved.predicate == ProgramSignatures.builtinIntPredicate .word) &&
+        hasWordOperator)
+      s!"{label} did not close its deferred operator and literal carriers as Word"
+  match checked with
+  | _ :: nestedAdd :: nestedNot :: letAdd :: letNot :: [] =>
+      validate "nested addition" 2
+        (fun form => form matches .binary _ .add _) nestedAdd
+      validate "nested complement" 1
+        (fun form => form matches .unary .bitNot _) nestedNot
+      validate "let-bound addition" 2
+        (fun form => form matches .binary _ .add _) letAdd
+      validate "let-bound complement" 1
+        (fun form => form matches .unary .bitNot _) letNot
+  | functions => throw (IO.userError
+      s!"nested operator fixture checked {functions.length} functions")
+
+private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
+  let unconstrained := String.intercalate "\n" [
+    "function add() { 1 + 1; return; }",
+    "function invert() { ~1; return; }",
+    "function compare() returns (Bool) { return 1 == 1; }"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace unconstrained) with
+  | .error errors =>
+      let unresolved := errors.filter fun error => match error with
+        | .body { error := .unresolvedIntegerLiteralTarget _ (.variable _),
+            .. } => true
+        | _ => false
+      assertTrue (unresolved.length == 3)
+        "an unconstrained deferred operator avoided final literal validation"
+  | .ok _ => throw (IO.userError
+      "unconstrained deferred integer-literal operators were accepted")
+  let unsupported := String.intercalate "\n" [
+    "enum Box { Only }",
+    "function acceptBox(value: Box) returns (Box) { return value; }",
+    "function acceptBool(value: Bool) returns (Bool) { return value; }",
+    "function box() returns (Box) { return acceptBox(1 + 1); }",
+    "function boolean() returns (Bool) { return acceptBool(~1); }"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace unsupported) with
+  | .error errors =>
+      let rejected := errors.filter fun error => match error with
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            predicate.trait == ProgramTraitId.builtin .int &&
+              predicate.subject != TypeSystem.Ty.word &&
+              predicate.subject != TypeSystem.Ty.integer
+        | _ => false
+      assertTrue (rejected.length == 2)
+        "a deferred operator authorized a nominal or Bool literal target"
+  | .ok _ => throw (IO.userError
+      "a deferred operator accepted a nominal or Bool literal target")
+  let traitOwned := String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "}",
+    "function accept(value: Word) returns (Word) { return value; }",
+    "function rejected() returns (Word) { return accept(1 + 1); }"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace traitOwned) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            predicate.trait != ProgramTraitId.builtin .int &&
+              predicate.subject == TypeSystem.Ty.word
+        | _ => false)
+        "a deferred builtin operator bypassed an available Add catalog"
+  | .ok _ => throw (IO.userError
+      "an available Add catalog was bypassed by direct builtin deferral")
+  let logical := String.intercalate "\n" [
+    "function accept(value: Word) returns (Word) { return value; }",
+    "function badAnd() returns (Word) {",
+    "  let value = 1;",
+    "  value && value;",
+    "  return accept(value);",
+    "}",
+    "function badOr() returns (Word) {",
+    "  let value = 1;",
+    "  value || value;",
+    "  return accept(value);",
+    "}",
+    "function badNot() returns (Word) {",
+    "  let value = 1;",
+    "  !value;",
+    "  return accept(value);",
+    "}"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace logical) with
+  | .error errors =>
+      let hasUnknown (name : String) := errors.any fun error => match error with
+        | .body { error := .unknownVariable actual, .. } => actual == name
+        | _ => false
+      assertTrue (hasUnknown "and" && hasUnknown "or" && hasUnknown "not")
+        "a Bool-domain logical operator was deferred over a Word literal target"
+  | .ok _ => throw (IO.userError
+      "Bool-domain logical operators were accepted over Word literal targets")
+  let unrelatedStaged := String.intercalate "\n" [
+    "function take(value: integer, ignored: integer) returns (integer) {",
+    "  return value;",
+    "}",
+    "function bad(value: integer) returns (integer) {",
+    "  return take(value, 1) + value;",
+    "}"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace unrelatedStaged) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .operatorNotSupported "Add" .integer, .. } => true
+        | _ => false)
+        "an unrelated ground integer literal authorized a staged operator"
+  | .ok _ => throw (IO.userError
+      "an unrelated literal authorized an integer operator on nonliteral inputs")
+
 private def testBooleanOperatorResultDoesNotTypeOperands : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Eq<T> {",
@@ -517,6 +660,8 @@ def testSourceInference : IO Unit := do
   testLetBoundIntegerLiteralClosesLater
   testLiteralRequirementPreservesIndependentPolymorphism
   testContextualIntegerLiteralOperators
+  testNestedIntegerLiteralOperatorsCloseLater
+  testDeferredIntegerLiteralOperatorRejections
   testBooleanOperatorResultDoesNotTypeOperands
   testGroundOperatorResultKeepsCoercion
   testUnsupportedStatement

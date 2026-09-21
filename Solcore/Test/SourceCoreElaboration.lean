@@ -855,6 +855,32 @@ private def testStagedIntegerTypeRejected : IO Unit := do
   expectError "staged integer literal" literalFunction
     (.declaration literalFunction.declaration)
     fun reason => reason == .unsupportedType TypeSystem.Ty.integer
+  let operatorProgram ← checkedProgram (String.intercalate "\n" [
+    "function acceptInteger(value: integer) returns (integer) { return value; }",
+    "function directStaged() returns (integer) { return 1 + 1; }",
+    "function stagedOperator() returns (integer) {",
+    "  return acceptInteger(1 + 1);",
+    "}"
+  ])
+  let validateStagedOperator (label name : String) : IO Unit := do
+    let operatorFunction ← checkedNamed operatorProgram name
+    assertTrue (operatorFunction.solvedRequirements.length == 2 &&
+        operatorFunction.solvedRequirements.all fun solved =>
+          solved.predicate == ProgramSignatures.builtinIntPredicate .integer &&
+            match solved.evidence with
+            | .implementation (.byImpl goal (.builtin .intInteger) []) =>
+                goal == solved.predicate
+            | _ => false)
+      s!"{label} did not retain both Int<integer> solutions"
+    assertTrue (operatorFunction.typedBody.nodes.any fun
+        | .expression { type := .integer, form := .binary _ .add _, .. } => true
+        | _ => false)
+      s!"{label} did not retain its integer typed-IR target"
+    expectError label operatorFunction
+      (.declaration operatorFunction.declaration)
+      fun reason => reason == .unsupportedType TypeSystem.Ty.integer
+  validateStagedOperator "direct staged integer operator" "directStaged"
+  validateStagedOperator "nested staged integer operator" "stagedOperator"
 
 private def intPredicate (target : TypeSystem.Ty) : ProgramPredicate :=
   ProgramSignatures.builtinIntPredicate target

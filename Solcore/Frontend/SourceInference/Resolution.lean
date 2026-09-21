@@ -368,9 +368,28 @@ def commitCoercionPlan : State → List PlannedCoercionStep →
         target := step.target
       } :: steps, state)
 
-def isIntegerLiteralVariable (state : State) (type : Ty) : Bool :=
-  state.integerLiterals.any fun origin =>
-    decide (state.resolve (.variable origin.metavariable) = state.resolve type)
+def isOpenIntegerLiteralTarget (state : State)
+    (origins : List IntegerLiteralOrigin) (type : Ty) : Bool :=
+  match state.resolve type with
+  | .variable _ => origins.any fun origin =>
+      decide (state.resolve (.variable origin.metavariable) = state.resolve type)
+  | _ => false
+
+/-- An operator with no source-level catalog may postpone direct builtin
+selection only while its operand is the open target of a relevant literal. -/
+def isDeferredBuiltinOperatorTarget (state : State)
+    (hasOpenLiteralOperand : Bool) (builtin type : Ty) : Bool :=
+  builtin == Ty.word && hasOpenLiteralOperand &&
+    match state.resolve type with
+    | .variable _ => true
+    | _ => false
+
+/-- `integer` shares the literal-facing operator surface with Word during
+source checking, but remains staged and is still rejected by Core lowering. -/
+def isStagedIntegerOperatorTarget (state : State)
+    (hasOpenLiteralOperand : Bool) (builtin type : Ty) : Bool :=
+  builtin == Ty.word && state.resolve type == Ty.integer &&
+    hasOpenLiteralOperand
 
 /-- The target language deliberately mixes trait-backed operators with ordinary
 named functions from its standard prelude.  Keeping that distinction in one
@@ -465,14 +484,18 @@ structure OperatorInferenceResult where
   state : State
 
 def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
-    (left right : Ty) (expected : Option Ty) (state : State) :
+    (left right : Ty) (expected : Option Ty)
+    (integerLiterals : List IntegerLiteralOrigin) (state : State) :
     Except Error OperatorInferenceResult := do
+  let hasOpenLiteralOperand :=
+    isOpenIntegerLiteralTarget state integerLiterals left ||
+      isOpenIntegerLiteralTarget state integerLiterals right
   let state ← unify state left right
   let state ← match expected with
     | some expected =>
         let operand := state.resolve left
         if binaryResultIsBool operator || operand.freeVariables.isEmpty ||
-            !isIntegerLiteralVariable state operand then
+            !hasOpenLiteralOperand then
           pure state
         else
           unify state operand expected
@@ -487,7 +510,18 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
     }
   else
     match binaryOperatorDispatch operator with
-    | .function name => throw (.unknownVariable name)
+    | .function name =>
+        if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+              builtin operand ||
+            isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+              builtin operand then
+          pure {
+            type := if binaryResultIsBool operator then .bool else operand
+            requirements := []
+            state
+          }
+        else
+          throw (.unknownVariable name)
     | .traitMethod traitName methodName =>
         match ← operatorTrait? context traitName with
         | some trait =>
@@ -502,16 +536,30 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
               requirements
               state
             }
-        | none => throw (.operatorNotSupported traitName operand)
+        | none =>
+            if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+                  builtin operand ||
+                isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+                  builtin operand then
+              pure {
+                type := if binaryResultIsBool operator then .bool else operand
+                requirements := []
+                state
+              }
+            else
+              throw (.operatorNotSupported traitName operand)
 
 def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
-    (operandType : Ty) (expected : Option Ty) (state : State) :
+    (operandType : Ty) (expected : Option Ty)
+    (integerLiterals : List IntegerLiteralOrigin) (state : State) :
     Except Error OperatorInferenceResult := do
+  let hasOpenLiteralOperand :=
+    isOpenIntegerLiteralTarget state integerLiterals operandType
   let state ← match expected with
     | some expected =>
         let operand := state.resolve operandType
         if operator == .logicalNot || operand.freeVariables.isEmpty ||
-            !isIntegerLiteralVariable state operand then
+            !hasOpenLiteralOperand then
           pure state
         else
           unify state operand expected
@@ -524,7 +572,18 @@ def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
     pure { type := builtin, requirements := [], state }
   else
     match unaryOperatorDispatch operator with
-    | .function name => throw (.unknownVariable name)
+    | .function name =>
+        if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+              builtin operand ||
+            isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+              builtin operand then
+          pure {
+            type := if operator == .logicalNot then .bool else operand
+            requirements := []
+            state
+          }
+        else
+          throw (.unknownVariable name)
     | .traitMethod traitName methodName =>
         match ← operatorTrait? context traitName with
         | some trait =>
@@ -539,7 +598,18 @@ def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
               requirements
               state
             }
-        | none => throw (.operatorNotSupported traitName operand)
+        | none =>
+            if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+                  builtin operand ||
+                isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+                  builtin operand then
+              pure {
+                type := if operator == .logicalNot then .bool else operand
+                requirements := []
+                state
+              }
+            else
+              throw (.operatorNotSupported traitName operand)
 
 /-- Expected-type checking result for one exact source occurrence. -/
 structure ExpectationResult where

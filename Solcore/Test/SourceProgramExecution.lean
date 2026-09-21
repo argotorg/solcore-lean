@@ -108,6 +108,27 @@ private def testModuleQualifiedName : IO Unit := do
   | .error error => throw (IO.userError
       s!"main-module root failed: {reprStr error}")
 
+private def testDeferredIntegerOperators : IO Unit := do
+  let moduleId ← mainModule "main.solc"
+  let workspace := rawWorkspace "main.solc" [("main.solc",
+    String.intercalate "\n" [
+      "function accept(value: Word) returns (Word) { return value; }",
+      "function nestedAdd() returns (Word) { return accept(1 + 1); }",
+      "function nestedNot() returns (Word) { return accept(~1); }"
+    ])]
+  match run workspace (Seed.named moduleId "nestedAdd") [] generousLimits with
+  | .ok result =>
+      assertTrue (decide (result = .done (.word (word 2)) []))
+        "public execution changed deferred nested addition"
+  | .error error => throw (IO.userError
+      s!"public deferred addition failed: {reprStr error}")
+  match run workspace (Seed.named moduleId "nestedNot") [] generousLimits with
+  | .ok result =>
+      assertTrue (decide (result = .done (.word (word 1).bitNot) []))
+        "public execution changed deferred nested complement"
+  | .error error => throw (IO.userError
+      s!"public deferred complement failed: {reprStr error}")
+
 private def testSeedErrors : IO Unit := do
   let moduleId ← mainModule "main.solc"
   let missingModule ← mainModule "missing.solc"
@@ -252,6 +273,7 @@ def testSourceProgramExecution : IO Unit := do
   testNamedSeedAndPreparedRun
   testDeclarationSeedAndStore
   testModuleQualifiedName
+  testDeferredIntegerOperators
   testSeedErrors
   testAmbiguousAndNonFunctionSeeds
   testStageErrors

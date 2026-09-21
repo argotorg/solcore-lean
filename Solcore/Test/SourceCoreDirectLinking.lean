@@ -2570,6 +2570,50 @@ private def testBuiltinIntegerLiteralLinking : IO Unit := do
       some (.done (.word (word 1)) [])))
     "direct linking bypassed or changed builtin Int<Word> modulo lowering"
 
+private def testDeferredIntegerOperatorLinking : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "function accept(value: Word) returns (Word) { return value; }",
+    "function nestedAdd() returns (Word) { return accept(1 + 1); }",
+    "function nestedNot() returns (Word) { return accept(~1); }",
+    "function letAdd() returns (Word) {",
+    "  let value = 1 + 1;",
+    "  return accept(value);",
+    "}",
+    "function letNot() returns (Word) {",
+    "  let value = ~1;",
+    "  return accept(value);",
+    "}"
+  ])
+  let nestedAdd ← signatureNamed program "nestedAdd"
+  let nestedNot ← signatureNamed program "nestedNot"
+  let letAdd ← signatureNamed program "letAdd"
+  let letNot ← signatureNamed program "letNot"
+  let outcome ← runOrThrow "deferred integer operators" program [
+    monomorphicRequest nestedAdd,
+    monomorphicRequest nestedNot,
+    monomorphicRequest letAdd,
+    monomorphicRequest letNot
+  ] 8
+  let linked ← linkOrThrow "deferred integer operators" program outcome
+  let cases := [
+    (nestedAdd, word 2),
+    (nestedNot, (word 1).bitNot),
+    (letAdd, word 2),
+    (letNot, (word 1).bitNot)
+  ]
+  for (signature, expected) in cases do
+    let key : SourceSpecialization.SpecializationKey := {
+      declaration := signature.id
+      arguments := []
+    }
+    let entry ← match linked.findEntry? key with
+      | some entry => pure entry
+      | none => throw (IO.userError
+          s!"deferred integer operator lost `{signature.name}`")
+    assertTrue (decide (entry.run? [] 32 =
+        some (.done (.word expected) [])))
+      s!"deferred integer operator `{signature.name}` changed runtime meaning"
+
 /-- Exercise complete acyclic generic linking, capture-free argument staging,
 runtime input validation, finite-budget and recursion boundaries, proof-only
 trait-evidence forwarding, strict and named operator authority, Ord dispatch,
@@ -2611,5 +2655,6 @@ def testSourceCoreDirectLinking : IO Unit := do
   testMalformedRequirementMetadata program
   testMalformedCoercionEvidence program
   testBuiltinIntegerLiteralLinking
+  testDeferredIntegerOperatorLinking
 
 end Tests.SourceCoreDirectLinking

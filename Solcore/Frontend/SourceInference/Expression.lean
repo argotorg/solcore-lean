@@ -235,7 +235,7 @@ mutual
               match ← functionsNamed context name with
               | [] =>
                   let inferred ← inferUnaryOperator context operator.value
-                    operand.type expected state
+                    operand.type expected integerLiterals state
                   recordExpressionWithExpected context expression id
                     inferred.type (.unary operator.value operand.id)
                     inferred.requirements expected inferred.state
@@ -250,7 +250,7 @@ mutual
                     [operand] attempt
           | .traitMethod _ _ =>
               let inferred ← inferUnaryOperator context operator.value
-                operand.type expected state
+                operand.type expected integerLiterals state
               recordExpressionWithExpected context expression id inferred.type
                 (.unary operator.value operand.id) inferred.requirements expected
                 inferred.state
@@ -265,7 +265,7 @@ mutual
               match ← functionsNamed context name with
               | [] =>
                   let inferred ← inferBinaryOperator context operator.value
-                    left.type right.type expected state
+                    left.type right.type expected integerLiterals state
                   recordExpressionWithExpected context expression id inferred.type
                     (.binary left.id operator.value right.id)
                     inferred.requirements expected inferred.state
@@ -284,7 +284,7 @@ mutual
                     fitted.state
           | .traitMethod _ _ =>
               let inferred ← inferBinaryOperator context operator.value
-                left.type right.type expected state
+                left.type right.type expected integerLiterals state
               recordExpressionWithExpected context expression id inferred.type
                 (.binary left.id operator.value right.id) inferred.requirements
                 expected inferred.state
