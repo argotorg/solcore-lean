@@ -113,8 +113,8 @@ type, or later monomorphic use closes them; Bool-domain logical operators and
 unrelated or merely co-located literals are not admitted, and visible operator
 catalogs remain authoritative.  General signed compile-time `integer`
 evaluation and custom builtin `Int` execution remain later.  ADR-0349 through
-ADR-0355 implement the closed integer/Word conversion, arithmetic, comparison,
-conditional, let-binding, and provisional direct-call boundary.
+ADR-0356 implement the closed integer/Word conversion, arithmetic, comparison,
+conditional, let-binding, direct-call, and canonical function-marker boundary.
 
 ADR-0348 connects the first pattern slice to that carrier architecture.
 Terminal single-scrutinee matches retain ordered numeric-pattern builtin-`Int`
@@ -203,16 +203,23 @@ Both conditional branches remain eager, so recursion in an unselected branch
 still rejects; every written edge remains in the worklist and specialization
 budget.
 
-This is a provisional type-directed rule, not the pinned reference's full
-comptime contract.  The reference retains separate parameter and result
-comptime flags.  The current Lean signature/checking carrier discards the raw
-parameter marker; a written `comptime<T>` result is represented structurally as
-`Ty.comptime T`, but there is no separate canonical counterpart of the
-reference's result flag.  Reference-style marker retention and enforcement,
-general `comptime<T>`, predicate/coercion support, selected-branch recursion and
-compile-time programs such as Fibonacci remain later.  Integer-returning
-functions also remain invalid runtime roots because Core has no runtime
-`integer` representation.
+ADR-0356 replaces that provisional marker representation with the pinned
+reference's separate function contract.  A resolved parameter row carries its
+`comptime` bit independently of its bare type.  A singleton
+`returns (comptime<T>)` is normalized to bare `T` plus a result bit, while a
+marked item among multiple results and a nested outer wrapper reject.  The bits
+survive typed inputs, checked functions, declaration instantiations,
+specialization, trait/implementation method matching, worklist reconstruction,
+and linking.  Runtime roots cannot expose marked inputs or results; a runtime
+call rejects a runtime-dependent actual or an unsupported/deferred form at a
+marked parameter and rejects a marked result, while an actual proved closed is
+accepted.  The unmarked pure
+bare-`integer` partial-evaluation path remains intentionally compatible.
+General staging classification and `comptime<T>` evaluation,
+predicate/coercion support, staged implementation methods, selected-branch
+recursion and compile-time programs such as Fibonacci remain later.
+Integer-returning functions also remain invalid runtime roots because Core has
+no runtime `integer` representation.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,

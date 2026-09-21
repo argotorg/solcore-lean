@@ -6,7 +6,9 @@ Implemented as a provisional executable extension of the ADR-0349–0354 closed
 staging boundary.  The accepted profile consists of canonical whole-program
 direct calls whose fully specialized inputs and single result are exact bare
 `integer`, whose signature has no predicates, whose call and arguments have no
-output coercions, and whose specialization path is acyclic.
+output coercions, and whose specialization path is acyclic.  ADR-0356 has since
+closed this ADR's marker-retention deferral while preserving the unmarked
+bare-integer rule as an intentional partial-evaluation compatibility path.
 
 ## Context
 
@@ -115,10 +117,10 @@ termination state.
 
 ## Deferred boundaries
 
-- Canonical retention and enforcement of the parameter `comptime` marker and a
-  separate reference-style result flag, alongside Lean's existing structural
-  `Ty.comptime T`, remain required before this provisional bare-integer rule can
-  be generalized.
+- Canonical retention and initial enforcement of the parameter `comptime`
+  marker and separate reference-style result flag are implemented by ADR-0356.
+  General expression staging classification and staged evaluation beyond the
+  closed integer profile remain required before this rule can be generalized.
 - General `comptime<T>`, staged Word/Bool parameters and locals, multiple return
   values, predicate-bearing calls, output or argument coercions, indirect calls,
   and calls depending on runtime values remain unsupported.

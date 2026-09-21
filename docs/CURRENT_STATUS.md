@@ -137,12 +137,18 @@ Runtime and staged expansion share the same specialization-key visiting stack
 and decreasing link-depth fuel.  Both conditional branches remain eager, and
 self-, mutual-, or unselected-branch recursion rejects.  Integer-returning
 functions still reject as runtime roots because Core has no runtime `integer`.
-This is a provisional type-directed rule: raw parameter `comptime` syntax is
-not yet retained in the checked signature carrier.  A written `comptime<T>`
-result is represented structurally as `Ty.comptime T`, but Lean has no separate
-canonical counterpart of the reference's result flag.  Reference-style marker
-semantics, general `comptime<T>`, predicate/coercion support, selected-branch
-recursion, and compile-time Fibonacci remain later.
+ADR-0356 now replaces the provisional marker representation with canonical
+function contracts.  Resolved parameter rows retain their `comptime` bits,
+`returns (comptime<T>)` becomes bare result `T` plus a separate result bit, and
+the same metadata survives checked binders, declaration instantiations,
+specialization, trait/implementation method conformance, worklist validation,
+and linking.  Marked runtime roots, marked results reaching runtime call
+lowering, and runtime-dependent actuals passed to marked parameters reject;
+unsupported/deferred argument forms also reject explicitly, while actuals
+proved closed are admitted.  The unmarked pure bare-`integer` path remains an
+intentional partial-evaluation compatibility rule.  A general
+staging lattice, general `comptime<T>` evaluation, predicate/coercion support,
+selected-branch recursion, and compile-time Fibonacci remain later.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5888,16 +5894,20 @@ graphs.  Eager branch validation means recursion in an unselected branch still
 rejects, as do all other direct or mutual cycles.  An integer function remains
 invalid as a runtime root.
 
-This bare-integer rule does not yet reproduce the pinned reference's staging
-markers.  The reference retains per-parameter and result comptime flags and
-requires a comptime result plus comptime actuals before classifying a call as
-comptime.  Lean syntax retains the raw parameter marker, but signature
-resolution currently discards it.  A written `comptime<T>` result remains
-structurally visible as `Ty.comptime T`, but the checked/specialized carriers
-have no separate canonical counterpart of the reference's result flag.
-Reference-style marker retention and enforcement, general `comptime<T>`,
-predicates and coercions, indirect calls, selected-branch recursion, and
-compile-time Fibonacci remain deferred.
+ADR-0356 now reproduces the pinned reference's separate function-contract
+markers at this boundary.  Parameter rows retain their source-order comptime
+bits, while a singleton `returns (comptime<T>)` is normalized to bare `T` plus
+one result bit.  Checked binders, checked functions, call/reference
+instantiations, specialization, trait/implementation conformance, worklist
+reconstruction and direct linking all preserve and compare those bits.
+Marked runtime roots reject; a runtime call rejects a marked result or a
+runtime-dependent actual at a marked parameter, while unsupported/deferred
+argument forms reject explicitly and actuals proved closed are accepted.  The
+unmarked pure bare-integer rule remains an intentional
+partial-evaluation path.  General expression staging classification and
+`comptime<T>` evaluation, predicates and coercions, indirect calls, staged
+implementation methods, selected-branch recursion, and compile-time Fibonacci
+remain deferred.
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
 requirements even after an early wildcard, and build one hidden let followed by
