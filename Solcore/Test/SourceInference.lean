@@ -169,6 +169,32 @@ private def testInconclusiveCoercion : IO Unit := do
         | _ => false) "overlapping coercion implementations lost ambiguity"
   | .ok _ => throw (IO.userError "ambiguous coercion implementation was selected")
 
+private def testUnsolvedCoercionMethodPredicate : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Eq<T> {}",
+    "trait Coerce<From, To> {",
+    "  function coerce(value: From) returns (To) where From: Eq;",
+    "}",
+    "function acceptWord(value: Word) returns (Word) { return value; }",
+    "function reject<T>(value: T) returns (Word) where T: Coerce<Word> {",
+    "  return acceptWord(value);",
+    "}"
+  ]
+  let loaded ← load source
+  let eq ← match loaded.environment.traitsNamed "Eq" with
+    | [declaration] => pure declaration.id
+    | declarations => throw (IO.userError
+        s!"expected one Eq trait, found {declarations.length}")
+  match SourceInference.checkLoadedProgram loaded with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            decide (predicate.trait = eq) && predicate.arguments.isEmpty
+        | _ => false)
+        "a coercion method predicate was accepted without Eq<T>"
+  | .ok _ => throw (IO.userError
+      "a coercion method predicate was accepted without Eq<T>")
+
 private def testConstrainedLetDoesNotGeneralizeAwayEvidence : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Eq<T> {}",
@@ -377,6 +403,7 @@ def testSourceInference : IO Unit := do
   testTraitBackedCoercion
   testMissingCoercion
   testInconclusiveCoercion
+  testUnsolvedCoercionMethodPredicate
   testConstrainedLetDoesNotGeneralizeAwayEvidence
   testOperatorMethodPredicates
   testUnsolvedOperatorMethodPredicates

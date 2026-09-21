@@ -36,6 +36,7 @@ structure DeclarationInstantiation where
 /-- One evidence-bearing edge in an inserted coercion path. -/
 structure CoercionStep where
   requirement : RequirementId
+  methodRequirements : List RequirementId := []
   source : Ty
   target : Ty
   deriving Repr, BEq, DecidableEq
@@ -204,6 +205,12 @@ def applySubstitution (substitution : Substitution)
 end DeclarationInstantiation
 
 namespace CoercionStep
+
+/-- Every proof obligation owned by this edge, with the primary
+`Coerce<From, To>` requirement first and method predicates following in
+declaration order. -/
+def requirements (step : CoercionStep) : List RequirementId :=
+  step.requirement :: step.methodRequirements
 
 def applySubstitution (substitution : Substitution)
     (step : CoercionStep) : CoercionStep :=

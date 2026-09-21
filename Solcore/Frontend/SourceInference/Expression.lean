@@ -60,7 +60,7 @@ def generalizeValue (state : State) (locals : TypeSystem.Environment)
 
 def coercionRequirements (coercions : List CoercionStep) :
     List RequirementId :=
-  coercions.map (·.requirement)
+  coercions.flatMap (·.requirements)
 
 def attachExpressionCoercions (state : State)
     (entries : List ExpressionCoercions) : State :=

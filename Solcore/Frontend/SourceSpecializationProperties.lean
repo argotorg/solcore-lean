@@ -33,6 +33,22 @@ open SourceInference TypeSystem
       instantiation.parameterSubstitution.map Prod.fst := by
   simp [applyInstantiation]
 
+@[simp] theorem applyCoercionStep_requirement
+    (substitution : ParameterSubstitution) (step : CoercionStep) :
+    (applyCoercionStep substitution step).requirement = step.requirement := by
+  rfl
+
+@[simp] theorem applyCoercionStep_methodRequirements
+    (substitution : ParameterSubstitution) (step : CoercionStep) :
+    (applyCoercionStep substitution step).methodRequirements =
+      step.methodRequirements := by
+  rfl
+
+@[simp] theorem applyCoercionStep_requirements
+    (substitution : ParameterSubstitution) (step : CoercionStep) :
+    (applyCoercionStep substitution step).requirements = step.requirements := by
+  rfl
+
 @[simp] theorem applyNode_id (substitution : ParameterSubstitution)
     (node : Node) :
     (applyNode substitution node).id = node.id := by

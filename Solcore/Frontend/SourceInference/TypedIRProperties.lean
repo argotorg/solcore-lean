@@ -11,6 +11,17 @@ namespace Solcore.Frontend.SourceInference
     (step.applySubstitution substitution).requirement = step.requirement := by
   rfl
 
+@[simp] theorem CoercionStep.applySubstitution_methodRequirements
+    (substitution : TypeSystem.Substitution) (step : CoercionStep) :
+    (step.applySubstitution substitution).methodRequirements =
+      step.methodRequirements := by
+  rfl
+
+@[simp] theorem CoercionStep.applySubstitution_requirements
+    (substitution : TypeSystem.Substitution) (step : CoercionStep) :
+    (step.applySubstitution substitution).requirements = step.requirements := by
+  rfl
+
 @[simp] theorem ExpressionNode.applySubstitution_id
     (substitution : TypeSystem.Substitution) (node : ExpressionNode) :
     (node.applySubstitution substitution).id = node.id := by

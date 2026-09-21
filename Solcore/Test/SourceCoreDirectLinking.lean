@@ -185,6 +185,16 @@ private def replaceExpressionRequirements (nodes : List Node)
         node
   | .statement _ => node
 
+private def replaceExpressionCoercions (nodes : List Node)
+    (target : ExpressionId) (coercions : List CoercionStep) : List Node :=
+  nodes.map fun node => match node with
+  | .expression expression =>
+      if expression.id == target then
+        .expression { expression with coercions }
+      else
+        node
+  | .statement _ => node
+
 private def renameLocalReference (oldId newId : Resolved.LocalId) :
     ExpressionForm → ExpressionForm
   | .reference name (.local id) =>
@@ -2166,6 +2176,186 @@ private def testMultiStepRuntimeCoercion : IO Unit := do
         some (.done (.pair (.bool false) (.bool true)) [])))
     "multi-step Coerce evidence did not compose both selected method bodies"
 
+private def testCoercionMethodPredicateEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Marker<T> {}",
+    "trait Coerce<From, To> {",
+    "  function coerce(value: From) returns (To)",
+    "      where From: Eq, From: Marker;",
+    "}",
+    "impl Eq<Bool> {",
+    "  function eq(left: Bool, right: Bool) returns (Bool) { return left; }",
+    "}",
+    "impl Marker<Bool> {}",
+    "function equalWithEvidence<T>(left: T, right: T) returns (Bool)",
+    "    where T: Eq {",
+    "  return left == right;",
+    "}",
+    "impl Coerce<Bool, Word> {",
+    "  function coerce(value: Bool) returns (Word)",
+    "      where Bool: Eq, Bool: Marker {",
+    "    return equalWithEvidence(value, value) ? 41 : 7;",
+    "  }",
+    "}",
+    "function acceptWord(value: Word) returns (Word) { return value; }",
+    "function coerceWithEvidence<T>(value: T) returns (Word)",
+    "    where T: Coerce<Word>, T: Eq, T: Marker {",
+    "  return acceptWord(value);",
+    "}",
+    "function entry(value: Bool) returns (Word) {",
+    "  return coerceWithEvidence(value);",
+    "}"
+  ])
+  let coerceTrait ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Coerce" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"coercion method-predicate fixture expected one Coerce trait, found {traits.length}")
+  let eqTrait ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Eq" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"coercion method-predicate fixture expected one Eq trait, found {traits.length}")
+  let markerTrait ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Marker" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"coercion method-predicate fixture expected one Marker trait, found {traits.length}")
+  let entry ← signatureNamed program "entry"
+  let wrapper ← signatureNamed program "coerceWithEvidence"
+  let function ← functionFor program wrapper
+  let node ← match firstCoercedNode? function.typedBody.nodes with
+    | some node => pure node
+    | none => throw (IO.userError
+        "coercion method-predicate fixture lost its coercion occurrence")
+  let step ← match node.coercions with
+    | [step] => pure step
+    | coercions => throw (IO.userError
+        s!"coercion method-predicate fixture expected one step, found {coercions.length}")
+  let (eqRequirement, markerRequirement) ← match step.methodRequirements with
+    | [eqRequirement, markerRequirement] =>
+        pure (eqRequirement, markerRequirement)
+    | requirements => throw (IO.userError
+        s!"coercion method-predicate fixture expected two method requirements, found {requirements.length}")
+  let solved := step.requirements.filterMap fun requirement =>
+    function.solvedRequirements.find? fun row => row.id == requirement
+  let orderedAssumptions := match solved with
+    | [primary, eq, marker] =>
+        primary.id == step.requirement &&
+          eq.id == eqRequirement && marker.id == markerRequirement &&
+          primary.predicate.trait == coerceTrait.id &&
+          eq.predicate.trait == eqTrait.id &&
+          marker.predicate.trait == markerTrait.id &&
+          (primary.evidence matches .assumption _) &&
+          (eq.evidence matches .assumption _) &&
+          (marker.evidence matches .assumption _)
+    | _ => false
+  assertTrue (decide (node.requirements = step.requirements) &&
+      orderedAssumptions)
+    "generic coercion did not retain primary Coerce then ordered method evidence"
+
+  let outcome ← runOrThrow "coercion method predicate evidence" program
+    [monomorphicRequest entry] 3
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"coercion method predicate: incomplete plan {reprStr other}")
+  let specializedWrapper := plan.specializations.find? fun specialized =>
+    specialized.declaration == wrapper.id
+  assertTrue (specializedWrapper.any fun specialized =>
+      decide (specialized.key.arguments = [.bool]) &&
+        match specialized.assumptions with
+        | [primary, eq, marker] =>
+            primary.trait == coerceTrait.id && eq.trait == eqTrait.id &&
+              marker.trait == markerTrait.id
+        | _ => false)
+    "specialized coercion wrapper lost its ordered Coerce/Eq/Marker assumptions"
+  let linked ← linkOrThrow "coercion method predicate evidence" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "coercion method predicate: linked root was absent")
+  assertTrue (decide (linkedEntry.run? [.bool true] 4096 =
+        some (.done (.word (word 41)) []) ∧
+      linkedEntry.run? [.bool false] 4096 =
+        some (.done (.word (word 7)) [])))
+    "Coerce.coerce did not consume its caller-owned Eq/Marker evidence"
+
+  let programWithStep := fun replacement =>
+    replaceFunction program {
+      function with
+      typedBody := {
+        function.typedBody with
+        nodes := replaceExpressionCoercions function.typedBody.nodes node.id
+          [replacement]
+      }
+    }
+  let reversedProgram := programWithStep {
+    step with methodRequirements := step.methodRequirements.reverse
+  }
+  let reversedOutcome ← runOrThrow "reordered coercion method requirements"
+    reversedProgram [monomorphicRequest entry] 3
+  match SourceCoreDirectLinking.link reversedProgram reversedOutcome with
+  | .error (.coercionMethodRequirementPredicateMismatch caller occurrence
+      requirement expected actual) =>
+      assertTrue (decide (caller.declaration = wrapper.id ∧
+          caller.arguments = [.bool] ∧ occurrence = node.id ∧
+          requirement = markerRequirement ∧ expected.trait = eqTrait.id ∧
+          actual.trait = markerTrait.id))
+        "reordered coercion evidence rejection lost exact positional metadata"
+  | result => throw (IO.userError
+      s!"reordered coercion method requirements were accepted: {reprStr result}")
+
+  let shortenedProgram := programWithStep {
+    step with methodRequirements := [eqRequirement]
+  }
+  let shortenedOutcome ← runOrThrow "short coercion method requirements"
+    shortenedProgram [monomorphicRequest entry] 3
+  match SourceCoreDirectLinking.link shortenedProgram shortenedOutcome with
+  | .error (.coercionMethodRequirementCountMismatch caller occurrence primary
+      2 1) =>
+      assertTrue (decide (caller.declaration = wrapper.id ∧
+          caller.arguments = [.bool] ∧ occurrence = node.id ∧
+          primary = step.requirement))
+        "short coercion evidence rejection lost its caller or primary evidence"
+  | result => throw (IO.userError
+      s!"a missing coercion method requirement was accepted: {reprStr result}")
+
+  let primaryOnlyProgram := programWithStep {
+    step with methodRequirements := []
+  }
+  let primaryOnlyOutcome ← runOrThrow "primary-only coercion requirements"
+    primaryOnlyProgram [monomorphicRequest entry] 3
+  match SourceCoreDirectLinking.link primaryOnlyProgram primaryOnlyOutcome with
+  | .error (.coercionMethodRequirementCountMismatch caller occurrence primary
+      2 0) =>
+      assertTrue (decide (caller.declaration = wrapper.id ∧
+          caller.arguments = [.bool] ∧ occurrence = node.id ∧
+          primary = step.requirement))
+        "primary-only coercion rejection lost its caller or primary evidence"
+  | result => throw (IO.userError
+      s!"a primary-only coercion method requirement was accepted: {reprStr result}")
+
+  let duplicateProgram := programWithStep {
+    step with methodRequirements := [eqRequirement, eqRequirement]
+  }
+  let duplicateOutcome ← runOrThrow "duplicate coercion method requirements"
+    duplicateProgram [monomorphicRequest entry] 3
+  match SourceCoreDirectLinking.link duplicateProgram duplicateOutcome with
+  | .error (.sourceCore error) =>
+      assertTrue (error.reason ==
+          .duplicateCoercionRequirement eqRequirement)
+        "duplicate coercion evidence rejection lost its requirement identity"
+  | result => throw (IO.userError
+      s!"duplicate coercion method requirements were accepted: {reprStr result}")
+
 private def testMalformedRequirementMetadata
     (program : CheckedProgram) : IO Unit := do
   let constrained ← signatureNamed program "constrained"
@@ -2364,6 +2554,7 @@ def testSourceCoreDirectLinking : IO Unit := do
   testNamedOperatorResultCoercionChain
   testBuiltinOperatorFallback
   testMultiStepRuntimeCoercion
+  testCoercionMethodPredicateEvidence
   testMalformedRequirementMetadata program
   testMalformedCoercionEvidence program
 

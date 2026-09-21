@@ -29,9 +29,10 @@ Target-compatible
 `not` functions and reuse the direct-call specialization/linking path.  A
 conversion slice validates each closed coercion edge by exact requirement
 identity and executes the selected `Coerce<From, To>.coerce` method body for
-direct-call arguments, forwarded generic evidence and call results.  Its edge
-carrier remains primary-only, so method predicates on `coerce` are explicitly
-deferred.  A finite
+direct-call arguments, forwarded generic evidence and call results.  Each edge
+retains its primary coercion obligation followed by the selected `coerce`
+method's predicates in declaration order; the linker validates and supplies
+all of those caller-owned witnesses.  A finite
 detached linker now lets those selected methods call cataloged functions and
 consume coherent trait-header or exact implementation-premise evidence through
 the same policies.
@@ -361,30 +362,40 @@ Word/Bool builtins for source fixtures without a loaded standard prelude.
 
 The first runtime coercion consumer is connected by the same rule: method
 bodies, not endpoint types, define behavior.  One step must identify exactly
-one solved requirement whose predicate and evidence goal are precisely
-`Coerce<From, To>` for the typed edge.  An assumption is accepted only when a
+one primary solved requirement whose predicate and evidence goal are precisely
+`Coerce<From, To>` for the typed edge, followed by every solved method
+requirement in declaration order.  An assumption is accepted only when a
 unique matching closed implementation witness was forwarded into the current
 generic specialization.  The selected two-parameter trait and implementation
 must each have exactly one method named `coerce`; the implementation must have
 a ground specialization, its predicates must be closed and backed by exact
-selected premises.  The current coercion-edge carrier exposes only the primary
-`Coerce<From, To>` requirement, so a `coerce` method with additional method
-predicates remains rejected instead of being executed without caller evidence.
-A premise-free checked method must
+selected premises.  The coercion-edge carrier records the primary
+`Coerce<From, To>` requirement followed by the selected method's predicates in
+declaration order.  Inference validates the instantiated `[From] -> [To]`
+method signature, requires all edge obligations to be solvable while searching,
+and allocates a stable requirement identity for each one after path selection.
+The executable consumer checks the exact count, order, predicates, evidence
+goals and canonical selected witnesses before supplying the method evidence to
+the detached body.  Empty legacy `Coerce` marker traits remain accepted by the
+inference-only graph with no method obligations; executable linking still
+requires the uniquely named method.  A checked method must
 lower from one `From` input to one `To` result before it is capture-free inlined.
 Executable regressions cover a direct call-argument conversion, a conversion
 inside a generic callee justified by forwarded evidence, and conversion of a
 call result which also carries independent proof-only signature evidence.  A
 Bool-to-Word fixture returns `41` or `7`, demonstrating that no hard-coded
 endpoint conversion supplies the runtime result.
+The constrained companion declares `coerce where From: Eq, From: Marker`,
+forwards both witnesses through a generic conversion wrapper, consumes Eq from
+the detached method body and produces the same `41`/`7` branch results.  Missing,
+reordered, primary-only and duplicate edge-obligation metadata all reject.
 
 Budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
 assumptions, non-call/operator/literal requirements outside the supported
 unary, binary and conversion profiles and indirect calls all reject explicitly.
 Other evidence-dependent operators, underdetermined generic implementations
 and method-level `where` predicates on profiles without an ordered caller-owned
-evidence carrier—currently including `Coerce.coerce`—are not assigned an
-invented runtime meaning.
+evidence carrier are not assigned an invented runtime meaning.
 Selected implementation methods instead enter a finite detached linker.  It
 reconstructs method-local direct-call metadata against the program catalog,
 including callees absent from the top-level specialization plan, forwards exact
@@ -425,10 +436,10 @@ matching implementation method are required; unrelated rows are ignored, while
 missing or duplicate named rows reject.  An executable Add fixture includes an
 unrelated `tag` method and observes the selected `add` body's result `91`.
 
-The next internal boundary is method-level predicates for coercions and other
-profiles without an ordered caller-obligation carrier, generic arguments not
-represented by the current evidence language, and additional runtime-evidence
-profiles.  Recursive calls require
+The next internal boundary is method-level predicates for remaining profiles
+without an ordered caller-obligation carrier, generic arguments not represented
+by the current evidence language, and additional runtime-evidence profiles.
+Recursive calls require
 a separate named or global recursive Core representation rather than cyclic
 inlining.
 Selection-bearing constructor,

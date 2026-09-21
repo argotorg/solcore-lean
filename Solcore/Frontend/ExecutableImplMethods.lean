@@ -410,10 +410,9 @@ def checkMethodWithEvidenceAndArity
   }
 
 /-- Select a method that has no caller-owned predicate evidence. This remains
-the default entry for callers without an evidence carrier, including the
-current coercion consumer; a constrained method is rejected by
-`methodEvidenceCountMismatch` instead of being silently admitted without its
-caller obligations. -/
+the compatibility entry for consumers whose selected method is unconstrained;
+a constrained method is rejected by `methodEvidenceCountMismatch` instead of
+being silently admitted without its caller obligations. -/
 def checkMethodWithArity
     (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
     (expectedTraitArity : Nat) (expectedName : String) :

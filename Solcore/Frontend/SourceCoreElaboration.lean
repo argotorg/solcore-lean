@@ -350,6 +350,18 @@ private def consumeCoercionRequirementWith {error : Type}
         else
           pure result
 
+private def consumeCoercionRequirementsWith {error : Type}
+    (lift : Error → error) (site : ErrorSite)
+    (attached : List RequirementId) :
+    List RequirementId → List RequirementId → List RequirementId →
+      Except error (List RequirementId × List RequirementId)
+  | [], seen, remaining => pure (seen, remaining)
+  | requirement :: requirements, seen, remaining => do
+      let remaining ← consumeCoercionRequirementWith lift site attached
+        seen remaining requirement
+      consumeCoercionRequirementsWith lift site attached requirements
+        (requirement :: seen) remaining
+
 private def prepareCoercionTailWith {error : Type}
     (lift : Error → error) (site : ErrorSite)
     (attached : List RequirementId) (finalType : Ty) :
@@ -369,10 +381,10 @@ private def prepareCoercionTailWith {error : Type}
         failWith lift site
           (.identityCoercionStep index step.requirement step.source)
       else
-        let remaining ← consumeCoercionRequirementWith lift site attached
-          seen remaining step.requirement
+        let (seen, remaining) ← consumeCoercionRequirementsWith lift site
+          attached step.requirements seen remaining
         prepareCoercionTailWith lift site attached finalType (index + 1)
-          step.target (step.requirement :: seen) remaining rest
+          step.target seen remaining rest
 
 private def prepareCoercionPathWith {error : Type}
     (lift : Error → error) (node : ExpressionNode)
@@ -383,10 +395,10 @@ private def prepareCoercionPathWith {error : Type}
     failWith lift site
       (.identityCoercionStep 0 first.requirement first.source)
   else
-    let remaining ← consumeCoercionRequirementWith lift site
-      node.requirements [] node.requirements first.requirement
+    let (seen, remaining) ← consumeCoercionRequirementsWith lift site
+      node.requirements first.requirements [] node.requirements
     let remaining ← prepareCoercionTailWith lift site node.requirements
-      node.type 1 first.target [first.requirement] remaining rest
+      node.type 1 first.target seen remaining rest
     pure {
       rawType := first.source
       remainingRequirements := remaining
@@ -411,10 +423,10 @@ private def checkedCoercionPlansWith {error : Type}
         failWith lift (.occurrence node.id.occurrence)
           (.coercionPlanTargetTypeMismatch step.requirement targetType
             plan.targetType)
-      else if plan.consumedRequirements != [step.requirement] then
+      else if plan.consumedRequirements != step.requirements then
         failWith lift (.occurrence node.id.occurrence)
           (.coercionPlanRequirementsMismatch step.requirement
-            [step.requirement] plan.consumedRequirements)
+            step.requirements plan.consumedRequirements)
       else
         pure (plan :: (← checkedCoercionPlansWith lift onCoercion scope
           node rest))

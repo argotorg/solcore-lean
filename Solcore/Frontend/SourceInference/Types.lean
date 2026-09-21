@@ -75,6 +75,15 @@ inductive Error where
       (trait : Resolved.DeclarationId) (name : String)
       (expectedParameters actualParameters : List Ty)
       (expectedReturns actualReturns : List Ty)
+  | missingCoercionTraitCatalog (trait : Resolved.DeclarationId)
+  | duplicateCoercionTraitMethod
+      (trait : Resolved.DeclarationId) (count : Nat)
+  | coercionTraitArityMismatch
+      (trait : Resolved.DeclarationId) (expected actual : Nat)
+  | coercionTraitMethodSignatureMismatch
+      (trait : Resolved.DeclarationId)
+      (expectedParameters actualParameters : List Ty)
+      (expectedReturns actualReturns : List Ty)
   | ambiguousImportedNamespace
       (name : String) (candidates : List Workspace.ModuleId)
   | ambiguousCoercion

@@ -37,6 +37,8 @@ private def expressionId : ExpressionId :=
   ⟨⟨owner, 0⟩⟩
 
 private def requirementId : RequirementId := ⟨4⟩
+private def methodRequirement0 : RequirementId := ⟨5⟩
+private def methodRequirement1 : RequirementId := ⟨6⟩
 private def variable0 : TypeSystem.Ty := .variable ⟨0⟩
 private def variable1 : TypeSystem.Ty := .variable ⟨1⟩
 
@@ -52,9 +54,10 @@ private def expression : ExpressionNode := {
   span
   type := variable1
   form := .reference "chosen" (.declaration instantiation)
-  requirements := [requirementId]
+  requirements := [requirementId, methodRequirement0, methodRequirement1]
   coercions := [{
     requirement := requirementId
+    methodRequirements := [methodRequirement0, methodRequirement1]
     source := variable0
     target := variable1
   }]
@@ -89,13 +92,21 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
   | some node =>
       assertTrue (decide (node.rawType = .word ∧ node.type = .bool ∧
           node.hasValidCoercionPath ∧
-          node.requirements = [requirementId] ∧
+          node.requirements =
+            [requirementId, methodRequirement0, methodRequirement1] ∧
           node.coercions = [{
             requirement := requirementId
+            methodRequirements := [methodRequirement0, methodRequirement1]
             source := .word
             target := .bool
           }]))
         "typed expression type/coercion closure changed"
+      match node.coercions with
+      | [step] =>
+          assertTrue (decide (step.requirements =
+              [requirementId, methodRequirement0, methodRequirement1]))
+            "coercion obligations lost primary-first declaration order"
+      | _ => throw (IO.userError "typed coercion path changed shape")
       match node.form with
       | .reference "chosen" (.declaration selected) =>
           assertTrue (decide (selected.type = .word ∧
@@ -113,6 +124,7 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
     argumentTypeAfterCoercion := variable1
     argumentCoercions := [{
       requirement := requirementId
+      methodRequirements := [methodRequirement0, methodRequirement1]
       source := variable0
       target := variable1
     }]
@@ -123,6 +135,7 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
           metadata.argumentTypeAfterCoercion = .bool ∧
           metadata.argumentCoercions = [{
             requirement := requirementId
+            methodRequirements := [methodRequirement0, methodRequirement1]
             source := .word
             target := .bool
           }] ∧ metadata.hasValidArgumentCoercionPath))

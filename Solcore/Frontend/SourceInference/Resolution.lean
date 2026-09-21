@@ -91,6 +91,7 @@ structure CoercionEdge where
   source : Ty
   target : Ty
   predicate : ProgramPredicate
+  methodPredicates : List ProgramPredicate := []
   deriving Repr, DecidableEq
 
 /-- One not-yet-committed edge selected by coercion search.  Requirement IDs
@@ -99,6 +100,7 @@ structure PlannedCoercionStep where
   source : Ty
   target : Ty
   predicate : ProgramPredicate
+  methodPredicates : List ProgramPredicate := []
   deriving Repr, DecidableEq
 
 structure CoercionPath where
@@ -116,6 +118,47 @@ structure CoercionEdges where
 structure CoercionExpansion where
   paths : List CoercionPath := []
   blocked : List Error := []
+
+/-- The optional named method catalog used to attach caller-owned predicates
+to every coercion edge.  Empty legacy marker traits remain usable by the
+inference-only graph; executable linking still requires `coerce`. -/
+structure CoercionMethodProfile where
+  trait : Resolved.DeclarationId
+  parameters : List TypeParameterId
+  method : ProgramTraitMethodSignature
+
+def coercionMethodProfile? (context : Context)
+    (trait : Resolved.DeclarationId) :
+    Except Error (Option CoercionMethodProfile) := do
+  let signature ← match context.signatures.trait? trait with
+    | some signature => pure signature
+    | none => throw (.missingCoercionTraitCatalog trait)
+  unless signature.parameters.length = 2 do
+    throw (.coercionTraitArityMismatch trait 2 signature.parameters.length)
+  match signature.methods.filter fun method => method.name == "coerce" with
+  | [] => pure none
+  | [method] => pure (some {
+      trait
+      parameters := signature.parameters
+      method
+    })
+  | methods => throw (.duplicateCoercionTraitMethod trait methods.length)
+
+def coercionMethodPredicates (profile : Option CoercionMethodProfile)
+    (source target : Ty) : Except Error (List ProgramPredicate) := do
+  let some profile := profile | pure []
+  let substitution : ParameterSubstitution :=
+    profile.parameters.zip [source, target]
+  let actualParameters := profile.method.parameterTypes.map substitution.apply
+  let actualReturns := profile.method.returnTypes.map substitution.apply
+  let expectedParameters := [source]
+  let expectedReturns := [target]
+  unless actualParameters = expectedParameters &&
+      actualReturns = expectedReturns do
+    throw (.coercionTraitMethodSignatureMismatch profile.trait
+      expectedParameters actualParameters expectedReturns actualReturns)
+  pure (profile.method.wherePredicates.map
+    (ProgramPredicate.applyParameters substitution))
 
 def typeHasParameter : Ty → Bool
   | .parameter _ => true
@@ -170,28 +213,49 @@ def assumptionCoercionEdges (context : Context) (state : State)
       | _ => none
 
 def coercionEdges (context : Context) (state : State)
-    (trait : Resolved.DeclarationId) (source : Ty) : List CoercionEdge :=
-  ((context.signatures.implRules.filterMap (coercionRuleEdge? trait source)) ++
-    assumptionCoercionEdges context state trait source).eraseDups
+    (profile : Option CoercionMethodProfile)
+    (trait : Resolved.DeclarationId) (source : Ty) :
+    Except Error (List CoercionEdge) := do
+  let edges :=
+    ((context.signatures.implRules.filterMap (coercionRuleEdge? trait source)) ++
+      assumptionCoercionEdges context state trait source).eraseDups
+  edges.mapM fun edge => do
+    let methodPredicates ←
+      coercionMethodPredicates profile edge.source edge.target
+    pure { edge with methodPredicates }
+
+def coercionEvidenceViable (context : Context) (state : State)
+    (predicate : ProgramPredicate) (methodPredicates : List ProgramPredicate) :
+    Except Error Bool := do
+  match solvePredicate context state predicate with
+  | .error (.noTraitImplementation _) => pure false
+  | .error error => throw error
+  | .ok _ =>
+      match solvePredicates context state methodPredicates with
+      | .ok _ => pure true
+      | .error (.noTraitImplementation _) => pure false
+      | .error error => throw error
 
 def viableCoercionEdges (context : Context) (state : State) :
     List CoercionEdge → CoercionEdges
   | [] => {}
   | edge :: rest =>
       let tail := viableCoercionEdges context state rest
-      match solvePredicate context state edge.predicate with
-      | .ok _ => { tail with viable := edge :: tail.viable }
-      | .error (.noTraitImplementation _) => tail
+      match coercionEvidenceViable context state edge.predicate
+          edge.methodPredicates with
+      | .ok true => { tail with viable := edge :: tail.viable }
+      | .ok false => tail
       | .error error => { tail with blocked := error :: tail.blocked }
 
 def expandCoercionPath (context : Context) (state : State)
+    (profile : Option CoercionMethodProfile)
     (trait : Resolved.DeclarationId) (path : CoercionPath) :
-    CoercionExpansion :=
-  let candidates := (coercionEdges context state trait path.current).filter
+    Except Error CoercionExpansion := do
+  let candidates := (← coercionEdges context state profile trait path.current).filter
     fun edge => !path.visited.contains edge.target
   let edges := viableCoercionEdges context state
     candidates
-  {
+  pure {
     paths := edges.viable.map fun edge => {
       current := edge.target
       visited := path.visited ++ [edge.target]
@@ -199,19 +263,22 @@ def expandCoercionPath (context : Context) (state : State)
         source := edge.source
         target := edge.target
         predicate := edge.predicate
+        methodPredicates := edge.methodPredicates
       }]
     }
     blocked := edges.blocked
   }
 
 def expandCoercionPaths (context : Context) (state : State)
+    (profile : Option CoercionMethodProfile)
     (trait : Resolved.DeclarationId) :
-    List CoercionPath → CoercionExpansion
-  | [] => {}
+    List CoercionPath → Except Error CoercionExpansion
+  | [] => pure {}
   | path :: rest =>
-      let head := expandCoercionPath context state trait path
-      let tail := expandCoercionPaths context state trait rest
-      {
+      do
+      let head ← expandCoercionPath context state profile trait path
+      let tail ← expandCoercionPaths context state profile trait rest
+      pure {
         paths := head.paths ++ tail.paths
         blocked := head.blocked ++ tail.blocked
       }
@@ -235,23 +302,24 @@ def selectCoercionPath (source target : Ty)
 edge bound, not a recursion guard: one additional expansion distinguishes
 ordinary exhaustion from an explicitly truncated search. -/
 def searchCoercionPaths (context : Context) (state : State)
+    (profile : Option CoercionMethodProfile)
     (trait : Resolved.DeclarationId) (source target : Ty) :
     Nat → List CoercionPath → List Error →
       Except Error (Option (List PlannedCoercionStep))
   | 0, frontier, blocked => do
-      let beyond := expandCoercionPaths context state trait frontier
+      let beyond ← expandCoercionPaths context state profile trait frontier
       if beyond.paths.isEmpty then
         finishCoercionSearch (blocked ++ beyond.blocked)
       else throw (.coercionDepthLimit source target context.coercionDepth)
   | fuel + 1, frontier, blocked => do
-      let next := expandCoercionPaths context state trait frontier
+      let next ← expandCoercionPaths context state profile trait frontier
       match ← selectCoercionPath source target next.paths with
       | some predicates => pure (some predicates)
       | none => do
           let blocked := blocked ++ next.blocked
           if next.paths.isEmpty then finishCoercionSearch blocked
           else
-            searchCoercionPaths context state trait source target fuel
+            searchCoercionPaths context state profile trait source target fuel
               next.paths blocked
 
 /-- Prefer the direct obligation, then search concrete intermediate types.
@@ -263,22 +331,30 @@ def coercionPlan? (context : Context) (state : State)
   match ← conventionalTraitWithArity? context "Coerce" 2 with
   | none => pure none
   | some trait =>
+      let profile ← coercionMethodProfile? context trait
       let direct : ProgramPredicate := {
         trait
         subject := source
         arguments := [target]
       }
-      match solvePredicate context state direct with
-      | .ok _ => pure (some [{ source, target, predicate := direct }])
-      | .error (.noTraitImplementation _) =>
-          match ← searchCoercionPaths context state trait source target
+      let methodPredicates ← coercionMethodPredicates profile source target
+      let directStep : PlannedCoercionStep := {
+        source
+        target
+        predicate := direct
+        methodPredicates
+      }
+      match coercionEvidenceViable context state direct methodPredicates with
+      | .ok true => pure (some [directStep])
+      | .ok false =>
+          match ← searchCoercionPaths context state profile trait source target
               context.coercionDepth [{
                 current := source
                 visited := [source]
                 steps := []
               }] [] with
           | some steps => pure (some steps)
-          | none => pure (some [{ source, target, predicate := direct }])
+          | none => pure (some [directStep])
       | .error error => throw error
 
 /-- Allocate requirement identities for a selected coercion path in path
@@ -290,9 +366,12 @@ def commitCoercionPlan : State → List PlannedCoercionStep →
   | state, step :: rest =>
       let (requirement, state) :=
         state.addRequirementWithId step.predicate
+      let (methodRequirements, state) :=
+        state.addRequirementsWithIds step.methodPredicates
       let (steps, state) := commitCoercionPlan state rest
       ({
         requirement
+        methodRequirements
         source := step.source
         target := step.target
       } :: steps, state)
@@ -541,11 +620,10 @@ def fitArguments (context : Context) :
       Except Error (Option ArgumentFitResult)
   | state, [], [] => .ok (some { state, cost := 0, coercions := [] })
   | state, argument :: arguments, parameter :: parameters => do
-      let requirementMark := state.requirementMark
       match ← candidateWithExpected context state argument (some parameter) with
       | none => pure none
       | some fitted =>
-          let headCost := fitted.state.requirementCountSince requirementMark
+          let headCost := fitted.coercions.length
           match ← fitArguments context fitted.state arguments parameters with
           | none => pure none
           | some tail =>
@@ -657,13 +735,11 @@ def tryFunctionCandidate (context : Context)
           match ← fitArguments context state arguments parameters with
           | none => pure none
           | some fittedArguments =>
-              let resultRequirementMark := fittedArguments.state.requirementMark
               match ← candidateWithExpected context fittedArguments.state
                   { id := call, type := result } expected with
               | none => pure none
               | some fittedResult =>
-                  let resultCost := fittedResult.state.requirementCountSince
-                    resultRequirementMark
+                  let resultCost := fittedResult.coercions.length
                   let numeric ←
                     defaultCandidateNumerics context numericOrigins fittedResult.state
                   let state := removeCandidateNumerics numeric.state numericOrigins

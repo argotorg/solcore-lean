@@ -224,7 +224,7 @@ private def executableCoercionPolicy :
         pure {
           sourceType := .word
           targetType := .bool
-          consumedRequirements := [step.requirement]
+          consumedRequirements := step.requirements
           build := fun value => pure
             (.unary .boolNot (.binary .wordEq value (.word (word 0))))
         }
@@ -232,7 +232,7 @@ private def executableCoercionPolicy :
         pure {
           sourceType := .bool
           targetType := .word
-          consumedRequirements := [step.requirement]
+          consumedRequirements := step.requirements
           build := fun value => pure
             (.ifE value (.word (word 1)) (.word (word 0)))
         }
@@ -251,6 +251,19 @@ private def constantCoercionPolicy (sourceType targetType : Core.Ty)
     consumedRequirements := consumed
     build := fun value => pure value
   }
+
+private def replaceCoercionPlanRequirements
+    (target : RequirementId) (consumed : List RequirementId) :
+    SourceCoreElaboration.CoercionElaborator
+      SourceCoreElaboration.Error :=
+  fun scope node step => do
+    let plan ← executableCoercionPolicy scope node step
+    pure {
+      plan with
+      consumedRequirements :=
+        if step.requirement = target then consumed
+        else plan.consumedRequirements
+    }
 
 private def expectCoercionPolicyError (label : String)
     (function : CheckedFunction) (expression : ExpressionId)
@@ -462,20 +475,39 @@ private def testCoercionPolicy : IO Unit := do
   let binaryRequirement : RequirementId := ⟨201⟩
   let firstCoercion : RequirementId := ⟨202⟩
   let secondCoercion : RequirementId := ⟨203⟩
+  let firstMethod0 : RequirementId := ⟨204⟩
+  let firstMethod1 : RequirementId := ⟨205⟩
+  let secondMethod : RequirementId := ⟨206⟩
   let solved := [
     solvedWordRequirement function.declaration binaryRequirement,
     solvedWordRequirement function.declaration firstCoercion,
-    solvedWordRequirement function.declaration secondCoercion
+    solvedWordRequirement function.declaration secondCoercion,
+    solvedWordRequirement function.declaration firstMethod0,
+    solvedWordRequirement function.declaration firstMethod1,
+    solvedWordRequirement function.declaration secondMethod
   ]
   let rootCoerced : CheckedFunction := {
     function with
     solvedRequirements := solved
     typedBody := changeExpression function.typedBody expression fun node => {
       node with
-      requirements := [secondCoercion, binaryRequirement, firstCoercion]
+      requirements := [
+        secondMethod, secondCoercion, binaryRequirement,
+        firstMethod1, firstCoercion, firstMethod0
+      ]
       coercions := [
-        { requirement := firstCoercion, source := .word, target := .bool },
-        { requirement := secondCoercion, source := .bool, target := .word }
+        {
+          requirement := firstCoercion
+          methodRequirements := [firstMethod0, firstMethod1]
+          source := .word
+          target := .bool
+        },
+        {
+          requirement := secondCoercion
+          methodRequirements := [secondMethod]
+          source := .bool
+          target := .word
+        }
       ]
     }
   }
@@ -505,10 +537,23 @@ private def testCoercionPolicy : IO Unit := do
           node with requirements := [binaryRequirement]
         }) left fun node => {
           node with
-          requirements := [firstCoercion, secondCoercion]
+          requirements := [
+            firstMethod1, firstCoercion, secondMethod,
+            secondCoercion, firstMethod0
+          ]
           coercions := [
-            { requirement := firstCoercion, source := .word, target := .bool },
-            { requirement := secondCoercion, source := .bool, target := .word }
+            {
+              requirement := firstCoercion
+              methodRequirements := [firstMethod0, firstMethod1]
+              source := .word
+              target := .bool
+            },
+            {
+              requirement := secondCoercion
+              methodRequirements := [secondMethod]
+              source := .bool
+              target := .word
+            }
           ]
         }
   }
@@ -536,6 +581,8 @@ private def testMalformedCoercionPolicies : IO Unit := do
   let (_, expression) ← rootIds function
   let first : RequirementId := ⟨301⟩
   let second : RequirementId := ⟨302⟩
+  let firstMethod : RequirementId := ⟨303⟩
+  let secondMethod : RequirementId := ⟨304⟩
   let changed (requirements : List RequirementId)
       (coercions : List CoercionStep) : CheckedFunction :=
     withExpression function expression fun node => {
@@ -573,6 +620,69 @@ private def testMalformedCoercionPolicies : IO Unit := do
       { requirement := first, source := .bool, target := .word }
     ]) expression executableCoercionPolicy fun reason => match reason with
       | .duplicateCoercionRequirement actual => actual == first
+      | _ => false
+  let methodStep : CoercionStep := {
+    requirement := first
+    methodRequirements := [firstMethod, secondMethod]
+    source := .word
+    target := .bool
+  }
+  let returnStep : CoercionStep := {
+    requirement := second
+    source := .bool
+    target := .word
+  }
+  expectCoercionPolicyError "missing coercion method requirement"
+    (changed [first, firstMethod, second] [methodStep, returnStep])
+    expression executableCoercionPolicy fun reason => match reason with
+      | .missingCoercionRequirement actual attached =>
+          actual == secondMethod &&
+            attached == [first, firstMethod, second]
+      | _ => false
+  expectCoercionPolicyError "duplicate coercion method requirement"
+    (changed [first, firstMethod, second] [
+      { methodStep with
+        methodRequirements := [firstMethod, firstMethod] },
+      returnStep
+    ]) expression executableCoercionPolicy fun reason => match reason with
+      | .duplicateCoercionRequirement actual => actual == firstMethod
+      | _ => false
+  let validWithMethods := changed
+    [first, firstMethod, secondMethod, second] [methodStep, returnStep]
+  let expectedMethodRequirements := [first, firstMethod, secondMethod]
+  expectCoercionPolicyError "coercion plan missing method requirement"
+    validWithMethods expression
+      (replaceCoercionPlanRequirements first [first, firstMethod])
+    fun reason => match reason with
+      | .coercionPlanRequirementsMismatch actual expected consumed =>
+          actual == first && expected == expectedMethodRequirements &&
+            consumed == [first, firstMethod]
+      | _ => false
+  expectCoercionPolicyError "coercion plan duplicate method requirement"
+    validWithMethods expression
+      (replaceCoercionPlanRequirements first
+        [first, firstMethod, secondMethod, secondMethod])
+    fun reason => match reason with
+      | .coercionPlanRequirementsMismatch actual expected consumed =>
+          actual == first && expected == expectedMethodRequirements &&
+            consumed == [first, firstMethod, secondMethod, secondMethod]
+      | _ => false
+  expectCoercionPolicyError "coercion plan reordered method requirements"
+    validWithMethods expression
+      (replaceCoercionPlanRequirements first
+        [first, secondMethod, firstMethod])
+    fun reason => match reason with
+      | .coercionPlanRequirementsMismatch actual expected consumed =>
+          actual == first && expected == expectedMethodRequirements &&
+            consumed == [first, secondMethod, firstMethod]
+      | _ => false
+  expectCoercionPolicyError "coercion plan consumed only primary requirement"
+    validWithMethods expression
+      (replaceCoercionPlanRequirements first [first])
+    fun reason => match reason with
+      | .coercionPlanRequirementsMismatch actual expected consumed =>
+          actual == first && expected == expectedMethodRequirements &&
+            consumed == [first]
       | _ => false
   let valid := changed [first, second] [
     { requirement := first, source := .word, target := .bool },

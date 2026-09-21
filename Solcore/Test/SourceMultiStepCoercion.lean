@@ -246,6 +246,53 @@ private def testGenericEdgeSolvesWherePredicate : IO Unit := do
       throw (IO.userError
         s!"unexpected implementation/evidence shape: {implementations.length}/{evidence.length}")
 
+private def testMethodPredicateFailureFallsBackToTwoSteps : IO Unit := do
+  let fixture ← check (String.intercalate "\n" [
+    "trait Allowed<From, To> {}",
+    "trait Coerce<From, To> {",
+    "  function coerce(value: From) returns (To) where From: Allowed<To>;",
+    "}",
+    "impl Allowed<Bool, Unit> {}",
+    "impl Allowed<Unit, Word> {}",
+    "impl Coerce<Bool, Word> {",
+    "  function coerce(value: Bool) returns (Word)",
+    "      where Bool: Allowed<Word> { return 99; }",
+    "}",
+    "impl Coerce<Bool, Unit> {",
+    "  function coerce(value: Bool) returns (Unit)",
+    "      where Bool: Allowed<Unit> { return; }",
+    "}",
+    "impl Coerce<Unit, Word> {",
+    "  function coerce(value: Unit) returns (Word)",
+    "      where Unit: Allowed<Word> { return 7; }",
+    "}",
+    "function accept(value: Word) returns (Word) { return value; }",
+    "function convert(value: Bool) returns (Word) { return accept(value); }"
+  ])
+  let convert ← checkedNamed fixture "convert"
+  let allowed ← namedTrait fixture.environment "Allowed"
+  let coerce ← namedTrait fixture.environment "Coerce"
+  let primaryFirst := coercionPredicate coerce .bool .unit
+  let methodFirst : ProgramPredicate := {
+    trait := allowed
+    subject := .bool
+    arguments := [.unit]
+  }
+  let primarySecond := coercionPredicate coerce .unit .word
+  let methodSecond : ProgramPredicate := {
+    trait := allowed
+    subject := .unit
+    arguments := [.word]
+  }
+  let expected := [primaryFirst, methodFirst, primarySecond, methodSecond]
+  assertTrue (decide (convert.predicates = expected) &&
+      decide (convert.evidence.map SourceInference.PredicateEvidence.goal =
+        expected))
+    "a blocked direct edge did not fall back with primary/method evidence in edge order"
+  assertTrue (convert.evidence.all fun evidence =>
+      evidence matches .implementation _)
+    "the viable two-step coercion did not retain implementation evidence"
+
 private def isExplicitPathAmbiguity : SourceInference.Error → Bool
   | .ambiguousCoercion _ _ _ _ => true
   | _ => false
@@ -355,6 +402,7 @@ def testSourceMultiStepCoercion : IO Unit := do
   testIrrelevantAmbiguousBranchDoesNotBlock
   testAssumptionEdgeRetainsEvidence
   testGenericEdgeSolvesWherePredicate
+  testMethodPredicateFailureFallsBackToTwoSteps
   testAmbiguousDirectPathDoesNotFallBack
   testEqualLengthPathsAreAmbiguous
   testCycleTerminates

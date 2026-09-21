@@ -150,6 +150,13 @@ inductive Error where
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (requirement : RequirementId)
       (expected actual : ProgramPredicate)
+  | coercionMethodRequirementCountMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (primary : RequirementId) (expected actual : Nat)
+  | coercionMethodRequirementPredicateMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
   | runtimeCoercionEvidenceUnresolved
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (requirement : RequirementId) (predicate : ProgramPredicate)
@@ -629,7 +636,7 @@ private def runtimeBinaryResultType (operator : Syntax.BinaryOp)
   if SourceInference.Detail.binaryResultIsBool operator then .bool
   else operandType
 
-private def exactRuntimeCoercionEvidence (caller : SpecializedFunction)
+private def exactRuntimeCoercionPrimaryEvidence (caller : SpecializedFunction)
     (node : ExpressionNode) (step : CoercionStep)
     (available : List PredicateEvidence) :
     Except Error (ProgramPredicate × TypedTraitResolution.Evidence) := do
@@ -645,6 +652,28 @@ private def exactRuntimeCoercionEvidence (caller : SpecializedFunction)
   | .assumption predicate =>
       throw (.runtimeCoercionEvidenceUnresolved caller.key node.id
         step.requirement predicate)
+
+private def exactRuntimeCoercionMethodEvidence
+    (caller : SpecializedFunction) (node : ExpressionNode)
+    (step : CoercionStep) (available : List PredicateEvidence)
+    (predicates : List ProgramPredicate) :
+    Except Error (List TypedTraitResolution.Evidence) := do
+  if step.methodRequirements.length != predicates.length then
+    throw (.coercionMethodRequirementCountMismatch caller.key node.id
+      step.requirement predicates.length step.methodRequirements.length)
+  exactRuntimeMethodEvidenceRows caller node available
+    (fun expected actual =>
+      .coercionMethodRequirementCountMismatch caller.key node.id
+        step.requirement expected actual)
+    (fun requirement expected actual =>
+      .coercionMethodRequirementPredicateMismatch caller.key node.id
+        requirement expected actual)
+    (fun requirement expected actual =>
+      .coercionRequirementEvidenceGoalMismatch caller.key node.id requirement
+        expected actual)
+    (fun requirement predicate =>
+      .runtimeCoercionEvidenceUnresolved caller.key node.id requirement predicate)
+    step.methodRequirements predicates
 
 private abbrev ExecutableMethodElaborator :=
   ExecutableImplMethods.CheckedMethod →
@@ -797,7 +826,7 @@ private def coercionPlan (program : CheckedProgram)
     (node : ExpressionNode) (step : CoercionStep) :
     Except Error (SourceCoreElaboration.CoercionPlan Error) := do
   let (predicate, evidence) ←
-    exactRuntimeCoercionEvidence caller node step available
+    exactRuntimeCoercionPrimaryEvidence caller node step available
   let trait ← match program.signatures.trait? predicate.trait with
     | some trait => pure trait
     | none => throw (.executableImplMethod caller.key node.id
@@ -808,9 +837,13 @@ private def coercionPlan (program : CheckedProgram)
   if predicate.subject != step.source || predicate.arguments != [step.target] then
     throw (.runtimeCoercionPredicateMismatch caller.key node.id
       step.requirement step.source step.target predicate)
+  let methodPredicates ← runtimeMethodPredicates caller node trait predicate
+    2 "coerce"
+  let methodEvidence ← exactRuntimeCoercionMethodEvidence caller node step
+    available methodPredicates
   let method ←
-    (ExecutableImplMethods.checkMethodWithArity program evidence
-      2 "coerce").mapError fun error =>
+    (ExecutableImplMethods.checkMethodWithEvidenceAndArity program evidence
+      methodEvidence 2 "coerce").mapError fun error =>
         .executableImplMethod caller.key node.id error
   let elaborated ← elaborateMethod method
   let sourceType ←
@@ -829,7 +862,7 @@ private def coercionPlan (program : CheckedProgram)
   pure {
     sourceType
     targetType
-    consumedRequirements := [step.requirement]
+    consumedRequirements := step.requirements
     build := fun value =>
       let temporaries := freshTemporaries temporaryOwner temporaryBase 1
       let body := aliasInputs elaborated.inputs temporaries elaborated.resolved

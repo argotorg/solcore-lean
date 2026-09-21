@@ -5637,8 +5637,9 @@ surrounding expected type.  These two forms are type-checking boundaries only;
 no executable read or proxy term is claimed yet.
 Decimal and hexadecimal literals use inference variables and default
 deterministically to Word when unconstrained.  Candidate-local defaulting gives
-Word zero cost, while trait-backed literal interpretations and introduced
-coercion requirements add cost; only minimum-cost overloads compete and equal
+Word zero cost, while trait-backed literal interpretations and selected
+coercion edges add cost.  Each coercion edge costs one regardless of how many
+proof obligations it carries; only minimum-cost overloads compete and equal
 minima remain ambiguous.  Function arguments are fitted independently at the
 source arity, while one tuple-valued argument remains whole.  Expected-type
 mismatches try a direct `Coerce<From, To>` obligation first and then search
@@ -5879,23 +5880,33 @@ fallback keeps primitive Bool negation and short-circuit Bool lowering; an
 ordinary `and` or `or` call uses the target's current eager call behavior.
 
 The first executable conversion profile uses the same selected-method
-authority.  Each output coercion step must name exactly one attached and solved
-requirement whose predicate and evidence goal are exactly
-`Coerce<From, To>` for that edge.  An unresolved assumption rejects unless a
+authority.  Each output coercion step must name exactly one primary attached
+and solved requirement whose predicate and evidence goal are exactly
+`Coerce<From, To>` for that edge, followed by every attached and solved method
+requirement in declaration order.  An unresolved assumption rejects unless a
 unique matching closed implementation witness was forwarded from the caller.
 The selected two-parameter trait and implementation must each contain one
 method named `coerce`.  The selected implementation and method must satisfy the
-same ground-specialized, closed-implementation-predicate profile.  The current
-coercion-edge carrier records only its primary `Coerce<From, To>` requirement,
-so a `coerce` method with additional method predicates is still rejected rather
-than executed without caller evidence.  A premise-free method is checked at one
-`From` input
+same ground-specialized, closed-implementation-predicate profile.  Every edge
+records its primary `Coerce<From, To>` requirement followed by the selected
+`coerce` method's predicates in declaration order.  Inference validates the
+instantiated one-input/one-result signature, admits an edge only when both its
+primary and method obligations are solvable, and allocates identities only
+after selecting the path.  The linker validates the exact ordered predicates
+and canonical witnesses and supplies them to the detached method body.  Empty
+legacy `Coerce` marker traits remain compatible with inference and carry no
+method obligations, while executable linking still requires the named method.
+A method is checked at one `From` input
 and one `To` result and then capture-free inlined; endpoint types validate the
 method but never invent its behavior.  Regressions execute a direct Bool-to-Word
 argument conversion, the same conversion justified by evidence forwarded into
 a generic callee, and a call-result conversion alongside separate proof-only
 signature evidence.  The fixture's method returns `41` or `7`, confirming that
 the selected method body—not a hard-coded endpoint conversion—is executed.
+A constrained companion declares `coerce where From: Eq, From: Marker`,
+forwards both witnesses through a generic conversion wrapper, consumes Eq in
+the detached method body and preserves the `41`/`7` behavior.  Missing,
+reordered, primary-only and duplicate edge-obligation metadata all reject.
 
 Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
 direct-call cycles, seed roots with unresolved assumptions, unconsumed
@@ -5903,8 +5914,8 @@ non-call/operator/literal requirements outside the supported unary, binary and
 conversion profiles and indirect calls reject explicitly.  Other runtime
 operators, implementation parameters not determined by the selected evidence,
 and method-level `where` predicates on profiles without an ordered caller-owned
-evidence carrier—currently including `Coerce.coerce`—remain explicit
-boundaries.  Selected implementation methods now have their own
+evidence carrier remain explicit boundaries.  Selected implementation methods
+now have their own
 finite detached linker.  It reconstructs direct-call metadata against the
 whole-program catalog even when a method-only helper is absent from the
 top-level specialization plan, threads proof evidence into constrained generic
@@ -5943,17 +5954,22 @@ longer block execution, while missing or duplicate named rows reject.  The
 end-to-end Add regression executes `add` from a catalog which also contains
 `tag` and observes the method-authoritative result `91`.
 
-Method-level predicates are executable end to end for the supported unary and
-binary profiles.  The Add regression retains `Add<T>` followed by `Eq<T>` on
+Method-level predicates are executable end to end for the supported unary,
+binary and coercion profiles.  The Add regression retains `Add<T>` followed by
+`Eq<T>` on
 the operator occurrence, validates the closed witnesses in that order, supplies
 the `Eq<Word>` witness to the detached `Add.add` body, and observes `92`.  The
 parallel BitNot regression performs the same flow for `BitNot<T>`, `Eq<T>` and
-`BitNot.bnot`, observing `94`.
+`BitNot.bnot`, observing `94`.  Each conversion edge analogously retains its
+primary witness and ordered `coerce`-method witnesses; coercion search can skip
+an otherwise matching edge whose method obligations are unavailable and use a
+longer viable path, while overload cost remains the number of conversion edges
+rather than the number of proof obligations.
 
 The next frontend boundary is broader implementation shapes—method-level
-predicates for coercions and other profiles which do not yet carry their ordered
-caller obligations, plus generic parameters not recoverable from the current
-evidence language—and additional runtime-evidence profiles.
+predicates for remaining profiles which do not yet carry their ordered caller
+obligations, plus generic parameters not recoverable from the current evidence
+language—and additional runtime-evidence profiles.
 Recursive source calls require
 a separate named or global recursive-function representation rather than cyclic
 inlining.
