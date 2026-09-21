@@ -79,6 +79,16 @@ restricted linking into a reusable checked entry; `run` additionally checks
 the runtime input types and executes it.  This interface performs no automatic
 entry discovery, exposes no multi-root policy, and adds no source Oracle.
 
+The target-compatible numeric-literal foundation has started (ADR-0344).
+`integer` is now a distinct, exact-lowercase, lowest-priority source intrinsic
+which source checking may retain but Semantic Core explicitly rejects.  The
+unbounded numeric decoder also has a separate modulo-Word projection matching
+primitive `wordFromInteger`; the older strict in-range projection remains
+unchanged for its monomorphic adapter.  Builtin `Int` evidence, typed literal
+conversion metadata and end-to-end `Int.fromInteger` execution are the next
+steps, so whole-program inference still retains its temporary
+`FromLiteral`/`Numeric` compatibility behavior.
+
 ## What works now
 
 ### Resolved local-expression semantics

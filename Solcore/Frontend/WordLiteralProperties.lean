@@ -151,4 +151,44 @@ theorem wordLiteralDenotes_span (payload : Syntax.CoreLiteralValue)
     (span otherSpan : Syntax.SourceSpan) (word : Core.Word) :
     WordLiteralDenotes ⟨span, payload⟩ word ↔ WordLiteralDenotes ⟨otherSpan, payload⟩ word := Iff.rfl
 
+theorem interpretWordLiteralModulo?_sound
+    {literal : Syntax.CoreLiteral} {word : Core.Word}
+    (decoded : interpretWordLiteralModulo? literal = some word) :
+    ModuloWordLiteralDenotes literal word := by
+  cases natural : numericLiteralValue? literal.value with
+  | none => simp [interpretWordLiteralModulo?, natural] at decoded
+  | some value =>
+      have equal : Core.Word.ofNatModulo value = word := by
+        simpa [interpretWordLiteralModulo?, natural] using decoded
+      exact ⟨value, numericLiteralValue?_sound natural, equal⟩
+
+theorem interpretWordLiteralModulo?_complete
+    {literal : Syntax.CoreLiteral} {word : Core.Word}
+    (meaning : ModuloWordLiteralDenotes literal word) :
+    interpretWordLiteralModulo? literal = some word := by
+  rcases meaning with ⟨value, natural, equal⟩
+  simp [interpretWordLiteralModulo?, numericLiteralValue?_complete natural, equal]
+
+theorem interpretWordLiteralModulo?_iff
+    {literal : Syntax.CoreLiteral} {word : Core.Word} :
+    interpretWordLiteralModulo? literal = some word ↔
+      ModuloWordLiteralDenotes literal word :=
+  ⟨interpretWordLiteralModulo?_sound, interpretWordLiteralModulo?_complete⟩
+
+theorem interpretWordLiteralModulo?_eq_none_iff
+    {literal : Syntax.CoreLiteral} :
+    interpretWordLiteralModulo? literal = none ↔
+      ¬ ∃ value, NumericLiteralDenotes literal.value value := by
+  simp [interpretWordLiteralModulo?, numericLiteralValue?_eq_none_iff]
+
+theorem interpretWordLiteralModulo?_span (payload : Syntax.CoreLiteralValue)
+    (span otherSpan : Syntax.SourceSpan) :
+    interpretWordLiteralModulo? ⟨span, payload⟩ =
+      interpretWordLiteralModulo? ⟨otherSpan, payload⟩ := rfl
+
+theorem moduloWordLiteralDenotes_span (payload : Syntax.CoreLiteralValue)
+    (span otherSpan : Syntax.SourceSpan) (word : Core.Word) :
+    ModuloWordLiteralDenotes ⟨span, payload⟩ word ↔
+      ModuloWordLiteralDenotes ⟨otherSpan, payload⟩ word := Iff.rfl
+
 end Solcore.Frontend

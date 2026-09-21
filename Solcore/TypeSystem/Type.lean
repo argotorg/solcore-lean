@@ -26,6 +26,7 @@ inductive BuiltinType where
   | unit
   | bool
   | word
+  | integer
   deriving Repr, DecidableEq
 
 /-- The stable identity at the head of a type application. -/
@@ -58,6 +59,10 @@ def unit : Ty := .constructor (.builtin .unit)
 def bool : Ty := .constructor (.builtin .bool)
 
 def word : Ty := .constructor (.builtin .word)
+
+/-- The arbitrary-precision source integer type.  It is staged and therefore
+does not by itself acquire a `Core.Ty` projection. -/
+def integer : Ty := .constructor (.builtin .integer)
 
 /-- Left-associated type application. -/
 def applyMany (head : Ty) (arguments : List Ty) : Ty :=

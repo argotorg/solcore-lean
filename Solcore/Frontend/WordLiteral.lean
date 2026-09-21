@@ -1,6 +1,6 @@
 import Solcore.Frontend.NumericDigits
 import Solcore.Syntax.Literal
-import Solcore.Core.Syntax
+import Solcore.Core.Primitive
 
 /-!
 Standalone mathematical numeric meaning and an explicitly strict Word projection.
@@ -40,8 +40,20 @@ inductive NumericLiteralDenotes : Syntax.CoreLiteralValue → Nat → Prop where
 def interpretWordLiteral? (literal : Syntax.CoreLiteral) : Option Core.Word :=
   (numericLiteralValue? literal.value).bind Core.Word.ofNat?
 
+/-- Convert a well-formed nonnegative integer literal modulo the 256-bit Word
+range.  This is the conversion primitive needed by a future `Int.fromInteger`
+profile; it does not alter the existing strict Word-literal adapter. -/
+def interpretWordLiteralModulo? (literal : Syntax.CoreLiteral) : Option Core.Word :=
+  (numericLiteralValue? literal.value).map Core.Word.ofNatModulo
+
 /-- Strict Word meaning retains exactly the independent natural value. -/
 def WordLiteralDenotes (literal : Syntax.CoreLiteral) (word : Core.Word) : Prop :=
   NumericLiteralDenotes literal.value word.val
+
+/-- Independent meaning of the nonnegative modulo projection. -/
+def ModuloWordLiteralDenotes
+    (literal : Syntax.CoreLiteral) (word : Core.Word) : Prop :=
+  ∃ value, NumericLiteralDenotes literal.value value ∧
+    Core.Word.ofNatModulo value = word
 
 end Solcore.Frontend

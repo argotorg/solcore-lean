@@ -819,6 +819,20 @@ private def testOverflowLiteral : IO Unit := do
   expectError "overflow literal" function (.occurrence expression.occurrence)
     fun reason => reason matches .invalidWordLiteral _
 
+private def testStagedIntegerTypeRejected : IO Unit := do
+  let program ← checkedProgram
+    "function staged(value: integer) returns (integer) { return value; }"
+  let function ← checkedNamed program "staged"
+  let input ← match function.typedBody.inputs with
+    | [input] => pure input
+    | inputs => throw (IO.userError
+        s!"staged integer fixture has {inputs.length} inputs")
+  assertTrue (decide (input.scheme.body = TypeSystem.Ty.integer ∧
+      function.inferredBodyType = TypeSystem.Ty.integer))
+    "integer did not survive source checking as a distinct staged type"
+  expectError "staged integer" function (.binder input.id)
+    fun reason => reason == .unsupportedType TypeSystem.Ty.integer
+
 /-- Exercise the complete first source-to-Core lowering profile and every
 staged boundary that must reject explicitly. -/
 def testSourceCoreElaboration : IO Unit := do
@@ -836,5 +850,6 @@ def testSourceCoreElaboration : IO Unit := do
   testUnsupportedTypesAndDuplicateInputs function
   testTypeMismatchAndUnconsumedRequirement function
   testOverflowLiteral
+  testStagedIntegerTypeRejected
 
 end Tests.SourceCoreElaboration

@@ -103,6 +103,8 @@ theorem modulus_has_a_natural_meaning_but_no_word_meaning :
     NumericLiteralDenotes hexOverflow Core.wordModulus ∧
     interpretWordLiteral? (literal decimalOverflow) = none ∧
     interpretWordLiteral? (literal hexOverflow) = none ∧
+    interpretWordLiteralModulo? (literal decimalOverflow) = some Core.Word.zero ∧
+    interpretWordLiteralModulo? (literal hexOverflow) = some Core.Word.zero ∧
     (¬ ∃ word, WordLiteralDenotes (literal decimalOverflow) word) ∧
     (¬ ∃ word, WordLiteralDenotes (literal hexOverflow) word) := by
   have decimal : numericLiteralValue? decimalOverflow = some Core.wordModulus := by decide
@@ -113,7 +115,22 @@ theorem modulus_has_a_natural_meaning_but_no_word_meaning :
     interpretWordLiteral?_eq_none_of_out_of_range decimalMeaning (Nat.le_refl _)
   have hexRejected : interpretWordLiteral? (literal hexOverflow) = none :=
     interpretWordLiteral?_eq_none_of_out_of_range hexMeaning (Nat.le_refl _)
-  refine ⟨decimal, hexadecimal, decimalMeaning, hexMeaning, decimalRejected, hexRejected, ?_, ?_⟩
+  have modulusWraps :
+      Core.Word.ofNatModulo Core.wordModulus = Core.Word.zero := by
+    apply Fin.ext
+    simp [Core.Word.ofNatModulo, Core.Word.zero]
+  have decimalModulo :
+      interpretWordLiteralModulo? (literal decimalOverflow) =
+        some Core.Word.zero := by
+    apply interpretWordLiteralModulo?_complete
+    exact ⟨Core.wordModulus, decimalMeaning, modulusWraps⟩
+  have hexModulo :
+      interpretWordLiteralModulo? (literal hexOverflow) =
+        some Core.Word.zero := by
+    apply interpretWordLiteralModulo?_complete
+    exact ⟨Core.wordModulus, hexMeaning, modulusWraps⟩
+  refine ⟨decimal, hexadecimal, decimalMeaning, hexMeaning, decimalRejected,
+    hexRejected, decimalModulo, hexModulo, ?_, ?_⟩
   · rintro ⟨word, meaning⟩
     have impossible := interpretWordLiteral?_complete meaning
     rw [decimalRejected] at impossible
@@ -135,12 +152,17 @@ theorem malformed_payloads_have_no_numeric_or_word_meaning
     numericLiteralValue? payload = none ∧
     (¬ ∃ value, NumericLiteralDenotes payload value) ∧
     interpretWordLiteral? ⟨location, payload⟩ = none ∧
+    interpretWordLiteralModulo? ⟨location, payload⟩ = none ∧
     ¬ ∃ word, WordLiteralDenotes ⟨location, payload⟩ word := by
   have allRejected : ∀ candidate ∈ malformed, numericLiteralValue? candidate = none := by decide
   have rejected := allRejected payload present
   have wordRejected : interpretWordLiteral? ⟨location, payload⟩ = none := by
     simp [interpretWordLiteral?, rejected]
-  refine ⟨rejected, numericLiteralValue?_eq_none_iff.mp rejected, wordRejected, ?_⟩
+  have moduloRejected :
+      interpretWordLiteralModulo? ⟨location, payload⟩ = none := by
+    simp [interpretWordLiteralModulo?, rejected]
+  refine ⟨rejected, numericLiteralValue?_eq_none_iff.mp rejected, wordRejected,
+    moduloRejected, ?_⟩
   rintro ⟨word, meaning⟩
   have impossible := interpretWordLiteral?_complete meaning
   rw [wordRejected] at impossible
@@ -149,8 +171,14 @@ theorem malformed_payloads_have_no_numeric_or_word_meaning
 theorem span_changes_do_not_change_interpretation_or_independent_meaning
     (payload : Syntax.CoreLiteralValue) (location otherLocation : Syntax.SourceSpan) (word : Core.Word) :
     interpretWordLiteral? ⟨location, payload⟩ = interpretWordLiteral? ⟨otherLocation, payload⟩ ∧
-    (WordLiteralDenotes ⟨location, payload⟩ word ↔ WordLiteralDenotes ⟨otherLocation, payload⟩ word) :=
+    (WordLiteralDenotes ⟨location, payload⟩ word ↔ WordLiteralDenotes ⟨otherLocation, payload⟩ word) ∧
+    interpretWordLiteralModulo? ⟨location, payload⟩ =
+      interpretWordLiteralModulo? ⟨otherLocation, payload⟩ ∧
+    (ModuloWordLiteralDenotes ⟨location, payload⟩ word ↔
+      ModuloWordLiteralDenotes ⟨otherLocation, payload⟩ word) :=
   ⟨interpretWordLiteral?_span payload location otherLocation,
-    wordLiteralDenotes_span payload location otherLocation word⟩
+    wordLiteralDenotes_span payload location otherLocation word,
+    interpretWordLiteralModulo?_span payload location otherLocation,
+    moduloWordLiteralDenotes_span payload location otherLocation word⟩
 
 end Tests.FrontendWordLiteral

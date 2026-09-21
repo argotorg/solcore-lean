@@ -240,6 +240,8 @@ def lowerType (site : ErrorSite) : Ty → Except Error Core.Ty
   | .constructor (.builtin .unit) => .ok .unit
   | .constructor (.builtin .bool) => .ok .bool
   | .constructor (.builtin .word) => .ok .word
+  | type@(.constructor (.builtin .integer)) =>
+      fail site (.unsupportedType type)
   | .constructor (.declaration id) => fail site (.nominalType id)
   | .product left right => do
       pure (.product (← lowerType site left) (← lowerType site right))

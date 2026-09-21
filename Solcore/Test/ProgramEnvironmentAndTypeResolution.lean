@@ -28,6 +28,12 @@ private def parsed (origin : Syntax.SourceOrigin) (path content : String) :
           s!"{path}: source diagnostics: {reprStr output.lexicalDiagnostics}; {reprStr output.parseDiagnostics}")
       pure output.parsed
 
+private def build (sources : List Syntax.ParsedFile) : IO ProgramEnvironment := do
+  match buildProgramEnvironment sources with
+  | .ok environment => pure environment
+  | .error errors =>
+      throw (IO.userError s!"program environment failed: {reprStr errors}")
+
 private def environment : IO ProgramEnvironment := do
   let types ← parsed .main "types.solc" (String.intercalate "\n" [
     "enum Box<T> { Wrap(T) }",
@@ -35,7 +41,9 @@ private def environment : IO ProgramEnvironment := do
     "type Identity(T) = T;",
     "type Applied(T) = T<Word>;",
     "type Local = Box<Word>;",
-    "type Callable = function(Box<Word>) returns (Bool);"
+    "type Callable = function(Box<Word>) returns (Bool);",
+    "type IntegerBuiltin = integer;",
+    "type AppliedInteger = integer<Word>;"
   ])
   let models ← parsed .main "models.solc" (String.intercalate "\n" [
     "type Qualified = types.Box<Bool>;",
@@ -43,14 +51,12 @@ private def environment : IO ProgramEnvironment := do
     "type External = dep.containers.Remote;",
     "type Tupled = (unit, Bool, Word);",
     "type WrongArity = Box;",
-    "type MissingAlias = Missing;"
+    "type MissingAlias = Missing;",
+    "type CapitalInteger = Integer;"
   ])
   let dependency ← parsed (.external "dep") "containers.solc"
     "enum Remote { One }"
-  match buildProgramEnvironment [types, models, dependency] with
-  | .ok result => pure result
-  | .error errors =>
-      throw (IO.userError s!"environment rejected valid sources: {reprStr errors}")
+  build [types, models, dependency]
 
 private def declaration (environment : ProgramEnvironment)
     (modulePath name : String) : IO ProgramDeclaration := do
@@ -108,6 +114,9 @@ private def testSuccessfulResolution : IO Unit := do
   assertTrue (decide (callable = .function
       (TypeSystem.Ty.nominal box.id [.word]) .bool))
     "function type did not resolve structurally"
+  let integer ← resolvedAlias environment "types" "IntegerBuiltin"
+  assertTrue (decide (integer = TypeSystem.Ty.integer))
+    "the lowercase integer intrinsic did not resolve"
 
 private def expectResolutionFailures : IO Unit := do
   let environment ← environment
@@ -138,6 +147,62 @@ private def expectResolutionFailures : IO Unit := do
   | .error (.duplicateGenericParameter "T" 0 1) => pure ()
   | result => throw (IO.userError
       s!"duplicate generic result changed: {reprStr result}")
+  let appliedInteger ← declaration environment "types" "AppliedInteger"
+  let appliedIntegerSource ← aliasValue appliedInteger
+  match resolveProgramTypeExpr environment (.ofDeclaration appliedInteger)
+      appliedIntegerSource with
+  | .error (.typeArityMismatch ["integer"] 0 1) => pure ()
+  | result => throw (IO.userError
+      s!"applied integer result changed: {reprStr result}")
+  let capitalInteger ← declaration environment "models" "CapitalInteger"
+  let capitalIntegerSource ← aliasValue capitalInteger
+  match resolveProgramTypeExpr environment (.ofDeclaration capitalInteger)
+      capitalIntegerSource with
+  | .error (.unknownTypeName ["Integer"]) => pure ()
+  | result => throw (IO.userError
+      s!"uppercase Integer unexpectedly became intrinsic: {reprStr result}")
+
+private def testIntegerFallbackPriority : IO Unit := do
+  let localSource ← parsed .main "local_integer.solc"
+    "enum integer { Only } type Use = integer;"
+  let localEnvironment ← build [localSource]
+  let localInteger ← declaration localEnvironment "local_integer" "integer"
+  let localUse ← resolvedAlias localEnvironment "local_integer" "Use"
+  assertTrue (decide (localUse = TypeSystem.Ty.nominal localInteger.id []))
+    "a local integer declaration did not shadow the intrinsic"
+
+  let exportedSource ← parsed .main "exported_integer.solc"
+    "export {*}; enum integer { Only }"
+  let importedConsumer ← parsed .main "imported_integer.solc"
+    "import * from exported_integer; type Use = integer;"
+  let importedEnvironment ← build [exportedSource, importedConsumer]
+  let importedInteger ← declaration importedEnvironment
+    "exported_integer" "integer"
+  let importedUse ← resolvedAlias importedEnvironment
+    "imported_integer" "Use"
+  assertTrue (decide (importedUse = TypeSystem.Ty.nominal importedInteger.id []))
+    "a visible imported integer declaration did not shadow the intrinsic"
+
+  let globalSource ← parsed .main "global_integer.solc"
+    "enum integer { Only }"
+  let globalConsumer ← parsed .main "global_consumer.solc"
+    "type Use = integer;"
+  let globalEnvironment ← build [globalSource, globalConsumer]
+  let globalInteger ← declaration globalEnvironment "global_integer" "integer"
+  let globalUse ← resolvedAlias globalEnvironment "global_consumer" "Use"
+  assertTrue (decide (globalUse = TypeSystem.Ty.nominal globalInteger.id []))
+    "the no-import global integer compatibility lookup lost priority"
+
+  let unrelatedImport ← parsed .main "unrelated.solc"
+    "export {*}; enum Visible { Only }"
+  let isolatedConsumer ← parsed .main "isolated_integer.solc"
+    "import * from unrelated; type Use = integer;"
+  let isolatedEnvironment ← build
+    [globalSource, unrelatedImport, isolatedConsumer]
+  let isolatedUse ← resolvedAlias isolatedEnvironment
+    "isolated_integer" "Use"
+  assertTrue (decide (isolatedUse = TypeSystem.Ty.integer))
+    "an unimported integer declaration incorrectly hid the intrinsic"
 
 private def expectEnvironmentFailures : IO Unit := do
   let duplicate ← parsed .main "duplicate.solc"
@@ -179,6 +244,7 @@ end ProgramEnvironmentAndTypeResolution
 def testProgramEnvironmentAndTypeResolution : IO Unit := do
   ProgramEnvironmentAndTypeResolution.testSuccessfulResolution
   ProgramEnvironmentAndTypeResolution.expectResolutionFailures
+  ProgramEnvironmentAndTypeResolution.testIntegerFallbackPriority
   ProgramEnvironmentAndTypeResolution.expectEnvironmentFailures
 
 end Tests

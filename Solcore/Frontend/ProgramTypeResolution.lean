@@ -4,10 +4,11 @@ import Solcore.TypeSystem.Type
 /-!
 Executable whole-program resolution of canonical source type expressions.
 
-Unqualified names prefer a generic parameter, then a builtin, then the current
-module, and then imported public entities.  Imported namespace paths traverse
-public module re-exports.  The no-import and explicit canonical-path fallbacks
-remain as the initial-profile compatibility boundary.
+Unqualified names prefer a generic parameter, then the legacy builtins, then
+the current module, and then imported public entities.  The exact lowercase
+`integer` intrinsic is a final fallback after user-defined types.  Imported
+namespace paths traverse public module re-exports.  The no-import and explicit
+canonical-path fallbacks remain as the initial-profile compatibility boundary.
 -/
 
 set_option autoImplicit false
@@ -125,6 +126,20 @@ private def uniqueDeclaredType
   | declarations =>
       .error (.ambiguousTypeName components (declarations.map (·.id)))
 
+/-- Resolve the staged integer intrinsic after the caller has exhausted every
+user-defined type visible at the current lookup boundary. -/
+private def resolveIntegerFallback
+    (components : List String) (name : String)
+    (arguments : List TypeSystem.Ty) :
+    Except ProgramTypeResolutionError TypeSystem.Ty :=
+  if name = "integer" then
+    if arguments.isEmpty then
+      .ok TypeSystem.Ty.integer
+    else
+      .error (.typeArityMismatch components 0 arguments.length)
+  else
+    .error (.unknownTypeName components)
+
 private def resolveNamedProgramType
     (environment : ProgramEnvironment) (scope : ProgramTypeScope)
     (components : List String) (arguments : List TypeSystem.Ty) :
@@ -154,10 +169,14 @@ private def resolveNamedProgramType
                       match visibility.typesNamed name with
                       | [] =>
                           if visibility.hasImports then
-                            .error (.unknownTypeName components)
+                            resolveIntegerFallback components name arguments
                           else
-                            uniqueDeclaredType components arguments
-                              (environment.typesNamed name)
+                            match environment.typesNamed name with
+                            | [] =>
+                                resolveIntegerFallback components name arguments
+                            | globalCandidates =>
+                                uniqueDeclaredType components arguments
+                                  globalCandidates
                       | importedCandidates =>
                           uniqueDeclaredType components arguments
                             importedCandidates

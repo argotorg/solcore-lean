@@ -61,6 +61,16 @@ execution.  Checking fuel, specialization budget and execution fuel remain
 independent.  Automatic entry discovery, multiple public roots and a source
 Oracle remain later policies rather than being guessed by this API.
 
+ADR-0344 begins the target-compatible numeric-literal path without changing
+the current executable compatibility profile.  The exact lowercase
+`integer` intrinsic is a distinct staged source type at the lowest lookup
+priority and is rejected if it reaches runtime Core.  A separate modulo-Word
+projection now matches primitive `wordFromInteger`, while the older strict
+Word projection remains scoped to its monomorphic adapter.  Collision-free
+builtin `Int` evidence and retained `Int.fromInteger` conversion metadata are
+the next dependency before whole-program literal execution can switch away
+from `FromLiteral`/`Numeric`.
+
 This is an executable-first milestone rather than a completed proof campaign.
 The first typed-carrier step now assigns contiguous function-local identities to
 obligations and preserves each identity with its normalized predicate and
