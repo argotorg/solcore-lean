@@ -1332,13 +1332,14 @@ private def buildDetachedDraftFuel (program : CheckedProgram)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
     (visiting : List SpecializationKey)
     (assumptionEvidence : List PredicateEvidence)
-    (validateIncoming : Bool) (fuel : Nat)
+    (allowComptimeContract validateIncoming : Bool) (fuel : Nat)
     (specialized : SpecializedFunction) :
     Except Error SourceCoreElaboration.BodyDraft :=
   let parameterComptime :=
     specialized.function.typedBody.inputs.map (·.comptime)
-  if (parameterComptime.any fun marked => marked) ||
-      specialized.function.returnComptime then
+  if !allowComptimeContract &&
+      ((parameterComptime.any fun marked => marked) ||
+        specialized.function.returnComptime) then
     .error (.detachedComptimeUnsupported specialized.key parameterComptime
       specialized.function.returnComptime)
   else if visiting.contains specialized.key then
@@ -1361,7 +1362,7 @@ private def buildDetachedDraftFuel (program : CheckedProgram)
                 SourceCoreElaboration.ElaboratedFunction := do
               let draft ← buildDetachedDraftFuel program temporaryOwner
                 temporaryBase (specialized.key :: visiting) methodEvidence false
-                remaining methodSpecialized
+                false remaining methodSpecialized
               draft.finalizeWith Error.sourceCore
             match result with
             | .ok elaborated => pure elaborated
@@ -1387,8 +1388,8 @@ private def buildDetachedDraftFuel (program : CheckedProgram)
             validateRuntimeCallBoundary specialized node arguments
               resolvedCallee
             let calleeDraft ← buildDetachedDraftFuel program temporaryOwner
-              temporaryBase (specialized.key :: visiting) calleeEvidence true
-              remaining resolvedCallee
+              temporaryBase (specialized.key :: visiting) calleeEvidence false
+              true remaining resolvedCallee
             let loweredCallee ← calleeDraft.finalizeWith Error.sourceCore
             if loweredCallee.inputs.length != arguments.length then
               throw (.argumentArityMismatch node.id loweredCallee.inputs.length
@@ -1427,7 +1428,8 @@ private def buildDetachedDraftFuel (program : CheckedProgram)
           specialized.function
 termination_by fuel
 
-private def elaborateDetachedMethod (program : CheckedProgram)
+private def elaborateDetachedMethodWithContract
+    (allowComptimeContract : Bool) (program : CheckedProgram)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
     (caller : SpecializedFunction) (visiting : List SpecializationKey)
     (fuel : Nat) (occurrence : ExpressionId)
@@ -1437,13 +1439,26 @@ private def elaborateDetachedMethod (program : CheckedProgram)
   let available := availableMethodAssumptionEvidence program method
   let result : Except Error SourceCoreElaboration.ElaboratedFunction := do
     let draft ← buildDetachedDraftFuel program temporaryOwner temporaryBase
-      (caller.key :: visiting) available false fuel specialized
+      (caller.key :: visiting) available allowComptimeContract false fuel
+      specialized
     draft.finalizeWith Error.sourceCore
   match result with
   | .ok elaborated => pure elaborated
   | .error (.sourceCore error) =>
       .error (.implMethodSourceCore caller.key occurrence method.id error)
   | .error error => .error error
+
+/-- Ordinary runtime evidence never treats a method's `comptime` contract as
+erasable. -/
+private def elaborateDetachedMethod :=
+  elaborateDetachedMethodWithContract false
+
+/-- Staged evidence may erase the selected method root's `comptime` contract
+because its operands are already closed staged values and its result is checked
+again at the staged carrier boundary.  Nested detached methods and function
+calls retain the ordinary rejection boundary. -/
+private def elaborateDetachedStagedMethod :=
+  elaborateDetachedMethodWithContract true
 
 mutual
 
@@ -1534,18 +1549,18 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
                 node callee instantiation
             onStagedValueCoercion := fun node step =>
               stagedValueCoercionPlan program temporaryOwner temporaryBase
-                (elaborateDetachedMethod program temporaryOwner temporaryBase
-                  specialized visiting remaining node.id)
+                (elaborateDetachedStagedMethod program temporaryOwner
+                  temporaryBase specialized visiting remaining node.id)
                 specialized assumptionEvidence node step
             onStagedValueRequiredUnary := fun node operator _ =>
               stagedValueRequiredUnaryPlan program temporaryOwner temporaryBase
-                (elaborateDetachedMethod program temporaryOwner temporaryBase
-                  specialized visiting remaining node.id)
+                (elaborateDetachedStagedMethod program temporaryOwner
+                  temporaryBase specialized visiting remaining node.id)
                 specialized assumptionEvidence node operator
             onStagedValueRequiredBinary := fun node _ operator _ =>
               stagedValueRequiredBinaryPlan program temporaryOwner temporaryBase
-                (elaborateDetachedMethod program temporaryOwner temporaryBase
-                  specialized visiting remaining node.id)
+                (elaborateDetachedStagedMethod program temporaryOwner
+                  temporaryBase specialized visiting remaining node.id)
                 specialized assumptionEvidence node operator
           }
           (fun _ node operator _ =>
@@ -1616,18 +1631,18 @@ private def evaluateStagedValueFunctionFuel (program : CheckedProgram)
               node callee instantiation)
           (fun node step =>
             stagedValueCoercionPlan program temporaryOwner temporaryBase
-              (elaborateDetachedMethod program temporaryOwner temporaryBase
-                specialized visiting remaining node.id)
+              (elaborateDetachedStagedMethod program temporaryOwner
+                temporaryBase specialized visiting remaining node.id)
               specialized assumptionEvidence node step)
           (fun node operator _ =>
             stagedValueRequiredUnaryPlan program temporaryOwner temporaryBase
-              (elaborateDetachedMethod program temporaryOwner temporaryBase
-                specialized visiting remaining node.id)
+              (elaborateDetachedStagedMethod program temporaryOwner
+                temporaryBase specialized visiting remaining node.id)
               specialized assumptionEvidence node operator)
           (fun node _ operator _ =>
             stagedValueRequiredBinaryPlan program temporaryOwner temporaryBase
-              (elaborateDetachedMethod program temporaryOwner temporaryBase
-                specialized visiting remaining node.id)
+              (elaborateDetachedStagedMethod program temporaryOwner
+                temporaryBase specialized visiting remaining node.id)
               specialized assumptionEvidence node operator)
           specialized arguments
 termination_by fuel
