@@ -114,7 +114,7 @@ unrelated or merely co-located literals are not admitted, and visible operator
 catalogs remain authoritative.  Signed compile-time `integer` evaluation and
 custom builtin `Int` execution remain later except for the closed direct
 integer/Word conversion, arithmetic, and comparison trees implemented by
-ADR-0349 through ADR-0352.
+ADR-0349 through ADR-0353.
 
 ADR-0348 connects the first pattern slice to that carrier architecture.
 Terminal single-scrutinee matches retain ordered numeric-pattern builtin-`Int`
@@ -164,6 +164,17 @@ ADR-0352 completes the pinned seven-function integer compiler catalog with
 as nonnegative `Int`.  Runtime Word locals, general Word operators, and ordinary
 Word-returning calls remain outside the staging purity boundary.  Cross-domain
 cycles terminate under the shared decreasing fuel.
+
+ADR-0353 connects expression conditionals to that closed evaluator family.
+An exact closed Bool guard and both exact integer or Word branches are evaluated
+eagerly in guard/then/else order, even when the guard already determines which
+value will be selected.  This retains the pinned reference `MastCond` policy of
+visiting every child and preserves all three requirement streams, while the
+Lean closed boundary additionally selects the resulting host `Int` or Word
+value.  Runtime-dependent or malformed unselected branches still reject, and
+ordinary runtime conditionals retain Core `ifE` meaning.  The next ADR adds an
+environment for let-bound staged values and local references; parameters,
+ordinary calls, recursion, and general `comptime<T>` evaluation remain later.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,

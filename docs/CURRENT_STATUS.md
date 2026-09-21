@@ -106,7 +106,7 @@ implementation execution remains a later boundary.
 
 Direct bare `wordFromInteger`, `wordToInteger`, `integerAdd`, `integerSub`,
 `integerMul`, `integerEq`, and `integerLt` compiler functions now provide the
-closed numeric staging slice (ADR-0349–0352).  They have collision-free builtin
+closed numeric staging slice (ADR-0349–0353).  They have collision-free builtin
 identities, derive exact lookup from one ordered supported catalog, and are
 selected only after local and visible source functions fail to supply any
 same-name candidate.  Source Core evaluates a closed
@@ -117,6 +117,11 @@ applying modulo.  A separate closed Word evaluator admits exact `Int<Word>`
 literals, groups, and nested `wordFromInteger`, then `wordToInteger` exposes the
 canonical unsigned Word payload as a nonnegative `Int`.  Runtime-dependent
 staged trees and every surviving `integer` value still reject explicitly.
+Closed staged conditionals now evaluate their Bool guard and both integer or
+Word branches eagerly in source order, preserve all three requirement streams,
+and select a value only after every child succeeds.  Ordinary runtime
+conditionals remain Core conditionals; let-bound staged values are the next
+vertical slice.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5831,7 +5836,16 @@ A mutually fuel-bounded closed Word evaluator additionally accepts
 `wordFromInteger`.  `wordToInteger` converts that canonical unsigned Word to a
 nonnegative Lean `Int`; it does not sign-extend, so converting a Word produced
 from `-1` yields `2^256 - 1`.  Runtime Word locals, general Word operators, and
-ordinary Word-returning calls remain outside this staging boundary.
+ordinary Word-returning calls remain outside this staging boundary.  The
+integer and Word evaluators now also accept exact closed expression
+conditionals.  A closed Bool evaluator validates builtin constants, integer
+comparisons, transparent groups, and nested Bool conditionals; staging then
+evaluates the guard, then branch, and else branch eagerly, preserves consumed
+requirements in that order, and selects the integer or Word value only after
+all three succeed.  This follows the pinned `MastCond` all-children evaluation
+boundary while adding value selection for the closed fragment.  It does not
+fold ordinary runtime Core conditionals.  Let-bound staged values and local
+references remain the next staging slice.
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
 requirements even after an early wildcard, and build one hidden let followed by
