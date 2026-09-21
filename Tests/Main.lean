@@ -1278,6 +1278,8 @@ import Solcore.Test.SourcePatternMatching
 import Solcore.Test.SourcePatternMatchingTamper
 import Solcore.Test.SourceStagedIntegerIntrinsics
 import Solcore.Test.SourceStagedIntegerIntrinsicsTamper
+import Solcore.Test.SourceStagedConditionals
+import Solcore.Test.SourceStagedConditionalsTamper
 
 set_option autoImplicit false
 
@@ -6071,6 +6073,8 @@ def staticSemanticsSpineTests : IO Unit := do
   SourcePatternMatchingTamper.testSourcePatternMatchingTamper
   SourceStagedIntegerIntrinsics.testSourceStagedIntegerIntrinsics
   SourceStagedIntegerIntrinsicsTamper.testSourceStagedIntegerIntrinsicsTamper
+  SourceStagedConditionals.testSourceStagedConditionals
+  SourceStagedConditionalsTamper.testSourceStagedConditionalsTamper
 
 def run : IO Unit := do
   coreLocalFragmentPairBoundaryTests

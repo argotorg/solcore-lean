@@ -964,13 +964,16 @@ private def testRuntimeBoundaryRejections : IO Unit := do
             "runtime-dependent fixture lost wordFromInteger call")
     | none => throw (IO.userError
         "runtime-dependent fixture lost its return expression")
+  let guard ← match dependent.typedBody.lookupExpression? argument with
+    | some { form := .conditional guard _ _, .. } => pure guard
+    | node => throw (IO.userError
+        s!"runtime-dependent fixture lost its conditional guard: {reprStr node}")
   match SourceCoreElaboration.elaborateFunction dependent with
   | .ok _ => throw (IO.userError
       "runtime-dependent staged conditional reached Semantic Core")
   | .error error =>
-      assertTrue (decide (error.site =
-          .occurrence argument.occurrence ∧
-          error.reason = .stagedIntegerExpressionNotClosed))
+      assertTrue (decide (error.site = .occurrence guard.occurrence ∧
+          error.reason = .stagedBoolExpressionNotClosed))
         s!"runtime-dependent staged conditional produced the wrong error: {reprStr error}"
 
   let leakingProgram ← checkedProgram
@@ -1093,13 +1096,18 @@ private def testRuntimeBoundaryRejections : IO Unit := do
     | dependentArgument :: _ => pure dependentArgument
     | [] => throw (IO.userError
         "runtime-dependent comparison lost its first argument")
+  let comparisonGuard ←
+    match comparison.typedBody.lookupExpression? dependentArgument with
+    | some { form := .conditional guard _ _, .. } => pure guard
+    | node => throw (IO.userError
+        s!"runtime-dependent comparison lost its guard: {reprStr node}")
   match SourceCoreElaboration.elaborateFunction comparison with
   | .ok _ => throw (IO.userError
       "runtime-dependent staged comparison reached Semantic Core")
   | .error error =>
       assertTrue (decide (error.site =
-          .occurrence dependentArgument.occurrence ∧
-          error.reason = .stagedIntegerExpressionNotClosed))
+          .occurrence comparisonGuard.occurrence ∧
+          error.reason = .stagedBoolExpressionNotClosed))
         s!"runtime-dependent comparison produced the wrong error: {reprStr error}"
 
 /-- Exercise exact signed staging, modulo projection, builtin identity,
