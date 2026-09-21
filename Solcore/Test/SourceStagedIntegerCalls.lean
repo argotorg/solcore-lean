@@ -414,9 +414,13 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
   ]
   match prepare (workspace markedRuntimeResult) (Seed.named moduleId "main")
       (limits 2) with
-  | .error (.linking (.runtimeCallComptimeResult _ _ _)) => pure ()
-  | result => throw (IO.userError
-      s!"comptime result crossed runtime call lowering: {reprStr result}")
+  | .ok prepared =>
+      assertTrue (decide (prepared.inputTypes = [] ∧
+          prepared.entry.elaborated.resolved = .word seven ∧
+          prepared.run? [] 64 = some (.done (.word seven) [])))
+        "marked Word result was not materialized as a closed Core constant"
+  | .error error => throw (IO.userError
+      s!"marked Word result was not materialized: {reprStr error}")
 
 private def expectRecursiveCall (label source root expected : String)
     (budget : Nat) : IO Unit := do

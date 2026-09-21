@@ -195,6 +195,12 @@ inductive Error where
   | stagedIntegerCallPredicatesUnsupported
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (predicates : List ProgramPredicate)
+  | stagedValueCallPredicatesUnsupported
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (predicates : List ProgramPredicate)
+  | stagedValueCallResultNotComptime
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (callee : SpecializationKey)
   | runtimeRootComptimeParameter
       (key : SpecializationKey) (index : Nat) (binder : Resolved.LocalId)
   | runtimeRootComptimeResult (key : SpecializationKey)
@@ -558,6 +564,10 @@ private def exactCallRequirementEvidence (caller : SpecializedFunction)
 private abbrev StagedIntegerCalleeEvaluator :=
   SpecializationKey → List PredicateEvidence → List Int → Except Error Int
 
+private abbrev StagedValueCalleeEvaluator :=
+  SpecializationKey → List PredicateEvidence →
+    List SourceStagedValue.Value → Except Error SourceStagedValue.Value
+
 /-- Validate one integer-valued direct call against the canonical plan before
 Source Core evaluates any argument.  The returned closure crosses the function
 boundary with values only: the callee reconciles its own requirement ledger. -/
@@ -604,6 +614,61 @@ private def stagedIntegerCallPlan (program : CheckedProgram) (plan : Plan)
   pure {
     argumentTypes := resolvedCallee.function.typedBody.inputs.map fun binder =>
       binder.scheme.body
+    consumedRequirements := node.requirements
+    invoke := invokeCallee resolvedCallee.key calleeEvidence
+  }
+
+/-- Validate one Core-representable staged direct call against the canonical
+specialization plan before Source Core evaluates any argument.  The callee
+reconciles its own requirement ledger and crosses this boundary with a value
+only. -/
+private def stagedValueCallPlan (program : CheckedProgram) (plan : Plan)
+    (caller : SpecializedFunction) (available : List PredicateEvidence)
+    (invokeCallee : StagedValueCalleeEvaluator)
+    (node : ExpressionNode) (callee : ExpressionId)
+    (instantiation : DeclarationInstantiation) :
+    Except Error (SourceCoreElaboration.StagedValueCallPlan Error) := do
+  let calleeEvidence ← exactCallRequirementEvidence caller node available
+    instantiation
+  unless instantiation.predicates.isEmpty do
+    throw (.stagedValueCallPredicatesUnsupported caller.key node.id
+      instantiation.predicates)
+  let edge ← exactCallEdge plan caller.key node.id
+  let resolvedCallee ←
+    (SourceSpecializationWorklist.resolveRequest program {
+      declaration := instantiation.declaration
+      parameterSubstitution := instantiation.parameterSubstitution
+    }).mapError (fun error => Error.malformedCall error)
+  validateCallComptimeMetadata node instantiation resolvedCallee
+  unless resolvedCallee.function.returnComptime do
+    throw (.stagedValueCallResultNotComptime caller.key node.id
+      resolvedCallee.key)
+  if edge.callee != resolvedCallee.key then
+    throw (.callEdgeCalleeMismatch caller.key node.id edge.callee
+      resolvedCallee.key)
+  let plannedCallee ← exactSpecialization plan edge.callee
+  if plannedCallee != resolvedCallee then
+    throw (.nonCanonicalSpecialization edge.callee)
+  let calleeNode ← match caller.function.typedBody.lookupExpression? callee with
+    | some calleeNode => pure calleeNode
+    | none => throw (.malformedCall (.missingCalleeNode node.id callee))
+  unless calleeNode.requirements.isEmpty do
+    throw (.sourceCore {
+      site := .occurrence callee.occurrence
+      reason := .requirementsPresent calleeNode.requirements
+    })
+  unless calleeNode.coercions.isEmpty do
+    throw (.sourceCore {
+      site := .occurrence callee.occurrence
+      reason := .coercionsPresent calleeNode.coercions
+    })
+  match calleeNode.form with
+  | .reference _ (.declaration _) => pure ()
+  | _ => throw (.malformedCall (.calleeNotDeclarationReference node.id callee))
+  pure {
+    argumentTypes := resolvedCallee.function.typedBody.inputs.map fun binder =>
+      binder.scheme.body
+    resultType := resolvedCallee.function.inferredBodyType
     consumedRequirements := node.requirements
     invoke := invokeCallee resolvedCallee.key calleeEvidence
   }
@@ -1217,7 +1282,7 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
         let specialized ← exactSpecialization plan key
         validateAssumptionEvidence specialized.key specialized.assumptions
           assumptionEvidence
-        SourceCoreElaboration.lowerFunctionBodyWithRuntimeAndStagedPolicies
+        SourceCoreElaboration.lowerSpecializedFunctionBodyWithRuntimeAndStagedPolicies
           Error.sourceCore
           (fun _ node _ arguments resolution => do
             let instantiation ← match resolution with
@@ -1275,6 +1340,16 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
                   (key :: visiting) calleeEvidence remaining calleeKey
                   arguments)
               node callee instantiation)
+          {
+            analysis := specialized.stageAnalysis
+            onStagedValueCall := fun node callee _ instantiation =>
+              stagedValueCallPlan program plan specialized assumptionEvidence
+                (fun calleeKey calleeEvidence arguments =>
+                  evaluateStagedValueFunctionFuel program plan
+                    (key :: visiting) calleeEvidence remaining calleeKey
+                    arguments)
+                node callee instantiation
+          }
           (fun _ node operator _ =>
             requiredUnaryPlan program temporaryOwner temporaryBase
               (elaborateDetachedMethod program temporaryOwner temporaryBase
@@ -1290,7 +1365,7 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
               (elaborateDetachedMethod program temporaryOwner temporaryBase
                 specialized visiting remaining node.id)
               specialized assumptionEvidence node step)
-          specialized.function
+          specialized
 termination_by fuel
 
 private def evaluateStagedIntegerFunctionFuel (program : CheckedProgram)
@@ -1315,6 +1390,31 @@ private def evaluateStagedIntegerFunctionFuel (program : CheckedProgram)
                   (key :: visiting) calleeEvidence remaining calleeKey values)
               node callee instantiation)
           specialized.function arguments
+termination_by fuel
+
+private def evaluateStagedValueFunctionFuel (program : CheckedProgram)
+    (plan : Plan) (visiting : List SpecializationKey)
+    (assumptionEvidence : List PredicateEvidence) (fuel : Nat)
+    (key : SpecializationKey) (arguments : List SourceStagedValue.Value) :
+    Except Error SourceStagedValue.Value :=
+  if visiting.contains key then
+    .error (.recursiveCallCycle key)
+  else
+    match fuel with
+    | 0 => .error (.linkDepthLimit key)
+    | remaining + 1 => do
+        let specialized ← exactSpecialization plan key
+        validateAssumptionEvidence specialized.key specialized.assumptions
+          assumptionEvidence
+        SourceCoreElaboration.evaluateStagedValueFunctionWith
+          Error.sourceCore
+          (fun node callee _ instantiation =>
+            stagedValueCallPlan program plan specialized assumptionEvidence
+              (fun calleeKey calleeEvidence values =>
+                evaluateStagedValueFunctionFuel program plan
+                  (key :: visiting) calleeEvidence remaining calleeKey values)
+              node callee instantiation)
+          specialized arguments
 termination_by fuel
 
 end
