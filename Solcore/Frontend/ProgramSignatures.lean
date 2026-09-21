@@ -24,6 +24,7 @@ def spelling : BuiltinFunctionId → String
   | .integerAdd => "integerAdd"
   | .integerEq => "integerEq"
   | .integerLt => "integerLt"
+  | .integerMul => "integerMul"
 
 /-- Exact compiler-function spellings remain pairwise distinct. -/
 theorem all_spellings_nodup : (all.map spelling).Nodup := by
@@ -35,7 +36,8 @@ def parameterTypes : BuiltinFunctionId → List TypeSystem.Ty
   | .wordFromInteger => [TypeSystem.Ty.integer]
   | .integerAdd
   | .integerEq
-  | .integerLt => [TypeSystem.Ty.integer, TypeSystem.Ty.integer]
+  | .integerLt
+  | .integerMul => [TypeSystem.Ty.integer, TypeSystem.Ty.integer]
 
 /-- Fixed source result type of one compiler-provided function. -/
 def returnType : BuiltinFunctionId → TypeSystem.Ty
@@ -44,6 +46,7 @@ def returnType : BuiltinFunctionId → TypeSystem.Ty
   | .integerAdd => TypeSystem.Ty.integer
   | .integerEq
   | .integerLt => TypeSystem.Ty.bool
+  | .integerMul => TypeSystem.Ty.integer
 
 /-- Exact monomorphic function type of one compiler-provided function. -/
 def type (function : BuiltinFunctionId) : TypeSystem.Ty :=

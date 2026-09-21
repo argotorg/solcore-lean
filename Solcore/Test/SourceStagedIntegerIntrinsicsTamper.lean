@@ -560,15 +560,16 @@ private def binaryFixture (content : String)
             s!"{expected.spelling} fixture lost its valued return")
     | roots => throw (IO.userError
         s!"{expected.spelling} fixture retained {roots.length} roots")
-  let call ← if expected = .integerAdd then
+  let call ← if (expected == .integerAdd) || (expected == .integerMul) then
       match function.typedBody.lookupExpression? root with
       | some node =>
           match node.form with
           | .call _ [argument] (.builtinFunction .wordFromInteger) =>
               pure argument
           | _ => throw (IO.userError
-              "integerAdd fixture lost its wordFromInteger boundary")
-      | none => throw (IO.userError "integerAdd fixture lost its root")
+              s!"{expected.spelling} fixture lost its wordFromInteger boundary")
+      | none => throw (IO.userError
+          s!"{expected.spelling} fixture lost its root")
     else
       pure root
   let (callee, left, right) ←
@@ -615,7 +616,8 @@ private def withBinaryExpression (fixture : BinaryFixture)
 private def expectBinaryErrorAt (fixture : BinaryFixture) (label : String)
     (function : CheckedFunction) (site : SourceCoreElaboration.ErrorSite)
     (accept : SourceCoreElaboration.ErrorReason → Bool) : IO Unit := do
-  if fixture.functionId = .integerAdd then
+  if (fixture.functionId == .integerAdd) ||
+      (fixture.functionId == .integerMul) then
     expectEvaluationErrorAt label function fixture.call site accept
   else
     expectElaborationErrorAt label function site accept
@@ -624,6 +626,7 @@ private def mismatchedBuiltin : BuiltinFunctionId → BuiltinFunctionId
   | .integerAdd => .integerSub
   | .integerEq => .integerLt
   | .integerLt => .integerEq
+  | .integerMul => .integerAdd
   | .integerSub => .integerAdd
   | .wordFromInteger => .integerAdd
 
@@ -653,6 +656,21 @@ private def testExpandedBinaryBaseline (fixture : BinaryFixture) : IO Unit := do
             "integerAdd baseline changed exact value or evidence order"
       | .error error => throw (IO.userError
           s!"integerAdd baseline did not evaluate: {reprStr error}")
+  | .integerMul =>
+      assertTrue (decide (lowered.resolved =
+          .word (Core.Word.ofNatModulo 2) ∧ lowered.core =
+          .word (Core.Word.ofNatModulo 2)))
+        "integerMul baseline did not erase to Word 2"
+      match SourceCoreElaboration.evaluateStagedInteger
+          fixture.function.solvedRequirements fixture.function.typedBody
+          fixture.call with
+      | .ok evaluated =>
+          assertTrue (decide (evaluated.value = (2 : Int) ∧
+              evaluated.consumedRequirements =
+                [leftRequirement, rightRequirement]))
+            "integerMul baseline changed exact value or evidence order"
+      | .error error => throw (IO.userError
+          s!"integerMul baseline did not evaluate: {reprStr error}")
   | .integerEq =>
       assertTrue (decide (lowered.resolved = .bool false ∧
           lowered.core = .bool false))
@@ -772,7 +790,9 @@ private def testExpandedBinaryContract (fixture : BinaryFixture) : IO Unit := do
   expect "callee coercions" calleeCoercions calleeSite fun reason =>
     reason == .coercionsPresent [coercion]
 
-  let cyclic := if fixture.functionId = .integerAdd then
+  let isArithmetic := (fixture.functionId == .integerAdd) ||
+    (fixture.functionId == .integerMul)
+  let cyclic := if isArithmetic then
       withBinaryExpression fixture fixture.call fun node => {
         node with form := match node.form with
           | .call callee _ resolution =>
@@ -783,7 +803,7 @@ private def testExpandedBinaryContract (fixture : BinaryFixture) : IO Unit := do
       withBinaryExpression fixture fixture.left fun node => {
         node with form := .group fixture.left, requirements := []
       }
-  let cycleSite := if fixture.functionId = .integerAdd then callSite else leftSite
+  let cycleSite := if isArithmetic then callSite else leftSite
   expect "staged argument cycle" cyclic cycleSite fun reason =>
     reason == .stagedIntegerDepthLimit
 
@@ -802,13 +822,16 @@ private def testExpandedBuiltinTampering : IO Unit := do
   let add ← binaryFixture
     "function add() returns (Word) { return wordFromInteger(integerAdd(1, 2)); }"
     .integerAdd
+  let multiply ← binaryFixture
+    "function multiply() returns (Word) { return wordFromInteger(integerMul(1, 2)); }"
+    .integerMul
   let equality ← binaryFixture
     "function equality() returns (Bool) { return integerEq(1, 2); }"
     .integerEq
   let less ← binaryFixture
     "function less() returns (Bool) { return integerLt(1, 2); }"
     .integerLt
-  for fixture in [add, equality, less] do
+  for fixture in [add, multiply, equality, less] do
     testExpandedBinaryBaseline fixture
     testExpandedBinaryContract fixture
 

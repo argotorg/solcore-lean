@@ -491,17 +491,20 @@ structure StagedIntegerEvaluation where
 private inductive StagedIntegerBinaryOperation where
   | add
   | sub
+  | mul
 
 private def stagedIntegerBinaryOperation? :
     BuiltinFunctionId → Option StagedIntegerBinaryOperation
   | .integerAdd => some .add
   | .integerSub => some .sub
+  | .integerMul => some .mul
   | _ => none
 
 private def applyStagedIntegerBinary :
     StagedIntegerBinaryOperation → Int → Int → Int
   | .add, left, right => left + right
   | .sub, left, right => left - right
+  | .mul, left, right => left * right
 
 private inductive StagedIntegerComparison where
   | eq

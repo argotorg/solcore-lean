@@ -21,6 +21,7 @@ inductive BuiltinFunctionId where
   | integerAdd
   | integerEq
   | integerLt
+  | integerMul
   deriving Repr, BEq, DecidableEq
 
 namespace BuiltinFunctionId
@@ -30,7 +31,8 @@ append-only introduction order.  Name lookup derives from this list so
 extending the identity type cannot silently leave a separate hand-written
 lookup chain stale. -/
 def all : List BuiltinFunctionId :=
-  [.integerSub, .wordFromInteger, .integerAdd, .integerEq, .integerLt]
+  [.integerSub, .wordFromInteger, .integerAdd, .integerEq, .integerLt,
+    .integerMul]
 
 /-- Every compiler-function identity occurs in the lookup catalog. -/
 theorem all_complete (function : BuiltinFunctionId) : function ∈ all := by

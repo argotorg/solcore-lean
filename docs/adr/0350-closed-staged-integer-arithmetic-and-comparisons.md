@@ -62,9 +62,8 @@ consumed by a supported staged boundary remains an unsupported runtime
 
 ## Deferred boundaries
 
-- `integerMul` is deferred until the executable profile fixes a value-size or
-  total-work policy for repeated exact multiplication.  A depth bound alone
-  stops cycles but does not bound the bit size produced by repeated squaring.
+- ADR-0351 adds exact `integerMul` for source-generated occurrence trees and
+  defers synthetic shared-DAG resource hardening explicitly.
 - `wordToInteger` requires a separately specified closed Word evaluator and
   purity boundary.  General runtime Word expressions must not be evaluated at
   compile time accidentally.

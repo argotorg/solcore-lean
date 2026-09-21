@@ -99,6 +99,8 @@ private def expandedSource : String :=
   let successor := toString (Core.wordModulus + 1)
   let plusFive := toString (Core.wordModulus + 5)
   let plusSeven := toString (Core.wordModulus + 7)
+  let halfModulus : Nat := 2 ^ 128
+  let half := toString halfModulus
   String.intercalate "\n" [
     "function addHugeNegative() returns (Word) {",
     "  return wordFromInteger(integerAdd(" ++ plusFive ++
@@ -109,6 +111,24 @@ private def expandedSource : String :=
     "}",
     "function arithmeticNested() returns (Word) {",
     "  return wordFromInteger(integerSub(integerAdd(20, integerSub(0, 3)), integerAdd(4, 5)));",
+    "}",
+    "function mulPower() returns (Word) {",
+    "  return wordFromInteger(integerMul(" ++ half ++ ", " ++ half ++ "));",
+    "}",
+    "function mulNegative() returns (Word) {",
+    "  return wordFromInteger(integerMul(integerSub(0, 3), 5));",
+    "}",
+    "function mulNegativeBoth() returns (Word) {",
+    "  return wordFromInteger(integerMul(integerSub(0, 3), integerSub(0, 5)));",
+    "}",
+    "function mulZero() returns (Word) {",
+    "  return wordFromInteger(integerMul(0, integerSub(0, " ++ plusSeven ++ ")));",
+    "}",
+    "function mulNested() returns (Word) {",
+    "  return wordFromInteger(integerMul(integerAdd(7, integerSub(0, 2)), integerSub(6, 3)));",
+    "}",
+    "function mulEqBeforeModulo() returns (Bool) {",
+    "  return integerEq(integerMul(" ++ modulus ++ ", " ++ modulus ++ "), 0);",
     "}",
     "function eqBeforeModulo() returns (Bool) {",
     "  return integerEq(0, " ++ modulus ++ ");",
@@ -348,7 +368,8 @@ private def testBuiltinCatalog : IO Unit := do
     .wordFromInteger,
     .integerAdd,
     .integerEq,
-    .integerLt
+    .integerLt,
+    .integerMul
   ]
   assertTrue (decide (BuiltinFunctionId.all = expected) &&
       decide expected.Nodup &&
@@ -373,7 +394,11 @@ private def testBuiltinCatalog : IO Unit := do
       BuiltinFunctionId.integerLt.parameterTypes = integerBinary ∧
       BuiltinFunctionId.integerLt.returnType = Ty.bool ∧
       BuiltinFunctionId.integerLt.scheme =
-        .mono BuiltinFunctionId.integerLt.type))
+        .mono BuiltinFunctionId.integerLt.type ∧
+      BuiltinFunctionId.integerMul.parameterTypes = integerBinary ∧
+      BuiltinFunctionId.integerMul.returnType = Ty.integer ∧
+      BuiltinFunctionId.integerMul.scheme =
+        .mono BuiltinFunctionId.integerMul.type))
     "expanded integer builtin signatures changed"
 
 private def testExpandedTypedCarrierAndWorklist : IO Unit := do
@@ -413,6 +438,74 @@ private def testExpandedTypedCarrierAndWorklist : IO Unit := do
         "integerAdd did not preserve an exact huge signed result"
   | .error error => throw (IO.userError
       s!"checked integerAdd did not stage exactly: {reprStr error}")
+
+  let multiplication ← checkedNamed program "mulPower"
+  let multiplicationRoot ← returnedExpression multiplication
+  let multiplicationOuter ← expectBuiltinCall multiplication
+    multiplicationRoot .wordFromInteger
+  let multiplicationId ← match multiplicationOuter with
+    | [multiplicationId] => pure multiplicationId
+    | arguments => throw (IO.userError
+        s!"multiplication conversion retained {arguments.length} arguments")
+  let multiplicationArguments ← expectBuiltinCall multiplication
+    multiplicationId .integerMul
+  let (leftPower, rightPower) ← match multiplicationArguments with
+    | [leftPower, rightPower] => pure (leftPower, rightPower)
+    | arguments => throw (IO.userError
+        s!"integerMul retained {arguments.length} arguments")
+  let halfModulus : Nat := 2 ^ 128
+  let halfSource := Syntax.CoreLiteralValue.decimal (toString halfModulus)
+  let leftPowerRequirement ← expectIntegerLiteral multiplication leftPower
+    halfSource halfModulus
+  let rightPowerRequirement ← expectIntegerLiteral multiplication rightPower
+    halfSource halfModulus
+  let multiplicationRequirements :=
+    [leftPowerRequirement, rightPowerRequirement]
+  assertTrue (decide (multiplication.solvedRequirements.map (·.id) =
+      multiplicationRequirements))
+    "integerMul changed source-order literal evidence"
+  match SourceCoreElaboration.evaluateStagedInteger
+      multiplication.solvedRequirements multiplication.typedBody
+      multiplicationId with
+  | .ok evaluated =>
+      assertTrue (decide (evaluated.value = Int.ofNat Core.wordModulus ∧
+          evaluated.consumedRequirements = multiplicationRequirements))
+        "2^128 * 2^128 was not evaluated as exact mathematical 2^256"
+  | .error error => throw (IO.userError
+      s!"checked integerMul did not stage exactly: {reprStr error}")
+
+  let multiplicationSignature ← signatureNamed program "mulPower"
+  let multiplicationRequest : SourceSpecializationWorklist.Request := {
+    declaration := multiplicationSignature.id
+    parameterSubstitution := []
+  }
+  match SourceSpecializationWorklist.run program [multiplicationRequest] 1 with
+  | .ok (.complete plan) =>
+      assertTrue (plan.specializations.length == 1 && plan.callEdges.isEmpty)
+        "integerMul became a source specialization edge"
+  | result => throw (IO.userError
+      s!"integerMul worklist did not close in one slot: {reprStr result}")
+
+  let negativeMultiplication ← checkedNamed program "mulNegative"
+  let negativeRoot ← returnedExpression negativeMultiplication
+  let negativeOuter ← expectBuiltinCall negativeMultiplication negativeRoot
+    .wordFromInteger
+  let negativeMultiplicationId ← match negativeOuter with
+    | [id] => pure id
+    | arguments => throw (IO.userError
+        s!"negative multiplication retained {arguments.length} outer arguments")
+  let _ ← expectBuiltinCall negativeMultiplication negativeMultiplicationId
+    .integerMul
+  match SourceCoreElaboration.evaluateStagedInteger
+      negativeMultiplication.solvedRequirements
+      negativeMultiplication.typedBody negativeMultiplicationId with
+  | .ok evaluated =>
+      assertTrue (decide (evaluated.value = (-15 : Int) ∧
+          evaluated.consumedRequirements =
+            negativeMultiplication.solvedRequirements.map (·.id)))
+        "negative multiplication lost its exact sign or requirement order"
+  | .error error => throw (IO.userError
+      s!"negative integerMul did not stage exactly: {reprStr error}")
 
   let equality ← checkedNamed program "eqBeforeModulo"
   let equalityRoot ← returnedExpression equality
@@ -482,7 +575,12 @@ private def testExpandedPublicExecution : IO Unit := do
   let wordCases : List (String × Core.Word) := [
     ("addHugeNegative", Core.Word.ofIntModulo (-2)),
     ("addNegatives", Core.Word.ofIntModulo (-13)),
-    ("arithmeticNested", Core.Word.ofNatModulo 8)
+    ("arithmeticNested", Core.Word.ofNatModulo 8),
+    ("mulPower", Core.Word.zero),
+    ("mulNegative", Core.Word.ofIntModulo (-15)),
+    ("mulNegativeBoth", Core.Word.ofNatModulo 15),
+    ("mulZero", Core.Word.zero),
+    ("mulNested", Core.Word.ofNatModulo 15)
   ]
   for (name, expected) in wordCases do
     assertPreparedExpandedWord moduleId name expected
@@ -491,7 +589,8 @@ private def testExpandedPublicExecution : IO Unit := do
     ("eqSignedExact", true),
     ("ltBeforeModulo", false),
     ("ltNegative", true),
-    ("ltNegativeReverse", false)
+    ("ltNegativeReverse", false),
+    ("mulEqBeforeModulo", false)
   ]
   for (name, expected) in boolCases do
     assertPreparedExpandedBool moduleId name expected
@@ -545,9 +644,12 @@ private def testExpandedSourceDeclarationsShadowBuiltins : IO Unit := do
     "function integerLt(left: Word, right: Word) returns (Bool) {",
     "  return true;",
     "}",
+    "function integerMul(left: Word, right: Word) returns (Word) {",
+    "  return 41;",
+    "}",
     "function shadowed() returns (Word) {",
     "  return integerEq(integerAdd(1, 2), 40) ? 9 :",
-    "    (integerLt(1, 2) ? 41 : 42);",
+    "    (integerLt(1, 2) ? integerMul(1, 2) : 42);",
     "}"
   ]
   let program ← checkedProgram content
@@ -560,10 +662,10 @@ private def testExpandedSourceDeclarationsShadowBuiltins : IO Unit := do
     | .expression { form := .call _ _ (.declaration selected), .. } =>
         some selected.declaration
     | _ => none
-  assertTrue (builtinCalls.isEmpty && declarationCalls.length == 3)
+  assertTrue (builtinCalls.isEmpty && declarationCalls.length == 4)
     "expanded source declarations did not shadow compiler builtins"
   let moduleId ← mainModule
-  let shadowLimits : Limits := { limits with specializationBudget := 4 }
+  let shadowLimits : Limits := { limits with specializationBudget := 5 }
   match run (workspace content) (Seed.named moduleId "shadowed") []
       shadowLimits with
   | .ok (.done (.word actual) []) =>
@@ -603,6 +705,9 @@ private def testInferenceRejections : IO Unit := do
   expectBodyError "integerLt arity"
     "function bad() returns (Bool) { return integerLt(); }"
     fun error => error == .builtinFunctionArityMismatch .integerLt 2 0
+  expectBodyError "integerMul arity"
+    "function bad() returns (integer) { return integerMul(1); }"
+    fun error => error == .builtinFunctionArityMismatch .integerMul 2 1
   expectBodyError "integerAdd operand type"
     "function bad() returns (integer) { return integerAdd(true, 1); }"
     fun error => error matches .unification _
@@ -611,6 +716,9 @@ private def testInferenceRejections : IO Unit := do
     fun error => error matches .unification _
   expectBodyError "integerLt operand type"
     "function bad() returns (Bool) { return integerLt(1, false); }"
+    fun error => error matches .unification _
+  expectBodyError "integerMul operand type"
+    "function bad() returns (integer) { return integerMul(false, 1); }"
     fun error => error matches .unification _
 
   let blocked := String.intercalate "\n" [
@@ -653,6 +761,9 @@ private def testInferenceRejections : IO Unit := do
   expectExpandedNoFallback "integerLt"
     "function integerLt(left: Bool, right: Bool) returns (Bool) { return left; }"
     "function bad() returns (Bool) { return integerLt(1, 2); }"
+  expectExpandedNoFallback "integerMul"
+    "function integerMul(left: Bool, right: Bool) returns (Bool) { return left; }"
+    "function bad() returns (Word) { return wordFromInteger(integerMul(1, 2)); }"
 
 private def testRuntimeBoundaryRejections : IO Unit := do
   let dependentProgram ← checkedProgram
@@ -687,6 +798,18 @@ private def testRuntimeBoundaryRejections : IO Unit := do
       assertTrue (decide (error.site = .declaration leaking.declaration ∧
           error.reason = .unsupportedType Ty.integer))
         s!"integer leakage produced the wrong boundary error: {reprStr error}"
+
+  let multiplicationLeakProgram ← checkedProgram
+    "function leakingMul() returns (integer) { return integerMul(2, 3); }"
+  let multiplicationLeak ← checkedNamed multiplicationLeakProgram "leakingMul"
+  match SourceCoreElaboration.elaborateFunction multiplicationLeak with
+  | .ok _ => throw (IO.userError
+      "integerMul escaped into the runtime function boundary")
+  | .error error =>
+      assertTrue (decide (error.site =
+          .declaration multiplicationLeak.declaration ∧
+          error.reason = .unsupportedType Ty.integer))
+        s!"integerMul leakage produced the wrong error: {reprStr error}"
 
   let comparisonProgram ← checkedProgram
     "function dependentEq(flag: Bool) returns (Bool) { return integerEq(flag ? 1 : 2, 1); }"
