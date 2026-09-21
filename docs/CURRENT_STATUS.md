@@ -146,9 +146,16 @@ and linking.  Marked runtime roots, marked results reaching runtime call
 lowering, and runtime-dependent actuals passed to marked parameters reject;
 unsupported/deferred argument forms also reject explicitly, while actuals
 proved closed are admitted.  The unmarked pure bare-`integer` path remains an
-intentional partial-evaluation compatibility rule.  A general
-staging lattice, general `comptime<T>` evaluation, predicate/coercion support,
-selected-branch recursion, and compile-time Fibonacci remain later.
+intentional partial-evaluation compatibility rule.  ADR-0357 adds the first
+scope-aware `Comptime`/`Runtime`/`Deferred` analysis over checked typed source.
+It propagates stages through stable local identities, ordinary lets, groups,
+unary/binary expressions, tuples and conditionals, classifies marked or
+uncoerced comptime-only direct-call results from all actual arguments, and
+stores the recomputed side table on each concrete specialization.  The
+restricted linker now consumes that table for marked arguments instead of
+running a private classifier.  This is dependence classification, not general
+staged-value evaluation: predicate/coercion execution, indirect calls, selected-branch
+recursion and compile-time Fibonacci remain later.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5904,10 +5911,22 @@ Marked runtime roots reject; a runtime call rejects a marked result or a
 runtime-dependent actual at a marked parameter, while unsupported/deferred
 argument forms reject explicitly and actuals proved closed are accepted.  The
 unmarked pure bare-integer rule remains an intentional
-partial-evaluation path.  General expression staging classification and
-`comptime<T>` evaluation, predicates and coercions, indirect calls, staged
-implementation methods, selected-branch recursion, and compile-time Fibonacci
-remain deferred.
+partial-evaluation path.
+
+ADR-0357 replaces the linker's argument-local approximation with a reusable,
+scope-aware source-stage side table.  The exact three-point join makes any
+runtime child dominate, returns comptime only when every child is comptime,
+and otherwise remains deferred.  Inputs are seeded from canonical markers and
+the exact `integer`/structural `comptime<T>` types; an effective comptime-result
+body treats all inputs as comptime.  Initialized ordinary lets inherit their
+initializer, while direct calls are comptime only for an explicit marked or
+uncoerced comptime-only result with all-comptime actuals and otherwise remain
+deferred.  Traversal follows roots and lexical statement structure rather than
+flat node-table order, and each concrete specialization owns its recomputed
+facts.  The linker queries those facts to distinguish a definite runtime
+argument from a deferred one.  General staged-value evaluation, predicates and coercions, indirect
+calls, staged implementation methods, selected-branch recursion, and
+compile-time Fibonacci remain deferred.
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
 requirements even after an early wildcard, and build one hidden let followed by

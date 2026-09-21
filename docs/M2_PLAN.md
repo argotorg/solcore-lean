@@ -215,11 +215,30 @@ call rejects a runtime-dependent actual or an unsupported/deferred form at a
 marked parameter and rejects a marked result, while an actual proved closed is
 accepted.  The unmarked pure
 bare-`integer` partial-evaluation path remains intentionally compatible.
-General staging classification and `comptime<T>` evaluation,
-predicate/coercion support, staged implementation methods, selected-branch
-recursion and compile-time programs such as Fibonacci remain later.
+General staged-value evaluation, predicate/coercion support, staged
+implementation methods, selected-branch recursion and compile-time programs
+such as Fibonacci remain later.
 Integer-returning functions also remain invalid runtime roots because Core has
 no runtime `integer` representation.
+
+ADR-0357 completes the first general classification part of that deferred
+boundary without yet generalizing evaluation.  A scope-aware sidecar assigns
+`Comptime`, `Runtime` or `Deferred` to every reached expression and binder in a
+checked function.  It follows typed roots and lexical statement edges, carries
+let initializer stages through stable local identities, treats groups and
+unary expressions transparently, uses the exact runtime-dominating join for
+binary/tuple/conditional structure, and
+classifies a direct call as comptime only when its effective result is
+comptime and all actuals are comptime.  Effective comptime includes the
+canonical result marker or, when no output coercion is retained, exact bare
+`integer` and structural `comptime<T>`; the same comptime-only types seed
+inputs.  A marked/effectively-comptime result
+body analyzes every input as comptime.  Specialization recomputes the side
+table for each concrete key, allowing a generic type to refine to a
+comptime-only type, and the final direct linker consumes those exact facts for
+marked-parameter rejection.  General staged values, mutation, indirect calls,
+predicate/coercion execution, staged methods and recursion remain the next
+boundaries.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
