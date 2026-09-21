@@ -1282,6 +1282,8 @@ import Solcore.Test.SourceStagedConditionals
 import Solcore.Test.SourceStagedConditionalsTamper
 import Solcore.Test.SourceStagedIntegerLocals
 import Solcore.Test.SourceStagedIntegerLocalsTamper
+import Solcore.Test.SourceStagedIntegerCalls
+import Solcore.Test.SourceStagedIntegerCallsTamper
 
 set_option autoImplicit false
 
@@ -6079,6 +6081,8 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceStagedConditionalsTamper.testSourceStagedConditionalsTamper
   SourceStagedIntegerLocals.testSourceStagedIntegerLocals
   SourceStagedIntegerLocalsTamper.testSourceStagedIntegerLocalsTamper
+  SourceStagedIntegerCalls.testSourceStagedIntegerCalls
+  SourceStagedIntegerCallsTamper.testSourceStagedIntegerCallsTamper
 
 def run : IO Unit := do
   coreLocalFragmentPairBoundaryTests
