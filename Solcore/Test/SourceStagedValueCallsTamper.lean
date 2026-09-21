@@ -195,29 +195,208 @@ private def testOrdinaryEvidenceLetPreserved : IO Unit := do
 
 private def comptimeInputDraftSource : String := String.intercalate "\n" [
   "function staged() returns (comptime<Word>) { return 7; }",
-  "function helper(comptime unused: Word) returns (Word) {",
+  "function direct(comptime unused: Word) returns (Word) {",
   "  return staged();",
   "}",
-  "function entry() returns (Word) { return helper(1); }"
+  "function cached(comptime unused: Word) returns (Word) {",
+  "  let closed: Word = staged();",
+  "  return closed;",
+  "}",
+  "function entryDirect() returns (Word) { return direct(1); }",
+  "function entryCached() returns (Word) { return cached(1); }"
 ]
 
-private def testComptimeInputDraftBoundary : IO Unit := do
+private def testIndependentComptimeInputDraft : IO Unit := do
   let moduleId ← mainModule
-  match prepare (workspace comptimeInputDraftSource)
+  let store : Core.Store := [.bool false, .word (word 33)]
+  for (name, cached) in [("entryDirect", false), ("entryCached", true)] do
+    let prepared ← match prepare (workspace comptimeInputDraftSource)
+        (Seed.named moduleId name) (limits 3) with
+      | .ok prepared => pure prepared
+      | .error error => throw (IO.userError
+          s!"{name}: input-independent staged draft was rejected: {reprStr error}")
+    assertTrue (decide (prepared.run? [] 4096 store =
+        some (.done (.word (word 7)) store)))
+      s!"{name}: input-independent staged draft changed its value or store"
+    match prepared.entry.elaborated.resolved, cached with
+    | .letE temporary (.word argument)
+        (.letE _ (.var reference) (.word result)), false =>
+        assertTrue (decide (temporary = reference ∧ argument = word 1 ∧
+            result = word 7))
+          "direct input-independent call did not reify its marked result"
+    | .letE temporary (.word argument)
+        (.letE _ (.var reference)
+          (.letE closed (.word result) (.var closedReference))), true =>
+        assertTrue (decide (temporary = reference ∧ closed = closedReference ∧
+            argument = word 1 ∧ result = word 7))
+          "cached input-independent call did not reify its let initializer"
+    | resolved, _ => throw (IO.userError
+        s!"{name}: unexpected resolved draft shape: {reprStr resolved}")
+
+private def knownComptimeInputSource : String := String.intercalate "\n" [
+  "function increment(comptime value: Word) returns (comptime<Word>) {",
+  "  return value + 1;",
+  "}",
+  "function helper(comptime value: Word) returns (Word) {",
+  "  return increment(value);",
+  "}",
+  "function entry() returns (Word) { return helper(7); }",
+  "function entryAlias() returns (Word) {",
+  "  let known: Word = 12;",
+  "  return helper(known);",
+  "}",
+  "function entryPair() returns ((Word, Word)) {",
+  "  return (helper(2), helper(9));",
+  "}"
+]
+
+private def testKnownComptimeInputPropagation : IO Unit := do
+  let moduleId ← mainModule
+  let store : Core.Store := [.word (word 41), .bool true]
+  let prepared ← match prepare (workspace knownComptimeInputSource)
       (Seed.named moduleId "entry") (limits 3) with
-  | .error (.linking (.runtimeCallComptimeResult _ _ _)) => pure ()
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"known comptime input did not reach its runtime draft: {reprStr error}")
+  assertTrue (decide (prepared.run? [] 4096 store =
+      some (.done (.word (word 8)) store)))
+    "known comptime input produced the wrong staged result or changed the store"
+  match prepared.entry.elaborated.resolved with
+  | .letE temporary (.word argument)
+      (.letE _ (.var reference) (.word result)) =>
+      assertTrue (decide (temporary = reference ∧ argument = word 7 ∧
+          result = word 8))
+        "known comptime input was not materialized inside the callee draft"
+  | resolved => throw (IO.userError
+      s!"known comptime input has the wrong resolved shape: {reprStr resolved}")
+
+  let pair ← match prepare (workspace knownComptimeInputSource)
+      (Seed.named moduleId "entryPair") (limits 3) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"distinct known inputs failed to prepare: {reprStr error}")
+  assertTrue (decide (pair.run? [] 4096 store = some (.done
+      (.pair (.word (word 3)) (.word (word 10))) store)))
+    "two call sites sharing one type specialization also shared a staged value"
+
+  let alias ← match prepare (workspace knownComptimeInputSource)
+      (Seed.named moduleId "entryAlias") (limits 3) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"caller-local known alias failed to prepare: {reprStr error}")
+  assertTrue (decide (alias.inputTypes = [] ∧
+      alias.run? [] 4096 store = some (.done (.word (word 13)) store)))
+    "caller-local staged alias did not reach the runtime callee draft"
+
+private def mixedKnownInputSource : String := String.intercalate "\n" [
+  "function choose(comptime flag: Bool) returns (comptime<Word>) {",
+  "  return flag ? 2 : 9;",
+  "}",
+  "function helper(comptime flag: Bool, value: Word, select: Bool) returns (Word) {",
+  "  let selected: Word = choose(flag);",
+  "  return select ? selected : value;",
+  "}",
+  "function entry(value: Word, select: Bool) returns (Word) {",
+  "  return helper(true, value, select);",
+  "}"
+]
+
+private def testMixedKnownAndRuntimeInputs : IO Unit := do
+  let moduleId ← mainModule
+  let prepared ← match prepare (workspace mixedKnownInputSource)
+      (Seed.named moduleId "entry") (limits 3) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"mixed staged/runtime inputs failed to prepare: {reprStr error}")
+  assertTrue (decide (prepared.inputTypes = [.word, .bool]))
+    "runtime arguments disappeared from the linked Core input context"
+  let store : Core.Store := [.bool false, .word (word 77)]
+  assertTrue (decide (prepared.run? [.word (word 40), .bool true] 4096 store =
+      some (.done (.word (word 2)) store)))
+    "known Bool input did not materialize the selected marked value"
+  assertTrue (decide (prepared.run? [.word (word 40), .bool false] 4096 store =
+      some (.done (.word (word 40)) store)))
+    "runtime Word or Bool input was erased while propagating staged knowledge"
+
+private def productKnownInputSource : String := String.intercalate "\n" [
+  "function stagedProduct(comptime value: (Word, Bool)) returns (comptime<(Word, Bool)>) {",
+  "  return value;",
+  "}",
+  "function helper(comptime value: (Word, Bool)) returns ((Word, Bool)) {",
+  "  return stagedProduct(value);",
+  "}",
+  "function entry() returns ((Word, Bool)) {",
+  "  return helper((4, true));",
+  "}"
+]
+
+private def testProductKnownInput : IO Unit := do
+  let moduleId ← mainModule
+  let prepared ← match prepare (workspace productKnownInputSource)
+      (Seed.named moduleId "entry") (limits 3) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"known product input failed to prepare: {reprStr error}")
+  let expected := Core.Value.pair (.word (word 4)) (.bool true)
+  let store : Core.Store := [.word (word 19)]
+  assertTrue (decide (prepared.inputTypes = [] ∧
+      prepared.run? [] 4096 store = some (.done expected store)))
+    "known product input did not retain its staged structure or store"
+  match prepared.entry.elaborated.resolved with
+  | .letE temporary (.pair (.word argumentWord) (.bool argumentFlag))
+      (.letE _ (.var reference)
+        (.pair (.word resultWord) (.bool resultFlag))) =>
+      assertTrue (decide (temporary = reference ∧
+          argumentWord = word 4 ∧ argumentFlag ∧
+          resultWord = word 4 ∧ resultFlag))
+        "product-valued marked result was not reified inside the runtime draft"
+  | resolved => throw (IO.userError
+      s!"known product input has the wrong resolved shape: {reprStr resolved}")
+
+private def unavailableKnownInputSource : String := String.intercalate "\n" [
+  "function identity(comptime value: Word) returns (comptime<Word>) {",
+  "  return value;",
+  "}",
+  "function helper(comptime value: Word) returns (Word) {",
+  "  return identity(value);",
+  "}",
+  "function producer(value: Word) returns (Word) { return value; }",
+  "function runtimeEntry(value: Word) returns (Word) {",
+  "  return helper(value);",
+  "}",
+  "function deferredEntry(value: Word) returns (Word) {",
+  "  return helper(producer(value));",
+  "}"
+]
+
+private def testUnavailableKnownInputsRejected : IO Unit := do
+  let moduleId ← mainModule
+  match prepare (workspace unavailableKnownInputSource)
+      (Seed.named moduleId "runtimeEntry") (limits 3) with
+  | .error (.linking (.runtimeArgumentToComptimeParameter _ _ 0 _)) =>
+      pure ()
   | result => throw (IO.userError
-      s!"comptime-input runtime draft crossed the documented phase boundary: {reprStr result}")
+      s!"runtime actual was promoted to a known comptime input: {reprStr result}")
+  match prepare (workspace unavailableKnownInputSource)
+      (Seed.named moduleId "deferredEntry") (limits 4) with
+  | .error (.linking (.comptimeArgumentDeferred _ _ 0 _)) => pure ()
+  | result => throw (IO.userError
+      s!"deferred actual was promoted to a known comptime input: {reprStr result}")
 
 /-- Fix unsupported evidence/coercion boundaries, eager recursion rejection,
-ordinary evidence-let compatibility, the comptime-input draft boundary, and
-successful finite evaluation of a sufficiently budgeted acyclic chain. -/
+ordinary evidence-let compatibility, known/unavailable runtime-draft staging,
+mixed runtime inputs, structural values, and successful finite evaluation of
+a sufficiently budgeted acyclic chain. -/
 def testSourceStagedValueCallsTamper : IO Unit := do
   testPredicateRejected
   testResultCoercionRejected
   testRecursiveRejections
   testDeepAcyclicCall
   testOrdinaryEvidenceLetPreserved
-  testComptimeInputDraftBoundary
+  testIndependentComptimeInputDraft
+  testKnownComptimeInputPropagation
+  testMixedKnownAndRuntimeInputs
+  testProductKnownInput
+  testUnavailableKnownInputsRejected
 
 end Tests.SourceStagedValueCallsTamper
