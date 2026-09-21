@@ -4,15 +4,16 @@ import Solcore.Frontend.SourceSpecialization
 /-!
 Checked source bodies for the first executable implementation-method profile.
 
-This boundary accepts explicitly sized implementation evidence whose selected
-method carries no additional predicates.  A generic implementation is admitted
-only when its closed evidence goal determines every declaration parameter.
-Closed implementation-level predicates must correspond exactly to the evidence
-premises, while trait-level predicates are instantiated at the closed evidence
-goal.  Both become static assumptions of the synthetic method.  The boundary
-validates the retained method catalog defensively, checks the generic method as
-an ordinary synthetic function, and closes it through the existing source
-specializer before exposing it to runtime lowering.
+This boundary accepts explicitly sized implementation evidence together with
+ordered, caller-owned evidence for method predicates.  A generic implementation
+is admitted only when its closed evidence goal determines every declaration
+parameter. Closed implementation-level predicates must correspond exactly to
+the primary evidence premises, while trait- and method-level predicates are
+instantiated at the closed evidence goal. All three become static assumptions
+of the synthetic method. The boundary validates the retained method catalog
+defensively, checks the generic method as an ordinary synthetic function, and
+closes it through the existing source specializer before exposing it to runtime
+lowering.
 -/
 
 set_option autoImplicit false
@@ -29,6 +30,8 @@ structure CheckedMethod where
   traitPredicates : List ProgramPredicate
   implementationPredicates : List ProgramPredicate
   implementationPremises : List TypedTraitResolution.Evidence
+  methodPredicates : List ProgramPredicate
+  methodPremises : List TypedTraitResolution.Evidence
   synthetic : ProgramFunctionSignature
   checked : SourceInference.CheckedFunction
   specialized : SourceSpecialization.SpecializedFunction
@@ -111,6 +114,28 @@ inductive Error where
       (method : ProgramImplMethodId) (predicates : List ProgramPredicate)
   | traitMethodPredicatesPresent
       (method : ProgramTraitMethodId) (predicates : List ProgramPredicate)
+  | methodPredicateMismatch
+      (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
+      (expected actual : List ProgramPredicate)
+  | closedMethodPredicateMismatch
+      (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
+      (expected actual : List ProgramPredicate)
+  | methodPredicateNotClosed
+      (method : ProgramImplMethodId) (predicate : ProgramPredicate)
+      (reason : NonClosedType)
+  | methodEvidenceCountMismatch
+      (method : ProgramImplMethodId) (expected actual : Nat)
+  | methodEvidenceGoalMismatch
+      (method : ProgramImplMethodId) (index : Nat)
+      (expected actual : ProgramPredicate)
+  | methodEvidenceResolutionNoSolution
+      (method : ProgramImplMethodId) (index : Nat) (goal : ProgramPredicate)
+  | methodEvidenceResolutionInconclusive
+      (method : ProgramImplMethodId) (index : Nat)
+      (reason : TraitResolution.InconclusiveReason
+        Resolved.DeclarationId Ty Resolved.DeclarationId)
+  | methodEvidenceNotSelected
+      (method : ProgramImplMethodId) (index : Nat) (goal : ProgramPredicate)
   | implementationMethodOwnerMismatch
       (method : ProgramImplMethodId)
       (expected actual : Resolved.DeclarationId)
@@ -215,6 +240,34 @@ private def validateSelectedEvidence (program : CheckedProgram)
       else
         .error (.evidenceNotSelected implementation goal)
 
+private def validateMethodEvidenceGoals (program : CheckedProgram)
+    (method : ProgramImplMethodId) :
+    Nat → List ProgramPredicate → List TypedTraitResolution.Evidence →
+      Except Error Unit
+  | _, [], [] => pure ()
+  | index, predicate :: predicates, evidence :: rest => do
+      let .byImpl actual _ _ := evidence
+      unless actual = predicate do
+        throw (.methodEvidenceGoalMismatch method index predicate actual)
+      match (TypedTraitResolution.resolve program.signatures.implRules 32
+          predicate).outcome with
+      | .noSolution =>
+          throw (.methodEvidenceResolutionNoSolution method index predicate)
+      | .inconclusive reason =>
+          throw (.methodEvidenceResolutionInconclusive method index reason)
+      | .success selected =>
+          unless selected == evidence do
+            throw (.methodEvidenceNotSelected method index predicate)
+      validateMethodEvidenceGoals program method (index + 1) predicates rest
+  | _, _, _ => pure ()
+
+private def validateMethodEvidence (program : CheckedProgram)
+    (method : ProgramImplMethodId) (predicates : List ProgramPredicate)
+    (evidence : List TypedTraitResolution.Evidence) : Except Error Unit := do
+  unless predicates.length = evidence.length do
+    throw (.methodEvidenceCountMismatch method predicates.length evidence.length)
+  validateMethodEvidenceGoals program method 0 predicates evidence
+
 private def validateDeterminedParameters
     (implementation : Resolved.DeclarationId)
     (substitution : ParameterSubstitution) : Except Error Unit := do
@@ -241,13 +294,16 @@ private def closedSyntheticSignature
   }
 }
 
-/-- Select and check one named executable method justified by closed trait
-evidence.  The evidence goal must determine every implementation
-parameter.  Trait declaration predicates and exact closed implementation
-premises become static method assumptions; runtime dictionaries and
-method-level predicates remain explicit later profiles. -/
-def checkMethodWithArity
+/-- Select and check one named executable method justified by closed primary
+trait evidence and ordered evidence for every method predicate. The primary
+evidence goal must determine every implementation parameter. Trait declaration
+predicates, exact closed implementation premises, and closed method predicates
+become static method assumptions. Method evidence belongs to the caller rather
+than the implementation rule, so it is supplied separately and is not nested
+under the primary evidence. -/
+def checkMethodWithEvidenceAndArity
     (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
+    (methodEvidence : List TypedTraitResolution.Evidence)
     (expectedTraitArity : Nat) (expectedName : String) :
     Except Error CheckedMethod := do
   let .byImpl goal implementationId premises := evidence
@@ -291,12 +347,6 @@ def checkMethodWithArity
   let implementationMethod ←
     exactImplementationMethod implementation expectedName
   let traitMethod ← exactTraitMethod trait expectedName
-  unless implementationMethod.wherePredicates.isEmpty do
-    throw (.implementationMethodPredicatesPresent implementationMethod.id
-      implementationMethod.wherePredicates)
-  unless traitMethod.wherePredicates.isEmpty do
-    throw (.traitMethodPredicatesPresent traitMethod.id
-      traitMethod.wherePredicates)
   unless implementationMethod.id.implementation = implementation.id do
     throw (.implementationMethodOwnerMismatch implementationMethod.id
       implementation.id implementationMethod.id.implementation)
@@ -306,6 +356,26 @@ def checkMethodWithArity
   unless implementationMethod.traitMethod = traitMethod.id do
     throw (.methodAssociationMismatch implementationMethod.id traitMethod.id
       implementationMethod.traitMethod)
+  let genericMethodPredicates := traitMethod.wherePredicates.map
+    (ProgramPredicate.applyParameters genericTraitParameterSubstitution)
+  unless genericMethodPredicates = implementationMethod.wherePredicates do
+    throw (.methodPredicateMismatch implementationMethod.id traitMethod.id
+      genericMethodPredicates implementationMethod.wherePredicates)
+  let methodPredicates := traitMethod.wherePredicates.map
+    (ProgramPredicate.applyParameters traitParameterSubstitution)
+  let closedImplementationMethodPredicates :=
+    implementationMethod.wherePredicates.map
+      (ProgramPredicate.applyParameters headMatch.parameterSubstitution)
+  unless methodPredicates = closedImplementationMethodPredicates do
+    throw (.closedMethodPredicateMismatch implementationMethod.id traitMethod.id
+      methodPredicates closedImplementationMethodPredicates)
+  for predicate in methodPredicates do
+    match firstNonClosedGoalType predicate with
+    | some reason => throw (.methodPredicateNotClosed implementationMethod.id
+        predicate reason)
+    | none => pure ()
+  validateMethodEvidence program implementationMethod.id methodPredicates
+    methodEvidence
   let baseSynthetic :=
     implementation.functionSignatureOfMethod implementationMethod
   let genericSynthetic := {
@@ -320,7 +390,8 @@ def checkMethodWithArity
   let specialized ← SourceSpecialization.specializeFunction genericSynthetic
     genericChecked headMatch.parameterSubstitution |>.mapError
       Error.specialization
-  let expectedAssumptions := traitPredicates ++ headMatch.wherePredicates
+  let expectedAssumptions := traitPredicates ++ headMatch.wherePredicates ++
+    methodPredicates
   unless specialized.assumptions = expectedAssumptions do
     throw (.specializedAssumptionsMismatch implementation.id
       expectedAssumptions specialized.assumptions)
@@ -331,10 +402,24 @@ def checkMethodWithArity
     traitPredicates
     implementationPredicates := headMatch.wherePredicates
     implementationPremises := premises
+    methodPredicates
+    methodPremises := methodEvidence
     synthetic
     checked := specialized.function
     specialized
   }
+
+/-- Select a method that has no caller-owned predicate evidence. This remains
+the default entry for callers without an evidence carrier, including the
+current coercion consumer; a constrained method is rejected by
+`methodEvidenceCountMismatch` instead of being silently admitted without its
+caller obligations. -/
+def checkMethodWithArity
+    (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
+    (expectedTraitArity : Nat) (expectedName : String) :
+    Except Error CheckedMethod :=
+  checkMethodWithEvidenceAndArity program evidence [] expectedTraitArity
+    expectedName
 
 /-- Compatibility name retained from the monomorphic executable profile.
 Generic implementations whose parameters are fully determined by a closed goal
@@ -354,6 +439,13 @@ def checkMonomorphicPremiseFreeMethodWithArity
     Except Error CheckedMethod :=
   checkMethodWithArity program evidence expectedTraitArity
     expectedName
+
+/-- One-parameter entry with explicit, ordered caller-owned method evidence. -/
+def checkMethodWithEvidence
+    (program : CheckedProgram) (evidence : TypedTraitResolution.Evidence)
+    (methodEvidence : List TypedTraitResolution.Evidence)
+    (expectedName : String) : Except Error CheckedMethod :=
+  checkMethodWithEvidenceAndArity program evidence methodEvidence 1 expectedName
 
 /-- Canonical one-parameter entry for the current executable method profile. -/
 def checkMethod

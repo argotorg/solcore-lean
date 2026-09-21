@@ -1441,6 +1441,229 @@ private def testGenericImplementationPredicateEvidence : IO Unit := do
         some (.done (.word (word 92)) [])))
     "generic Add<T> method did not specialize or deduplicate its Eq<T> evidence"
 
+private def testBinaryMethodPredicateEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T) where T: Eq;",
+    "}",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "}",
+    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "  return left == right;",
+    "}",
+    "impl Add<Word> {",
+    "  function add(left: Word, right: Word) returns (Word) where Word: Eq {",
+    "    return equalWithEvidence(left, right) ? 91 : 92;",
+    "  }",
+    "}",
+    "function addWithEvidence<T>(left: T, right: T) returns (T)",
+    "    where T: Add, T: Eq {",
+    "  return left + right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Word) {",
+    "  return addWithEvidence(left, right);",
+    "}"
+  ])
+  let addTrait ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Add" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"method-predicate fixture expected one Add trait, found {traits.length}")
+  let eqTrait ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Eq" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"method-predicate fixture expected one Eq trait, found {traits.length}")
+  let entry ← signatureNamed program "entry"
+  let add ← signatureNamed program "addWithEvidence"
+  let equal ← signatureNamed program "equalWithEvidence"
+  let addFunction ← functionFor program add
+  let binary ← match firstBinaryNode? addFunction.typedBody.nodes with
+    | some binary => pure binary
+    | none => throw (IO.userError
+        "method-predicate fixture lost its Add binary occurrence")
+  let solved := binary.requirements.filterMap fun requirement =>
+    addFunction.solvedRequirements.find? fun row => row.id == requirement
+  let orderedAssumptions := match solved with
+    | [primary, method] =>
+        primary.predicate.trait == addTrait.id &&
+          method.predicate.trait == eqTrait.id &&
+          (primary.evidence matches .assumption _) &&
+          (method.evidence matches .assumption _)
+    | _ => false
+  assertTrue (binary.requirements.length == 2 && orderedAssumptions)
+    "generic + did not retain primary Add then caller-owned Eq evidence"
+
+  let outcome ← runOrThrow "binary method predicate evidence" program
+    [monomorphicRequest entry] 2
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"binary method predicate: incomplete plan {reprStr other}")
+  let specializedAdd := plan.specializations.find? fun specialized =>
+    specialized.declaration == add.id
+  assertTrue ((specializedAdd.any fun specialized =>
+      decide (specialized.key.arguments = [.word]) &&
+        match specialized.assumptions with
+        | [primary, method] =>
+            primary.trait == addTrait.id && method.trait == eqTrait.id
+        | _ => false) &&
+      !(plan.specializations.any fun specialized =>
+        specialized.declaration == equal.id))
+    "binary method predicate lost caller order or leaked a detached helper"
+  let linked ← linkOrThrow "binary method predicate evidence" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "binary method predicate: linked root was absent")
+  assertTrue (decide (linkedEntry.run?
+      [.word (word 5), .word (word 5)] 4096 =
+        some (.done (.word (word 92)) [])))
+    "Add.add did not consume its caller-owned Eq evidence"
+
+  let primaryRequirement ← match binary.requirements with
+    | primary :: _ => pure primary
+    | [] => throw (IO.userError
+        "binary method predicate had no primary requirement")
+  let duplicateFunction : CheckedFunction := {
+    addFunction with
+    typedBody := {
+      addFunction.typedBody with
+      nodes := replaceExpressionRequirements addFunction.typedBody.nodes
+        binary.id [primaryRequirement, primaryRequirement]
+    }
+  }
+  let duplicateProgram := replaceFunction program duplicateFunction
+  let duplicateOutcome ← runOrThrow "duplicate binary method requirement"
+    duplicateProgram [monomorphicRequest entry] 2
+  match SourceCoreDirectLinking.link duplicateProgram duplicateOutcome with
+  | .error (.duplicateBinaryRequirement caller occurrence requirement) =>
+      assertTrue (decide (caller.declaration = add.id ∧
+          caller.arguments = [.word] ∧ occurrence = binary.id ∧
+          requirement = primaryRequirement))
+        "duplicate method requirement rejection lost its caller or occurrence"
+  | result => throw (IO.userError
+      s!"a duplicate binary method requirement was accepted: {reprStr result}")
+  let missingFunction : CheckedFunction := {
+    addFunction with
+    typedBody := {
+      addFunction.typedBody with
+      nodes := replaceExpressionRequirements addFunction.typedBody.nodes
+        binary.id [primaryRequirement]
+    }
+  }
+  let missingProgram := replaceFunction program missingFunction
+  let missingOutcome ← runOrThrow "missing binary method requirement"
+    missingProgram [monomorphicRequest entry] 2
+  match SourceCoreDirectLinking.link missingProgram missingOutcome with
+  | .error (.binaryRequirementCountMismatch caller occurrence 2 1) =>
+      assertTrue (decide (caller.declaration = add.id ∧
+          caller.arguments = [.word] ∧ occurrence = binary.id))
+        "missing method requirement rejection lost its caller or occurrence"
+  | result => throw (IO.userError
+      s!"a missing binary method requirement was accepted: {reprStr result}")
+
+private def testUnaryMethodPredicateEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
+    "trait BitNot<T> {",
+    "  function bnot(value: T) returns (T) where T: Eq;",
+    "}",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "}",
+    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "  return left == right;",
+    "}",
+    "impl BitNot<Word> {",
+    "  function bnot(value: Word) returns (Word) where Word: Eq {",
+    "    return equalWithEvidence(value, value) ? 93 : 94;",
+    "  }",
+    "}",
+    "function bitNotWithEvidence<T>(value: T) returns (T)",
+    "    where T: BitNot, T: Eq {",
+    "  return ~value;",
+    "}",
+    "function entry(value: Word) returns (Word) {",
+    "  return bitNotWithEvidence(value);",
+    "}"
+  ])
+  let bitNot ← signatureNamed program "bitNotWithEvidence"
+  let entry ← signatureNamed program "entry"
+  let bitNotTrait ← match program.signatures.traits.filter fun trait =>
+      trait.name == "BitNot" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"unary method-predicate fixture expected one BitNot trait, found {traits.length}")
+  let eqTrait ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Eq" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"unary method-predicate fixture expected one Eq trait, found {traits.length}")
+  let function ← functionFor program bitNot
+  let unary ← match firstUnaryNode? function.typedBody.nodes with
+    | some unary => pure unary
+    | none => throw (IO.userError
+        "unary method-predicate fixture lost its BitNot occurrence")
+  let solved := unary.requirements.filterMap fun requirement =>
+    function.solvedRequirements.find? fun row => row.id == requirement
+  let orderedAssumptions := match solved with
+    | [primary, method] =>
+        primary.predicate.trait == bitNotTrait.id &&
+          method.predicate.trait == eqTrait.id &&
+          (primary.evidence matches .assumption _) &&
+          (method.evidence matches .assumption _)
+    | _ => false
+  assertTrue (unary.requirements.length == 2 && orderedAssumptions)
+    "generic ~ did not retain primary and method-level assumptions"
+  let outcome ← runOrThrow "unary method predicate evidence" program
+    [monomorphicRequest entry] 2
+  let linked ← linkOrThrow "unary method predicate evidence" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "unary method predicate: linked root was absent")
+  assertTrue (decide (linkedEntry.run? [.word (word 7)] 4096 =
+      some (.done (.word (word 94)) [])))
+    "BitNot.bnot did not consume its caller-owned Eq evidence"
+  let primaryRequirement ← match unary.requirements with
+    | primary :: _ => pure primary
+    | [] => throw (IO.userError
+        "unary method predicate had no primary requirement")
+  let duplicateFunction : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := replaceExpressionRequirements function.typedBody.nodes unary.id
+        [primaryRequirement, primaryRequirement]
+    }
+  }
+  let duplicateProgram := replaceFunction program duplicateFunction
+  let duplicateOutcome ← runOrThrow "duplicate unary method requirement"
+    duplicateProgram [monomorphicRequest entry] 2
+  match SourceCoreDirectLinking.link duplicateProgram duplicateOutcome with
+  | .error (.duplicateUnaryRequirement caller occurrence requirement) =>
+      assertTrue (decide (caller.declaration = bitNot.id ∧
+          caller.arguments = [.word] ∧ occurrence = unary.id ∧
+          requirement = primaryRequirement))
+        "duplicate unary requirement rejection lost its caller or occurrence"
+  | result => throw (IO.userError
+      s!"a duplicate unary method requirement was accepted: {reprStr result}")
+
 private def testNamedLogicalNotWithEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Marker<T> {}",
@@ -2130,6 +2353,8 @@ def testSourceCoreDirectLinking : IO Unit := do
   testGenericTraitPredicateEvidence
   testImplementationPredicateEvidence
   testGenericImplementationPredicateEvidence
+  testBinaryMethodPredicateEvidence
+  testUnaryMethodPredicateEvidence
   testNamedLogicalNotWithEvidence
   testNamedLogicalNotExpectedType
   testNamedLogicalNotMismatchDoesNotFallback

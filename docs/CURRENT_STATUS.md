@@ -45,7 +45,11 @@ now retain and signature-check their methods.  Deliberately narrow runtime
 evidence paths execute selected ground arithmetic and bitwise methods
 (`Add.add`, `Sub.sub`, `Mul.mul`, `Div.div`, `Mod.mod`, `BitAnd.band`,
 `BitXor.bxor`, `BitOr.bor`), unary `BitNot<T>.bnot`, `Eq<T>.eq` and
-`Ord<T>.gt`.  The standard
+`Ord<T>.gt`.  For these trait-backed unary and binary operators, inference
+records the primary trait obligation followed by the selected named method's
+predicates in declaration order.  The linker validates the corresponding
+ordered canonical caller evidence and supplies it to the detached method body.
+The standard
 `Ord<T> where T: Eq` header is accepted when its closed instantiated
 supertrait predicate is only a static method-body assumption; consuming that
 assumption inside the method resolves coherent evidence on demand.
@@ -5807,27 +5811,36 @@ requirements are consumed statically and do not become Core values or method
 calls.
 
 The runtime unary profile is executable for trait-backed `BitNot<T>.bnot`.
-The unary occurrence must own exactly one solved requirement, and a generic
-caller's assumption must resolve to one forwarded closed implementation
-witness.  Source Core retains operand traversal and type checking while the
-linker selects the uniquely named, ground-specialized `bnot` method from the
-trait and implementation catalogs, checks it, and capture-free inlines it.  Its
-method body is authoritative: the executable regression
-returns
-`91`, rather than the builtin Word complement.  A concrete Word `~` remains an
-evidence-free builtin operation, preserving the target's builtin fast path.
+Inference gives the occurrence an ordered requirement list containing the
+primary `BitNot<T>` predicate followed by the predicates declared on the named
+`bnot` method, after checking that the instantiated method has one operand and
+the expected result type.  A generic caller's assumptions must resolve to forwarded closed
+implementation witnesses.  The linker checks the exact requirement count and
+order, duplicate identities, predicates, evidence goals and canonical selected
+evidence before passing the method-predicate witnesses to the detached method
+body.  Source Core retains operand traversal and type checking while the linker
+selects the uniquely named, ground-specialized `bnot` method from the trait and
+implementation catalogs, checks it, and capture-free inlines it.  Its method
+body is authoritative: the original executable regression returns `91`, rather
+than the builtin Word complement, and a constrained end-to-end regression
+executes `BitNot.bnot where T: Eq` and returns `94` after consuming the caller's
+`Eq<Word>` evidence.  A concrete Word `~` remains an evidence-free builtin
+operation, preserving the target's builtin fast path.
 
 The runtime binary profile is executable for strict arithmetic, bitwise
-operators, equality and greater-than ordering.  A required occurrence must have
-exactly one matching
-solved operator requirement and closed implementation witness.  The selected
-trait must have one type parameter; its uniquely named selected method is
-non-generic.  The selected implementation may be generic only when the closed
-evidence goal determines
-every declaration parameter, and its method must be predicate-free.  The body
-is checked under the rigid implementation parameters and then closed by the
-existing source specializer; its detached-link key retains the canonical ground
-argument sequence.
+operators, equality and greater-than ordering.  Inference places the primary
+operator trait predicate first and then the selected named method's predicates
+in their declaration order, after checking the instantiated two-operand and
+single-result operator signature.  The selected trait must have one type parameter;
+its uniquely named selected method is non-generic.  The selected implementation
+may be generic only when the closed primary evidence goal determines every
+declaration parameter.  Its method predicates must agree exactly with the trait
+method after generic and closed instantiation.  The executable checker validates
+one ordered, canonical caller witness for every closed method predicate.  The
+body is checked under the rigid implementation parameters and then closed by
+the existing source specializer; its detached-link key retains the canonical
+ground argument sequence, and its method witnesses become available to the
+detached method body.
 Closed implementation-level `where` predicates are checked positionally
 against the selected evidence premises and retained as static assumptions of
 the synthetic method.
@@ -5872,9 +5885,11 @@ requirement whose predicate and evidence goal are exactly
 unique matching closed implementation witness was forwarded from the caller.
 The selected two-parameter trait and implementation must each contain one
 method named `coerce`.  The selected implementation and method must satisfy the
-same ground-specialized,
-closed-implementation-predicate and predicate-free-method profile.  The method
-is checked at one `From` input
+same ground-specialized, closed-implementation-predicate profile.  The current
+coercion-edge carrier records only its primary `Coerce<From, To>` requirement,
+so a `coerce` method with additional method predicates is still rejected rather
+than executed without caller evidence.  A premise-free method is checked at one
+`From` input
 and one `To` result and then capture-free inlined; endpoint types validate the
 method but never invent its behavior.  Regressions execute a direct Bool-to-Word
 argument conversion, the same conversion justified by evidence forwarded into
@@ -5887,8 +5902,9 @@ direct-call cycles, seed roots with unresolved assumptions, unconsumed
 non-call/operator/literal requirements outside the supported unary, binary and
 conversion profiles and indirect calls reject explicitly.  Other runtime
 operators, implementation parameters not determined by the selected evidence,
-and method-level `where`-constrained profiles remain
-explicit boundaries.  Selected implementation methods now have their own
+and method-level `where` predicates on profiles without an ordered caller-owned
+evidence carrier—currently including `Coerce.coerce`—remain explicit
+boundaries.  Selected implementation methods now have their own
 finite detached linker.  It reconstructs direct-call metadata against the
 whole-program catalog even when a method-only helper is absent from the
 top-level specialization plan, threads proof evidence into constrained generic
@@ -5927,9 +5943,17 @@ longer block execution, while missing or duplicate named rows reject.  The
 end-to-end Add regression executes `add` from a catalog which also contains
 `tag` and observes the method-authoritative result `91`.
 
+Method-level predicates are executable end to end for the supported unary and
+binary profiles.  The Add regression retains `Add<T>` followed by `Eq<T>` on
+the operator occurrence, validates the closed witnesses in that order, supplies
+the `Eq<Word>` witness to the detached `Add.add` body, and observes `92`.  The
+parallel BitNot regression performs the same flow for `BitNot<T>`, `Eq<T>` and
+`BitNot.bnot`, observing `94`.
+
 The next frontend boundary is broader implementation shapes—method-level
-predicates and generic parameters not recoverable from the current evidence
-language—and additional runtime-evidence profiles.
+predicates for coercions and other profiles which do not yet carry their ordered
+caller obligations, plus generic parameters not recoverable from the current
+evidence language—and additional runtime-evidence profiles.
 Recursive source calls require
 a separate named or global recursive-function representation rather than cyclic
 inlining.

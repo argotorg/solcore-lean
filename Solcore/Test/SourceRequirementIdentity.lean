@@ -112,13 +112,17 @@ private def testCandidateForkCommitsOnlySelectedIds : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
     "trait Ready<T> {}",
     "trait Coerce<From, To> {}",
-    "trait Eq<T> {}",
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
     "enum Box { Only }",
     "enum Flag { Only }",
     "enum Token { Only }",
     "impl Ready<Word> {}",
     "impl Coerce<Word, Box> {}",
-    "impl Eq<Token> {}",
+    "impl Eq<Token> {",
+    "  function eq(left: Token, right: Token) returns (Bool) { return true; }",
+    "}",
     "function choose(value: Box) returns (Bool) { return true; }",
     "function choose(value: Flag) returns (Bool) { return true; }",
     "function choose<T>(value: T) returns (Bool) where T: Ready {",
@@ -138,10 +142,14 @@ private def testCandidateForkCommitsOnlySelectedIds : IO Unit := do
 
 private def testFinalizeContinuesInferenceIds : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
-    "trait Add<T> {}",
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "}",
     "trait Numeric<T> {}",
     "enum Box { Only }",
-    "impl Add<Box> {}",
+    "impl Add<Box> {",
+    "  function add(left: Box, right: Box) returns (Box) { return left; }",
+    "}",
     "impl Numeric<Box> {}",
     "function compute(value: Box) returns (Box) { return value + 1; }"
   ])
@@ -154,9 +162,13 @@ private def testFinalizeContinuesInferenceIds : IO Unit := do
 
 private def testRepeatedPredicatesKeepDistinctIds : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
-    "trait Eq<T> {}",
+    "trait Eq<T> {",
+    "  function eq(left: T, right: T) returns (Bool);",
+    "}",
     "enum Token { Only }",
-    "impl Eq<Token> {}",
+    "impl Eq<Token> {",
+    "  function eq(left: Token, right: Token) returns (Bool) { return true; }",
+    "}",
     "function compareTwice(token: Token) returns (Bool) {",
     "  token == token;",
     "  return token == token;",

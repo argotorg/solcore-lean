@@ -25,6 +25,26 @@ private def check (content : String) :
   | .error errors =>
       throw (IO.userError s!"source inference failed: {reprStr errors}")
 
+private def load (content : String) : IO LoadedProgram := do
+  match loadProgram (workspace content) with
+  | .ok loaded => pure loaded
+  | .error errors =>
+      throw (IO.userError s!"source inference loading failed: {reprStr errors}")
+
+private def checkedNamed (environment : ProgramEnvironment)
+    (checked : List SourceInference.CheckedFunction) (name : String) :
+    IO SourceInference.CheckedFunction :=
+  match checked.find? fun function =>
+      (environment.declaration? function.declaration).any fun declaration =>
+        declaration.name == some name with
+  | some function => pure function
+  | none => throw (IO.userError s!"checked function `{name}` was not found")
+
+private def traitNameOf (environment : ProgramEnvironment)
+    (predicate : ProgramPredicate) : Option String := do
+  let declaration ← environment.declaration? predicate.trait
+  declaration.name
+
 private def testLambdaLetTupleConditional : IO Unit := do
   let checked ← check (String.intercalate "\n" [
     "function polymorphic(flag: Bool) returns (Word, Bool) {",
@@ -168,6 +188,160 @@ private def testConstrainedLetDoesNotGeneralizeAwayEvidence : IO Unit := do
         "a constrained let detached its predicate from the instantiated type"
   | .ok _ => throw (IO.userError "Eq<Word> evidence was reused for Bool")
 
+private def testOperatorMethodPredicates : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Eq<T> {}",
+    "trait Noise<T> {}",
+    "trait Add<T> {",
+    "  function tag(value: T) returns (T) where T: Noise;",
+    "  function add(left: T, right: T) returns (T) where T: Eq;",
+    "}",
+    "trait BitNot<T> {",
+    "  function bnot(value: T) returns (T) where T: Eq;",
+    "}",
+    "function addWithMethodEvidence<T>(left: T, right: T) returns (T)",
+    "    where T: Add, T: Eq {",
+    "  return left + right;",
+    "}",
+    "function bitNotWithMethodEvidence<T>(value: T) returns (T)",
+    "    where T: BitNot, T: Eq {",
+    "  return ~value;",
+    "}"
+  ]
+  let loaded ← load source
+  let checked ← match SourceInference.checkLoadedProgram loaded with
+    | .ok checked => pure checked
+    | .error errors => throw (IO.userError
+        s!"operator method predicates were rejected: {reprStr errors}")
+  let addition ← checkedNamed loaded.environment checked
+    "addWithMethodEvidence"
+  let bitNot ← checkedNamed loaded.environment checked
+    "bitNotWithMethodEvidence"
+  let names (function : SourceInference.CheckedFunction) :=
+    function.solvedRequirements.map fun solved =>
+      traitNameOf loaded.environment solved.predicate
+  let assumptionEvidence (function : SourceInference.CheckedFunction) :=
+    function.solvedRequirements.all fun solved =>
+      match solved.evidence with
+      | .assumption predicate => predicate == solved.predicate
+      | .implementation _ => false
+  assertTrue (decide (names addition = [some "Add", some "Eq"]) &&
+      assumptionEvidence addition)
+    "binary inference did not retain Add<T>, Eq<T> in declaration order"
+  assertTrue (decide (names bitNot = [some "BitNot", some "Eq"]) &&
+      assumptionEvidence bitNot)
+    "unary inference did not retain BitNot<T>, Eq<T> in declaration order"
+
+private def testUnsolvedOperatorMethodPredicates : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Eq<T> {}",
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T) where T: Eq;",
+    "}",
+    "trait BitNot<T> {",
+    "  function bnot(value: T) returns (T) where T: Eq;",
+    "}",
+    "function rejectAdd<T>(left: T, right: T) returns (T) where T: Add {",
+    "  return left + right;",
+    "}",
+    "function rejectBitNot<T>(value: T) returns (T) where T: BitNot {",
+    "  return ~value;",
+    "}"
+  ]
+  let loaded ← load source
+  let eq ← match loaded.environment.traitsNamed "Eq" with
+    | [declaration] => pure declaration.id
+    | declarations => throw (IO.userError
+        s!"expected one Eq trait, found {declarations.length}")
+  match SourceInference.checkLoadedProgram loaded with
+  | .error errors =>
+      let unsolved := errors.filter fun error => match error with
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            decide (predicate.trait = eq)
+        | _ => false
+      assertTrue (unsolved.length == 2)
+        "a binary or unary method predicate was accepted without Eq<T>"
+  | .ok _ => throw (IO.userError
+      "operator method predicates were accepted without Eq<T>")
+
+private def testOperatorMethodCatalogDiagnostics : IO Unit := do
+  let missingSource := String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function tag(value: T) returns (T);",
+    "}",
+    "function reject<T>(left: T, right: T) returns (T) where T: Add {",
+    "  return left + right;",
+    "}"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace missingSource) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .missingOperatorTraitMethod _ "add", .. } => true
+        | _ => false)
+        "a trait catalog without the named add method lost its diagnostic"
+  | .ok _ => throw (IO.userError
+      "a trait catalog without the named add method was accepted")
+
+  let malformedSource := String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function add(value: T) returns (Bool);",
+    "}",
+    "function reject<T>(left: T, right: T) returns (T) where T: Add {",
+    "  return left + right;",
+    "}"
+  ]
+  match SourceInference.loadAndCheckProgram (workspace malformedSource) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := (.operatorTraitMethodSignatureMismatch _ "add"
+            expectedParameters actualParameters expectedReturns actualReturns),
+            .. } => decide (expectedParameters.length = 2 ∧
+              actualParameters.length = 1 ∧ expectedReturns.length = 1 ∧
+              actualReturns = [.bool])
+        | _ => false)
+        "a malformed add method lost its operator-signature diagnostic"
+  | .ok _ => throw (IO.userError
+      "a malformed add method was accepted as binary operator semantics")
+
+  let duplicateSource := String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "}",
+    "function reject<T>(left: T, right: T) returns (T) where T: Add {",
+    "  return left + right;",
+    "}"
+  ]
+  let loaded ← load duplicateSource
+  let signatures ← match buildProgramSignatures loaded.environment with
+    | .ok signatures => pure signatures
+    | .error errors => throw (IO.userError
+        s!"operator catalog fixture failed: {reprStr errors}")
+  let add ← match signatures.traits.filter fun trait => trait.name == "Add" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Add catalog, found {traits.length}")
+  let method ← match add.methods with
+    | [method] => pure method
+    | methods => throw (IO.userError
+        s!"expected one Add method, found {methods.length}")
+  let duplicate := {
+    method with id := { method.id with methodIndex := method.id.methodIndex + 1 }
+  }
+  let tampered := {
+    signatures with
+    traits := signatures.traits.map fun trait =>
+      if trait.id = add.id then { trait with methods := trait.methods ++ [duplicate] }
+      else trait
+  }
+  match SourceInference.checkFunctionBodies loaded.environment tampered with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error.error with
+        | .duplicateOperatorTraitMethod trait "add" 2 => trait == add.id
+        | _ => false)
+        "a duplicate named operator method lost its defensive diagnostic"
+  | .ok _ => throw (IO.userError
+      "a duplicate named operator method was selected silently")
+
 private def testAmbiguousCoercionTrait : IO Unit := do
   let raw : Workspace.RawWorkspace := {
     entry := "main.solc"
@@ -204,6 +378,9 @@ def testSourceInference : IO Unit := do
   testMissingCoercion
   testInconclusiveCoercion
   testConstrainedLetDoesNotGeneralizeAwayEvidence
+  testOperatorMethodPredicates
+  testUnsolvedOperatorMethodPredicates
+  testOperatorMethodCatalogDiagnostics
   testAmbiguousCoercionTrait
 
 end Tests.SourceInference

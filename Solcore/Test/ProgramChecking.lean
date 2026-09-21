@@ -100,7 +100,9 @@ private def unsolvedTraitWorkspace : Workspace.RawWorkspace := {
   mainSources := [{
     path := "broken.solc"
     content := String.intercalate "\n" [
-      "trait Add<T> {}",
+      "trait Add<T> {",
+      "  function add(left: T, right: T) returns (T);",
+      "}",
       "enum Box { Only }",
       "function broken(value: Box) returns (Box) { return value + value; }"
     ]
@@ -122,10 +124,16 @@ private def inconclusiveTraitWorkspace : Workspace.RawWorkspace := {
   mainSources := [{
     path := "ambiguous.solc"
     content := String.intercalate "\n" [
-      "trait Add<T> {}",
+      "trait Add<T> {",
+      "  function add(left: T, right: T) returns (T);",
+      "}",
       "enum Box { Only }",
-      "impl Add<Box> {}",
-      "impl Add<Box> {}",
+      "impl Add<Box> {",
+      "  function add(left: Box, right: Box) returns (Box) { return left; }",
+      "}",
+      "impl Add<Box> {",
+      "  function add(left: Box, right: Box) returns (Box) { return right; }",
+      "}",
       "function ambiguous(value: Box) returns (Box) { return value + value; }"
     ]
   }]

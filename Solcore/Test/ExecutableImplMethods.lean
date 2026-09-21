@@ -599,52 +599,195 @@ private def testImplementationPredicateEvidence : IO Unit := do
   | .ok _ => throw (IO.userError
       "mismatched implementation premise evidence was executable")
 
-private def testMethodPredicateRejections : IO Unit := do
+private def testMethodPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
-    "trait Eq<T> {}",
+    "trait Eq<T> { function eq(left: T, right: T) returns (Bool); }",
+    "trait Mark<T> {}",
     "trait Guard<T> {",
-    "  function guard(value: T) returns (T) where T: Eq;",
+    "  function guard(value: T) returns (T) where T: Eq, T: Mark;",
     "}",
-    "impl Guard<Word> {",
-    "  function guard(value: Word) returns (Word) where Word: Eq { return value; }",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return true; }",
+    "}",
+    "impl Mark<Word> {}",
+    "impl<T> Guard<T> {",
+    "  function guard(value: T) returns (T) where T: Eq, T: Mark {",
+    "    value == value;",
+    "    return value;",
+    "  }",
     "}"
   ])
-  let implementation ← onlyImplementation program
+  let eq ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Eq" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Eq trait, found {traits.length}")
+  let mark ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Mark" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Mark trait, found {traits.length}")
+  let guard ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Guard" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Guard trait, found {traits.length}")
+  let implementation ← match program.signatures.implementations.filter
+      fun implementation => implementation.head.trait == guard.id with
+    | [implementation] => pure implementation
+    | implementations => throw (IO.userError
+        s!"expected one Guard implementation, found {implementations.length}")
   let implementationMethod ← match implementation.methods with
     | [method] => pure method
     | methods => throw (IO.userError
         s!"expected one Guard implementation method, found {methods.length}")
-  match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program
-      (evidenceFor implementation) 1 "guard" with
-  | .error (.implementationMethodPredicatesPresent id [_]) =>
+  let eqWord : ProgramPredicate := {
+    trait := eq.id
+    subject := .word
+    arguments := []
+  }
+  let markWord : ProgramPredicate := {
+    trait := mark.id
+    subject := .word
+    arguments := []
+  }
+  let guardWord : ProgramPredicate := {
+    trait := guard.id
+    subject := .word
+    arguments := []
+  }
+  let primaryEvidence ← match (TypedTraitResolution.resolve
+      program.signatures.implRules 32 guardWord).outcome with
+    | .success evidence => pure evidence
+    | outcome => throw (IO.userError
+        s!"Guard<Word> evidence did not resolve: {reprStr outcome}")
+  let eqEvidence ← match (TypedTraitResolution.resolve
+      program.signatures.implRules 32 eqWord).outcome with
+    | .success evidence => pure evidence
+    | outcome => throw (IO.userError
+        s!"Eq<Word> evidence did not resolve: {reprStr outcome}")
+  let markEvidence ← match (TypedTraitResolution.resolve
+      program.signatures.implRules 32 markWord).outcome with
+    | .success evidence => pure evidence
+    | outcome => throw (IO.userError
+        s!"Mark<Word> evidence did not resolve: {reprStr outcome}")
+  let method ← match
+      ExecutableImplMethods.checkMethodWithEvidenceAndArity program
+        primaryEvidence [eqEvidence, markEvidence] 1 "guard" with
+    | .ok method => pure method
+    | .error error => throw (IO.userError
+        s!"caller-owned method evidence was rejected: {reprStr error}")
+  let methodEvidenceMatches := match method.methodPremises with
+    | [first, second] => first == eqEvidence && second == markEvidence
+    | _ => false
+  assertTrue (methodEvidenceMatches && decide (
+      method.methodPredicates = [eqWord, markWord] ∧
+      method.traitPredicates = [] ∧
+      method.implementationPredicates = [] ∧
+      method.synthetic.scheme.predicates = [eqWord, markWord] ∧
+      method.specialized.assumptions = [eqWord, markWord] ∧
+      method.synthetic.parameterTypes = [.word] ∧
+      method.synthetic.returnTypes = [.word] ∧
+      method.checked.solvedRequirements.map (·.predicate) = [eqWord]))
+    "method predicates or their caller-owned evidence lost source order"
+  match ExecutableImplMethods.checkMethodWithArity program primaryEvidence
+      1 "guard" with
+  | .error (.methodEvidenceCountMismatch id 2 0) =>
       assertTrue (decide (id = implementationMethod.id))
-        "method-predicate rejection named the wrong implementation method"
+        "compatibility-entry rejection named the wrong implementation method"
   | .error error => throw (IO.userError
-      s!"where-constrained implementation method had the wrong rejection: {reprStr error}")
+      s!"missing method evidence had the wrong rejection: {reprStr error}")
   | .ok _ => throw (IO.userError
-      "where-constrained implementation method was executable")
-  let strippedImplementation : ProgramImplementationSignature := {
+      "the empty-evidence compatibility entry discharged method predicates")
+  match ExecutableImplMethods.checkMethodWithEvidenceAndArity program
+      primaryEvidence [eqEvidence] 1 "guard" with
+  | .error (.methodEvidenceCountMismatch id 2 1) =>
+      assertTrue (decide (id = implementationMethod.id))
+        "method-evidence count rejection named the wrong method"
+  | .error error => throw (IO.userError
+      s!"short method evidence had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError "short method evidence was accepted")
+  match ExecutableImplMethods.checkMethodWithEvidenceAndArity program
+      primaryEvidence [markEvidence, eqEvidence] 1 "guard" with
+  | .error (.methodEvidenceGoalMismatch id 0 expected actual) =>
+      assertTrue (decide (id = implementationMethod.id ∧ expected = eqWord ∧
+          actual = markWord))
+        "method-evidence order rejection lost its first expected goal"
+  | .error error => throw (IO.userError
+      s!"reordered method evidence had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError "reordered method evidence was accepted")
+  let forgedEqEvidence : TypedTraitResolution.Evidence :=
+    .byImpl eqWord implementation.id []
+  match ExecutableImplMethods.checkMethodWithEvidenceAndArity program
+      primaryEvidence [forgedEqEvidence, markEvidence] 1 "guard" with
+  | .error (.methodEvidenceNotSelected id 0 goal) =>
+      assertTrue (decide (id = implementationMethod.id ∧ goal = eqWord))
+        "noncanonical method-evidence rejection lost its method or goal"
+  | .error error => throw (IO.userError
+      s!"forged method evidence had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError "forged method evidence was accepted")
+  let reversedImplementation : ProgramImplementationSignature := {
     implementation with
     methods := implementation.methods.map fun method => {
-      method with wherePredicates := []
+      method with wherePredicates := method.wherePredicates.reverse
     }
   }
-  let strippedProgram : CheckedProgram := {
+  let reversedProgram : CheckedProgram := {
     program with
     signatures := {
       program.signatures with
-      implementations := [strippedImplementation]
+      implementations := program.signatures.implementations.map fun candidate =>
+        if candidate.id = implementation.id then reversedImplementation
+        else candidate
     }
   }
-  match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity
-      strippedProgram (evidenceFor strippedImplementation) 1 "guard" with
-  | .error (.traitMethodPredicatesPresent id [_]) =>
-      assertTrue (decide (id = implementationMethod.traitMethod))
-        "method-predicate rejection named the wrong trait method"
+  match ExecutableImplMethods.checkMethodWithEvidenceAndArity reversedProgram
+      primaryEvidence [eqEvidence, markEvidence] 1 "guard" with
+  | .error (.methodPredicateMismatch id traitMethod expected actual) =>
+      assertTrue (decide (id = implementationMethod.id ∧
+          traitMethod = implementationMethod.traitMethod ∧
+          expected = implementationMethod.wherePredicates ∧
+          actual = implementationMethod.wherePredicates.reverse))
+        "generic method-predicate mismatch lost its ordered catalogs"
   | .error error => throw (IO.userError
-      s!"where-constrained trait method had the wrong rejection: {reprStr error}")
+      s!"tampered generic method predicates had the wrong rejection: {reprStr error}")
   | .ok _ => throw (IO.userError
-      "where-constrained trait method was executable")
+      "tampered generic method predicates were executable")
+  let foreignParameter : TypeSystem.TypeParameterId := {
+    owner := guard.id
+    index := guard.parameters.length + 11
+  }
+  let openPredicate := { eqWord with subject := .parameter foreignParameter }
+  let openTraitMethod ← match guard.methods with
+    | [method] => pure { method with wherePredicates := [openPredicate] }
+    | methods => throw (IO.userError
+        s!"expected one Guard trait method, found {methods.length}")
+  let openImplementationMethod := {
+    implementationMethod with wherePredicates := [openPredicate]
+  }
+  let openGuard := { guard with methods := [openTraitMethod] }
+  let openImplementation := {
+    implementation with methods := [openImplementationMethod]
+  }
+  let openProgram : CheckedProgram := {
+    program with
+    signatures := {
+      program.signatures with
+      traits := program.signatures.traits.map fun candidate =>
+        if candidate.id = guard.id then openGuard else candidate
+      implementations := program.signatures.implementations.map fun candidate =>
+        if candidate.id = implementation.id then openImplementation else candidate
+    }
+  }
+  match ExecutableImplMethods.checkMethodWithEvidenceAndArity openProgram
+      primaryEvidence [eqEvidence] 1 "guard" with
+  | .error (.methodPredicateNotClosed id predicate (.rigid parameter)) =>
+      assertTrue (decide (id = implementationMethod.id ∧
+          predicate = openPredicate ∧ parameter = foreignParameter))
+        "open method-predicate rejection lost its method or rigid parameter"
+  | .error error => throw (IO.userError
+      s!"open method predicate had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError "an open method predicate was executable")
 
 private def testBodyIsActuallyChecked : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -679,7 +822,7 @@ def testExecutableImplMethods : IO Unit := do
   testGenericImplementationSpecialization
   testUndeterminedImplementationParameterRejection
   testImplementationPredicateEvidence
-  testMethodPredicateRejections
+  testMethodPredicateEvidence
   testBodyIsActuallyChecked
 
 end Tests.ExecutableImplMethods

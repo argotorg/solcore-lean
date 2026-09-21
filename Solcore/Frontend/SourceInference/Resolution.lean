@@ -341,6 +341,51 @@ def binaryBuiltinType : Syntax.BinaryOp → Ty
   | .logicalAnd | .logicalOr => .bool
   | _ => .word
 
+/-- Select the exact trait method assigned to an operator spelling.  Program
+signature construction rejects duplicate method names, but keeping the
+cardinality check here makes inference reject malformed or independently
+assembled catalogs instead of silently selecting one entry. -/
+def exactOperatorTraitMethod (context : Context)
+    (trait : Resolved.DeclarationId) (methodName : String) :
+    Except Error (ProgramTraitSignature × ProgramTraitMethodSignature) := do
+  let signature ← match context.signatures.trait? trait with
+    | some signature => pure signature
+    | none => throw (.missingOperatorTraitCatalog trait)
+  match signature.methods.filter fun method => method.name == methodName with
+  | [] => throw (.missingOperatorTraitMethod trait methodName)
+  | [method] => pure (signature, method)
+  | methods => throw (.duplicateOperatorTraitMethod trait methodName methods.length)
+
+/-- The operator occurrence owns both selection of the primary trait and the
+named method's declaration-ordered local obligations.  Operator traits have
+one source parameter, so instantiating it with the inferred operand closes the
+same method predicates that implementation signatures are checked against.
+The instantiated parameter and result lists must also match the operator's
+fixed source-level signature. -/
+def operatorTraitPredicates (context : Context)
+    (trait : Resolved.DeclarationId) (methodName : String) (operand : Ty)
+    (expectedParameters expectedReturns : List Ty) :
+    Except Error (List ProgramPredicate) := do
+  let (signature, method) ←
+    exactOperatorTraitMethod context trait methodName
+  unless signature.parameters.length = 1 do
+    throw (.operatorTraitArityMismatch trait 1 signature.parameters.length)
+  let substitution : ParameterSubstitution :=
+    signature.parameters.zip [operand]
+  let actualParameters := method.parameterTypes.map substitution.apply
+  let actualReturns := method.returnTypes.map substitution.apply
+  unless actualParameters = expectedParameters &&
+      actualReturns = expectedReturns do
+    throw (.operatorTraitMethodSignatureMismatch trait methodName
+      expectedParameters actualParameters expectedReturns actualReturns)
+  let primary : ProgramPredicate := {
+    trait
+    subject := operand
+    arguments := []
+  }
+  pure (primary :: method.wherePredicates.map
+    (ProgramPredicate.applyParameters substitution))
+
 /-- Operator inference result together with the obligations introduced by the
 operator occurrence itself. -/
 structure OperatorInferenceResult where
@@ -370,15 +415,18 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
   else
     match binaryOperatorDispatch operator with
     | .function name => throw (.unknownVariable name)
-    | .traitMethod traitName _ =>
+    | .traitMethod traitName methodName =>
         match ← operatorTrait? context traitName with
         | some trait =>
-            let (requirement, state) := state.addRequirementWithId {
-              trait, subject := operand, arguments := []
-            }
+            let result := if binaryResultIsBool operator then .bool else operand
+            let predicates ←
+              operatorTraitPredicates context trait methodName operand
+                [operand, operand] [result]
+            let (requirements, state) :=
+              state.addRequirementsWithIds predicates
             pure {
-              type := if binaryResultIsBool operator then .bool else operand
-              requirements := [requirement]
+              type := result
+              requirements
               state
             }
         | none => throw (.operatorNotSupported traitName operand)
@@ -398,15 +446,18 @@ def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
   else
     match unaryOperatorDispatch operator with
     | .function name => throw (.unknownVariable name)
-    | .traitMethod traitName _ =>
+    | .traitMethod traitName methodName =>
         match ← operatorTrait? context traitName with
         | some trait =>
-            let (requirement, state) := state.addRequirementWithId {
-              trait, subject := operand, arguments := []
-            }
+            let result := if operator == .logicalNot then .bool else operand
+            let predicates ←
+              operatorTraitPredicates context trait methodName operand
+                [operand] [result]
+            let (requirements, state) :=
+              state.addRequirementsWithIds predicates
             pure {
-              type := if operator == .logicalNot then .bool else operand
-              requirements := [requirement]
+              type := result
+              requirements
               state
             }
         | none => throw (.operatorNotSupported traitName operand)

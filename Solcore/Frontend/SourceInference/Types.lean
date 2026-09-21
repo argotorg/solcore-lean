@@ -64,6 +64,17 @@ inductive Error where
         Resolved.DeclarationId Ty Resolved.DeclarationId)
   | ambiguousOperatorTrait
       (name : String) (candidates : List Resolved.DeclarationId)
+  | missingOperatorTraitCatalog (trait : Resolved.DeclarationId)
+  | missingOperatorTraitMethod
+      (trait : Resolved.DeclarationId) (name : String)
+  | duplicateOperatorTraitMethod
+      (trait : Resolved.DeclarationId) (name : String) (count : Nat)
+  | operatorTraitArityMismatch
+      (trait : Resolved.DeclarationId) (expected actual : Nat)
+  | operatorTraitMethodSignatureMismatch
+      (trait : Resolved.DeclarationId) (name : String)
+      (expectedParameters actualParameters : List Ty)
+      (expectedReturns actualReturns : List Ty)
   | ambiguousImportedNamespace
       (name : String) (candidates : List Workspace.ModuleId)
   | ambiguousCoercion
