@@ -1272,6 +1272,7 @@ import Solcore.Test.SourceSpecializationWorklist
 import Solcore.Test.SourceCoreElaboration
 import Solcore.Test.SourceCoreDirectLinking
 import Solcore.Test.ProgramChecking
+import Solcore.Test.SourceProgramExecution
 
 set_option autoImplicit false
 
@@ -6059,6 +6060,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceCoreElaboration.testSourceCoreElaboration
   SourceCoreDirectLinking.testSourceCoreDirectLinking
   ProgramChecking.testProgramChecking
+  SourceProgramExecution.testSourceProgramExecution
 
 def run : IO Unit := do
   coreLocalFragmentPairBoundaryTests

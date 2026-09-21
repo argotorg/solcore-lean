@@ -36,8 +36,10 @@ all of those caller-owned witnesses.  A finite
 detached linker now lets those selected methods call cataloged functions and
 consume coherent trait-header or exact implementation-premise evidence through
 the same policies.
+An explicit single-seed public Lean pipeline now composes raw-workspace
+checking, specialization, linking and execution as specified by ADR-0343.
 Other runtime evidence, recursive or indirect source calls, automatic entry
-discovery and a public source pipeline remain staged extensions.
+discovery, multiple public roots and a source Oracle remain staged extensions.
 
 ## Context
 
@@ -435,6 +437,16 @@ rows with the required method name.  Exactly one matching trait method and one
 matching implementation method are required; unrelated rows are ignored, while
 missing or duplicate named rows reject.  An executable Add fixture includes an
 unrelated `tag` method and observes the selected `add` body's result `91`.
+
+ADR-0343 exposes the completed vertical slice through
+`Solcore.Frontend.SourceProgramExecution`.  One explicit seed may identify a
+function by stable declaration identity or by an exact module/name pair and may
+supply its ground type arguments.  `prepare` composes whole-program checking,
+finite specialization and restricted linking into one reusable
+`PreparedEntry`; `run` additionally validates runtime inputs and invokes the
+checked Core entry under separate checking, specialization and execution
+limits.  This public Lean API adds no automatic entry discovery, multi-root
+policy, Oracle format or support for forms rejected by the underlying stages.
 
 The next internal boundary is method-level predicates for remaining profiles
 without an ordered caller-obligation carrier, generic arguments not represented

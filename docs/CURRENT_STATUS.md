@@ -70,6 +70,15 @@ recovered from the selected evidence goal.  Other runtime
 evidence remains outside this path.  It is not yet a general source compiler or
 a public source Oracle.
 
+`Solcore.Frontend.SourceProgramExecution` now publishes the implemented
+vertical slice as an explicit single-seed Lean API.  A caller supplies a raw
+workspace, either an exact declaration identity or an exact module/name pair,
+ground type arguments, finite checking/specialization/execution limits, runtime
+values and a store.  `prepare` composes checking, finite specialization and
+restricted linking into a reusable checked entry; `run` additionally checks
+the runtime input types and executes it.  This interface performs no automatic
+entry discovery, exposes no multi-root policy, and adds no source Oracle.
+
 ## What works now
 
 ### Resolved local-expression semantics
@@ -5978,13 +5987,25 @@ remain later in dependency order.  A whole-program reference to an obligation
 remains the owning declaration paired with its function-local requirement
 identity.
 
+The public Lean composition boundary for this restricted profile is now
+`Solcore.Frontend.SourceProgramExecution` (ADR-0343).  `SeedTarget.declaration`
+and `SeedTarget.named` select exactly one root; `Seed.arguments` supplies its
+ground generic arguments.  `Limits` keeps checking fuel, specialization budget
+and execution fuel independent.  `prepare` returns the linked entry as a
+`PreparedEntry`, from which its canonical key and exact input types are
+derived; top-level `run` uses the configured execution fuel after exact
+runtime-input validation.  Stage-specific checking, seed,
+worklist and linking failures remain visible, and a finite specialization
+frontier has its own `specializationBudgetExhausted` result rather than being
+collapsed into an invented source-execution or linker result.
+
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary
 Solcore source text. In particular, it does not yet provide:
 
-- automatic entry-point discovery/seeding and a public source-to-execution
-  pipeline;
+- automatic entry-point discovery/seeding, multiple public roots and a public
+  source Oracle;
 - execution of cyclic or indirect source call graphs, runtime
   evidence-dependent operator/literal/non-call forms outside the narrow
   `BitNot<T>`, strict arithmetic/bitwise, `Eq<T>`, closed standard `Ord<T>` and

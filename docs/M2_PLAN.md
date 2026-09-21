@@ -53,6 +53,14 @@ entry point accumulates function failures while preserving no-solution versus
 inconclusive trait outcomes.  Proxy and mapping-index support is currently a
 type-checking boundary, not executable lowering.
 
+ADR-0343 now composes the implemented vertical slice into one public Lean
+boundary.  An explicit declaration ID or exact module/name seed flows from a
+raw workspace through whole-program checking, finite specialization,
+restricted acyclic linking, runtime input validation and checked Semantic Core
+execution.  Checking fuel, specialization budget and execution fuel remain
+independent.  Automatic entry discovery, multiple public roots and a source
+Oracle remain later policies rather than being guessed by this API.
+
 This is an executable-first milestone rather than a completed proof campaign.
 The first typed-carrier step now assigns contiguous function-local identities to
 obligations and preserves each identity with its normalized predicate and
@@ -60,13 +68,14 @@ evidence through finalization.  Allocation and solve-order preservation have
 small proofs, and transactional candidate tests establish that losing overloads
 do not leak identities.
 
-The next vertical work completes an occurrence-addressed typed/resolved source
-IR before broadening selection-bearing expressions and statements.  It must
-retain expression and binder identities, chosen overloads, instantiated types,
-obligation identities and ordered coercion steps.  Constructor catalogs and
-construction, patterns/match, member selection and place-aware assignment can
-then extend that IR, followed by executable conversion terms and
-specialization/elaboration into monomorphic Semantic Core.  Constructor and
+The occurrence-addressed typed/resolved source IR, ground specialization
+worklist and initial monomorphic Core linker are now implemented.  They retain
+expression and binder identities, chosen overloads, instantiated types,
+obligation identities and ordered coercion steps, including ordered method
+predicates on the supported unary, binary and conversion profiles.  The next
+vertical work should extend runtime evidence only where it agrees with the
+target language, then broaden constructors, patterns/match, member selection
+and place-aware assignment on the same carrier.  Constructor and
 operator export selectors, cyclic
 aliases, polymorphic recursion, higher-rank/higher-kinded types, generic or
 symbolic coercion intermediates, coinductive trait/coercion cycles and a complete
