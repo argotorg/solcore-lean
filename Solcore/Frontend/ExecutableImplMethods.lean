@@ -4,7 +4,7 @@ import Solcore.Frontend.SourceSpecialization
 /-!
 Checked source bodies for the first executable implementation-method profile.
 
-This boundary accepts explicitly sized implementation evidence whose sole
+This boundary accepts explicitly sized implementation evidence whose selected
 method carries no additional predicates.  A generic implementation is admitted
 only when its closed evidence goal determines every declaration parameter.
 Closed implementation-level predicates must correspond exactly to the evidence
@@ -94,13 +94,17 @@ inductive Error where
       (reason : NonClosedType)
   | missingImplementationMethod
       (implementation : Resolved.DeclarationId) (expectedName : String)
+  /-- Number of implementation methods with the requested name. -/
   | multipleImplementationMethods
       (implementation : Resolved.DeclarationId) (count : Nat)
   | missingTraitMethod
       (trait : Resolved.DeclarationId) (expectedName : String)
+  /-- Number of trait methods with the requested name. -/
   | multipleTraitMethods (trait : Resolved.DeclarationId) (count : Nat)
+  /-- Retained for compatibility with the former sole-method selector. -/
   | implementationMethodNameMismatch
       (method : ProgramImplMethodId) (expected actual : String)
+  /-- Retained for compatibility with the former sole-method selector. -/
   | traitMethodNameMismatch
       (method : ProgramTraitMethodId) (expected actual : String)
   | implementationMethodPredicatesPresent
@@ -141,19 +145,20 @@ private def exactTrait
   | [trait] => .ok trait
   | traits => .error (.duplicateTraits id traits.length)
 
-private def onlyImplementationMethod
+private def exactImplementationMethod
     (implementation : ProgramImplementationSignature) (expectedName : String) :
     Except Error ProgramImplMethodSignature :=
-  match implementation.methods with
+  match implementation.methods.filter fun method =>
+      method.name == expectedName with
   | [] => .error (.missingImplementationMethod implementation.id expectedName)
   | [method] => .ok method
   | methods =>
       .error (.multipleImplementationMethods implementation.id methods.length)
 
-private def onlyTraitMethod
+private def exactTraitMethod
     (trait : ProgramTraitSignature) (expectedName : String) :
     Except Error ProgramTraitMethodSignature :=
-  match trait.methods with
+  match trait.methods.filter fun method => method.name == expectedName with
   | [] => .error (.missingTraitMethod trait.id expectedName)
   | [method] => .ok method
   | methods => .error (.multipleTraitMethods trait.id methods.length)
@@ -236,8 +241,8 @@ private def closedSyntheticSignature
   }
 }
 
-/-- Select and check the sole executable method justified by one closed piece
-of trait evidence.  The evidence goal must determine every implementation
+/-- Select and check one named executable method justified by closed trait
+evidence.  The evidence goal must determine every implementation
 parameter.  Trait declaration predicates and exact closed implementation
 premises become static method assumptions; runtime dictionaries and
 method-level predicates remain explicit later profiles. -/
@@ -284,13 +289,8 @@ def checkMethodWithArity
   let genericTraitPredicates := trait.wherePredicates.map
     (ProgramPredicate.applyParameters genericTraitParameterSubstitution)
   let implementationMethod ←
-    onlyImplementationMethod implementation expectedName
-  let traitMethod ← onlyTraitMethod trait expectedName
-  unless implementationMethod.name = expectedName do
-    throw (.implementationMethodNameMismatch implementationMethod.id
-      expectedName implementationMethod.name)
-  unless traitMethod.name = expectedName do
-    throw (.traitMethodNameMismatch traitMethod.id expectedName traitMethod.name)
+    exactImplementationMethod implementation expectedName
+  let traitMethod ← exactTraitMethod trait expectedName
   unless implementationMethod.wherePredicates.isEmpty do
     throw (.implementationMethodPredicatesPresent implementationMethod.id
       implementationMethod.wherePredicates)

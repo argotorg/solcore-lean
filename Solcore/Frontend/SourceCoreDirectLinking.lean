@@ -20,9 +20,11 @@ must be discharged by a unique incoming witness with the same goal.  Evidence
 never becomes a runtime Core value.  Deliberately narrow required-unary,
 required-binary, and coercion profiles use closed `BitNot<T>`, arithmetic,
 bitwise, `Eq<T>`, `Ord<T>` and `Coerce<From, To>` evidence to select, check, and
-inline the sole monomorphic implementation method.  Operators backed by
-ordinary prelude functions are represented as ordinary direct calls before this
-layer.  Every other runtime-evidence shape remains an explicit staged boundary.
+inline the uniquely named ground specialization of an implementation method;
+unrelated methods in the same trait and implementation are ignored.  Operators
+backed by ordinary prelude functions are represented as ordinary direct calls
+before this layer.  Every other runtime-evidence shape remains an explicit
+staged boundary.
 
 The current Core has no recursive binding construct.  Accordingly, recursive
 specialization cycles are rejected explicitly rather than assigned an

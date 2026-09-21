@@ -116,6 +116,107 @@ private def testTwoParameterTraitMethodCheck : IO Unit := do
       Core.infer? elaborated.inputs.values elaborated.core = some .bool))
     "checked Coerce method did not retain a Word input and Bool result"
 
+private def testMultiMethodSelection : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "  function tag(value: T) returns (Bool);",
+    "}",
+    "impl Add<Word> {",
+    "  function add(left: Word, right: Word) returns (Word) { return left; }",
+    "  function tag(value: Word) returns (Bool) { return true; }",
+    "}"
+  ])
+  let implementation ← onlyImplementation program
+  let evidence := evidenceFor implementation
+  let add ← match ExecutableImplMethods.checkMethodWithArity program evidence
+      1 "add" with
+    | .ok method => pure method
+    | .error error => throw (IO.userError
+        s!"named add selection failed: {reprStr error}")
+  let tag ← match ExecutableImplMethods.checkMethodWithArity program evidence
+      1 "tag" with
+    | .ok method => pure method
+    | .error error => throw (IO.userError
+        s!"named tag selection failed: {reprStr error}")
+  assertTrue (decide (
+      add.id.methodIndex = 0 ∧ add.traitMethod.id.methodIndex = 0 ∧
+      add.synthetic.parameterTypes = [.word, .word] ∧
+      add.synthetic.returnTypes = [.word] ∧
+      tag.id.methodIndex = 1 ∧ tag.traitMethod.id.methodIndex = 1 ∧
+      tag.synthetic.parameterTypes = [.word] ∧
+      tag.synthetic.returnTypes = [.bool]))
+    "multi-method selection lost the requested method identity or type"
+  let implementationMethods ← match implementation.methods with
+    | [addMethod, tagMethod] => pure (addMethod, tagMethod)
+    | methods => throw (IO.userError
+        s!"expected two implementation methods, found {methods.length}")
+  let duplicatedImplementation := {
+    implementation with
+    methods := implementation.methods ++ [implementationMethods.1]
+  }
+  let duplicatedImplementationProgram : CheckedProgram := {
+    program with
+    signatures := {
+      program.signatures with
+      implementations := [duplicatedImplementation]
+    }
+  }
+  match ExecutableImplMethods.checkMethodWithArity
+      duplicatedImplementationProgram evidence 1 "add" with
+  | .error (.multipleImplementationMethods id 2) =>
+      assertTrue (decide (id = implementation.id))
+        "duplicate named impl-method rejection named the wrong implementation"
+  | .error error => throw (IO.userError
+      s!"duplicate named impl methods had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "duplicate implementation methods with one name were selected")
+  let trait ← match program.signatures.traits with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one trait, found {traits.length}")
+  let traitMethods ← match trait.methods with
+    | [addMethod, tagMethod] => pure (addMethod, tagMethod)
+    | methods => throw (IO.userError
+        s!"expected two trait methods, found {methods.length}")
+  let missingNamedTrait := { trait with methods := [traitMethods.2] }
+  let missingNamedTraitProgram : CheckedProgram := {
+    program with
+    signatures := {
+      program.signatures with
+      traits := [missingNamedTrait]
+    }
+  }
+  match ExecutableImplMethods.checkMethodWithArity missingNamedTraitProgram
+      evidence 1 "add" with
+  | .error (.missingTraitMethod id "add") =>
+      assertTrue (decide (id = trait.id))
+        "missing named trait-method rejection named the wrong trait"
+  | .error error => throw (IO.userError
+      s!"missing named trait method had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "missing named trait method was selected")
+  let duplicatedTrait := {
+    trait with
+    methods := trait.methods ++ [traitMethods.1]
+  }
+  let duplicatedTraitProgram : CheckedProgram := {
+    program with
+    signatures := {
+      program.signatures with
+      traits := [duplicatedTrait]
+    }
+  }
+  match ExecutableImplMethods.checkMethodWithArity duplicatedTraitProgram
+      evidence 1 "add" with
+  | .error (.multipleTraitMethods id 2) =>
+      assertTrue (decide (id = trait.id))
+        "duplicate named trait-method rejection named the wrong trait"
+  | .error error => throw (IO.userError
+      s!"duplicate named trait methods had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "duplicate trait methods with one name were selected")
+
 private def testTraitPredicateInstantiation : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {}",
@@ -289,7 +390,9 @@ private def testDefensiveProfileRejections : IO Unit := do
   | .ok _ => throw (IO.userError "duplicate implementation catalog was accepted")
   match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program
       (evidenceFor implementation) 1 "sum" with
-  | .error (.implementationMethodNameMismatch _ "sum" "add") => pure ()
+  | .error (.missingImplementationMethod id "sum") =>
+      assertTrue (decide (id = implementation.id))
+        "missing named method rejection named the wrong implementation"
   | .error error => throw (IO.userError
       s!"wrong method name had the wrong rejection: {reprStr error}")
   | .ok _ => throw (IO.userError "wrong expected method name was accepted")
@@ -566,6 +669,7 @@ the first profile's explicit staged boundaries. -/
 def testExecutableImplMethods : IO Unit := do
   testSuccessfulMethodCheck
   testTwoParameterTraitMethodCheck
+  testMultiMethodSelection
   testTraitPredicateInstantiation
   testTraitPredicateParameterOrder
   testUnclosedTraitPredicateRejection

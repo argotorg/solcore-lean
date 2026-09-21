@@ -600,6 +600,41 @@ private def testImplementationMethodDirectCall : IO Unit := do
         some (.done (.word (word 50)) [])))
     "implementation method did not execute its detached direct-call helper"
 
+private def testMultiMethodImplementationSelection : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "  function tag(value: T) returns (Bool);",
+    "}",
+    "impl Add<Word> {",
+    "  function add(left: Word, right: Word) returns (Word) { return 91; }",
+    "  function tag(value: Word) returns (Bool) { return true; }",
+    "}",
+    "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
+    "  return left + right;",
+    "}",
+    "function entry(left: Word, right: Word) returns (Word) {",
+    "  return addWithEvidence(left, right);",
+    "}"
+  ])
+  let entry ← signatureNamed program "entry"
+  let outcome ← runOrThrow "multi-method implementation selection" program
+    [monomorphicRequest entry] 2
+  let linked ← linkOrThrow "multi-method implementation selection" program
+    outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "multi-method implementation selection: linked root was absent")
+  assertTrue (decide (linkedEntry.run?
+      [.word (word 50), .word (word 8)] 2048 =
+        some (.done (.word (word 91)) [])))
+    "multi-method Add implementation did not execute its named add method"
+
 private def testImplementationMethodCallCycle : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Add<T> {",
@@ -2084,6 +2119,7 @@ def testSourceCoreDirectLinking : IO Unit := do
   testProofOnlyEvidence program
   testRuntimeEvidenceBoundaries program
   testImplementationMethodDirectCall
+  testMultiMethodImplementationSelection
   testImplementationMethodCallCycle
   testStrictRuntimeBinaryEvidence
   testRuntimeBitNotEvidence
