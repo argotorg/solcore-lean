@@ -456,6 +456,20 @@ private def validateRuntimeCallBoundary (caller : SpecializedFunction)
   if callee.function.returnComptime then
     throw (.runtimeCallComptimeResult caller.key node.id callee.key)
 
+/-- Read only explicitly marked arguments through Source Core's lexical staged
+oracle.  Runtime positions never query the oracle, and unknown marked values
+remain absent from the callee draft environment. -/
+private def knownStagedInputsAt
+    (oracle : SourceCoreElaboration.StagedValueArgumentOracle Error)
+    (node : ExpressionNode) : List TypedBinder → List ExpressionId →
+      Except Error SourceCoreElaboration.KnownStagedValueInputs
+  | [], [] => pure []
+  | input :: inputs, argument :: arguments => do
+      let value ← if input.comptime then oracle argument else pure none
+      pure (value :: (← knownStagedInputsAt oracle node inputs arguments))
+  | inputs, arguments =>
+      throw (.argumentArityMismatch node.id inputs.length arguments.length)
+
 private def firstDuplicateRequirement :
     List RequirementId → Option RequirementId
   | [] => none
@@ -1270,7 +1284,8 @@ mutual
 private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
     (visiting : List SpecializationKey)
-    (assumptionEvidence : List PredicateEvidence) (fuel : Nat)
+    (assumptionEvidence : List PredicateEvidence)
+    (knownInputs : SourceCoreElaboration.KnownStagedValueInputs) (fuel : Nat)
     (key : SpecializationKey) :
     Except Error SourceCoreElaboration.BodyDraft :=
   if visiting.contains key then
@@ -1282,9 +1297,9 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
         let specialized ← exactSpecialization plan key
         validateAssumptionEvidence specialized.key specialized.assumptions
           assumptionEvidence
-        SourceCoreElaboration.lowerSpecializedFunctionBodyWithRuntimeAndStagedPolicies
+        SourceCoreElaboration.lowerSpecializedFunctionBodyWithKnownStagedInputsAndRuntimePolicies
           Error.sourceCore
-          (fun _ node _ arguments resolution => do
+          (fun stagedValueArgument _ node _ arguments resolution => do
             let instantiation ← match resolution with
               | .indirect _ => throw (.indirectCall node.id)
               | .declaration instantiation => pure instantiation
@@ -1307,9 +1322,11 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
             if edge.callee != resolvedCallee.key then
               throw (.callEdgeCalleeMismatch key node.id edge.callee
                 resolvedCallee.key)
+            let calleeKnownInputs ← knownStagedInputsAt stagedValueArgument
+              node resolvedCallee.function.typedBody.inputs arguments
             let calleeDraft ← buildDraftFuel program plan temporaryOwner
-              temporaryBase (key :: visiting) calleeEvidence remaining
-              edge.callee
+              temporaryBase (key :: visiting) calleeEvidence
+              calleeKnownInputs remaining edge.callee
             let callee ← calleeDraft.finalizeWith Error.sourceCore
             if callee.inputs.length != arguments.length then
               throw (.argumentArityMismatch node.id callee.inputs.length
@@ -1365,7 +1382,7 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
               (elaborateDetachedMethod program temporaryOwner temporaryBase
                 specialized visiting remaining node.id)
               specialized assumptionEvidence node step)
-          specialized
+          knownInputs specialized
 termination_by fuel
 
 private def evaluateStagedIntegerFunctionFuel (program : CheckedProgram)
@@ -1443,8 +1460,10 @@ private def linkSeeds (program : CheckedProgram) (plan : Plan)
       let expansionFuel := plan.specializations.length +
         program.functions.length +
         program.signatures.implementations.length + 1
+      let knownInputs :=
+        specialized.function.typedBody.inputs.map fun _ => none
       let draft ← buildDraftFuel program plan key.declaration temporaryBase
-        [] [] expansionFuel key
+        [] [] knownInputs expansionFuel key
       let elaborated ← draft.finalizeWith Error.sourceCore
       pure ({ key, elaborated } ::
         (← linkSeeds program plan temporaryBase rest))
