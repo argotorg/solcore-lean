@@ -1,5 +1,8 @@
 import Solcore.Frontend.ProgramChecking
+import Solcore.Frontend.SourceSpecialization
+import Solcore.Frontend.SourceStagedValue
 import Solcore.Frontend.WordLiteral
+import Solcore.Core.Primitive
 import Solcore.Resolved.Typing
 
 /-!
@@ -135,6 +138,32 @@ inductive ErrorReason where
   | stagedBoolTypeMismatch (expected actual : Ty)
   | stagedBoolExpressionNotClosed
   | stagedBoolDepthLimit
+  | stagedValueExpressionStageMissing
+  | stagedValueExpressionRuntime
+  | stagedValueExpressionDeferred
+  | stagedValueBinderStageMissing
+  | stagedValueBinderRuntime
+  | stagedValueBinderDeferred
+  | stagedValueTypeMismatch (expected actual : Ty)
+  | stagedValueLocalSpellingMismatch
+      (binder : Resolved.LocalId) (expected actual : String)
+  | stagedValueInvalidUnaryOperand
+      (operator : Syntax.UnaryOp) (actual : Ty)
+  | stagedValueInvalidBinaryOperands
+      (operator : Syntax.BinaryOp) (left right : Ty)
+  | stagedValueArgumentArityMismatch (expected actual : Nat)
+  | stagedValueFunctionTypeMismatch (expected actual : Ty)
+  | stagedValueSpecializationKeyMismatch
+      (expected actual : Resolved.DeclarationId)
+  | stagedValueSpecializationArgumentsMismatch
+      (expected actual : List Ty)
+  | stagedValueAnalysisFailure (error : SourceStageAnalysis.Error)
+  | stagedValueAnalysisMismatch
+      (expected actual : SourceStageAnalysis.Analysis)
+  | stagedValueRequirementsMismatch
+      (expected actual : List RequirementId)
+  | stagedValueStatementNotClosed
+  | stagedValueDepthLimit
   | matchHiddenOwnerMismatch
       (expected actual : Resolved.DeclarationId)
   | duplicateMatchHidden (id : Resolved.LocalId)
@@ -1898,6 +1927,489 @@ def reconcileConsumedRequirements
     (solved consumed : List RequirementId) :
     Except Error (List RequirementId) :=
   reconcileConsumedRequirementsAux declaration [] solved consumed
+
+/-- A Core-representable staged value together with the exact source
+requirements consumed while producing it.  The separate bare-integer
+evaluator remains the compatibility path for unbounded compile-time integers. -/
+structure StagedValueEvaluation where
+  value : SourceStagedValue.Value
+  consumedRequirements : List RequirementId
+  deriving Repr, DecidableEq
+
+private structure StagedValueBinding where
+  binder : TypedBinder
+  value : SourceStagedValue.Value
+
+private abbrev StagedValueEnvironment := List StagedValueBinding
+
+private def StagedValueEnvironment.contains
+    (environment : StagedValueEnvironment) (id : Resolved.LocalId) : Bool :=
+  environment.any fun binding => decide (binding.binder.id = id)
+
+private def StagedValueEnvironment.lookup?
+    (environment : StagedValueEnvironment) (id : Resolved.LocalId) :
+    Option StagedValueBinding :=
+  environment.find? fun binding => decide (binding.binder.id = id)
+
+private def requireStagedExpressionWith {error : Type}
+    (lift : Error → error) (analysis : SourceStageAnalysis.Analysis)
+    (id : ExpressionId) : Except error Unit :=
+  match analysis.expressionStage? id with
+  | none =>
+      failWith lift (.occurrence id.occurrence)
+        .stagedValueExpressionStageMissing
+  | some .runtime =>
+      failWith lift (.occurrence id.occurrence) .stagedValueExpressionRuntime
+  | some .deferred =>
+      failWith lift (.occurrence id.occurrence) .stagedValueExpressionDeferred
+  | some .comptime => pure ()
+
+private def requireStagedBinderWith {error : Type}
+    (lift : Error → error) (analysis : SourceStageAnalysis.Analysis)
+    (binder : Resolved.LocalId) : Except error Unit :=
+  match analysis.binderStage? binder with
+  | none => failWith lift (.binder binder) .stagedValueBinderStageMissing
+  | some .runtime => failWith lift (.binder binder) .stagedValueBinderRuntime
+  | some .deferred => failWith lift (.binder binder) .stagedValueBinderDeferred
+  | some .comptime => pure ()
+
+private def ensureStagedValueTypeWith {error : Type}
+    (lift : Error → error) (site : ErrorSite) (expected : Ty)
+    (value : SourceStagedValue.Value) : Except error Unit :=
+  let actual := SourceStagedValue.sourceType value
+  if actual = expected then
+    pure ()
+  else
+    failWith lift site (.stagedValueTypeMismatch expected actual)
+
+private def stagedBoolWith {error : Type} (lift : Error → error)
+    (site : ErrorSite) (value : SourceStagedValue.Value) : Except error Bool :=
+  match value with
+  | .bool value => pure value
+  | value => failWith lift site
+      (.stagedValueTypeMismatch .bool (SourceStagedValue.sourceType value))
+
+private def stagedValueOfCore? : Core.Value → Option SourceStagedValue.Value
+  | .unit => some .unit
+  | .bool value => some (.bool value)
+  | .word value => some (.word value)
+  | .pair left right => do
+      let left ← stagedValueOfCore? left
+      let right ← stagedValueOfCore? right
+      pure (.product left right)
+  | _ => none
+
+private def stagedProductValue : List SourceStagedValue.Value →
+    SourceStagedValue.Value
+  | [] => .unit
+  | [value] => value
+  | value :: rest => .product value (stagedProductValue rest)
+
+private def stagedCoreBinary? : Syntax.BinaryOp → Option Core.BinaryOp
+  | .multiply => some .wordMul
+  | .divide => some .wordDiv
+  | .modulo => some .wordMod
+  | .add => some .wordAdd
+  | .subtract => some .wordSub
+  | .bitAnd => some .wordAnd
+  | .bitXor => some .wordXor
+  | .bitOr => some .wordOr
+  | .greater => some .wordGt
+  | .equal => some .wordEq
+  | .less
+  | .lessEqual
+  | .greaterEqual
+  | .notEqual
+  | .logicalAnd
+  | .logicalOr => none
+
+private def applyStagedBinary (operator : Syntax.BinaryOp)
+    (left right : SourceStagedValue.Value) : Option SourceStagedValue.Value :=
+  match operator, left, right with
+  | .less, .word left, .word right =>
+      some (.bool (decide (left.val < right.val)))
+  | .lessEqual, .word left, .word right =>
+      some (.bool (decide (left.val ≤ right.val)))
+  | .greaterEqual, .word left, .word right =>
+      some (.bool (decide (left.val ≥ right.val)))
+  | .notEqual, .word left, .word right =>
+      some (.bool (decide (left != right)))
+  | .logicalAnd, .bool left, .bool right => some (.bool (left && right))
+  | .logicalOr, .bool left, .bool right => some (.bool (left || right))
+  | operator, left, right => do
+      let coreOperator ← stagedCoreBinary? operator
+      let value ← coreOperator.apply
+        (SourceStagedValue.toCore left) (SourceStagedValue.toCore right)
+      stagedValueOfCore? value
+
+private def validateStagedValueBinderShapeWith {error : Type}
+    (lift : Error → error) (site : ErrorSite) (source : TypedSource)
+    (binder : TypedBinder) : Except error Unit := do
+  if binder.id.owner != source.owner then
+    failWith lift site (.ownerMismatch source.owner binder.id.owner)
+  else if !binder.scheme.quantified.isEmpty then
+    failWith lift site (.polymorphicLocal binder.scheme.quantified)
+  else
+    pure ()
+
+private def validateStagedValueBindingWith {error : Type}
+    (lift : Error → error) (site : ErrorSite) (source : TypedSource)
+    (binding : StagedValueBinding) : Except error Unit := do
+  validateStagedValueBinderShapeWith lift site source binding.binder
+  ensureStagedValueTypeWith lift site binding.binder.scheme.body binding.value
+
+private def evaluateStagedValueListWith {error : Type}
+    (evaluate : ExpressionId → Except error StagedValueEvaluation) :
+    List ExpressionId → Except error (List StagedValueEvaluation)
+  | [] => pure []
+  | expression :: rest => do
+      let value ← evaluate expression
+      let values ← evaluateStagedValueListWith evaluate rest
+      pure (value :: values)
+
+private def evaluateStagedValueFuelWith {error : Type}
+    (lift : Error → error) (analysis : SourceStageAnalysis.Analysis)
+    (solvedRequirements : List SolvedRequirement) (source : TypedSource)
+    (environment : StagedValueEnvironment) :
+    Nat → ExpressionId → Except error StagedValueEvaluation
+  | 0, id =>
+      failWith lift (.occurrence id.occurrence) .stagedValueDepthLimit
+  | fuel + 1, id => do
+      requireStagedExpressionWith lift analysis id
+      let node ← (lookupExpression source id).mapError lift
+      let site := ErrorSite.occurrence id.occurrence
+      unless node.coercions.isEmpty do
+        failWith lift site (.coercionsPresent node.coercions)
+      let recurse := evaluateStagedValueFuelWith lift analysis
+        solvedRequirements source environment fuel
+      match node.form with
+      | .integerLiteral literal resolution => do
+          if node.type != Ty.word then
+            failWith lift site (.stagedValueTypeMismatch .word node.type)
+          let validated ← validateIntegerLiteralResolutionWith lift site
+            solvedRequirements node.type node.requirements literal resolution
+            (.builtin .intWord)
+            (fun target =>
+              if target = Ty.word then pure ()
+              else failWith lift site
+                (.stagedValueTypeMismatch .word target))
+          pure {
+            value := .word (Core.Word.ofNatModulo validated.rawValue)
+            consumedRequirements := validated.consumedRequirements
+          }
+      | form => do
+          unless node.requirements.isEmpty do
+            failWith lift site (.requirementsPresent node.requirements)
+          match form with
+          | .literal literal => do
+              if node.type != Ty.word then
+                failWith lift site (.stagedValueTypeMismatch .word node.type)
+              match interpretWordLiteral? ⟨node.span, literal⟩ with
+              | some word => pure {
+                  value := .word word
+                  consumedRequirements := []
+                }
+              | none => failWith lift site (.invalidWordLiteral literal)
+          | .reference name (.local binder) => do
+              if binder.owner != source.owner then
+                failWith lift site (.ownerMismatch source.owner binder.owner)
+              let binding ← match environment.lookup? binder with
+                | some binding => pure binding
+                | none => failWith lift site (.unknownLocal binder)
+              validateStagedValueBindingWith lift site source binding
+              if name != binding.binder.name then
+                failWith lift site
+                  (.stagedValueLocalSpellingMismatch binder
+                    binding.binder.name name)
+              if node.type != binding.binder.scheme.body then
+                failWith lift site
+                  (.stagedValueTypeMismatch binding.binder.scheme.body
+                    node.type)
+              pure { value := binding.value, consumedRequirements := [] }
+          | .reference name (.builtinBoolean value) => do
+              if node.type != Ty.bool then
+                failWith lift site (.stagedValueTypeMismatch .bool node.type)
+              let expected := builtinBooleanSpelling value
+              if name = expected then
+                pure { value := .bool value, consumedRequirements := [] }
+              else
+                failWith lift site
+                  (.builtinBooleanSpellingMismatch value expected name)
+          | .reference _ (.declaration _) =>
+              failWith lift site
+                (.unsupportedExpression .declarationReference)
+          | .reference _ (.builtinFunction _) =>
+              failWith lift site
+                (.unsupportedExpression .declarationReference)
+          | .group inner => do
+              let evaluated ← recurse inner
+              ensureStagedValueTypeWith lift site node.type evaluated.value
+              pure evaluated
+          | .tuple elements => do
+              let evaluated ← evaluateStagedValueListWith recurse elements
+              let value := stagedProductValue
+                (evaluated.map fun element => element.value)
+              ensureStagedValueTypeWith lift site node.type value
+              pure {
+                value
+                consumedRequirements := evaluated.flatMap fun element =>
+                  element.consumedRequirements
+              }
+          | .unary operator operand => do
+              let operand ← recurse operand
+              let coreOperator := match operator with
+                | .logicalNot => Core.UnaryOp.boolNot
+                | .bitNot => Core.UnaryOp.wordNot
+              let coreValue ← match coreOperator.apply
+                  (SourceStagedValue.toCore operand.value) with
+                | some value => pure value
+                | none =>
+                    let reason := ErrorReason.stagedValueInvalidUnaryOperand
+                      operator (SourceStagedValue.sourceType operand.value)
+                    failWith lift site reason
+              let value ← match stagedValueOfCore? coreValue with
+                | some value => pure value
+                | none =>
+                    let reason := ErrorReason.stagedValueInvalidUnaryOperand
+                      operator (SourceStagedValue.sourceType operand.value)
+                    failWith lift site reason
+              ensureStagedValueTypeWith lift site node.type value
+              pure {
+                value
+                consumedRequirements := operand.consumedRequirements
+              }
+          | .binary left operator right => do
+              let left ← recurse left
+              let right ← recurse right
+              let value ← match applyStagedBinary operator
+                  left.value right.value with
+                | some value => pure value
+                | none =>
+                    let reason := ErrorReason.stagedValueInvalidBinaryOperands
+                      operator (SourceStagedValue.sourceType left.value)
+                      (SourceStagedValue.sourceType right.value)
+                    failWith lift site reason
+              ensureStagedValueTypeWith lift site node.type value
+              pure {
+                value
+                consumedRequirements := left.consumedRequirements ++
+                  right.consumedRequirements
+              }
+          | .conditional condition thenBranch elseBranch => do
+              let condition ← recurse condition
+              let conditionValue ← stagedBoolWith lift site condition.value
+              let thenBranch ← recurse thenBranch
+              let elseBranch ← recurse elseBranch
+              let selected := if conditionValue then thenBranch.value
+                else elseBranch.value
+              ensureStagedValueTypeWith lift site node.type thenBranch.value
+              ensureStagedValueTypeWith lift site node.type elseBranch.value
+              pure {
+                value := selected
+                consumedRequirements := condition.consumedRequirements ++
+                  thenBranch.consumedRequirements ++
+                  elseBranch.consumedRequirements
+              }
+          | .call _ _ _ =>
+              failWith lift site (.unsupportedExpression .call)
+          | .lambda _ _ _ =>
+              failWith lift site (.unsupportedExpression .lambda)
+          | .proxy _ => failWith lift site (.unsupportedExpression .proxy)
+          | .index _ _ => failWith lift site (.unsupportedExpression .index)
+          | .integerLiteral _ _ =>
+              failWith lift site .stagedValueStatementNotClosed
+
+/-- Evaluate a closed, Core-representable expression only when ADR-0357 has
+classified that exact occurrence as compile-time available. -/
+def evaluateStagedValueWith {error : Type} (lift : Error → error)
+    (analysis : SourceStageAnalysis.Analysis)
+    (solvedRequirements : List SolvedRequirement) (source : TypedSource)
+    (id : ExpressionId) : Except error StagedValueEvaluation :=
+  evaluateStagedValueFuelWith lift analysis solvedRequirements source []
+    (source.nodes.length + 1) id
+
+/-- Standalone closed staged-value evaluation. -/
+def evaluateStagedValue (analysis : SourceStageAnalysis.Analysis)
+    (solvedRequirements : List SolvedRequirement) (source : TypedSource)
+    (id : ExpressionId) : Except Error StagedValueEvaluation :=
+  evaluateStagedValueWith (fun error => error) analysis solvedRequirements
+    source id
+
+private def bindStagedValueInputsWith {error : Type}
+    (lift : Error → error) (analysis : SourceStageAnalysis.Analysis)
+    (source : TypedSource) :
+    List Resolved.LocalId → List TypedBinder → List SourceStagedValue.Value →
+      Except error StagedValueEnvironment
+  | _, [], [] => pure []
+  | seen, binder :: rest, value :: values => do
+      if seen.contains binder.id then
+        failWith lift (.binder binder.id) (.duplicateInput binder.id)
+      validateStagedValueBinderShapeWith lift (.binder binder.id) source binder
+      requireStagedBinderWith lift analysis binder.id
+      ensureStagedValueTypeWith lift (.binder binder.id) binder.scheme.body value
+      pure ({ binder, value } ::
+        (← bindStagedValueInputsWith lift analysis source
+          (binder.id :: seen) rest values))
+  | _, binders, values =>
+      failWith lift (.declaration source.owner)
+        (.stagedValueArgumentArityMismatch binders.length values.length)
+
+private def evaluateStagedValueStatementsFuelWith {error : Type}
+    (lift : Error → error) (analysis : SourceStageAnalysis.Analysis)
+    (solvedRequirements : List SolvedRequirement) :
+    Nat → TypedSource → StagedValueEnvironment → ErrorSite → ErrorReason →
+      List StatementId → Except error StagedValueEvaluation
+  | _, _, _, fallthroughSite, fallthroughReason, [] =>
+      failWith lift fallthroughSite fallthroughReason
+  | 0, _, _, _, _, id :: _ =>
+      failWith lift (.occurrence id.occurrence) .stagedValueDepthLimit
+  | fuel + 1, source, environment, fallthroughSite, fallthroughReason,
+      id :: rest => do
+    let node ← (lookupStatement source id).mapError lift
+    let site := ErrorSite.occurrence id.occurrence
+    match node.form with
+    | .letDecl binder initializer => do
+        if node.type != Ty.unit then
+          failWith lift site (.stagedValueTypeMismatch .unit node.type)
+        if environment.contains binder.id then
+          failWith lift (.binder binder.id) (.duplicateLocal binder.id)
+        validateStagedValueBinderShapeWith lift (.binder binder.id) source binder
+        requireStagedBinderWith lift analysis binder.id
+        let initializer ← match initializer with
+          | none => failWith lift site .uninitializedLet
+          | some initializer =>
+              evaluateStagedValueFuelWith lift analysis solvedRequirements
+                source environment fuel initializer
+        ensureStagedValueTypeWith lift (.binder binder.id)
+          binder.scheme.body initializer.value
+        let body ← evaluateStagedValueStatementsFuelWith lift analysis
+          solvedRequirements fuel source ({ binder, value := initializer.value } ::
+            environment) fallthroughSite fallthroughReason rest
+        pure {
+          value := body.value
+          consumedRequirements := initializer.consumedRequirements ++
+            body.consumedRequirements
+        }
+    | .returnStmt value => do
+        if !rest.isEmpty then
+          failWith lift site (.nonTailStatement .returnStmt)
+        match value with
+        | none =>
+            if node.type = Ty.unit then
+              pure { value := .unit, consumedRequirements := [] }
+            else
+              failWith lift site .stagedValueStatementNotClosed
+        | some value => do
+            let evaluated ← evaluateStagedValueFuelWith lift analysis
+              solvedRequirements source environment fuel value
+            ensureStagedValueTypeWith lift site node.type evaluated.value
+            pure evaluated
+    | .ifThen condition thenBody elseBody => do
+        if !rest.isEmpty then
+          failWith lift site (.nonTailStatement .ifThen)
+        let elseBody ← match elseBody with
+          | some body => pure body
+          | none => failWith lift site .missingElseBranch
+        let condition ← evaluateStagedValueFuelWith lift analysis
+          solvedRequirements source environment fuel condition
+        let conditionValue ← stagedBoolWith lift site condition.value
+        let thenBranch ← evaluateStagedValueStatementsFuelWith lift analysis
+          solvedRequirements fuel source environment site
+          (.conditionalBranchFallthrough .thenBranch) thenBody
+        let elseBranch ← evaluateStagedValueStatementsFuelWith lift analysis
+          solvedRequirements fuel source environment site
+          (.conditionalBranchFallthrough .elseBranch) elseBody
+        let selected := if conditionValue then thenBranch.value
+          else elseBranch.value
+        ensureStagedValueTypeWith lift site node.type thenBranch.value
+        ensureStagedValueTypeWith lift site node.type elseBranch.value
+        pure {
+          value := selected
+          consumedRequirements := condition.consumedRequirements ++
+            thenBranch.consumedRequirements ++
+            elseBranch.consumedRequirements
+        }
+    | .block body => do
+        if !rest.isEmpty then
+          failWith lift site (.nonTailStatement .block)
+        let evaluated ← evaluateStagedValueStatementsFuelWith lift analysis
+          solvedRequirements fuel source environment site .blockFallthrough body
+        ensureStagedValueTypeWith lift site node.type evaluated.value
+        pure evaluated
+    | .matchWith _ => failWith lift site .stagedValueStatementNotClosed
+    | .expression _ _ =>
+        failWith lift site (.unsupportedStatement .expression)
+
+/-- Execute the Core-representable, call-free staged subset of one exact source
+specialization.  Stable input identities and the specialization-owned stage
+table are both checked before evaluation, and the function-local requirement
+ledger is reconciled exactly once. -/
+def evaluateStagedValueFunction
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (arguments : List SourceStagedValue.Value) :
+    Except Error SourceStagedValue.Value := do
+  let function := specialized.function
+  let source := function.typedBody
+  if source.owner != specialized.declaration then
+    fail (.declaration specialized.declaration)
+      (.ownerMismatch specialized.declaration source.owner)
+  else if function.declaration != specialized.declaration then
+    fail (.declaration specialized.declaration)
+      (.ownerMismatch specialized.declaration function.declaration)
+  else if specialized.key.declaration != specialized.declaration then
+    fail (.declaration specialized.declaration)
+      (.stagedValueSpecializationKeyMismatch specialized.declaration
+        specialized.key.declaration)
+  else if specialized.key.arguments !=
+      specialized.parameterSubstitution.map Prod.snd then
+    fail (.declaration specialized.declaration)
+      (.stagedValueSpecializationArgumentsMismatch
+        (specialized.parameterSubstitution.map Prod.snd)
+        specialized.key.arguments)
+  else if source.inputs.length != arguments.length then
+    fail (.declaration function.declaration)
+      (.stagedValueArgumentArityMismatch source.inputs.length arguments.length)
+  else
+    let expectedAnalysis ← match SourceStageAnalysis.analyzeFunction function with
+      | .ok analysis => pure analysis
+      | .error error =>
+          fail (.declaration function.declaration)
+            (.stagedValueAnalysisFailure error)
+    if expectedAnalysis != specialized.stageAnalysis then
+      fail (.declaration function.declaration)
+        (.stagedValueAnalysisMismatch expectedAnalysis
+          specialized.stageAnalysis)
+    let environment ← bindStagedValueInputsWith (fun error => error)
+      specialized.stageAnalysis source [] source.inputs arguments
+    let expectedType := Ty.function
+      (Ty.productMany (source.inputs.map fun binder => binder.scheme.body))
+      function.inferredBodyType
+    if function.type != expectedType then
+      fail (.declaration function.declaration)
+        (.stagedValueFunctionTypeMismatch expectedType function.type)
+    let roots ← statementRoots source.roots
+    let fallthroughSite := match finalStatement? roots with
+      | some statement => ErrorSite.occurrence statement.occurrence
+      | none => ErrorSite.declaration function.declaration
+    let evaluated ← evaluateStagedValueStatementsFuelWith
+      (fun error => error) specialized.stageAnalysis
+      function.solvedRequirements (source.nodes.length + 1) source environment
+      fallthroughSite .statementListFallthrough roots
+    ensureStagedValueTypeWith (fun error => error)
+      (.declaration function.declaration) function.inferredBodyType
+      evaluated.value
+    let solvedRequirements :=
+      function.solvedRequirements.map fun requirement => requirement.id
+    if evaluated.consumedRequirements != solvedRequirements then
+      fail (.declaration function.declaration)
+        (.stagedValueRequirementsMismatch solvedRequirements
+          evaluated.consumedRequirements)
+    let unconsumed ← reconcileConsumedRequirements function.declaration
+      solvedRequirements evaluated.consumedRequirements
+    unless unconsumed.isEmpty do
+      fail (.declaration function.declaration)
+        (.unconsumedRequirements unconsumed)
+    pure evaluated.value
 
 /-- Execute one checked integer-returning function in the closed staged domain.
 Inputs are paired internally with the declaration-owned typed binders, so a
