@@ -58,6 +58,17 @@ private def coerceSource : String := String.intercalate "\n" [
   "}"
 ]
 
+private def stagedSource : String := String.intercalate "\n" [
+  "trait Stage<T> {",
+  "  function stage(comptime value: T) returns (comptime<T>);",
+  "}",
+  "impl Stage<Word> {",
+  "  function stage(comptime value: Word) returns (comptime<Word>) {",
+  "    return value;",
+  "  }",
+  "}"
+]
+
 private def testSuccessfulMethodCheck : IO Unit := do
   let program ← checkedProgramOf successSource
   let implementation ← onlyImplementation program
@@ -115,6 +126,82 @@ private def testTwoParameterTraitMethodCheck : IO Unit := do
       elaborated.returnType = .bool ∧
       Core.infer? elaborated.inputs.values elaborated.core = some .bool))
     "checked Coerce method did not retain a Word input and Bool result"
+
+private def testComptimeMarkerValidation : IO Unit := do
+  let program ← checkedProgramOf stagedSource
+  let implementation ← onlyImplementation program
+  let implementationMethod ← match implementation.methods with
+    | [method] => pure method
+    | methods => throw (IO.userError
+        s!"expected one Stage implementation method, found {methods.length}")
+  let trait ← match program.signatures.traits with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Stage trait, found {traits.length}")
+  let traitMethod ← match trait.methods with
+    | [method] => pure method
+    | methods => throw (IO.userError
+        s!"expected one Stage trait method, found {methods.length}")
+  let checked ← match ExecutableImplMethods.checkMethodWithArity program
+      (evidenceFor implementation) 1 "stage" with
+    | .ok checked => pure checked
+    | .error error => throw (IO.userError
+        s!"matching comptime method markers were rejected: {reprStr error}")
+  assertTrue (decide (checked.traitMethod.parameterComptime = [true] ∧
+      checked.traitMethod.returnComptime ∧
+      checked.synthetic.parameterComptime = [true] ∧
+      checked.synthetic.returnComptime))
+    "executable method lost its validated comptime markers"
+  let parameterTamperedMethod := {
+    implementationMethod with
+    parameters := implementationMethod.parameters.map fun parameter => {
+      parameter with comptime := false
+    }
+  }
+  let parameterTamperedImplementation := {
+    implementation with methods := [parameterTamperedMethod]
+  }
+  let parameterTamperedProgram : CheckedProgram := {
+    program with
+    signatures := {
+      program.signatures with
+      implementations := [parameterTamperedImplementation]
+    }
+  }
+  match ExecutableImplMethods.checkMethodWithArity parameterTamperedProgram
+      (evidenceFor implementation) 1 "stage" with
+  | .error (.methodComptimeMismatch method expectedTraitMethod
+      [true] [false] true true) =>
+      assertTrue (decide (method = implementationMethod.id ∧
+          expectedTraitMethod = traitMethod.id))
+        "parameter-marker rejection lost the method association"
+  | .error error => throw (IO.userError
+      s!"tampered parameter marker had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "tampered implementation-method parameter marker was executable")
+  let returnTamperedMethod := {
+    implementationMethod with returnComptime := false
+  }
+  let returnTamperedImplementation := {
+    implementation with methods := [returnTamperedMethod]
+  }
+  let returnTamperedProgram : CheckedProgram := {
+    program with
+    signatures := {
+      program.signatures with implementations := [returnTamperedImplementation]
+    }
+  }
+  match ExecutableImplMethods.checkMethodWithArity returnTamperedProgram
+      (evidenceFor implementation) 1 "stage" with
+  | .error (.methodComptimeMismatch method expectedTraitMethod
+      [true] [true] true false) =>
+      assertTrue (decide (method = implementationMethod.id ∧
+          expectedTraitMethod = traitMethod.id))
+        "return-marker rejection lost the method association"
+  | .error error => throw (IO.userError
+      s!"tampered return marker had the wrong rejection: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "tampered implementation-method return marker was executable")
 
 private def testMultiMethodSelection : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -839,6 +926,7 @@ the first profile's explicit staged boundaries. -/
 def testExecutableImplMethods : IO Unit := do
   testSuccessfulMethodCheck
   testTwoParameterTraitMethodCheck
+  testComptimeMarkerValidation
   testMultiMethodSelection
   testTraitPredicateInstantiation
   testTraitPredicateParameterOrder
