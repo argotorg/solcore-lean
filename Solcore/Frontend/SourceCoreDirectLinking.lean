@@ -192,12 +192,6 @@ inductive Error where
   | callEdgeCalleeMismatch
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (edgeCallee resolvedCallee : SpecializationKey)
-  | stagedIntegerCallPredicatesUnsupported
-      (caller : SpecializationKey) (occurrence : ExpressionId)
-      (predicates : List ProgramPredicate)
-  | stagedValueCallPredicatesUnsupported
-      (caller : SpecializationKey) (occurrence : ExpressionId)
-      (predicates : List ProgramPredicate)
   | stagedValueCallResultNotComptime
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (callee : SpecializationKey)
@@ -583,8 +577,10 @@ private abbrev StagedValueCalleeEvaluator :=
     List SourceStagedValue.Value → Except Error SourceStagedValue.Value
 
 /-- Validate one integer-valued direct call against the canonical plan before
-Source Core evaluates any argument.  The returned closure crosses the function
-boundary with values only: the callee reconciles its own requirement ledger. -/
+Source Core evaluates any argument.  Proof-only call predicates are resolved
+exactly and forwarded as concrete callee assumption evidence.  The returned
+closure crosses the function boundary with values only: the callee reconciles
+its own requirement ledger. -/
 private def stagedIntegerCallPlan (program : CheckedProgram) (plan : Plan)
     (caller : SpecializedFunction) (available : List PredicateEvidence)
     (invokeCallee : StagedIntegerCalleeEvaluator)
@@ -593,9 +589,6 @@ private def stagedIntegerCallPlan (program : CheckedProgram) (plan : Plan)
     Except Error (SourceCoreElaboration.StagedIntegerCallPlan Error) := do
   let calleeEvidence ← exactCallRequirementEvidence caller node available
     instantiation
-  unless instantiation.predicates.isEmpty do
-    throw (.stagedIntegerCallPredicatesUnsupported caller.key node.id
-      instantiation.predicates)
   let edge ← exactCallEdge plan caller.key node.id
   let resolvedCallee ←
     (SourceSpecializationWorklist.resolveRequest program {
@@ -633,9 +626,10 @@ private def stagedIntegerCallPlan (program : CheckedProgram) (plan : Plan)
   }
 
 /-- Validate one Core-representable staged direct call against the canonical
-specialization plan before Source Core evaluates any argument.  The callee
-reconciles its own requirement ledger and crosses this boundary with a value
-only. -/
+specialization plan before Source Core evaluates any argument.  Proof-only call
+predicates are resolved exactly and forwarded as concrete callee assumption
+evidence.  The callee reconciles its own requirement ledger and crosses this
+boundary with a value only. -/
 private def stagedValueCallPlan (program : CheckedProgram) (plan : Plan)
     (caller : SpecializedFunction) (available : List PredicateEvidence)
     (invokeCallee : StagedValueCalleeEvaluator)
@@ -644,9 +638,6 @@ private def stagedValueCallPlan (program : CheckedProgram) (plan : Plan)
     Except Error (SourceCoreElaboration.StagedValueCallPlan Error) := do
   let calleeEvidence ← exactCallRequirementEvidence caller node available
     instantiation
-  unless instantiation.predicates.isEmpty do
-    throw (.stagedValueCallPredicatesUnsupported caller.key node.id
-      instantiation.predicates)
   let edge ← exactCallEdge plan caller.key node.id
   let resolvedCallee ←
     (SourceSpecializationWorklist.resolveRequest program {
