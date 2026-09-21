@@ -405,15 +405,18 @@ private def testPlanEdgeValidation (fixture : Fixture) : IO Unit := do
     [{ edge with callee := fixture.entryKey }]
   expectCallEdgesMismatch "duplicate staged-call edge" fixture [edge, edge]
 
-private def testPredicateRejection : IO Unit := do
+private def testPredicateEvidenceForwarded : IO Unit := do
   let predicateSource := String.intercalate "\n" [
     "trait Marker<T> {}",
     "impl Marker<integer> {}",
     "function marked(comptime value: integer) returns (comptime<integer>) where integer: Marker {",
-    "  return value;",
+    "  return integerAdd(value, 1);",
+    "}",
+    "function relay(comptime value: integer) returns (comptime<integer>) where integer: Marker {",
+    "  return marked(value);",
     "}",
     "function entry() returns (Word) {",
-    "  return wordFromInteger(marked(3));",
+    "  return wordFromInteger(relay(3));",
     "}"
   ]
   let program ← checkedProgramOf "predicate-bearing staged call"
@@ -431,26 +434,34 @@ private def testPredicateRejection : IO Unit := do
     | form => throw (IO.userError
         s!"predicate-bearing staged call changed shape: {reprStr form}")
   let outcome ← match SourceSpecializationWorklist.run program
-      [monoRequest entrySignature] 2 with
+      [monoRequest entrySignature] 3 with
     | .ok outcome@(.complete _) => pure outcome
     | result => throw (IO.userError
         s!"predicate-bearing staged call did not plan: {reprStr result}")
-  match SourceCoreDirectLinking.link program outcome with
-  | .error (.stagedIntegerCallPredicatesUnsupported caller occurrence actual) =>
-      assertTrue (decide (caller = keyOf entrySignature ∧
-          occurrence = call.id ∧ actual = predicates))
-        "predicate rejection lost caller, occurrence, or exact predicates"
-  | result => throw (IO.userError
-      s!"predicate-bearing staged call was not rejected: {reprStr result}")
+  assertTrue (!predicates.isEmpty)
+    "predicate-bearing staged call lost its declaration predicate"
+  let linked ← match SourceCoreDirectLinking.link program outcome with
+    | .ok linked => pure linked
+    | .error error => throw (IO.userError
+        s!"predicate-bearing staged call did not link: {reprStr error}")
+  let linkedEntry ← match linked.findEntry? (keyOf entrySignature) with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError
+        "predicate-bearing staged call lost its linked entry")
+  let store : Core.Store := [.bool true, .word (Core.Word.ofNatModulo 19)]
+  assertTrue (decide (linkedEntry.run? [] 4096 store = some
+      (.done (.word (Core.Word.ofNatModulo 4)) store)))
+    "proof-only integer call evidence changed the result or store"
 
-/-- Reject forged staged-call metadata, binders, local edges, and call plans. -/
+/-- Reject forged staged-call metadata, binders, local edges, and call plans,
+while retaining exact proof-only predicate evidence across nested calls. -/
 def testSourceStagedIntegerCallsTamper : IO Unit := do
   let value ← fixture
   testCallExpressionContract value
   testFunctionAndInputContract value
   testCalleeReferenceContract value
   testPlanEdgeValidation value
-  testPredicateRejection
+  testPredicateEvidenceForwarded
   IO.println "staged integer source-call tamper checks GREEN"
 
 end Tests.SourceStagedIntegerCallsTamper

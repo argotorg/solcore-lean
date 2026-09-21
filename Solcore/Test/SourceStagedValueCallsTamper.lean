@@ -48,22 +48,37 @@ private def word (value : Nat) : Core.Word :=
 private def predicateSource : String := String.intercalate "\n" [
   "trait Marker<T> {}",
   "impl Marker<Word> {}",
-  "function marked(comptime value: Word) returns (comptime<Word>) where Word: Marker {",
+  "function marked<T>(comptime value: T) returns (comptime<T>) where T: Marker {",
   "  return value;",
   "}",
-  "function entry() returns (Word) { return marked(3); }"
+  "function relay<T>(comptime value: T) returns (comptime<T>) where T: Marker {",
+  "  return marked(value);",
+  "}",
+  "function wrapper(comptime value: Word) returns (Word) where Word: Marker {",
+  "  return relay(value);",
+  "}",
+  "function entry() returns (Word) { return wrapper(3); }"
 ]
 
-private def testPredicateRejected : IO Unit := do
+private def testPredicateEvidenceForwarded : IO Unit := do
   let moduleId ← mainModule
-  match prepare (workspace predicateSource) (Seed.named moduleId "entry")
-      (limits 2) with
-  | .error (.linking (.stagedValueCallPredicatesUnsupported
-      _ _ predicates)) =>
-      assertTrue (!predicates.isEmpty)
-        "predicate-bearing rejection lost its exact predicate list"
-  | result => throw (IO.userError
-      s!"predicate-bearing marked call was not rejected: {reprStr result}")
+  let prepared ← match prepare (workspace predicateSource)
+      (Seed.named moduleId "entry") (limits 4) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"predicate-bearing marked calls failed: {reprStr error}")
+  let store : Core.Store := [.bool false, .word (word 29)]
+  assertTrue (decide (prepared.run? [] 4096 store =
+      some (.done (.word (word 3)) store)))
+    "proof-only staged call evidence changed the value or store"
+  match prepared.entry.elaborated.resolved with
+  | .letE temporary (.word argument)
+      (.letE _ (.var reference) (.word result)) =>
+      assertTrue (decide (temporary = reference ∧ argument = word 3 ∧
+          result = word 3))
+        "predicate-bearing nested staged result was not materialized"
+  | resolved => throw (IO.userError
+      s!"predicate-bearing staged calls have the wrong shape: {reprStr resolved}")
 
 private def coercionSource : String := String.intercalate "\n" [
   "trait Coerce<From, To> {",
@@ -383,12 +398,12 @@ private def testUnavailableKnownInputsRejected : IO Unit := do
   | result => throw (IO.userError
       s!"deferred actual was promoted to a known comptime input: {reprStr result}")
 
-/-- Fix unsupported evidence/coercion boundaries, eager recursion rejection,
-ordinary evidence-let compatibility, known/unavailable runtime-draft staging,
-mixed runtime inputs, structural values, and successful finite evaluation of
-a sufficiently budgeted acyclic chain. -/
+/-- Fix proof-only evidence forwarding, the remaining coercion boundary, eager
+recursion rejection, ordinary evidence-let compatibility, known/unavailable
+runtime-draft staging, mixed runtime inputs, structural values, and successful
+finite evaluation of a sufficiently budgeted acyclic chain. -/
 def testSourceStagedValueCallsTamper : IO Unit := do
-  testPredicateRejected
+  testPredicateEvidenceForwarded
   testResultCoercionRejected
   testRecursiveRejections
   testDeepAcyclicCall
