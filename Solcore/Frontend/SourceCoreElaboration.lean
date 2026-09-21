@@ -121,6 +121,12 @@ inductive ErrorReason where
   | stagedIntegerTypeMismatch (expected actual : Ty)
   | stagedIntegerLocalSpellingMismatch
       (binder : Resolved.LocalId) (expected actual : String)
+  | stagedIntegerCallRequirementsMismatch
+      (expected actual : List RequirementId)
+  | stagedIntegerCallArgumentArityMismatch (expected actual : Nat)
+  | stagedIntegerFunctionTypeMismatch (expected actual : Ty)
+  | stagedIntegerArgumentArityMismatch (expected actual : Nat)
+  | stagedIntegerStatementNotClosed
   | stagedIntegerExpressionNotClosed
   | stagedIntegerDepthLimit
   | stagedWordTypeMismatch (expected actual : Ty)
@@ -227,6 +233,23 @@ lifting ordinary source-to-Core failures through `lowerFunctionBodyWith`. -/
 abbrev CallElaborator (error : Type) :=
   Resolved.Context → ExpressionNode → ExpressionId →
   List ExpressionId → CallResolution → Except error (CallPlan error)
+
+/-- A staged-integer call policy declares its exact source argument types and
+function-local call requirements before receiving the already validated and
+evaluated signed arguments in source order.  The result deliberately contains
+no requirement IDs: obligations consumed in the callee belong to the callee's
+ledger and must be reconciled at that function boundary. -/
+structure StagedIntegerCallPlan (error : Type) where
+  argumentTypes : List Ty
+  consumedRequirements : List RequirementId
+  invoke : List Int → Except error Int
+
+/-- A whole-program consumer may execute an otherwise non-closed direct source
+call while the staged evaluator retains argument lookup, type checking,
+left-to-right evaluation, and caller-local requirement accounting. -/
+abbrev StagedIntegerCallElaborator (error : Type) :=
+  ExpressionNode → ExpressionId → List ExpressionId →
+  DeclarationInstantiation → Except error (StagedIntegerCallPlan error)
 
 /-- A policy for a requirement-bearing unary expression declares the exact
 type at which Source Core must check its operand, identifies the requirements
@@ -647,7 +670,9 @@ private def validateStagedIntegerBinderWith {error : Type}
 mutual
 
 private def evaluateStagedIntegerFuelWith {error : Type}
-    (lift : Error → error) (solvedRequirements : List SolvedRequirement)
+    (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (environment : StagedIntegerEnvironment) :
     Nat → ExpressionId → Except error StagedIntegerEvaluation
   | 0, id =>
@@ -662,6 +687,7 @@ private def evaluateStagedIntegerFuelWith {error : Type}
           match arguments with
           | [argument] =>
               let evaluated ← evaluateStagedWordFuelWith lift
+                onStagedIntegerCall
                 solvedRequirements source environment fuel argument
               pure {
                 value := Int.ofNat evaluated.value.val
@@ -679,8 +705,10 @@ private def evaluateStagedIntegerFuelWith {error : Type}
               match arguments with
               | [left, right] =>
                   let left ← evaluateStagedIntegerFuelWith lift
+                    onStagedIntegerCall
                     solvedRequirements source environment fuel left
                   let right ← evaluateStagedIntegerFuelWith lift
+                    onStagedIntegerCall
                     solvedRequirements source environment fuel right
                   pure {
                     value := applyStagedIntegerBinary operation left.value
@@ -700,6 +728,42 @@ private def evaluateStagedIntegerFuelWith {error : Type}
                   (.stagedIntegerTypeMismatch .integer node.type)
               else
                 failWith lift site .stagedIntegerExpressionNotClosed
+      | .call callee arguments (.declaration instantiation) => do
+          unless node.coercions.isEmpty do
+            failWith lift site (.coercionsPresent node.coercions)
+          if node.type != Ty.integer then
+            failWith lift site (.stagedIntegerTypeMismatch .integer node.type)
+          let plan ← onStagedIntegerCall node callee arguments instantiation
+          if plan.consumedRequirements != node.requirements then
+            failWith lift site
+              (.stagedIntegerCallRequirementsMismatch node.requirements
+                plan.consumedRequirements)
+          else if plan.argumentTypes.length != arguments.length then
+            failWith lift site
+              (.stagedIntegerCallArgumentArityMismatch
+                plan.argumentTypes.length arguments.length)
+          else
+            let evaluatedArguments ←
+              (plan.argumentTypes.zip arguments).mapM fun pair => do
+                let argumentNode ←
+                  (lookupExpression source pair.2).mapError lift
+                if pair.1 != Ty.integer then
+                  failWith lift (.occurrence pair.2.occurrence)
+                    (.stagedIntegerTypeMismatch .integer pair.1)
+                else if argumentNode.type != pair.1 then
+                  failWith lift (.occurrence pair.2.occurrence)
+                    (.stagedIntegerTypeMismatch pair.1 argumentNode.type)
+                else
+                  evaluateStagedIntegerFuelWith lift onStagedIntegerCall
+                    solvedRequirements source environment fuel pair.2
+            let value ← plan.invoke
+              (evaluatedArguments.map fun argument => argument.value)
+            pure {
+              value
+              consumedRequirements := evaluatedArguments.flatMap
+                (fun argument => argument.consumedRequirements) ++
+                plan.consumedRequirements
+            }
       | form => do
           unless node.coercions.isEmpty do
             failWith lift site (.coercionsPresent node.coercions)
@@ -737,18 +801,21 @@ private def evaluateStagedIntegerFuelWith {error : Type}
               }
           | .group inner =>
               if node.requirements.isEmpty then
-                evaluateStagedIntegerFuelWith lift solvedRequirements source
-                  environment fuel inner
+                evaluateStagedIntegerFuelWith lift onStagedIntegerCall
+                  solvedRequirements source environment fuel inner
               else
                 failWith lift site (.requirementsPresent node.requirements)
           | .conditional condition thenBranch elseBranch => do
               unless node.requirements.isEmpty do
                 failWith lift site (.requirementsPresent node.requirements)
               let condition ← evaluateStagedBoolFuelWith lift
+                onStagedIntegerCall
                 solvedRequirements source environment fuel condition
               let thenBranch ← evaluateStagedIntegerFuelWith lift
+                onStagedIntegerCall
                 solvedRequirements source environment fuel thenBranch
               let elseBranch ← evaluateStagedIntegerFuelWith lift
+                onStagedIntegerCall
                 solvedRequirements source environment fuel elseBranch
               pure {
                 value := if condition.value then thenBranch.value
@@ -762,7 +829,9 @@ private def evaluateStagedIntegerFuelWith {error : Type}
               failWith lift site .stagedIntegerExpressionNotClosed
 
 private def evaluateStagedWordFuelWith {error : Type}
-    (lift : Error → error) (solvedRequirements : List SolvedRequirement)
+    (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (environment : StagedIntegerEnvironment) :
     Nat → ExpressionId → Except error StagedWordEvaluation
   | 0, id =>
@@ -777,6 +846,7 @@ private def evaluateStagedWordFuelWith {error : Type}
           match arguments with
           | [argument] =>
               let evaluated ← evaluateStagedIntegerFuelWith lift
+                onStagedIntegerCall
                 solvedRequirements source environment fuel argument
               pure {
                 value := Core.Word.ofIntModulo evaluated.value
@@ -806,18 +876,21 @@ private def evaluateStagedWordFuelWith {error : Type}
               }
           | .group inner =>
               if node.requirements.isEmpty then
-                evaluateStagedWordFuelWith lift solvedRequirements source
-                  environment fuel inner
+                evaluateStagedWordFuelWith lift onStagedIntegerCall
+                  solvedRequirements source environment fuel inner
               else
                 failWith lift site (.requirementsPresent node.requirements)
           | .conditional condition thenBranch elseBranch => do
               unless node.requirements.isEmpty do
                 failWith lift site (.requirementsPresent node.requirements)
               let condition ← evaluateStagedBoolFuelWith lift
+                onStagedIntegerCall
                 solvedRequirements source environment fuel condition
               let thenBranch ← evaluateStagedWordFuelWith lift
+                onStagedIntegerCall
                 solvedRequirements source environment fuel thenBranch
               let elseBranch ← evaluateStagedWordFuelWith lift
+                onStagedIntegerCall
                 solvedRequirements source environment fuel elseBranch
               pure {
                 value := if condition.value then thenBranch.value
@@ -831,7 +904,9 @@ private def evaluateStagedWordFuelWith {error : Type}
               failWith lift site .stagedWordExpressionNotClosed
 
 private def evaluateStagedBoolFuelWith {error : Type}
-    (lift : Error → error) (solvedRequirements : List SolvedRequirement)
+    (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (environment : StagedIntegerEnvironment) :
     Nat → ExpressionId → Except error StagedBoolEvaluation
   | 0, id =>
@@ -848,8 +923,10 @@ private def evaluateStagedBoolFuelWith {error : Type}
               match arguments with
               | [left, right] =>
                   let left ← evaluateStagedIntegerFuelWith lift
+                    onStagedIntegerCall
                     solvedRequirements source environment fuel left
                   let right ← evaluateStagedIntegerFuelWith lift
+                    onStagedIntegerCall
                     solvedRequirements source environment fuel right
                   pure {
                     value := applyStagedIntegerComparison comparison left.value
@@ -885,15 +962,18 @@ private def evaluateStagedBoolFuelWith {error : Type}
                 failWith lift site
                   (.builtinBooleanSpellingMismatch value expected name)
           | .group inner =>
-              evaluateStagedBoolFuelWith lift solvedRequirements source
-                environment fuel inner
+              evaluateStagedBoolFuelWith lift onStagedIntegerCall
+                solvedRequirements source environment fuel inner
           | .conditional condition thenBranch elseBranch => do
-              let condition ← evaluateStagedBoolFuelWith lift solvedRequirements
-                source environment fuel condition
+              let condition ← evaluateStagedBoolFuelWith lift
+                onStagedIntegerCall solvedRequirements source environment fuel
+                condition
               let thenBranch ← evaluateStagedBoolFuelWith lift
-                solvedRequirements source environment fuel thenBranch
+                onStagedIntegerCall solvedRequirements source environment fuel
+                thenBranch
               let elseBranch ← evaluateStagedBoolFuelWith lift
-                solvedRequirements source environment fuel elseBranch
+                onStagedIntegerCall solvedRequirements source environment fuel
+                elseBranch
               pure {
                 value := if condition.value then thenBranch.value
                   else elseBranch.value
@@ -905,6 +985,43 @@ private def evaluateStagedBoolFuelWith {error : Type}
 
 end
 
+private def rejectStagedIntegerCallsWith {error : Type}
+    (lift : Error → error) : StagedIntegerCallElaborator error :=
+  fun node _ _ _ =>
+    failWith lift (.occurrence node.id.occurrence)
+      .stagedIntegerExpressionNotClosed
+
+/-- Evaluate staged integer expressions with an explicit whole-program direct
+call policy.  Structural expression fuel remains source-local; recursive call
+fuel and specialization-cycle tracking belong to the policy's owner. -/
+def evaluateStagedIntegerWith {error : Type} (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (solvedRequirements : List SolvedRequirement)
+    (source : TypedSource) (id : ExpressionId) :
+    Except error StagedIntegerEvaluation :=
+  evaluateStagedIntegerFuelWith lift onStagedIntegerCall solvedRequirements
+    source [] (source.nodes.length + 1) id
+
+/-- Evaluate staged Word expressions while allowing nested staged-integer
+source calls only through the supplied policy. -/
+def evaluateStagedWordWith {error : Type} (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (solvedRequirements : List SolvedRequirement)
+    (source : TypedSource) (id : ExpressionId) :
+    Except error StagedWordEvaluation :=
+  evaluateStagedWordFuelWith lift onStagedIntegerCall solvedRequirements source
+    [] (source.nodes.length + 1) id
+
+/-- Evaluate staged Bool expressions while allowing nested staged-integer
+source calls only through the supplied policy. -/
+def evaluateStagedBoolWith {error : Type} (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (solvedRequirements : List SolvedRequirement)
+    (source : TypedSource) (id : ExpressionId) :
+    Except error StagedBoolEvaluation :=
+  evaluateStagedBoolFuelWith lift onStagedIntegerCall solvedRequirements source
+    [] (source.nodes.length + 1) id
+
 /-- Evaluate exactly the closed staged-integer fragment accepted by runtime
 erasure, including conversions through the closed staged-Word fragment.  The
 bound comes from the finite typed-node table, so malformed cycles produce a
@@ -912,8 +1029,9 @@ located failure rather than nontermination. -/
 def evaluateStagedInteger (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (id : ExpressionId) :
     Except Error StagedIntegerEvaluation :=
-  evaluateStagedIntegerFuelWith (fun error => error) solvedRequirements source
-    [] (source.nodes.length + 1) id
+  evaluateStagedIntegerWith (fun error => error)
+    (rejectStagedIntegerCallsWith (fun error => error))
+    solvedRequirements source id
 
 /-- Evaluate exactly the closed staged-Word fragment accepted by
 `wordToInteger`.  Cross-domain cycles share the same finite node-derived fuel
@@ -921,8 +1039,9 @@ as staged-integer evaluation. -/
 def evaluateStagedWord (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (id : ExpressionId) :
     Except Error StagedWordEvaluation :=
-  evaluateStagedWordFuelWith (fun error => error) solvedRequirements source
-    [] (source.nodes.length + 1) id
+  evaluateStagedWordWith (fun error => error)
+    (rejectStagedIntegerCallsWith (fun error => error))
+    solvedRequirements source id
 
 /-- Evaluate the closed staged-Bool fragment used by integer and Word
 conditionals.  All three conditional children are validated under the same
@@ -931,10 +1050,12 @@ result, preserving declaration-wide exact requirement accounting. -/
 def evaluateStagedBool (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (id : ExpressionId) :
     Except Error StagedBoolEvaluation :=
-  evaluateStagedBoolFuelWith (fun error => error) solvedRequirements source
-    [] (source.nodes.length + 1) id
+  evaluateStagedBoolWith (fun error => error)
+    (rejectStagedIntegerCallsWith (fun error => error))
+    solvedRequirements source id
 
 private def lowerWordFromIntegerWith {error : Type} (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
     (environment : StagedIntegerEnvironment)
     (fuel : Nat) (node : ExpressionNode) (callee : ExpressionId)
@@ -943,8 +1064,8 @@ private def lowerWordFromIntegerWith {error : Type} (lift : Error → error)
     .wordFromInteger
   match arguments with
   | [argument] =>
-      let evaluated ← evaluateStagedIntegerFuelWith lift solvedRequirements
-        source environment fuel argument
+      let evaluated ← evaluateStagedIntegerFuelWith lift
+        onStagedIntegerCall solvedRequirements source environment fuel argument
       pure {
         resolved := .word (Core.Word.ofIntModulo evaluated.value)
         consumedRequirements := evaluated.consumedRequirements
@@ -955,11 +1076,12 @@ private def lowerWordFromIntegerWith {error : Type} (lift : Error → error)
           arguments.length)
 
 private def lowerStagedBoolWith {error : Type} (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
     (environment : StagedIntegerEnvironment)
     (fuel : Nat) (id : ExpressionId) : Except error LoweredExpression := do
-  let evaluated ← evaluateStagedBoolFuelWith lift solvedRequirements source
-    environment fuel id
+  let evaluated ← evaluateStagedBoolFuelWith lift onStagedIntegerCall
+    solvedRequirements source environment fuel id
   pure {
     resolved := .bool evaluated.value
     consumedRequirements := evaluated.consumedRequirements
@@ -1282,6 +1404,7 @@ located error.  A nonempty coercion path is checked and planned once around a
 coercion-cleared view of the base node. -/
 private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
@@ -1294,19 +1417,19 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
   | 0 => failWith lift (.occurrence id.occurrence) .expressionDepthLimit
   | fuel + 1 => do
       let node ← (lookupExpression source id).mapError lift
-      let recurse := lowerExpressionFuelWith lift onCall onRequiredUnary
-        onRequiredBinary onCoercion solvedRequirements fuel source scope
-        environment
+      let recurse := lowerExpressionFuelWith lift onCall onStagedIntegerCall
+        onRequiredUnary onRequiredBinary onCoercion solvedRequirements fuel
+        source scope environment
       match node.form with
       | .call callee arguments (.builtinFunction .wordFromInteger) =>
-          lowerWordFromIntegerWith lift solvedRequirements source environment
-            fuel node callee arguments
+          lowerWordFromIntegerWith lift onStagedIntegerCall solvedRequirements
+            source environment fuel node callee arguments
       | .call _ _ (.builtinFunction .integerEq) =>
-          lowerStagedBoolWith lift solvedRequirements source environment
-            (fuel + 1) id
+          lowerStagedBoolWith lift onStagedIntegerCall solvedRequirements source
+            environment (fuel + 1) id
       | .call _ _ (.builtinFunction .integerLt) =>
-          lowerStagedBoolWith lift solvedRequirements source environment
-            (fuel + 1) id
+          lowerStagedBoolWith lift onStagedIntegerCall solvedRequirements source
+            environment (fuel + 1) id
       | _ =>
           match node.coercions with
           | [] =>
@@ -1328,6 +1451,7 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
 
 private def lowerExpressionAsWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
@@ -1345,8 +1469,9 @@ private def lowerExpressionAsWith {error : Type} (lift : Error → error)
             node.type)
   | _ => pure ()
   ensureTypeWith lift (.occurrence id.occurrence) expected node.type
-  lowerExpressionFuelWith lift onCall onRequiredUnary onRequiredBinary
-    onCoercion solvedRequirements fuel source scope environment id
+  lowerExpressionFuelWith lift onCall onStagedIntegerCall onRequiredUnary
+    onRequiredBinary onCoercion solvedRequirements fuel source scope
+    environment id
 
 private inductive MatchPatternLeaf where
   | wildcard
@@ -1421,6 +1546,7 @@ private def finalStatement? : List StatementId → Option StatementId
 fuel, while expression edges consume the remaining fuel independently. -/
 private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
@@ -1447,10 +1573,11 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           let initializer ← match initializer with
             | none => failWith lift site .uninitializedLet
             | some initializer =>
-                evaluateStagedIntegerFuelWith lift solvedRequirements source
-                  environment fuel initializer
-          let body ← lowerStatementsFuelWith lift onCall onRequiredUnary
-            onRequiredBinary onCoercion solvedRequirements fuel source scope
+                evaluateStagedIntegerFuelWith lift onStagedIntegerCall
+                  solvedRequirements source environment fuel initializer
+          let body ← lowerStatementsFuelWith lift onCall
+            onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
+            solvedRequirements fuel source scope
             ({ binder, value := initializer.value } :: environment) expected
             fallthroughSite fallthroughReason rest
           pure {
@@ -1467,13 +1594,14 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           let initializer ← match initializer with
             | none => failWith lift site .uninitializedLet
             | some initializer =>
-                lowerExpressionAsWith lift onCall onRequiredUnary
-                  onRequiredBinary onCoercion solvedRequirements fuel source
-                  scope environment binderType initializer
-          let body ← lowerStatementsFuelWith lift onCall onRequiredUnary
-            onRequiredBinary onCoercion solvedRequirements fuel source
-            ((binder.id, binderType) :: scope) environment expected
-            fallthroughSite fallthroughReason rest
+                lowerExpressionAsWith lift onCall onStagedIntegerCall
+                  onRequiredUnary onRequiredBinary onCoercion
+                  solvedRequirements fuel source scope environment binderType
+                  initializer
+          let body ← lowerStatementsFuelWith lift onCall
+            onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
+            solvedRequirements fuel source ((binder.id, binderType) :: scope)
+            environment expected fallthroughSite fallthroughReason rest
           pure {
             resolved := .letE binder.id initializer.resolved body.resolved
             consumedRequirements := initializer.consumedRequirements ++
@@ -1494,9 +1622,9 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
               else
                 failWith lift site (.typedNodeTypeMismatch expected .unit)
           | some value =>
-              lowerExpressionAsWith lift onCall onRequiredUnary
-                onRequiredBinary onCoercion solvedRequirements fuel source
-                scope environment expected value
+              lowerExpressionAsWith lift onCall onStagedIntegerCall
+                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
+                fuel source scope environment expected value
     | .ifThen condition thenBody elseBody => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .ifThen)
@@ -1506,15 +1634,15 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           | some elseBody => do
               ensureTypeWith lift site expected node.type
               let condition ← lowerExpressionAsWith lift onCall
-                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
-                fuel source scope environment .bool condition
+                onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
+                solvedRequirements fuel source scope environment .bool condition
               let thenBranch ← lowerStatementsFuelWith lift onCall
-                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
-                fuel source scope environment expected site
+                onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
+                solvedRequirements fuel source scope environment expected site
                 (.conditionalBranchFallthrough .thenBranch) thenBody
               let elseBranch ← lowerStatementsFuelWith lift onCall
-                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
-                fuel source scope environment expected site
+                onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
+                solvedRequirements fuel source scope environment expected site
                 (.conditionalBranchFallthrough .elseBranch) elseBody
               pure {
                 resolved := .ifE condition.resolved thenBranch.resolved
@@ -1528,9 +1656,9 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           failWith lift site (.nonTailStatement .block)
         else
           ensureTypeWith lift site expected node.type
-          lowerStatementsFuelWith lift onCall onRequiredUnary onRequiredBinary
-            onCoercion solvedRequirements fuel source scope environment expected
-            site .blockFallthrough body
+          lowerStatementsFuelWith lift onCall onStagedIntegerCall
+            onRequiredUnary onRequiredBinary onCoercion solvedRequirements fuel
+            source scope environment expected site .blockFallthrough body
     | .matchWith resolution => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .matchWith)
@@ -1548,9 +1676,10 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           let scrutineeCoreType ←
             (lowerType (.occurrence resolution.scrutinee.occurrence)
               scrutineeNode.type).mapError lift
-          let scrutinee ← lowerExpressionAsWith lift onCall onRequiredUnary
-            onRequiredBinary onCoercion solvedRequirements fuel source scope
-            environment scrutineeCoreType resolution.scrutinee
+          let scrutinee ← lowerExpressionAsWith lift onCall
+            onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
+            solvedRequirements fuel source scope environment scrutineeCoreType
+            resolution.scrutinee
           let expectedRequirements := resolution.cases.flatMap fun arm =>
             arm.pattern.requirements
           if resolution.requirements != expectedRequirements then
@@ -1561,17 +1690,17 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
               let pattern ← lowerMatchPatternWith lift site solvedRequirements
                 scrutineeNode.type arm.pattern
               let branch ← lowerStatementsFuelWith lift onCall
-                onRequiredUnary onRequiredBinary onCoercion solvedRequirements
-                fuel source scope environment expected site .blockFallthrough
-                arm.body
+                onStagedIntegerCall onRequiredUnary onRequiredBinary onCoercion
+                solvedRequirements fuel source scope environment expected site
+                .blockFallthrough arm.body
               pure { pattern, branch }
             let fallback ← match resolution.defaultBody with
               | none => pure none
               | some body => do
                   let lowered ← lowerStatementsFuelWith lift onCall
-                    onRequiredUnary onRequiredBinary onCoercion
-                    solvedRequirements fuel source scope environment expected
-                    site .blockFallthrough body
+                    onStagedIntegerCall onRequiredUnary onRequiredBinary
+                    onCoercion solvedRequirements fuel source scope environment
+                    expected site .blockFallthrough body
                   pure (some lowered)
             let folded := foldLoweredMatchCases resolution.hiddenScrutinee
               loweredCases (fallback.map (·.resolved))
@@ -1591,6 +1720,120 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
     | .expression _ _ =>
         failWith lift site (.unsupportedStatement .expression)
 
+private def bindStagedIntegerInputsWith {error : Type}
+    (lift : Error → error) (source : TypedSource) :
+    List Resolved.LocalId → List TypedBinder → List Int →
+      Except error StagedIntegerEnvironment
+  | _, [], [] => pure []
+  | seen, binder :: rest, value :: values => do
+      if binder.id.owner != source.owner then
+        failWith lift (.binder binder.id)
+          (.ownerMismatch source.owner binder.id.owner)
+      else if seen.contains binder.id then
+        failWith lift (.binder binder.id) (.duplicateInput binder.id)
+      else if !binder.scheme.quantified.isEmpty then
+        failWith lift (.binder binder.id)
+          (.polymorphicInput binder.scheme.quantified)
+      else if binder.scheme.body != Ty.integer then
+        failWith lift (.binder binder.id)
+          (.stagedIntegerTypeMismatch .integer binder.scheme.body)
+      else
+        pure ({ binder, value } ::
+          (← bindStagedIntegerInputsWith lift source (binder.id :: seen)
+            rest values))
+  | _, binders, values =>
+      failWith lift (.declaration source.owner)
+        (.stagedIntegerArgumentArityMismatch binders.length values.length)
+
+/-- Evaluate the pure tail-normal statement subset used by an integer-returning
+staged function.  Integer lets are strict and erased, while both arms of a
+terminal conditional are validated and accounted before its value is chosen. -/
+private def evaluateStagedIntegerStatementsFuelWith {error : Type}
+    (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (solvedRequirements : List SolvedRequirement) :
+    Nat → TypedSource → StagedIntegerEnvironment → ErrorSite →
+      ErrorReason → List StatementId →
+      Except error StagedIntegerEvaluation
+  | _, _, _, fallthroughSite, fallthroughReason, [] =>
+      failWith lift fallthroughSite fallthroughReason
+  | 0, _, _, _, _, id :: _ =>
+      failWith lift (.occurrence id.occurrence) .statementDepthLimit
+  | fuel + 1, source, environment, fallthroughSite, fallthroughReason,
+      id :: rest => do
+    let node ← (lookupStatement source id).mapError lift
+    let site := ErrorSite.occurrence id.occurrence
+    match node.form with
+    | .letDecl binder initializer => do
+        ensureTypeWith lift site .unit node.type
+        if environment.contains binder.id then
+          failWith lift (.binder binder.id) (.duplicateLocal binder.id)
+        else
+          validateStagedIntegerBinderWith lift (.binder binder.id) source binder
+          let initializer ← match initializer with
+            | none => failWith lift site .uninitializedLet
+            | some initializer =>
+                evaluateStagedIntegerFuelWith lift onStagedIntegerCall
+                  solvedRequirements source environment fuel initializer
+          let body ← evaluateStagedIntegerStatementsFuelWith lift
+            onStagedIntegerCall solvedRequirements fuel source
+            ({ binder, value := initializer.value } :: environment)
+            fallthroughSite fallthroughReason rest
+          pure {
+            value := body.value
+            consumedRequirements := initializer.consumedRequirements ++
+              body.consumedRequirements
+          }
+    | .returnStmt value => do
+        if !rest.isEmpty then
+          failWith lift site (.nonTailStatement .returnStmt)
+        else if node.type != Ty.integer then
+          failWith lift site (.stagedIntegerTypeMismatch .integer node.type)
+        else
+          match value with
+          | none => failWith lift site .stagedIntegerStatementNotClosed
+          | some value =>
+              evaluateStagedIntegerFuelWith lift onStagedIntegerCall
+                solvedRequirements source environment fuel value
+    | .ifThen condition thenBody elseBody => do
+        if !rest.isEmpty then
+          failWith lift site (.nonTailStatement .ifThen)
+        else if node.type != Ty.integer then
+          failWith lift site (.stagedIntegerTypeMismatch .integer node.type)
+        else
+          match elseBody with
+          | none => failWith lift site .missingElseBranch
+          | some elseBody => do
+              let condition ← evaluateStagedBoolFuelWith lift
+                onStagedIntegerCall solvedRequirements source environment fuel
+                condition
+              let thenBranch ← evaluateStagedIntegerStatementsFuelWith lift
+                onStagedIntegerCall solvedRequirements fuel source environment
+                site (.conditionalBranchFallthrough .thenBranch) thenBody
+              let elseBranch ← evaluateStagedIntegerStatementsFuelWith lift
+                onStagedIntegerCall solvedRequirements fuel source environment
+                site (.conditionalBranchFallthrough .elseBranch) elseBody
+              pure {
+                value := if condition.value then thenBranch.value
+                  else elseBranch.value
+                consumedRequirements := condition.consumedRequirements ++
+                  thenBranch.consumedRequirements ++
+                  elseBranch.consumedRequirements
+              }
+    | .block body => do
+        if !rest.isEmpty then
+          failWith lift site (.nonTailStatement .block)
+        else if node.type != Ty.integer then
+          failWith lift site (.stagedIntegerTypeMismatch .integer node.type)
+        else
+          evaluateStagedIntegerStatementsFuelWith lift onStagedIntegerCall
+            solvedRequirements fuel source environment site .blockFallthrough
+            body
+    | .matchWith _ =>
+        failWith lift site .stagedIntegerStatementNotClosed
+    | .expression _ _ =>
+        failWith lift site (.unsupportedStatement .expression)
+
 /-- Preserve the original call-free profile as a reusable call policy. -/
 def rejectCalls : CallElaborator Error :=
   fun _ node _ _ _ =>
@@ -1603,6 +1846,11 @@ def rejectCalls : CallElaborator Error :=
       | .ok _ =>
           fail (.occurrence node.id.occurrence)
             (.unsupportedExpression .call)
+
+/-- Preserve standalone closed staging by rejecting every ordinary source
+function call.  Builtin integer intrinsics are intercepted before this policy. -/
+def rejectStagedIntegerCalls : StagedIntegerCallElaborator Error :=
+  rejectStagedIntegerCallsWith (fun error => error)
 
 /-- Preserve the original evidence-free profile for requirement-bearing binary
 expressions. -/
@@ -1651,13 +1899,66 @@ def reconcileConsumedRequirements
     Except Error (List RequirementId) :=
   reconcileConsumedRequirementsAux declaration [] solved consumed
 
-/-- Lower a checked function body to the resolved local fragment while letting
-caller-supplied policies handle otherwise staged calls, requirement-bearing
-unary and binary expressions, and coercion steps.  All child traversal,
-typed-node, lexical-scope, coercion-path, and requirement checks remain owned by
-this module and are lifted into the consumer's error type. -/
-def lowerFunctionBodyWithRuntimePolicies {error : Type} (lift : Error → error)
+/-- Execute one checked integer-returning function in the closed staged domain.
+Inputs are paired internally with the declaration-owned typed binders, so a
+whole-program caller supplies only signed values and cannot forge the lexical
+environment.  Callee requirements are reconciled here and never escape into a
+caller's function-local ledger. -/
+def evaluateStagedIntegerFunctionWith {error : Type}
+    (lift : Error → error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
+    (function : CheckedFunction) (arguments : List Int) : Except error Int := do
+  let source := function.typedBody
+  if source.owner != function.declaration then
+    failWith lift (.declaration function.declaration)
+      (.ownerMismatch function.declaration source.owner)
+  else if source.inputs.length != arguments.length then
+    failWith lift (.declaration function.declaration)
+      (.stagedIntegerArgumentArityMismatch source.inputs.length
+        arguments.length)
+  else
+    let environment ← bindStagedIntegerInputsWith lift source []
+      source.inputs arguments
+    if function.inferredBodyType != Ty.integer then
+      failWith lift (.declaration function.declaration)
+        (.stagedIntegerTypeMismatch .integer function.inferredBodyType)
+    let expectedType := Ty.function
+      (Ty.productMany (source.inputs.map fun binder => binder.scheme.body))
+      Ty.integer
+    if function.type != expectedType then
+      failWith lift (.declaration function.declaration)
+        (.stagedIntegerFunctionTypeMismatch expectedType function.type)
+    let roots ← (statementRoots source.roots).mapError lift
+    let fallthroughSite := match finalStatement? roots with
+      | some statement => ErrorSite.occurrence statement.occurrence
+      | none => ErrorSite.declaration function.declaration
+    let evaluated ← evaluateStagedIntegerStatementsFuelWith lift
+      onStagedIntegerCall function.solvedRequirements
+      (source.nodes.length + 1) source environment fallthroughSite
+      .statementListFallthrough roots
+    let solvedRequirements :=
+      function.solvedRequirements.map fun requirement => requirement.id
+    let unconsumed ←
+      (reconcileConsumedRequirements function.declaration solvedRequirements
+        evaluated.consumedRequirements).mapError lift
+    unless unconsumed.isEmpty do
+      failWith lift (.declaration function.declaration)
+        (.unconsumedRequirements unconsumed)
+    pure evaluated.value
+
+/-- Standalone staged-function execution retains the closed-call boundary. -/
+def evaluateStagedIntegerFunction (function : CheckedFunction)
+    (arguments : List Int) : Except Error Int :=
+  evaluateStagedIntegerFunctionWith (fun error => error)
+    rejectStagedIntegerCalls function arguments
+
+/-- Lower a checked function body while separately delegating runtime calls and
+closed staged-integer calls.  Both policies receive only their own fixed
+builders; Source Core retains every recursive traversal and requirement gate. -/
+def lowerFunctionBodyWithRuntimeAndStagedPolicies {error : Type}
+    (lift : Error → error)
     (onCall : CallElaborator error)
+    (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
     (onCoercion : CoercionElaborator error)
@@ -1680,8 +1981,8 @@ def lowerFunctionBodyWithRuntimePolicies {error : Type} (lift : Error → error)
     let fallthroughSite := match finalStatement? roots with
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
-    let lowered ← lowerStatementsFuelWith lift onCall onRequiredUnary
-      onRequiredBinary onCoercion function.solvedRequirements
+    let lowered ← lowerStatementsFuelWith lift onCall onStagedIntegerCall
+      onRequiredUnary onRequiredBinary onCoercion function.solvedRequirements
       (source.nodes.length + 1) source inputs [] expected fallthroughSite
       .statementListFallthrough roots
     let solvedRequirements :=
@@ -1697,6 +1998,19 @@ def lowerFunctionBodyWithRuntimePolicies {error : Type} (lift : Error → error)
       rootOccurrence
       unconsumedRequirements
     }
+
+/-- Compatibility wrapper retaining the previous closed staged-call boundary
+while exposing the established runtime call/evidence/coercion policies. -/
+def lowerFunctionBodyWithRuntimePolicies {error : Type} (lift : Error → error)
+    (onCall : CallElaborator error)
+    (onRequiredUnary : RequiredUnaryElaborator error)
+    (onRequiredBinary : RequiredBinaryElaborator error)
+    (onCoercion : CoercionElaborator error)
+    (function : CheckedFunction) :
+    Except error BodyDraft :=
+  lowerFunctionBodyWithRuntimeAndStagedPolicies lift onCall
+    (rejectStagedIntegerCallsWith lift) onRequiredUnary onRequiredBinary
+    onCoercion function
 
 /-- Compatibility entry point for call, required-binary, and coercion
 consumers.  Requirement-bearing unary expressions retain their former explicit
