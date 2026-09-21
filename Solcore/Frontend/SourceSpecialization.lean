@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.Types
+import Solcore.Frontend.SourceStageAnalysis
 
 /-!
 Closing specialization for checked generic source functions.
@@ -50,6 +51,7 @@ inductive Error where
   | polymorphicBinder (binder : Resolved.LocalId) (variables : List TypeVarId)
   | evidenceGoalMismatch (id : RequirementId)
       (predicate goal : ProgramPredicate)
+  | stageAnalysis (error : SourceStageAnalysis.Error)
   | residualType (reason : NonConcreteType)
   deriving Repr, DecidableEq
 
@@ -71,6 +73,8 @@ structure SpecializedFunction where
   parameterSubstitution : ParameterSubstitution
   assumptions : List ProgramPredicate
   function : CheckedFunction
+  /-- Scope-aware source-stage facts for this exact specialization. -/
+  stageAnalysis : SourceStageAnalysis.Analysis
   deriving Repr, BEq
 
 def applyScheme (substitution : ParameterSubstitution) (scheme : Scheme) : Scheme :=
@@ -545,6 +549,9 @@ def specializeFunction (signature : ProgramFunctionSignature)
   validateConcreteBinders (typedSourceBinders specialized.typedBody)
   validateConcreteTypes (assumptions.flatMap predicateTypes ++
     checkedFunctionTypes specialized)
+  let stagesAfter ← match SourceStageAnalysis.analyzeFunction specialized with
+    | .ok analysis => pure analysis
+    | .error error => throw (.stageAnalysis error)
   pure {
     key := {
       declaration := function.declaration
@@ -554,6 +561,7 @@ def specializeFunction (signature : ProgramFunctionSignature)
     parameterSubstitution := canonical
     assumptions
     function := specialized
+    stageAnalysis := stagesAfter
   }
 
 end Solcore.Frontend.SourceSpecialization

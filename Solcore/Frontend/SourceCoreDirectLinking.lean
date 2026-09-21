@@ -204,6 +204,8 @@ inductive Error where
   | comptimeArgumentDeferred
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (parameterIndex : Nat) (argument : ExpressionId)
+  | missingArgumentStage
+      (caller : SpecializationKey) (occurrence argument : ExpressionId)
   | runtimeCallComptimeResult
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (callee : SpecializationKey)
@@ -417,91 +419,21 @@ private def validateCallComptimeMetadata (node : ExpressionNode)
       (.specializedCalleeReturnComptimeMismatch node.id
         instantiation.returnComptime callee.function.returnComptime))
 
-/-- Conservative staging classification at the final runtime-link boundary.
-Only expressions proved closed by this small classifier may cross a marked
-parameter.  Runtime dependencies receive the precise runtime error; calls and
-other unsupported forms remain distinguishable as deferred and reject rather
-than silently entering ordinary Core lowering. -/
-private inductive ArgumentStage where
-  | comptime
-  | runtime
-  | deferred
-  deriving Repr, DecidableEq
-
-private def combineArgumentStages (stages : List ArgumentStage) :
-    ArgumentStage :=
-  if stages.any fun stage => stage == .runtime then
-    .runtime
-  else if stages.all fun stage => stage == .comptime then
-    .comptime
-  else
-    .deferred
-
-private def classifyArgumentStageFuel (caller : SpecializedFunction) :
-    Nat → ExpressionId → Except Error ArgumentStage
-  | 0, expression =>
-      .error (.sourceCore {
-        site := .occurrence expression.occurrence
-        reason := .expressionDepthLimit
-      })
-  | fuel + 1, expression => do
-      let source := caller.function.typedBody
-      let node ← match source.lookupNode? expression.occurrence with
-        | none => throw (.sourceCore {
-            site := .occurrence expression.occurrence
-            reason := .missingNode
-          })
-        | some (.statement _) => throw (.sourceCore {
-            site := .occurrence expression.occurrence
-            reason := .expectedExpressionNode
-          })
-        | some (.expression node) => pure node
-      let recurse := classifyArgumentStageFuel caller fuel
-      match node.form with
-      | .reference _ (.local binder) =>
-          match source.inputs.find? fun input => decide (input.id = binder) with
-          | some input =>
-              pure (if input.comptime then .comptime else .runtime)
-          | none => pure .deferred
-      | .group inner
-      | .unary _ inner => recurse inner
-      | .binary left _ right => do
-          let leftStage ← recurse left
-          let rightStage ← recurse right
-          pure (combineArgumentStages [leftStage, rightStage])
-      | .conditional condition thenBranch elseBranch => do
-          let conditionStage ← recurse condition
-          let thenStage ← recurse thenBranch
-          let elseStage ← recurse elseBranch
-          pure (combineArgumentStages
-            [conditionStage, thenStage, elseStage])
-      | .tuple elements => do
-          let stages ← elements.mapM recurse
-          pure (combineArgumentStages stages)
-      | .literal _
-      | .integerLiteral _ _
-      | .reference _ (.builtinBoolean _) => pure .comptime
-      | .reference _ (.declaration _)
-      | .reference _ (.builtinFunction _)
-      | .lambda _ _ _
-      | .call _ _ _
-      | .proxy _
-      | .index _ _ => pure .deferred
-
 private def validateRuntimeCallArguments (caller : SpecializedFunction)
     (node : ExpressionNode) : Nat → List TypedBinder → List ExpressionId →
       Except Error Unit
   | _, [], [] => pure ()
   | index, input :: inputs, argument :: arguments => do
       if input.comptime then
-        let stage ← classifyArgumentStageFuel caller
-          (caller.function.typedBody.nodes.length + 1) argument
+        let stage ← match caller.stageAnalysis.expressionStage? argument with
+          | some stage => pure stage
+          | none => throw (.missingArgumentStage caller.key node.id argument)
         match stage with
-        | .comptime => pure ()
-        | .runtime =>
+        | SourceStageAnalysis.Stage.comptime => pure ()
+        | SourceStageAnalysis.Stage.runtime =>
           throw (.runtimeArgumentToComptimeParameter caller.key node.id index
             argument)
-        | .deferred =>
+        | SourceStageAnalysis.Stage.deferred =>
           throw (.comptimeArgumentDeferred caller.key node.id index argument)
       validateRuntimeCallArguments caller node (index + 1) inputs arguments
   | _, inputs, arguments =>
