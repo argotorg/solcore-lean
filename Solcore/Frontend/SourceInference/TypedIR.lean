@@ -22,8 +22,9 @@ structure TypedBinder where
   id : Resolved.LocalId
   name : String
   scheme : Scheme
-  /-- Whether this declaration input is required during staged evaluation.
-  Ordinary lexical binders leave this false. -/
+  /-- Whether this parameter is required during staged evaluation.  Named
+  function inputs and explicitly marked lambda parameters retain the bit;
+  ordinary lexical binders leave it false. -/
   comptime : Bool := false
   span : Option Syntax.SourceSpan := none
   deriving Repr, BEq, DecidableEq

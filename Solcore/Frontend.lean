@@ -404,6 +404,7 @@ import Solcore.Frontend.TypedLetReturnTreeLookupProperties
 import Solcore.Frontend.ProgramIdentity
 import Solcore.Frontend.ProgramChecking
 import Solcore.Frontend.ExecutableImplMethods
+import Solcore.Frontend.SourceStageAnalysis
 import Solcore.Frontend.SourceSpecialization
 import Solcore.Frontend.SourceSpecializationProperties
 import Solcore.Frontend.SourceSpecializationWorklist

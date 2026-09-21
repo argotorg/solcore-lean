@@ -27,18 +27,20 @@ def bindLambdaParameters (context : Context) :
       Except Error (List TypedBinder × List Ty × State)
   | [], _, _, state => .ok ([], [], state)
   | parameter :: rest, index, seen, state => do
-      let (name, type, state) ← match parameter.value with
+      let (name, type, comptime, state) ← match parameter.value with
         | .error => throw (.malformedLambdaParameter index)
         | .inferred name =>
             let (type, state) := state.fresh
-            pure (name.value, type, state)
-        | .typed _ name sourceType =>
-            pure (name.value, (← resolveSourceType context sourceType), state)
+            pure (name.value, type, false, state)
+        | .typed marker name sourceType =>
+            pure (name.value, (← resolveSourceType context sourceType),
+              marker.isSome, state)
       if seen.contains name then
         throw (.duplicateLambdaParameter name)
       else
         let (binder, state) :=
           state.allocateBinder name (.mono type) (some parameter.span)
+            (comptime := comptime)
         let (binders, types, state) ← bindLambdaParameters context rest
           (index + 1) (name :: seen) state
         pure (binder :: binders, type :: types, state)

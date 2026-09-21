@@ -290,11 +290,13 @@ def restoreLexicalScope (state : State) (scope : LexicalScope) : State := {
 
 /-- Allocate and enter one stable local binder in the current lexical scope. -/
 def allocateBinder (state : State) (name : String) (scheme : Scheme)
-    (span : Option Syntax.SourceSpan := none) : TypedBinder × State :=
+    (span : Option Syntax.SourceSpan := none) (comptime : Bool := false) :
+    TypedBinder × State :=
   let binder : TypedBinder := {
     id := { owner := state.owner, binderIndex := state.nextLocal }
     name
     scheme
+    comptime
     span
   }
   (binder, {
