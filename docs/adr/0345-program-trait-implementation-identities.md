@@ -22,7 +22,8 @@ Represent program-wide trait and implementation identities as disjoint sums:
 - `ProgramImplId.builtin` or `ProgramImplId.declaration`.
 
 The builtin namespaces initially reserve `Int`, `Int<integer>`, and
-`Int<Word>` identities.  This ADR does not yet install their resolution rules.
+`Int<Word>` identities.  This ADR does not install their resolution rules;
+ADR-0346 builds that profile on this identity boundary.
 
 There is a one-way coercion from `Resolved.DeclarationId` into each program
 identity so source signature construction remains concise.  There is no
@@ -45,9 +46,9 @@ reuse an index or spelling.  Evidence retains whether its implementation is a
 compiler primitive or a source declaration, while all existing source trait
 resolution and executable-method behavior remains unchanged.
 
-The next slice may prepend primitive `Int<integer>` and `Int<Word>` rules to a
-combined resolution view without changing source catalog counts.  Literal
-inference and Core execution remain separate later changes.
+ADR-0346 prepends primitive `Int<Word>` and `Int<integer>` rules to a combined
+resolution view without changing source catalog counts.  Literal inference
+and Core execution remain separate later changes.
 
 ## Verification
 

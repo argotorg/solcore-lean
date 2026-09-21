@@ -84,9 +84,11 @@ The target-compatible numeric-literal foundation has started (ADR-0344).
 which source checking may retain but Semantic Core explicitly rejects.  The
 unbounded numeric decoder also has a separate modulo-Word projection matching
 primitive `wordFromInteger`; the older strict in-range projection remains
-unchanged for its monomorphic adapter.  Builtin `Int` evidence, typed literal
-conversion metadata and end-to-end `Int.fromInteger` execution are the next
-steps, so whole-program inference still retains its temporary
+unchanged for its monomorphic adapter.  Premise-free builtin `Int<Word>` and
+`Int<integer>` evidence is now installed ahead of source rules through the
+combined resolution view (ADR-0346), while source catalogs remain source-only.
+Typed literal conversion metadata and end-to-end `Int.fromInteger` execution
+are the next steps, so whole-program inference still retains its temporary
 `FromLiteral`/`Numeric` compatibility behavior.
 
 Program-wide trait and implementation evidence now uses collision-free
@@ -94,8 +96,8 @@ builtin-or-source identities (ADR-0345).  Source declaration IDs coerce only
 into the tagged identity; source-only catalog consumers must project them back
 explicitly and reject builtin evidence.  This reserves honest identities for
 the builtin `Int` trait and its `integer`/Word implementations without
-inventing source declarations.  The identities are installed, but their
-primitive resolution rules are the next slice.
+inventing source declarations.  General evidence resolution now consumes the
+primitive rules; source-only coercion enumeration and method catalogs do not.
 
 ## What works now
 

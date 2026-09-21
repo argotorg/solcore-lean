@@ -52,9 +52,9 @@ change any existing expression adapter.
 
 ## Deferred boundary
 
-This ADR does not yet:
+This ADR by itself does not:
 
-- introduce the builtin `Int` class or its `word` and `integer` instances;
+- attach the builtin `Int` evidence installed later by ADR-0346 to literals;
 - change whole-program literal inference or its current compatibility tests;
 - attach `Int.fromInteger` selection and evidence to typed literal nodes;
 - execute the modulo helper from Source Core or the public source pipeline;
@@ -63,7 +63,8 @@ This ADR does not yet:
 - execute user-defined `Int` instances.
 
 ADR-0345 supplies the collision-free sum identity for source and builtin
-trait/implementation evidence.  Literal inference can next retain an exact
+trait/implementation evidence, and ADR-0346 installs the primitive resolution
+profile.  Literal inference can next retain an exact
 `integer -> target` conversion plan, and Source Core can consume the builtin
 Word plan without ever emitting `integer` at runtime.
 

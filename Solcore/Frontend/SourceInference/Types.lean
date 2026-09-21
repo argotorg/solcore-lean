@@ -386,7 +386,7 @@ def solveNormalizedPredicate (context : Context) (state : State)
   if requirementAssumption? context state goal then
     .ok (.assumption goal)
   else
-    match TypedTraitResolution.resolve context.signatures.implRules
+    match TypedTraitResolution.resolve context.signatures.resolutionRules
         context.traitDepth goal with
     | { outcome := .success evidence, .. } => .ok (.implementation evidence)
     | { outcome := .noSolution, .. } => .error (.noTraitImplementation goal)

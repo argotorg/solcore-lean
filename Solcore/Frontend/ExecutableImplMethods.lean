@@ -232,7 +232,7 @@ private def validateEvidencePremises
 private def validateSelectedEvidence (program : CheckedProgram)
     (implementation : Resolved.DeclarationId) (goal : ProgramPredicate)
     (evidence : TypedTraitResolution.Evidence) : Except Error Unit :=
-  match (TypedTraitResolution.resolve program.signatures.implRules 32
+  match (TypedTraitResolution.resolve program.signatures.resolutionRules 32
       goal).outcome with
   | .noSolution => .error (.evidenceResolutionNoSolution goal)
   | .inconclusive reason => .error (.evidenceResolutionInconclusive reason)
@@ -251,7 +251,7 @@ private def validateMethodEvidenceGoals (program : CheckedProgram)
       let .byImpl actual _ _ := evidence
       unless actual = predicate do
         throw (.methodEvidenceGoalMismatch method index predicate actual)
-      match (TypedTraitResolution.resolve program.signatures.implRules 32
+      match (TypedTraitResolution.resolve program.signatures.resolutionRules 32
           predicate).outcome with
       | .noSolution =>
           throw (.methodEvidenceResolutionNoSolution method index predicate)

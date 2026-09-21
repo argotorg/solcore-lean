@@ -72,10 +72,15 @@ ADR-0345 supplies the collision-free identity dependency.  Program predicates,
 implementation rules and evidence distinguish compiler builtins from source
 declarations, with no fabricated declaration IDs or reverse coercion.  Existing
 source catalogs and execution are unchanged, and source-only method/linker
-boundaries reject builtin tags explicitly.  Installing the primitive
-`Int<integer>` and `Int<Word>` rules, then retaining exact `Int.fromInteger`
-conversion metadata, are the next steps before whole-program literal execution
-can switch away from `FromLiteral`/`Numeric`.
+boundaries reject builtin tags explicitly.
+
+ADR-0346 installs premise-free primitive `Int<Word>` then `Int<integer>` rules
+as a stable prefix of the general resolution view.  Source trait,
+implementation and rule catalogs retain their original counts; a source trait
+spelled `Int` remains disjoint and independently resolvable.  Coercion graph
+enumeration stays source-only.  Retaining exact `Int.fromInteger` conversion
+metadata is the next step before whole-program literal execution can switch
+away from `FromLiteral`/`Numeric`.
 
 This is an executable-first milestone rather than a completed proof campaign.
 The first typed-carrier step now assigns contiguous function-local identities to

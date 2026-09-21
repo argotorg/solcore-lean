@@ -1,5 +1,6 @@
 import Solcore.Syntax.Parser
 import Solcore.Frontend.ProgramSignatures
+import Solcore.Frontend.TypedTraitResolution
 
 /-! Executable source-to-signature and source-to-impl-rule regressions. -/
 
@@ -109,6 +110,81 @@ private def testSuccessfulCollection : IO Unit := do
           }]))
         "impl head/where predicate resolution changed"
   | rules => throw (IO.userError s!"impl rules changed: {reprStr rules}")
+
+private def testBuiltinIntResolutionProfile : IO Unit := do
+  let source ← parsed "source_int.solc" (String.intercalate "\n" [
+    "trait Int<T> {}",
+    "impl Int<Bool> {}"
+  ])
+  let environment ← catalog [source]
+  let sourceTrait ← declarationNamed environment "Int"
+  let signatures ← match buildProgramSignatures environment with
+    | .ok signatures => pure signatures
+    | .error errors =>
+        throw (IO.userError s!"builtin Int profile failed: {reprStr errors}")
+  let sourceRule ← match signatures.implRules with
+    | [rule] => pure rule
+    | rules => throw (IO.userError
+        s!"source Int catalog changed: {reprStr rules}")
+  let some sourceImplementation := sourceRule.id.declaration?
+    | throw (IO.userError "source Int rule lost its declaration identity")
+  assertTrue (decide (signatures.resolutionRules =
+      [ProgramSignatures.builtinIntWordRule,
+        ProgramSignatures.builtinIntIntegerRule, sourceRule] ∧
+      signatures.traits.length = 1 ∧
+      signatures.implementations.length = 1 ∧
+      signatures.implRules.length = 1 ∧
+      signatures.resolutionRules.length = 3))
+    "combined resolution rules lost builtin-first order or source-only counts"
+  let builtinWord := ProgramSignatures.builtinIntPredicate .word
+  let builtinInteger := ProgramSignatures.builtinIntPredicate .integer
+  let builtinBool := ProgramSignatures.builtinIntPredicate .bool
+  let builtinFlexible := ProgramSignatures.builtinIntPredicate (.variable ⟨0⟩)
+  let builtinExtraArgument : ProgramPredicate := {
+    ProgramSignatures.builtinIntPredicate .word with
+    arguments := [.bool]
+  }
+  let sourceBool : ProgramPredicate := {
+    trait := sourceTrait.id
+    subject := .bool
+    arguments := []
+  }
+  match (TypedTraitResolution.resolve signatures.resolutionRules 1
+      builtinWord).outcome with
+  | .success (.byImpl goal (.builtin .intWord) []) =>
+      assertTrue (decide (goal = builtinWord))
+        "builtin Word evidence retained the wrong goal"
+  | outcome => throw (IO.userError
+      s!"builtin Int<Word> resolution changed: {reprStr outcome}")
+  match (TypedTraitResolution.resolve signatures.resolutionRules 1
+      builtinInteger).outcome with
+  | .success (.byImpl goal (.builtin .intInteger) []) =>
+      assertTrue (decide (goal = builtinInteger))
+        "builtin integer evidence retained the wrong goal"
+  | outcome => throw (IO.userError
+      s!"builtin Int<integer> resolution changed: {reprStr outcome}")
+  match (TypedTraitResolution.resolve signatures.resolutionRules 1
+      builtinBool).outcome with
+  | .noSolution => pure ()
+  | outcome => throw (IO.userError
+      s!"builtin Int<Bool> unexpectedly crossed into source Int: {reprStr outcome}")
+  match (TypedTraitResolution.resolve signatures.resolutionRules 1
+      builtinFlexible).outcome with
+  | .noSolution => pure ()
+  | outcome => throw (IO.userError
+      s!"builtin Int rules defaulted a caller-owned variable: {reprStr outcome}")
+  match (TypedTraitResolution.resolve signatures.resolutionRules 1
+      builtinExtraArgument).outcome with
+  | .noSolution => pure ()
+  | outcome => throw (IO.userError
+      s!"builtin Int accepted an extra argument: {reprStr outcome}")
+  match (TypedTraitResolution.resolve signatures.resolutionRules 1
+      sourceBool).outcome with
+  | .success (.byImpl goal (.declaration implementation) []) =>
+      assertTrue (decide (goal = sourceBool ∧ implementation = sourceImplementation))
+        "source Int evidence retained the wrong tagged goal or implementation"
+  | outcome => throw (IO.userError
+      s!"source trait named Int did not remain resolvable: {reprStr outcome}")
 
 private def testMethodCatalog : IO Unit := do
   let source ← parsed "methods.solc" (String.intercalate "\n" [
@@ -325,6 +401,7 @@ end ProgramSignatures
 /-- Run the first source-connected signature and trait-rule vertical slice. -/
 def testProgramSignatures : IO Unit := do
   ProgramSignatures.testSuccessfulCollection
+  ProgramSignatures.testBuiltinIntResolutionProfile
   ProgramSignatures.testMethodCatalog
   ProgramSignatures.testFailures
   ProgramSignatures.testMethodFailures

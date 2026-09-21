@@ -896,7 +896,7 @@ private def resolvedMethodTraitEvidence (program : CheckedProgram) :
   | [] => []
   | predicate :: rest =>
       let tail := resolvedMethodTraitEvidence program rest
-      match (TypedTraitResolution.resolve program.signatures.implRules 32
+      match (TypedTraitResolution.resolve program.signatures.resolutionRules 32
           predicate).outcome with
       | .success evidence@(.byImpl goal _ _) =>
           if goal = predicate then .implementation evidence :: tail else tail

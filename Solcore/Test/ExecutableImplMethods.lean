@@ -465,7 +465,7 @@ private def testGenericImplementationSpecialization : IO Unit := do
     arguments := []
   }
   let evidence ← match (TypedTraitResolution.resolve
-      program.signatures.implRules 32 goal).outcome with
+      program.signatures.resolutionRules 32 goal).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
         s!"generic Identity<Word> did not resolve: {reprStr outcome}")
@@ -517,7 +517,7 @@ private def testUndeterminedImplementationParameterRejection : IO Unit := do
     arguments := []
   }
   let evidence ← match (TypedTraitResolution.resolve
-      program.signatures.implRules 32 goal).outcome with
+      program.signatures.resolutionRules 32 goal).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
         s!"phantom Identity<Word> head did not resolve: {reprStr outcome}")
@@ -556,7 +556,7 @@ private def testImplementationPredicateEvidence : IO Unit := do
     | implementations => throw (IO.userError
         s!"expected one Add implementation, found {implementations.length}")
   let evidence ← match (TypedTraitResolution.resolve
-      program.signatures.implRules 32 implementation.head).outcome with
+      program.signatures.resolutionRules 32 implementation.head).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
         s!"Add implementation evidence did not resolve: {reprStr outcome}")
@@ -659,17 +659,17 @@ private def testMethodPredicateEvidence : IO Unit := do
     arguments := []
   }
   let primaryEvidence ← match (TypedTraitResolution.resolve
-      program.signatures.implRules 32 guardWord).outcome with
+      program.signatures.resolutionRules 32 guardWord).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
         s!"Guard<Word> evidence did not resolve: {reprStr outcome}")
   let eqEvidence ← match (TypedTraitResolution.resolve
-      program.signatures.implRules 32 eqWord).outcome with
+      program.signatures.resolutionRules 32 eqWord).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
         s!"Eq<Word> evidence did not resolve: {reprStr outcome}")
   let markEvidence ← match (TypedTraitResolution.resolve
-      program.signatures.implRules 32 markWord).outcome with
+      program.signatures.resolutionRules 32 markWord).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
         s!"Mark<Word> evidence did not resolve: {reprStr outcome}")

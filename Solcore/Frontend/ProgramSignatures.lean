@@ -185,8 +185,8 @@ def functionSignatureOfMethod
 end ProgramImplementationSignature
 
 /-- The declarations needed by source expression inference, trait search, and
-later trait-evidence execution. `functions` and `implRules` remain the original
-consumer-facing projections. -/
+later trait-evidence execution. `functions` and `implRules` remain source-only
+catalog projections; `ProgramSignatures.resolutionRules` adds compiler rules. -/
 structure ProgramSignatures where
   functions : List ProgramFunctionSignature
   implRules : List ProgramImplRule
@@ -195,6 +195,38 @@ structure ProgramSignatures where
   deriving Repr
 
 namespace ProgramSignatures
+
+/-- The exact unary builtin `Int` obligation for a selected result type. -/
+def builtinIntPredicate (subject : TypeSystem.Ty) : ProgramPredicate := {
+  trait := .builtin .int
+  subject
+  arguments := []
+}
+
+/-- Primitive `Int<Word>` evidence.  Builtins are deliberately separate from
+the source implementation catalog because they have no source declaration or
+method body. -/
+def builtinIntWordRule : ProgramImplRule := {
+  id := .builtin .intWord
+  head := builtinIntPredicate .word
+  wherePredicates := []
+}
+
+/-- Primitive `Int<integer>` evidence retained for staged literal payloads. -/
+def builtinIntIntegerRule : ProgramImplRule := {
+  id := .builtin .intInteger
+  head := builtinIntPredicate .integer
+  wherePredicates := []
+}
+
+/-- Compiler-provided rules in stable resolution order. -/
+def builtinResolutionRules : List ProgramImplRule :=
+  [builtinIntWordRule, builtinIntIntegerRule]
+
+/-- The complete trait-resolution view.  Primitive rules precede source rules,
+while `implRules` itself remains the source-only catalog projection. -/
+def resolutionRules (signatures : ProgramSignatures) : List ProgramImplRule :=
+  builtinResolutionRules ++ signatures.implRules
 
 /-- Preserve every overload with an exact unqualified spelling. -/
 def functionsNamed (signatures : ProgramSignatures)
