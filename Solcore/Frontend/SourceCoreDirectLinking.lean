@@ -997,6 +997,11 @@ private def buildDetachedDraftFuel (program : CheckedProgram)
             let instantiation ← match resolution with
               | .indirect _ => throw (.indirectCall node.id)
               | .declaration instantiation => pure instantiation
+              | .builtinFunction _ =>
+                  throw (.sourceCore {
+                    site := .occurrence node.id.occurrence
+                    reason := .stagedIntegerExpressionNotClosed
+                  })
             let calleeEvidence ← exactCallRequirementEvidence specialized node
               assumptionEvidence instantiation
             let resolvedCallee ← validateDetachedCallMetadata program specialized
@@ -1081,6 +1086,11 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
             let instantiation ← match resolution with
               | .indirect _ => throw (.indirectCall node.id)
               | .declaration instantiation => pure instantiation
+              | .builtinFunction _ =>
+                  throw (.sourceCore {
+                    site := .occurrence node.id.occurrence
+                    reason := .stagedIntegerExpressionNotClosed
+                  })
             let calleeEvidence ← exactCallRequirementEvidence specialized node
               assumptionEvidence instantiation
             let edge ← exactCallEdge plan key node.id

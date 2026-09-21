@@ -15,6 +15,43 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
+namespace BuiltinFunctionId
+
+/-- Exact source spelling of one compiler-provided function. -/
+def spelling : BuiltinFunctionId → String
+  | .integerSub => "integerSub"
+  | .wordFromInteger => "wordFromInteger"
+
+/-- Fixed source parameter types of one compiler-provided function. -/
+def parameterTypes : BuiltinFunctionId → List TypeSystem.Ty
+  | .integerSub => [TypeSystem.Ty.integer, TypeSystem.Ty.integer]
+  | .wordFromInteger => [TypeSystem.Ty.integer]
+
+/-- Fixed source result type of one compiler-provided function. -/
+def returnType : BuiltinFunctionId → TypeSystem.Ty
+  | .integerSub => TypeSystem.Ty.integer
+  | .wordFromInteger => TypeSystem.Ty.word
+
+/-- Exact monomorphic function type of one compiler-provided function. -/
+def type (function : BuiltinFunctionId) : TypeSystem.Ty :=
+  .function (TypeSystem.Ty.productMany function.parameterTypes)
+    function.returnType
+
+/-- The compiler-provided function has no rigid or flexible parameters. -/
+def scheme (function : BuiltinFunctionId) : TypeSystem.Scheme :=
+  .mono function.type
+
+end BuiltinFunctionId
+
+/-- Resolve the deliberately small exact bare compiler-function namespace. -/
+def builtinFunctionNamed? (name : String) : Option BuiltinFunctionId :=
+  if name = BuiltinFunctionId.integerSub.spelling then
+    some .integerSub
+  else if name = BuiltinFunctionId.wordFromInteger.spelling then
+    some .wordFromInteger
+  else
+    none
+
 /-- The concrete trait-predicate representation used by whole-program source
 checking. -/
 abbrev ProgramPredicate :=

@@ -90,6 +90,7 @@ def applyReferenceResolution (substitution : ParameterSubstitution) :
   | .local binder => .local binder
   | .declaration instantiation =>
       .declaration (applyInstantiation substitution instantiation)
+  | .builtinFunction function => .builtinFunction function
   | .builtinBoolean value => .builtinBoolean value
 
 def applyIndirectCallResolution (substitution : ParameterSubstitution)
@@ -111,6 +112,7 @@ def applyCallResolution (substitution : ParameterSubstitution) :
       .indirect (applyIndirectCallResolution substitution metadata)
   | .declaration instantiation =>
       .declaration (applyInstantiation substitution instantiation)
+  | .builtinFunction function => .builtinFunction function
 
 def applyIntegerLiteralResolution (substitution : ParameterSubstitution)
     (resolution : IntegerLiteralResolution) : IntegerLiteralResolution := {
@@ -308,6 +310,7 @@ private def instantiationTypes
 
 private def referenceTypes : ReferenceResolution → List Ty
   | .local _
+  | .builtinFunction _
   | .builtinBoolean _ => []
   | .declaration instantiation => instantiationTypes instantiation
 
@@ -318,6 +321,7 @@ private def callResolutionTypes : CallResolution → List Ty
         metadata.argumentCoercions.flatMap fun step =>
           [step.source, step.target]
   | .declaration instantiation => instantiationTypes instantiation
+  | .builtinFunction _ => []
 
 private def expressionFormTypes : ExpressionForm → List Ty
   | .reference _ resolution => referenceTypes resolution

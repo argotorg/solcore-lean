@@ -47,6 +47,8 @@ inductive Error where
       (name : String) (candidates : List Resolved.DeclarationId)
   | ambiguousOverload
       (name : String) (candidates : List Resolved.DeclarationId)
+  | builtinFunctionArityMismatch
+      (function : BuiltinFunctionId) (expected actual : Nat)
   | malformedFunctionType (declaration : Resolved.DeclarationId)
   | malformedLambdaParameter (index : Nat)
   | duplicateLambdaParameter (name : String)

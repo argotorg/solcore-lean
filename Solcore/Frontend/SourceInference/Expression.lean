@@ -148,6 +148,44 @@ def recordIndirectCall (source : Syntax.Expr) (callee : InferredExpression)
       coercionRequirements result.callCoercions)
     result.callCoercions result.state
 
+private def unifyBuiltinFunctionArgumentsEqual :
+    List InferredExpression → List Ty → State → Except Error State
+  | [], _, state => .ok state
+  | _, [], state => .ok state
+  | argument :: arguments, parameter :: parameters, state => do
+      let state ← unify state argument.type parameter
+      unifyBuiltinFunctionArgumentsEqual arguments parameters state
+
+/-- Check one fixed compiler-function signature without overload, coercion, or
+source-declaration metadata.  The caller has already established that no
+source-visible function shadows this lowest-priority fallback. -/
+def recordBuiltinFunctionCall (source callee : Syntax.Expr) (name : String)
+    (function : BuiltinFunctionId) (arguments : List InferredExpression)
+    (call : ExpressionId) (expected : Option Ty) (state : State) :
+    Except Error (InferredExpression × State) := do
+  let parameters := function.parameterTypes
+  unless arguments.length = parameters.length do
+    throw (.builtinFunctionArityMismatch function parameters.length
+      arguments.length)
+  let state ← unifyBuiltinFunctionArgumentsEqual arguments parameters state
+  let state ← match expected with
+    | none => pure state
+    | some expected => unify state function.returnType expected
+  let (calleeId, state) := state.allocateExpressionId
+  let calleeExpression : InferredExpression := {
+    id := calleeId
+    type := function.type
+  }
+  let (_, state) := recordExpression callee calleeExpression
+    (.reference name (.builtinFunction function)) [] [] state
+  let result : InferredExpression := {
+    id := call
+    type := state.resolve function.returnType
+  }
+  pure <| recordExpression source result
+    (.call calleeId (arguments.map (·.id)) (.builtinFunction function))
+    [] [] state
+
 /-- Result of checking every explicit case in source order. -/
 structure MatchCasesResult where
   cases : List TypedMatchCase
@@ -279,7 +317,14 @@ mutual
                     (.builtinBoolean (name.value == "true"))) [] expected state
               else do
                 match ← functionsNamed context name.value with
-                | [] => .error (.unknownVariable name.value)
+                | [] =>
+                    match builtinFunctionNamed? name.value with
+                    | some function =>
+                        recordExpressionWithExpected context expression id
+                          function.type
+                          (.reference name.value (.builtinFunction function))
+                          [] expected state
+                    | none => .error (.unknownVariable name.value)
                 | [signature] =>
                     let instantiated :=
                       signature.scheme.instantiate state.inference.next
@@ -446,11 +491,20 @@ mutual
               match calleeIdentifier? callee with
               | some name =>
                   match state.lookupBinder? name with
-                  | none =>
-                      let attempt ← selectFunctionCandidate context name arguments
-                        integerLiterals id expected state
-                      pure <| recordSelectedCall expression callee name arguments
-                        attempt
+                  | none => do
+                      let candidates ← functionsNamed context name
+                      match candidates with
+                      | [] =>
+                          match builtinFunctionNamed? name with
+                          | some function =>
+                              recordBuiltinFunctionCall expression callee name
+                                function arguments id expected state
+                          | none => throw (.noMatchingOverload name [])
+                      | candidates =>
+                          let attempt ← selectFunctionCandidateFrom context name
+                            candidates arguments integerLiterals id expected state
+                          pure <| recordSelectedCall expression callee name arguments
+                            attempt
                   | some _ =>
                       let (calleeResult, state) ←
                         inferExprFuel fuel context callee none state

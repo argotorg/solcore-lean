@@ -112,7 +112,8 @@ literal origins before contextual unification until a call parameter, return
 type, or later monomorphic use closes them; Bool-domain logical operators and
 unrelated or merely co-located literals are not admitted, and visible operator
 catalogs remain authoritative.  Signed compile-time `integer` evaluation and
-custom builtin `Int` execution remain later.
+custom builtin `Int` execution remain later except for the closed direct
+`integerSub`/`wordFromInteger` tree implemented by ADR-0349.
 
 ADR-0348 connects the first pattern slice to that carrier architecture.
 Terminal single-scrutinee matches retain ordered numeric-pattern builtin-`Int`
@@ -129,6 +130,17 @@ symbolic coercion intermediates, coinductive trait/coercion cycles and a complet
 overlap policy remain explicit edge-case work.  Broad diagnostic and static-
 semantics soundness/completeness theorem families do not block these executable
 stages.
+
+ADR-0349 connects the first signed staged-integer primitives.  Bare
+`integerSub` and `wordFromInteger` receive collision-free compiler identities
+only after visible source functions have had the opportunity to shadow them.
+The specialization worklist records no source edge for those calls.  Source
+Core evaluates only closed literal/group/nested-subtraction trees as unbounded
+Lean `Int`, revalidates every premise-free builtin `Int<integer>` obligation,
+and erases the outer conversion to a Word constant modulo `2^256`.  Staged
+locals, runtime-dependent conditionals, ordinary calls, recursion, other
+integer primitives and every surviving runtime `integer` remain explicit later
+boundaries.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,

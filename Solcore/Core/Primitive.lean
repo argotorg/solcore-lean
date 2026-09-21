@@ -12,6 +12,15 @@ def maximum : Word :=
 def ofNatModulo (value : Nat) : Word :=
   ⟨value % wordModulus, Nat.mod_lt value (by decide)⟩
 
+/-- Canonical projection of an arbitrary signed integer into an unsigned EVM
+word.  Negative values use the same nonnegative remainder convention as
+mathematical reduction modulo `2^256`; in particular, `-1` maps to
+`Word.maximum`. -/
+def ofIntModulo : Int → Word
+  | .ofNat value => ofNatModulo value
+  | .negSucc value =>
+      ofNatModulo (wordModulus - ((value + 1) % wordModulus))
+
 def add (left right : Word) : Word :=
   left + right
 

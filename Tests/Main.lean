@@ -1276,6 +1276,8 @@ import Solcore.Test.ProgramChecking
 import Solcore.Test.SourceProgramExecution
 import Solcore.Test.SourcePatternMatching
 import Solcore.Test.SourcePatternMatchingTamper
+import Solcore.Test.SourceStagedIntegerIntrinsics
+import Solcore.Test.SourceStagedIntegerIntrinsicsTamper
 
 set_option autoImplicit false
 
@@ -6067,6 +6069,8 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceProgramExecution.testSourceProgramExecution
   SourcePatternMatching.testSourcePatternMatching
   SourcePatternMatchingTamper.testSourcePatternMatchingTamper
+  SourceStagedIntegerIntrinsics.testSourceStagedIntegerIntrinsics
+  SourceStagedIntegerIntrinsicsTamper.testSourceStagedIntegerIntrinsicsTamper
 
 def run : IO Unit := do
   coreLocalFragmentPairBoundaryTests

@@ -107,6 +107,7 @@ structure IndirectCallResolution where
 inductive ReferenceResolution where
   | local (binder : Resolved.LocalId)
   | declaration (instantiation : DeclarationInstantiation)
+  | builtinFunction (function : BuiltinFunctionId)
   | builtinBoolean (value : Bool)
   deriving Repr, BEq, DecidableEq
 
@@ -116,6 +117,7 @@ the bundled arguments separately from the call result. -/
 inductive CallResolution where
   | indirect (metadata : IndirectCallResolution)
   | declaration (instantiation : DeclarationInstantiation)
+  | builtinFunction (function : BuiltinFunctionId)
   deriving Repr, BEq, DecidableEq
 
 /-- Category-safe identity of one expression occurrence. -/
@@ -340,6 +342,7 @@ def applySubstitution (substitution : Substitution) :
   | .local binder => .local binder
   | .declaration instantiation =>
       .declaration (instantiation.applySubstitution substitution)
+  | .builtinFunction function => .builtinFunction function
   | .builtinBoolean value => .builtinBoolean value
 
 end ReferenceResolution
@@ -352,6 +355,7 @@ def applySubstitution (substitution : Substitution) :
       .indirect (metadata.applySubstitution substitution)
   | .declaration instantiation =>
       .declaration (instantiation.applySubstitution substitution)
+  | .builtinFunction function => .builtinFunction function
 
 end CallResolution
 

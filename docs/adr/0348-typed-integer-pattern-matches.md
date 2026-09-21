@@ -94,8 +94,8 @@ local set so generated call, method, and coercion temporaries cannot capture it.
 - Nonterminal match control flow, falling-through arms, and broader result-flow
   analysis remain later work.
 - Runtime staged-`integer` matching, custom compiler-builtin `Int`
-  implementations, and general signed compile-time integer evaluation remain
-  separate boundaries.
+  implementations, and signed evaluation beyond ADR-0349's closed direct
+  intrinsic tree remain separate boundaries.
 - A future declaration-wide typed-IR validator may reject synthetic reuse of a
   hidden match identity by another hidden or branch-local binder.  Monotone
   inference allocation already prevents that state for source-produced IR.

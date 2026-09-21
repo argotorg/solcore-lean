@@ -99,6 +99,26 @@ inductive ErrorReason where
       (expected actual : ProgramImplId)
   | integerLiteralPremiseCountMismatch
       (requirement : RequirementId) (expected actual : Nat)
+  | builtinFunctionCalleeNotReference (function : BuiltinFunctionId)
+  | builtinFunctionCalleeIdentityMismatch
+      (expected actual : BuiltinFunctionId)
+  | builtinFunctionCalleeSpellingMismatch
+      (function : BuiltinFunctionId) (expected actual : String)
+  | builtinFunctionCalleeTypeMismatch
+      (function : BuiltinFunctionId) (expected actual : Ty)
+  | builtinFunctionCallTypeMismatch
+      (function : BuiltinFunctionId) (expected actual : Ty)
+  | builtinFunctionArgumentArityMismatch
+      (function : BuiltinFunctionId) (expected actual : Nat)
+  | builtinFunctionArgumentTypeMismatch
+      (function : BuiltinFunctionId) (index : Nat) (expected actual : Ty)
+  | builtinFunctionRequirementsPresent
+      (function : BuiltinFunctionId) (requirements : List RequirementId)
+  | builtinFunctionCoercionsPresent
+      (function : BuiltinFunctionId) (coercions : List CoercionStep)
+  | stagedIntegerTypeMismatch (expected actual : Ty)
+  | stagedIntegerExpressionNotClosed
+  | stagedIntegerDepthLimit
   | matchHiddenOwnerMismatch
       (expected actual : Resolved.DeclarationId)
   | duplicateMatchHidden (id : Resolved.LocalId)
@@ -365,16 +385,24 @@ private def exactIntegerLiteralRequirementWith {error : Type}
       failWith lift site
         (.duplicateIntegerLiteralRequirements requirement solved.length)
 
-/-- Validate the complete builtin `Int.fromInteger` contract before erasing it
-to the runtime Word constant.  Expression and pattern carriers share this
-primitive validation, including exact attachment and evidence checks. -/
-private def lowerIntegerLiteralResolutionWith {error : Type}
+private structure ValidatedIntegerLiteral where
+  rawValue : Nat
+  consumedRequirements : List RequirementId
+
+/-- Validate the source payload, stable requirement attachment, target-specific
+builtin `Int` evidence, and premise-free primitive implementation shared by
+runtime Word literals and staged integer evaluation.  `checkTarget` is invoked
+after payload validation and before evidence lookup so each consumer retains
+its own target-domain boundary without duplicating the carrier checks. -/
+private def validateIntegerLiteralResolutionWith {error : Type}
     (lift : Error → error) (site : ErrorSite)
     (solvedRequirements : List SolvedRequirement) (nodeType : Ty)
     (attachedRequirements : List RequirementId)
     (source : Syntax.CoreLiteralValue)
-    (resolution : IntegerLiteralResolution) :
-    Except error LoweredExpression := do
+    (resolution : IntegerLiteralResolution)
+    (expectedImplementation : ProgramImplId)
+    (checkTarget : Ty → Except error Unit) :
+    Except error ValidatedIntegerLiteral := do
   if resolution.targetType != nodeType then
     failWith lift site
       (.integerLiteralTargetTypeMismatch resolution.targetType nodeType)
@@ -390,9 +418,7 @@ private def lowerIntegerLiteralResolutionWith {error : Type}
       failWith lift site
         (.integerLiteralRawValueMismatch decoded resolution.rawValue)
     else
-      -- This keeps `Int<integer>` staged: `lowerType` rejects `integer`
-      -- before any runtime constant can be constructed.
-      ensureTypeWith lift site .word resolution.targetType
+      checkTarget resolution.targetType
       let expected := resolution.predicate
       let solved ← exactIntegerLiteralRequirementWith lift site
         solvedRequirements resolution.requirement
@@ -410,8 +436,6 @@ private def lowerIntegerLiteralResolutionWith {error : Type}
             failWith lift site
               (.unresolvedIntegerLiteralEvidence resolution.requirement)
         | .implementation (.byImpl _ implementation premises) =>
-            let expectedImplementation : ProgramImplId :=
-              .builtin .intWord
             if implementation != expectedImplementation then
               failWith lift site
                 (.integerLiteralImplementationMismatch
@@ -423,10 +447,28 @@ private def lowerIntegerLiteralResolutionWith {error : Type}
                   resolution.requirement 0 premises.length)
             else
               pure {
-                resolved := .word
-                  (Core.Word.ofNatModulo resolution.rawValue)
+                rawValue := resolution.rawValue
                 consumedRequirements := [resolution.requirement]
               }
+
+/-- Validate the complete builtin `Int.fromInteger` contract before erasing it
+to the runtime Word constant.  Expression and pattern carriers share this
+primitive validation, including exact attachment and evidence checks. -/
+private def lowerIntegerLiteralResolutionWith {error : Type}
+    (lift : Error → error) (site : ErrorSite)
+    (solvedRequirements : List SolvedRequirement) (nodeType : Ty)
+    (attachedRequirements : List RequirementId)
+    (source : Syntax.CoreLiteralValue)
+    (resolution : IntegerLiteralResolution) :
+    Except error LoweredExpression := do
+  let validated ← validateIntegerLiteralResolutionWith lift site
+    solvedRequirements nodeType attachedRequirements source resolution
+    (.builtin .intWord)
+    (fun target => ensureTypeWith lift site .word target)
+  pure {
+    resolved := .word (Core.Word.ofNatModulo validated.rawValue)
+    consumedRequirements := validated.consumedRequirements
+  }
 
 /-- Expression-node wrapper for the shared integer-literal validator. -/
 private def lowerIntegerLiteralWith {error : Type} (lift : Error → error)
@@ -436,6 +478,164 @@ private def lowerIntegerLiteralWith {error : Type} (lift : Error → error)
     Except error LoweredExpression :=
   lowerIntegerLiteralResolutionWith lift (.occurrence node.id.occurrence)
     solvedRequirements node.type node.requirements source resolution
+
+/-- A closed staged integer and the exact literal obligations consumed while
+computing it.  The signed value remains visible for direct executable tests;
+only `wordFromInteger` projects it into runtime Core. -/
+structure StagedIntegerEvaluation where
+  value : Int
+  consumedRequirements : List RequirementId
+  deriving Repr, DecidableEq
+
+private def validateBuiltinFunctionArgumentTypesWith {error : Type}
+    (lift : Error → error) (source : TypedSource)
+    (function : BuiltinFunctionId) :
+    Nat → List Ty → List ExpressionId → Except error Unit
+  | _, [], [] => pure ()
+  | index, expected :: expectedRest, argument :: argumentRest => do
+      let node ← (lookupExpression source argument).mapError lift
+      if node.type != expected then
+        failWith lift (.occurrence argument.occurrence)
+          (.builtinFunctionArgumentTypeMismatch function index expected
+            node.type)
+      else
+        validateBuiltinFunctionArgumentTypesWith lift source function
+          (index + 1) expectedRest argumentRest
+  | _, _, _ =>
+      -- The caller checks arity before entering this exact positional walk.
+      failWith lift (.declaration source.owner)
+        (.builtinFunctionArgumentArityMismatch function
+          function.parameterTypes.length 0)
+
+/-- Recheck the complete synthetic callee and fixed signature attached by
+source inference.  Compiler functions have no source declaration identity,
+requirements, coercions, or specialization edge. -/
+private def validateBuiltinFunctionCallWith {error : Type}
+    (lift : Error → error) (source : TypedSource)
+    (node : ExpressionNode) (callee : ExpressionId)
+    (arguments : List ExpressionId) (function : BuiltinFunctionId) :
+    Except error Unit := do
+  let site := ErrorSite.occurrence node.id.occurrence
+  unless node.requirements.isEmpty do
+    failWith lift site
+      (.builtinFunctionRequirementsPresent function node.requirements)
+  unless node.coercions.isEmpty do
+    failWith lift site
+      (.builtinFunctionCoercionsPresent function node.coercions)
+  if node.type != function.returnType then
+    failWith lift site
+      (.builtinFunctionCallTypeMismatch function function.returnType node.type)
+  unless arguments.length = function.parameterTypes.length do
+    failWith lift site
+      (.builtinFunctionArgumentArityMismatch function
+        function.parameterTypes.length arguments.length)
+  let calleeNode ← (lookupExpression source callee).mapError lift
+  let calleeSite := ErrorSite.occurrence callee.occurrence
+  unless calleeNode.requirements.isEmpty do
+    failWith lift calleeSite (.requirementsPresent calleeNode.requirements)
+  unless calleeNode.coercions.isEmpty do
+    failWith lift calleeSite (.coercionsPresent calleeNode.coercions)
+  match calleeNode.form with
+  | .reference name (.builtinFunction actual) =>
+      if actual != function then
+        failWith lift calleeSite
+          (.builtinFunctionCalleeIdentityMismatch function actual)
+      else if name != function.spelling then
+        failWith lift calleeSite
+          (.builtinFunctionCalleeSpellingMismatch function function.spelling
+            name)
+      else if calleeNode.type != function.type then
+        failWith lift calleeSite
+          (.builtinFunctionCalleeTypeMismatch function function.type
+            calleeNode.type)
+      else
+        validateBuiltinFunctionArgumentTypesWith lift source function 0
+          function.parameterTypes arguments
+  | _ =>
+      failWith lift calleeSite (.builtinFunctionCalleeNotReference function)
+
+private def evaluateStagedIntegerFuelWith {error : Type}
+    (lift : Error → error) (solvedRequirements : List SolvedRequirement)
+    (source : TypedSource) :
+    Nat → ExpressionId → Except error StagedIntegerEvaluation
+  | 0, id =>
+      failWith lift (.occurrence id.occurrence) .stagedIntegerDepthLimit
+  | fuel + 1, id => do
+      let node ← (lookupExpression source id).mapError lift
+      let site := ErrorSite.occurrence id.occurrence
+      match node.form with
+      | .call callee arguments (.builtinFunction .integerSub) => do
+          validateBuiltinFunctionCallWith lift source node callee arguments
+            .integerSub
+          match arguments with
+          | [left, right] =>
+              let left ← evaluateStagedIntegerFuelWith lift
+                solvedRequirements source fuel left
+              let right ← evaluateStagedIntegerFuelWith lift
+                solvedRequirements source fuel right
+              pure {
+                value := left.value - right.value
+                consumedRequirements := left.consumedRequirements ++
+                  right.consumedRequirements
+              }
+          | _ =>
+              failWith lift site
+                (.builtinFunctionArgumentArityMismatch .integerSub 2
+                  arguments.length)
+      | form => do
+          unless node.coercions.isEmpty do
+            failWith lift site (.coercionsPresent node.coercions)
+          if node.type != Ty.integer then
+            failWith lift site (.stagedIntegerTypeMismatch .integer node.type)
+          match form with
+          | .integerLiteral literal resolution =>
+              let validated ← validateIntegerLiteralResolutionWith lift site
+                solvedRequirements node.type node.requirements literal resolution
+                (.builtin .intInteger)
+                (fun target =>
+                  if target = Ty.integer then pure ()
+                  else failWith lift site
+                    (.stagedIntegerTypeMismatch .integer target))
+              pure {
+                value := Int.ofNat validated.rawValue
+                consumedRequirements := validated.consumedRequirements
+              }
+          | .group inner =>
+              if node.requirements.isEmpty then
+                evaluateStagedIntegerFuelWith lift solvedRequirements source
+                  fuel inner
+              else
+                failWith lift site (.requirementsPresent node.requirements)
+          | _ =>
+              failWith lift site .stagedIntegerExpressionNotClosed
+
+/-- Evaluate exactly the closed staged-integer fragment accepted by runtime
+erasure.  The bound comes from the finite typed-node table, so malformed cycles
+produce a located failure rather than nontermination. -/
+def evaluateStagedInteger (solvedRequirements : List SolvedRequirement)
+    (source : TypedSource) (id : ExpressionId) :
+    Except Error StagedIntegerEvaluation :=
+  evaluateStagedIntegerFuelWith (fun error => error) solvedRequirements source
+    (source.nodes.length + 1) id
+
+private def lowerWordFromIntegerWith {error : Type} (lift : Error → error)
+    (solvedRequirements : List SolvedRequirement) (source : TypedSource)
+    (fuel : Nat) (node : ExpressionNode) (callee : ExpressionId)
+    (arguments : List ExpressionId) : Except error LoweredExpression := do
+  validateBuiltinFunctionCallWith lift source node callee arguments
+    .wordFromInteger
+  match arguments with
+  | [argument] =>
+      let evaluated ← evaluateStagedIntegerFuelWith lift solvedRequirements
+        source fuel argument
+      pure {
+        resolved := .word (Core.Word.ofIntModulo evaluated.value)
+        consumedRequirements := evaluated.consumedRequirements
+      }
+  | _ =>
+      failWith lift (.occurrence node.id.occurrence)
+        (.builtinFunctionArgumentArityMismatch .wordFromInteger 1
+          arguments.length)
 
 private def eraseRequirement? (target : RequirementId) :
     List RequirementId → Option (List RequirementId)
@@ -708,6 +908,9 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
           | .reference _ (.declaration _) =>
               failWith lift (.occurrence id.occurrence)
                 (.unsupportedExpression .declarationReference)
+          | .reference _ (.builtinFunction _) =>
+              failWith lift (.occurrence id.occurrence)
+                (.unsupportedExpression .declarationReference)
           | .group inner => recurse inner
           | .tuple elements => do
               let lowered ← elements.mapM recurse
@@ -764,23 +967,28 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
       let node ← (lookupExpression source id).mapError lift
       let recurse := lowerExpressionFuelWith lift onCall onRequiredUnary
         onRequiredBinary onCoercion solvedRequirements fuel source scope
-      match node.coercions with
-      | [] =>
-          lowerExpressionNodeWith lift onCall onRequiredUnary onRequiredBinary
-            solvedRequirements source scope recurse node
-      | first :: rest => do
-          let prepared ← prepareCoercionPathWith lift node first rest
-          let plans ← checkedCoercionPlansWith lift onCoercion scope node
-            (first :: rest)
-          let baseNode := {
-            node with
-            type := prepared.rawType
-            requirements := prepared.remainingRequirements
-            coercions := []
-          }
-          let base ← lowerExpressionNodeWith lift onCall onRequiredUnary
-            onRequiredBinary solvedRequirements source scope recurse baseNode
-          applyCoercionPlans base.resolved base.consumedRequirements plans
+      match node.form with
+      | .call callee arguments (.builtinFunction .wordFromInteger) =>
+          lowerWordFromIntegerWith lift solvedRequirements source fuel node
+            callee arguments
+      | _ =>
+          match node.coercions with
+          | [] =>
+              lowerExpressionNodeWith lift onCall onRequiredUnary
+                onRequiredBinary solvedRequirements source scope recurse node
+          | first :: rest => do
+              let prepared ← prepareCoercionPathWith lift node first rest
+              let plans ← checkedCoercionPlansWith lift onCoercion scope node
+                (first :: rest)
+              let baseNode := {
+                node with
+                type := prepared.rawType
+                requirements := prepared.remainingRequirements
+                coercions := []
+              }
+              let base ← lowerExpressionNodeWith lift onCall onRequiredUnary
+                onRequiredBinary solvedRequirements source scope recurse baseNode
+              applyCoercionPlans base.resolved base.consumedRequirements plans
 
 private def lowerExpressionAsWith {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
@@ -792,6 +1000,13 @@ private def lowerExpressionAsWith {error : Type} (lift : Error → error)
     (expected : Core.Ty) (id : ExpressionId) :
     Except error LoweredExpression := do
   let node ← (lookupExpression source id).mapError lift
+  match node.form with
+  | .call _ _ (.builtinFunction function) =>
+      if node.type != function.returnType then
+        failWith lift (.occurrence id.occurrence)
+          (.builtinFunctionCallTypeMismatch function function.returnType
+            node.type)
+  | _ => pure ()
   ensureTypeWith lift (.occurrence id.occurrence) expected node.type
   lowerExpressionFuelWith lift onCall onRequiredUnary onRequiredBinary
     onCoercion solvedRequirements fuel source scope id

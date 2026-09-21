@@ -7,8 +7,9 @@ Finite whole-program specialization planning.
 Requests may present declaration parameters in any order.  The checked
 program's exact signature/body pair and `SourceSpecialization.specializeFunction`
 are the sole canonicalization boundary.  Each newly admitted specialization is
-scanned in typed-source node order; direct calls append requests to the FIFO
-tail, while already-seen canonical keys are skipped without consuming budget.
+scanned in typed-source node order; direct source-declaration calls append
+requests to the FIFO tail, compiler-function calls add no edge, and already-seen
+canonical keys are skipped without consuming budget.
 
 The budget counts distinct specializations admitted to the plan.  Exhaustion
 is an ordinary outcome rather than a malformed-program error, which makes
@@ -198,8 +199,9 @@ private def validateIndirectArgumentCoercions (node : ExpressionNode)
   if !metadata.hasValidArgumentCoercionPath then
     throw (.invalidIndirectArgumentCoercionPath node.id metadata)
 
-/-- Collect direct requests and per-occurrence edges in typed-source node
-order.  An indirect call is outside this initial closed-call profile. -/
+/-- Collect source-declaration requests and per-occurrence edges in typed-source
+node order. Compiler-function calls have no source specialization, while an
+indirect call is outside this initial closed-call profile. -/
 private def collectDirectCalls (program : CheckedProgram)
     (caller : SourceSpecialization.SpecializationKey)
     (source : TypedSource) :
@@ -219,6 +221,8 @@ private def collectDirectCalls (program : CheckedProgram)
               let (requests, edges) ←
                 collectDirectCalls program caller source rest
               pure (request :: requests, edge :: edges)
+          | .call _ _ (.builtinFunction _) =>
+              collectDirectCalls program caller source rest
           | _ => collectDirectCalls program caller source rest
       | .statement _ => collectDirectCalls program caller source rest
 

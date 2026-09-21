@@ -1,8 +1,8 @@
 import Solcore.Resolved.Identity
 
 /-!
-Collision-free identities for traits and implementations in the whole-program
-frontend.
+Collision-free identities for compiler functions, traits, and implementations
+in the whole-program frontend.
 
 Source declarations and compiler-provided builtins inhabit disjoint variants.
 The one-way declaration coercions keep source catalog construction concise,
@@ -13,6 +13,12 @@ explicitly.
 set_option autoImplicit false
 
 namespace Solcore.Frontend
+
+/-- Compiler-provided functions that do not have source declaration identities. -/
+inductive BuiltinFunctionId where
+  | integerSub
+  | wordFromInteger
+  deriving Repr, BEq, DecidableEq
 
 /-- Compiler-provided traits that do not have source declaration identities. -/
 inductive BuiltinTraitId where

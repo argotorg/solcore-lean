@@ -142,6 +142,8 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
         "final substitution did not close indirect argument coercion metadata"
   | .declaration _ => throw (IO.userError
       "final substitution changed an indirect call into a declaration call")
+  | .builtinFunction _ => throw (IO.userError
+      "final substitution changed an indirect call into a builtin call")
 
 private def testCoercionPathValidation : IO Unit := do
   let secondRequirement : RequirementId := ⟨5⟩

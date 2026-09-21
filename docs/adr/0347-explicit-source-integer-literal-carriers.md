@@ -150,10 +150,12 @@ invariant checks at the lowering boundary.
 - Executing a custom implementation of the compiler builtin `Int` trait remains
   unsupported.  A source trait spelled `Int` is intentionally disjoint and is
   not an extension point for this primitive carrier.
-- Negative compile-time integers and staged evaluation of signed integer
-  arithmetic remain deferred.  The current carrier decodes nonnegative decimal
-  and hexadecimal spellings to `Nat`; the source grammar has no unary minus,
-  and signed values produced by staged integer primitives are not evaluated.
+- ADR-0349 evaluates the first closed signed subset: literal/group/nested
+  `integerSub` trees are computed as Lean `Int` and an outer
+  `wordFromInteger` projects modulo `2^256`.  The carrier itself still decodes
+  nonnegative decimal and hexadecimal spellings to `Nat`, and the source
+  grammar has no unary minus.  General staged arithmetic and control flow
+  remain deferred.
 - ADR-0348 adds a separate typed carrier and executable boundary for terminal
   single-scrutinee numeric-pattern matches.  Pattern literals do not reuse this
   expression carrier; broader pattern forms remain deferred there.
