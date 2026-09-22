@@ -83,30 +83,44 @@ private def nominalTypeParts? (type : Ty) :
     | _ => none
   loop type []
 
-private def dataSignaturesForDeclarations (context : Context)
-    (declarations : List ProgramDeclaration) : List ProgramDataSignature :=
-  declarations.filterMap fun declaration => context.signatures.dataType? declaration.id
+private structure AccessibleDataType where
+  signature : ProgramDataSignature
+  constructors : ProgramConstructorVisibility
+
+private def fullyAccessibleDataType
+    (signature : ProgramDataSignature) : AccessibleDataType := {
+  signature
+  constructors := .ofVisible (signature.constructors.map (·.name))
+}
+
+private def dataSignaturesForImportedTypes (context : Context)
+    (types : List ProgramImportedType) : List AccessibleDataType :=
+  types.filterMap fun imported => do
+    let signature ← context.signatures.dataType? imported.declaration.id
+    pure { signature, constructors := imported.constructors }
+
+private def dataSignaturesForPublicEntities (context : Context)
+    (entities : List ProgramPublicEntity) : List AccessibleDataType :=
+  entities.filterMap fun entity => do
+    let signature ← context.signatures.dataType? entity.declaration.id
+    pure { signature, constructors := entity.constructors }
 
 private def visibleDataTypesNamed (context : Context) (name : String) :
-    Except Error (List ProgramDataSignature) :=
+    Except Error (List AccessibleDataType) :=
   let localDataTypes := context.signatures.dataTypes.filter fun dataType =>
     dataType.name == name &&
       decide (dataType.id.moduleId = context.scope.currentModule)
   if !localDataTypes.isEmpty then
-    pure localDataTypes
+    pure (localDataTypes.map fullyAccessibleDataType)
   else
     match buildProgramImports context.environment context.scope.currentModule with
     | .error errors => throw (.importVisibility errors)
     | .ok visibility =>
-        if visibility.hasImports then
-          pure (dataSignaturesForDeclarations context
-            (visibility.typesNamed name))
-        else
-          pure (context.signatures.dataTypes.filter fun dataType =>
-            dataType.name == name)
+        pure (dataSignaturesForImportedTypes context
+          (visibility.typeBindingsNamed name))
 
 private def qualifiedDataTypesNamed (context : Context)
-    (qualifiers : List String) : Except Error (List ProgramDataSignature) := do
+    (qualifiers : List String) : Except Error (List AccessibleDataType) := do
   let typeName ← match qualifiers.getLast? with
     | some name => pure name
     | none => pure ""
@@ -118,19 +132,19 @@ private def qualifiedDataTypesNamed (context : Context)
     | .error errors => throw (.importVisibility errors)
     | .ok visibility =>
         if visibility.hasNamespaceRoot modulePath then
-          pure (dataSignaturesForDeclarations context
-            (visibility.typesInNamespacePathNamed modulePath typeName))
+          pure (dataSignaturesForPublicEntities context
+            (visibility.typeEntitiesInNamespacePathNamed modulePath typeName))
         else
-          pure (context.signatures.dataTypes.filter fun dataType =>
-            dataType.name == typeName &&
-              dataType.id.moduleId.path.segments.map (·.text) == modulePath)
+          pure []
 
-private def constructorsInDataTypes (dataTypes : List ProgramDataSignature)
+private def constructorsInDataTypes (dataTypes : List AccessibleDataType)
     (name : String) :
     List (ProgramDataSignature × ProgramDataConstructorSignature) :=
   dataTypes.flatMap fun dataType =>
-    dataType.constructors.filterMap fun constructor =>
-      if constructor.name == name then some (dataType, constructor) else none
+    dataType.signature.constructors.filterMap fun constructor =>
+      if constructor.name == name && dataType.constructors.contains name then
+        some (dataType.signature, constructor)
+      else none
 
 private def exactConstructorCandidate (qualifiers : List String) (name : String) :
     List (ProgramDataSignature × ProgramDataConstructorSignature) →
@@ -158,8 +172,20 @@ private def contextualConstructorCandidate (context : Context) (state : State)
   let dataType ← match context.signatures.dataType? declaration with
     | some dataType => pure dataType
     | none => throw (.unknownConstructor [] name)
+  let constructorVisibility ←
+    if decide (dataType.id.moduleId = context.scope.currentModule) then
+      pure (fullyAccessibleDataType dataType).constructors
+    else
+      match buildProgramImports context.environment context.scope.currentModule with
+      | .error errors => throw (.importVisibility errors)
+      | .ok visibility =>
+          pure <| (visibility.constructorVisibilityForDeclaration? dataType.id).getD
+            .opaqueData
   let constructor ← exactConstructorCandidate [] name
-    (constructorsInDataTypes [dataType] name)
+    (constructorsInDataTypes [{
+      signature := dataType
+      constructors := constructorVisibility
+    }] name)
   pure (constructor.1, constructor.2, arguments)
 
 private def instantiateDataConstructor
@@ -206,7 +232,7 @@ private def constructorCalleeCandidates (context : Context) (state : State)
           else
             pure (constructorsInDataTypes
               ((← visibleDataTypesNamed context name).filter fun dataType =>
-                dataType.name == name) name)
+                dataType.signature.name == name) name)
 
 /-- Distinguish an existing data namespace with a missing constructor from an
 ordinary qualified function/member expression.  Local roots continue to shadow
