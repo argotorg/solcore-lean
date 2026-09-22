@@ -127,12 +127,40 @@ def applyIntegerLiteralResolution (substitution : ParameterSubstitution)
   resolution with targetType := substitution.apply resolution.targetType
 }
 
+def applyDataConstructorInstantiation (substitution : ParameterSubstitution)
+    (instantiation : DataConstructorInstantiation) :
+    DataConstructorInstantiation := {
+  instantiation with
+  parameterSubstitution := instantiation.parameterSubstitution.map fun entry =>
+    (entry.1, substitution.apply entry.2)
+  payloadTypes := instantiation.payloadTypes.map substitution.apply
+  resultType := substitution.apply instantiation.resultType
+}
+
+def applyMatchPatternInstruction (substitution : ParameterSubstitution) :
+    MatchPatternInstruction → MatchPatternInstruction
+  | .wildcard => .wildcard
+  | .integerLiteral source resolution =>
+      .integerLiteral source
+        (applyIntegerLiteralResolution substitution resolution)
+  | .binder selectedBinder => .binder (applyBinder substitution selectedBinder)
+  | .constructor instantiation argumentCount =>
+      .constructor (applyDataConstructorInstantiation substitution instantiation)
+        argumentCount
+  | .tuple elementCount => .tuple elementCount
+
 def applyMatchPatternResolution (substitution : ParameterSubstitution) :
     MatchPatternResolution → MatchPatternResolution
   | .wildcard => .wildcard
   | .integerLiteral source resolution =>
       .integerLiteral source
         (applyIntegerLiteralResolution substitution resolution)
+  | .binder selectedBinder => .binder (applyBinder substitution selectedBinder)
+  | .constructor instantiation arguments =>
+      .constructor (applyDataConstructorInstantiation substitution instantiation)
+        (arguments.map (applyMatchPatternInstruction substitution))
+  | .tuple elements =>
+      .tuple (elements.map (applyMatchPatternInstruction substitution))
 
 def applyTypedMatchPattern (substitution : ParameterSubstitution)
     (pattern : TypedMatchPattern) : TypedMatchPattern := {
@@ -171,8 +199,33 @@ def applyExpressionForm (substitution : ParameterSubstitution) :
         (substitution.apply returnType) body
   | .call callee arguments resolution =>
       .call callee arguments (applyCallResolution substitution resolution)
+  | .constructor instantiation arguments =>
+      .constructor (applyDataConstructorInstantiation substitution instantiation)
+        arguments
+  | .member base name memberIndex => .member base name memberIndex
   | .proxy inner => .proxy (substitution.apply inner)
   | .index base index => .index base index
+
+def applyPlaceResolution (substitution : ParameterSubstitution)
+    (place : PlaceResolution) : PlaceResolution := {
+  place with type := substitution.apply place.type
+}
+
+def applyAssignmentResolution (substitution : ParameterSubstitution)
+    (assignment : AssignmentResolution) : AssignmentResolution := {
+  assignment with target := applyPlaceResolution substitution assignment.target
+}
+
+def applyForItemForm (substitution : ParameterSubstitution) :
+    ForItemForm → ForItemForm
+  | .letDecl selectedBinder initializer =>
+      .letDecl (applyBinder substitution selectedBinder) initializer
+  | .expression expressionId => .expression expressionId
+  | .assignValue assignment operator value =>
+      .assignValue (applyAssignmentResolution substitution assignment)
+        operator value
+  | .assignBitNot assignment =>
+      .assignBitNot (applyAssignmentResolution substitution assignment)
 
 def applyCoercionStep (substitution : ParameterSubstitution)
     (step : CoercionStep) : CoercionStep := {
@@ -196,11 +249,22 @@ def applyStatementForm (substitution : ParameterSubstitution) :
   | .returnStmt value => .returnStmt value
   | .expression expression trailingSemicolon =>
       .expression expression trailingSemicolon
+  | .assignValue assignment operator value =>
+      .assignValue (applyAssignmentResolution substitution assignment)
+        operator value
+  | .assignBitNot assignment =>
+      .assignBitNot (applyAssignmentResolution substitution assignment)
   | .ifThen condition thenBody elseBody =>
       .ifThen condition thenBody elseBody
   | .block body => .block body
   | .matchWith resolution =>
       .matchWith (applyMatchResolution substitution resolution)
+  | .forLoop initializer condition post body =>
+      .forLoop (initializer.map (applyForItemForm substitution)) condition
+        (post.map (applyForItemForm substitution)) body
+  | .whileLoop condition body => .whileLoop condition body
+  | .breakStmt => .breakStmt
+  | .continueStmt => .continueStmt
 
 def applyStatementNode (substitution : ParameterSubstitution)
     (node : StatementNode) : StatementNode := {
@@ -331,11 +395,33 @@ private def callResolutionTypes : CallResolution → List Ty
   | .declaration instantiation => instantiationTypes instantiation
   | .builtinFunction _ => []
 
+private def dataInstantiationTypes
+    (instantiation : DataConstructorInstantiation) : List Ty :=
+  instantiation.parameterSubstitution.map Prod.snd ++
+    instantiation.resultType :: instantiation.payloadTypes
+
+private def matchInstructionTypes : MatchPatternInstruction → List Ty
+  | .wildcard
+  | .tuple _ => []
+  | .integerLiteral _ resolution => [resolution.targetType]
+  | .binder selectedBinder => [selectedBinder.scheme.body]
+  | .constructor instantiation _ => dataInstantiationTypes instantiation
+
+private def matchResolutionTypes : MatchPatternResolution → List Ty
+  | .wildcard => []
+  | .integerLiteral _ resolution => [resolution.targetType]
+  | .binder selectedBinder => [selectedBinder.scheme.body]
+  | .constructor instantiation arguments =>
+      dataInstantiationTypes instantiation ++
+        arguments.flatMap matchInstructionTypes
+  | .tuple elements => elements.flatMap matchInstructionTypes
+
 private def expressionFormTypes : ExpressionForm → List Ty
   | .reference _ resolution => referenceTypes resolution
   | .integerLiteral _ resolution => [resolution.targetType]
   | .lambda _ returnType _ => [returnType]
   | .call _ _ resolution => callResolutionTypes resolution
+  | .constructor instantiation _ => dataInstantiationTypes instantiation
   | .proxy inner => [inner]
   | .literal _
   | .group _
@@ -343,19 +429,31 @@ private def expressionFormTypes : ExpressionForm → List Ty
   | .unary _ _
   | .binary _ _ _
   | .conditional _ _ _
+  | .member _ _ _
   | .index _ _ => []
+
+private def forItemTypes : ForItemForm → List Ty
+  | .letDecl selectedBinder _ => [selectedBinder.scheme.body]
+  | .assignValue assignment _ _
+  | .assignBitNot assignment => [assignment.target.type]
+  | .expression _ => []
 
 private def statementFormTypes : StatementForm → List Ty
   | .letDecl _ _ => []
   | .returnStmt _
   | .expression _ _
   | .ifThen _ _ _
-  | .block _ => []
+  | .block _
+  | .whileLoop _ _
+  | .breakStmt
+  | .continueStmt => []
+  | .assignValue assignment _ _
+  | .assignBitNot assignment => [assignment.target.type]
+  | .forLoop initializer _ post _ =>
+      (initializer ++ post).flatMap forItemTypes
   | .matchWith resolution =>
       resolution.cases.flatMap fun arm =>
-        arm.pattern.type :: match arm.pattern.resolution with
-          | .wildcard => []
-          | .integerLiteral _ literal => [literal.targetType]
+        arm.pattern.type :: matchResolutionTypes arm.pattern.resolution
 
 private def nodeTypes : Node → List Ty
   | .expression node =>
@@ -372,6 +470,21 @@ private def expressionFormBinders : ExpressionForm → List TypedBinder
 
 private def statementFormBinders : StatementForm → List TypedBinder
   | .letDecl binder _ => [binder]
+  | .forLoop initializer _ post _ =>
+      (initializer ++ post).filterMap fun
+        | .letDecl selectedBinder _ => some selectedBinder
+        | _ => none
+  | .matchWith resolution =>
+      resolution.cases.flatMap fun arm =>
+        let instructionBinders := fun (instructions : List MatchPatternInstruction) =>
+          instructions.filterMap fun
+            | .binder selectedBinder => some selectedBinder
+            | _ => none
+        match arm.pattern.resolution with
+        | .binder selectedBinder => [selectedBinder]
+        | .constructor _ instructions
+        | .tuple instructions => instructionBinders instructions
+        | _ => []
   | _ => []
 
 private def nodeBinders : Node → List TypedBinder

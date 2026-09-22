@@ -461,12 +461,40 @@ private def localIdsInExpressionForm : ExpressionForm → List Resolved.LocalId
   | .lambda parameters _ _ => parameters.map (·.id)
   | _ => []
 
+private def localIdsInMatchPatternInstruction :
+    MatchPatternInstruction → List Resolved.LocalId
+  | .binder binder => [binder.id]
+  | _ => []
+
+private def localIdsInMatchPatternResolution :
+    MatchPatternResolution → List Resolved.LocalId
+  | .binder binder => [binder.id]
+  | .constructor _ arguments
+  | .tuple arguments => arguments.flatMap localIdsInMatchPatternInstruction
+  | _ => []
+
+private def localIdsInAssignment
+    (assignment : AssignmentResolution) : List Resolved.LocalId :=
+  [assignment.target.root]
+
+private def localIdsInForItem : ForItemForm → List Resolved.LocalId
+  | .letDecl binder _ => [binder.id]
+  | .assignValue assignment _ _
+  | .assignBitNot assignment => localIdsInAssignment assignment
+  | .expression _ => []
+
 private def localIdsInNode : Node → List Resolved.LocalId
   | .expression node => localIdsInExpressionForm node.form
   | .statement node =>
       match node.form with
       | .letDecl binder _ => [binder.id]
-      | .matchWith resolution => [resolution.hiddenScrutinee]
+      | .matchWith resolution =>
+          resolution.hiddenScrutinee :: resolution.cases.flatMap fun arm =>
+            localIdsInMatchPatternResolution arm.pattern.resolution
+      | .assignValue assignment _ _
+      | .assignBitNot assignment => localIdsInAssignment assignment
+      | .forLoop initializer _ post _ =>
+          (initializer ++ post).flatMap localIdsInForItem
       | _ => []
 
 private def sourceLocalIds (source : TypedSource) : List Resolved.LocalId :=

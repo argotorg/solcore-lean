@@ -40,6 +40,15 @@ structure DeclarationInstantiation where
   returnComptime : Bool := false
   deriving Repr, BEq, DecidableEq
 
+/-- One constructor selected from a data declaration after its rigid type
+parameters have been instantiated at this occurrence. -/
+structure DataConstructorInstantiation where
+  constructor : ProgramDataConstructorId
+  parameterSubstitution : ParameterSubstitution
+  payloadTypes : List Ty
+  resultType : Ty
+  deriving Repr, BEq, DecidableEq
+
 /-- One evidence-bearing edge in an inserted coercion path. -/
 structure CoercionStep where
   requirement : RequirementId
@@ -79,7 +88,30 @@ written group and span without admitting unsupported pattern syntax. -/
 inductive MatchPatternSource where
   | wildcard (span marker : Syntax.SourceSpan)
   | integerLiteral (span : Syntax.SourceSpan) (literal : Syntax.CoreLiteral)
+  | binder (span : Syntax.SourceSpan) (name : String)
+  | constructor
+      (span : Syntax.SourceSpan)
+      (leadingDot : Option Syntax.SourceSpan)
+      (qualifiers : List String)
+      (name : String)
+      (argumentCount : Nat)
   | group (span : Syntax.SourceSpan) (inner : MatchPatternSource)
+  | tuple (span : Syntax.SourceSpan) (elementCount : Nat)
+  deriving Repr, BEq, DecidableEq
+
+/-- Prefix instruction for a recursively nested pattern.  Child counts make
+the flat source-order stream lossless while keeping the executable carrier a
+first-order list with derived decidable equality. -/
+inductive MatchPatternInstruction where
+  | wildcard
+  | integerLiteral
+      (source : Syntax.CoreLiteralValue)
+      (resolution : IntegerLiteralResolution)
+  | binder (binder : TypedBinder)
+  | constructor
+      (instantiation : DataConstructorInstantiation)
+      (argumentCount : Nat)
+  | tuple (elementCount : Nat)
   deriving Repr, BEq, DecidableEq
 
 /-- The supported semantic classification of one source match pattern. -/
@@ -88,6 +120,11 @@ inductive MatchPatternResolution where
   | integerLiteral
       (source : Syntax.CoreLiteralValue)
       (resolution : IntegerLiteralResolution)
+  | binder (binder : TypedBinder)
+  | constructor
+      (instantiation : DataConstructorInstantiation)
+      (arguments : List MatchPatternInstruction)
+  | tuple (elements : List MatchPatternInstruction)
   deriving Repr, BEq, DecidableEq
 
 /-- A source-preserving pattern carrier for the initial executable match
@@ -159,6 +196,39 @@ structure MatchResolution where
   requirements : List RequirementId := []
   deriving Repr, BEq, DecidableEq
 
+/-- One projection on an assignable source place.  Mapping indexes retain the
+already typed key occurrence; member projections retain the selected stable
+position rather than repeating source lookup at runtime. -/
+inductive PlaceProjection where
+  | index (key : ExpressionId)
+  | member (name : String) (index : Nat)
+  deriving Repr, BEq, DecidableEq
+
+/-- A place rooted at one stable lexical binder. -/
+structure PlaceResolution where
+  root : Resolved.LocalId
+  projections : List PlaceProjection
+  type : Ty
+  deriving Repr, BEq, DecidableEq
+
+/-- A checked assignment including every operator-owned requirement in
+source order.  Plain `=` owns no requirement. -/
+structure AssignmentResolution where
+  target : PlaceResolution
+  requirements : List RequirementId := []
+  deriving Repr, BEq, DecidableEq
+
+/-- Typed item used by a canonical `for` initializer or post clause. -/
+inductive ForItemForm where
+  | letDecl (binder : TypedBinder) (initializer : Option ExpressionId)
+  | expression (expression : ExpressionId)
+  | assignValue
+      (assignment : AssignmentResolution)
+      (operator : Syntax.ValueAssignOp)
+      (value : ExpressionId)
+  | assignBitNot (assignment : AssignmentResolution)
+  deriving Repr, BEq, DecidableEq
+
 /-- Category-preserving identity of either typed source-node kind. -/
 inductive NodeId where
   | expression (id : ExpressionId)
@@ -198,6 +268,10 @@ inductive ExpressionForm where
       (callee : ExpressionId)
       (arguments : List ExpressionId)
       (resolution : CallResolution)
+  | constructor
+      (instantiation : DataConstructorInstantiation)
+      (arguments : List ExpressionId)
+  | member (base : ExpressionId) (name : String) (index : Nat)
   | proxy (inner : Ty)
   | index (base index : ExpressionId)
   deriving Repr, BEq, DecidableEq
@@ -222,12 +296,25 @@ inductive StatementForm where
   | letDecl (binder : TypedBinder) (initializer : Option ExpressionId)
   | returnStmt (value : Option ExpressionId)
   | expression (expression : ExpressionId) (trailingSemicolon : Bool)
+  | assignValue
+      (assignment : AssignmentResolution)
+      (operator : Syntax.ValueAssignOp)
+      (value : ExpressionId)
+  | assignBitNot (assignment : AssignmentResolution)
   | ifThen
       (condition : ExpressionId)
       (thenBody : List StatementId)
       (elseBody : Option (List StatementId))
   | block (body : List StatementId)
   | matchWith (resolution : MatchResolution)
+  | forLoop
+      (initializer : List ForItemForm)
+      (condition : ExpressionId)
+      (post : List ForItemForm)
+      (body : List StatementId)
+  | whileLoop (condition : ExpressionId) (body : List StatementId)
+  | breakStmt
+  | continueStmt
   deriving Repr, BEq, DecidableEq
 
 /-- One typed statement occurrence and its inferred result type. -/
@@ -295,6 +382,20 @@ def applySubstitution (substitution : Substitution)
       (TypedTraitResolution.applySubstitution substitution) }
 
 end DeclarationInstantiation
+
+namespace DataConstructorInstantiation
+
+def applySubstitution (substitution : Substitution)
+    (instantiation : DataConstructorInstantiation) :
+    DataConstructorInstantiation := {
+  instantiation with
+  parameterSubstitution :=
+    applyFinalToParameters substitution instantiation.parameterSubstitution
+  payloadTypes := instantiation.payloadTypes.map substitution.apply
+  resultType := substitution.apply instantiation.resultType
+}
+
+end DataConstructorInstantiation
 
 namespace CoercionStep
 
@@ -392,6 +493,9 @@ def applySubstitution (substitution : Substitution) : ExpressionForm → Express
           (substitution.apply returnType) body
     | .call callee arguments resolution =>
         .call callee arguments (resolution.applySubstitution substitution)
+    | .constructor instantiation arguments =>
+        .constructor (instantiation.applySubstitution substitution) arguments
+    | .member base name memberIndex => .member base name memberIndex
     | .proxy inner => .proxy (substitution.apply inner)
     | .index base key => .index base key
 
@@ -423,11 +527,29 @@ end ExpressionNode
 
 namespace MatchPatternResolution
 
+private def applyInstructionSubstitution (substitution : Substitution) :
+    MatchPatternInstruction → MatchPatternInstruction
+  | .wildcard => .wildcard
+  | .integerLiteral source resolution =>
+      .integerLiteral source (resolution.applySubstitution substitution)
+  | .binder selectedBinder =>
+      .binder (selectedBinder.applySubstitution substitution)
+  | .constructor instantiation argumentCount =>
+      .constructor (instantiation.applySubstitution substitution) argumentCount
+  | .tuple elementCount => .tuple elementCount
+
 def applySubstitution (substitution : Substitution) :
     MatchPatternResolution → MatchPatternResolution
   | .wildcard => .wildcard
   | .integerLiteral source resolution =>
       .integerLiteral source (resolution.applySubstitution substitution)
+  | .binder selectedBinder =>
+      .binder (selectedBinder.applySubstitution substitution)
+  | .constructor instantiation arguments =>
+      .constructor (instantiation.applySubstitution substitution)
+        (arguments.map (applyInstructionSubstitution substitution))
+  | .tuple elements =>
+      .tuple (elements.map (applyInstructionSubstitution substitution))
 
 end MatchPatternResolution
 
@@ -461,6 +583,38 @@ def applySubstitution (substitution : Substitution)
 
 end MatchResolution
 
+namespace PlaceResolution
+
+def applySubstitution (substitution : Substitution)
+    (place : PlaceResolution) : PlaceResolution := {
+  place with type := substitution.apply place.type
+}
+
+end PlaceResolution
+
+namespace AssignmentResolution
+
+def applySubstitution (substitution : Substitution)
+    (assignment : AssignmentResolution) : AssignmentResolution := {
+  assignment with target := assignment.target.applySubstitution substitution
+}
+
+end AssignmentResolution
+
+namespace ForItemForm
+
+def applySubstitution (substitution : Substitution) :
+    ForItemForm → ForItemForm
+  | .letDecl binder initializer =>
+      .letDecl (binder.applySubstitution substitution) initializer
+  | .expression expressionId => .expression expressionId
+  | .assignValue assignment operator value =>
+      .assignValue (assignment.applySubstitution substitution) operator value
+  | .assignBitNot assignment =>
+      .assignBitNot (assignment.applySubstitution substitution)
+
+end ForItemForm
+
 namespace StatementForm
 
 /-- Apply a final substitution to binder schemes embedded in a statement. -/
@@ -471,11 +625,22 @@ def applySubstitution (substitution : Substitution) : StatementForm → Statemen
     | .returnStmt value => .returnStmt value
     | .expression expressionId trailingSemicolon =>
         .expression expressionId trailingSemicolon
+    | .assignValue assignment operator value =>
+        .assignValue (assignment.applySubstitution substitution) operator value
+    | .assignBitNot assignment =>
+        .assignBitNot (assignment.applySubstitution substitution)
     | .ifThen condition thenBody elseBody =>
         .ifThen condition thenBody elseBody
     | .block body => .block body
     | .matchWith resolution =>
         .matchWith (resolution.applySubstitution substitution)
+    | .forLoop initializer condition post body =>
+        .forLoop
+          (initializer.map (ForItemForm.applySubstitution substitution))
+          condition (post.map (ForItemForm.applySubstitution substitution)) body
+    | .whileLoop condition body => .whileLoop condition body
+    | .breakStmt => .breakStmt
+    | .continueStmt => .continueStmt
 
 end StatementForm
 

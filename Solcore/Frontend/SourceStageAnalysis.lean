@@ -303,6 +303,13 @@ mutual
                 | .indirect _
                 | .builtinFunction _ => Stage.deferred
               pure (stage, state)
+          | .constructor _ arguments => do
+              let (_, state) ←
+                analyzeExpressionListWith recurse arguments state
+              pure (.deferred, state)
+          | .member base _ _ => do
+              let (_, state) ← recurse state base
+              pure (.deferred, state)
           | .proxy _ =>
               pure (.deferred, state)
           | .index base index => do
@@ -335,6 +342,19 @@ mutual
           | .expression expression _ => do
               let (_, state) ← analyzeExpression state expression
               pure (environment, state)
+          | .assignValue assignment _ value => do
+              let state ← assignment.target.projections.foldlM
+                (fun state projection => match projection with
+                  | .index key => (analyzeExpression state key).map (fun result => result.2)
+                  | .member _ _ => pure state) state
+              let (_, state) ← analyzeExpression state value
+              pure (environment, state)
+          | .assignBitNot assignment => do
+              let state ← assignment.target.projections.foldlM
+                (fun state projection => match projection with
+                  | .index key => (analyzeExpression state key).map (fun result => result.2)
+                  | .member _ _ => pure state) state
+              pure (environment, state)
           | .ifThen condition thenBody elseBody => do
               let (_, state) ← analyzeExpression state condition
               let (_, state) ← analyzeStatementListWith
@@ -366,6 +386,61 @@ mutual
                 | none => pure state
                 | some body => analyzeBody state body
               pure (environment, state)
+          | .forLoop initializer condition post body => do
+              let rec analyzeItems :
+                  List ForItemForm → Environment → Traversal →
+                    Except Error (Environment × Traversal)
+                | [], itemEnvironment, itemState =>
+                    pure (itemEnvironment, itemState)
+                | item :: rest, itemEnvironment, itemState => do
+                    let analyzeItemExpression :=
+                      analyzeExpressionFuel source fuel itemEnvironment
+                    let (itemEnvironment, itemState) ← match item with
+                      | .letDecl itemBinder initializer => do
+                          let (stage, itemState) ← match initializer with
+                            | none => pure (.deferred, itemState)
+                            | some value =>
+                                analyzeItemExpression itemState value
+                          registerBinder source.owner itemEnvironment itemState
+                            itemBinder.id stage
+                      | .expression value => do
+                          let (_, itemState) ←
+                            analyzeItemExpression itemState value
+                          pure (itemEnvironment, itemState)
+                      | .assignValue assignment _ value => do
+                          let itemState ← assignment.target.projections.foldlM
+                            (fun itemState projection => match projection with
+                              | .index key =>
+                                  (analyzeItemExpression itemState key).map
+                                    (fun result => result.2)
+                              | .member _ _ => pure itemState) itemState
+                          let (_, itemState) ←
+                            analyzeItemExpression itemState value
+                          pure (itemEnvironment, itemState)
+                      | .assignBitNot assignment => do
+                          let itemState ← assignment.target.projections.foldlM
+                            (fun itemState projection => match projection with
+                              | .index key =>
+                                  (analyzeItemExpression itemState key).map
+                                    (fun result => result.2)
+                              | .member _ _ => pure itemState) itemState
+                          pure (itemEnvironment, itemState)
+                    analyzeItems rest itemEnvironment itemState
+              let (loopEnvironment, state) ←
+                analyzeItems initializer environment state
+              let (_, state) ←
+                analyzeExpressionFuel source fuel loopEnvironment state condition
+              let (_, state) ← analyzeStatementListWith
+                (analyzeStatementFuel source fuel) body loopEnvironment state
+              let (_, state) ← analyzeItems post loopEnvironment state
+              pure (environment, state)
+          | .whileLoop condition body => do
+              let (_, state) ← analyzeExpression state condition
+              let (_, state) ← analyzeStatementListWith
+                (analyzeStatementFuel source fuel) body environment state
+              pure (environment, state)
+          | .breakStmt
+          | .continueStmt => pure (environment, state)
         let state ← leaveOccurrence state statement.occurrence
         pure (environment, state)
 

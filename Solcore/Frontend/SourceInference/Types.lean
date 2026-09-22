@@ -96,6 +96,18 @@ inductive Error where
       (expression : ExpressionId) (requirement : RequirementId)
       (expected actual : ProgramPredicate)
   | matchScrutineeArityMismatch (expected actual : Nat)
+  | constructorNeedsExpectedType (name : String)
+  | unknownConstructor (qualifiers : List String) (name : String)
+  | ambiguousConstructor
+      (qualifiers : List String) (name : String)
+      (candidates : List ProgramDataConstructorId)
+  | constructorArityMismatch
+      (constructor : ProgramDataConstructorId) (expected actual : Nat)
+  | constructorResultMismatch
+      (constructor : ProgramDataConstructorId) (expected actual : Ty)
+  | invalidAssignmentTarget (span : Syntax.SourceSpan)
+  | controlOutsideLoop (kind : String)
+  | duplicatePatternBinder (name : String)
   | unsupportedPattern (span : Syntax.SourceSpan) (kind : String)
   | nonNumericPatternType (span : Syntax.SourceSpan) (type : Ty)
   | nonReturningMatchArm (span : Syntax.SourceSpan)
@@ -116,6 +128,9 @@ structure Context where
   assumptions : List ProgramPredicate := []
   traitDepth : Nat := 32
   coercionDepth : Nat := 4
+  /-- Lexical loop nesting used to reject control statements which would
+  otherwise escape a function or lambda boundary. -/
+  loopDepth : Nat := 0
 
 /-- The lexical portion of inference state.  Restoring this snapshot leaves
 identity allocators and every accumulated semantic fact untouched. -/

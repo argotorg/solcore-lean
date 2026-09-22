@@ -32,6 +32,8 @@ inductive UnsupportedExpression where
   | declarationReference
   | call
   | lambda
+  | constructor
+  | member
   | proxy
   | index
   deriving Repr, BEq, DecidableEq
@@ -39,6 +41,9 @@ inductive UnsupportedExpression where
 /-- Statement forms outside the tail-normal executable profile. -/
 inductive UnsupportedStatement where
   | expression
+  | assignment
+  | loop
+  | loopControl
   deriving Repr, BEq, DecidableEq
 
 /-- Statements whose control-flow meaning cannot be preserved before the end
@@ -1664,6 +1669,10 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
                 (.unsupportedExpression .call)
           | .lambda _ _ _ => failWith lift (.occurrence id.occurrence)
               (.unsupportedExpression .lambda)
+          | .constructor _ _ => failWith lift (.occurrence id.occurrence)
+              (.unsupportedExpression .constructor)
+          | .member _ _ _ => failWith lift (.occurrence id.occurrence)
+              (.unsupportedExpression .member)
           | .proxy _ => failWith lift (.occurrence id.occurrence)
               (.unsupportedExpression .proxy)
           | .index _ _ => failWith lift (.occurrence id.occurrence)
@@ -1832,11 +1841,15 @@ private def lowerExpressionAsWith {error : Type} (lift : Error → error)
 private inductive MatchPatternLeaf where
   | wildcard
   | integerLiteral (literal : Syntax.CoreLiteral)
+  | unsupported
 
 private def matchPatternLeaf : MatchPatternSource → MatchPatternLeaf
   | .wildcard _ _ => .wildcard
   | .integerLiteral _ literal => .integerLiteral literal
+  | .binder _ _ => .unsupported
+  | .constructor _ _ _ _ _ => .unsupported
   | .group _ inner => matchPatternLeaf inner
+  | .tuple _ _ => .unsupported
 
 private structure LoweredMatchPattern where
   tag : Option Core.Word
@@ -2125,6 +2138,15 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
             }
     | .expression _ _ =>
         failWith lift site (.unsupportedStatement .expression)
+    | .assignValue _ _ _
+    | .assignBitNot _ =>
+        failWith lift site (.unsupportedStatement .assignment)
+    | .forLoop _ _ _ _
+    | .whileLoop _ _ =>
+        failWith lift site (.unsupportedStatement .loop)
+    | .breakStmt
+    | .continueStmt =>
+        failWith lift site (.unsupportedStatement .loopControl)
 
 private def bindStagedIntegerInputsWith {error : Type}
     (lift : Error → error) (source : TypedSource) :
@@ -2243,6 +2265,15 @@ private def evaluateStagedIntegerStatementsFuelWith {error : Type}
         failWith lift site .stagedIntegerStatementNotClosed
     | .expression _ _ =>
         failWith lift site (.unsupportedStatement .expression)
+    | .assignValue _ _ _
+    | .assignBitNot _ =>
+        failWith lift site (.unsupportedStatement .assignment)
+    | .forLoop _ _ _ _
+    | .whileLoop _ _ =>
+        failWith lift site (.unsupportedStatement .loop)
+    | .breakStmt
+    | .continueStmt =>
+        failWith lift site (.unsupportedStatement .loopControl)
 
 /-- Preserve the original call-free profile as a reusable call policy. -/
 def rejectCalls : CallElaborator Error :=
@@ -2724,6 +2755,10 @@ private def evaluateStagedValueNodeWith {error : Type}
               failWith lift site (.unsupportedExpression .call)
           | .lambda _ _ _ =>
               failWith lift site (.unsupportedExpression .lambda)
+          | .constructor _ _ =>
+              failWith lift site (.unsupportedExpression .constructor)
+          | .member _ _ _ =>
+              failWith lift site (.unsupportedExpression .member)
           | .proxy _ => failWith lift site (.unsupportedExpression .proxy)
           | .index _ _ => failWith lift site (.unsupportedExpression .index)
           | .integerLiteral _ _ =>
@@ -2969,6 +3004,15 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
     | .matchWith _ => failWith lift site .stagedValueStatementNotClosed
     | .expression _ _ =>
         failWith lift site (.unsupportedStatement .expression)
+    | .assignValue _ _ _
+    | .assignBitNot _ =>
+        failWith lift site (.unsupportedStatement .assignment)
+    | .forLoop _ _ _ _
+    | .whileLoop _ _ =>
+        failWith lift site (.unsupportedStatement .loop)
+    | .breakStmt
+    | .continueStmt =>
+        failWith lift site (.unsupportedStatement .loopControl)
 
 /-- Execute the Core-representable staged subset of one exact source
 specialization with an explicit whole-program direct-call policy.  Stable input

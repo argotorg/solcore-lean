@@ -437,7 +437,10 @@ private def lowerExpressionFuel (context : Context)
           }
       | .call _ _ (.builtinFunction _) =>
           throw (.unsupportedExpression id)
-      | .proxy _ | .index _ _ => throw (.unsupportedExpression id)
+      | .constructor _ _
+      | .member _ _ _
+      | .proxy _
+      | .index _ _ => throw (.unsupportedExpression id)
 
 private def lowerStatementsFuel (context : Context)
     (scope : RuntimeContext) (expected : Core.Ty) :
@@ -502,7 +505,14 @@ private def lowerStatementsFuel (context : Context)
       | .block body => do
           unless rest.isEmpty do throw (.nonTailStatement id)
           lowerStatementsFuel context scope expected fuel body
-      | .matchWith _ | .expression _ _ =>
+      | .matchWith _
+      | .expression _ _
+      | .assignValue _ _ _
+      | .assignBitNot _
+      | .forLoop _ _ _ _
+      | .whileLoop _ _
+      | .breakStmt
+      | .continueStmt =>
           throw (.unsupportedStatement id)
 
 end
