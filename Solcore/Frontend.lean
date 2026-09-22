@@ -414,6 +414,8 @@ import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.SourceCoreElaborationProperties
 import Solcore.Frontend.SourceRuntime
 import Solcore.Frontend.SourceRuntimeProperties
+import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Frontend.SourceTypedRuntimeProperties
 import Solcore.Frontend.SourceCoreDirectLinking
 import Solcore.Frontend.SourceCoreDirectLinkingProperties
 import Solcore.Frontend.SourceRuntimeLinking
