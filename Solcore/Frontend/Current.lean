@@ -1,0 +1,34 @@
+import Solcore.Frontend.ProgramIdentity
+import Solcore.Frontend.ProgramChecking
+import Solcore.Frontend.ExecutableImplMethods
+import Solcore.Frontend.SourceStageAnalysis
+import Solcore.Frontend.SourceStageAnalysisProperties
+import Solcore.Frontend.SourceStagedValue
+import Solcore.Frontend.SourceStagedValueProperties
+import Solcore.Frontend.SourceSpecialization
+import Solcore.Frontend.SourceSpecializationProperties
+import Solcore.Frontend.SourceSpecializationWorklist
+import Solcore.Frontend.SourceSpecializationWorklistProperties
+import Solcore.Frontend.SourceCoreElaboration
+import Solcore.Frontend.SourceCoreElaborationProperties
+import Solcore.Frontend.SourceRuntime
+import Solcore.Frontend.SourceRuntimeProperties
+import Solcore.Frontend.SourceRuntimeStaticInversionProperties
+import Solcore.Frontend.SourceRuntimeStaticOperatorProperties
+import Solcore.Frontend.SourceRuntimeDeepProperties
+import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Frontend.SourceTypedRuntimeProperties
+import Solcore.Frontend.SourceCoreDirectLinking
+import Solcore.Frontend.SourceCoreDirectLinkingProperties
+import Solcore.Frontend.SourceRuntimeLinking
+import Solcore.Frontend.SourceRuntimeLinkingSafetyProperties
+import Solcore.Frontend.SourceRuntimeEntryDeepProperties
+import Solcore.Frontend.SourceTypedStaticSafetyProperties
+import Solcore.Frontend.SourceProgramExecution
+import Solcore.Frontend.SourceProgramExecutionProperties
+import Solcore.Frontend.SourceCompiler
+import Solcore.Frontend.SourceCompilerProperties
+import Solcore.Frontend.SourceCompilerGraphDeepProperties
+import Solcore.Frontend.SourceCompilerSignatureProperties
+
+/-! Current whole-program source pipeline and preservation results. -/

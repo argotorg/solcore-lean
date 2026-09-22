@@ -26,6 +26,9 @@ selection, and source execution profile. Automatic entry discovery, multi-root
 policy, general storage/ABI behavior, and a source wire/Oracle remain outside
 that boundary.
 
+For the current module structure and suggested reading order, see the
+[architecture overview](docs/ARCHITECTURE.md) and [project map](docs/PROJECT_MAP.md).
+
 ## Requirements
 
 - Lean 4.32.1, selected by the checked-in `lean-toolchain` file
