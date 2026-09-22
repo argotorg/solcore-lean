@@ -237,18 +237,26 @@ private def testStageErrors : IO Unit := do
   let indirect := rawWorkspace "main.solc" [("main.solc",
     "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }")]
   match prepare indirect (Seed.named moduleId "apply") generousLimits with
-  | .error (.worklist (.indirectCall _)) => pure ()
-  | result => throw (IO.userError
-      s!"indirect call lost its worklist-stage error: {reprStr result}")
+  | .ok prepared =>
+      let identity : Core.Value := .closure .word .word (.var 0) []
+      let input : Core.Value := .word (word 23)
+      assertTrue (decide (prepared.inputTypes =
+          [.function .word .word, .word] ∧
+          prepared.run? [identity, input] 128 = some (.done input [])))
+        "indirect call did not execute the supplied Core closure"
+  | .error error => throw (IO.userError
+      s!"indirect call was not prepared: {reprStr error}")
   let recursive := rawWorkspace "main.solc" [("main.solc",
     "function loop(value: Word) returns (Word) { return loop(value); }")]
   match prepare recursive (Seed.named moduleId "loop") generousLimits with
-  | .error (.linking (.recursiveCallCycle key)) =>
-      assertTrue (decide (key.declaration.moduleId = moduleId ∧
-          key.declaration.declarationIndex = 0 ∧ key.arguments = []))
-        "recursive-link error changed the explicit root key"
-  | result => throw (IO.userError
-      s!"recursive source root crossed the acyclic linker: {reprStr result}")
+  | .ok prepared =>
+      let input : Core.Value := .word (word 1)
+      match prepared.run? [input] 16 with
+      | some (.outOfFuel _) => pure ()
+      | result => throw (IO.userError
+          s!"recursive source root did not exhaust runtime fuel: {reprStr result}")
+  | .error error => throw (IO.userError
+      s!"recursive source root was not prepared: {reprStr error}")
 
 private def testRuntimeBoundary : IO Unit := do
   let moduleId ← mainModule "main.solc"

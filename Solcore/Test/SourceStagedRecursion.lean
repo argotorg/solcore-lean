@@ -259,16 +259,22 @@ private def runtimeRecursionSource : String := String.intercalate "\n" [
   "function loop(value: Word) returns (Word) { return loop(value); }"
 ]
 
-private def testRuntimeRecursionRemainsRejected : IO Unit := do
+private def testRuntimeRecursionUsesExecutionFuel : IO Unit := do
   let moduleId ← mainModule
   match prepare (workspace runtimeRecursionSource)
       (Seed.named moduleId "loop") (limits 1 64) with
-  | .error (.linking (.recursiveCallCycle _)) => pure ()
-  | result => throw (IO.userError
-      s!"runtime recursion crossed the staged boundary: {reprStr result}")
+  | .ok prepared =>
+      match prepared.run? [.word (word 1)] 8 preservedStore with
+      | some (.outOfFuel state) =>
+          assertTrue (decide (state.store = preservedStore))
+            "runtime recursion lost the caller store at fuel exhaustion"
+      | result => throw (IO.userError
+          s!"runtime recursion did not use execution fuel: {reprStr result}")
+  | .error error => throw (IO.userError
+      s!"runtime recursion was not linked: {reprStr error}")
 
-/-- Exercise staged recursion through the public check/specialize/link/run
-pipeline while retaining the runtime recursion boundary. -/
+/-- Exercise staged and runtime recursion through their independent public
+fuel boundaries. -/
 def testSourceStagedRecursion : IO Unit := do
   testIntegerRecursion
   testGeneralWordAndBoolRecursion
@@ -277,7 +283,7 @@ def testSourceStagedRecursion : IO Unit := do
   testUnselectedInfiniteRecursionIsNotExecuted
   testSameValueCycles
   testStagedFuelBoundaries
-  testRuntimeRecursionRemainsRejected
+  testRuntimeRecursionUsesExecutionFuel
   IO.println "staged recursion checks GREEN"
 
 end Tests.SourceStagedRecursion

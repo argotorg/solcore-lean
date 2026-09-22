@@ -1280,6 +1280,7 @@ import Solcore.Test.SourceSpecialization
 import Solcore.Test.SourceSpecializationWorklist
 import Solcore.Test.SourceCoreElaboration
 import Solcore.Test.SourceCoreDirectLinking
+import Solcore.Test.SourceRuntimeCallGraph
 import Solcore.Test.ProgramChecking
 import Solcore.Test.SourceProgramExecution
 import Solcore.Test.SourcePatternMatching
@@ -6087,6 +6088,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceSpecializationWorklist.testSourceSpecializationWorklist
   SourceCoreElaboration.testSourceCoreElaboration
   SourceCoreDirectLinking.testSourceCoreDirectLinking
+  SourceRuntimeCallGraph.testSourceRuntimeCallGraph
   ProgramChecking.testProgramChecking
   SourceProgramExecution.testSourceProgramExecution
   SourcePatternMatching.testSourcePatternMatching
