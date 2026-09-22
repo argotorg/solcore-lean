@@ -57,6 +57,15 @@ private def publicNames
   | none => []
   | some interface => interface.entities.map (·.publicName)
 
+private def constructorVisibility?
+    (interfaces : Solcore.Frontend.ProgramInterfaces)
+    (moduleId : Workspace.ModuleId) (name : String) :
+    Option ProgramConstructorVisibility := do
+  let interface ← interfaces.interface? moduleId
+  let entity ← interface.entities.find? fun entity =>
+    entity.publicName == name && entity.declaration.nameSpace == some .type
+  pure entity.constructors
+
 private def testExplicitLocalInterfaces : IO Unit := do
   let implicit ← parsed "implicit.solc" <|
     "enum Private { Only } function hidden() returns (Word) { return 0; }"
@@ -186,20 +195,99 @@ private def testModuleBindingsAndSelectionUnion : IO Unit := do
   assertTrue (publicNames result mixedId == ["Left", "Right"])
     "empty or mixed local selection did not behave as union/no-op"
 
+private def testConstructorVisibility : IO Unit := do
+  let localAll ← parsed "localAll.solc"
+    "enum LocalAll { First, Second } export {LocalAll(*)};"
+  let localSubset ← parsed "localSubset.solc"
+    "enum LocalSubset { First, Second } export {LocalSubset(Second)};"
+  let localBare ← parsed "localBare.solc"
+    "enum LocalBare { First } export {LocalBare};"
+  let localWildcard ← parsed "localWildcard.solc"
+    "enum LocalWildcard { First } export {*};"
+  let split ← parsed "split.solc" (String.intercalate "\n" [
+    "enum Split { First, Second, Third }",
+    "export {Split(Second)};",
+    "export {Split(First)};"
+  ])
+  let provider ← parsed "provider.solc" (String.intercalate "\n" [
+    "enum Remote { One, Two, Hidden }",
+    "export {Remote(One, Two)};"
+  ])
+  let remoteWildcard ← parsed "remoteWildcard.solc" "export provider.*;"
+  let remoteNamed ← parsed "remoteNamed.solc" "export provider.{Remote};"
+  let remoteAll ← parsed "remoteAll.solc" "export provider.{Remote(*)};"
+  let remoteSubset ← parsed "remoteSubset.solc"
+    "export provider.{Remote(Two)};"
+  let opaqueProvider ← parsed "opaqueProvider.solc"
+    "enum Opaque { One } export {Opaque};"
+  let opaqueAll ← parsed "opaqueAll.solc"
+    "export opaqueProvider.{Opaque(*)};"
+  let cycleA ← parsed "cycleA.solc" (String.intercalate "\n" [
+    "export provider.{Remote(One)};",
+    "export cycleB.*;"
+  ])
+  let cycleB ← parsed "cycleB.solc" (String.intercalate "\n" [
+    "export provider.{Remote(Two)};",
+    "export cycleA.*;"
+  ])
+  let sources := [localAll, localSubset, localBare, localWildcard, split,
+    provider, remoteWildcard, remoteNamed, remoteAll, remoteSubset,
+    opaqueProvider, opaqueAll, cycleA, cycleB]
+  let (environment, result) ← interfaces sources
+  let visibility (path name : String) : IO (Option ProgramConstructorVisibility) := do
+    pure <| constructorVisibility? result (← moduleId environment path) name
+  assertTrue (decide (
+      (← visibility "localAll" "LocalAll") = some (.visible ["First", "Second"]) ∧
+      (← visibility "localSubset" "LocalSubset") = some (.visible ["Second"]) ∧
+      (← visibility "localBare" "LocalBare") = some .opaqueData ∧
+      (← visibility "localWildcard" "LocalWildcard") = some .opaqueData ∧
+      (← visibility "split" "Split") = some (.visible ["First", "Second"])))
+    "local constructor selection, opacity, or deterministic union changed"
+  assertTrue (decide (
+      (← visibility "remoteWildcard" "Remote") =
+        some (.visible ["One", "Two"]) ∧
+      (← visibility "remoteNamed" "Remote") = some .opaqueData ∧
+      (← visibility "remoteAll" "Remote") =
+        some (.visible ["One", "Two"]) ∧
+      (← visibility "remoteSubset" "Remote") = some (.visible ["Two"])))
+    "remote wildcard preservation, named opacity, or bounded selection changed"
+  assertTrue (decide ((← visibility "opaqueAll" "Opaque") = some .opaqueData))
+    "an empty visible constructor selection was not normalized to opaque data"
+  assertTrue (decide (
+      (← visibility "cycleA" "Remote") = some (.visible ["One", "Two"]) ∧
+      (← visibility "cycleB" "Remote") = some (.visible ["One", "Two"])))
+    "constructor subsets did not union deterministically through a cycle"
+
 private def testExplicitErrors : IO Unit := do
   let unsupported ← parsed "unsupported.solc" (String.intercalate "\n" [
     "enum Choice { One }",
-    "export {Choice(*), (==)};"
+    "type Alias = Word;",
+    "export {Choice(Missing), Alias(*), (==)};"
   ])
   let unsupportedEnvironment ← environment [unsupported]
   let unsupportedId ← moduleId unsupportedEnvironment "unsupported"
   match buildProgramInterfaces unsupportedEnvironment with
-  | .error [.unsupportedConstructorExport owner "Choice",
-      .unsupportedOperatorExport operatorOwner "=="] =>
-      assertTrue (decide (owner = unsupportedId ∧ operatorOwner = unsupportedId))
-        "unsupported export errors lost their owner"
-  | result => throw (IO.userError
-      s!"unsupported selector result changed: {reprStr result}")
+  | .error errors =>
+      assertTrue (decide (
+          errors.contains (.unknownExportConstructor unsupportedId "Choice" "Missing") ∧
+          errors.contains (.unknownExportName unsupportedId "Alias") ∧
+          errors.contains (.unknownExportName unsupportedId "==")))
+        "constructor validation or ordinary operator export lookup changed"
+  | .ok _ => throw (IO.userError
+      "invalid constructor/operator selectors were accepted")
+  let provider ← parsed "bounded.solc"
+    "enum Bounded { Public, Hidden } export {Bounded(Public)};"
+  let revealing ← parsed "revealing.solc"
+    "export bounded.{Bounded(Hidden)};"
+  let revealingEnvironment ← environment [provider, revealing]
+  let revealingId ← moduleId revealingEnvironment "revealing"
+  match buildProgramInterfaces revealingEnvironment with
+  | .error errors =>
+      assertTrue (errors.contains
+          (.unknownExportConstructor revealingId "Bounded" "Hidden"))
+        "a named re-export revealed a constructor hidden by its provider"
+  | .ok _ => throw (IO.userError
+      "a hidden provider constructor was re-exported")
   let missing ← parsed "missing.solc" (String.intercalate "\n" [
     "import {Absent} from missingTarget;",
     "export absentModule.*;",
@@ -228,6 +316,7 @@ def testProgramInterfaces : IO Unit := do
   ProgramInterfaces.testChainsAndCycles
   ProgramInterfaces.testWildcardBoundaries
   ProgramInterfaces.testModuleBindingsAndSelectionUnion
+  ProgramInterfaces.testConstructorVisibility
   ProgramInterfaces.testExplicitErrors
 
 end Tests

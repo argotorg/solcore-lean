@@ -1,4 +1,4 @@
-import Solcore.Frontend.ProgramEnvironment
+import Solcore.Frontend.ProgramModuleResolution
 
 /-!
 Executable public module interfaces for the initial whole-program profile.
@@ -6,18 +6,36 @@ Executable public module interfaces for the initial whole-program profile.
 Interfaces are explicit: a module without an `export` declaration publishes
 nothing.  Imports and re-exports are interpreted over a finite monotone
 least-fixed-point computation, so positive export cycles are supported without
-choosing a source-order winner.  Constructor and operator export selectors are
-kept as explicit errors until those entity forms enter the program catalog.
+choosing a source-order winner.  Data declarations separately record whether
+their constructors are opaque or which constructor spellings are public.
 -/
 
 set_option autoImplicit false
 
 namespace Solcore.Frontend
 
+/-- Constructor access carried by a public or imported type binding. -/
+inductive ProgramConstructorVisibility where
+  | notData
+  | opaqueData
+  | visible (names : List String)
+  deriving Repr, BEq, DecidableEq
+
+namespace ProgramConstructorVisibility
+
+/-- Normalize the empty visible set to opaque data, matching the upstream
+nonempty-set invariant. -/
+def ofVisible : List String → ProgramConstructorVisibility
+  | [] => .opaqueData
+  | names => .visible names
+
+end ProgramConstructorVisibility
+
 /-- One public entity name and the top-level declaration it denotes. -/
 structure ProgramPublicEntity where
   publicName : String
   declaration : ProgramDeclaration
+  constructors : ProgramConstructorVisibility := .notData
   deriving Repr
 
 /-- One public module namespace binding. -/
@@ -48,14 +66,59 @@ inductive ProgramInterfaceError where
   | unknownExportName
       (owner : Workspace.ModuleId)
       (name : String)
-  | unsupportedConstructorExport
+  | unknownExportConstructor
       (owner : Workspace.ModuleId)
-      (name : String)
-  | unsupportedOperatorExport
-      (owner : Workspace.ModuleId)
-      (spelling : String)
+      (typeName constructorName : String)
   | fixedPointExhausted
   deriving Repr, DecidableEq
+
+namespace ProgramDeclaration
+
+/-- Constructor spellings of a catalogued enum, in declaration order. -/
+def constructorNames (declaration : ProgramDeclaration) : List String :=
+  match declaration.source.value with
+  | .enum source => source.value.constructors.map (·.value.name.value)
+  | _ => []
+
+/-- Full local constructor access for a catalogued declaration. -/
+def localConstructorVisibility
+    (declaration : ProgramDeclaration) : ProgramConstructorVisibility :=
+  match declaration.kind with
+  | .enum => .ofVisible declaration.constructorNames
+  | _ => .notData
+
+end ProgramDeclaration
+
+namespace ProgramConstructorVisibility
+
+/-- Whether the binding denotes a data declaration, even if it is opaque. -/
+def isData : ProgramConstructorVisibility → Bool
+  | .notData => false
+  | .opaqueData | .visible _ => true
+
+/-- Whether one constructor spelling is exposed by the binding. -/
+def contains : ProgramConstructorVisibility → String → Bool
+  | .visible names, name => names.contains name
+  | _, _ => false
+
+/-- Remove constructor access while retaining the fact that this is data. -/
+def strip : ProgramConstructorVisibility → ProgramConstructorVisibility
+  | .notData => .notData
+  | .opaqueData | .visible _ => .opaqueData
+
+/-- Monotone deterministic union for duplicate bindings of one declaration. -/
+def merge (declaration : ProgramDeclaration) :
+    ProgramConstructorVisibility → ProgramConstructorVisibility →
+      ProgramConstructorVisibility
+  | .notData, .notData => .notData
+  | .opaqueData, .opaqueData => .opaqueData
+  | .opaqueData, .visible names | .visible names, .opaqueData => .ofVisible names
+  | .visible left, .visible right =>
+      .ofVisible <| declaration.constructorNames.filter fun name =>
+        left.contains name || right.contains name
+  | .notData, _ | _, .notData => .notData
+
+end ProgramConstructorVisibility
 
 namespace ProgramInterfaces
 
@@ -101,57 +164,29 @@ def modulesNamed (interfaces : ProgramInterfaces)
 
 end ProgramInterfaces
 
-private def qualifiedComponents (path : Syntax.QualifiedName) : List String :=
-  path.value.components.toList.map (·.value)
-
-private def importComponents (path : Syntax.ModulePath) : List String :=
-  path.value.components.toList.map (·.value)
-
-private def moduleComponents (moduleId : Workspace.ModuleId) : List String :=
-  moduleId.path.segments.map (·.text)
-
-private def sameLibraryTarget?
-    (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
-    (components : List String) : Option Workspace.ModuleId :=
-  (environment.modules.find? fun module =>
-    decide (module.id.library = owner.library) &&
-      moduleComponents module.id == components).map (·.id)
-
-private def importTarget?
-    (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
-    (path : Syntax.ModulePath) : Option Workspace.ModuleId :=
-  let components := importComponents path
-  if path.value.externalMarker.isSome then
-    match components with
-    | library :: rest =>
-        (environment.modules.find? fun module =>
-          match module.id.library with
-          | .external name =>
-              name.render == library && moduleComponents module.id == rest
-          | _ => false).map (·.id)
-    | [] => none
-  else
-    sameLibraryTarget? environment owner components
-
-private def exportTarget?
-    (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
-    (path : Syntax.QualifiedName) : Option Workspace.ModuleId :=
-  sameLibraryTarget? environment owner (qualifiedComponents path)
-
 private def entityKeyEq
     (left right : ProgramPublicEntity) : Bool :=
   left.publicName == right.publicName &&
     decide (left.declaration.id = right.declaration.id)
 
+private def entityEq
+    (left right : ProgramPublicEntity) : Bool :=
+  entityKeyEq left right && left.constructors == right.constructors
+
 private def moduleKeyEq
     (left right : ProgramPublicModule) : Bool :=
   left.publicName == right.publicName && decide (left.target = right.target)
 
-private def appendEntity
-    (entities : List ProgramPublicEntity) (entity : ProgramPublicEntity) :
-    List ProgramPublicEntity :=
-  if entities.any fun previous => entityKeyEq previous entity then entities
-  else entities ++ [entity]
+private def appendEntity :
+    List ProgramPublicEntity → ProgramPublicEntity → List ProgramPublicEntity
+  | [], entity => [entity]
+  | previous :: rest, entity =>
+      if entityKeyEq previous entity then
+        { previous with
+          constructors := previous.constructors.merge previous.declaration
+            entity.constructors } :: rest
+      else
+        previous :: appendEntity rest entity
 
 private def appendModule
     (modules : List ProgramPublicModule) (binding : ProgramPublicModule) :
@@ -174,10 +209,10 @@ private def mergeInterface
 }
 
 private def interfaceEq (left right : ProgramInterface) : Bool :=
-  left.entities.length == right.entities.length &&
+    left.entities.length == right.entities.length &&
     left.modules.length == right.modules.length &&
     (left.entities.zip right.entities |>.all fun pair =>
-      entityKeyEq pair.1 pair.2) &&
+      entityEq pair.1 pair.2) &&
     (left.modules.zip right.modules |>.all fun pair =>
       moduleKeyEq pair.1 pair.2)
 
@@ -199,17 +234,23 @@ private def interfaceOf
 private structure VisibleEntity where
   localName : String
   declaration : ProgramDeclaration
+  constructors : ProgramConstructorVisibility := .notData
   deriving Repr
 
 private def visibleKeyEq (left right : VisibleEntity) : Bool :=
   left.localName == right.localName &&
     decide (left.declaration.id = right.declaration.id)
 
-private def appendVisible
-    (entities : List VisibleEntity) (entity : VisibleEntity) :
-    List VisibleEntity :=
-  if entities.any fun previous => visibleKeyEq previous entity then entities
-  else entities ++ [entity]
+private def appendVisible :
+    List VisibleEntity → VisibleEntity → List VisibleEntity
+  | [], entity => [entity]
+  | previous :: rest, entity =>
+      if visibleKeyEq previous entity then
+        { previous with
+          constructors := previous.constructors.merge previous.declaration
+            entity.constructors } :: rest
+      else
+        previous :: appendVisible rest entity
 
 private def mergeVisible
     (left right : List VisibleEntity) : List VisibleEntity :=
@@ -230,7 +271,11 @@ private def publicAsVisible
     List VisibleEntity :=
   interface.entities.filterMap fun entity =>
     if hidden.contains entity.publicName then none
-    else some { localName := entity.publicName, declaration := entity.declaration }
+    else some {
+      localName := entity.publicName
+      declaration := entity.declaration
+      constructors := entity.constructors
+    }
 
 private structure VisibilityResult where
   entities : List VisibleEntity := []
@@ -251,7 +296,11 @@ private def selectImported
     {}
   else
     { entities := candidates.map fun entity =>
-        { localName, declaration := entity.declaration } }
+        {
+          localName
+          declaration := entity.declaration
+          constructors := entity.constructors
+        } }
 
 private def validateHidden
     (owner target : Workspace.ModuleId) (interface : ProgramInterface)
@@ -266,8 +315,8 @@ private def processImport
     VisibilityResult :=
   let path := match declaration.value with
     | .plain path | .namespace path _ | .wildcard path _ | .selected _ path _ => path
-  match importTarget? environment owner path with
-  | none => { errors := [.unknownModule owner (importComponents path)] }
+  match resolveProgramModulePath? environment owner path with
+  | none => { errors := [.unknownModule owner (programModulePathComponents path)] }
   | some target =>
       let interface := interfaceOf interfaces target
       match declaration.value with
@@ -311,7 +360,11 @@ private def localEntities
     List VisibleEntity :=
   (environment.declarationsIn moduleId).filterMap fun declaration =>
     match declaration.nameSpace, declaration.name with
-    | some _, some name => some { localName := name, declaration }
+    | some _, some name => some {
+        localName := name
+        declaration
+        constructors := declaration.localConstructorVisibility
+      }
     | _, _ => none
 
 private def visibleNamed
@@ -335,7 +388,11 @@ private def addVisibleWithName
   { contribution with
     interface := { contribution.interface with
       entities := mergeEntities contribution.interface.entities <|
-        entities.map fun entity => { publicName, declaration := entity.declaration } } }
+        entities.map fun entity => {
+          publicName
+          declaration := entity.declaration
+          constructors := entity.constructors
+        } } }
 
 private def addPublicEntities
     (contribution : Contribution) (entities : List ProgramPublicEntity) :
@@ -356,25 +413,88 @@ private def addError
     (contribution : Contribution) (error : ProgramInterfaceError) : Contribution :=
   { contribution with errors := contribution.errors ++ [error] }
 
+private def stripVisibleConstructors (entity : VisibleEntity) : VisibleEntity :=
+  { entity with constructors := entity.constructors.strip }
+
+private def stripPublicConstructors
+    (entity : ProgramPublicEntity) : ProgramPublicEntity :=
+  { entity with constructors := entity.constructors.strip }
+
+private structure SelectedVisibleEntity where
+  entity : VisibleEntity
+  errors : List ProgramInterfaceError := []
+
+private def selectVisibleConstructors
+    (owner : Workspace.ModuleId) (typeName : String)
+    (selection : Syntax.ConstructorSelection) (entity : VisibleEntity) :
+    Option SelectedVisibleEntity :=
+  if !entity.constructors.isData then
+    none
+  else
+    let available := match entity.constructors with
+      | .visible names => names
+      | .notData | .opaqueData => []
+    let requested : List String := match selection.value with
+      | .all _ => available
+      | .named constructors =>
+          (constructors.toList.map fun (constructor : Syntax.Identifier) =>
+            constructor.value).eraseDups
+    let selected := available.filter requested.contains
+    let missing := match selection.value with
+      | .all _ => []
+      | .named _ => requested.filter fun name => !available.contains name
+    some {
+      entity := { entity with constructors := .ofVisible selected }
+      errors := missing.map fun constructorName =>
+        .unknownExportConstructor owner typeName constructorName
+    }
+
+private def addSelectedConstructors
+    (owner : Workspace.ModuleId) (typeName publicName : String)
+    (selection : Syntax.ConstructorSelection) (candidates : List VisibleEntity)
+    (contribution : Contribution) : Contribution :=
+  let selected := candidates.filterMap fun entity =>
+    selectVisibleConstructors owner typeName selection entity
+  if selected.isEmpty then
+    addError contribution (.unknownExportName owner typeName)
+  else
+    selected.foldl (fun result item =>
+      let result := addVisibleWithName result publicName [item.entity]
+      item.errors.foldl addError result) contribution
+
+private def visibleOfPublic (entity : ProgramPublicEntity) : VisibleEntity := {
+  localName := entity.publicName
+  declaration := entity.declaration
+  constructors := entity.constructors
+}
+
 private def processExportName
     (owner : Workspace.ModuleId) (locals imported : List VisibleEntity)
     (contribution : Contribution) (name : Syntax.ExportName) : Contribution :=
   match name.value with
   | .wildcard _ =>
       locals.foldl (fun result entity =>
-        addVisibleWithName result entity.localName [entity]) contribution
+        addVisibleWithName result entity.localName
+          [stripVisibleConstructors entity]) contribution
   | .identifier identifier none =>
       let spelling := identifier.value
       let candidates := visibleNamed locals imported spelling
       if candidates.isEmpty then
         addError contribution (.unknownExportName owner spelling)
       else
-        addVisibleWithName contribution spelling candidates
-  | .identifier identifier (some _) =>
-      addError contribution
-        (.unsupportedConstructorExport owner identifier.value)
+        addVisibleWithName contribution spelling
+          (candidates.map stripVisibleConstructors)
+  | .identifier identifier (some selection) =>
+      let spelling := identifier.value
+      addSelectedConstructors owner spelling spelling selection
+        (visibleNamed locals imported spelling) contribution
   | .operator spelling =>
-      addError contribution (.unsupportedOperatorExport owner spelling.value)
+      let candidates := visibleNamed locals imported spelling.value
+      if candidates.isEmpty then
+        addError contribution (.unknownExportName owner spelling.value)
+      else
+        addVisibleWithName contribution spelling.value
+          (candidates.map stripVisibleConstructors)
 
 private def processRemoteName
     (owner : Workspace.ModuleId) (targetInterface : ProgramInterface)
@@ -388,12 +508,21 @@ private def processRemoteName
       if candidates.isEmpty then
         addError contribution (.unknownExportName owner spelling)
       else
-        addPublicEntities contribution candidates
-  | .identifier identifier (some _) =>
-      addError contribution
-        (.unsupportedConstructorExport owner identifier.value)
+        addPublicEntities contribution (candidates.map stripPublicConstructors)
+  | .identifier identifier (some selection) =>
+      let spelling := identifier.value
+      let candidates := targetInterface.entities.filterMap fun entity =>
+        if entity.publicName == spelling then some (visibleOfPublic entity)
+        else none
+      addSelectedConstructors owner spelling spelling selection candidates
+        contribution
   | .operator spelling =>
-      addError contribution (.unsupportedOperatorExport owner spelling.value)
+      let candidates := targetInterface.entities.filter fun entity =>
+        entity.publicName == spelling.value
+      if candidates.isEmpty then
+        addError contribution (.unknownExportName owner spelling.value)
+      else
+        addPublicEntities contribution (candidates.map stripPublicConstructors)
 
 private def processLocalExportItem
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
@@ -402,9 +531,9 @@ private def processLocalExportItem
   match item.value with
   | .name name => processExportName owner locals imported contribution name
   | .moduleWildcard path _ =>
-      match exportTarget? environment owner path with
+      match resolveProgramExportPath? environment owner path with
       | none => addError contribution
-          (.unknownModule owner (qualifiedComponents path))
+          (.unknownModule owner (programExportPathComponents path))
       | some target =>
           addPublicEntities contribution (interfaceOf interfaces target).entities
 
@@ -418,20 +547,21 @@ private def processExport
         (processLocalExportItem environment interfaces module.id locals imported)
         contribution
   | .module path =>
-      match exportTarget? environment module.id path with
+      match resolveProgramExportPath? environment module.id path with
       | none => addError contribution
-          (.unknownModule module.id (qualifiedComponents path))
+          (.unknownModule module.id (programExportPathComponents path))
       | some target =>
-          addPublicModule contribution (qualifiedComponents path).getLast! target
+          addPublicModule contribution
+            (programExportPathComponents path).getLast! target
   | .moduleAs path alias =>
-      match exportTarget? environment module.id path with
+      match resolveProgramExportPath? environment module.id path with
       | none => addError contribution
-          (.unknownModule module.id (qualifiedComponents path))
+          (.unknownModule module.id (programExportPathComponents path))
       | some target => addPublicModule contribution alias.value target
   | .itemsFrom path selection =>
-      match exportTarget? environment module.id path with
+      match resolveProgramExportPath? environment module.id path with
       | none => addError contribution
-          (.unknownModule module.id (qualifiedComponents path))
+          (.unknownModule module.id (programExportPathComponents path))
       | some target =>
           let targetInterface := interfaceOf interfaces target
           match selection.value with
