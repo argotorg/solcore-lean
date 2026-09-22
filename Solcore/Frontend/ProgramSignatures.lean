@@ -259,6 +259,33 @@ structure ProgramImplementationSignature where
   source : Syntax.ImplDecl
   deriving Repr
 
+/-- Stable source identity of one constructor within an algebraic data
+declaration.  Constructor order is semantic because Core data values retain
+the same zero-based tag. -/
+structure ProgramDataConstructorId where
+  dataType : Resolved.DeclarationId
+  constructorIndex : Nat
+  deriving Repr, BEq, DecidableEq
+
+/-- One constructor after resolving every positional payload type in the
+generic scope of its owning data declaration. -/
+structure ProgramDataConstructorSignature where
+  id : ProgramDataConstructorId
+  name : String
+  payloadTypes : List TypeSystem.Ty
+  source : Syntax.EnumConstructor
+  deriving Repr
+
+/-- A resolved top-level algebraic data declaration.  `parameters` retain
+declaration order and constructor order is preserved exactly from source. -/
+structure ProgramDataSignature where
+  id : Resolved.DeclarationId
+  name : String
+  parameters : List TypeSystem.TypeParameterId
+  constructors : List ProgramDataConstructorSignature
+  source : Syntax.EnumDecl
+  deriving Repr
+
 namespace ProgramImplementationSignature
 
 /-- Backward-compatible trait-search projection of an implementation catalog. -/
@@ -300,6 +327,7 @@ structure ProgramSignatures where
   implRules : List ProgramImplRule
   traits : List ProgramTraitSignature
   implementations : List ProgramImplementationSignature
+  dataTypes : List ProgramDataSignature := []
   deriving Repr
 
 namespace ProgramSignatures
@@ -371,6 +399,23 @@ def implMethod? (signatures : ProgramSignatures)
   let implementation ← signatures.implementation? id.implementation
   implementation.methods.find? fun method => decide (method.id = id)
 
+/-- Look up one algebraic data declaration by stable declaration identity. -/
+def dataType? (signatures : ProgramSignatures)
+    (id : Resolved.DeclarationId) : Option ProgramDataSignature :=
+  signatures.dataTypes.find? fun dataType => decide (dataType.id = id)
+
+/-- Preserve source order when finding constructors with an exact spelling. -/
+def constructorsNamed (signatures : ProgramSignatures)
+    (name : String) : List ProgramDataConstructorSignature :=
+  signatures.dataTypes.flatMap fun dataType =>
+    dataType.constructors.filter fun constructor => constructor.name == name
+
+/-- Recover the owning data declaration of one constructor identity. -/
+def constructor? (signatures : ProgramSignatures)
+    (id : ProgramDataConstructorId) : Option ProgramDataConstructorSignature := do
+  let dataType ← signatures.dataType? id.dataType
+  dataType.constructors.find? fun constructor => decide (constructor.id = id)
+
 end ProgramSignatures
 
 /-- Failures while turning cataloged declarations into typed signatures. -/
@@ -425,6 +470,9 @@ inductive ProgramSignatureError where
       (expected actual : List ProgramPredicate)
   | traitCatalogUnavailable
       (implementation trait : Resolved.DeclarationId)
+  | duplicateDataConstructor
+      (dataType : Resolved.DeclarationId) (name : String)
+      (firstIndex duplicateIndex : Nat)
   deriving Repr, DecidableEq
 
 private def programSignatureErrorDeclaration :
@@ -449,6 +497,7 @@ private def programSignatureErrorDeclaration :
   | .implMethodComptimeMismatch method _ _ _ _ _ => method.implementation
   | .implMethodPredicateMismatch method _ _ _ => method.implementation
   | .traitCatalogUnavailable implementation _ => implementation
+  | .duplicateDataConstructor dataType _ _ _ => dataType
 
 private def declarationParameters
     (declaration : ProgramDeclaration) : List TypeSystem.TypeParameterId :=
@@ -488,6 +537,49 @@ private def resolveSignatureTypes
       let type ← resolveSignatureType environment declaration scope source
       let types ← resolveSignatureTypes environment declaration scope rest
       pure (type :: types)
+
+private def dataConstructorsOfDeclaration
+    (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
+    (scope : ProgramTypeScope) :
+    List Syntax.EnumConstructor → Nat → List (String × Nat) →
+      Except ProgramSignatureError (List ProgramDataConstructorSignature)
+  | [], _, _ => pure []
+  | source :: rest, index, seen => do
+      let name := source.value.name.value
+      match seen.find? fun previous => previous.1 == name with
+      | some previous =>
+          throw (.duplicateDataConstructor declaration.id name previous.2 index)
+      | none =>
+          let payloadSources := source.value.fields.map
+            (fun fields => fields.elements) |>.getD []
+          let payloadTypes ← resolveSignatureTypes environment declaration scope
+            payloadSources
+          let constructors ← dataConstructorsOfDeclaration environment
+            declaration scope rest (index + 1) ((name, index) :: seen)
+          pure ({
+            id := { dataType := declaration.id, constructorIndex := index }
+            name
+            payloadTypes
+            source
+          } :: constructors)
+
+private def dataSignatureOfDeclaration
+    (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
+    (source : Syntax.EnumDecl) :
+    Except ProgramSignatureError ProgramDataSignature := do
+  let scope := ProgramTypeScope.ofDeclaration declaration
+  match validateProgramTypeScope scope with
+  | .error error => throw (.typeResolution declaration.id error)
+  | .ok () => pure ()
+  let constructors ← dataConstructorsOfDeclaration environment declaration
+    scope source.value.constructors 0 []
+  pure {
+    id := declaration.id
+    name := source.value.name.value
+    parameters := declarationParameters declaration
+    constructors
+    source
+  }
 
 private def firstTopLevelComptimeReturn? :
     List Syntax.TypeExpr → Nat → Option Nat
@@ -907,6 +999,7 @@ private structure ProgramSignatureBuildState where
   errors : List ProgramSignatureError := []
   functions : List ProgramFunctionSignature := []
   implementations : List ProgramImplementationSignature := []
+  dataTypes : List ProgramDataSignature := []
 
 private def collectProgramSignatures
     (environment : ProgramEnvironment) (traits : List ProgramTraitSignature) :
@@ -915,13 +1008,21 @@ private def collectProgramSignatures
   | [], state => state
   | declaration :: rest, state =>
       let state :=
-        match signatureItemOfDeclaration environment traits declaration with
-        | .error error => { state with errors := state.errors ++ [error] }
-        | .ok (function?, implementation?) => {
-            state with
-            functions := state.functions ++ function?.toList
-            implementations := state.implementations ++ implementation?.toList
-          }
+        match declaration.source.value with
+        | .enum source =>
+            match dataSignatureOfDeclaration environment declaration source with
+            | .error error => { state with errors := state.errors ++ [error] }
+            | .ok dataType => {
+                state with dataTypes := state.dataTypes ++ [dataType]
+              }
+        | _ =>
+            match signatureItemOfDeclaration environment traits declaration with
+            | .error error => { state with errors := state.errors ++ [error] }
+            | .ok (function?, implementation?) => {
+                state with
+                functions := state.functions ++ function?.toList
+                implementations := state.implementations ++ implementation?.toList
+              }
       collectProgramSignatures environment traits rest state
 
 /-- Resolve every top-level function signature and implementation rule.
@@ -945,6 +1046,7 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
       implRules := state.implementations.map (ProgramImplementationSignature.implRule)
       traits := traitState.traits
       implementations := state.implementations
+      dataTypes := state.dataTypes
     }
   else
     .error errors

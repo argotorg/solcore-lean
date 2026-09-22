@@ -57,7 +57,7 @@ private def testSuccessfulCollection : IO Unit := do
     | .error errors =>
         throw (IO.userError s!"signature failure: {reprStr errors}")
   assertTrue (decide (signatures.functions.length = 1 ∧
-      signatures.implRules.length = 1))
+      signatures.implRules.length = 1 ∧ signatures.dataTypes.length = 1))
     "function/impl source collection changed"
   assertTrue (decide ((signatures.functionsNamed "choose").length = 1 ∧
       (signatures.localFunctionsNamed choose.id.moduleId "choose").length = 1))
@@ -110,6 +110,21 @@ private def testSuccessfulCollection : IO Unit := do
           }]))
         "impl head/where predicate resolution changed"
   | rules => throw (IO.userError s!"impl rules changed: {reprStr rules}")
+  let dataType ← match signatures.dataType? box.id with
+    | some dataType => pure dataType
+    | none => throw (IO.userError "missing Box data signature")
+  let dataParameter : TypeSystem.Ty :=
+    .parameter { owner := box.id, index := 0 }
+  match dataType.constructors with
+  | [constructor] =>
+      assertTrue (decide (dataType.name = "Box" ∧
+          dataType.parameters = [{ owner := box.id, index := 0 }] ∧
+          constructor.id = { dataType := box.id, constructorIndex := 0 } ∧
+          constructor.name = "Wrap" ∧
+          constructor.payloadTypes = [dataParameter]))
+        "generic data constructor catalog changed"
+  | constructors => throw (IO.userError
+      s!"Box constructor catalog changed: {reprStr constructors}")
 
 private def testComptimeMarkerCollection : IO Unit := do
   let source ← parsed "comptime_signatures.solc" (String.intercalate "\n" [
@@ -404,6 +419,11 @@ private def testFailures : IO Unit := do
     "function mixed() returns (Word, comptime<Word>) { return (0, 0); }"
     fun error => match error with
       | .comptimeReturnMustBeSingleton _ 1 2 => true
+      | _ => false
+  expectSingleError
+    "enum Duplicate { Same, Same(Word) }"
+    fun error => match error with
+      | .duplicateDataConstructor _ "Same" 0 1 => true
       | _ => false
 
 private def testMethodFailures : IO Unit := do
