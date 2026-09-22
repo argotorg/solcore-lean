@@ -204,6 +204,16 @@ inductive RuntimeError where
   | missingSpecialization (key : Key)
   | duplicateSpecialization (key : Key) (count : Nat)
   | invalidFunctionType (key : Key) (type : Ty)
+  | unresolvedAssumptions (key : Key) (predicates : List ProgramPredicate)
+  | comptimeContract
+      (key : Key) (parameterComptime : List Bool) (returnComptime : Bool)
+  | markedBinder (id : Resolved.LocalId)
+  | stagedBinderType (id : Resolved.LocalId) (type : Ty)
+  | stagedResultType (key : Key) (type : Ty)
+  | stagedExpressionType (id : ExpressionId) (type : Ty)
+  | stagedLambdaResult (id : ExpressionId) (type : Ty)
+  | unsupportedStagedInput (expected : Ty)
+  | inputValidationFuelExhausted (expected : Ty) (fuel : Nat)
   | missingExpression (id : ExpressionId)
   | missingStatement (id : StatementId)
   | expectedStatementRoot (id : ExpressionId)
@@ -413,13 +423,89 @@ private def validateExecutableMetadata (function : CheckedFunction) :
     | .expression expression => validateExpressionMetadata function expression
     | .statement statement => validateStatementMetadata function statement.form
 
+private def typeContainsStaged : Ty → Bool
+  | .constructor (.builtin .integer)
+  | .comptime _ => true
+  | .application function argument
+  | .function function argument
+  | .product function argument
+  | .mapping function argument =>
+      typeContainsStaged function || typeContainsStaged argument
+  | .proxy inner => typeContainsStaged inner
+  | .variable _ | .parameter _ | .constructor _ | .error => false
+
+private def validateRuntimeBinder (binder : TypedBinder) :
+    Except RuntimeError Unit := do
+  if binder.comptime then throw (.markedBinder binder.id)
+  if typeContainsStaged binder.scheme.body then
+    throw (.stagedBinderType binder.id binder.scheme.body)
+
+private def validateForItemBinder : ForItemForm → Except RuntimeError Unit
+  | .letDecl binder _ => validateRuntimeBinder binder
+  | .expression _ | .assignValue _ _ _ | .assignBitNot _ => pure ()
+
+private def validatePatternInstructionBinder :
+    MatchPatternInstruction → Except RuntimeError Unit
+  | .binder binder => validateRuntimeBinder binder
+  | .wildcard | .integerLiteral _ _ | .constructor _ _ | .tuple _ => pure ()
+
+private def validatePatternBinders (pattern : TypedMatchPattern) :
+    Except RuntimeError Unit := do
+  match pattern.resolution with
+  | .binder binder => validateRuntimeBinder binder
+  | .constructor _ instructions | .tuple instructions =>
+      for instruction in instructions do
+        validatePatternInstructionBinder instruction
+  | .wildcard | .integerLiteral _ _ => pure ()
+
+private def validateRuntimeBinders (function : CheckedFunction) :
+    Except RuntimeError Unit := do
+  for node in function.typedBody.nodes do
+    match node with
+    | .expression expression => do
+        if typeContainsStaged expression.type then
+          throw (.stagedExpressionType expression.id expression.type)
+        match expression.form with
+        | .lambda parameters resultType _ => do
+            for parameter in parameters do validateRuntimeBinder parameter
+            if typeContainsStaged resultType then
+              throw (.stagedLambdaResult expression.id resultType)
+        | _ => pure ()
+    | .statement { form := .letDecl binder _, .. } =>
+        validateRuntimeBinder binder
+    | .statement { form := .forLoop initializer _ post _, .. } =>
+        for item in initializer ++ post do validateForItemBinder item
+    | .statement { form := .matchWith resolution, .. } =>
+        for arm in resolution.cases do validatePatternBinders arm.pattern
+    | _ => pure ()
+
+private def validateSpecializationMetadata
+    (specialized : SourceSpecialization.SpecializedFunction) :
+    Except RuntimeError Unit := do
+  unless specialized.assumptions.isEmpty do
+    throw (.unresolvedAssumptions specialized.key specialized.assumptions)
+  let parameterComptime :=
+    specialized.function.typedBody.inputs.map (·.comptime)
+  if parameterComptime.any fun marked => marked then
+    throw (.comptimeContract specialized.key parameterComptime
+      specialized.function.returnComptime)
+  if specialized.function.returnComptime then
+    throw (.comptimeContract specialized.key parameterComptime true)
+  if typeContainsStaged specialized.function.inferredBodyType then
+    throw (.stagedResultType specialized.key
+      specialized.function.inferredBodyType)
+  for binder in specialized.function.typedBody.inputs do
+    validateRuntimeBinder binder
+  validateRuntimeBinders specialized.function
+  validateExecutableMetadata specialized.function
+
 /-- Preflight every reachable specialization before selecting this runtime as
 an executable backend.  The canonical worklist has already fixed the finite
 call graph; this pass rejects metadata which the typed runtime deliberately
 does not dispatch instead of postponing that rejection until a call happens. -/
 def validateExecutablePlan (plan : Plan) : Except RuntimeError Unit := do
   for specialized in plan.specializations do
-    validateExecutableMetadata specialized.function
+    validateSpecializationMetadata specialized
 
 private def applyCoercion (plan : Plan) (step : CoercionStep)
     (value : Value) : Except RuntimeError Value := do
@@ -1094,7 +1180,7 @@ mutual
       | .error error => .fault error state
       | .ok specialized =>
           let function := specialized.function
-          match validateExecutableMetadata function with
+          match validateSpecializationMetadata specialized with
           | .error error => .fault error state
           | .ok () =>
               match resultType? function with
@@ -1432,58 +1518,96 @@ private def validConstructorInstantiation (signatures : ProgramSignatures)
                 instantiation.payloadTypes = expectedPayload &&
                   instantiation.resultType = expectedResult
 
+/-- Exact outcome of bounded recursive runtime-input validation. -/
+inductive TypeValidation where
+  | valid
+  | invalid
+  | unsupportedStaged
+  | outOfFuel
+  deriving Repr, BEq, DecidableEq
+
+private def combineValidation (first second : TypeValidation) : TypeValidation :=
+  match first with
+  | .valid => second
+  | .invalid => .invalid
+  | .unsupportedStaged => .unsupportedStaged
+  | .outOfFuel => .outOfFuel
+
 mutual
 
-  private def valuesHaveTypesFuel (fuel : Nat)
+  private def valuesValidateFuel (fuel : Nat)
       (signatures : ProgramSignatures) (plan : Plan) :
-      List Ty → List Value → Bool
-    | [], [] => true
+      List Ty → List Value → TypeValidation
+    | [], [] => .valid
     | expected :: expectedRest, actual :: actualRest =>
-        Value.hasTypeFuel fuel signatures plan expected actual &&
-          valuesHaveTypesFuel fuel signatures plan expectedRest actualRest
-    | _, _ => false
+        combineValidation
+          (Value.validateTypeFuel fuel signatures plan expected actual)
+          (valuesValidateFuel fuel signatures plan expectedRest actualRest)
+    | _, _ => .invalid
 
-  private def mappingEntriesHaveTypesFuel (fuel : Nat)
+  private def mappingEntriesValidateFuel (fuel : Nat)
       (signatures : ProgramSignatures) (plan : Plan)
-      (keyType valueType : Ty) : List (Value × Value) → Bool
-    | [] => true
+      (keyType valueType : Ty) : List (Value × Value) → TypeValidation
+    | [] => .valid
     | entry :: rest =>
-        Value.hasTypeFuel fuel signatures plan keyType entry.1 &&
-          Value.hasTypeFuel fuel signatures plan valueType entry.2 &&
-          mappingEntriesHaveTypesFuel fuel signatures plan keyType valueType rest
+        combineValidation
+          (Value.validateTypeFuel fuel signatures plan keyType entry.1)
+          (combineValidation
+            (Value.validateTypeFuel fuel signatures plan valueType entry.2)
+            (mappingEntriesValidateFuel fuel signatures plan keyType valueType
+              rest))
 
-  /-- Recursive executable validator underlying the safe public input gate. -/
-  def Value.hasTypeFuel : Nat → ProgramSignatures → Plan → Ty → Value → Bool
-    | 0, _, _, _, _ => false
+  /-- Bounded deep validation which distinguishes malformed input from budget
+  exhaustion. -/
+  def Value.validateTypeFuel :
+      Nat → ProgramSignatures → Plan → Ty → Value → TypeValidation
+    | 0, _, _, _, _ => .outOfFuel
     | fuel + 1, signatures, plan, expected, actual =>
         match expected, actual with
-        | .constructor (.builtin .unit), .unit => true
-        | .constructor (.builtin .bool), .bool _ => true
-        | .constructor (.builtin .word), .word _ => true
-        | .constructor (.builtin .integer), .integer _ => true
+        | .constructor (.builtin .unit), .unit => .valid
+        | .constructor (.builtin .bool), .bool _ => .valid
+        | .constructor (.builtin .word), .word _ => .valid
+        | .constructor (.builtin .integer), .integer _ => .valid
         | .product leftType rightType, .product left right =>
-            Value.hasTypeFuel fuel signatures plan leftType left &&
-              Value.hasTypeFuel fuel signatures plan rightType right
-        | .proxy inner, .proxy actualInner => decide (inner = actualInner)
+            combineValidation
+              (Value.validateTypeFuel fuel signatures plan leftType left)
+              (Value.validateTypeFuel fuel signatures plan rightType right)
+        | .proxy inner, .proxy actualInner =>
+            if inner = actualInner then .valid else .invalid
         | .mapping keyType valueType, .mapping actualKey actualValue entries =>
-            decide (keyType = actualKey) && decide (valueType = actualValue) &&
-              mappingEntriesHaveTypesFuel fuel signatures plan keyType valueType
+            if decide (keyType = actualKey) &&
+                decide (valueType = actualValue) then
+              mappingEntriesValidateFuel fuel signatures plan keyType valueType
                 entries
+            else
+              .invalid
         | _, .constructed instantiation arguments =>
-            decide (expected = instantiation.resultType) &&
-              validConstructorInstantiation signatures instantiation &&
-              valuesHaveTypesFuel fuel signatures plan
-                instantiation.payloadTypes arguments
+            if decide (expected = instantiation.resultType) &&
+                validConstructorInstantiation signatures instantiation then
+              if instantiation.payloadTypes.any typeContainsStaged then
+                .unsupportedStaged
+              else
+                valuesValidateFuel fuel signatures plan
+                  instantiation.payloadTypes arguments
+            else
+              .invalid
         | .function _ _, .global key =>
             match exactSpecialization plan key with
-            | .ok specialized => decide (specialized.function.type = expected)
-            | .error _ => false
-        | .function _ _, .builtin function => decide (function.type = expected)
+            | .ok specialized =>
+                if specialized.function.type = expected then .valid else .invalid
+            | .error _ => .invalid
+        | .function _ _, .builtin function =>
+            if function.type = expected then .valid else .invalid
         | .comptime inner, value =>
-            Value.hasTypeFuel fuel signatures plan inner value
-        | _, _ => false
+            Value.validateTypeFuel fuel signatures plan inner value
+        | _, _ => .invalid
 
 end
+
+/-- Boolean compatibility projection of exact bounded validation. -/
+def Value.hasTypeFuel (fuel : Nat) (signatures : ProgramSignatures)
+    (plan : Plan) (expected : Ty) (value : Value) : Bool :=
+  Value.validateTypeFuel fuel signatures plan expected value == .valid
 
 namespace Value
 
@@ -1500,10 +1624,11 @@ private def validateInputs (signatures : ProgramSignatures) (plan : Plan)
     (fuel : Nat) : List Ty → List Value → Option RuntimeError
   | [], [] => none
   | expected :: expectedRest, actual :: actualRest =>
-      if actual.hasType signatures plan fuel expected then
-        validateInputs signatures plan fuel expectedRest actualRest
-      else
-        some (.typeMismatch expected (actual.type? plan))
+      match actual.validateTypeFuel fuel signatures plan expected with
+      | .valid => validateInputs signatures plan fuel expectedRest actualRest
+      | .invalid => some (.typeMismatch expected (actual.type? plan))
+      | .unsupportedStaged => some (.unsupportedStagedInput expected)
+      | .outOfFuel => some (.inputValidationFuelExhausted expected fuel)
   | expected, actual => some (.argumentArityMismatch expected.length actual.length)
 
 /-- Execute a plan whose inputs and embedded nominal metadata have already

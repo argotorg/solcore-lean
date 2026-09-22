@@ -18,28 +18,42 @@ open TypeSystem
 theorem unit_hasType (signatures : ProgramSignatures) (plan : Plan)
     (fuel : Nat) :
     Value.hasType signatures plan (fuel + 1) .unit .unit = true := by
-  simpa only [Value.hasType, Nat.add_one, Ty.unit] using
-    Value.hasTypeFuel.eq_2 signatures plan fuel
+  unfold Value.hasType Value.hasTypeFuel
+  simp only [Ty.unit, Nat.add_one]
+  rw [Value.validateTypeFuel.eq_2]
+  rfl
 
 theorem bool_hasType (signatures : ProgramSignatures) (plan : Plan)
     (fuel : Nat) (value : Bool) :
     Value.hasType signatures plan (fuel + 1) .bool (.bool value) = true := by
-  simpa only [Value.hasType, Nat.add_one, Ty.bool] using
-    Value.hasTypeFuel.eq_3 signatures plan fuel value
+  unfold Value.hasType Value.hasTypeFuel
+  simp only [Ty.bool, Nat.add_one]
+  rw [Value.validateTypeFuel.eq_3]
+  rfl
 
 theorem word_hasType (signatures : ProgramSignatures) (plan : Plan)
     (fuel : Nat) (value : Core.Word) :
     Value.hasType signatures plan (fuel + 1) .word (.word value) = true := by
-  simpa only [Value.hasType, Nat.add_one, Ty.word] using
-    Value.hasTypeFuel.eq_4 signatures plan fuel value
+  unfold Value.hasType Value.hasTypeFuel
+  simp only [Ty.word, Nat.add_one]
+  rw [Value.validateTypeFuel.eq_4]
+  rfl
 
 theorem proxy_hasType (signatures : ProgramSignatures) (plan : Plan)
     (fuel : Nat) (inner : Ty) :
     Value.hasType signatures plan (fuel + 1) (.proxy inner) (.proxy inner) =
       true := by
-  unfold Value.hasType
-  rw [Nat.add_one, Value.hasTypeFuel.eq_7]
-  simp
+  unfold Value.hasType Value.hasTypeFuel
+  rw [Nat.add_one, Value.validateTypeFuel.eq_7]
+  split
+  · change true = true
+    rfl
+  · contradiction
+
+theorem zero_fuel_validateType (signatures : ProgramSignatures) (plan : Plan)
+    (expected : Ty) (value : Value) :
+    value.validateTypeFuel 0 signatures plan expected = .outOfFuel := by
+  rw [Value.validateTypeFuel.eq_1]
 
 theorem zero_fuel_runTrusted (plan : Plan) (entry : Key)
     (arguments : List Value) (state : RuntimeState) :

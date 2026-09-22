@@ -122,6 +122,7 @@ private def expectProxyWord (label : String) : RunResult → IO Unit
 
 private def source : String := String.intercalate "\n" [
   "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
+  "enum StagedBox { Open(integer) }",
   "function sumTree(tree: Tree<Word>) returns (Word) {",
   "  match (tree) {",
   "    case .Leaf(value) { return value; }",
@@ -141,6 +142,9 @@ private def source : String := String.intercalate "\n" [
   "}",
   "function acceptTree(tree: Tree<Word>) returns (Word) {",
   "  return 13;",
+  "}",
+  "function acceptStagedBox(value: StagedBox) returns (Word) {",
+  "  return 17;",
   "}",
   "function tupleMatch() returns (Word) {",
   "  let tree: Tree<Word> = .Leaf(7);",
@@ -264,6 +268,22 @@ private def leafConstructor (dataType : ProgramDataSignature) :
   | constructors => throw (IO.userError
       s!"expected one Leaf constructor, found {constructors.length}")
 
+private def stagedBoxData (program : CheckedProgram) :
+    IO ProgramDataSignature :=
+  match program.signatures.dataTypes.filter fun dataType =>
+      dataType.name == "StagedBox" with
+  | [dataType] => pure dataType
+  | dataTypes => throw (IO.userError
+      s!"expected one StagedBox signature, found {dataTypes.length}")
+
+private def stagedBoxConstructor (dataType : ProgramDataSignature) :
+    IO ProgramDataConstructorSignature :=
+  match dataType.constructors.filter fun constructor =>
+      constructor.name == "Open" with
+  | [constructor] => pure constructor
+  | constructors => throw (IO.userError
+      s!"expected one StagedBox.Open constructor, found {constructors.length}")
+
 private def testNominalInputValidation (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "acceptTree"
   let dataType ← treeData program
@@ -295,6 +315,26 @@ private def testNominalInputValidation (program : CheckedProgram) : IO Unit := d
         "forged constructor failed for an unrelated input type"
   | result => throw (IO.userError
       s!"forged constructor input was not rejected: {reprStr result}")
+
+  let stagedPrepared ← prepareNamed program "acceptStagedBox"
+  let stagedData ← stagedBoxData program
+  let stagedConstructor ← stagedBoxConstructor stagedData
+  let stagedResultType := Ty.nominal stagedData.id []
+  let stagedInstantiation : SourceInference.DataConstructorInstantiation := {
+    constructor := stagedConstructor.id
+    parameterSubstitution := []
+    payloadTypes := stagedConstructor.payloadTypes
+    resultType := stagedResultType
+  }
+  match runPrepared stagedPrepared
+      [.constructed stagedInstantiation [.integer 13]] with
+  | .fault (.unsupportedStagedInput expected) { heap := [] } =>
+      assertTrue (decide (expected = stagedResultType))
+        "staged constructor input lost its authoritative nominal type"
+  | .fault error state => throw (IO.userError
+      s!"staged constructor input mutated state before rejection: {reprStr error}, {reprStr state}")
+  | result => throw (IO.userError
+      s!"staged constructor input was not rejected: {reprStr result}")
 
 private def expectPreExecutionFault (label : String)
     (accept : RuntimeError → Bool) : RunResult → IO Unit
