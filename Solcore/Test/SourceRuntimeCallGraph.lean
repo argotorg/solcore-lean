@@ -189,6 +189,19 @@ private def testExactCoreClosureFault : IO Unit := do
   | other => throw (IO.userError
       s!"embedded Core fault was erased at the exact boundary: {reprStr other}")
 
+private def testForgedCoreClosureResultRejected : IO Unit := do
+  let forged : Core.Value :=
+    .closure .word .word (.bool true) []
+  let result ← runNamedExact closureSource "invoke"
+    [forged, .word (word 7)] 128 preservedStore
+  match result with
+  | .runtime (.fault
+      (.resultTypeMismatch .word (some .bool)) store) =>
+      assertTrue (decide (store = preservedStore))
+        "forged Core closure result rejection lost its exact store"
+  | other => throw (IO.userError
+      s!"forged Core closure result escaped its declared type: {reprStr other}")
+
 private def globalValueSource : String := String.intercalate "\n" [
   "function increment(value: Word) returns (Word) { return value + 1; }",
   "function decrement(value: Word) returns (Word) { return value - 1; }",
@@ -298,6 +311,7 @@ def testSourceRuntimeCallGraph : IO Unit := do
   testMutualRecursion
   testLexicalClosures
   testExactCoreClosureFault
+  testForgedCoreClosureResultRejected
   testGlobalFunctionValues
   testErasedSourceArity
   testErasedUnitArity

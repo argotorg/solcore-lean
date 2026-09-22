@@ -381,6 +381,7 @@ inductive RuntimeError where
   | argumentArityMismatch (expected actual : Nat)
   | argumentTypeMismatch
       (index : Nat) (expected : Core.Ty) (actual : Option Core.Ty)
+  | resultTypeMismatch (expected : Core.Ty) (actual : Option Core.Ty)
   | nonCoreArgument (index : Nat)
   | coreFault (error : Core.MachineFault)
   deriving Repr, DecidableEq
@@ -419,7 +420,7 @@ private def applyValue
     (store : Core.Store) : RunResult :=
   let invoke
       (parameters : List Parameter)
-      (_resultType : Core.Ty)
+      (resultType : Core.Ty)
       (body : Expr)
       (captured : Environment) : RunResult :=
     let bundled := packValues arguments
@@ -430,7 +431,16 @@ private def applyValue
     else
       match unpackValues? parameters bundled with
       | some normalized =>
-          evaluateBody (bindParameters parameters normalized captured) store body
+          match evaluateBody
+              (bindParameters parameters normalized captured) store body with
+          | .done value finalStore =>
+              if value.type? program = some resultType then
+                .done value finalStore
+              else
+                .fault (.resultTypeMismatch resultType (value.type? program))
+                  finalStore
+          | .outOfFuel finalStore => .outOfFuel finalStore
+          | .fault error finalStore => .fault error finalStore
       | none =>
           .fault (.argumentArityMismatch parameters.length arguments.length) store
   match function with
@@ -441,7 +451,7 @@ private def applyValue
       | some definition =>
           invoke definition.parameters definition.resultType definition.body []
       | none => .fault (.unknownGlobal key) store
-  | .coreClosure parameterType _ body captured =>
+  | .coreClosure parameterType resultType body captured =>
       let bundled := packValues arguments
       if bundled.type? program != some parameterType then
         .fault (.argumentTypeMismatch 0 parameterType (bundled.type? program)) store
@@ -451,7 +461,12 @@ private def applyValue
         | some argument =>
             match Core.runStateful coreFuel
                 (Core.State.initial body (argument :: captured) store) with
-            | .done value finalStore => .done (.ofCore value) finalStore
+            | .done value finalStore =>
+                if value.type = resultType then
+                  .done (.ofCore value) finalStore
+                else
+                  .fault (.resultTypeMismatch resultType (some value.type))
+                    finalStore
             | .outOfFuel state => .outOfFuel state.store
             | .fault error state => .fault (.coreFault error) state.store
   | actual => .fault (.expectedFunction (actual.type? program)) store
