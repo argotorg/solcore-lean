@@ -197,6 +197,25 @@ theorem HasShallowTypes.write?
     exact replacement
   · exact typing selected old
 
+/-- Allocating a value whose shallow type agrees with the new cell preserves
+the heap invariant.  This is the heap step used by parameter and pattern
+binding in the evaluator. -/
+theorem HasShallowTypes.allocateValue
+    {plan : Plan} {state : RuntimeState}
+    (typing : state.HasShallowTypes plan) (type : Ty) (value : Value)
+    (typed : value.type? plan = some type) :
+    (state.allocate type (some value)).2.HasShallowTypes plan := by
+  intro selected member
+  simp only [RuntimeState.allocate] at member
+  rw [List.mem_append] at member
+  rcases member with old | fresh
+  · exact typing selected old
+  · simp only [List.mem_singleton] at fresh
+    subst selected
+    intro found equal
+    cases equal
+    exact typed
+
 end RuntimeState
 
 mutual
@@ -815,6 +834,31 @@ private def bindValues (plan : Plan) : Environment → RuntimeState →
         throw (.typeMismatch binder.scheme.body (value.type? plan))
       let (location, state) := state.allocate binder.scheme.body (some value)
       bindValues plan ((binder.id, location) :: environment) state rest
+
+/-- The successful parameter/pattern-binding path of the evaluator preserves
+shallow heap typing across every allocated binding cell. -/
+private theorem bindValues_ok_preserves_shallow_types
+    (plan : Plan) (bindings : List (TypedBinder × Value))
+    (environment finalEnvironment : Environment)
+    (state finalState : RuntimeState)
+    (typing : state.HasShallowTypes plan)
+    (bound : bindValues plan environment state bindings =
+      .ok (finalEnvironment, finalState)) :
+    finalState.HasShallowTypes plan := by
+  induction bindings generalizing environment state with
+  | nil =>
+      simp [bindValues] at bound
+      obtain ⟨rfl, rfl⟩ := bound
+      exact typing
+  | cons binding rest inductionHypothesis =>
+      obtain ⟨binder, value⟩ := binding
+      by_cases typed : value.type? plan = some binder.scheme.body
+      · simp [bindValues, typed, bne] at bound
+        exact inductionHypothesis _ _
+          (typing.allocateValue binder.scheme.body value typed) bound
+      · simp [bindValues, typed, bne] at bound
+        change Except.error _ = Except.ok (finalEnvironment, finalState) at bound
+        cases bound
 
 private def statementIds : List NodeId → Except RuntimeError (List StatementId)
   | [] => pure []

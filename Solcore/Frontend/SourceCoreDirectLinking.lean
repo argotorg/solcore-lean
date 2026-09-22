@@ -2121,30 +2121,118 @@ private def firstComptimeInput : Nat → List TypedBinder →
       if input.comptime then some (index, input.id)
       else firstComptimeInput (index + 1) inputs
 
+private def linkSeedUnchecked (program : CheckedProgram) (plan : Plan)
+    (temporaryBase stagedFuel : Nat) (key : SpecializationKey) :
+    Except Error LinkedEntry := do
+  let specialized ← exactSpecialization plan key
+  unless specialized.assumptions.isEmpty do
+    throw (.unresolvedAssumptions key specialized.assumptions)
+  match firstComptimeInput 0 specialized.function.typedBody.inputs with
+  | some (index, binder) =>
+      throw (.runtimeRootComptimeParameter key index binder)
+  | none => pure ()
+  if specialized.function.returnComptime then
+    throw (.runtimeRootComptimeResult key)
+  let expansionFuel := plan.specializations.length +
+    program.functions.length +
+    program.signatures.implementations.length + 1
+  let knownInputs := specialized.function.typedBody.inputs.map fun _ => none
+  let draft ← buildDraftFuel program plan key.declaration temporaryBase
+    [] [] knownInputs stagedFuel expansionFuel key
+  let elaborated ← draft.finalizeWith Error.sourceCore
+  pure { key, elaborated }
+
+private def linkSeed (program : CheckedProgram) (plan : Plan)
+    (temporaryBase stagedFuel : Nat) (key : SpecializationKey) :
+    Except Error LinkedEntry := do
+  let entry ← linkSeedUnchecked program plan temporaryBase stagedFuel key
+  let specialized ← exactSpecialization plan key
+  let expected ← (SourceCoreElaboration.lowerType
+    (.declaration specialized.function.declaration)
+    specialized.function.inferredBodyType).mapError Error.sourceCore
+  if entry.elaborated.returnType ≠ expected then
+    throw (.sourceCore {
+      site := .declaration specialized.function.declaration
+      reason := .returnTypeMismatch expected entry.elaborated.returnType
+    })
+  pure entry
+
+/-- A successful direct-Core seed carries exactly the Core lowering of its
+source specialization's inferred result type.  This check remains at the
+linker boundary even when a policy elaborator changes its implementation. -/
+theorem linkSeed_resultType (program : CheckedProgram) (plan : Plan)
+    (temporaryBase stagedFuel : Nat) (key : SpecializationKey)
+    (entry : LinkedEntry)
+    (accepted : linkSeed program plan temporaryBase stagedFuel key =
+      .ok entry) :
+    ∃ specialized : SpecializedFunction, ∃ expected : Core.Ty,
+      SourceCoreElaboration.lowerType
+        (.declaration specialized.function.declaration)
+        specialized.function.inferredBodyType = .ok expected ∧
+      entry.elaborated.returnType = expected ∧
+      specialized.key = key := by
+  unfold linkSeed at accepted
+  cases unchecked : linkSeedUnchecked program plan temporaryBase stagedFuel key with
+  | error error => simp [unchecked, bind, Except.bind] at accepted
+  | ok candidate =>
+      simp only [unchecked, bind, Except.bind] at accepted
+      cases found : exactSpecialization plan key with
+      | error error => simp [found] at accepted
+      | ok specialized =>
+          simp only [found] at accepted
+          cases lowered : SourceCoreElaboration.lowerType
+              (.declaration specialized.function.declaration)
+              specialized.function.inferredBodyType with
+          | error error => simp [lowered, Except.mapError] at accepted
+          | ok expected =>
+              simp only [lowered, Except.mapError] at accepted
+              split at accepted
+              · simp at accepted
+              · simp only [pure, Pure.pure, Except.pure] at accepted
+                injection accepted with same
+                subst entry
+                refine ⟨specialized, expected, lowered, ?_, ?_⟩
+                · exact Classical.byContradiction
+                    ‹¬candidate.elaborated.returnType ≠ expected›
+                · unfold exactSpecialization at found
+                  cases lookup : lookupSpecialization? plan key with
+                  | none => simp [lookup] at found
+                  | some actual =>
+                      simp [lookup] at found
+                      subst actual
+                      unfold lookupSpecialization? at lookup
+                      have accepted := List.find?_some lookup
+                      exact of_decide_eq_true accepted
+
 private def linkSeeds (program : CheckedProgram) (plan : Plan)
     (temporaryBase stagedFuel : Nat) : List SpecializationKey →
       Except Error (List LinkedEntry)
   | [] => pure []
   | key :: rest => do
-      let specialized ← exactSpecialization plan key
-      unless specialized.assumptions.isEmpty do
-        throw (.unresolvedAssumptions key specialized.assumptions)
-      match firstComptimeInput 0 specialized.function.typedBody.inputs with
-      | some (index, binder) =>
-          throw (.runtimeRootComptimeParameter key index binder)
-      | none => pure ()
-      if specialized.function.returnComptime then
-        throw (.runtimeRootComptimeResult key)
-      let expansionFuel := plan.specializations.length +
-        program.functions.length +
-        program.signatures.implementations.length + 1
-      let knownInputs :=
-        specialized.function.typedBody.inputs.map fun _ => none
-      let draft ← buildDraftFuel program plan key.declaration temporaryBase
-        [] [] knownInputs stagedFuel expansionFuel key
-      let elaborated ← draft.finalizeWith Error.sourceCore
-      pure ({ key, elaborated } ::
+      let entry ← linkSeed program plan temporaryBase stagedFuel key
+      pure (entry ::
         (← linkSeeds program plan temporaryBase stagedFuel rest))
+
+theorem linkSeeds_singleton_resultType (program : CheckedProgram)
+    (plan : Plan) (temporaryBase stagedFuel : Nat)
+    (key : SpecializationKey) (entry : LinkedEntry)
+    (accepted : linkSeeds program plan temporaryBase stagedFuel [key] =
+      .ok [entry]) :
+    ∃ specialized : SpecializedFunction, ∃ expected : Core.Ty,
+      SourceCoreElaboration.lowerType
+        (.declaration specialized.function.declaration)
+        specialized.function.inferredBodyType = .ok expected ∧
+      entry.elaborated.returnType = expected ∧
+      specialized.key = key := by
+  simp only [linkSeeds] at accepted
+  cases linked : linkSeed program plan temporaryBase stagedFuel key with
+  | error error => simp [linked, bind, Except.bind] at accepted
+  | ok candidate =>
+      simp only [linked, bind, Except.bind, pure, Pure.pure, Except.pure]
+        at accepted
+      cases accepted
+      exact linkSeed_resultType program plan temporaryBase stagedFuel key
+        entry linked
 
 /-- Link every seed with an explicit staged-call depth budget.  Runtime draft
 expansion retains its independent catalog-derived bound. -/
@@ -2160,6 +2248,36 @@ def linkWithStagingFuel (program : CheckedProgram)
     entries := ← linkSeeds program plan (freshBase plan) stagedFuel
       plan.seedKeys
   }
+
+/-- The public one-root direct-Core linker certifies that its result type is
+the lowering of the checked specialization's inferred source result type. -/
+theorem linkWithStagingFuel_singleton_resultType
+    (program : CheckedProgram) (plan : Plan) (stagedFuel : Nat)
+    (key : SpecializationKey) (entry : LinkedEntry)
+    (seed : plan.seedKeys = [key])
+    (linked : linkWithStagingFuel program (.complete plan) stagedFuel =
+      .ok { entries := [entry] }) :
+    ∃ specialized : SpecializedFunction, ∃ expected : Core.Ty,
+      SourceCoreElaboration.lowerType
+        (.declaration specialized.function.declaration)
+        specialized.function.inferredBodyType = .ok expected ∧
+      entry.elaborated.returnType = expected ∧
+      specialized.key = key := by
+  unfold linkWithStagingFuel at linked
+  simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at linked
+  cases valid : validatePlan program plan with
+  | error error => simp [valid] at linked
+  | ok checked =>
+      simp only [valid, seed] at linked
+      cases seeds : linkSeeds program plan (freshBase plan) stagedFuel [key] with
+      | error error => simp [seeds] at linked
+      | ok entries =>
+          simp only [seeds] at linked
+          injection linked with equalEntries
+          injection equalEntries with entriesEq
+          subst entries
+          exact linkSeeds_singleton_resultType program plan (freshBase plan)
+            stagedFuel key entry seeds
 
 /-- Compatibility linker with the default public staged-evaluation budget. -/
 def link (program : CheckedProgram)

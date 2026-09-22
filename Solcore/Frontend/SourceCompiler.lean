@@ -86,6 +86,9 @@ inductive CompileError where
   | rootSpecializationCountMismatch
       (key : SourceSpecialization.SpecializationKey) (actual : Nat)
   | backendEntryCountMismatch (backend : Backend) (actual : Nat)
+  | publicCoreResultProjection (error : SourceCoreElaboration.Error)
+  | publicCoreResultMismatch (expected actual : Core.Ty)
+  | publicGraphResultMismatch (expected actual : Ty)
   | noBackend (failures : BackendFailures)
   deriving Repr
 
@@ -96,6 +99,16 @@ private inductive Executable where
   | callGraph (entry : SourceRuntimeLinking.LinkedEntry)
   | typedSource
   deriving Repr
+
+private def Executable.HasPublicResultProjection
+    (root : SourceSpecialization.SpecializedFunction) : Executable → Prop
+  | .core entry =>
+      SourceCoreElaboration.lowerType
+        (.declaration root.declaration) root.function.inferredBodyType =
+          .ok entry.elaborated.returnType
+  | .callGraph entry =>
+      root.function.inferredBodyType = entry.sourceBodyType
+  | .typedSource => True
 
 /-- A checked, canonically specialized, reusable single-root artifact.  The
 private constructor prevents callers from pairing an arbitrary plan and root. -/
@@ -145,6 +158,38 @@ a specialization table. This does not validate a closure body or heap. -/
 def TypedValueHasResultType (compiled : CompiledEntry)
     (value : SourceTypedRuntime.Value) : Prop :=
   value.type? compiled.plan = some compiled.resultType
+
+/-- The selected backend's result projection agrees with the public source
+result type.  Compilation checks this separately from runtime result typing:
+the latter alone would only refer to a backend-native declaration. -/
+def HasPublicResultProjection (compiled : CompiledEntry) : Prop :=
+  compiled.executable.HasPublicResultProjection compiled.root
+
+/-- Deep direct-Core result/store typing expressed against the compiler's
+public source result type rather than only the linker's private return type. -/
+def CoreResultHasPublicType (compiled : CompiledEntry)
+    (value : Core.Value) (finalStore : Core.Store) : Prop :=
+  match compiled.executable with
+  | .core _ =>
+      ∃ publicType,
+        SourceCoreElaboration.lowerType
+          (.declaration compiled.root.declaration) compiled.resultType =
+            .ok publicType ∧
+        ∃ finalWorld,
+          Core.StoreHasTypes finalWorld finalStore ∧
+            Core.RuntimeValueHasType finalWorld value publicType
+  | .callGraph _ | .typedSource => False
+
+/-- The finite graph's shallow value tag is the projection of the compiler's
+public result type, in the selected checked runtime table. -/
+def GraphValueHasPublicType (compiled : CompiledEntry)
+    (value : SourceRuntime.Value) : Prop :=
+  match compiled.executable with
+  | .callGraph entry =>
+      ∃ publicType,
+        SourceRuntimeLinking.lowerType compiled.resultType = .ok publicType ∧
+          SourceRuntime.Value.HasType entry.program.program value publicType
+  | .core _ | .typedSource => False
 
 end CompiledEntry
 
@@ -377,6 +422,56 @@ private def selectBackend (program : CheckedProgram)
               typedSource := typedSourceError
             })
 
+/-- Guard the public result signature against an inconsistent linker payload.
+The graph entry separately certifies projection from its source type to its
+Core result type; here we identify that source type with the canonical root. -/
+private def validatePublicResultType
+    (root : SourceSpecialization.SpecializedFunction)
+    (executable : Executable) : Except CompileError Unit := do
+  match executable with
+  | .core entry =>
+      let projected ← (SourceCoreElaboration.lowerType
+          (.declaration root.declaration) root.function.inferredBodyType)
+        |>.mapError CompileError.publicCoreResultProjection
+      if projected = entry.elaborated.returnType then
+        pure ()
+      else
+        throw (.publicCoreResultMismatch projected
+          entry.elaborated.returnType)
+  | .callGraph entry =>
+      if root.function.inferredBodyType = entry.sourceBodyType then
+        pure ()
+      else
+        throw (.publicGraphResultMismatch root.function.inferredBodyType
+          entry.sourceBodyType)
+  | .typedSource => pure ()
+
+private theorem validatePublicResultType_correct
+    (root : SourceSpecialization.SpecializedFunction)
+    (executable : Executable)
+    (accepted : validatePublicResultType root executable = .ok ()) :
+    executable.HasPublicResultProjection root := by
+  cases executable with
+  | core entry =>
+      simp only [Executable.HasPublicResultProjection]
+      cases projection : SourceCoreElaboration.lowerType
+          (.declaration root.declaration) root.function.inferredBodyType with
+      | error error =>
+          simp [validatePublicResultType, projection, Except.mapError,
+            bind, Except.bind] at accepted
+      | ok projected =>
+          by_cases same : projected = entry.elaborated.returnType
+          · exact congrArg Except.ok same
+          · simp [validatePublicResultType, projection, same,
+              Except.mapError, bind, Except.bind] at accepted
+  | callGraph entry =>
+      simp only [Executable.HasPublicResultProjection]
+      by_cases same : root.function.inferredBodyType = entry.sourceBodyType
+      · exact same
+      · simp [validatePublicResultType, same] at accepted
+  | typedSource =>
+      trivial
+
 /-- Compile one explicit root from an already checked program.  This is the
 compile-once path for clients which prepare several entries from one catalog. -/
 def compileChecked (program : CheckedProgram) (seed : Seed)
@@ -393,6 +488,7 @@ def compileChecked (program : CheckedProgram) (seed : Seed)
     |>.mapError CompileError.invalidPlan
   let root ← exactRoot plan
   let executable ← selectBackend program plan options.stagingFuel
+  validatePublicResultType root executable
   pure ⟨program, plan, root, executable⟩
 
 /-- Every artifact returned by the public checked compilation path retains its
@@ -441,8 +537,75 @@ theorem compileChecked_hasCanonicalRoot
                           cases compiledOk
                       | ok executable =>
                           rw [backend] at compiledOk
+                          simp at compiledOk
+                          cases publicResult : validatePublicResultType root
+                              executable with
+                          | error error =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                          | ok checkedResult =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                              exact exactRoot_specializations plan root selected
+
+/-- The public result type is certified against the backend selected by every
+successful checked compilation, including fallback to the finite graph. -/
+theorem compileChecked_hasPublicResultProjection
+    (program : CheckedProgram) (seed : Seed) (options : CompileOptions)
+    (compiled : CompiledEntry)
+    (compiledOk : compileChecked program seed options = .ok compiled) :
+    compiled.HasPublicResultProjection := by
+  unfold compileChecked at compiledOk
+  cases seedResult : SourceProgramExecution.resolveSeed program seed with
+  | error error =>
+      rw [seedResult] at compiledOk
+      cases compiledOk
+  | ok request =>
+      rw [seedResult] at compiledOk
+      simp only [Except.mapError, bind, Except.bind] at compiledOk
+      cases worklist : SourceSpecializationWorklist.run program [request]
+          options.specializationBudget with
+      | error error =>
+          rw [worklist] at compiledOk
+          cases compiledOk
+      | ok outcome =>
+          rw [worklist] at compiledOk
+          cases outcome with
+          | budgetExhausted plan next pending =>
+              cases compiledOk
+          | complete plan =>
+              simp only [pure, Pure.pure, Except.pure] at compiledOk
+              cases valid : SourceCoreDirectLinking.validatePlan program plan with
+              | error error =>
+                  rw [valid] at compiledOk
+                  cases compiledOk
+              | ok checked =>
+                  rw [valid] at compiledOk
+                  cases selected : exactRoot plan with
+                  | error error =>
+                      rw [selected] at compiledOk
+                      cases compiledOk
+                  | ok root =>
+                      rw [selected] at compiledOk
+                      cases backend : selectBackend program plan
+                          options.stagingFuel with
+                      | error error =>
+                          rw [backend] at compiledOk
                           cases compiledOk
-                          exact exactRoot_specializations plan root selected
+                      | ok executable =>
+                          rw [backend] at compiledOk
+                          simp at compiledOk
+                          cases publicResult : validatePublicResultType root
+                              executable with
+                          | error error =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                          | ok checkedResult =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                              simpa [CompiledEntry.HasPublicResultProjection]
+                                using validatePublicResultType_correct root
+                                  executable publicResult
 
 /-- Successful compilation preserves the exact canonical identity obtained by
 resolving the caller's seed.  In particular, backend fallback cannot swap the
@@ -502,8 +665,16 @@ theorem compileChecked_key_of_resolved (program : CheckedProgram) (seed : Seed)
                       cases compiledOk
                   | ok backend =>
                       rw [executable] at compiledOk
-                      cases compiledOk
-                      exact rootKey
+                      simp at compiledOk
+                      cases publicResult : validatePublicResultType root
+                          backend with
+                      | error error =>
+                          rw [publicResult] at compiledOk
+                          cases compiledOk
+                      | ok checkedResult =>
+                          rw [publicResult] at compiledOk
+                          cases compiledOk
+                          exact rootKey
 
 /-- Check a raw workspace and compile one explicit root. -/
 def compile (raw : Workspace.RawWorkspace) (seed : Seed)

@@ -526,6 +526,15 @@ Those state/value invariants and backend-to-public-source signature coherence
 are the next proof obligations; validator completeness remains independently
 deferred.
 
+ADR-0375 resolves the backend-to-public-result signature obligation for the
+three selected compiler paths. Direct-Core and finite-graph linkers validate
+their result projections, graph entries certify the checked table signature,
+and successful compilation proves projection agreement with the canonical
+public root. Deep Core results and shallow graph results are now stated at
+that public result projection. Successful typed-runtime argument/pattern
+binding preserves shallow heap-cell typing. Recursive closure/store validity
+and evaluator-wide typed-heap preservation remain the next proof tranches.
+
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
 expression and statement nodes; complete selected declaration instantiations;

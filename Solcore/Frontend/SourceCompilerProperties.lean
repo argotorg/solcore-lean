@@ -235,6 +235,75 @@ theorem CompiledEntry.runTyped_done_has_public_resultType
         CompiledEntry.SuccessfulResultHasNativeType,
         CompiledEntry.resultType] using native
 
+/-- The deep direct-Core preservation result uses the compiler's public source
+result type once its checked backend projection is supplied. -/
+theorem CompiledEntry.run_core_done_has_public_resultType
+    (compiled : CompiledEntry) (arguments : List Core.Value)
+    (store : Core.Store) (options : RunOptions)
+    {value : Core.Value} {finalStore : Core.Store}
+    (projection : compiled.HasPublicResultProjection)
+    (precondition : compiled.PreservationPrecondition
+      (.coreValues arguments store))
+    (ran : compiled.run (.coreValues arguments store) options =
+      .ok (.core (.done value finalStore))) :
+    compiled.CoreResultHasPublicType value finalStore := by
+  have native := compiled.run_core_done_preserves_type arguments store
+    options precondition ran
+  cases compiled
+  rename_i program plan root executable
+  cases executable with
+  | core entry =>
+      change SourceCoreElaboration.lowerType
+        (.declaration root.declaration) root.function.inferredBodyType =
+          .ok entry.elaborated.returnType at projection
+      simp only [CompiledEntry.SuccessfulResultHasNativeType] at native
+      obtain ⟨finalWorld, storeTyped, valueTyped⟩ := native
+      simp only [CompiledEntry.CoreResultHasPublicType,
+        CompiledEntry.resultType]
+      exact ⟨entry.elaborated.returnType, projection, finalWorld,
+        storeTyped, valueTyped⟩
+  | callGraph entry =>
+      simp only [CompiledEntry.SuccessfulResultHasNativeType] at native
+  | typedSource =>
+      simp only [CompiledEntry.PreservationPrecondition] at precondition
+
+/-- A successful selected graph result has the projection of the compiler's
+public source result type, not merely an unrelated runtime-table tag. -/
+theorem CompiledEntry.run_callGraph_done_has_public_resultType
+    (compiled : CompiledEntry) (invocation : Invocation)
+    (options : RunOptions) {value : SourceRuntime.Value}
+    {finalStore : Core.Store}
+    (backend : compiled.backend = .callGraph)
+    (projection : compiled.HasPublicResultProjection)
+    (ran : compiled.run invocation options =
+      .ok (.callGraph (.done value finalStore))) :
+    compiled.GraphValueHasPublicType value := by
+  have native := compiled.run_callGraph_done_preserves_type invocation
+    options ran
+  cases compiled
+  rename_i program plan root executable
+  cases executable with
+  | core entry =>
+      simp [CompiledEntry.backend] at backend
+  | callGraph entry =>
+      simp only [CompiledEntry.SuccessfulResultHasNativeType,
+        CompiledEntry.GraphResultHasType] at native
+      obtain ⟨signature, selected, valueTyped⟩ := native
+      obtain ⟨entrySignature, entrySelected, entryResult⟩ :=
+        entry.signatureResultType
+      have sameSignature : signature = entrySignature := by
+        rw [entrySelected] at selected
+        exact (Option.some.inj selected).symm
+      subst signature
+      change root.function.inferredBodyType = entry.sourceBodyType at projection
+      simp only [CompiledEntry.GraphValueHasPublicType,
+        CompiledEntry.resultType]
+      refine ⟨entry.resultType, ?_, ?_⟩
+      · simpa [projection] using entry.resultType_eq_source
+      · simpa [entryResult] using valueTyped
+  | typedSource =>
+      simp [CompiledEntry.backend] at backend
+
 /-- Whole-compiler successful-result preservation.  One theorem now covers
 all three selected runtimes without erasing their native value/store domains.
 The precondition is substantial only for direct Core (deep values/store) and
@@ -412,6 +481,59 @@ theorem compile_hasCanonicalRoot
       simp only [Except.mapError, bind, Except.bind] at compiledOk
       exact compileChecked_hasCanonicalRoot program seed
         options.toCompileOptions compiled compiledOk
+
+/-- Raw-workspace compilation retains the same public/backend result-type
+projection certificate as checked-program compilation. -/
+theorem compile_hasPublicResultProjection
+    (raw : Workspace.RawWorkspace) (seed : Seed) (options : CheckingOptions)
+    (compiled : CompiledEntry)
+    (compiledOk : compile raw seed options = .ok compiled) :
+    compiled.HasPublicResultProjection := by
+  unfold compile at compiledOk
+  cases checked : checkProgram raw options.checkingFuel with
+  | error errors =>
+      rw [checked] at compiledOk
+      cases compiledOk
+  | ok program =>
+      rw [checked] at compiledOk
+      simp only [Except.mapError, bind, Except.bind] at compiledOk
+      exact compileChecked_hasPublicResultProjection program seed
+        options.toCompileOptions compiled compiledOk
+
+/-- A compiler-produced direct-Core entry returns a deeply typed value and
+final store at the public source result projection. -/
+theorem compileChecked_runCore_done_has_public_resultType
+    (program : CheckedProgram) (seed : Seed)
+    (compileOptions : CompileOptions) (compiled : CompiledEntry)
+    (compiledOk : compileChecked program seed compileOptions = .ok compiled)
+    (arguments : List Core.Value) (store : Core.Store)
+    (runOptions : RunOptions) {value : Core.Value}
+    {finalStore : Core.Store}
+    (precondition : compiled.PreservationPrecondition
+      (.coreValues arguments store))
+    (ran : compiled.runCore arguments runOptions store =
+      .ok (.core (.done value finalStore))) :
+    compiled.CoreResultHasPublicType value finalStore := by
+  exact compiled.run_core_done_has_public_resultType arguments store
+    runOptions (compileChecked_hasPublicResultProjection program seed
+      compileOptions compiled compiledOk) precondition ran
+
+/-- A compiler-produced finite graph entry returns a value whose checked
+runtime tag is the projection of the public source result type. -/
+theorem compileChecked_runGraph_done_has_public_resultType
+    (program : CheckedProgram) (seed : Seed)
+    (compileOptions : CompileOptions) (compiled : CompiledEntry)
+    (compiledOk : compileChecked program seed compileOptions = .ok compiled)
+    (backend : compiled.backend = .callGraph)
+    (invocation : Invocation) (runOptions : RunOptions)
+    {value : SourceRuntime.Value} {finalStore : Core.Store}
+    (ran : compiled.run invocation runOptions =
+      .ok (.callGraph (.done value finalStore))) :
+    compiled.GraphValueHasPublicType value := by
+  exact compiled.run_callGraph_done_has_public_resultType invocation
+    runOptions backend
+    (compileChecked_hasPublicResultProjection program seed compileOptions
+      compiled compiledOk) ran
 
 /-- For a compiler-produced typed backend, the root provenance required by
 the backend-native preservation theorem is automatic. -/

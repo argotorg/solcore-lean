@@ -6671,8 +6671,19 @@ Graph result tags do not validate source-native closure bodies, captures or
 final stores; typed-source tags do not recursively validate mappings,
 constructors, captured locations or the final heap. A shallow per-cell heap
 invariant and primitive state-operation lemmas now provide a typed-runtime
-foundation. Backend-native Core result types also still need a proven bridge
-to the compiler's public source `resultType`.
+foundation. At the ADR-0374 boundary, backend-native Core result types still
+needed a proven bridge to the compiler's public source `resultType`.
+
+ADR-0375 closes that public result-signature bridge for successful compilation.
+The direct-Core linker checks its inferred source result projection against the
+elaborated return type; finite-graph entries certify both their source-to-Core
+projection and the selected runtime signature. The compiler checks the chosen
+entry against the canonical public root and proves that every compiled artifact
+has a public result projection. Successful direct-Core results therefore carry
+deep value/final-store typing at the public projection, while successful graph
+results carry its shallow checked-table tag. Source-typed `bindValues` now
+preserves the shallow heap-cell invariant. Deep graph closure/store validity
+and typed evaluator-wide heap preservation remain open.
 
 ## What is not yet claimed
 

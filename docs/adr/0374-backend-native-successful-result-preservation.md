@@ -108,6 +108,9 @@ binding, place updates, calls, and control flow.  Once those two state theorems
 exist, backend/public-signature coherence can close the fully deep
 whole-language subject-reduction statement.
 
+ADR-0375 subsequently closes the public result-signature portion and the
+shallow binding-heap step; the deep graph and typed-state obligations remain.
+
 ## Verification target
 
 The focused runtime, linker, compiler, and typed-runtime modules, their runtime

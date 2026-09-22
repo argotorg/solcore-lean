@@ -91,15 +91,37 @@ inductive Error where
   | missingElseBranch (occurrence : StatementId)
   | statementFallthrough (owner : Resolved.DeclarationId)
   | runtimeType (error : SourceRuntime.TypeError)
+  | linkedResultTypeMismatch (key : Key) (source runtime : Core.Ty)
   | publicResultUnsupported (type : Core.Ty)
   | compatibilitySourceCore (error : SourceCoreElaboration.Error)
   deriving Repr
+
+/-- The structural source-to-Core projection admitted by the finite call-graph
+linker.  Unlike direct Core lowering, this projection also admits function
+types for runtime globals and closures. -/
+def lowerType : Ty → Except Error Core.Ty
+  | .constructor (.builtin .unit) => pure .unit
+  | .constructor (.builtin .bool) => pure .bool
+  | .constructor (.builtin .word) => pure .word
+  | .product left right => do
+      pure (.product (← lowerType left) (← lowerType right))
+  | .function parameter result => do
+      pure (.function (← lowerType parameter) (← lowerType result))
+  | type => throw (.unsupportedType type)
 
 structure LinkedEntry where
   key : Key
   inputs : RuntimeContext
   resultType : Core.Ty
+  /-- The inferred result type of the specialization selected by `key`. -/
+  sourceBodyType : Ty
+  /-- A public certificate that the entry result uses that source type. -/
+  resultType_eq_source : lowerType sourceBodyType = .ok resultType
   program : SourceRuntime.CheckedProgram
+  /-- The executable table exposes this same result type at the entry key. -/
+  signatureResultType : ∃ signature,
+    program.entrySignature? key = some signature ∧
+    signature.resultType = resultType
   deriving Repr
 
 structure LinkedProgram where
@@ -115,19 +137,6 @@ private structure Context where
   plan : Plan
   specialized : SourceSpecialization.SpecializedFunction
   source : TypedSource
-
-/-- The structural source-to-Core projection admitted by the finite call-graph
-linker.  Unlike direct Core lowering, this projection also admits function
-types for runtime globals and closures. -/
-def lowerType : Ty → Except Error Core.Ty
-  | .constructor (.builtin .unit) => pure .unit
-  | .constructor (.builtin .bool) => pure .bool
-  | .constructor (.builtin .word) => pure .word
-  | .product left right => do
-      pure (.product (← lowerType left) (← lowerType right))
-  | .function parameter result => do
-      pure (.function (← lowerType parameter) (← lowerType result))
-  | type => throw (.unsupportedType type)
 
 private def lowerBinder (source : TypedSource) (binder : TypedBinder) :
     Except Error SourceRuntime.Parameter := do
@@ -522,7 +531,8 @@ end
 
 private def lowerDefinition (program : CheckedProgram) (plan : Plan)
     (specialized : SourceSpecialization.SpecializedFunction) :
-    Except Error SourceRuntime.Definition := do
+    Except Error { definition : SourceRuntime.Definition //
+      lowerType specialized.function.inferredBodyType = .ok definition.resultType } := do
   unless specialized.assumptions.isEmpty do
     throw (.unresolvedAssumptions specialized.key specialized.assumptions)
   let function := specialized.function
@@ -534,34 +544,50 @@ private def lowerDefinition (program : CheckedProgram) (plan : Plan)
     throw (.comptimeContract specialized.key parameterComptime
       function.returnComptime)
   let parameters ← source.inputs.mapM (lowerBinder source)
-  let resultType ← lowerType function.inferredBodyType
-  let roots ← statementRoots source.roots
-  let context : Context := { program, plan, specialized, source }
-  let lowered ← lowerStatementsFuel context parameters resultType
-    (source.nodes.length + 1) roots
-  let expectedRequirements := function.solvedRequirements.map (·.id)
-  if lowered.consumed != expectedRequirements then
-    throw (.requirementsMismatch specialized.key expectedRequirements
-      lowered.consumed)
-  pure {
-    key := specialized.key
-    parameters
-    resultType
-    body := lowered.expr
-  }
+  match projection : lowerType function.inferredBodyType with
+  | .error error => throw error
+  | .ok resultType =>
+      let roots ← statementRoots source.roots
+      let context : Context := { program, plan, specialized, source }
+      let lowered ← lowerStatementsFuel context parameters resultType
+        (source.nodes.length + 1) roots
+      let expectedRequirements := function.solvedRequirements.map (·.id)
+      if lowered.consumed != expectedRequirements then
+        throw (.requirementsMismatch specialized.key expectedRequirements
+          lowered.consumed)
+      let definition : SourceRuntime.Definition := {
+        key := specialized.key
+        parameters
+        resultType
+        body := lowered.expr
+      }
+      pure ⟨definition, by
+        simpa only [definition] using projection⟩
 
 private def linkedEntry (checked : SourceRuntime.CheckedProgram)
     (plan : Plan) (key : Key) : Except Error LinkedEntry := do
-  let _ ← exactSpecialization plan key
-  let definition ← match checked.program.findDefinition? key with
-    | some definition => pure definition
-    | none => throw (.missingSpecialization key)
-  pure {
-    key
-    inputs := definition.parameters
-    resultType := definition.resultType
-    program := checked
-  }
+  let specialized ← exactSpecialization plan key
+  match found : checked.program.findDefinition? key with
+  | none => throw (.missingSpecialization key)
+  | some definition =>
+      match projected : lowerType specialized.function.inferredBodyType with
+      | .error error => throw error
+      | .ok sourceResultType =>
+          if sameType : definition.resultType = sourceResultType then
+            pure {
+              key
+              inputs := definition.parameters
+              resultType := definition.resultType
+              sourceBodyType := specialized.function.inferredBodyType
+              resultType_eq_source := by simpa only [sameType] using projected
+              program := checked
+              signatureResultType := by
+                refine ⟨definition.signature, ?_, rfl⟩
+                simp [SourceRuntime.CheckedProgram.entrySignature?,
+                  SourceRuntime.Program.findSignature?, found]
+            }
+          else
+            throw (.linkedResultTypeMismatch key sourceResultType definition.resultType)
 
 /-- Lower every canonical specialization once, check the complete table under
 all signatures simultaneously, and recover entries in seed order. -/
@@ -574,7 +600,9 @@ def link (program : CheckedProgram)
         throw (.budgetExhausted next pending.length)
   SourceCoreDirectLinking.validatePlan program plan
     |>.mapError Error.invalidPlan
-  let definitions ← plan.specializations.mapM (lowerDefinition program plan)
+  let definitions ← plan.specializations.mapM fun specialized => do
+    let certified ← lowerDefinition program plan specialized
+    pure certified.val
   let checked ← ({ definitions } : SourceRuntime.Program).check
     |>.mapError Error.runtimeType
   pure {
