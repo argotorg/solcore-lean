@@ -166,12 +166,12 @@ private def testGenericCoercionEvidenceForwarded : IO Unit := do
         some (.done (.word (word 41)) store)))
     "generic coercion evidence was not forwarded through the staged call"
 
-private def expectRecursiveCall (label content root : String)
+private def expectStagedCycle (label content root : String)
     (budget : Nat) : IO Unit := do
   let moduleId ← mainModule
   match prepare (workspace content) (Seed.named moduleId root)
       (limits budget) with
-  | .error (.linking (.recursiveCallCycle _)) => pure ()
+  | .error (.linking (.stagedInvocationCycle _)) => pure ()
   | result => throw (IO.userError
       s!"{label}: recursive staged call was not rejected: {reprStr result}")
 
@@ -204,11 +204,18 @@ private def eagerRecursiveSource : String := String.intercalate "\n" [
   "}"
 ]
 
-private def testRecursiveRejections : IO Unit := do
-  expectRecursiveCall "self recursion" selfRecursiveSource "entry" 2
-  expectRecursiveCall "mutual recursion" mutualRecursiveSource "entry" 3
-  expectRecursiveCall "eager unselected recursion" eagerRecursiveSource
-    "entry" 3
+private def testRecursiveBoundaries : IO Unit := do
+  expectStagedCycle "self recursion" selfRecursiveSource "entry" 2
+  expectStagedCycle "mutual recursion" mutualRecursiveSource "entry" 3
+  let moduleId ← mainModule
+  let prepared ← match prepare (workspace eagerRecursiveSource)
+      (Seed.named moduleId "entry") (limits 3) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"unselected staged recursion was executed: {reprStr error}")
+  assertTrue (decide (prepared.run? [] 64 =
+      some (.done (.word (word 1)) [])))
+    "selected staged branch did not retain its value"
 
 private def deepAcyclicSource : String := String.intercalate "\n" [
   "function leaf(comptime value: Word) returns (comptime<Word>) {",
@@ -457,16 +464,17 @@ private def testUnavailableKnownInputsRejected : IO Unit := do
   | result => throw (IO.userError
       s!"deferred actual was promoted to a known comptime input: {reprStr result}")
 
-/-- Fix proof-only evidence forwarding, staged coercion execution, eager
-recursion rejection, ordinary evidence-let compatibility, known/unavailable
-runtime-draft staging, mixed runtime inputs, structural values, and successful
-finite evaluation of a sufficiently budgeted acyclic chain. -/
+/-- Fix proof-only evidence forwarding, staged coercion execution, exact
+staged-cycle rejection, selected-branch recursion, ordinary evidence-let
+compatibility, known/unavailable runtime-draft staging, mixed runtime inputs,
+structural values, and successful finite evaluation of a sufficiently
+budgeted acyclic chain. -/
 def testSourceStagedValueCallsTamper : IO Unit := do
   testPredicateEvidenceForwarded
   testResultCoercionExecuted
   testArgumentAndResultCoercions
   testGenericCoercionEvidenceForwarded
-  testRecursiveRejections
+  testRecursiveBoundaries
   testDeepAcyclicCall
   testOrdinaryEvidenceLetPreserved
   testIndependentComptimeInputDraft

@@ -422,7 +422,7 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
   | .error error => throw (IO.userError
       s!"marked Word result was not materialized: {reprStr error}")
 
-private def expectRecursiveCall (label source root expected : String)
+private def expectStagedCycle (label source root expected : String)
     (budget : Nat) : IO Unit := do
   let program ← checkedProgram source
   let expectedSignature ← signatureNamed program expected
@@ -430,13 +430,13 @@ private def expectRecursiveCall (label source root expected : String)
   let moduleId ← mainModule
   match prepare (workspace source) (Seed.named moduleId root)
       (limits budget) with
-  | .error (.linking (.recursiveCallCycle key)) =>
+  | .error (.linking (.stagedInvocationCycle key)) =>
       assertTrue (key == expectedKey)
         s!"{label}: recursion error retained the wrong key {reprStr key}"
   | result => throw (IO.userError
       s!"{label}: recursive staged call was not rejected: {reprStr result}")
 
-private def testRecursiveRejections : IO Unit := do
+private def testRecursiveBoundaries : IO Unit := do
   let selfSource := String.intercalate "\n" [
     "function loop(comptime x: integer) returns (comptime<integer>) { return loop(x); }",
     "function main() returns (Word) { return wordFromInteger(loop(1)); }"
@@ -453,7 +453,7 @@ private def testRecursiveRejections : IO Unit := do
         "self-recursive plan did not remain finite and explicit"
   | outcome => throw (IO.userError
       s!"self-recursive plan did not close: {reprStr outcome}")
-  expectRecursiveCall "self recursion" selfSource "main" "loop" 2
+  expectStagedCycle "self recursion" selfSource "main" "loop" 2
 
   let mutualSource := String.intercalate "\n" [
     "function left(comptime x: integer) returns (comptime<integer>) { return right(x); }",
@@ -469,7 +469,7 @@ private def testRecursiveRejections : IO Unit := do
         "mutual-recursive plan lost a specialization or edge"
   | outcome => throw (IO.userError
       s!"mutual-recursive plan did not close: {reprStr outcome}")
-  expectRecursiveCall "mutual recursion" mutualSource "main" "left" 3
+  expectStagedCycle "mutual recursion" mutualSource "main" "left" 3
 
   let deadSource := String.intercalate "\n" [
     "function dec(comptime x: integer) returns (comptime<integer>) { return integerSub(x, 1); }",
@@ -478,8 +478,15 @@ private def testRecursiveRejections : IO Unit := do
     "  return wordFromInteger(true ? dec(10) : loop(0));",
     "}"
   ]
-  expectRecursiveCall "unselected recursive branch" deadSource "main"
-    "loop" 3
+  let moduleId ← mainModule
+  let prepared ← match prepare (workspace deadSource)
+      (Seed.named moduleId "main") (limits 3) with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"unselected recursive branch was executed: {reprStr error}")
+  assertTrue (decide (prepared.run? [] 64 =
+      some (.done (.word (Core.Word.ofNatModulo 9)) [])))
+    "unselected recursive branch changed the selected staged value"
 
 /-- Exercise direct integer source calls through planning, linking, and execution. -/
 def testSourceStagedIntegerCalls : IO Unit := do
@@ -489,7 +496,7 @@ def testSourceStagedIntegerCalls : IO Unit := do
   testPublicExecution
   testIntegerRootBoundary
   testRuntimeComptimeBoundaries
-  testRecursiveRejections
+  testRecursiveBoundaries
   IO.println "staged integer source-call checks GREEN"
 
 end Tests.SourceStagedIntegerCalls
