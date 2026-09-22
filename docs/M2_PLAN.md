@@ -474,6 +474,31 @@ backend policy, source or closure wire formats, a public source Oracle, general
 typed-runtime evidence dispatch, storage/ABI effects, and broad compiler
 correctness proofs remain later work.
 
+ADR-0372 completes roadmap phase 10's first proof-and-hardening profile for the
+implemented frontend.  Worklist outcomes now preserve the exact canonical seed
+list and have a proved aggregate specialization-count bound.  Exact-root
+recovery and successful raw/already-checked compilation preserve the resolved
+specialization key across backend fallback.  Compiler laws separate checking,
+seed, specialization and execution failures, and prove that Core/call-graph and
+typed invocation domains cannot cross.
+
+The staged Unit/Bool/Word/product carrier now has full Core round-trip,
+reflection, exact-type, uniqueness and injectivity laws.  The three-way stage
+join has empty, singleton, runtime-dominance, all-comptime, deferred and append
+composition laws.  For an exact root with nonempty expected and supplied
+argument lists, zero-depth typed input validation preserves the supplied state
+before parameter allocation, and the negative compiler matrix exercises all
+backend/domain directions plus independent validation and execution bounds.
+The initial type-system law layer respects ordered first-match substitutions
+rather than assuming arbitrary substitutions are duplicate-free or idempotent.
+
+This phase makes no false total-work claim: only specialization budget counts
+aggregate admitted keys; checking, staging, validation and execution policies
+remain structural/depth bounds where defined that way.  Complete graph closure,
+general graph/typed-heap preservation, exhaustive stage-sidecar ownership,
+module fixed-point soundness, general unification/trait-evidence metatheory and
+features outside the restricted compiler profile remain later proof tranches.
+
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
 expression and statement nodes; complete selected declaration instantiations;

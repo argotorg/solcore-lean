@@ -6614,6 +6614,31 @@ malformation, unsupported staged payloads and fuel exhaustion separately.
 Failure of all runtimes retains all three rejection values.  This does not
 alter the older boundary's types or backend policy.
 
+Roadmap phase 10's restricted proof-and-hardening profile is complete
+(ADR-0372).  The specialization worklist now has general theorems preserving
+canonical seed order/duplicates and bounding admitted specialization count by
+the aggregate budget.  Successful compiler artifacts preserve the exact
+resolved root key through direct, graph and typed fallback.  Checked laws also
+fix checking/seed/budget failure precedence, one-shot error separation, all
+backend invocation-domain boundaries, and native retention of runtime faults
+and exhaustion.
+
+The closed staged carrier is now proved to round-trip through Core, reflect
+every successful projection, preserve exact Core types, project uniquely and
+embed injectively.  Stage joins have algebraic characterization and append
+composition laws.  For an exact root with at least one expected input and at
+least one supplied argument, zero-depth typed input validation rejects before
+allocation and preserves an arbitrary supplied heap.  A first type-system
+property layer records only laws valid for ordered first-match substitutions
+and the current bounded unifier.
+
+These results harden the implemented profile; they are not a whole-language
+soundness claim.  Specialization is the aggregate-count bound.  Other fuels are
+documented as structural/depth policies, not total-work meters.  General graph
+and typed-heap preservation, complete stage-sidecar ownership, module fixed-
+point soundness, unification/trait-evidence completeness, and correctness of
+deferred source features remain open.
+
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary
