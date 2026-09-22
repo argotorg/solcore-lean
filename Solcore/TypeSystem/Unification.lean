@@ -73,6 +73,25 @@ def unifyWithFuel (fuel : Nat) (constraints : List Constraint) :
     Except Error Substitution :=
   loop fuel [] constraints
 
+@[simp]
+theorem unifyWithFuel_empty (fuel : Nat) :
+    unifyWithFuel (fuel + 1) [] = .ok [] := by
+  simp [unifyWithFuel, loop]
+
+@[simp]
+theorem unifyWithFuel_reflexive (fuel : Nat) (type : Ty) :
+    unifyWithFuel (fuel + 2) [{ left := type, right := type }] = .ok [] := by
+  simp [unifyWithFuel, loop]
+
+@[simp]
+theorem unifyWithFuel_variable_constructor (fuel : Nat) (metavariable : TypeVarId)
+    (constructor : TypeConstructorId) :
+    unifyWithFuel (fuel + 2)
+      [{ left := .variable metavariable, right := .constructor constructor }] =
+        .ok [(metavariable, .constructor constructor)] := by
+  simp [unifyWithFuel, loop, Substitution.compose, Substitution.apply,
+    Substitution.lookup?, Ty.containsVariable, Ty.freeVariables]
+
 /-- First-order unification with an occurs check. -/
 def unify (constraints : List Constraint) : Except Error Substitution :=
   unifyWithFuel (defaultFuel constraints) constraints
