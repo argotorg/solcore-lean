@@ -333,13 +333,6 @@ private structure InferredForItems where
   items : List ForItemForm
   state : State
 
-private def patternResolutionIsWildcard : MatchPatternResolution → Bool
-  | .wildcard => true
-  | .integerLiteral _ _
-  | .constructor _ _
-  | .tuple _ => false
-  | .binder _ => true
-
 /-- Internal result of recursively checking one source pattern.  The prefix
 instruction stream is self-delimiting because constructor and tuple nodes
 retain their child counts. -/
@@ -571,6 +564,19 @@ private def constructorArgumentsIrrefutable
       instantiation.payloadTypes.length instructions with
   | some (true, []) => true
   | _ => false
+
+private def typedPatternIsCatchall (pattern : TypedMatchPattern) : Bool :=
+  match pattern.resolution with
+  | .wildcard | .binder _ => true
+  | .tuple instructions =>
+      match pattern.source with
+      | .tuple _ count =>
+          match consumeIrrefutableInstructions (instructions.length + 1) count
+              instructions with
+          | some (true, []) => true
+          | _ => false
+      | _ => false
+  | .integerLiteral .. | .constructor .. => false
 
 private def exhaustsNominalConstructors (context : Context) (state : State)
     (scrutineeType : Ty) (cases : List TypedMatchCase) : Bool :=
@@ -1070,7 +1076,7 @@ mutual
                 pattern
                 body := body.statements
               } :: tail.cases
-              hasWildcard := patternResolutionIsWildcard pattern.resolution ||
+              hasWildcard := typedPatternIsCatchall pattern ||
                 tail.hasWildcard
               allReturn := body.sawReturn && tail.allReturn
               state := tail.state

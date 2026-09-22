@@ -1261,6 +1261,7 @@ import Solcore.Test.ProgramIdentity
 import Solcore.Test.ProgramSignatures
 import Solcore.Test.ExecutableImplMethods
 import Solcore.Test.SourceInference
+import Solcore.Test.SourcePhase7Inference
 import Solcore.Test.SourceCoercionRanking
 import Solcore.Test.SourceLiteralOverloadRanking
 import Solcore.Test.SourceMultiStepCoercion
@@ -6069,6 +6070,7 @@ def staticSemanticsSpineTests : IO Unit := do
   testProgramSignatures
   ExecutableImplMethods.testExecutableImplMethods
   SourceInference.testSourceInference
+  SourcePhase7Inference.testSourcePhase7Inference
   SourceCoercionRanking.testSourceCoercionRanking
   SourceLiteralOverloadRanking.testSourceLiteralOverloadRanking
   SourceMultiStepCoercion.testSourceMultiStepCoercion

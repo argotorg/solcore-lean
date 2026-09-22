@@ -147,7 +147,7 @@ private def testPatternDefaultAndLateConstraint : IO Unit := do
       | .integerLiteral _ literal =>
           decide (latePattern.type = .integer ∧
             literal.targetType = .integer)
-      | .wildcard => false)
+      | _ => false)
     "body inference did not constrain the pattern before Word defaulting"
   let signature ← signatureNamed program "generic"
   let generic ← checkedNamed program "generic"
@@ -168,7 +168,7 @@ private def testPatternDefaultAndLateConstraint : IO Unit := do
       specializedPattern.type = Ty.word) &&
       match specializedPattern.resolution with
       | .integerLiteral _ literal => literal.targetType == Ty.word
-      | .wildcard => false)
+      | _ => false)
     "specialization did not preserve and close the pattern carrier"
   let pickSignature ← signatureNamed program "pick"
   let pick ← checkedNamed program "pick"
@@ -237,10 +237,7 @@ private def testPatternInferenceRejections : IO Unit := do
     ]) fun error => error matches .nonNumericPatternType _ (.parameter _)
   let unsupported : List (String × String × String) := [
     ("string pattern", "case \"text\" { return 1; }", "string literal"),
-    ("binder pattern", "case value { return 1; }", "binder"),
-    ("constructor pattern", "case .Only { return 1; }", "constructor"),
-    ("comptime pattern", "case comptime 0 { return 1; }", "comptime"),
-    ("tuple pattern", "case (0, 1) { return 1; }", "tuple")
+    ("comptime pattern", "case comptime 0 { return 1; }", "comptime")
   ]
   for (label, arm, kind) in unsupported do
     expectInferenceError label
@@ -255,21 +252,15 @@ private def testPatternInferenceRejections : IO Unit := do
       ]) fun error => match error with
         | .unsupportedPattern _ actual => actual == kind
         | _ => false
-  expectInferenceError "multiple scrutinees"
-    "function bad(tag: Word) returns (Word) { match (tag, tag) { case (0, 0) { return 1; } default { return 2; } } }"
-    fun error => error == .matchScrutineeArityMismatch 1 2
-  expectInferenceError "nonterminal match"
-    "function bad(tag: Word) { match (tag) { case _ { return; } } return; }"
-    fun error => error matches .nonTerminalMatch _
   expectInferenceError "uncovered literal match"
     "function bad(tag: Word) returns (Word) { match (tag) { case 0 { return 1; } } }"
     fun error => error matches .nonExhaustiveMatch _
   expectInferenceError "fallthrough case"
     "function bad(tag: Word) returns (Word) { match (tag) { case _ { let value: Word = 1; } } }"
-    fun error => error matches .nonReturningMatchArm _
+    fun error => error matches .unification _
   expectInferenceError "fallthrough default"
     "function bad(tag: Word) returns (Word) { match (tag) { case 0 { return 1; } default { let value: Word = 2; } } }"
-    fun error => error matches .nonReturningMatchDefault _
+    fun error => error matches .unification _
 
 private def guardWords : Resolved.Expr → List Core.Word
   | .ifE (.binary .wordEq _ (.word literal)) _ rest =>

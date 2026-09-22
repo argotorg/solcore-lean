@@ -370,12 +370,12 @@ private def testGroundOperatorResultKeepsCoercion : IO Unit := do
 private def testUnsupportedStatement : IO Unit := do
   let source :=
     "function loop(flag: Bool) { while (flag) { return; } }"
-  match SourceInference.loadAndCheckProgram (workspace source) with
-  | .error errors =>
-      assertTrue (errors.any fun error => match error with
-        | .body { error := .unsupportedStatement "while loop", .. } => true
-        | _ => false) "deferred while inference was not explicit"
-  | .ok _ => throw (IO.userError "deferred while inference was accepted")
+  let checked ← check source
+  assertTrue (checked.any fun function =>
+      function.typedBody.nodes.any fun
+        | .statement { form := .whileLoop .., .. } => true
+        | _ => false)
+    "while inference did not retain its typed control-flow node"
 
 private def testTraitBackedCoercion : IO Unit := do
   let source := String.intercalate "\n" [
