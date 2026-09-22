@@ -256,11 +256,12 @@ private def lowerExpressionFuel (context : Context)
           if node.type != .word || resolution.targetType != .word ||
               node.requirements != [resolution.requirement] then
             throw (.integerLiteralMetadata node.id.occurrence)
-          let decoded ← match interpretWordLiteral? ⟨node.span, source⟩ with
-            | some word => pure word
+          let rawValue ← match numericLiteralValue? source with
+            | some value => pure value
             | none => throw (.invalidWordLiteral node.id.occurrence)
-          if decoded != Core.Word.ofNatModulo resolution.rawValue then
+          if rawValue != resolution.rawValue then
             throw (.integerLiteralMetadata node.id.occurrence)
+          let decoded := Core.Word.ofNatModulo rawValue
           let solved ← exactRequirement
             context.specialized.function.solvedRequirements
             resolution.requirement

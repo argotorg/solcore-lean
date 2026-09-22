@@ -126,6 +126,19 @@ private def testRuntimeRecursion : IO Unit := do
   | result => throw (IO.userError
       s!"low graph fuel used a fabricated Core checkpoint: {reprStr result}")
 
+private def modularLiteralSource : String := String.intercalate "\n" [
+  "function wrapped(value: Word) returns (Word) {",
+  "  return value == 0 ?",
+  "    115792089237316195423570985008687907853269984665640564039457584007913129639936 :",
+  "    wrapped(value - 1);",
+  "}"
+]
+
+private def testModularRuntimeLiteral : IO Unit := do
+  let result ← runNamed modularLiteralSource "wrapped" [.word (word 1)]
+  assertTrue (decide (result = .done (.word Core.Word.zero) []))
+    "runtime graph rejected or misdecoded an exactly modular Word literal"
+
 private def mutualSource : String := String.intercalate "\n" [
   "function even(value: Word) returns (Bool) {",
   "  return value == 0 ? true : odd(value - 1);",
@@ -308,6 +321,7 @@ private def testTamperedPlanRejected : IO Unit := do
 
 def testSourceRuntimeCallGraph : IO Unit := do
   testRuntimeRecursion
+  testModularRuntimeLiteral
   testMutualRecursion
   testLexicalClosures
   testExactCoreClosureFault
