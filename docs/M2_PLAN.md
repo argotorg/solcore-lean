@@ -354,11 +354,43 @@ one depth unit, siblings reuse the same remaining depth, and zero reports
 The public pipeline now closes countdown, factorial, finite mutual recursion,
 small Fibonacci, general Word/Bool recursion, statement conditionals, and
 generic evidence forwarding to constants without changing the caller store.
-Ordinary runtime recursion retains `recursiveCallCycle`.  Result memoization,
-a value-indexed cache, a sibling-shared total-work budget, runtime/Core
-recursion, indirect or higher-order recursion, mutation/effects, unsupported
-carriers, type-growing polymorphic recursion beyond the specialization budget,
-and broad metatheory remain explicit hardening or later phases.
+Result memoization, a value-indexed cache, a sibling-shared total-work budget,
+mutation/effects, unsupported staged carriers, type-growing polymorphic
+recursion beyond the specialization budget, and broad staged metatheory remain
+explicit hardening or later phases.
+
+ADR-0366–0368 complete roadmap phase 6, runtime call-graph generalization.  An
+additive finite runtime table names definitions by canonical specialization
+key, collects every signature before checking bodies, and therefore represents
+runtime self and mutual recursion without cyclic inlining.  Its call-by-value
+evaluator threads the exact store and exposes completion, runtime fault, and
+fuel exhaustion.  Fuel is a structural depth bound rather than a global
+total-work counter.
+
+Runtime lambdas capture lexical environments, named declarations are
+first-class global function values, and application retains the source
+zero/single/right-associated-product argument-bundle convention.  The
+worklist discovers standalone declaration-reference edges separately from
+direct calls, while an indirect call uses its evaluated callee rather than a
+guessed static target.  The graph linker lowers every specialization once,
+after reconstructing exact seeds, specialization order, direct-call edges and
+reference edges.  It checks the complete table and connects direct calls,
+declaration values, lambdas, and indirect applications.
+
+The public runner tries the established evidence-aware Core linker first and
+uses the runtime table only as an additive fallback.  The graph path currently
+accepts structural Unit/Bool/Word/product/function definitions and tail-normal
+control flow.  It rejects comptime contracts, unresolved/evidence-bearing
+definitions except validated builtin Word literals, and indirect argument or
+result coercions.  Function-valued public results have no Core projection, and
+the exact `runExact?`/`runExact` boundary retains backend-tagged graph faults
+and store-only exhaustion.  Legacy `run?`/`run` remain opaque Core projections
+which preserve the store but do not manufacture a resumable graph checkpoint;
+`PreparedEntry.usesRuntimeCallGraph` exposes the chosen mode.
+Nominal data and constructors, members, assignment,
+mappings/proxies/indexing, loops, broader control flow, effects, a published
+graph-result Oracle/wire protocol, automatic roots, multi-root execution, and
+broad runtime-table metatheory remain later phases.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,

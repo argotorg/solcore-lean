@@ -37,8 +37,11 @@ canonical syntax.  It loads a workspace, constructs declaration and type
 environments, resolves signatures and predicates, infers the supported source
 fragment, and returns checked functions with occurrence-addressed typed bodies
 and trait evidence.  The internal downstream path now specializes explicit
-roots, discovers finite direct-call plans, and lowers complete acyclic plans in
-the closed builtin subset to independently rechecked Semantic Core entries.
+roots, discovers finite direct-call and first-class declaration-reference
+plans, and keeps the established acyclic linker authoritative for independently
+rechecked Semantic Core entries.  An additive checked runtime table represents
+structural runtime cycles, lexical lambdas, and indirect applications when
+finite body inlining cannot.
 Proof-only direct-call signature predicates may be discharged statically after
 exact requirement/evidence validation.  Checked trait/implementation catalogs
 now retain and signature-check their methods.  Deliberately narrow runtime
@@ -76,8 +79,14 @@ workspace, either an exact declaration identity or an exact module/name pair,
 ground type arguments, finite checking/specialization/execution limits, runtime
 values and a store.  `prepare` composes checking, finite specialization and
 restricted linking into a reusable checked entry; `run` additionally checks
-the runtime input types and executes it.  This interface performs no automatic
-entry discovery, exposes no multi-root policy, and adds no source Oracle.
+the runtime input types and executes it.  Acyclic and evidence-aware programs
+still use Semantic Core directly.  The structural fallback uses a finite
+global-definition table for runtime self/mutual recursion, lexical closures,
+first-class named functions, and bundled indirect calls.  This interface
+performs no automatic entry discovery, exposes no multi-root policy, and adds
+no source Oracle or wire protocol.  `PreparedEntry.usesRuntimeCallGraph`
+reports which execution mode was retained; `runExact?` and top-level
+`runExact` preserve exact Core-versus-runtime results.
 
 The target-compatible expression integer-literal slice is implemented
 (ADR-0344–0347).  Each decimal or hexadecimal occurrence now retains its source
@@ -206,9 +215,40 @@ ADR-0361–0364 complete the evidence-aware staging phase.  ADR-0365 completes
 the next roadmap phase with selected-branch bare-`integer` and
 Unit/Bool/Word/product staged recursion, exact active-invocation cycle checks,
 and a public dynamic-call-depth bound.  Countdown, factorial, finite mutual
-recursion, and small compile-time Fibonacci now close to constants.  Indirect
-calls, mutation, nominal or functional values, result memoization, a
-sibling-shared total-work budget, and ordinary runtime/Core recursion remain
+recursion, and small compile-time Fibonacci now close to constants.
+
+ADR-0366–0368 complete roadmap phase 6, runtime call-graph generalization.  A
+separate finite runtime IR collects all global signatures before checking
+bodies, so named self and mutual cycles remain finite rather than recursively
+inlined.  Its fuelled call-by-value evaluator threads the exact store and makes
+completion, fault, and exhaustion observable.  Source lambdas create lexical
+closures, declaration references remain first-class global values, and zero-,
+one-, or multiple-argument indirect calls follow the typed function-bundle
+convention.
+
+The specialization worklist now discovers standalone declaration references
+without duplicating direct-call callee edges.  The graph linker reconstructs
+and validates seed keys, specialization order, direct-call edges, and reference
+edges before lowering each reachable specialization once and checking the whole
+table.  It is used by the public runner only when the established Core linker
+rejects.  The established linker and its evidence/staging diagnostics remain
+authoritative whenever it succeeds.  End-to-end runtime countdown, factorial,
+finite mutual recursion, capturing and multi-argument lambdas, higher-order
+passing and internal closure returns, erased-arity bundle application, and
+conditional selection of named functions are executable.  A helper may return
+a closure for use inside the graph even though a function-valued public result
+cannot cross the Core compatibility boundary.
+
+This graph path is intentionally narrower than the acyclic Core path.  It
+admits structural Unit/Bool/Word/product/function types, rejects comptime and
+evidence-bearing runtime definitions except for validated builtin Word
+literals, and does not execute indirect argument or result coercions.  A source
+closure or named global cannot be returned through the public Core-value
+boundary.  The new exact Lean execution API retains graph faults and store-only
+fuel exhaustion, while legacy `run?`/`run` project them opaquely into the Core
+result carrier and preserve the exact store.  Nominal data, assignment,
+mappings/proxies, loops, broader control flow, effects, automatic entry
+discovery, multi-root execution, and broad safety/correspondence proofs remain
 later.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
@@ -5748,12 +5788,15 @@ ordinary specialization is now public and compile-time consumed. Recovered
 malformed output remains separate so that recovery is not confused with
 language acceptance.
 
-The initial whole-program resolver, checker, specialization planner and
-restricted acyclic linker below now consume the canonical syntax.  Checked
-Semantic Core is reached only for explicitly seeded, complete acyclic plans in
-the builtin tail-normal fragment.  The linker admits proof-only direct-call
-signature predicates when every requirement and its closed implementation
-evidence match exactly; this is not a public or general source elaborator.
+The initial whole-program resolver, checker, specialization planner and two
+restricted link paths below now consume the canonical syntax.  Explicitly
+seeded complete acyclic plans in the builtin tail-normal fragment reach
+independently checked Semantic Core.  Structural runtime cycles, lambdas and
+indirect calls may instead reach the checked finite runtime table of
+ADR-0366–0368.  The Core linker admits proof-only direct-call signature
+predicates when every requirement and its closed implementation evidence match
+exactly; the graph fallback is narrower and does not make this a general source
+elaborator.
 Canonical local references, Boolean
 operators, Word addition/subtraction/multiplication/unsigned division/remainder,
 bitwise operations, unsigned `>`/`<`/`<=`/`>=` and Word equality/inequality, strict
@@ -5836,15 +5879,16 @@ polymorphic recursion, coinductive trait cycles and overlap policy beyond
 explicit ambiguity are deferred.  Generic or symbolic intermediate coercion
 paths and coinductive coercion cycles are not yet connected.  The specialization
 and lowering slices described below cover a deliberately closed builtin subset.
-Complete acyclic direct calls are executable through the restricted plan
+Complete acyclic direct calls are executable through the restricted Core plan
 linker, including a narrow closed `Coerce<From, To>.coerce` conversion profile.
 A direct call's signature predicates may be consumed statically when its
 requirement IDs, predicates and evidence goals match exactly; closed
 implementation evidence is forwarded through nested constrained calls and may
-justify a conversion inside the generic callee.  Cyclic or indirect calls,
-runtime trait evidence beyond the strict arithmetic/bitwise, `Eq<T>`, `Ord<T>` and
-`Coerce<From, To>` profiles, general conversion execution and general source
-semantics are not claimed.
+justify a conversion inside the generic callee.  The separate runtime graph
+path executes structural cyclic and coercion-free indirect calls but rejects
+those evidence-bearing definitions.  Runtime trait evidence beyond the strict
+arithmetic/bitwise, `Eq<T>`, `Ord<T>` and `Coerce<From, To>` profiles, general
+conversion execution and general source semantics are not claimed.
 
 The occurrence-addressed typed and resolved source IR is implemented as the
 architecture boundary before constructor/member selection, broader matches,
@@ -6154,14 +6198,38 @@ calls receive the same remaining depth rather than sharing a total-work
 counter.  Countdown, factorial, finite mutual countdown, small Fibonacci,
 general Word/Bool recursion, statement-condition recursion, and constrained
 generic evidence forwarding close through the public pipeline to constants
-while preserving the caller's store.  Ordinary runtime recursion still
-reports `recursiveCallCycle`.
+while preserving the caller's store.  The established direct Core linker still
+reports `recursiveCallCycle` for an ordinary runtime cycle; ADR-0366–0368 add a
+separate checked runtime-table fallback for that structural case.
 
 Result memoization, a value-indexed cache, a sibling-shared total-work budget,
-ordinary runtime/Core recursion, indirect or higher-order recursion, effects,
-mutation, nominal/function/proxy/index values, unsupported staged carriers,
+effects, mutation, nominal/proxy/index values, unsupported staged carriers,
 nested marked method expansion, type-growing polymorphic recursion beyond the
-specialization budget, and broad proof hardening remain deferred.
+specialization budget, and broad staged proof hardening remain deferred.
+
+ADR-0366–0368 complete roadmap phase 6.  `SourceRuntime` checks a finite table
+of canonical specialization-keyed definitions after collecting all signatures,
+so direct and mutual runtime cycles no longer require cyclic Core syntax.
+Evaluation is fuel-observable and store-threaded.  Lambdas capture their
+lexical environments; named functions are first-class global values; and
+structurally bundled indirect applications evaluate callee and arguments from
+left to right.  The worklist discovers standalone declaration references and
+the graph linker reconstructs exact seeds, specialization order, call edges,
+and reference edges before lowering every reachable definition once.
+
+The public runner uses this table only as a fallback after the evidence-aware
+Core linker rejects.  The graph path accepts structural Unit/Bool/Word/product/
+function types and covers runtime countdown, factorial, mutual recursion,
+capturing and multi-argument lambdas, higher-order calls, and selected global
+function values.  It rejects comptime contracts and evidence-bearing runtime
+definitions except validated builtin Word literals, as well as indirect
+argument/result coercions.  Function-valued public results have no Core
+projection.  `runExact?`/`runExact` retain exact backend-tagged results;
+runtime faults remain opaque only through the legacy Core compatibility result.
+The graph out-of-fuel payload is store-only and is not a resumable Core state.
+Published Oracle support,
+nominal data, assignment, mappings/proxies/indexing, loops/effects, broader
+control flow, and broad graph safety/correspondence proofs remain deferred.
 
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
@@ -6212,13 +6280,16 @@ the resulting checked function through the existing Source-to-Core boundary and
 execute it.
 
 Finite whole-program specialization discovery is now executable from an
-explicit list of raw seed requests.  Every seed and discovered callee passes
+explicit list of raw seed requests.  Every seed, discovered callee, and
+first-class declaration reference passes
 through exact environment/signature/body lookup and the same authoritative
 specialization boundary.  The resulting plan retains canonical seed keys in
 input order, including duplicates, first-discovery FIFO specializations, and a
-separate edge for every direct-call expression occurrence.  Typed-node order
-determines discovery order; raw nested substitutions are re-canonicalized in
-the callee signature's parameter order.
+separate edge for every direct-call expression occurrence and every standalone
+declaration-reference occurrence.  A reference used only as the callee child
+of a direct call is not duplicated.  Typed-node order determines discovery
+order; raw nested substitutions are re-canonicalized in the callee signature's
+parameter order.
 
 The worklist charges its bound only for distinct canonical keys.  Same-key self
 and mutual recursion therefore close normally, while type-growing polymorphic
@@ -6226,22 +6297,26 @@ recursion returns a partial plan, the first unseen canonical key and its pending
 queue instead of diverging.  Direct-call reference metadata, instantiated
 types and predicates are checked against the specialized callee.  Signature
 assumptions and solved caller evidence remain intact but are not consumed at
-this stage, and indirect calls reject explicitly.  Small checked laws cover
-empty and zero-budget boundaries; raw-source regressions cover canonical
-multi-parameter calls, deterministic nested-call order, duplicate roots and
-call occurrences, recursive keys, finite budget exhaustion, retained where
-predicates, malformed typed metadata and the indirect-call boundary.
+this stage.  Indirect calls add no guessed target edge, but their callee
+function type, argument bundle, coercion path, result and requirement metadata
+are reconstructed and validated.  Small checked laws cover empty and
+zero-budget boundaries; raw-source regressions cover canonical multi-parameter
+calls, deterministic nested-call order, duplicate roots and call occurrences,
+declaration-reference discovery, recursive keys, finite budget exhaustion,
+retained where predicates, malformed typed metadata and the indirect-call
+boundary.
 
 The first specialized direct-call linker is now executable for complete
 acyclic plans.  It defensively reconstructs the worklist from canonical roots,
-checks canonical specialized entries and exact per-occurrence call edges, then
-recursively elaborates each target and expands calls into capture-free
-`Resolved.Expr` lets.  Arguments are evaluated left to right into fresh
-temporaries before callee input aliases enter scope.  Each explicitly seeded
-entry is lowered and independently rechecked by `Core.infer?`; seed order and
-duplicates are preserved, and execution checks exact runtime argument types
-before entering the existing Core machine.  This is finite inlining, not a
-named or global recursive-function facility in Core.
+checks canonical specialized entries plus exact per-occurrence call and
+standalone reference edges, then recursively elaborates each target and
+expands calls into capture-free `Resolved.Expr` lets.  Arguments are evaluated
+left to right into fresh temporaries before callee input aliases enter scope.
+Each explicitly seeded entry is lowered and independently rechecked by
+`Core.infer?`; seed order and duplicates are preserved, and execution checks
+exact runtime argument types before entering the existing Core machine.  This
+path is finite inlining, not a named or global recursive-function facility in
+Core; the additive graph linker supplies that distinct representation.
 
 Direct-call signature predicates are proof-only in this executable fragment.
 For each call, the linker validates the exact requirement count and order,
@@ -6351,10 +6426,12 @@ forwards both witnesses through a generic conversion wrapper, consumes Eq in
 the detached method body and preserves the `41`/`7` behavior.  Missing,
 reordered, primary-only and duplicate edge-obligation metadata all reject.
 
-Only complete worklist outcomes are linkable.  Budget-exhausted outcomes,
-direct-call cycles, seed roots with unresolved assumptions, unconsumed
-non-call/operator/literal requirements outside the supported unary, binary and
-conversion profiles and indirect calls reject explicitly.  Other runtime
+Only complete worklist outcomes are linkable.  On the direct Core path,
+budget-exhausted outcomes, direct-call cycles, seed roots with unresolved
+assumptions, unconsumed non-call/operator/literal requirements outside the
+supported unary, binary and conversion profiles, and indirect calls reject
+explicitly.  ADR-0366–0368's structural fallback handles the cycle/indirect
+cases only when its narrower evidence and type restrictions hold.  Other runtime
 operators, implementation parameters not determined by the selected evidence,
 and method-level `where` predicates on profiles without an ordered caller-owned
 evidence carrier remain explicit boundaries.  Selected implementation methods
@@ -6368,8 +6445,9 @@ and exhausted expansion fuel reject explicitly, and nominal source types remain
 outside the closed Core type projection.
 Thus the worklist may close same-key self or mutual recursion.  ADR-0365 assigns
 an executable meaning only when such an edge is invoked through the bounded
-staged-value machine; ordinary runtime and detached-Core expansion still reject
-specialization-key cycles.  Small checked laws
+staged-value machine; ordinary direct-Core and detached-method expansion still
+reject specialization-key cycles, while ADR-0366–0368 provide the separate
+structural runtime-table fallback.  Small checked laws
 fix the runtime input-type gate and budget-exhaustion boundary; end-to-end
 regressions execute proof-only constrained and nested generic calls as well as
 both conditional paths, method-authoritative `BitNot.bnot`, all strict Word
@@ -6415,23 +6493,28 @@ The next frontend boundary is broader implementation shapes—method-level
 predicates for remaining profiles which do not yet carry their ordered caller
 obligations, plus generic parameters not recoverable from the current evidence
 language—and additional runtime-evidence profiles.
-Recursive source calls require
-a separate named or global recursive-function representation rather than cyclic
-inlining.
+ADR-0366–0368 now supply the separate named runtime representation required by
+structural recursive source calls; evidence-bearing recursive graphs still
+require that runtime profile to be widened rather than cyclically inlined.
 Automatic entry discovery, constructors, members and place-aware statements
 remain later in dependency order.  A whole-program reference to an obligation
 remains the owning declaration paired with its function-local requirement
 identity.
 
 The public Lean composition boundary for this restricted profile is now
-`Solcore.Frontend.SourceProgramExecution` (ADR-0343).  `SeedTarget.declaration`
-and `SeedTarget.named` select exactly one root; `Seed.arguments` supplies its
-ground generic arguments.  `Limits` keeps checking fuel, specialization budget
-and execution fuel independent.  `prepare` returns the linked entry as a
-`PreparedEntry`, from which its canonical key and exact input types are
-derived; top-level `run` uses the configured execution fuel after exact
-runtime-input validation.  Stage-specific checking, seed,
-worklist and linking failures remain visible, and a finite specialization
+`Solcore.Frontend.SourceProgramExecution` (ADR-0343, ADR-0368).
+`SeedTarget.declaration` and `SeedTarget.named` select exactly one root;
+`Seed.arguments` supplies its ground generic arguments.  `Limits` keeps
+checking fuel, specialization budget, staging fuel and execution fuel
+independent.  `prepare` returns the linked entry as a `PreparedEntry`, from
+which its canonical key and exact input types are derived;
+`usesRuntimeCallGraph` reports whether the additive table fallback was selected.
+Top-level `runExact` uses the configured execution fuel after exact runtime-
+input validation and retains `.core` versus `.runtime` outcomes, including the
+runtime's precise fault and store-only fuel exhaustion.  Historical `run`
+projects that result into `Core.StatefulRunResult`; a projected graph exhaustion
+is inert and non-resumable.  Stage-specific checking, seed, worklist and
+authoritative Core-linking failures remain visible, and a finite specialization
 frontier has its own `specializationBudgetExhausted` result rather than being
 collapsed into an invented source-execution or linker result.
 
@@ -6442,11 +6525,13 @@ Solcore source text. In particular, it does not yet provide:
 
 - automatic entry-point discovery/seeding, multiple public roots and a public
   source Oracle;
-- execution of cyclic or indirect source call graphs, runtime
-  evidence-dependent operator/literal/non-call forms outside the narrow
-  `BitNot<T>`, strict arithmetic/bitwise, `Eq<T>`, closed standard `Ord<T>` and
-  `Coerce<From, To>` profiles and underdetermined-generic impl
-  execution, and generic or symbolic conversion execution;
+- cyclic or indirect source execution outside ADR-0366–0368's structural
+  Unit/Bool/Word/product/function graph profile, including its deferred
+  argument/result coercions; runtime evidence-dependent operator/literal/
+  non-call forms outside the narrow `BitNot<T>`, strict arithmetic/bitwise,
+  `Eq<T>`, closed standard `Ord<T>` and `Coerce<From, To>` profiles;
+  underdetermined-generic impl execution; and generic or symbolic conversion
+  execution;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;
