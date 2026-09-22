@@ -1776,6 +1776,9 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
                 lowerOrdinary
           | none => lowerOrdinary
       | .conditional _ _ _ =>
+          -- Materialize an eligible conditional as one staged computation.
+          -- Lowering its arms independently would invoke a staged call in a
+          -- dynamically unselected arm before Core could choose the result.
           match stagedValuePolicy with
           | some policy =>
               if policy.analysis.expressionStage? id = some .comptime &&
@@ -2149,8 +2152,9 @@ private def bindStagedIntegerInputsWith {error : Type}
         (.stagedIntegerArgumentArityMismatch binders.length values.length)
 
 /-- Evaluate the pure tail-normal statement subset used by an integer-returning
-staged function.  Integer lets are strict and erased, while both arms of a
-terminal conditional are validated and accounted before its value is chosen. -/
+staged function.  Integer lets are strict and erased.  Both arms of a terminal
+conditional are validated and accounted in source order, but only the selected
+arm may invoke a staged call. -/
 private def evaluateStagedIntegerStatementsFuelWith {error : Type}
     (lift : Error → error)
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
@@ -2426,6 +2430,9 @@ private def evaluateStagedValueListWith {error : Type}
       let values ← evaluateStagedValueListWith evaluate rest
       pure (value :: values)
 
+/-- Traverse one staged-value node in execution or validation mode.  Validation
+retains stage/type/evidence/ledger checks while substituting inert values for
+calls, selected methods, coercions, and primitive operations. -/
 private def evaluateStagedValueNodeWith {error : Type}
     (lift : Error → error)
     (onStagedValueCall : StagedValueCallElaborator error)
