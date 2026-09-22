@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceCoreDirectLinking
+import Solcore.Frontend.SourceRuntimeLinking
 
 /-!
 The first public raw-source execution pipeline.
@@ -9,10 +9,12 @@ arguments in declaration order.  The workspace entry source is never searched
 for a conventional function name.
 
 The pipeline deliberately composes the existing checked boundaries: whole-
-program checking, finite specialization discovery, restricted direct-call
-linking, and the linked entry's runtime type guard.  Each failure retains the
-stage that produced it.  Core completion, fuel exhaustion, and machine faults
-remain ordinary runtime results rather than pipeline errors.
+program checking, finite specialization discovery, evidence-aware finite
+linking, and the linked entry's runtime type guard.  When finite inlining meets
+a runtime cycle, lexical lambda, or indirect application, an additive checked
+runtime table retains those calls instead.  Each failure retains the stage
+that produced it.  Completion, fuel exhaustion, and runtime faults remain
+ordinary runtime results rather than pipeline errors.
 -/
 
 set_option autoImplicit false
@@ -183,8 +185,21 @@ def prepare (raw : Workspace.RawWorkspace) (seed : Seed)
     | .complete plan => pure plan
     | .budgetExhausted _ next pending =>
         throw (.specializationBudgetExhausted next pending.length)
-  let linked ← (SourceCoreDirectLinking.linkWithStagingFuel program
-    (.complete plan) limits.stagingFuel).mapError Error.linking
+  let complete : SourceSpecializationWorklist.Outcome := .complete plan
+  let linked ← match SourceCoreDirectLinking.linkWithStagingFuel program
+      complete limits.stagingFuel with
+    | .ok linked => pure linked
+    | .error directError =>
+        -- The established linker remains authoritative whenever it succeeds.
+        -- The graph linker is an additive fallback; if its deliberately
+        -- narrower structural profile also rejects, preserve the original
+        -- evidence-aware diagnostic.
+        match SourceRuntimeLinking.link program complete with
+        | .ok runtime =>
+            match runtime.toCoreLinkedProgram with
+            | .ok linked => pure linked
+            | .error _ => throw (.linking directError)
+        | .error _ => throw (.linking directError)
   match linked.entries with
   | [entry] => pure { entry }
   | entries => throw (.linkedEntryCountMismatch entries.length)

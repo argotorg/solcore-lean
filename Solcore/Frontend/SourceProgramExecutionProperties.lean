@@ -21,11 +21,12 @@ namespace Solcore.Frontend.SourceProgramExecution
 
 theorem PreparedEntry.run?_of_matching_types (prepared : PreparedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
+    (finite : prepared.entry.runtime = none)
     (typesEqual : inputs.map Core.Value.type = prepared.inputTypes) :
     prepared.run? inputs fuel store = some (Core.runStateful fuel
       (Core.State.initial prepared.entry.elaborated.core inputs store)) := by
   simp [PreparedEntry.run?, SourceCoreDirectLinking.LinkedEntry.run?,
-    PreparedEntry.inputTypes, typesEqual]
+    PreparedEntry.inputTypes, finite, typesEqual]
 
 theorem PreparedEntry.run?_of_mismatched_types (prepared : PreparedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
@@ -53,13 +54,14 @@ theorem run_of_prepared_matching_types (raw : Workspace.RawWorkspace)
     (seed : Seed) (inputs : List Core.Value) (limits : Limits)
     (store : Core.Store) (prepared : PreparedEntry)
     (preparedOk : prepare raw seed limits = .ok prepared)
+    (finite : prepared.entry.runtime = none)
     (typesEqual : inputs.map Core.Value.type = prepared.inputTypes) :
     run raw seed inputs limits store = .ok (Core.runStateful
       limits.executionFuel
       (Core.State.initial prepared.entry.elaborated.core inputs store)) := by
   rw [run_of_prepared raw seed inputs limits store prepared preparedOk]
   rw [PreparedEntry.run?_of_matching_types prepared inputs
-    limits.executionFuel store typesEqual]
+    limits.executionFuel store finite typesEqual]
 
 theorem run_of_prepared_mismatched_types (raw : Workspace.RawWorkspace)
     (seed : Seed) (inputs : List Core.Value) (limits : Limits)

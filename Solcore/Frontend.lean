@@ -412,8 +412,11 @@ import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.Frontend.SourceSpecializationWorklistProperties
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.SourceCoreElaborationProperties
+import Solcore.Frontend.SourceRuntime
+import Solcore.Frontend.SourceRuntimeProperties
 import Solcore.Frontend.SourceCoreDirectLinking
 import Solcore.Frontend.SourceCoreDirectLinkingProperties
+import Solcore.Frontend.SourceRuntimeLinking
 import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceProgramExecutionProperties
 
