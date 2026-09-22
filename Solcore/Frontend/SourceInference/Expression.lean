@@ -208,6 +208,25 @@ private def constructorCalleeCandidates (context : Context) (state : State)
               ((← visibleDataTypesNamed context name).filter fun dataType =>
                 dataType.name == name) name)
 
+/-- Distinguish an existing data namespace with a missing constructor from an
+ordinary qualified function/member expression.  Local roots continue to shadow
+type namespaces. -/
+private def missingExplicitConstructor? (context : Context) (state : State)
+    (callee : Syntax.Expr) : Except Error (Option (List String × String)) := do
+  match calleeQualifiedIdentifier? callee with
+  | some (qualifiers, name) =>
+      match qualifiers with
+      | root :: _ =>
+          if (state.lookupBinder? root).isSome then pure none
+          else
+            let dataTypes ← qualifiedDataTypesNamed context qualifiers
+            if dataTypes.isEmpty then pure none
+            else if (constructorsInDataTypes dataTypes name).isEmpty then
+              pure (some (qualifiers, name))
+            else pure none
+      | [] => pure none
+  | none => pure none
+
 def attachExpressionCoercions (state : State)
     (entries : List ExpressionCoercions) : State :=
   entries.foldl (fun state entry =>
@@ -802,6 +821,10 @@ mutual
               throw (.ambiguousConstructor [] name
                 (constructorCandidates.map fun candidate => candidate.2.id))
           | [] =>
+              match ← missingExplicitConstructor? context state callee with
+              | some (qualifiers, name) =>
+                  throw (.unknownConstructor qualifiers name)
+              | none => pure ()
               let integerLiteralStart := state.integerLiterals.length
               let (arguments, state) ← inferExprsFuel fuel context
                 arguments.elements state
@@ -894,7 +917,11 @@ mutual
                 freshDataConstructorInstantiation dataType constructor state
               inferConstructorApplicationFuel fuel context expression id
                 instantiation [] expected state
-          | [] => .error (.unsupportedExpression "field")
+          | [] =>
+              match ← missingExplicitConstructor? context state expression with
+              | some (qualifiers, missing) =>
+                  throw (.unknownConstructor qualifiers missing)
+              | none => .error (.unsupportedExpression "field")
           | _ => throw (.ambiguousConstructor [] name.value
               (candidates.map fun candidate => candidate.2.id))
       | .array .. => .error (.unsupportedExpression "array")

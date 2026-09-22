@@ -103,6 +103,13 @@ private def testConstructors : IO Unit := do
       "  return .Missing(value);",
       "}"
     ]) fun error => error == .unknownConstructor [] "Missing"
+  expectInferenceError "unknown qualified constructor"
+    (String.intercalate "\n" [
+      "enum Box<T> { Wrap(T) }",
+      "function bad(value: Word) returns (Box<Word>) {",
+      "  return Box.Missing(value);",
+      "}"
+    ]) fun error => error == .unknownConstructor ["Box"] "Missing"
   expectInferenceError "contextual constructor without an expected type"
     (String.intercalate "\n" [
       "enum Box<T> { Wrap(T) }",
