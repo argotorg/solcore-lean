@@ -33,6 +33,7 @@ private def workspace : Workspace.RawWorkspace := {
       "function grow<T>(value: T) { grow((value, value)); return; }",
       "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
       "function constrained(value: Word) returns (Word) { return keep(value); }",
+      "function asValue() returns (function(Word) returns (Word)) { return identity; }",
       "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }"
     ]
   }]
@@ -202,6 +203,8 @@ private def testBreadthFirstDiscovery (program : CheckedProgram) : IO Unit := do
             edge.caller.declaration = twice.id ∧
             edge.callee.declaration = identity.id))
         "two syntactic calls to one canonical callee did not retain two edges"
+      assertTrue plan.referenceEdges.isEmpty
+        "direct-call callee children were duplicated as reference edges"
   | outcome => throw (IO.userError
       s!"twice: expected a complete plan, found {reprStr outcome}")
   match ← runOrThrow "twice budget" program [request] 1 with
@@ -313,6 +316,60 @@ private def testAssumptionPreservation (program : CheckedProgram) : IO Unit := d
   | outcome => throw (IO.userError
       s!"constrained: expected a complete plan, found {reprStr outcome}")
 
+private def testFunctionValueReference (program : CheckedProgram) : IO Unit := do
+  let identity ← signatureNamed program "identity"
+  let asValue ← signatureNamed program "asValue"
+  let function ← functionFor program asValue
+  let reference ← match function.typedBody.nodes.findSome? fun node =>
+      match node with
+      | .expression expression@{
+          form := .reference _ (.declaration instantiation), .. } =>
+          if instantiation.declaration == identity.id then some expression else none
+      | _ => none with
+    | some reference => pure reference
+    | none => throw (IO.userError
+        "asValue: standalone declaration reference metadata was absent")
+  match ← runOrThrow "asValue" program [monomorphicRequest asValue] 2 with
+  | .complete plan =>
+      match plan.referenceEdges with
+      | [edge] =>
+          assertTrue (decide (plan.specializations.map (·.declaration) =
+              [asValue.id, identity.id] ∧ plan.callEdges = [] ∧
+              edge.caller.declaration = asValue.id ∧
+              edge.occurrence = reference.id ∧
+              edge.callee.declaration = identity.id ∧
+              edge.callee.arguments = [.word]))
+            "standalone function reference did not retain its canonical edge"
+      | edges => throw (IO.userError
+          s!"asValue: expected one reference edge, found {edges.length}")
+  | outcome => throw (IO.userError
+      s!"asValue: expected a complete plan, found {reprStr outcome}")
+  match ← runOrThrow "asValue budget" program
+      [monomorphicRequest asValue] 1 with
+  | .budgetExhausted plan next pending =>
+      assertTrue (decide (plan.specializations.length = 1 ∧
+          plan.callEdges = [] ∧ plan.referenceEdges.length = 1 ∧
+          next.declaration = identity.id ∧ next.arguments = [.word] ∧
+          pending.length = 1))
+        "standalone function reference was absent from the FIFO frontier"
+  | outcome => throw (IO.userError
+      s!"asValue budget: expected exhaustion, found {reprStr outcome}")
+  let malformedFunction : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setExpressionType function.typedBody.nodes reference.id .bool
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program malformedFunction)
+      [monomorphicRequest asValue] 2 with
+  | .error (.calleeNodeTypeMismatch actual .bool _) =>
+      assertTrue (actual == reference.id)
+        "standalone reference mismatch lost its occurrence identity"
+  | result => throw (IO.userError
+      s!"malformed standalone reference metadata was accepted: {reprStr result}")
+
 private def testIndirectCallBoundary (program : CheckedProgram) : IO Unit := do
   let apply ← signatureNamed program "apply"
   let function ← functionFor program apply
@@ -327,9 +384,12 @@ private def testIndirectCallBoundary (program : CheckedProgram) : IO Unit := do
     "apply: exact indirect arguments produced malformed call metadata"
   match SourceSpecializationWorklist.run program
       [monomorphicRequest apply] 1 with
-  | .error (.indirectCall _) => pure ()
+  | .ok (.complete plan) =>
+      assertTrue (decide (plan.specializations.length = 1 ∧
+          plan.callEdges = [] ∧ plan.referenceEdges = []))
+        "well-typed indirect call added a static target edge"
   | result => throw (IO.userError
-      s!"indirect call was not rejected explicitly: {reprStr result}")
+      s!"well-typed indirect call was not accepted: {reprStr result}")
   let malformedMetadata := {
     metadata with argumentTypeAfterCoercion := Ty.bool
   }
@@ -455,10 +515,10 @@ private def testMalformedTypedMetadata (program : CheckedProgram) : IO Unit := d
   | result => throw (IO.userError
       s!"missing environment declaration was not rejected: {reprStr result}")
 
-/-- Exercise canonical FIFO discovery, per-occurrence edges, recursion
-deduplication, finite type-growing recursion, retained assumptions/evidence,
-malformed catalog/metadata rejection and the initial indirect-call boundary
-from one checked raw workspace. -/
+/-- Exercise canonical FIFO discovery, per-occurrence direct and function-value
+edges, recursion deduplication, finite type-growing recursion, retained
+assumptions/evidence, malformed catalog/metadata rejection, and indirect-call
+validation from one checked raw workspace. -/
 def testSourceSpecializationWorklist : IO Unit := do
   let program ← checkedProgram
   testBreadthFirstDiscovery program
@@ -466,6 +526,7 @@ def testSourceSpecializationWorklist : IO Unit := do
   testTypedNodeOrder program
   testRecursiveKeys program
   testAssumptionPreservation program
+  testFunctionValueReference program
   testIndirectCallBoundary program
   testMalformedTypedMetadata program
 

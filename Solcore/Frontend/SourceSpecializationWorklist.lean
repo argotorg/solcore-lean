@@ -7,9 +7,13 @@ Finite whole-program specialization planning.
 Requests may present declaration parameters in any order.  The checked
 program's exact signature/body pair and `SourceSpecialization.specializeFunction`
 are the sole canonicalization boundary.  Each newly admitted specialization is
-scanned in typed-source node order; direct source-declaration calls append
-requests to the FIFO tail, compiler-function calls add no edge, and already-seen
-canonical keys are skipped without consuming budget.
+scanned in typed-source node order; direct source-declaration calls and
+standalone source-declaration function references append requests to the FIFO
+tail, compiler-function calls add no edge, and already-seen canonical keys are
+skipped without consuming budget.  A declaration reference which is the callee
+child of a direct call is represented only by that call edge, so adding
+first-class function discovery does not perturb the established direct-call
+frontier.
 
 The budget counts distinct specializations admitted to the plan.  Exhaustion
 is an ordinary outcome rather than a malformed-program error, which makes
@@ -39,6 +43,15 @@ structure CallEdge where
   callee : SourceSpecialization.SpecializationKey
   deriving Repr, BEq, DecidableEq
 
+/-- One declaration reference used as a first-class function value.  Direct
+call callee children are excluded because their occurrence is already retained
+by `CallEdge`. -/
+structure ReferenceEdge where
+  caller : SourceSpecialization.SpecializationKey
+  occurrence : ExpressionId
+  callee : SourceSpecialization.SpecializationKey
+  deriving Repr, BEq, DecidableEq
+
 /-- Canonical roots plus FIFO-ordered specializations and call occurrences
 discovered so far.  `seedKeys` preserves input seed order and duplicates even
 though `specializations` is deduplicated by first-seen key. -/
@@ -46,6 +59,7 @@ structure Plan where
   seedKeys : List SourceSpecialization.SpecializationKey
   specializations : List SourceSpecialization.SpecializedFunction
   callEdges : List CallEdge
+  referenceEdges : List ReferenceEdge := []
   deriving Repr, BEq
 
 /-- A finite run either closes the reachable direct-call graph or exposes the
@@ -102,6 +116,8 @@ inductive Error where
       (coercions : List CoercionStep)
   | invalidIndirectArgumentCoercionPath
       (call : ExpressionId) (metadata : IndirectCallResolution)
+  /-- Retained for downstream diagnostic compatibility.  Worklist discovery
+  no longer produces this error for a well-typed indirect call. -/
   | indirectCall (occurrence : ExpressionId)
   deriving Repr, DecidableEq
 
@@ -157,6 +173,34 @@ def canonicalSeedKeys (program : CheckedProgram) :
       let specialized ← resolveRequest program request
       pure (specialized.key :: (← canonicalSeedKeys program rest))
 
+private def canonicalReference (program : CheckedProgram)
+    (occurrence : ExpressionId) (referenceType : Ty)
+    (instantiation : DeclarationInstantiation) :
+    Except Error (Request × SourceSpecialization.SpecializedFunction) := do
+  if referenceType != instantiation.type then
+    throw (.calleeNodeTypeMismatch occurrence referenceType
+      instantiation.type)
+  let request : Request := {
+    declaration := instantiation.declaration
+    parameterSubstitution := instantiation.parameterSubstitution
+  }
+  let specialized ← resolveRequest program request
+  if specialized.function.type != instantiation.type then
+    throw (.specializedCalleeTypeMismatch occurrence
+      instantiation.type specialized.function.type)
+  if specialized.assumptions != instantiation.predicates then
+    throw (.specializedCalleeAssumptionsMismatch occurrence
+      instantiation.predicates specialized.assumptions)
+  let specializedParameterComptime :=
+    specialized.function.typedBody.inputs.map (·.comptime)
+  if instantiation.parameterComptime != specializedParameterComptime then
+    throw (.specializedCalleeParameterComptimeMismatch occurrence
+      instantiation.parameterComptime specializedParameterComptime)
+  if instantiation.returnComptime != specialized.function.returnComptime then
+    throw (.specializedCalleeReturnComptimeMismatch occurrence
+      instantiation.returnComptime specialized.function.returnComptime)
+  pure (request, specialized)
+
 private def directCall (program : CheckedProgram)
     (caller : SourceSpecialization.SpecializationKey)
     (source : TypedSource) (node : ExpressionNode)
@@ -174,28 +218,8 @@ private def directCall (program : CheckedProgram)
   if instantiation != reference then
     throw (.calleeInstantiationMetadataMismatch node.id
       instantiation reference)
-  if calleeType != instantiation.type then
-    throw (.calleeNodeTypeMismatch node.id calleeType
-      instantiation.type)
-  let request : Request := {
-    declaration := instantiation.declaration
-    parameterSubstitution := instantiation.parameterSubstitution
-  }
-  let specialized ← resolveRequest program request
-  if specialized.function.type != instantiation.type then
-    throw (.specializedCalleeTypeMismatch node.id
-      instantiation.type specialized.function.type)
-  if specialized.assumptions != instantiation.predicates then
-    throw (.specializedCalleeAssumptionsMismatch node.id
-      instantiation.predicates specialized.assumptions)
-  let specializedParameterComptime :=
-    specialized.function.typedBody.inputs.map (·.comptime)
-  if instantiation.parameterComptime != specializedParameterComptime then
-    throw (.specializedCalleeParameterComptimeMismatch node.id
-      instantiation.parameterComptime specializedParameterComptime)
-  if instantiation.returnComptime != specialized.function.returnComptime then
-    throw (.specializedCalleeReturnComptimeMismatch node.id
-      instantiation.returnComptime specialized.function.returnComptime)
+  let (request, specialized) ←
+    canonicalReference program node.id calleeType instantiation
   pure (request, {
     caller
     occurrence := node.id
@@ -213,32 +237,50 @@ private def validateIndirectArgumentCoercions (node : ExpressionNode)
   if !metadata.hasValidArgumentCoercionPath then
     throw (.invalidIndirectArgumentCoercionPath node.id metadata)
 
-/-- Collect source-declaration requests and per-occurrence edges in typed-source
-node order. Compiler-function calls have no source specialization, while an
-indirect call is outside this initial closed-call profile. -/
-private def collectDirectCalls (program : CheckedProgram)
+private def directDeclarationCallees : List Node → List ExpressionId
+  | [] => []
+  | .expression { form := .call callee _ (.declaration _), .. } :: rest =>
+      callee :: directDeclarationCallees rest
+  | _ :: rest => directDeclarationCallees rest
+
+/-- Collect source-declaration requests and exact per-occurrence edges in
+typed-source node order.  Compiler-function calls have no source
+specialization.  Indirect calls are validated here, while their runtime target
+is represented by the callee expression and therefore adds no static edge. -/
+private def collectReferences (program : CheckedProgram)
     (caller : SourceSpecialization.SpecializationKey)
     (source : TypedSource) :
-    List Node → Except Error (List Request × List CallEdge)
-  | [] => pure ([], [])
-  | node :: rest => do
+    List ExpressionId → List Node →
+      Except Error (List Request × List CallEdge × List ReferenceEdge)
+  | _, [] => pure ([], [], [])
+  | directCallees, node :: rest => do
+      let collectRest := collectReferences program caller source directCallees rest
       match node with
       | .expression expression =>
           validateExpressionCoercions expression
           match expression.form with
           | .call _ _ (.indirect metadata) =>
               validateIndirectArgumentCoercions expression metadata
-              throw (.indirectCall expression.id)
+              collectRest
           | .call callee _ (.declaration instantiation) =>
               let (request, edge) ←
                 directCall program caller source expression callee instantiation
-              let (requests, edges) ←
-                collectDirectCalls program caller source rest
-              pure (request :: requests, edge :: edges)
-          | .call _ _ (.builtinFunction _) =>
-              collectDirectCalls program caller source rest
-          | _ => collectDirectCalls program caller source rest
-      | .statement _ => collectDirectCalls program caller source rest
+              let (requests, callEdges, referenceEdges) ← collectRest
+              pure (request :: requests, edge :: callEdges, referenceEdges)
+          | .reference _ (.declaration instantiation) =>
+              if directCallees.contains expression.id then
+                collectRest
+              else
+                let (request, specialized) ← canonicalReference program
+                  expression.id expression.type instantiation
+                let (requests, callEdges, referenceEdges) ← collectRest
+                pure (request :: requests, callEdges, {
+                  caller
+                  occurrence := expression.id
+                  callee := specialized.key
+                } :: referenceEdges)
+          | _ => collectRest
+      | .statement _ => collectRest
 
 /-- Discard canonical keys already present in `seen` without consuming a
 distinct-key budget unit, returning the first new specialization. -/
@@ -262,29 +304,36 @@ def runAux (program : CheckedProgram)
     (queue : List Request)
     (seen : List SourceSpecialization.SpecializationKey)
     (specializations : List SourceSpecialization.SpecializedFunction)
-    (callEdges : List CallEdge) : Nat → Except Error Outcome
+    (callEdges : List CallEdge)
+    (referenceEdges : List ReferenceEdge) : Nat → Except Error Outcome
   | 0 => do
       let next ← nextUnseen program seen queue
       match next with
-      | none => pure (.complete { seedKeys, specializations, callEdges })
+      | none => pure (.complete {
+          seedKeys, specializations, callEdges, referenceEdges })
       | some (request, specialized, rest) =>
-          pure (.budgetExhausted { seedKeys, specializations, callEdges }
+          pure (.budgetExhausted {
+            seedKeys, specializations, callEdges, referenceEdges }
             specialized.key (request :: rest))
   | remaining + 1 => do
       let next ← nextUnseen program seen queue
       match next with
-      | none => pure (.complete { seedKeys, specializations, callEdges })
+      | none => pure (.complete {
+          seedKeys, specializations, callEdges, referenceEdges })
       | some (_, specialized, rest) =>
-          let (requests, edges) ← collectDirectCalls program
-            specialized.key specialized.function.typedBody
+          let source := specialized.function.typedBody
+          let directCallees := directDeclarationCallees source.nodes
+          let (requests, edges, references) ← collectReferences program
+            specialized.key source directCallees
             specialized.function.typedBody.nodes
           runAux program seedKeys (rest ++ requests) (specialized.key :: seen)
-            (specializations ++ [specialized]) (callEdges ++ edges) remaining
+            (specializations ++ [specialized]) (callEdges ++ edges)
+            (referenceEdges ++ references) remaining
 
 /-- Build a finite FIFO specialization plan from raw seed requests. -/
 def run (program : CheckedProgram) (seeds : List Request) (budget : Nat) :
     Except Error Outcome := do
   let seedKeys ← canonicalSeedKeys program seeds
-  runAux program seedKeys seeds [] [] [] budget
+  runAux program seedKeys seeds [] [] [] [] budget
 
 end Solcore.Frontend.SourceSpecializationWorklist
