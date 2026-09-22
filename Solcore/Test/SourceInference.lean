@@ -629,11 +629,15 @@ private def testAmbiguousCoercionTrait : IO Unit := do
   let raw : Workspace.RawWorkspace := {
     entry := "main.solc"
     mainSources := [
-      { path := "left.solc", content := "trait Coerce<From, To> {}" },
-      { path := "right.solc", content := "trait Coerce<From, To> {}" },
+      { path := "left.solc", content :=
+          "export {Coerce}; trait Coerce<From, To> {}" },
+      { path := "right.solc", content :=
+          "export {Coerce}; trait Coerce<From, To> {}" },
       {
         path := "main.solc"
         content := String.intercalate "\n" [
+          "import * from left;",
+          "import * from right;",
           "function accept(value: Bool) returns (Bool) { return value; }",
           "function reject(value: Word) returns (Bool) { return accept(value); }"
         ]

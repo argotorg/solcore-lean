@@ -43,19 +43,23 @@ private def environment : IO ProgramEnvironment := do
     "type Local = Box<Word>;",
     "type Callable = function(Box<Word>) returns (Bool);",
     "type IntegerBuiltin = integer;",
-    "type AppliedInteger = integer<Word>;"
+    "type AppliedInteger = integer<Word>;",
+    "export {Box};"
   ])
   let models ← parsed .main "models.solc" (String.intercalate "\n" [
+    "import * as types from types;",
+    "import {Box} from types;",
+    "import * as dep from @dep.containers;",
     "type Qualified = types.Box<Bool>;",
-    "type Fallback = Box<word>;",
-    "type External = dep.containers.Remote;",
+    "type Imported = Box<word>;",
+    "type External = dep.Remote;",
     "type Tupled = (unit, Bool, Word);",
     "type WrongArity = Box;",
     "type MissingAlias = Missing;",
     "type CapitalInteger = Integer;"
   ])
   let dependency ← parsed (.external "dep") "containers.solc"
-    "enum Remote { One }"
+    "export {*}; enum Remote { One }"
   build [types, models, dependency]
 
 private def declaration (environment : ProgramEnvironment)
@@ -101,9 +105,9 @@ private def testSuccessfulResolution : IO Unit := do
   let qualified ← resolvedAlias environment "models" "Qualified"
   assertTrue (decide (qualified = TypeSystem.Ty.nominal box.id [.bool]))
     "same-library qualified type did not resolve"
-  let fallback ← resolvedAlias environment "models" "Fallback"
-  assertTrue (decide (fallback = TypeSystem.Ty.nominal box.id [.word]))
-    "unique whole-program fallback did not resolve"
+  let imported ← resolvedAlias environment "models" "Imported"
+  assertTrue (decide (imported = TypeSystem.Ty.nominal box.id [.word]))
+    "an explicitly imported type did not resolve"
   let external ← resolvedAlias environment "models" "External"
   assertTrue (decide (external = TypeSystem.Ty.nominal remote.id []))
     "external-library qualified type did not resolve"
@@ -188,10 +192,9 @@ private def testIntegerFallbackPriority : IO Unit := do
   let globalConsumer ← parsed .main "global_consumer.solc"
     "type Use = integer;"
   let globalEnvironment ← build [globalSource, globalConsumer]
-  let globalInteger ← declaration globalEnvironment "global_integer" "integer"
   let globalUse ← resolvedAlias globalEnvironment "global_consumer" "Use"
-  assertTrue (decide (globalUse = TypeSystem.Ty.nominal globalInteger.id []))
-    "the no-import global integer compatibility lookup lost priority"
+  assertTrue (decide (globalUse = TypeSystem.Ty.integer))
+    "an unimported global declaration hid the integer intrinsic"
 
   let unrelatedImport ← parsed .main "unrelated.solc"
     "export {*}; enum Visible { Only }"
@@ -203,6 +206,31 @@ private def testIntegerFallbackPriority : IO Unit := do
     "isolated_integer" "Use"
   assertTrue (decide (isolatedUse = TypeSystem.Ty.integer))
     "an unimported integer declaration incorrectly hid the intrinsic"
+
+private def testStrictImportVisibility : IO Unit := do
+  let provider ← parsed .main "provider.solc"
+    "export {*}; enum Hidden { Only }"
+  let unrelated ← parsed .main "unrelated.solc"
+    "export {*}; enum Visible { Only }"
+  let consumer ← parsed .main "consumer.solc" (String.intercalate "\n" [
+    "import * from unrelated;",
+    "type Unqualified = Hidden;",
+    "type Canonical = provider.Hidden;"
+  ])
+  let environment ← build [provider, unrelated, consumer]
+  for (name, expected) in [
+      ("Unqualified", ProgramTypeResolutionError.unknownTypeName ["Hidden"]),
+      ("Canonical", ProgramTypeResolutionError.unknownTypeName
+        ["provider", "Hidden"])
+    ] do
+    let declaration ← declaration environment "consumer" name
+    let source ← aliasValue declaration
+    match resolveProgramTypeExpr environment (.ofDeclaration declaration) source with
+    | .error actual =>
+        assertTrue (decide (actual = expected))
+          s!"{name} received the wrong strict-visibility diagnostic"
+    | .ok type => throw (IO.userError
+        s!"{name} reached an unimported declaration: {reprStr type}")
 
 private def expectEnvironmentFailures : IO Unit := do
   let duplicate ← parsed .main "duplicate.solc"
@@ -221,9 +249,13 @@ private def expectEnvironmentFailures : IO Unit := do
         | .duplicateModule _ => true
         | _ => false) "duplicate module was not reported"
   | .ok _ => throw (IO.userError "duplicate module was accepted")
-  let left ← parsed .main "left.solc" "enum Shared { Left }"
-  let right ← parsed .main "right.solc" "enum Shared { Right }"
-  let consumer ← parsed .main "consumer.solc" "type Use = Shared;"
+  let left ← parsed .main "left.solc" "export {*}; enum Shared { Left }"
+  let right ← parsed .main "right.solc" "export {*}; enum Shared { Right }"
+  let consumer ← parsed .main "consumer.solc" (String.intercalate "\n" [
+    "import * from left;",
+    "import * from right;",
+    "type Use = Shared;"
+  ])
   let ambiguousEnvironment ←
     match buildProgramEnvironment [left, right, consumer] with
     | .ok environment => pure environment
@@ -245,6 +277,7 @@ def testProgramEnvironmentAndTypeResolution : IO Unit := do
   ProgramEnvironmentAndTypeResolution.testSuccessfulResolution
   ProgramEnvironmentAndTypeResolution.expectResolutionFailures
   ProgramEnvironmentAndTypeResolution.testIntegerFallbackPriority
+  ProgramEnvironmentAndTypeResolution.testStrictImportVisibility
   ProgramEnvironmentAndTypeResolution.expectEnvironmentFailures
 
 end Tests

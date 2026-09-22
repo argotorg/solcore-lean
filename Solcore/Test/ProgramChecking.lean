@@ -18,6 +18,7 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
     {
       path := "traits.solc"
       content := String.intercalate "\n" [
+        "export {Eq};",
         "trait Eq<T> {}",
         "impl Eq<Word> {}"
       ]
@@ -25,6 +26,8 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
     {
       path := "functions.solc"
       content := String.intercalate "\n" [
+        "import {Eq} from traits;",
+        "export {keep, choose};",
         "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
         "function choose(value: Bool) returns (Bool) { return value; }",
         "function choose(value: Word) returns (Word) { return value + 1; }"
@@ -32,7 +35,10 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
     },
     {
       path := "main.solc"
-      content := "function run() returns (Word) { return choose(keep(41)); }"
+      content := String.intercalate "\n" [
+        "import {keep, choose} from functions;",
+        "function run() returns (Word) { return choose(keep(41)); }"
+      ]
     }
   ]
   externalLibraries := []
