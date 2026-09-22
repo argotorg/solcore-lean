@@ -29,11 +29,7 @@ def functionsNamed (context : Context) (name : String) :
     match buildProgramImports context.environment context.scope.currentModule with
     | .error errors => .error (.importVisibility errors)
     | .ok visibility =>
-        if visibility.hasImports then
-          .ok (signaturesForDeclarations context (visibility.valuesNamed name))
-        else
-          .ok (context.signatures.functions.filter fun signature =>
-            signature.name == name)
+        .ok (signaturesForDeclarations context (visibility.valuesNamed name))
 
 def qualifiedFunctionsNamed (context : Context)
     (namespacePath : List String) (name : String) :
@@ -59,11 +55,7 @@ def traitCandidates (context : Context) (name : String) :
   | [] =>
       match buildProgramImports context.environment context.scope.currentModule with
       | .error errors => .error (.importVisibility errors)
-      | .ok visibility =>
-          if visibility.hasImports then
-            .ok (visibility.traitsNamed name)
-          else
-            .ok (context.environment.traitsNamed name)
+      | .ok visibility => .ok (visibility.traitsNamed name)
 
 def conventionalTraitWithArity? (context : Context) (name : String)
     (arity : Nat) :

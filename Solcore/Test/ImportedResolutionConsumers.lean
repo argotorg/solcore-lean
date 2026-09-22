@@ -68,11 +68,33 @@ private def testImportsCloseUnqualifiedVisibility : IO Unit := do
         "an unimported value remained visible after a direct import"
   | .ok _ => throw (IO.userError "an unimported value remained visible")
 
-private def testNoImportFallback : IO Unit := do
+private def testNoImportIsolation : IO Unit := do
   let consumer :=
     "function run() returns (Bool) { return hidden(true); }"
-  expectSuccess (raw [("provider.solc", provider), ("consumer.solc", consumer)]
-    "consumer.solc")
+  match SourceInference.loadAndCheckProgram
+      (raw [("provider.solc", provider), ("consumer.solc", consumer)]
+        "consumer.solc") with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .noMatchingOverload "hidden" candidates, .. } =>
+            candidates.isEmpty
+        | _ => false)
+        "a value leaked from an unimported module"
+  | .ok _ => throw (IO.userError "a value leaked from an unimported module")
+
+private def testCanonicalPathDoesNotBypassImports : IO Unit := do
+  let consumer :=
+    "function bad() returns (Bool) { return provider.hidden(true); }"
+  match SourceInference.loadAndCheckProgram
+      (raw [("provider.solc", provider), ("consumer.solc", consumer)]
+        "consumer.solc") with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .unsupportedExpression "field", .. } => true
+        | _ => false)
+        "a canonical module path bypassed the declared-import boundary"
+  | .ok _ => throw (IO.userError
+      "a canonical module path reached an unimported function")
 
 private def testAmbiguousNamespace : IO Unit := do
   let left := "export {*}; function choose(value: Word) returns (Word) { return value; }"
@@ -145,7 +167,8 @@ def testImportedResolutionConsumers : IO Unit := do
   testSelectedValuesTraitsAndLocalShadowing
   testQualifiedNamespaceValue
   testImportsCloseUnqualifiedVisibility
-  testNoImportFallback
+  testNoImportIsolation
+  testCanonicalPathDoesNotBypassImports
   testAmbiguousNamespace
   testReexportedEntitiesAndModulePath
   testNamespaceHonorsPublicInterface
