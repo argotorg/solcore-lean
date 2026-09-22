@@ -124,13 +124,13 @@ let plus modulo-Word equality tests.  Wildcards remain type-general and never
 default an open scrutinee.  Multiple scrutinees, binder/constructor/comptime/
 tuple/string patterns and nonterminal or falling-through match control flow
 remain later.  Subsequent vertical work can broaden constructors, member
-selection and place-aware assignment on the same carrier.  Constructor and
-operator export selectors, cyclic
-aliases, polymorphic recursion, higher-rank/higher-kinded types, generic or
-symbolic coercion intermediates, coinductive trait/coercion cycles and a complete
-overlap policy remain explicit edge-case work.  Broad diagnostic and static-
-semantics soundness/completeness theorem families do not block these executable
-stages.
+selection and place-aware assignment on the same carrier.  ADR-0370 later
+closes constructor export selection, transparent aliases with explicit cycle
+diagnostics, strict import visibility, and shared module-path resolution.
+Polymorphic recursion, higher-rank/higher-kinded types, generic or symbolic
+coercion intermediates, coinductive trait/coercion cycles and a complete overlap
+policy remain explicit edge-case work.  Broad diagnostic and static-semantics
+soundness/completeness theorem families do not block these executable stages.
 
 ADR-0349 connects the first signed staged-integer primitives.  Bare
 `integerSub` and `wordFromInteger` receive collision-free compiler identities
@@ -414,9 +414,40 @@ expression or indirect argument coercions reject until evidence dispatch is
 implemented.
 
 Phase 7 deliberately keeps proof density low.  General struct/object members,
-contract storage and ABI behavior, transparent constructor lookup through type
-aliases, staged nominal/effectful values, and broad safety, determinism, fuel
-and source-correspondence proofs remain later work.
+contract storage and ABI behavior, staged nominal/effectful values, and broad
+safety, determinism, fuel and source-correspondence proofs remain later work.
+
+ADR-0370 completes roadmap phase 8, the module/type edge-case profile.
+Transparent aliases resolve their right-hand sides in definition-site scope,
+substitute generic parameters simultaneously, and normalize recursively.
+Signature collection eagerly validates unused aliases; direct and mutual
+cycles report their closed declaration path, and exhaustion of the shared
+normalization-node budget is a distinct diagnostic.  An alias does not
+introduce a constructor namespace, so `Alias.Constructor` remains invalid,
+while an expected alias type can normalize to an enum and guide `.Constructor`.
+
+Public interfaces now carry constructor visibility as opaque data or an
+explicit visible set.  Local bare and wildcard exports keep constructors
+opaque; constructor selectors expose validated subsets.  Remote wildcards
+preserve upstream visibility, named bare re-exports strip it, and downstream
+selectors cannot regain a hidden constructor.  Fixed-point union remains
+monotone and constructor lookup consumes the resulting metadata.  Operator
+selectors use ordinary exported-name lookup rather than a separate namespace.
+
+Type, trait, value, and constructor lookup now requires lexical/local scope or
+a declared import.  The no-import whole-program search and direct canonical
+module-path bypass are removed.  Imports and remote exports share a canonical
+resolver: unmarked paths are relative to the importing module directory,
+multi-component `lib.*` starts at the current library root while bare `lib`
+remains relative, and `std`/`std.*` uses the standard library.  Only a missing
+multi-component standard path receives the documented local-relative fallback;
+`@library.*` starts at that external library root.
+
+Phase 8 retains the executable-first proof policy.  Nested contract namespaces,
+method-local generics, higher-rank/higher-kinded types, polymorphic recursion,
+coinductive trait/coercion cycles, overlap/default policy beyond explicit
+ambiguity, let-polymorphic runtime execution, broad interface and normalization
+proofs, and the phase-9 public compiler boundary remain later work.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,

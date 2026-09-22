@@ -271,8 +271,28 @@ only exact builtin integer-literal evidence and rejects other executable
 requirements plus expression or indirect-call coercions rather than treating
 selected user methods as builtins.  The phase uses focused executable and
 rejection tests rather than a broad proof campaign; general struct/object
-members, contract storage/ABI, alias transparency, staged nominal values, and
-broad static/dynamic correspondence proofs remain deferred.
+members, contract storage/ABI, staged nominal values, and broad static/dynamic
+correspondence proofs remain deferred.
+
+ADR-0370 completes roadmap phase 8's module/type edge-case profile.  Type
+aliases now normalize transparently under simultaneous generic substitution in
+their definition-site scope.  Unused aliases are checked eagerly; direct and
+mutual cycles retain their closed declaration path, while exhaustion of the
+shared normalization-node budget is a separate error.  An alias remains a type
+synonym rather than a constructor namespace: expected-type `.Constructor`
+works after alias normalization, while `Alias.Constructor` is rejected.
+
+Public data entities now carry opaque-or-visible constructor metadata through
+fixed-point exports, re-exports, imports, and source lookup.  Selective exports
+cannot regain a constructor hidden by an upstream interface.  Type, trait,
+value, and constructor lookup no longer searches all declarations when imports
+are absent and no written canonical path bypasses imports.  One module resolver
+serves imports and remote exports: bare paths (including bare `lib`) are
+relative, multi-component `lib.*` is library-rooted, `std`/`std.*` is standard,
+only a missing multi-component standard path has a local fallback, and
+`@external` is external-library-rooted.  This remains an executable-first phase:
+nested contract namespaces, advanced polymorphism, coinductive/overlap policy,
+let-polymorphic runtime execution, and broad proofs remain deferred.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5838,17 +5858,34 @@ sets and positive re-export cycles have deterministic executable meaning.
 Plain/namespace, wildcard and selective imports consume those interfaces for
 types, traits and values.  Generic parameters and local declarations retain
 their priority, while imported public module bindings support multi-component
-qualified type and function paths.
+qualified type and function paths.  ADR-0370 makes this boundary strict:
+unimported whole-program declarations and directly written canonical module
+paths are not compatibility fallbacks.  Imports and remote exports share one
+resolver for relative, current-library, standard-library and external-library
+paths.
+
+Public data entities additionally retain constructor visibility.  A bare data
+export is opaque; explicit constructor selectors expose validated subsets,
+remote wildcard exports preserve their source visibility, and named bare
+re-exports strip it.  Fixed-point unions are monotone, but a downstream
+selector cannot regain a constructor hidden upstream.  Explicit and
+expected-type constructor lookup both consume this metadata.
 
 The independent source type layer provides rigid declaration parameters,
 flexible inference variables, substitutions, rank-1 schemes, instantiation,
 let generalization, occurs-checking unification, and resolved function and impl
-signatures.  Implementation-head matching freshens parameters before
-unification.  Bounded tabled trait resolution returns evidence and distinguishes
-success, no solution, and inconclusive depth, cycle, overlap, or incomplete
-competitor outcomes.  Resolved trait and implementation catalogs additionally
-retain stable trait/implementation/method identities and reject duplicate,
-missing, extra or signature-incompatible implementation methods.
+signatures.  Transparent aliases resolve their right-hand sides in definition
+scope, substitute generic arguments simultaneously, and normalize recursively.
+All aliases, including unused declarations, are checked eagerly; cyclic paths
+and normalization-node-budget exhaustion are distinct diagnostics.  An alias
+does not create an explicit constructor namespace, although a normalized
+expected alias type can guide leading-dot construction.  Implementation-head
+matching freshens parameters before unification.  Bounded tabled trait resolution
+returns evidence and distinguishes success, no solution, and inconclusive
+depth, cycle, overlap, or incomplete competitor outcomes.  Resolved trait and
+implementation catalogs additionally retain stable
+trait/implementation/method identities and reject duplicate, missing, extra or
+signature-incompatible implementation methods.
 
 The first source-body checker handles locals, functions and overload sets,
 calls, lambdas, tuples, groups, conditionals, supported unary/binary operators,
@@ -5890,13 +5927,13 @@ workspace can therefore be loaded, have all function and impl signatures
 resolved, and have all supported function bodies checked in declaration order.
 
 This is deliberately an executable-first profile with reduced proof density.
-Constructor/operator export selectors and the remaining module-reference edge
-cases are explicit errors; the initial no-import and canonical-path lookup
-fallbacks remain for compatibility.  Dot construction, general fields, arrays,
-assignment, general match forms, loops, assembly and loop control reject as
-unsupported.  The match slice rejects multiple scrutinees, binder/constructor/
-comptime/tuple/string patterns, nonterminal use, uncovered literal-only cases,
-and falling-through branches.
+Constructor export selectors are enforced through interface metadata, while an
+operator selector is an ordinary exported spelling rather than a second
+namespace.  Strict import visibility and shared module-path resolution replace
+the former no-import and direct canonical-path compatibility fallbacks.
+Nested contract namespaces, general struct/object members, assembly, string or
+comptime patterns, and complete recursive coverage/redundancy analysis remain
+outside this boundary.
 Higher-rank and higher-kinded polymorphism,
 polymorphic recursion, coinductive trait cycles and overlap policy beyond
 explicit ambiguity are deferred.  Generic or symbolic intermediate coercion
