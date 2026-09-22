@@ -117,10 +117,12 @@ applying modulo.  A separate closed Word evaluator admits exact `Int<Word>`
 literals, groups, and nested `wordFromInteger`, then `wordToInteger` exposes the
 canonical unsigned Word payload as a nonnegative `Int`.  Runtime-dependent
 staged trees and every surviving `integer` value still reject explicitly.
-Closed staged conditionals now evaluate their Bool guard and both integer or
-Word branches eagerly in source order, preserve all three requirement streams,
-and select a value only after every child succeeds.  Ordinary runtime
-conditionals remain Core conditionals.  An initialized monomorphic let whose
+Closed staged conditionals now evaluate their Bool guard, execute only the
+selected integer or Word branch, and traverse the other branch in validate-only
+mode.  Both written branches still validate their metadata and preserve all
+three requirement streams in source order, but an unselected call or
+evidence-selected operation is not invoked.  Ordinary runtime conditionals
+remain Core conditionals.  An initialized monomorphic let whose
 final binder type is exactly `integer` now evaluates its initializer once under
 the preceding staged environment, binds the exact Lean `Int` by stable local
 identity, and disappears before Core.  Repeated local uses do not duplicate the
@@ -134,10 +136,14 @@ them.  Arguments evaluate left to right in the caller; their `Int` values are
 bound positionally to the callee's validated stable input identities.
 The callee reconciles its own requirements before returning only a value, so
 numerically overlapping function-local requirement IDs cannot cross ledgers.
-Runtime and staged expansion share the same specialization-key visiting stack
-and decreasing link-depth fuel.  Both conditional branches remain eager, and
-self-, mutual-, or unselected-branch recursion rejects.  Integer-returning
-functions still reject as runtime roots because Core has no runtime `integer`.
+Runtime draft expansion retains the specialization-key visiting stack and
+decreasing link-depth fuel.  Staged invocation instead uses a carrier-specific
+active frame consisting of the specialization key, ordered evidence, and
+concrete arguments, plus the public `Limits.stagingFuel` dynamic-depth bound.
+Different-value direct and mutual recursion is executable; an exact active
+frame repeats with `stagedInvocationCycle`, while exhausted depth reports
+`stagedFuelExhausted`.  Integer-returning functions still reject as runtime
+roots because Core has no runtime `integer`.
 ADR-0356 now replaces the provisional marker representation with canonical
 function contracts.  Resolved parameter rows retain their `comptime` bits,
 `returns (comptime<T>)` becomes bare result `T` plus a separate result bit, and
@@ -157,16 +163,18 @@ restricted linker now consumes that table for marked arguments instead of
 running a private classifier.  ADR-0358 consumes its `Comptime` facts in a
 standalone evaluator for exact Unit, Bool, Word and right-associated product
 values.  It covers positional inputs, stable-ID initialized lets, groups,
-tuples, requirement-free/coercion-free builtin operators, eager expression and
-statement conditionals, blocks and terminal returns, with exact requirement
+tuples, requirement-free/coercion-free builtin operators, selected-branch
+expression and statement conditionals with validate-only traversal of the
+other branch, blocks and terminal returns, with exact requirement
 reconciliation.  The arbitrary-precision integer evaluator stays separate.
 ADR-0359 now carries those values across authoritative marked-result direct
 call edges and materializes them as closed constants.  Arguments evaluate once
-from left to right, nested acyclic calls are supported, caller and callee
-requirement ledgers stay separate, and an otherwise runtime caller may alias a
-closed staged result.  Runtime, staged-integer and general staged expansion
-share one specialization-key stack and decreasing link-depth fuel, while both
-conditional branches remain eager.  ADR-0360 now passes exact call-site-known
+from left to right, caller and callee requirement ledgers stay separate, and an
+otherwise runtime caller may alias a closed staged result.  ADR-0365 extends
+this path from nested acyclic calls to fuel-bounded selected-branch recursion;
+runtime expansion keeps its specialization-key/link-fuel boundary while staged
+calls use exact value-indexed active frames and a separate dynamic-depth fuel.
+ADR-0360 now passes exact call-site-known
 Unit/Bool/Word/product values into the private staged environment of a
 runtime-callee draft.  An explicitly marked input can therefore feed a nested
 marked-result call, while every runtime Core input, argument alias, function
@@ -185,17 +193,23 @@ callee-local expressions.  It reuses the ordinary authoritative
 requirements, forwards concrete evidence through nested generic relays, and
 runs the resulting closed typed method application under structural fuel with
 an empty-store and staged-carrier boundary.  Caller/callee and detached-method
-ledgers remain separate, and linking shares the existing active-key stack and
-decreasing link fuel.  ADR-0363 applies the same authority to requirement-
+ledgers remain separate.  Detached-method and runtime-draft linking retains the
+existing active-key stack and decreasing link fuel; staged recursive invocation
+uses ADR-0365's value-indexed frame and depth policy.  ADR-0363 applies the same
+authority to requirement-
 bearing unary and binary nodes: exact primary-plus-method evidence selects the
 implementation body, operands evaluate left to right, and method results cross
 the same independently typed empty-store boundary.  ADR-0364 permits the one
 selected staged method root to carry validated `comptime` parameter/result
 markers while ordinary runtime dispatch continues to reject it.  Together
-ADR-0361–0364 complete the evidence-aware staging phase.  Indirect calls,
-mutation, nominal or functional values, value-indexed memoization, every form
-of recursion and compile-time Fibonacci remain later; staged recursion is the
-next roadmap phase.
+ADR-0361–0364 complete the evidence-aware staging phase.  ADR-0365 completes
+the next roadmap phase with selected-branch bare-`integer` and
+Unit/Bool/Word/product staged recursion, exact active-invocation cycle checks,
+and a public dynamic-call-depth bound.  Countdown, factorial, finite mutual
+recursion, and small compile-time Fibonacci now close to constants.  Indirect
+calls, mutation, nominal or functional values, result memoization, a
+sibling-shared total-work budget, and ordinary runtime/Core recursion remain
+later.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -5913,12 +5927,12 @@ from `-1` yields `2^256 - 1`.  Runtime Word locals, general Word operators, and
 ordinary Word-returning calls remain outside this staging boundary.  The
 integer and Word evaluators now also accept exact closed expression
 conditionals.  A closed Bool evaluator validates builtin constants, integer
-comparisons, transparent groups, and nested Bool conditionals; staging then
-evaluates the guard, then branch, and else branch eagerly, preserves consumed
-requirements in that order, and selects the integer or Word value only after
-all three succeed.  This follows the pinned `MastCond` all-children evaluation
-boundary while adding value selection for the closed fragment.  It does not
-fold ordinary runtime Core conditionals.  Initialized monomorphic lets whose
+comparisons, transparent groups, and nested Bool conditionals; staging
+evaluates the guard and selected branch while traversing the other branch in
+validate-only mode.  Consumed requirements from guard, then, and else remain in
+source order, but unselected calls and evidence-selected operations are not
+invoked.  It does not fold ordinary runtime Core conditionals.  Initialized
+monomorphic lets whose
 final binder type is exactly `integer` now use a separate staged environment.
 Their initializer is evaluated once under the old environment, its requirements
 are consumed before the statement tail, and only then is its stable binder and
@@ -5936,11 +5950,12 @@ left to right, binds their `Int` values to the callee's declaration-owned input
 IDs, and evaluates integer lets plus tail returns, terminal blocks, and terminal
 statement conditionals.  Caller obligations stay in caller order; the callee
 reconciles its own requirement table locally before returning an `Int`.
-Runtime and staged calls use one specialization-key visiting stack and one
-decreasing link-depth fuel, while per-source node fuel bounds malformed local
-graphs.  Eager branch validation means recursion in an unselected branch still
-rejects, as do all other direct or mutual cycles.  An integer function remains
-invalid as a runtime root.
+Runtime call drafting uses its specialization-key visiting stack and decreasing
+link-depth fuel, while per-source node fuel bounds malformed local graphs.
+Staged calls instead use ADR-0365's exact carrier/key/evidence/argument active
+frames and the public dynamic-depth budget.  Different-value direct and mutual
+recursion is executable; only an exact active invocation or exhausted staged
+fuel rejects.  An integer function remains invalid as a runtime root.
 
 ADR-0356 now reproduces the pinned reference's separate function-contract
 markers at this boundary.  Parameter rows retain their source-order comptime
@@ -5977,14 +5992,14 @@ exact equality and reject a stale or forged specialization sidecar.  `Runtime`,
 `Deferred` and missing facts reject distinctly.  It admits checked Word literals and Boolean
 constants, stable-ID local references, groups, tuples, and requirement-free,
 coercion-free builtin unary and binary operations.  Tuple elements are
-evaluated left to right.  Expression conditionals evaluate guard, then and else
-before selecting a value, so an unselected branch still contributes failures
-and requirements.
+evaluated left to right.  Expression conditionals execute the guard and
+selected branch, validate the unselected branch without invoking calls or
+evidence-selected operations, and still retain both branches' requirements.
 
 The corresponding standalone function evaluator validates positional input
 arity and types, then threads initialized lets, lexical blocks, terminal
-returns and eager two-return-branch statement conditionals through the same
-stable-ID value environment.  A let initializer uses the old environment and
+returns and selected-branch two-return-branch statement conditionals through
+the same stable-ID value environment.  A let initializer uses the old environment and
 is evaluated exactly once before its binder becomes visible; local reads do
 not consume its requirements again.  The returned value must match the checked
 source result type, and the complete consumed-requirement ledger must match the
@@ -6004,17 +6019,18 @@ Numerically overlapping requirement IDs therefore never cross ledgers.
 
 The result is reified with `SourceStagedValue.toResolved`, yielding a closed
 Unit, Bool, Word or right-associated product constant at the caller occurrence.
-Nested finite acyclic calls are admitted.  An ordinary runtime function may
+Nested finite calls are admitted, including ADR-0365's bounded recursion.  An ordinary runtime function may
 bind such a result to an ordinary runtime alias, but marked functions remain
 invalid runtime roots and runtime or `Deferred` actuals cannot be staged merely
 because a callee ignores them.  The unmarked pure bare-`integer` rule remains a
 separate compatibility path.
 
-General staged calls reuse the same canonical `SpecializationKey` visiting
-stack and decreasing link-depth fuel as runtime and staged-integer expansion;
-local source-node fuel separately bounds each callee's malformed graphs.  Both
-expression and statement conditionals still evaluate guard, then and else, so
-a call, failure or cycle in an unselected written branch also rejects.
+General staged calls retain the canonical specialization plan but use an exact
+active invocation frame over carrier, `SpecializationKey`, ordered evidence and
+concrete arguments, plus a separate decreasing staged-call-depth budget.  Local
+source-node fuel separately bounds each callee's malformed graphs.  Both
+expression and statement conditionals validate all written branches while
+invoking only the selected branch.
 
 ADR-0360 removes the remaining runtime-draft gap for known
 Core-representable marked inputs.  At each exact planned call occurrence, the
@@ -6032,7 +6048,9 @@ call occurrence rather than memoized by key, so distinct values at the same
 specialization cannot contaminate each other.  Oracle evaluation transfers no
 requirement ledger: ordinary actual lowering owns caller requirements exactly
 once, and the callee continues to reconcile only its declaration-owned rows.
-The same active-key stack, link fuel and eager conditional policy still apply.
+The ADR-0365 active-invocation and selected-branch policy applies when those
+known values feed a staged call; runtime draft linking retains its own key stack
+and link fuel.
 
 ADR-0361 removes the empty-signature-predicate restriction from both direct
 staged-call evaluators.  For every specialized call predicate, the linker
@@ -6043,16 +6061,16 @@ predicate order to the specialized callee.  Callee entry rejects any remaining
 assumption and validates the evidence goals before evaluation.  This supports
 nested constrained generic Word calls and nested constrained bare-`integer`
 calls while retaining value-only materialization, independent declaration-owned
-requirement ledgers, store preservation, and the shared active-key stack and
-link fuel.
+requirement ledgers, and store preservation.  Evidence is also part of
+ADR-0365's ordered active-invocation identity.
 
 ADR-0361's signature predicates remain proof-only: staging does not execute
 them or reify evidence into Core.  ADR-0362–0364 separately use selected
 evidence for the supported coercion and operator profiles described below.
 Indirect calls, mutation, nominal/function/proxy/index values, unsupported
-`Comptime`-classified source forms, value-indexed memoization, direct and mutual
-recursion, selected-branch recursion, and compile-time Fibonacci remain
-deferred.
+`Comptime`-classified source forms, and value-indexed result memoization remain
+deferred.  ADR-0365 separately admits bounded direct, mutual, and
+selected-branch staged recursion, including small compile-time Fibonacci.
 
 ADR-0362 adds exact coercion execution to the Core-representable staged-value
 path.  A node with a typed coercion path first evaluates its coercion-cleared
@@ -6079,9 +6097,10 @@ execution uses a structural bound over the complete resolved term, begins with
 an empty store, requires an empty final store, and projects the result back only
 into Unit, Bool, Word, or a recursively supported product.  Faults, fuel
 exhaustion, store changes, and values outside that carrier reject.  The caller
-or callee ledger remains separate from the detached method ledger, while
-detached linking and nested calls retain the shared active-key stack and
-decreasing link fuel.  Regressions cover marked-result conversion, composed
+or callee ledger remains separate from the detached method ledger.  Detached
+method and runtime-draft linking retain the specialization-key stack and
+decreasing link fuel; ADR-0365 separately governs recursive staged invocation.
+Regressions cover marked-result conversion, composed
 marked-argument and result conversions, and nested generic evidence forwarding.
 Bare-`integer` coercions remain a separate later boundary.
 
@@ -6115,12 +6134,34 @@ the exact marker vector and result flag.  Marked `Add.add` and
 `Coerce.coerce` staged roots materialize nonstandard results while preserving
 the caller store.
 
-This completes roadmap phase 4, evidence-aware staging.  Arbitrary trait
-methods, effects, indirect calls, mutation, nominal/function/proxy/index
-values, unsupported staged carriers, value-indexed memoization, direct and
-mutual recursion, selected-branch recursion, and compile-time Fibonacci remain
-deferred.  Phase 5 starts with staged recursion while retaining explicit fuel
-and cycle policy.
+This completes roadmap phase 4, evidence-aware staging.
+
+ADR-0365 completes roadmap phase 5 with fuel-bounded selected-branch staged
+recursion.  Both the bare-`integer` and Core-representable evaluators now carry
+execute/validate-only mode: guard metadata and both written branch ledgers are
+checked in source order, but only the selected branch invokes a staged callee,
+coercion method, or required operator method.  The canonical plan therefore
+retains and validates every edge without dynamically executing an unselected
+fault or recursive call.
+
+Each dynamic staged entry records a carrier-specific frame consisting of its
+`SpecializationKey`, ordered concrete predicate evidence, and concrete ordered
+arguments.  Exact recurrence of an active frame reports
+`stagedInvocationCycle`; the same specialization at a different value is
+allowed.  `SourceProgramExecution.Limits.stagingFuel` supplies an independent
+dynamic-call-depth bound and reports `stagedFuelExhausted` at zero.  Sibling
+calls receive the same remaining depth rather than sharing a total-work
+counter.  Countdown, factorial, finite mutual countdown, small Fibonacci,
+general Word/Bool recursion, statement-condition recursion, and constrained
+generic evidence forwarding close through the public pipeline to constants
+while preserving the caller's store.  Ordinary runtime recursion still
+reports `recursiveCallCycle`.
+
+Result memoization, a value-indexed cache, a sibling-shared total-work budget,
+ordinary runtime/Core recursion, indirect or higher-order recursion, effects,
+mutation, nominal/function/proxy/index values, unsupported staged carriers,
+nested marked method expansion, type-growing polymorphic recursion beyond the
+specialization budget, and broad proof hardening remain deferred.
 
 Terminal typed matches apply the same validation to each numeric pattern,
 lower every written arm/default under the original source scope, reconcile all
@@ -6325,8 +6366,10 @@ helpers, and recursively applies the supported unary, binary and coercion
 policies.  Trait-header assumptions are resolved only when consumed.  Cycles
 and exhausted expansion fuel reject explicitly, and nominal source types remain
 outside the closed Core type projection.
-Thus the worklist may close same-key self or mutual recursion, but the current
-linker does not assign those cycles an executable meaning.  Small checked laws
+Thus the worklist may close same-key self or mutual recursion.  ADR-0365 assigns
+an executable meaning only when such an edge is invoked through the bounded
+staged-value machine; ordinary runtime and detached-Core expansion still reject
+specialization-key cycles.  Small checked laws
 fix the runtime input-type gate and budget-exhaustion boundary; end-to-end
 regressions execute proof-only constrained and nested generic calls as well as
 both conditional paths, method-authoritative `BitNot.bnot`, all strict Word
