@@ -26,9 +26,9 @@ backed by ordinary prelude functions are represented as ordinary direct calls
 before this layer.  Every other runtime-evidence shape remains an explicit
 staged boundary.
 
-The current Core has no recursive binding construct.  Accordingly, recursive
-specialization cycles are rejected explicitly rather than assigned an
-approximate runtime meaning.
+The current Core has no recursive binding construct, so runtime specialization
+cycles remain rejected.  Closed staged calls instead use concrete
+evidence-and-value invocation frames plus a separate finite depth budget.
 -/
 
 set_option autoImplicit false

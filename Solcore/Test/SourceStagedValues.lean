@@ -210,9 +210,9 @@ private def testStatementEvaluation (program : CheckedProgram) : IO Unit := do
   let elseValue ← evaluateFunctionOrThrow "staged statement false" specialized
     [.bool false, .word (word 4)]
   assertTrue (thenValue == .word (word 6) && elseValue == .word (word 12))
-    "terminal block/if or eager branch selection changed"
+    "terminal block/if or selected-branch execution changed"
 
-private def testEagerRequirementAccounting (program : CheckedProgram) : IO Unit := do
+private def testBranchRequirementAccounting (program : CheckedProgram) : IO Unit := do
   let specialized ← specializedNamed program "eagerProduct"
   let expression ← returnedExpression specialized
   let evaluated ← match SourceCoreElaboration.evaluateStagedValue
@@ -220,7 +220,7 @@ private def testEagerRequirementAccounting (program : CheckedProgram) : IO Unit 
       specialized.function.typedBody expression with
     | .ok evaluated => pure evaluated
     | .error error => throw (IO.userError
-        s!"eager product expression failed: {reprStr error}")
+        s!"branch-accounting product expression failed: {reprStr error}")
   let expectedRequirements :=
     specialized.function.solvedRequirements.map fun requirement => requirement.id
   let expectedValue := SourceStagedValue.Value.product (.word (word 1))
@@ -228,8 +228,8 @@ private def testEagerRequirementAccounting (program : CheckedProgram) : IO Unit 
   assertTrue (expectedRequirements.length == 2 &&
       evaluated.value == expectedValue &&
       evaluated.consumedRequirements == expectedRequirements)
-    "unselected tuple branch was not eagerly evaluated in ledger order"
-  let functionValue ← evaluateFunctionOrThrow "eager product function"
+    "unselected tuple branch was not validated in ledger order"
+  let functionValue ← evaluateFunctionOrThrow "branch-accounting product"
     specialized []
   assertTrue (functionValue == expectedValue)
     "function-level exact ledger reconciliation changed the selected value"
@@ -288,7 +288,7 @@ def testSourceStagedValues : IO Unit := do
   let program ← checkedProgram
   testValueDomainAndExpressions program
   testStatementEvaluation program
-  testEagerRequirementAccounting program
+  testBranchRequirementAccounting program
   testStageBoundaries program
   testArgumentBoundaries program
 
