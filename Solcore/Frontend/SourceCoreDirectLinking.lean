@@ -42,6 +42,7 @@ abbrev SpecializationKey := SourceSpecialization.SpecializationKey
 abbrev SpecializedFunction := SourceSpecialization.SpecializedFunction
 abbrev WorklistError := SourceSpecializationWorklist.Error
 abbrev CallEdge := SourceSpecializationWorklist.CallEdge
+abbrev ReferenceEdge := SourceSpecializationWorklist.ReferenceEdge
 abbrev Plan := SourceSpecializationWorklist.Plan
 
 /-- Exact failures at the validated specialization-to-Core linking boundary. -/
@@ -57,6 +58,8 @@ inductive Error where
       (expected actual : List SpecializationKey)
   | callEdgesMismatch
       (expected actual : List CallEdge)
+  | referenceEdgesMismatch
+      (expected actual : List ReferenceEdge)
   | unresolvedAssumptions
       (key : SpecializationKey) (assumptions : List ProgramPredicate)
   | assumptionEvidenceCountMismatch
@@ -264,6 +267,14 @@ structure LinkedProgram where
   entries : List LinkedEntry
   deriving Repr
 
+/-- Exact execution carrier for both linker backends.  Graph outcomes stay in
+their own domain so runtime faults remain precise and exhausted runs cannot be
+mistaken for resumable Core machine checkpoints. -/
+inductive ExecutionResult where
+  | core (result : Core.StatefulRunResult)
+  | runtime (result : SourceRuntime.RunResult)
+  deriving Repr
+
 /-- A structural execution bound for the closed resolved fragment emitted by
 Source Core.  Both branches are counted for conditionals, so the selected
 runtime path is bounded without depending on its value. -/
@@ -301,19 +312,29 @@ private def runtimeResultToCore : SourceRuntime.RunResult →
       let state := Core.State.initial .unit [] store
       .fault (.expectedFunction .unit) state
 
+/-- Execute through the selected backend without erasing graph faults or
+manufacturing a Core continuation for graph fuel exhaustion. -/
+def LinkedEntry.runExact? (entry : LinkedEntry) (inputs : List Core.Value)
+    (fuel : Nat) (store : Core.Store := []) : Option ExecutionResult :=
+  if inputs.map Core.Value.type = entry.elaborated.inputs.values then
+    match entry.runtime with
+    | none => some (.core (Core.runStateful fuel
+        (Core.State.initial entry.elaborated.core inputs store)))
+    | some runtime => some (.runtime (runtime.run fuel entry.key inputs store))
+  else
+    none
+
 /-- Run a linked entry only when the supplied runtime values have exactly the
-source input types and order retained by elaboration. -/
+source input types and order retained by elaboration.  This compatibility API
+projects graph exhaustion/faults into inert, non-resumable Core states; new
+clients should use `runExact?` when `runtime.isSome`. -/
 def LinkedEntry.run? (entry : LinkedEntry) (inputs : List Core.Value)
     (fuel : Nat) (store : Core.Store := []) :
     Option Core.StatefulRunResult :=
-  if inputs.map Core.Value.type = entry.elaborated.inputs.values then
-    match entry.runtime with
-    | none => some (Core.runStateful fuel
-        (Core.State.initial entry.elaborated.core inputs store))
-    | some runtime =>
-        some (runtimeResultToCore (runtime.run fuel entry.key inputs store))
-  else
-    none
+  match entry.runExact? inputs fuel store with
+  | some (.core result) => some result
+  | some (.runtime result) => some (runtimeResultToCore result)
+  | none => none
 
 /-- First seed entry with a given canonical key. -/
 def LinkedProgram.findEntry? (program : LinkedProgram)
@@ -381,6 +402,17 @@ private def validateKnownEdgeKeys (plan : Plan) :
       else
         validateKnownEdgeKeys plan rest
 
+private def validateKnownReferenceEdgeKeys (plan : Plan) :
+    List ReferenceEdge → Except Error Unit
+  | [] => pure ()
+  | edge :: rest => do
+      if (lookupSpecialization? plan edge.caller).isNone then
+        throw (.missingSpecialization edge.caller)
+      else if (lookupSpecialization? plan edge.callee).isNone then
+        throw (.missingSpecialization edge.callee)
+      else
+        validateKnownReferenceEdgeKeys plan rest
+
 private def seedRequests (plan : Plan) :
     List SpecializationKey →
       Except Error (List SourceSpecializationWorklist.Request)
@@ -405,6 +437,7 @@ def validatePlan (program : CheckedProgram) (plan : Plan) : Except Error Unit :=
     if (lookupSpecialization? plan key).isNone then
       throw (.missingSpecialization key)
   validateKnownEdgeKeys plan plan.callEdges
+  validateKnownReferenceEdgeKeys plan plan.referenceEdges
   let seeds ← seedRequests plan plan.seedKeys
   let rebuilt ← (SourceSpecializationWorklist.run program seeds
     plan.specializations.length).mapError liftWorklistValidation
@@ -417,6 +450,9 @@ def validatePlan (program : CheckedProgram) (plan : Plan) : Except Error Unit :=
         throw (.specializationOrderMismatch expectedKeys keys)
       else if expected.callEdges != plan.callEdges then
         throw (.callEdgesMismatch expected.callEdges plan.callEdges)
+      else if expected.referenceEdges != plan.referenceEdges then
+        throw (.referenceEdgesMismatch expected.referenceEdges
+          plan.referenceEdges)
       else
         pure ()
 

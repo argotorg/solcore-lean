@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceSpecializationWorklist
+import Solcore.Frontend.SourceRuntimeLinking
 
 /-! End-to-end regressions for finite whole-program specialization discovery. -/
 
@@ -342,6 +342,22 @@ private def testFunctionValueReference (program : CheckedProgram) : IO Unit := d
             "standalone function reference did not retain its canonical edge"
       | edges => throw (IO.userError
           s!"asValue: expected one reference edge, found {edges.length}")
+      let malformed : SourceSpecializationWorklist.Plan := {
+        plan with referenceEdges := []
+      }
+      match SourceCoreDirectLinking.validatePlan program malformed with
+      | .error (.referenceEdgesMismatch expected []) =>
+          assertTrue (decide (expected = plan.referenceEdges))
+            "reference-ledger rejection lost the canonical edge"
+      | result => throw (IO.userError
+          s!"direct plan validation accepted a missing reference edge: {reprStr result}")
+      match SourceRuntimeLinking.link program (.complete malformed) with
+      | .error (.invalidPlan
+          (.referenceEdgesMismatch expected [])) =>
+          assertTrue (decide (expected = plan.referenceEdges))
+            "runtime linker lost the canonical reference ledger"
+      | result => throw (IO.userError
+          s!"runtime linker accepted a missing reference edge: {reprStr result}")
   | outcome => throw (IO.userError
       s!"asValue: expected a complete plan, found {reprStr outcome}")
   match ← runOrThrow "asValue budget" program

@@ -49,12 +49,50 @@ private def runNamed (content name : String) (inputs : List Core.Value)
   | .error error => throw (IO.userError
       s!"runtime-call-graph `{name}` failed: {reprStr error}")
 
+private def runNamedExact (content name : String) (inputs : List Core.Value)
+    (executionFuel : Nat := 512) (store : Core.Store := []) :
+    IO SourceCoreDirectLinking.ExecutionResult := do
+  let moduleId ← mainModule
+  match SourceProgramExecution.runExact (workspace content)
+      (Seed.named moduleId name) inputs (limits executionFuel) store with
+  | .ok result => pure result
+  | .error error => throw (IO.userError
+      s!"exact runtime-call-graph `{name}` failed: {reprStr error}")
+
+private def checkedProgram (content : String) : IO CheckedProgram := do
+  match checkProgram (workspace content) with
+  | .ok program => pure program
+  | .error errors => throw (IO.userError
+      s!"runtime-call-graph fixture failed checking: {reprStr errors}")
+
+private def completePlan (program : CheckedProgram) (name : String) :
+    IO SourceSpecializationWorklist.Plan := do
+  let signature ← match program.signatures.functions.filter
+      (fun signature => signature.name == name) with
+    | [signature] => pure signature
+    | signatures => throw (IO.userError
+        s!"expected one signature named `{name}`, found {signatures.length}")
+  let request : SourceSpecializationWorklist.Request := {
+    declaration := signature.id
+    parameterSubstitution := []
+  }
+  match SourceSpecializationWorklist.run program [request] 32 with
+  | .ok (.complete plan) => pure plan
+  | .ok outcome => throw (IO.userError
+      s!"runtime-call-graph plan did not complete: {reprStr outcome}")
+  | .error error => throw (IO.userError
+      s!"runtime-call-graph worklist failed: {reprStr error}")
+
 private def recursionSource : String := String.intercalate "\n" [
   "function countdown(value: Word) returns (Word) {",
   "  return value == 0 ? 7 : countdown(value - 1);",
   "}",
   "function factorial(value: Word) returns (Word) {",
   "  return value == 0 ? 1 : value * factorial(value - 1);",
+  "}",
+  "function indirectCountdown(value: Word) returns (Word) {",
+  "  let next = indirectCountdown;",
+  "  return value == 0 ? 9 : next(value - 1);",
   "}"
 ]
 
@@ -67,14 +105,26 @@ private def testRuntimeRecursion : IO Unit := do
     512 preservedStore
   assertTrue (decide (factorial = .done (.word (word 120)) preservedStore))
     "runtime factorial did not execute its recursive call graph"
-  let exhausted ← runNamed recursionSource "factorial" [.word (word 5)]
-    2 preservedStore
-  match exhausted with
-  | .outOfFuel state =>
-      assertTrue (decide (state.store = preservedStore))
-        "runtime recursion lost the store when execution fuel expired"
+  let indirect ← runNamed recursionSource "indirectCountdown"
+    [.word (word 5)] 512 preservedStore
+  assertTrue (decide (indirect = .done (.word (word 9)) preservedStore))
+    "first-class self reference did not recurse through indirect dispatch"
+  let exact ← runNamedExact recursionSource "countdown"
+    [.word (word 5)] 512 preservedStore
+  match exact with
+  | .runtime (.done (.word value) store) =>
+      assertTrue (decide (value = word 7 ∧ store = preservedStore))
+        "exact graph completion lost its value or store"
   | result => throw (IO.userError
-      s!"low execution fuel did not suspend recursion: {reprStr result}")
+      s!"graph completion used the wrong exact carrier: {reprStr result}")
+  let exhausted ← runNamedExact recursionSource "factorial"
+    [.word (word 5)] 2 preservedStore
+  match exhausted with
+  | .runtime (.outOfFuel store) =>
+      assertTrue (decide (store = preservedStore))
+        "exact graph exhaustion lost the caller store"
+  | result => throw (IO.userError
+      s!"low graph fuel used a fabricated Core checkpoint: {reprStr result}")
 
 private def mutualSource : String := String.intercalate "\n" [
   "function even(value: Word) returns (Bool) {",
@@ -104,6 +154,14 @@ private def closureSource : String := String.intercalate "\n" [
   "    return left + right;",
   "  };",
   "  return add(base, value);",
+  "}",
+  "function makeAdder(base: Word)",
+  "    returns (function(Word) returns (Word)) {",
+  "  return lam(item: Word) -> Word { return base + item; };",
+  "}",
+  "function returned(base: Word, value: Word) returns (Word) {",
+  "  let add = makeAdder(base);",
+  "  return add(value);",
   "}"
 ]
 
@@ -112,9 +170,24 @@ private def testLexicalClosures : IO Unit := do
     [.word (word 40), .word (word 2)]
   let multiple ← runNamed closureSource "multiple"
     [.word (word 19), .word (word 23)]
+  let returned ← runNamed closureSource "returned"
+    [.word (word 20), .word (word 22)]
   assertTrue (decide (captured = .done (.word (word 42)) [] ∧
-      multiple = .done (.word (word 42)) []))
-    "lexical capture, higher-order passing, or multi-argument bundling changed"
+      multiple = .done (.word (word 42)) [] ∧
+      returned = .done (.word (word 42)) []))
+    "lexical capture, function-valued return, or argument bundling changed"
+
+private def testExactCoreClosureFault : IO Unit := do
+  let malformed : Core.Value :=
+    .closure .word .word (.var 1) []
+  let result ← runNamedExact closureSource "invoke"
+    [malformed, .word (word 7)] 128 preservedStore
+  match result with
+  | .runtime (.fault (.coreFault (.unboundVariable 1)) store) =>
+      assertTrue (decide (store = preservedStore))
+        "embedded Core fault lost its exact store"
+  | other => throw (IO.userError
+      s!"embedded Core fault was erased at the exact boundary: {reprStr other}")
 
 private def globalValueSource : String := String.intercalate "\n" [
   "function increment(value: Word) returns (Word) { return value + 1; }",
@@ -134,11 +207,101 @@ private def testGlobalFunctionValues : IO Unit := do
       decremented = .done (.word (word 42)) []))
     "conditional global function references did not remain callable values"
 
+private def erasedAritySource : String := String.intercalate "\n" [
+  "function packed(pair: (Word, Word)) returns (Word) { return 1; }",
+  "function split(left: Word, right: Word) returns (Word) { return 2; }",
+  "function choose(flag: Bool, left: Word, right: Word) returns (Word) {",
+  "  let selected = flag ? packed : split;",
+  "  return selected(left, right);",
+  "}"
+]
+
+/-- Source arity is not part of a structural function type.  A one-product
+parameter function and a two-parameter function can therefore flow through the
+same conditional value; the runtime bundle is unpacked for the selected body. -/
+private def testErasedSourceArity : IO Unit := do
+  let packed ← runNamed erasedAritySource "choose"
+    [.bool true, .word (word 20), .word (word 22)]
+  let split ← runNamed erasedAritySource "choose"
+    [.bool false, .word (word 20), .word (word 22)]
+  assertTrue (decide (packed = .done (.word (word 1)) [] ∧
+      split = .done (.word (word 2)) []))
+    "structurally equal function values did not normalize their argument bundle"
+
+private def erasedUnitAritySource : String := String.intercalate "\n" [
+  "function empty() returns (Word) { return 3; }",
+  "function unit(value: ()) returns (Word) { return 4; }",
+  "function callEmpty(flag: Bool) returns (Word) {",
+  "  let selected = flag ? empty : unit;",
+  "  return selected();",
+  "}",
+  "function callUnit(flag: Bool) returns (Word) {",
+  "  let selected = flag ? empty : unit;",
+  "  return selected(());",
+  "}"
+]
+
+private def testErasedUnitArity : IO Unit := do
+  let emptyWithoutUnit ← runNamed erasedUnitAritySource "callEmpty" [.bool true]
+  let unitWithoutUnit ← runNamed erasedUnitAritySource "callEmpty" [.bool false]
+  let emptyWithUnit ← runNamed erasedUnitAritySource "callUnit" [.bool true]
+  let unitWithUnit ← runNamed erasedUnitAritySource "callUnit" [.bool false]
+  assertTrue (decide (
+      emptyWithoutUnit = .done (.word (word 3)) [] ∧
+      unitWithoutUnit = .done (.word (word 4)) [] ∧
+      emptyWithUnit = .done (.word (word 3)) [] ∧
+      unitWithUnit = .done (.word (word 4)) []))
+    "zero-parameter and one-Unit-parameter functions did not share Unit bundles"
+
+private def changeTrueToFalse : List SourceInference.Node →
+    List SourceInference.Node
+  | [] => []
+  | .expression node :: nodes =>
+      let changed := match node.form with
+        | .reference name (.builtinBoolean true) =>
+            SourceInference.Node.expression {
+              node with
+              form := .reference name (.builtinBoolean false)
+            }
+        | _ => .expression node
+      changed :: changeTrueToFalse nodes
+  | node :: nodes => node :: changeTrueToFalse nodes
+
+private def testTamperedPlanRejected : IO Unit := do
+  let program ← checkedProgram
+    "function value() returns (Bool) { return true; }"
+  let plan ← completePlan program "value"
+  let tampered ← match plan.specializations with
+    | [specialized] =>
+        let changedNodes := changeTrueToFalse
+          specialized.function.typedBody.nodes
+        if changedNodes == specialized.function.typedBody.nodes then
+          throw (IO.userError "tamper fixture did not contain true")
+        let changedFunction : SourceInference.CheckedFunction := {
+          specialized.function with
+          typedBody := {
+            specialized.function.typedBody with nodes := changedNodes
+          }
+        }
+        pure ({ plan with specializations := [{
+          specialized with function := changedFunction
+        }] } : SourceSpecializationWorklist.Plan)
+    | specializations => throw (IO.userError
+        s!"tamper fixture expected one specialization, found {specializations.length}")
+  match SourceRuntimeLinking.link program (.complete tampered) with
+  | .error (.invalidPlan (.nonCanonicalSpecialization _)) => pure ()
+  | result => throw (IO.userError
+      s!"runtime linker accepted an injected specialization body: {reprStr result}")
+
 def testSourceRuntimeCallGraph : IO Unit := do
   testRuntimeRecursion
   testMutualRecursion
   testLexicalClosures
+  testExactCoreClosureFault
   testGlobalFunctionValues
+  testErasedSourceArity
+  testErasedUnitArity
+  testTamperedPlanRejected
   IO.println "runtime call graph, recursion, and lexical closure checks GREEN"
 
 end Tests.SourceRuntimeCallGraph

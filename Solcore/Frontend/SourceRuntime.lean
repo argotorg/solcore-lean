@@ -135,21 +135,13 @@ private def checkExpected (expected : Core.Ty) (actual : StaticType) :
   if actual.erase = expected then pure ()
   else throw (.typeMismatch expected actual.erase)
 
-private def checkExactArguments
+private def checkBundledArguments
     (expected : List Core.Ty)
     (actual : List StaticType) : Except TypeError Unit := do
-  if expected.length != actual.length then
-    throw (.argumentArityMismatch expected.length actual.length)
-  let rec loop (index : Nat) :
-      List Core.Ty → List StaticType → Except TypeError Unit
-    | [], [] => pure ()
-    | expectedType :: expectedTypes, actualType :: actualTypes =>
-        if actualType.erase = expectedType then
-          loop (index + 1) expectedTypes actualTypes
-        else
-          throw (.argumentTypeMismatch index expectedType actualType.erase)
-    | _, _ => throw (.argumentArityMismatch expected.length actual.length)
-  loop 0 expected actual
+  let expectedBundle := bundleType expected
+  let actualBundle := bundleType (actual.map StaticType.erase)
+  if actualBundle = expectedBundle then pure ()
+  else throw (.typeMismatch expectedBundle actualBundle)
 
 mutual
 
@@ -218,7 +210,7 @@ mutual
         let argumentTypes ← inferList program context arguments
         match functionType with
         | .callable expected result =>
-            checkExactArguments expected argumentTypes
+            checkBundledArguments expected argumentTypes
             pure (.value result)
         | .value (.function expected result) =>
             let actual := bundleType (argumentTypes.map StaticType.erase)
@@ -351,6 +343,21 @@ private def packValues : List Value → Value
   | [value] => value
   | value :: values => .pair value (packValues values)
 
+/-- Recover the source parameter view from its single structural argument
+bundle.  Function types deliberately erase source arity: zero parameters and
+one `Unit` parameter both have bundle `Unit`, while one product parameter and
+several parameters can have the same product bundle.  Applications therefore
+pack the caller's arguments and unpack them according to the selected runtime
+closure, rather than comparing the two source arities. -/
+private def unpackValues? : List Parameter → Value → Option (List Value)
+  | [], .unit => some []
+  | [], _ => none
+  | [_], value => some [value]
+  | _ :: parameter :: parameters, .pair value values => do
+      let remaining ← unpackValues? (parameter :: parameters) values
+      pure (value :: remaining)
+  | _ :: _ :: _, _ => none
+
 private def bindParameters
     (parameters : List Parameter)
     (arguments : List Value)
@@ -430,14 +437,17 @@ private def applyValue
       (_resultType : Core.Ty)
       (body : Expr)
       (captured : Environment) : RunResult :=
-    if parameters.length != arguments.length then
-      .fault (.argumentArityMismatch parameters.length arguments.length) store
+    let bundled := packValues arguments
+    let expectedType := parameterType parameters
+    let actualType := bundled.type? program
+    if actualType != some expectedType then
+      .fault (.argumentTypeMismatch 0 expectedType actualType) store
     else
-      match firstArgumentMismatch? program (parameters.map Prod.snd) arguments with
-      | some (index, expected, actual) =>
-          .fault (.argumentTypeMismatch index expected actual) store
+      match unpackValues? parameters bundled with
+      | some normalized =>
+          evaluateBody (bindParameters parameters normalized captured) store body
       | none =>
-          evaluateBody (bindParameters parameters arguments captured) store body
+          .fault (.argumentArityMismatch parameters.length arguments.length) store
   match function with
   | .closure parameters resultType body captured =>
       invoke parameters resultType body captured

@@ -114,7 +114,15 @@ acyclic Core body retained in the compatibility inspection view. -/
 def usesRuntimeCallGraph (prepared : PreparedEntry) : Bool :=
   prepared.entry.runtime.isSome
 
-/-- Execute through the linked entry's existing runtime type guard. -/
+/-- Execute without conflating a runtime-call-graph continuation or fault with
+a Core machine state. -/
+def runExact? (prepared : PreparedEntry) (inputs : List Core.Value)
+    (fuel : Nat) (store : Core.Store := []) :
+    Option SourceCoreDirectLinking.ExecutionResult :=
+  prepared.entry.runExact? inputs fuel store
+
+/-- Compatibility projection to the historical Core-only result carrier.
+Prefer `runExact?` for runtime-call-graph entries. -/
 def run? (prepared : PreparedEntry) (inputs : List Core.Value)
     (fuel : Nat) (store : Core.Store := []) :
     Option Core.StatefulRunResult :=
@@ -217,6 +225,18 @@ def run (raw : Workspace.RawWorkspace) (seed : Seed)
     (store : Core.Store := []) : Except Error Core.StatefulRunResult := do
   let prepared ← prepare raw seed limits
   match prepared.run? inputs limits.executionFuel store with
+  | some result => pure result
+  | none => throw (.inputTypesMismatch prepared.inputTypes
+      (inputs.map Core.Value.type))
+
+/-- Execute one explicit source root while retaining the selected backend's
+exact result carrier. -/
+def runExact (raw : Workspace.RawWorkspace) (seed : Seed)
+    (inputs : List Core.Value) (limits : Limits := {})
+    (store : Core.Store := []) :
+    Except Error SourceCoreDirectLinking.ExecutionResult := do
+  let prepared ← prepare raw seed limits
+  match prepared.runExact? inputs limits.executionFuel store with
   | some result => pure result
   | none => throw (.inputTypesMismatch prepared.inputTypes
       (inputs.map Core.Value.type))

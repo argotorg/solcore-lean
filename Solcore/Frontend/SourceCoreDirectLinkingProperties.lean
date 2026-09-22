@@ -16,14 +16,29 @@ theorem LinkedEntry.run?_of_matching_types (entry : LinkedEntry)
     (typesEqual : inputs.map Core.Value.type = entry.elaborated.inputs.values) :
     entry.run? inputs fuel store = some (Core.runStateful fuel
       (Core.State.initial entry.elaborated.core inputs store)) := by
-  simp [LinkedEntry.run?, finite, typesEqual]
+  simp [LinkedEntry.run?, LinkedEntry.runExact?, finite, typesEqual]
+
+theorem LinkedEntry.runExact?_of_matching_types (entry : LinkedEntry)
+    (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
+    (finite : entry.runtime = none)
+    (typesEqual : inputs.map Core.Value.type = entry.elaborated.inputs.values) :
+    entry.runExact? inputs fuel store = some (.core (Core.runStateful fuel
+      (Core.State.initial entry.elaborated.core inputs store))) := by
+  simp [LinkedEntry.runExact?, finite, typesEqual]
 
 theorem LinkedEntry.run?_of_mismatched_types (entry : LinkedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
     (mismatch : inputs.map Core.Value.type ≠
       entry.elaborated.inputs.values) :
     entry.run? inputs fuel store = none := by
-  simp [LinkedEntry.run?, mismatch]
+  simp [LinkedEntry.run?, LinkedEntry.runExact?, mismatch]
+
+theorem LinkedEntry.runExact?_of_mismatched_types (entry : LinkedEntry)
+    (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
+    (mismatch : inputs.map Core.Value.type ≠
+      entry.elaborated.inputs.values) :
+    entry.runExact? inputs fuel store = none := by
+  simp [LinkedEntry.runExact?, mismatch]
 
 @[simp] theorem link_budgetExhausted (program : CheckedProgram) (plan : Plan)
     (next : SpecializationKey)

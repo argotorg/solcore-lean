@@ -31,6 +31,7 @@ abbrev RuntimeContext := List (Resolved.LocalId × Core.Ty)
 
 inductive Error where
   | worklist (error : SourceSpecializationWorklist.Error)
+  | invalidPlan (error : SourceCoreDirectLinking.Error)
   | budgetExhausted (next : Key) (pendingCount : Nat)
   | missingSpecialization (key : Key)
   | duplicateSpecializations (key : Key) (count : Nat)
@@ -557,6 +558,8 @@ def link (program : CheckedProgram)
     | .complete plan => pure plan
     | .budgetExhausted _ next pending =>
         throw (.budgetExhausted next pending.length)
+  SourceCoreDirectLinking.validatePlan program plan
+    |>.mapError Error.invalidPlan
   let definitions ← plan.specializations.mapM (lowerDefinition program plan)
   let checked ← ({ definitions } : SourceRuntime.Program).check
     |>.mapError Error.runtimeType

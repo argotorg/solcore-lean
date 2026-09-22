@@ -66,11 +66,19 @@ private def testNamedSeedAndPreparedRun : IO Unit := do
   assertTrue (decide (prepared.run? [fortyOne, .bool true] 4096 =
       some (.done fortyOne [])))
     "prepared named root did not execute its reachable generic call"
+  match prepared.runExact? [fortyOne, .bool true] 4096 with
+  | some (.core result) =>
+      assertTrue (decide (result = .done fortyOne []))
+        "acyclic exact execution changed its Core result"
+  | result => throw (IO.userError
+      s!"acyclic entry did not use the exact Core carrier: {reprStr result}")
   assertTrue (decide (prepared.run? [fortyOne, .bool false] 4096 =
       some (.done (.word (word 7)) [])))
     "prepared named root did not execute its other conditional branch"
   assertTrue ((prepared.run? [.bool true, fortyOne] 4096).isNone)
     "prepared run? accepted runtime values in the wrong type order"
+  assertTrue ((prepared.runExact? [.bool true, fortyOne] 4096).isNone)
+    "prepared runExact? accepted runtime values in the wrong type order"
 
 private def testDeclarationSeedAndStore : IO Unit := do
   let moduleId ← mainModule "main.solc"

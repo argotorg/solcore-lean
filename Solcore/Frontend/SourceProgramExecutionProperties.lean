@@ -24,6 +24,12 @@ namespace Solcore.Frontend.SourceProgramExecution
     prepared.run? inputs fuel store = prepared.entry.run? inputs fuel store := by
   rfl
 
+@[simp] theorem PreparedEntry.runExact?_eq_entry (prepared : PreparedEntry)
+    (inputs : List Core.Value) (fuel : Nat) (store : Core.Store) :
+    prepared.runExact? inputs fuel store =
+      prepared.entry.runExact? inputs fuel store := by
+  rfl
+
 theorem PreparedEntry.run?_of_matching_types (prepared : PreparedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
     (finite : prepared.entry.runtime = none)
@@ -31,6 +37,7 @@ theorem PreparedEntry.run?_of_matching_types (prepared : PreparedEntry)
     prepared.run? inputs fuel store = some (Core.runStateful fuel
       (Core.State.initial prepared.entry.elaborated.core inputs store)) := by
   simp [PreparedEntry.run?, SourceCoreDirectLinking.LinkedEntry.run?,
+    SourceCoreDirectLinking.LinkedEntry.runExact?,
     PreparedEntry.inputTypes, finite, typesEqual]
 
 theorem PreparedEntry.run?_of_mismatched_types (prepared : PreparedEntry)
@@ -40,7 +47,7 @@ theorem PreparedEntry.run?_of_mismatched_types (prepared : PreparedEntry)
   change inputs.map Core.Value.type ≠
     prepared.entry.elaborated.inputs.values at mismatch
   simp [PreparedEntry.run?, SourceCoreDirectLinking.LinkedEntry.run?,
-    mismatch]
+    SourceCoreDirectLinking.LinkedEntry.runExact?, mismatch]
 
 theorem run_of_prepared (raw : Workspace.RawWorkspace) (seed : Seed)
     (inputs : List Core.Value) (limits : Limits) (store : Core.Store)
@@ -78,5 +85,18 @@ theorem run_of_prepared_mismatched_types (raw : Workspace.RawWorkspace)
   rw [run_of_prepared raw seed inputs limits store prepared preparedOk]
   rw [PreparedEntry.run?_of_mismatched_types prepared inputs
     limits.executionFuel store mismatch]
+
+theorem runExact_of_prepared (raw : Workspace.RawWorkspace) (seed : Seed)
+    (inputs : List Core.Value) (limits : Limits) (store : Core.Store)
+    (prepared : PreparedEntry)
+    (preparedOk : prepare raw seed limits = .ok prepared) :
+    runExact raw seed inputs limits store =
+      match prepared.runExact? inputs limits.executionFuel store with
+      | some result => .ok result
+      | none => .error (.inputTypesMismatch prepared.inputTypes
+          (inputs.map Core.Value.type)) := by
+  unfold runExact
+  rw [preparedOk]
+  rfl
 
 end Solcore.Frontend.SourceProgramExecution
