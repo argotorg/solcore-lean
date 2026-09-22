@@ -53,8 +53,9 @@ coercion, bounded evidence-producing shortest-path `Coerce<From, To>` search,
 operator-trait checking, proxy-value type resolution and mapping read-index
 inference.  The whole-program entry point accumulates function failures while
 preserving no-solution versus inconclusive trait outcomes.  Proxy and
-mapping-index support is currently a type-checking boundary, not executable
-lowering.
+mapping-index support was still type-checking-only at the ADR-0342 checkpoint;
+ADR-0369 later made both executable in the source-typed runtime, and ADR-0371
+made that runtime reachable through the restricted public compiler.
 
 ADR-0343 now composes the implemented vertical slice into one public Lean
 boundary.  An explicit declaration ID or exact module/name seed flows from a
@@ -458,10 +459,14 @@ artifact.  Its public metadata is backend-independent source `Ty` data.
 Backend selection is fixed: independently checked direct Core, then the finite
 structural call graph, then the phase-7 source-typed runtime.  Canonical-plan
 validation runs before selection, and the typed fallback preflights every
-reachable specialization for unsupported executable requirements/coercions.
+reachable specialization for unsupported executable requirements/coercions,
+unresolved assumptions, marked contracts and recursively nested staged types
+or expression nodes.
 Failure of all three retains all three diagnostics.  Invocations and exact
 results are tagged so Core values/stores are never confused with typed values/
-heaps; typed input-validation and execution fuel are independent.
+heaps; typed input-validation and execution fuel are independent, and input
+malformation, unsupported staged payloads and validation exhaustion remain
+distinct.
 
 Phase 9 keeps explicit single-root selection and the existing compatibility
 API.  Automatic/ABI entry discovery, backend override, multi-root and mixed-

@@ -6579,10 +6579,11 @@ language—and additional runtime-evidence profiles.
 ADR-0366–0368 now supply the separate named runtime representation required by
 structural recursive source calls; evidence-bearing recursive graphs still
 require that runtime profile to be widened rather than cyclically inlined.
-Automatic entry discovery, constructors, members and place-aware statements
-remain later in dependency order.  A whole-program reference to an obligation
-remains the owning declaration paired with its function-local requirement
-identity.
+Automatic entry discovery and general members remain later in dependency
+order.  Constructors and place-aware statements now execute through the
+source-typed runtime; evidence-bearing forms still require that runtime profile
+to be widened.  A whole-program reference to an obligation remains the owning
+declaration paired with its function-local requirement identity.
 
 The Core-compatible Lean composition boundary remains
 `Solcore.Frontend.SourceProgramExecution` (ADR-0343, ADR-0368).
@@ -6606,9 +6607,12 @@ The canonical restricted compiler boundary is
 compile paths, a reusable sealed artifact, common canonical-plan validation,
 and fixed direct-Core/structural-graph/source-typed selection.  Core/graph and
 typed invocation domains stay explicitly tagged, exact outcomes are preserved,
-and typed input-validation fuel is independent of execution fuel.  Failure of
-all runtimes retains all three rejection values.  This does not alter the
-older boundary's types or backend policy.
+and typed input-validation fuel is independent of execution fuel.  Typed
+preflight rejects unresolved assumptions, marked contracts and staged-only
+types/expressions across the whole reachable plan; input validation reports
+malformation, unsupported staged payloads and fuel exhaustion separately.
+Failure of all runtimes retains all three rejection values.  This does not
+alter the older boundary's types or backend policy.
 
 ## What is not yet claimed
 

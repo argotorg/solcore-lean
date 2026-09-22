@@ -40,8 +40,9 @@ count, and selected backend.  The checked program, plan, and linker payload
 cannot be replaced by callers.
 
 Before backend selection, the compiler runs the direct linker's canonical plan
-validation once.  A forged or inconsistent plan is therefore not hidden by a
-later runtime fallback.
+validation as a common preflight.  Each compatibility linker may still repeat
+its own authoritative validation; a forged or inconsistent plan is therefore
+not hidden by a later runtime fallback.
 
 ### Select one backend in a fixed order
 
@@ -55,7 +56,9 @@ The first successful backend is authoritative.  This preserves existing Core
 and graph behavior for programs they already accept.  The typed runtime is
 selected only after both compatibility linkers reject.  Before selection it
 preflights executable metadata for every reachable specialization, rejecting
-requirements and coercions it does not dispatch.
+requirements and coercions it does not dispatch.  It also rejects unresolved
+where assumptions, marked contracts, recursively nested structural comptime
+types, and staged-only expression nodes rather than executing them at runtime.
 
 If no backend is usable, `CompileError.noBackend` retains the direct, graph,
 and typed rejection values together.  Checking, seed resolution, worklist,
@@ -68,7 +71,10 @@ Core and graph entries consume `Core.Value` plus `Core.Store`.  Typed entries
 consume `SourceTypedRuntime.Value` plus `SourceTypedRuntime.RuntimeState`.
 `Invocation.coreValues` and `Invocation.typedValues` keep these domains tagged;
 the compiler performs no guessed conversion between them.  A mismatched tag is
-rejected before execution.
+rejected before execution.  Once the domain tag agrees, each backend retains
+its native input-failure carrier.  The direct Core entry has no runtime-fault
+carrier for an input-list mismatch, so the facade reports the dedicated
+`coreInputTypesMismatch`; graph and typed runtime faults remain exact results.
 
 `ExecutionResult` retains exact Core, graph, or typed outcomes.  Runtime faults
 and fuel exhaustion are results, not compile failures.  Function-valued graph
@@ -79,7 +85,10 @@ Compiler options separate checking, specialization, and staging.  Runtime
 options separately bound recursive typed-input validation and execution.  The
 older `SourceTypedRuntime.run` keeps its same-fuel behavior; the compiler uses
 `runWithValidationFuel` so a shallow execution limit does not misclassify a
-valid nested input.
+valid nested input.  Bounded validation distinguishes malformed input,
+unsupported staged payloads, and validation-fuel exhaustion.  It checks values
+in source order and reports the first non-valid outcome, so exhaustion before a
+later field is not relabeled as a type mismatch.
 
 ### Preserve the compatibility API
 
@@ -120,9 +129,10 @@ fix direct Core precedence for a structural program, graph precedence for a
 recursive program, and typed selection for an imported selectively visible
 generic enum alias with expected-type construction, matching, and mutation.
 They execute all three exact result carriers, reject a wrong typed input before
-heap mutation, retain state on typed fuel exhaustion, reject a runtime-domain
-tag mismatch, propagate one-shot limits, and retain all three diagnostics when
-no backend supports a user coercion.
+heap mutation, distinguish input-validation exhaustion from execution
+exhaustion, retain supplied Core state, reject a runtime-domain tag mismatch,
+propagate one-shot limits, reject where/comptime/staged-expression fallback,
+and retain all three diagnostics when no backend supports a user coercion.
 
 The aggregate Lean build and test suite remain the acceptance boundary.  This
 phase adds no axiom, `sorry`, unsafe definition, or native decision procedure.
