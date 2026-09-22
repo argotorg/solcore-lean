@@ -841,7 +841,8 @@ private def evaluateStagedIntegerFuelWith {error : Type}
     (lift : Error → error)
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (solvedRequirements : List SolvedRequirement)
-    (source : TypedSource) (environment : StagedIntegerEnvironment) :
+    (source : TypedSource) (environment : StagedIntegerEnvironment)
+    (execute : Bool) :
     Nat → ExpressionId → Except error StagedIntegerEvaluation
   | 0, id =>
       failWith lift (.occurrence id.occurrence) .stagedIntegerDepthLimit
@@ -856,9 +857,9 @@ private def evaluateStagedIntegerFuelWith {error : Type}
           | [argument] =>
               let evaluated ← evaluateStagedWordFuelWith lift
                 onStagedIntegerCall
-                solvedRequirements source environment fuel argument
+                solvedRequirements source environment execute fuel argument
               pure {
-                value := Int.ofNat evaluated.value.val
+                value := if execute then Int.ofNat evaluated.value.val else 0
                 consumedRequirements := evaluated.consumedRequirements
               }
           | _ =>
@@ -874,13 +875,14 @@ private def evaluateStagedIntegerFuelWith {error : Type}
               | [left, right] =>
                   let left ← evaluateStagedIntegerFuelWith lift
                     onStagedIntegerCall
-                    solvedRequirements source environment fuel left
+                    solvedRequirements source environment execute fuel left
                   let right ← evaluateStagedIntegerFuelWith lift
                     onStagedIntegerCall
-                    solvedRequirements source environment fuel right
+                    solvedRequirements source environment execute fuel right
                   pure {
-                    value := applyStagedIntegerBinary operation left.value
-                      right.value
+                    value := if execute then
+                      applyStagedIntegerBinary operation left.value right.value
+                    else 0
                     consumedRequirements := left.consumedRequirements ++
                       right.consumedRequirements
                   }
@@ -923,9 +925,12 @@ private def evaluateStagedIntegerFuelWith {error : Type}
                     (.stagedIntegerTypeMismatch pair.1 argumentNode.type)
                 else
                   evaluateStagedIntegerFuelWith lift onStagedIntegerCall
-                    solvedRequirements source environment fuel pair.2
-            let value ← plan.invoke
-              (evaluatedArguments.map fun argument => argument.value)
+                    solvedRequirements source environment execute fuel pair.2
+            let value ← if execute then
+                plan.invoke
+                  (evaluatedArguments.map fun argument => argument.value)
+              else
+                pure 0
             pure {
               value
               consumedRequirements := evaluatedArguments.flatMap
@@ -970,7 +975,7 @@ private def evaluateStagedIntegerFuelWith {error : Type}
           | .group inner =>
               if node.requirements.isEmpty then
                 evaluateStagedIntegerFuelWith lift onStagedIntegerCall
-                  solvedRequirements source environment fuel inner
+                  solvedRequirements source environment execute fuel inner
               else
                 failWith lift site (.requirementsPresent node.requirements)
           | .conditional condition thenBranch elseBranch => do
@@ -978,13 +983,15 @@ private def evaluateStagedIntegerFuelWith {error : Type}
                 failWith lift site (.requirementsPresent node.requirements)
               let condition ← evaluateStagedBoolFuelWith lift
                 onStagedIntegerCall
-                solvedRequirements source environment fuel condition
+                solvedRequirements source environment execute fuel condition
               let thenBranch ← evaluateStagedIntegerFuelWith lift
                 onStagedIntegerCall
-                solvedRequirements source environment fuel thenBranch
+                solvedRequirements source environment
+                  (execute && condition.value) fuel thenBranch
               let elseBranch ← evaluateStagedIntegerFuelWith lift
                 onStagedIntegerCall
-                solvedRequirements source environment fuel elseBranch
+                solvedRequirements source environment
+                  (execute && !condition.value) fuel elseBranch
               pure {
                 value := if condition.value then thenBranch.value
                   else elseBranch.value
@@ -1000,7 +1007,8 @@ private def evaluateStagedWordFuelWith {error : Type}
     (lift : Error → error)
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (solvedRequirements : List SolvedRequirement)
-    (source : TypedSource) (environment : StagedIntegerEnvironment) :
+    (source : TypedSource) (environment : StagedIntegerEnvironment)
+    (execute : Bool) :
     Nat → ExpressionId → Except error StagedWordEvaluation
   | 0, id =>
       failWith lift (.occurrence id.occurrence) .stagedWordDepthLimit
@@ -1015,9 +1023,10 @@ private def evaluateStagedWordFuelWith {error : Type}
           | [argument] =>
               let evaluated ← evaluateStagedIntegerFuelWith lift
                 onStagedIntegerCall
-                solvedRequirements source environment fuel argument
+                solvedRequirements source environment execute fuel argument
               pure {
-                value := Core.Word.ofIntModulo evaluated.value
+                value := if execute then Core.Word.ofIntModulo evaluated.value
+                  else Core.Word.ofNatModulo 0
                 consumedRequirements := evaluated.consumedRequirements
               }
           | _ =>
@@ -1045,7 +1054,7 @@ private def evaluateStagedWordFuelWith {error : Type}
           | .group inner =>
               if node.requirements.isEmpty then
                 evaluateStagedWordFuelWith lift onStagedIntegerCall
-                  solvedRequirements source environment fuel inner
+                  solvedRequirements source environment execute fuel inner
               else
                 failWith lift site (.requirementsPresent node.requirements)
           | .conditional condition thenBranch elseBranch => do
@@ -1053,13 +1062,15 @@ private def evaluateStagedWordFuelWith {error : Type}
                 failWith lift site (.requirementsPresent node.requirements)
               let condition ← evaluateStagedBoolFuelWith lift
                 onStagedIntegerCall
-                solvedRequirements source environment fuel condition
+                solvedRequirements source environment execute fuel condition
               let thenBranch ← evaluateStagedWordFuelWith lift
                 onStagedIntegerCall
-                solvedRequirements source environment fuel thenBranch
+                solvedRequirements source environment
+                  (execute && condition.value) fuel thenBranch
               let elseBranch ← evaluateStagedWordFuelWith lift
                 onStagedIntegerCall
-                solvedRequirements source environment fuel elseBranch
+                solvedRequirements source environment
+                  (execute && !condition.value) fuel elseBranch
               pure {
                 value := if condition.value then thenBranch.value
                   else elseBranch.value
@@ -1075,7 +1086,8 @@ private def evaluateStagedBoolFuelWith {error : Type}
     (lift : Error → error)
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (solvedRequirements : List SolvedRequirement)
-    (source : TypedSource) (environment : StagedIntegerEnvironment) :
+    (source : TypedSource) (environment : StagedIntegerEnvironment)
+    (execute : Bool) :
     Nat → ExpressionId → Except error StagedBoolEvaluation
   | 0, id =>
       failWith lift (.occurrence id.occurrence) .stagedBoolDepthLimit
@@ -1092,13 +1104,15 @@ private def evaluateStagedBoolFuelWith {error : Type}
               | [left, right] =>
                   let left ← evaluateStagedIntegerFuelWith lift
                     onStagedIntegerCall
-                    solvedRequirements source environment fuel left
+                    solvedRequirements source environment execute fuel left
                   let right ← evaluateStagedIntegerFuelWith lift
                     onStagedIntegerCall
-                    solvedRequirements source environment fuel right
+                    solvedRequirements source environment execute fuel right
                   pure {
-                    value := applyStagedIntegerComparison comparison left.value
-                      right.value
+                    value := if execute then
+                      applyStagedIntegerComparison comparison left.value
+                        right.value
+                    else false
                     consumedRequirements := left.consumedRequirements ++
                       right.consumedRequirements
                   }
@@ -1131,17 +1145,17 @@ private def evaluateStagedBoolFuelWith {error : Type}
                   (.builtinBooleanSpellingMismatch value expected name)
           | .group inner =>
               evaluateStagedBoolFuelWith lift onStagedIntegerCall
-                solvedRequirements source environment fuel inner
+                solvedRequirements source environment execute fuel inner
           | .conditional condition thenBranch elseBranch => do
               let condition ← evaluateStagedBoolFuelWith lift
-                onStagedIntegerCall solvedRequirements source environment fuel
-                condition
+                onStagedIntegerCall solvedRequirements source environment
+                execute fuel condition
               let thenBranch ← evaluateStagedBoolFuelWith lift
-                onStagedIntegerCall solvedRequirements source environment fuel
-                thenBranch
+                onStagedIntegerCall solvedRequirements source environment
+                (execute && condition.value) fuel thenBranch
               let elseBranch ← evaluateStagedBoolFuelWith lift
-                onStagedIntegerCall solvedRequirements source environment fuel
-                elseBranch
+                onStagedIntegerCall solvedRequirements source environment
+                (execute && !condition.value) fuel elseBranch
               pure {
                 value := if condition.value then thenBranch.value
                   else elseBranch.value
@@ -1196,7 +1210,7 @@ def evaluateStagedIntegerWith {error : Type} (lift : Error → error)
     (source : TypedSource) (id : ExpressionId) :
     Except error StagedIntegerEvaluation :=
   evaluateStagedIntegerFuelWith lift onStagedIntegerCall solvedRequirements
-    source [] (source.nodes.length + 1) id
+    source [] true (source.nodes.length + 1) id
 
 /-- Evaluate staged Word expressions while allowing nested staged-integer
 source calls only through the supplied policy. -/
@@ -1206,7 +1220,7 @@ def evaluateStagedWordWith {error : Type} (lift : Error → error)
     (source : TypedSource) (id : ExpressionId) :
     Except error StagedWordEvaluation :=
   evaluateStagedWordFuelWith lift onStagedIntegerCall solvedRequirements source
-    [] (source.nodes.length + 1) id
+    [] true (source.nodes.length + 1) id
 
 /-- Evaluate staged Bool expressions while allowing nested staged-integer
 source calls only through the supplied policy. -/
@@ -1216,7 +1230,7 @@ def evaluateStagedBoolWith {error : Type} (lift : Error → error)
     (source : TypedSource) (id : ExpressionId) :
     Except error StagedBoolEvaluation :=
   evaluateStagedBoolFuelWith lift onStagedIntegerCall solvedRequirements source
-    [] (source.nodes.length + 1) id
+    [] true (source.nodes.length + 1) id
 
 /-- Evaluate exactly the closed staged-integer fragment accepted by runtime
 erasure, including conversions through the closed staged-Word fragment.  The
@@ -1261,7 +1275,8 @@ private def lowerWordFromIntegerWith {error : Type} (lift : Error → error)
   match arguments with
   | [argument] =>
       let evaluated ← evaluateStagedIntegerFuelWith lift
-        onStagedIntegerCall solvedRequirements source environment fuel argument
+        onStagedIntegerCall solvedRequirements source environment true fuel
+        argument
       pure {
         resolved := .word (Core.Word.ofIntModulo evaluated.value)
         consumedRequirements := evaluated.consumedRequirements
@@ -1277,7 +1292,7 @@ private def lowerStagedBoolWith {error : Type} (lift : Error → error)
     (environment : StagedIntegerEnvironment)
     (fuel : Nat) (id : ExpressionId) : Except error LoweredExpression := do
   let evaluated ← evaluateStagedBoolFuelWith lift onStagedIntegerCall
-    solvedRequirements source environment fuel id
+    solvedRequirements source environment true fuel id
   pure {
     resolved := .bool evaluated.value
     consumedRequirements := evaluated.consumedRequirements
@@ -1760,6 +1775,20 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
               else
                 lowerOrdinary
           | none => lowerOrdinary
+      | .conditional _ _ _ =>
+          match stagedValuePolicy with
+          | some policy =>
+              if policy.analysis.expressionStage? id = some .comptime &&
+                  stagedValueCacheEligible policy.analysis source
+                    stagedValueEnvironment (source.nodes.length + 1) id then
+                let evaluated ← policy.evaluate stagedValueEnvironment id
+                pure {
+                  resolved := SourceStagedValue.toResolved evaluated.value
+                  consumedRequirements := evaluated.consumedRequirements
+                }
+              else
+                lowerOrdinary
+          | none => lowerOrdinary
       | .call callee arguments (.builtinFunction .wordFromInteger) =>
           lowerWordFromIntegerWith lift onStagedIntegerCall solvedRequirements
             source environment fuel node callee arguments
@@ -1901,7 +1930,7 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
             | none => failWith lift site .uninitializedLet
             | some initializer =>
                 evaluateStagedIntegerFuelWith lift onStagedIntegerCall
-                  solvedRequirements source environment fuel initializer
+                  solvedRequirements source environment true fuel initializer
           let body ← lowerStatementsFuelWith lift onCall
             onStagedIntegerCall stagedValuePolicy onRequiredUnary
             onRequiredBinary onCoercion solvedRequirements fuel source scope
@@ -2125,7 +2154,7 @@ terminal conditional are validated and accounted before its value is chosen. -/
 private def evaluateStagedIntegerStatementsFuelWith {error : Type}
     (lift : Error → error)
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
-    (solvedRequirements : List SolvedRequirement) :
+    (solvedRequirements : List SolvedRequirement) (execute : Bool) :
     Nat → TypedSource → StagedIntegerEnvironment → ErrorSite →
       ErrorReason → List StatementId →
       Except error StagedIntegerEvaluation
@@ -2148,9 +2177,10 @@ private def evaluateStagedIntegerStatementsFuelWith {error : Type}
             | none => failWith lift site .uninitializedLet
             | some initializer =>
                 evaluateStagedIntegerFuelWith lift onStagedIntegerCall
-                  solvedRequirements source environment fuel initializer
+                  solvedRequirements source environment execute fuel
+                  initializer
           let body ← evaluateStagedIntegerStatementsFuelWith lift
-            onStagedIntegerCall solvedRequirements fuel source
+            onStagedIntegerCall solvedRequirements execute fuel source
             ({ binder, value := initializer.value } :: environment)
             fallthroughSite fallthroughReason rest
           pure {
@@ -2168,7 +2198,7 @@ private def evaluateStagedIntegerStatementsFuelWith {error : Type}
           | none => failWith lift site .stagedIntegerStatementNotClosed
           | some value =>
               evaluateStagedIntegerFuelWith lift onStagedIntegerCall
-                solvedRequirements source environment fuel value
+                solvedRequirements source environment execute fuel value
     | .ifThen condition thenBody elseBody => do
         if !rest.isEmpty then
           failWith lift site (.nonTailStatement .ifThen)
@@ -2179,13 +2209,15 @@ private def evaluateStagedIntegerStatementsFuelWith {error : Type}
           | none => failWith lift site .missingElseBranch
           | some elseBody => do
               let condition ← evaluateStagedBoolFuelWith lift
-                onStagedIntegerCall solvedRequirements source environment fuel
-                condition
+                onStagedIntegerCall solvedRequirements source environment
+                execute fuel condition
               let thenBranch ← evaluateStagedIntegerStatementsFuelWith lift
-                onStagedIntegerCall solvedRequirements fuel source environment
+                onStagedIntegerCall solvedRequirements
+                (execute && condition.value) fuel source environment
                 site (.conditionalBranchFallthrough .thenBranch) thenBody
               let elseBranch ← evaluateStagedIntegerStatementsFuelWith lift
-                onStagedIntegerCall solvedRequirements fuel source environment
+                onStagedIntegerCall solvedRequirements
+                (execute && !condition.value) fuel source environment
                 site (.conditionalBranchFallthrough .elseBranch) elseBody
               pure {
                 value := if condition.value then thenBranch.value
@@ -2201,8 +2233,8 @@ private def evaluateStagedIntegerStatementsFuelWith {error : Type}
           failWith lift site (.stagedIntegerTypeMismatch .integer node.type)
         else
           evaluateStagedIntegerStatementsFuelWith lift onStagedIntegerCall
-            solvedRequirements fuel source environment site .blockFallthrough
-            body
+            solvedRequirements execute fuel source environment site
+            .blockFallthrough body
     | .matchWith _ =>
         failWith lift site .stagedIntegerStatementNotClosed
     | .expression _ _ =>
@@ -2319,6 +2351,19 @@ private def stagedProductValue : List SourceStagedValue.Value →
   | [value] => value
   | value :: rest => .product value (stagedProductValue rest)
 
+/-- Produce a type-correct inert value for validate-only traversal.  Such a
+value can flow through local bindings and structural checks, but it is never
+returned from an executing branch or supplied to a staged call/method. -/
+private def stagedPlaceholderWith {error : Type} (lift : Error → error)
+    (site : ErrorSite) : Ty → Except error SourceStagedValue.Value
+  | .constructor (.builtin .unit) => pure .unit
+  | .constructor (.builtin .bool) => pure (.bool false)
+  | .constructor (.builtin .word) => pure (.word (Core.Word.ofNatModulo 0))
+  | .product left right => do
+      pure (.product (← stagedPlaceholderWith lift site left)
+        (← stagedPlaceholderWith lift site right))
+  | type => failWith lift site (.unsupportedType type)
+
 private def stagedCoreBinary? : Syntax.BinaryOp → Option Core.BinaryOp
   | .multiply => some .wordMul
   | .divide => some .wordDiv
@@ -2388,7 +2433,8 @@ private def evaluateStagedValueNodeWith {error : Type}
     (onStagedValueRequiredBinary : StagedValueRequiredBinaryElaborator error)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
     (environment : StagedValueEnvironment)
-    (recurse : ExpressionId → Except error StagedValueEvaluation)
+    (execute : Bool)
+    (recurse : Bool → ExpressionId → Except error StagedValueEvaluation)
     (node : ExpressionNode) : Except error StagedValueEvaluation := do
       let site := ErrorSite.occurrence node.id.occurrence
       match node.form with
@@ -2428,12 +2474,15 @@ private def evaluateStagedValueNodeWith {error : Type}
                   failWith lift (.occurrence pair.2.occurrence)
                     (.stagedValueTypeMismatch pair.1 argumentNode.type)
                 else
-                  let evaluated ← recurse pair.2
+                  let evaluated ← recurse execute pair.2
                   ensureStagedValueTypeWith lift
                     (.occurrence pair.2.occurrence) pair.1 evaluated.value
                   pure evaluated
-            let value ← plan.invoke
-              (evaluatedArguments.map fun argument => argument.value)
+            let value ← if execute then
+                plan.invoke
+                  (evaluatedArguments.map fun argument => argument.value)
+              else
+                stagedPlaceholderWith lift site node.type
             ensureStagedValueTypeWith lift site plan.resultType value
             pure {
               value
@@ -2443,23 +2492,26 @@ private def evaluateStagedValueNodeWith {error : Type}
             }
       | .unary operator operand => do
           if node.requirements.isEmpty then
-            let evaluated ← recurse operand
-            let coreOperator := match operator with
-              | .logicalNot => Core.UnaryOp.boolNot
-              | .bitNot => Core.UnaryOp.wordNot
-            let coreValue ← match coreOperator.apply
-                (SourceStagedValue.toCore evaluated.value) with
-              | some value => pure value
-              | none =>
-                  let reason := ErrorReason.stagedValueInvalidUnaryOperand
-                    operator (SourceStagedValue.sourceType evaluated.value)
-                  failWith lift site reason
-            let value ← match stagedValueOfCore? coreValue with
-              | some value => pure value
-              | none =>
-                  let reason := ErrorReason.stagedValueInvalidUnaryOperand
-                    operator (SourceStagedValue.sourceType evaluated.value)
-                  failWith lift site reason
+            let evaluated ← recurse execute operand
+            let value ← if execute then do
+                let coreOperator := match operator with
+                  | .logicalNot => Core.UnaryOp.boolNot
+                  | .bitNot => Core.UnaryOp.wordNot
+                let coreValue ← match coreOperator.apply
+                    (SourceStagedValue.toCore evaluated.value) with
+                  | some value => pure value
+                  | none =>
+                      let reason := ErrorReason.stagedValueInvalidUnaryOperand
+                        operator (SourceStagedValue.sourceType evaluated.value)
+                      failWith lift site reason
+                match stagedValueOfCore? coreValue with
+                | some value => pure value
+                | none =>
+                    let reason := ErrorReason.stagedValueInvalidUnaryOperand
+                      operator (SourceStagedValue.sourceType evaluated.value)
+                    failWith lift site reason
+              else
+                stagedPlaceholderWith lift site node.type
             ensureStagedValueTypeWith lift site node.type value
             pure {
               value
@@ -2484,7 +2536,7 @@ private def evaluateStagedValueNodeWith {error : Type}
               failWith lift site
                 (.stagedValueUnaryResultTypeMismatch resultType
                   plan.resultType)
-            let evaluated ← recurse operand
+            let evaluated ← recurse execute operand
             ensureStagedValueTypeWith lift (.occurrence operand.occurrence)
               operandNode.type evaluated.value
             let actualOperandType := SourceStagedValue.coreType evaluated.value
@@ -2492,7 +2544,10 @@ private def evaluateStagedValueNodeWith {error : Type}
               failWith lift site
                 (.stagedValueUnaryOperandTypeMismatch plan.operandType
                   actualOperandType)
-            let value ← plan.invoke evaluated.value
+            let value ← if execute then
+                plan.invoke evaluated.value
+              else
+                stagedPlaceholderWith lift site node.type
             let actualResultType := SourceStagedValue.coreType value
             if actualResultType != plan.resultType then
               failWith lift site
@@ -2506,16 +2561,18 @@ private def evaluateStagedValueNodeWith {error : Type}
             }
       | .binary left operator right => do
           if node.requirements.isEmpty then
-            let left ← recurse left
-            let right ← recurse right
-            let value ← match applyStagedBinary operator
-                left.value right.value with
-              | some value => pure value
-              | none =>
-                  let reason := ErrorReason.stagedValueInvalidBinaryOperands
-                    operator (SourceStagedValue.sourceType left.value)
-                    (SourceStagedValue.sourceType right.value)
-                  failWith lift site reason
+            let left ← recurse execute left
+            let right ← recurse execute right
+            let value ← if execute then
+                match applyStagedBinary operator left.value right.value with
+                | some value => pure value
+                | none =>
+                    let reason := ErrorReason.stagedValueInvalidBinaryOperands
+                      operator (SourceStagedValue.sourceType left.value)
+                      (SourceStagedValue.sourceType right.value)
+                    failWith lift site reason
+              else
+                stagedPlaceholderWith lift site node.type
             ensureStagedValueTypeWith lift site node.type value
             pure {
               value
@@ -2545,7 +2602,7 @@ private def evaluateStagedValueNodeWith {error : Type}
               failWith lift site
                 (.stagedValueBinaryResultTypeMismatch resultType
                   plan.resultType)
-            let evaluatedLeft ← recurse left
+            let evaluatedLeft ← recurse execute left
             ensureStagedValueTypeWith lift (.occurrence left.occurrence)
               leftNode.type evaluatedLeft.value
             let actualLeftType := SourceStagedValue.coreType evaluatedLeft.value
@@ -2553,7 +2610,7 @@ private def evaluateStagedValueNodeWith {error : Type}
               failWith lift site
                 (.stagedValueBinaryLeftTypeMismatch plan.leftType
                   actualLeftType)
-            let evaluatedRight ← recurse right
+            let evaluatedRight ← recurse execute right
             ensureStagedValueTypeWith lift (.occurrence right.occurrence)
               rightNode.type evaluatedRight.value
             let actualRightType := SourceStagedValue.coreType evaluatedRight.value
@@ -2561,7 +2618,10 @@ private def evaluateStagedValueNodeWith {error : Type}
               failWith lift site
                 (.stagedValueBinaryRightTypeMismatch plan.rightType
                   actualRightType)
-            let value ← plan.invoke evaluatedLeft.value evaluatedRight.value
+            let value ← if execute then
+                plan.invoke evaluatedLeft.value evaluatedRight.value
+              else
+                stagedPlaceholderWith lift site node.type
             let actualResultType := SourceStagedValue.coreType value
             if actualResultType != plan.resultType then
               failWith lift site
@@ -2619,11 +2679,12 @@ private def evaluateStagedValueNodeWith {error : Type}
               failWith lift site
                 (.unsupportedExpression .declarationReference)
           | .group inner => do
-              let evaluated ← recurse inner
+              let evaluated ← recurse execute inner
               ensureStagedValueTypeWith lift site node.type evaluated.value
               pure evaluated
           | .tuple elements => do
-              let evaluated ← evaluateStagedValueListWith recurse elements
+              let evaluated ← evaluateStagedValueListWith
+                (recurse execute) elements
               let value := stagedProductValue
                 (evaluated.map fun element => element.value)
               ensureStagedValueTypeWith lift site node.type value
@@ -2636,10 +2697,12 @@ private def evaluateStagedValueNodeWith {error : Type}
           | .binary _ _ _ =>
               failWith lift site (.requirementsPresent node.requirements)
           | .conditional condition thenBranch elseBranch => do
-              let condition ← recurse condition
+              let condition ← recurse execute condition
               let conditionValue ← stagedBoolWith lift site condition.value
-              let thenBranch ← recurse thenBranch
-              let elseBranch ← recurse elseBranch
+              let thenBranch ← recurse (execute && conditionValue)
+                thenBranch
+              let elseBranch ← recurse (execute && !conditionValue)
+                elseBranch
               let selected := if conditionValue then thenBranch.value
                 else elseBranch.value
               ensureStagedValueTypeWith lift site node.type thenBranch.value
@@ -2667,7 +2730,7 @@ private def evaluateStagedValueFuelWith {error : Type}
     (onStagedValueRequiredBinary : StagedValueRequiredBinaryElaborator error)
     (analysis : SourceStageAnalysis.Analysis)
     (solvedRequirements : List SolvedRequirement) (source : TypedSource)
-    (environment : StagedValueEnvironment) :
+    (environment : StagedValueEnvironment) (execute : Bool) :
     Nat → ExpressionId → Except error StagedValueEvaluation
   | 0, id =>
       failWith lift (.occurrence id.occurrence) .stagedValueDepthLimit
@@ -2675,15 +2738,16 @@ private def evaluateStagedValueFuelWith {error : Type}
       requireStagedExpressionWith lift analysis id
       let node ← (lookupExpression source id).mapError lift
       let site := ErrorSite.occurrence id.occurrence
-      let recurse := evaluateStagedValueFuelWith lift onStagedValueCall
-        onStagedValueCoercion onStagedValueRequiredUnary
-        onStagedValueRequiredBinary analysis solvedRequirements source
-        environment fuel
+      let recurse := fun mode =>
+        evaluateStagedValueFuelWith lift onStagedValueCall
+          onStagedValueCoercion onStagedValueRequiredUnary
+          onStagedValueRequiredBinary analysis solvedRequirements source
+          environment mode fuel
       match node.coercions with
       | [] =>
           evaluateStagedValueNodeWith lift onStagedValueCall
             onStagedValueRequiredUnary onStagedValueRequiredBinary
-            solvedRequirements source environment recurse node
+            solvedRequirements source environment execute recurse node
       | first :: rest => do
           let prepared ← prepareCoercionPathWith lift node first rest
           let plans ← checkedStagedValueCoercionPlansWith lift
@@ -2696,9 +2760,17 @@ private def evaluateStagedValueFuelWith {error : Type}
           }
           let base ← evaluateStagedValueNodeWith lift onStagedValueCall
             onStagedValueRequiredUnary onStagedValueRequiredBinary
-            solvedRequirements source environment recurse baseNode
-          let evaluated ← applyStagedValueCoercionPlansWith lift site
-            base.value base.consumedRequirements plans
+            solvedRequirements source environment execute recurse baseNode
+          let evaluated ← if execute then
+              applyStagedValueCoercionPlansWith lift site base.value
+                base.consumedRequirements plans
+            else
+              pure {
+                value := ← stagedPlaceholderWith lift site node.type
+                consumedRequirements := base.consumedRequirements ++
+                  plans.flatMap fun checked =>
+                    checked.plan.consumedRequirements
+              }
           ensureStagedValueTypeWith lift site node.type evaluated.value
           pure evaluated
 
@@ -2712,7 +2784,7 @@ def evaluateStagedValueWith {error : Type} (lift : Error → error)
     (rejectStagedValueCoercionsWith lift)
     (rejectStagedValueRequiredUnariesWith lift)
     (rejectStagedValueRequiredBinariesWith lift) analysis solvedRequirements
-    source [] (source.nodes.length + 1) id
+    source [] true (source.nodes.length + 1) id
 
 /-- Evaluate one staged expression in a declaration-owned lexical environment
 while delegating only direct source calls to a whole-program consumer. -/
@@ -2728,7 +2800,7 @@ private def evaluateStagedValueInEnvironmentWith {error : Type}
     Except error StagedValueEvaluation :=
   evaluateStagedValueFuelWith lift onStagedValueCall onStagedValueCoercion
     onStagedValueRequiredUnary onStagedValueRequiredBinary analysis
-    solvedRequirements source environment (source.nodes.length + 1) id
+    solvedRequirements source environment true (source.nodes.length + 1) id
 
 /-- Standalone closed staged-value evaluation. -/
 def evaluateStagedValue (analysis : SourceStageAnalysis.Analysis)
@@ -2789,7 +2861,7 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
     (onStagedValueRequiredUnary : StagedValueRequiredUnaryElaborator error)
     (onStagedValueRequiredBinary : StagedValueRequiredBinaryElaborator error)
     (analysis : SourceStageAnalysis.Analysis)
-    (solvedRequirements : List SolvedRequirement) :
+    (solvedRequirements : List SolvedRequirement) (execute : Bool) :
     Nat → TypedSource → StagedValueEnvironment → ErrorSite → ErrorReason →
       List StatementId → Except error StagedValueEvaluation
   | _, _, _, fallthroughSite, fallthroughReason, [] =>
@@ -2814,13 +2886,13 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
               evaluateStagedValueFuelWith lift onStagedValueCall
                 onStagedValueCoercion onStagedValueRequiredUnary
                 onStagedValueRequiredBinary analysis solvedRequirements
-                source environment fuel initializer
+                source environment execute fuel initializer
         ensureStagedValueTypeWith lift (.binder binder.id)
           binder.scheme.body initializer.value
         let body ← evaluateStagedValueStatementsFuelWith lift
           onStagedValueCall onStagedValueCoercion
           onStagedValueRequiredUnary onStagedValueRequiredBinary analysis
-          solvedRequirements fuel source
+          solvedRequirements execute fuel source
           ({ binder, value := initializer.value } :: environment)
           fallthroughSite fallthroughReason rest
         pure {
@@ -2841,7 +2913,7 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
             let evaluated ← evaluateStagedValueFuelWith lift
               onStagedValueCall onStagedValueCoercion
               onStagedValueRequiredUnary onStagedValueRequiredBinary analysis
-              solvedRequirements source environment fuel value
+              solvedRequirements source environment execute fuel value
             ensureStagedValueTypeWith lift site node.type evaluated.value
             pure evaluated
     | .ifThen condition thenBody elseBody => do
@@ -2853,17 +2925,19 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
         let condition ← evaluateStagedValueFuelWith lift onStagedValueCall
           onStagedValueCoercion onStagedValueRequiredUnary
           onStagedValueRequiredBinary analysis solvedRequirements source
-          environment fuel condition
+          environment execute fuel condition
         let conditionValue ← stagedBoolWith lift site condition.value
         let thenBranch ← evaluateStagedValueStatementsFuelWith lift
           onStagedValueCall onStagedValueCoercion
           onStagedValueRequiredUnary onStagedValueRequiredBinary analysis
-          solvedRequirements fuel source environment site
+          solvedRequirements (execute && conditionValue) fuel source
+          environment site
           (.conditionalBranchFallthrough .thenBranch) thenBody
         let elseBranch ← evaluateStagedValueStatementsFuelWith lift
           onStagedValueCall onStagedValueCoercion
           onStagedValueRequiredUnary onStagedValueRequiredBinary analysis
-          solvedRequirements fuel source environment site
+          solvedRequirements (execute && !conditionValue) fuel source
+          environment site
           (.conditionalBranchFallthrough .elseBranch) elseBody
         let selected := if conditionValue then thenBranch.value
           else elseBranch.value
@@ -2881,7 +2955,8 @@ private def evaluateStagedValueStatementsFuelWith {error : Type}
         let evaluated ← evaluateStagedValueStatementsFuelWith lift
           onStagedValueCall onStagedValueCoercion
           onStagedValueRequiredUnary onStagedValueRequiredBinary analysis
-          solvedRequirements fuel source environment site .blockFallthrough body
+          solvedRequirements execute fuel source environment site
+          .blockFallthrough body
         ensureStagedValueTypeWith lift site node.type evaluated.value
         pure evaluated
     | .matchWith _ => failWith lift site .stagedValueStatementNotClosed
@@ -2948,7 +3023,7 @@ def evaluateStagedValueFunctionWithPolicies {error : Type}
     let evaluated ← evaluateStagedValueStatementsFuelWith lift
       onStagedValueCall onStagedValueCoercion onStagedValueRequiredUnary
       onStagedValueRequiredBinary specialized.stageAnalysis
-      function.solvedRequirements (source.nodes.length + 1) source
+      function.solvedRequirements true (source.nodes.length + 1) source
       environment fallthroughSite .statementListFallthrough roots
     ensureStagedValueTypeWith lift
       (.declaration function.declaration) function.inferredBodyType
@@ -3020,7 +3095,7 @@ def evaluateStagedIntegerFunctionWith {error : Type}
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
     let evaluated ← evaluateStagedIntegerStatementsFuelWith lift
-      onStagedIntegerCall function.solvedRequirements
+      onStagedIntegerCall function.solvedRequirements true
       (source.nodes.length + 1) source environment fallthroughSite
       .statementListFallthrough roots
     let solvedRequirements :=
