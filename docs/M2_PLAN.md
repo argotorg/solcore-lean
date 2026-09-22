@@ -535,6 +535,28 @@ that public result projection. Successful typed-runtime argument/pattern
 binding preserves shallow heap-cell typing. Recursive closure/store validity
 and evaluator-wide typed-heap preservation remain the next proof tranches.
 
+ADR-0376 starts that deep tranche. A checked graph program now supplies typed
+definition bodies, linked entries retain the check and selected signature,
+and deeply typed caller arguments/store reach the exact runtime input relation.
+The graph value relation validates Core closures and source closures/captures;
+all application branches preserve deep results and final-store typing under
+an explicit typed-body evaluation contract. A fuel induction over all 13
+graph expression forms now proves that contract for a well-typed program;
+checked runner and linked entry normal completion preserve deep values,
+final-store typing and world extension from deep same-world caller inputs. The
+public compiler's selected graph route transports that result to the public
+source result projection.
+The typed runtime has all-depth structural
+value/heap typing, code-origin certificates for plan-backed closures/globals,
+and deep primitive heap-operation and root-assignment lemmas. A closure's code
+origin now reaches a checked lambda-node occurrence, but checked IR body
+soundness, composition of the locally proved projected-update paths, typed
+environments and evaluator induction remain open. The member payload frame is
+proved; unrestricted default typing is false for `.comptime` values and must
+be restricted to the runtime type profile. This tranche deliberately
+does not re-label shallow result tags as a
+backend-uniform deep preservation theorem.
+
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
 expression and statement nodes; complete selected declaration instantiations;

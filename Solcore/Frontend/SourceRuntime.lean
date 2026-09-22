@@ -1,4 +1,4 @@
-import Solcore.Core.Machine
+import Solcore.Core.Safety
 import Solcore.Frontend.SourceSpecialization
 
 /-!
@@ -83,16 +83,18 @@ def bundleType : List Core.Ty → Core.Ty
 def Signature.toCoreType (signature : Signature) : Core.Ty :=
   .function (bundleType signature.parameterTypes) signature.resultType
 
-private inductive StaticType where
+/-- The distinction between a callable source value and an ordinary value of
+function type, retained by the finite-graph checker. -/
+inductive StaticType where
   | value (type : Core.Ty)
   | callable (parameterTypes : List Core.Ty) (resultType : Core.Ty)
   deriving Repr, DecidableEq
 
-private def StaticType.erase : StaticType → Core.Ty
+def StaticType.erase : StaticType → Core.Ty
   | .value type => type
   | .callable parameters result => .function (bundleType parameters) result
 
-private abbrev StaticContext := List (Resolved.LocalId × StaticType)
+abbrev StaticContext := List (Resolved.LocalId × StaticType)
 
 inductive TypeError where
   | duplicateDefinition (key : Key)
@@ -108,7 +110,7 @@ inductive TypeError where
       (key : Key) (expected actual : Core.Ty)
   deriving Repr, DecidableEq
 
-private def lookupStatic?
+def lookupStatic?
     (context : StaticContext)
     (id : Resolved.LocalId) : Option StaticType :=
   (context.find? fun entry => decide (entry.1 = id)).map Prod.snd
@@ -130,7 +132,7 @@ private def firstDuplicateDefinition?
       if seen.any fun key => key == definition.key then some definition.key
       else firstDuplicateDefinition? (definition.key :: seen) definitions
 
-private def checkExpected (expected : Core.Ty) (actual : StaticType) :
+def checkExpected (expected : Core.Ty) (actual : StaticType) :
     Except TypeError Unit :=
   if actual.erase = expected then pure ()
   else throw (.typeMismatch expected actual.erase)
@@ -145,7 +147,7 @@ private def checkBundledArguments
 
 mutual
 
-  private def infer
+  def infer
       (program : Program)
       (context : StaticContext) : Expr → Except TypeError StaticType
     | .unit => pure (.value .unit)
@@ -218,7 +220,7 @@ mutual
             else throw (.typeMismatch expected actual)
         | .value actual => throw (.expectedFunction actual)
 
-  private def inferList
+  def inferList
       (program : Program)
       (context : StaticContext) : List Expr → Except TypeError (List StaticType)
     | [] => pure []
@@ -229,26 +231,245 @@ mutual
 
 end
 
+/-- A reusable static certificate for a source expression.  The inferred
+callability distinction is retained in the context, while the conclusion is
+the public Core type of the resulting value. -/
+def Expr.InfersType (program : Program) (context : StaticContext)
+    (expression : Expr) (expected : Core.Ty) : Prop :=
+  ∃ inferred, infer program context expression = .ok inferred ∧
+    inferred.erase = expected
+
+/-- Parameter identities do not affect the runtime's structural bundle type. -/
+theorem parameterType_eq_bundleType_map
+    (parameters : List Parameter) :
+    parameterType parameters = bundleType (parameters.map Prod.snd) := by
+  induction parameters with
+  | nil => rfl
+  | cons parameter parameters ih =>
+      cases parameters with
+      | nil => rfl
+      | cons next rest =>
+          simp [parameterType, bundleType, ih]
+
+/-- A successful lambda inference certifies its actual body under the
+captured context and the exact parameter binders, and fixes its erased
+function type. -/
+theorem Expr.InfersType.lambda_body
+    {program : Program} {context : StaticContext}
+    {parameters : List Parameter} {resultType : Core.Ty}
+    {body : Expr} {expected : Core.Ty}
+    (typing : Expr.InfersType program context
+      (.lambda parameters resultType body) expected) :
+    Expr.InfersType program
+        ((parameters.map fun parameter =>
+          (parameter.1, StaticType.value parameter.2)) ++ context)
+        body resultType ∧
+      expected = .function (parameterType parameters) resultType := by
+  obtain ⟨inferred, inferredAt, erased⟩ := typing
+  unfold infer at inferredAt
+  cases duplicates : firstDuplicateLocal? (context.map Prod.fst) parameters with
+  | some id =>
+      simp [duplicates, bind, Except.bind] at inferredAt
+  | none =>
+      cases bodyResult : infer program
+          ((parameters.map fun parameter =>
+            (parameter.1, StaticType.value parameter.2)) ++ context)
+          body with
+      | error error =>
+          simp [duplicates, bodyResult, bind, Except.bind] at inferredAt
+      | ok bodyType =>
+          by_cases equal : bodyType.erase = resultType
+          · simp [duplicates, bodyResult, checkExpected, equal,
+              bind, Except.bind] at inferredAt
+            cases inferredAt
+            refine ⟨⟨bodyType, bodyResult, equal⟩, ?_⟩
+            simpa [StaticType.erase, parameterType_eq_bundleType_map] using
+              erased.symm
+          · simp [duplicates, bodyResult, checkExpected, equal,
+              bind, Except.bind] at inferredAt
+
+/-- Successful application inference exposes the exact structural argument
+bundle and the function's erased input/output type, regardless of whether
+the callee was statically callable or an ordinary function-valued expression. -/
+theorem Expr.InfersType.apply_components
+    {program : Program} {context : StaticContext}
+    {function : Expr} {arguments : List Expr} {expected : Core.Ty}
+    (typing : Expr.InfersType program context
+      (.apply function arguments) expected) :
+    ∃ functionType argumentTypes parameterType resultType,
+      infer program context function = .ok functionType ∧
+      inferList program context arguments = .ok argumentTypes ∧
+      functionType.erase = .function parameterType resultType ∧
+      bundleType (argumentTypes.map StaticType.erase) = parameterType ∧
+      expected = resultType := by
+  obtain ⟨inferred, inferredAt, erased⟩ := typing
+  unfold infer at inferredAt
+  cases functionResult : infer program context function with
+  | error error =>
+      simp [functionResult, bind, Except.bind] at inferredAt
+  | ok functionType =>
+      cases argumentsResult : inferList program context arguments with
+      | error error =>
+          simp [functionResult, argumentsResult, bind, Except.bind]
+            at inferredAt
+      | ok argumentTypes =>
+          cases functionType with
+          | callable expectedTypes resultType =>
+              by_cases bundleEqual :
+                  bundleType (argumentTypes.map StaticType.erase) =
+                    bundleType expectedTypes
+              · simp [functionResult, argumentsResult,
+                  checkBundledArguments, bundleEqual,
+                  bind, Except.bind] at inferredAt
+                cases inferredAt
+                refine ⟨.callable expectedTypes resultType,
+                  argumentTypes, bundleType expectedTypes, resultType,
+                  rfl, rfl, rfl, bundleEqual, ?_⟩
+                simpa [StaticType.erase] using erased.symm
+              · simp [functionResult, argumentsResult,
+                  checkBundledArguments, bundleEqual,
+                  bind, Except.bind] at inferredAt
+          | value actual =>
+              cases actual with
+              | function parameterType resultType =>
+                  by_cases bundleEqual :
+                      bundleType (argumentTypes.map StaticType.erase) =
+                        parameterType
+                  · simp [functionResult, argumentsResult, bundleEqual,
+                      bind, Except.bind] at inferredAt
+                    cases inferredAt
+                    refine ⟨.value (.function parameterType resultType),
+                      argumentTypes, parameterType, resultType,
+                      rfl, rfl, rfl, bundleEqual, ?_⟩
+                    simpa [StaticType.erase] using erased.symm
+                  · simp [functionResult, argumentsResult, bundleEqual,
+                      bind, Except.bind] at inferredAt
+              | unit => simp [functionResult, argumentsResult,
+                    bind, Except.bind] at inferredAt
+              | bool => simp [functionResult, argumentsResult,
+                    bind, Except.bind] at inferredAt
+              | word => simp [functionResult, argumentsResult,
+                    bind, Except.bind] at inferredAt
+              | product _ _ => simp [functionResult, argumentsResult,
+                    bind, Except.bind] at inferredAt
+              | sum _ _ => simp [functionResult, argumentsResult,
+                    bind, Except.bind] at inferredAt
+              | cell _ => simp [functionResult, argumentsResult,
+                    bind, Except.bind] at inferredAt
+              | namedData _ => simp [functionResult, argumentsResult,
+                    bind, Except.bind] at inferredAt
+
 /-- A program whose finite definition table and every body have been checked. -/
 structure CheckedProgram where
   program : Program
   deriving Repr
 
+private def checkDefinitions (program : Program) :
+    List Definition → Except TypeError Unit
+  | [] => pure ()
+  | definition :: definitions => do
+      match firstDuplicateLocal? [] definition.parameters with
+      | some id => throw (.duplicateLocal id)
+      | none => pure ()
+      let context := definition.parameters.map fun parameter =>
+        (parameter.1, StaticType.value parameter.2)
+      let actual ← infer program context definition.body
+      if actual.erase = definition.resultType then
+        checkDefinitions program definitions
+      else
+        throw (.definitionResultMismatch
+          definition.key definition.resultType actual.erase)
+
+/-- Every definition traversed by a successful whole-table body check has a
+body whose inferred type is its declared result type. -/
+private theorem checkDefinitions_ok_forall (program : Program) :
+    ∀ definitions,
+      checkDefinitions program definitions = .ok () →
+      ∀ definition, definition ∈ definitions →
+        Expr.InfersType program
+          (definition.parameters.map fun parameter =>
+            (parameter.1, StaticType.value parameter.2))
+          definition.body definition.resultType := by
+  intro definitions
+  induction definitions with
+  | nil =>
+      intro _ definition member
+      cases member
+  | cons head rest inductionHypothesis =>
+      intro accepted definition member
+      unfold checkDefinitions at accepted
+      cases duplicate : firstDuplicateLocal? [] head.parameters with
+      | some id =>
+          simp [duplicate, bind, Except.bind] at accepted
+      | none =>
+          simp only [duplicate, bind, Except.bind] at accepted
+          cases inferred : infer program
+              (head.parameters.map fun parameter =>
+                (parameter.1, StaticType.value parameter.2)) head.body with
+          | error error =>
+              simp [inferred] at accepted
+          | ok actual =>
+              simp only [inferred] at accepted
+              by_cases same : actual.erase = head.resultType
+              · have restAccepted : checkDefinitions program rest = .ok () := by
+                  simpa [same] using accepted
+                rcases List.mem_cons.mp member with selected | later
+                · subst definition
+                  exact ⟨actual, inferred, same⟩
+                · exact inductionHypothesis restAccepted definition later
+              · simp [same] at accepted
+
 def Program.check (program : Program) : Except TypeError CheckedProgram := do
   match firstDuplicateDefinition? [] program.definitions with
   | some key => throw (.duplicateDefinition key)
   | none => pure ()
-  for definition in program.definitions do
-    match firstDuplicateLocal? [] definition.parameters with
-    | some id => throw (.duplicateLocal id)
-    | none => pure ()
-    let context := definition.parameters.map fun parameter =>
-      (parameter.1, StaticType.value parameter.2)
-    let actual ← infer program context definition.body
-    if actual.erase != definition.resultType then
-      throw (.definitionResultMismatch
-        definition.key definition.resultType actual.erase)
+  checkDefinitions program program.definitions
   pure ⟨program⟩
+
+/-- Whole-table checking supplies a static typing derivation for each actual
+definition body. This is the global-call case needed by graph evaluation
+preservation, and it depends on a real checker success rather than the
+forgeable `CheckedProgram` wrapper alone. -/
+theorem Program.check_definition_hasType
+    (program : Program) (checked : CheckedProgram)
+    (accepted : program.check = .ok checked)
+    (definition : Definition) (member : definition ∈ program.definitions) :
+    Expr.InfersType program
+      (definition.parameters.map fun parameter =>
+        (parameter.1, StaticType.value parameter.2))
+      definition.body definition.resultType := by
+  unfold Program.check at accepted
+  cases duplicate : firstDuplicateDefinition? [] program.definitions with
+  | some key =>
+      simp [duplicate, bind, Except.bind] at accepted
+  | none =>
+      simp only [duplicate, bind, Except.bind] at accepted
+      cases bodies : checkDefinitions program program.definitions with
+      | error error =>
+          simp [bodies] at accepted
+      | ok success =>
+          cases success
+          exact checkDefinitions_ok_forall program program.definitions bodies
+            definition member
+
+/-- Unlike the forgeable `CheckedProgram` carrier, this predicate records an
+actual successful pass of the whole-program checker. -/
+def Program.IsWellTyped (program : Program) : Prop :=
+  ∃ checked, program.check = .ok checked
+
+/-- A non-forgeable checked-program witness yields the body typing of a
+definition selected by the executable lookup. -/
+theorem Program.IsWellTyped.foundDefinition_hasType
+    {program : Program} (wellTyped : program.IsWellTyped)
+    {key : Key} {definition : Definition}
+    (found : program.findDefinition? key = some definition) :
+    Expr.InfersType program
+      (definition.parameters.map fun parameter =>
+        (parameter.1, StaticType.value parameter.2))
+      definition.body definition.resultType := by
+  obtain ⟨checked, accepted⟩ := wellTyped
+  exact program.check_definition_hasType checked accepted definition
+    (List.mem_of_find?_eq_some found)
 
 def CheckedProgram.entrySignature?
     (checked : CheckedProgram) (key : Key) : Option Signature :=
@@ -316,7 +537,7 @@ def Value.toCore? : Value → Option Core.Value
   | .closure _ _ _ _
   | .global _ => none
 
-private def Value.type? (program : Program) : Value → Option Core.Ty
+def Value.type? (program : Program) : Value → Option Core.Ty
   | .unit => some .unit
   | .bool _ => some .bool
   | .word _ => some .word
@@ -367,11 +588,103 @@ theorem inRight
 
 end Value.HasType
 
-private def lookupValue?
+mutual
+
+  /-- Deep typing of the finite graph's own values.  The Core case checks the
+  projected closure body, captured Core environment, and cell world using
+  Core's runtime relation.  A source closure additionally carries a checked
+  body and a pointwise-deep captured lexical environment. -/
+  inductive Value.GraphHasType
+      (program : Program) (world : Core.StoreTyping) :
+      Value → Core.Ty → (definitions : Core.DataEnvironment := []) → Prop where
+    | core
+        {definitions : Core.DataEnvironment}
+        {value : Value} {core : Core.Value} {expected : Core.Ty} :
+        value.toCore? = some core →
+        Core.RuntimeValueHasType world core expected definitions →
+        Value.HasType program value expected →
+        Value.GraphHasType program world value expected definitions
+    | pair
+        {definitions : Core.DataEnvironment}
+        {left right : Value} {leftType rightType : Core.Ty} :
+        Value.GraphHasType program world left leftType definitions →
+        Value.GraphHasType program world right rightType definitions →
+        Value.GraphHasType program world (.pair left right)
+          (.product leftType rightType) definitions
+    | inLeft
+        {definitions : Core.DataEnvironment}
+        {payload : Value} {leftType rightType : Core.Ty} :
+        Value.GraphHasType program world payload leftType definitions →
+        Value.GraphHasType program world (.inLeft rightType payload)
+          (.sum leftType rightType) definitions
+    | inRight
+        {definitions : Core.DataEnvironment}
+        {payload : Value} {leftType rightType : Core.Ty} :
+        Value.GraphHasType program world payload rightType definitions →
+        Value.GraphHasType program world (.inRight leftType payload)
+          (.sum leftType rightType) definitions
+    | sourceClosure
+        {definitions : Core.DataEnvironment}
+        {parameters : List Parameter} {resultType : Core.Ty}
+        {body : Expr} {environment : Environment}
+        {context : StaticContext} :
+        EnvironmentGraphHasTypes program world environment context definitions →
+        Expr.InfersType program
+          ((parameters.map fun parameter =>
+            (parameter.1, StaticType.value parameter.2)) ++ context)
+          body resultType →
+        Value.GraphHasType program world
+          (.closure parameters resultType body environment)
+          (.function (parameterType parameters) resultType) definitions
+    | global
+        {definitions : Core.DataEnvironment} {key : Key}
+        {signature : Signature} :
+        program.IsWellTyped →
+        program.findSignature? key = some signature →
+        Value.GraphHasType program world (.global key)
+          signature.toCoreType definitions
+
+  inductive EnvironmentGraphHasTypes
+      (program : Program) (world : Core.StoreTyping) :
+      Environment → StaticContext →
+      (definitions : Core.DataEnvironment := []) → Prop where
+    | nil {definitions : Core.DataEnvironment} :
+        EnvironmentGraphHasTypes program world [] [] definitions
+    | cons
+        {definitions : Core.DataEnvironment}
+        {id : Resolved.LocalId} {value : Value} {staticType : StaticType}
+        {environment : Environment} {context : StaticContext} :
+        Value.GraphHasType program world value staticType.erase definitions →
+        EnvironmentGraphHasTypes program world environment context definitions →
+        EnvironmentGraphHasTypes program world
+          ((id, value) :: environment)
+          ((id, staticType) :: context) definitions
+
+end
+
+/-- Deep graph typing always agrees with the runtime's shallow type tag. -/
+theorem Value.GraphHasType.hasType
+    {program : Program} {world : Core.StoreTyping}
+    {value : Value} {expected : Core.Ty}
+    {definitions : Core.DataEnvironment}
+    (typing : Value.GraphHasType program world value expected definitions) :
+    Value.HasType program value expected := by
+  induction typing using Value.GraphHasType.rec
+      (motive_2 := fun _ _ _ _ => True) with
+  | core _ _ shallow => exact shallow
+  | pair _ _ leftIH rightIH => exact Value.HasType.pair leftIH rightIH
+  | inLeft _ payloadIH => exact Value.HasType.inLeft payloadIH
+  | inRight _ payloadIH => exact Value.HasType.inRight payloadIH
+  | sourceClosure => simp [Value.HasType, Value.type?]
+  | global _ found => simp [Value.HasType, Value.type?, found]
+  | nil => trivial
+  | cons => trivial
+
+def lookupValue?
     (environment : Environment) (id : Resolved.LocalId) : Option Value :=
   (environment.find? fun entry => decide (entry.1 = id)).map Prod.snd
 
-private def packValues : List Value → Value
+def packValues : List Value → Value
   | [] => .unit
   | [value] => value
   | value :: values => .pair value (packValues values)
@@ -382,7 +695,7 @@ one `Unit` parameter both have bundle `Unit`, while one product parameter and
 several parameters can have the same product bundle.  Applications therefore
 pack the caller's arguments and unpack them according to the selected runtime
 closure, rather than comparing the two source arities. -/
-private def unpackValues? : List Parameter → Value → Option (List Value)
+def unpackValues? : List Parameter → Value → Option (List Value)
   | [], .unit => some []
   | [], _ => none
   | [_], value => some [value]
@@ -391,7 +704,7 @@ private def unpackValues? : List Parameter → Value → Option (List Value)
       pure (value :: remaining)
   | _ :: _ :: _, _ => none
 
-private def bindParameters
+def bindParameters
     (parameters : List Parameter)
     (arguments : List Value)
     (captured : Environment) : Environment :=
@@ -425,12 +738,12 @@ inductive RunResult where
   | fault (error : RuntimeError) (store : Core.Store)
   deriving Repr
 
-private inductive ArgumentsResult where
+inductive ArgumentsResult where
   | done (values : List Value) (store : Core.Store)
   | outOfFuel (store : Core.Store)
   | fault (error : RuntimeError) (store : Core.Store)
 
-private def evaluateArguments
+def evaluateArguments
     (evaluateOne : Core.Store → Expr → RunResult) :
     Core.Store → List Expr → ArgumentsResult
   | store, [] => .done [] store
@@ -444,7 +757,7 @@ private def evaluateArguments
       | .outOfFuel finalStore => .outOfFuel finalStore
       | .fault error finalStore => .fault error finalStore
 
-private def applyValue
+def applyValue
     (program : Program)
     (evaluateBody : Environment → Core.Store → Expr → RunResult)
     (coreFuel : Nat)
@@ -504,7 +817,7 @@ private def applyValue
             | .fault error state => .fault (.coreFault error) state.store
   | actual => .fault (.expectedFunction (actual.type? program)) store
 
-private def evaluate
+def evaluate
     (fuel : Nat)
     (program : Program)
     (environment : Environment)

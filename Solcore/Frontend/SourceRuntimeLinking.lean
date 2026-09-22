@@ -118,10 +118,24 @@ structure LinkedEntry where
   /-- A public certificate that the entry result uses that source type. -/
   resultType_eq_source : lowerType sourceBodyType = .ok resultType
   program : SourceRuntime.CheckedProgram
+  /-- The executable table was produced by the actual whole-table checker,
+  rather than supplied through the forgeable `CheckedProgram` constructor. -/
+  checkedBy : ∃ raw : SourceRuntime.Program, raw.check = .ok program
   /-- The executable table exposes this same result type at the entry key. -/
   signatureResultType : ∃ signature,
     program.entrySignature? key = some signature ∧
     signature.resultType = resultType
+  /-- The checked entry's positional parameter types are exactly those
+  retained for the public linked entry. -/
+  signatureInputTypes : ∃ signature,
+    program.entrySignature? key = some signature ∧
+    signature.parameterTypes = inputs.map Prod.snd
+  /-- A selected executable definition supplies the same parameter and result
+  types as the entry, allowing deep input premises to use this public shape. -/
+  definitionMatches : ∃ definition,
+    program.program.findDefinition? key = some definition ∧
+    definition.parameters = inputs ∧
+    definition.resultType = resultType
   deriving Repr
 
 structure LinkedProgram where
@@ -565,6 +579,7 @@ private def lowerDefinition (program : CheckedProgram) (plan : Plan)
         simpa only [definition] using projection⟩
 
 private def linkedEntry (checked : SourceRuntime.CheckedProgram)
+    (checkedBy : ∃ raw : SourceRuntime.Program, raw.check = .ok checked)
     (plan : Plan) (key : Key) : Except Error LinkedEntry := do
   let specialized ← exactSpecialization plan key
   match found : checked.program.findDefinition? key with
@@ -581,10 +596,16 @@ private def linkedEntry (checked : SourceRuntime.CheckedProgram)
               sourceBodyType := specialized.function.inferredBodyType
               resultType_eq_source := by simpa only [sameType] using projected
               program := checked
+              checkedBy
               signatureResultType := by
                 refine ⟨definition.signature, ?_, rfl⟩
                 simp [SourceRuntime.CheckedProgram.entrySignature?,
                   SourceRuntime.Program.findSignature?, found]
+              signatureInputTypes := by
+                refine ⟨definition.signature, ?_, rfl⟩
+                simp [SourceRuntime.CheckedProgram.entrySignature?,
+                  SourceRuntime.Program.findSignature?, found]
+              definitionMatches := ⟨definition, found, rfl, rfl⟩
             }
           else
             throw (.linkedResultTypeMismatch key sourceResultType definition.resultType)
@@ -603,11 +624,14 @@ def link (program : CheckedProgram)
   let definitions ← plan.specializations.mapM fun specialized => do
     let certified ← lowerDefinition program plan specialized
     pure certified.val
-  let checked ← ({ definitions } : SourceRuntime.Program).check
-    |>.mapError Error.runtimeType
-  pure {
-    entries := ← plan.seedKeys.mapM (linkedEntry checked plan)
-  }
+  let raw : SourceRuntime.Program := { definitions }
+  match accepted : raw.check with
+  | .error error => throw (.runtimeType error)
+  | .ok checked =>
+      pure {
+        entries := ← plan.seedKeys.mapM
+          (linkedEntry checked ⟨raw, accepted⟩ plan)
+      }
 
 private def defaultResolved : Core.Ty → Option Resolved.Expr
   | .unit => some .unit

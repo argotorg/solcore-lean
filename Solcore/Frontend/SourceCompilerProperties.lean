@@ -304,6 +304,29 @@ theorem CompiledEntry.run_callGraph_done_has_public_resultType
   | typedSource =>
       simp [CompiledEntry.backend] at backend
 
+/-- The compiler-level deep graph input premise entails the exact
+selected-definition input relation used by the graph safety induction. -/
+theorem CompiledEntry.graphDeepInput_to_runtime
+    (compiled : CompiledEntry) (arguments : List Core.Value)
+    (store : Core.Store)
+    (typing : compiled.GraphDeepInput arguments store) :
+    compiled.GraphRuntimeDeepInput arguments store := by
+  cases compiled
+  rename_i program plan root executable
+  cases executable with
+  | core entry =>
+      simp only [CompiledEntry.GraphDeepInput] at typing
+  | callGraph entry =>
+      simp only [CompiledEntry.GraphDeepInput] at typing
+      obtain ⟨world, argumentsTyped, storeTyped⟩ := typing
+      obtain ⟨definition, runtimeTyped⟩ :=
+        entry.runtimeInputsHaveType arguments store world
+          argumentsTyped storeTyped
+      simp only [CompiledEntry.GraphRuntimeDeepInput]
+      exact ⟨world, definition, runtimeTyped⟩
+  | typedSource =>
+      simp only [CompiledEntry.GraphDeepInput] at typing
+
 /-- Whole-compiler successful-result preservation.  One theorem now covers
 all three selected runtimes without erasing their native value/store domains.
 The precondition is substantial only for direct Core (deep values/store) and

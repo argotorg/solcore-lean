@@ -1,6 +1,8 @@
 import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceSpecializationWorklistProperties
 import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Frontend.SourceRuntimeLinkingSafetyProperties
+import Solcore.Frontend.SourceRuntimeDeepProperties
 import Solcore.Core.Safety
 
 /-!
@@ -151,6 +153,18 @@ def HasCanonicalRoot (compiled : CompiledEntry) : Prop :=
   compiled.plan.specializations.filter (fun candidate =>
     decide (candidate.key = compiled.root.key)) = [compiled.root]
 
+/-- The retained source program really came from a successful raw-workspace
+check. This provenance is not automatic for `compileChecked`, whose caller can
+provide an arbitrary `CheckedProgram` record. -/
+def HasCheckedSourceWitness (compiled : CompiledEntry) : Prop :=
+  ∃ raw fuel, checkProgram raw fuel = .ok compiled.program
+
+/-- The sealed plan passed the typed-source runtime's executable-profile
+preflight. Successful compilation guarantees this when that backend is
+selected; it is not asserted for Core or graph artifacts. -/
+def HasValidatedTypedPlan (compiled : CompiledEntry) : Prop :=
+  SourceTypedRuntime.validateExecutablePlan compiled.plan = .ok ()
+
 /-- A source-typed runtime value has this artifact's public source result
 type according to the runtime's shallow tag reconstruction. The underlying
 plan stays sealed, so callers can use this proposition without reconstructing
@@ -189,6 +203,48 @@ def GraphValueHasPublicType (compiled : CompiledEntry)
       ∃ publicType,
         SourceRuntimeLinking.lowerType compiled.resultType = .ok publicType ∧
           SourceRuntime.Value.HasType entry.program.program value publicType
+  | .core _ | .typedSource => False
+
+/-- Semantic graph input premise for a whole-language deep preservation
+theorem. A shallow runtime tag alone cannot validate a supplied Core closure
+or an arbitrary initial store. -/
+def GraphDeepInput (compiled : CompiledEntry)
+    (arguments : List Core.Value) (store : Core.Store) : Prop :=
+  match compiled.executable with
+  | .callGraph entry =>
+      ∃ world,
+        Core.RuntimeEnvironmentHasTypes world arguments
+          (entry.inputs.map Prod.snd) ∧
+        Core.StoreHasTypes world store
+  | .core _ | .typedSource => False
+
+/-- The exact selected-definition premise consumed by graph evaluator safety
+proofs. Successful linking certifies both table checking and signature
+identity, so only deep caller inputs and store typing remain external. -/
+def GraphRuntimeDeepInput (compiled : CompiledEntry)
+    (arguments : List Core.Value) (store : Core.Store) : Prop :=
+  match compiled.executable with
+  | .callGraph entry =>
+      ∃ world definition,
+        entry.program.RuntimeInputsHaveType entry.key arguments store
+          definition world
+  | .core _ | .typedSource => False
+
+/-- Deep finite-graph result and final-store typing at the public source
+result projection, retaining extension of the caller's initial Core world.
+Unlike the shallow graph result tag, this validates source closures and their
+captures as well as Core-projectable values. -/
+def GraphDeepResult (compiled : CompiledEntry)
+    (initialWorld : Core.StoreTyping) (value : SourceRuntime.Value)
+    (finalStore : Core.Store) : Prop :=
+  match compiled.executable with
+  | .callGraph entry =>
+      ∃ publicType finalWorld,
+        SourceRuntimeLinking.lowerType compiled.resultType = .ok publicType ∧
+        Core.WorldExtends initialWorld finalWorld ∧
+        Core.StoreHasTypes finalWorld finalStore ∧
+        SourceRuntime.Value.GraphHasType entry.program.program finalWorld
+          value publicType
   | .core _ | .typedSource => False
 
 end CompiledEntry
@@ -422,6 +478,40 @@ private def selectBackend (program : CheckedProgram)
               typedSource := typedSourceError
             })
 
+private theorem selectBackend_typed_plan
+    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (stagingFuel : Nat)
+    (selected : selectBackend program plan stagingFuel = .ok .typedSource) :
+    SourceTypedRuntime.validateExecutablePlan plan = .ok () := by
+  cases direct : SourceCoreDirectLinking.linkWithStagingFuel program
+      (.complete plan) stagingFuel with
+  | ok linked =>
+      cases entries : linked.entries with
+      | nil => simp [selectBackend, direct, entries] at selected
+      | cons entry rest =>
+          cases rest with
+          | nil => simp [selectBackend, direct, entries] at selected
+          | cons another tail =>
+              simp [selectBackend, direct, entries] at selected
+  | error directError =>
+      cases graph : SourceRuntimeLinking.link program (.complete plan) with
+      | ok linked =>
+          cases entries : linked.entries with
+          | nil => simp [selectBackend, direct, graph, entries] at selected
+          | cons entry rest =>
+              cases rest with
+              | nil =>
+                  simp [selectBackend, direct, graph, entries] at selected
+              | cons another tail =>
+                  simp [selectBackend, direct, graph, entries] at selected
+      | error graphError =>
+          cases validated : SourceTypedRuntime.validateExecutablePlan plan with
+          | ok value =>
+              cases value
+              rfl
+          | error error =>
+              simp [selectBackend, direct, graph, validated] at selected
+
 /-- Guard the public result signature against an inconsistent linker payload.
 The graph entry separately certifies projection from its source type to its
 Core result type; here we identify that source type with the canonical root. -/
@@ -491,6 +581,64 @@ def compileChecked (program : CheckedProgram) (seed : Seed)
   validatePublicResultType root executable
   pure ⟨program, plan, root, executable⟩
 
+/-- Checked compilation retains the exact caller-supplied checked program.
+This is an identity fact, not a claim that the supplied record came from the
+source checker. -/
+theorem compileChecked_program
+    (program : CheckedProgram) (seed : Seed) (options : CompileOptions)
+    (compiled : CompiledEntry)
+    (compiledOk : compileChecked program seed options = .ok compiled) :
+    compiled.program = program := by
+  unfold compileChecked at compiledOk
+  cases seedResult : SourceProgramExecution.resolveSeed program seed with
+  | error error =>
+      rw [seedResult] at compiledOk
+      cases compiledOk
+  | ok request =>
+      rw [seedResult] at compiledOk
+      simp only [Except.mapError, bind, Except.bind] at compiledOk
+      cases worklist : SourceSpecializationWorklist.run program [request]
+          options.specializationBudget with
+      | error error =>
+          rw [worklist] at compiledOk
+          cases compiledOk
+      | ok outcome =>
+          rw [worklist] at compiledOk
+          cases outcome with
+          | budgetExhausted plan next pending =>
+              cases compiledOk
+          | complete plan =>
+              simp only [pure, Pure.pure, Except.pure] at compiledOk
+              cases valid : SourceCoreDirectLinking.validatePlan program plan with
+              | error error =>
+                  rw [valid] at compiledOk
+                  cases compiledOk
+              | ok checked =>
+                  rw [valid] at compiledOk
+                  cases selected : exactRoot plan with
+                  | error error =>
+                      rw [selected] at compiledOk
+                      cases compiledOk
+                  | ok root =>
+                      rw [selected] at compiledOk
+                      cases backend : selectBackend program plan
+                          options.stagingFuel with
+                      | error error =>
+                          rw [backend] at compiledOk
+                          cases compiledOk
+                      | ok executable =>
+                          rw [backend] at compiledOk
+                          simp at compiledOk
+                          cases publicResult : validatePublicResultType root
+                              executable with
+                          | error error =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                          | ok checkedResult =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                              rfl
+
 /-- Every artifact returned by the public checked compilation path retains its
 root as the unique specialization selected by the canonical seed key. -/
 theorem compileChecked_hasCanonicalRoot
@@ -547,6 +695,71 @@ theorem compileChecked_hasCanonicalRoot
                               rw [publicResult] at compiledOk
                               cases compiledOk
                               exact exactRoot_specializations plan root selected
+
+/-- Selecting the typed-source backend certifies that its retained finite plan
+passed the runtime's executable-profile preflight. -/
+theorem compileChecked_hasValidatedTypedPlan
+    (program : CheckedProgram) (seed : Seed) (options : CompileOptions)
+    (compiled : CompiledEntry)
+    (compiledOk : compileChecked program seed options = .ok compiled)
+    (typedBackend : compiled.backend = .typedSource) :
+    compiled.HasValidatedTypedPlan := by
+  unfold compileChecked at compiledOk
+  cases seedResult : SourceProgramExecution.resolveSeed program seed with
+  | error error =>
+      rw [seedResult] at compiledOk
+      cases compiledOk
+  | ok request =>
+      rw [seedResult] at compiledOk
+      simp only [Except.mapError, bind, Except.bind] at compiledOk
+      cases worklist : SourceSpecializationWorklist.run program [request]
+          options.specializationBudget with
+      | error error =>
+          rw [worklist] at compiledOk
+          cases compiledOk
+      | ok outcome =>
+          rw [worklist] at compiledOk
+          cases outcome with
+          | budgetExhausted plan next pending =>
+              cases compiledOk
+          | complete plan =>
+              simp only [pure, Pure.pure, Except.pure] at compiledOk
+              cases valid : SourceCoreDirectLinking.validatePlan program plan with
+              | error error =>
+                  rw [valid] at compiledOk
+                  cases compiledOk
+              | ok checked =>
+                  rw [valid] at compiledOk
+                  cases selected : exactRoot plan with
+                  | error error =>
+                      rw [selected] at compiledOk
+                      cases compiledOk
+                  | ok root =>
+                      rw [selected] at compiledOk
+                      cases backendSelected : selectBackend program plan
+                          options.stagingFuel with
+                      | error error =>
+                          rw [backendSelected] at compiledOk
+                          cases compiledOk
+                      | ok executable =>
+                          rw [backendSelected] at compiledOk
+                          simp at compiledOk
+                          cases publicResult : validatePublicResultType root
+                              executable with
+                          | error error =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                          | ok checkedResult =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                              cases executable with
+                              | core entry =>
+                                  simp [CompiledEntry.backend] at typedBackend
+                              | callGraph entry =>
+                                  simp [CompiledEntry.backend] at typedBackend
+                              | typedSource =>
+                                  exact selectBackend_typed_plan program plan
+                                    options.stagingFuel backendSelected
 
 /-- The public result type is certified against the backend selected by every
 successful checked compilation, including fallback to the finite graph. -/
@@ -682,6 +895,45 @@ def compile (raw : Workspace.RawWorkspace) (seed : Seed)
   let program ← (checkProgram raw options.checkingFuel).mapError
     CompileError.checking
   compileChecked program seed options.toCompileOptions
+
+/-- Raw compilation records an actual successful source-checker run.  The
+checked-program entry point deliberately has no corresponding unconditional
+theorem because its input carrier is constructible by callers. -/
+theorem compile_hasCheckedSourceWitness
+    (raw : Workspace.RawWorkspace) (seed : Seed)
+    (options : CheckingOptions) (compiled : CompiledEntry)
+    (compiledOk : compile raw seed options = .ok compiled) :
+    compiled.HasCheckedSourceWitness := by
+  unfold compile at compiledOk
+  cases checked : checkProgram raw options.checkingFuel with
+  | error errors =>
+      rw [checked] at compiledOk
+      cases compiledOk
+  | ok program =>
+      rw [checked] at compiledOk
+      simp only [Except.mapError, bind, Except.bind] at compiledOk
+      refine ⟨raw, options.checkingFuel, ?_⟩
+      simpa [compileChecked_program program seed options.toCompileOptions
+        compiled compiledOk] using checked
+
+/-- The same typed-plan certificate is available after raw-workspace
+compilation, provided the selected backend is typed source. -/
+theorem compile_hasValidatedTypedPlan
+    (raw : Workspace.RawWorkspace) (seed : Seed)
+    (options : CheckingOptions) (compiled : CompiledEntry)
+    (compiledOk : compile raw seed options = .ok compiled)
+    (typedBackend : compiled.backend = .typedSource) :
+    compiled.HasValidatedTypedPlan := by
+  unfold compile at compiledOk
+  cases checked : checkProgram raw options.checkingFuel with
+  | error errors =>
+      rw [checked] at compiledOk
+      cases compiledOk
+  | ok program =>
+      rw [checked] at compiledOk
+      simp only [Except.mapError, bind, Except.bind] at compiledOk
+      exact compileChecked_hasValidatedTypedPlan program seed
+        options.toCompileOptions compiled compiledOk typedBackend
 
 /-- Combined failure carrier for the one-shot convenience boundary. -/
 inductive Error where

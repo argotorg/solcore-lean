@@ -106,7 +106,7 @@ private def resultType? (function : CheckedFunction) : Option Ty :=
 
 mutual
 
-  private def valueTypes? (plan : Plan) : List Value → Option (List Ty)
+  def valueTypes? (plan : Plan) : List Value → Option (List Ty)
     | [] => some []
     | value :: values => do
         let type ← Value.type? plan value
@@ -156,7 +156,7 @@ not a claim that recursively contained runtime data has been validated. -/
 def HasShallowTypes (state : RuntimeState) (plan : Plan) : Prop :=
   ∀ cell, cell ∈ state.heap → cell.HasShallowType plan
 
-private theorem mem_replaceCell
+theorem mem_replaceCell
     (index : Nat) (replacement selected : Cell) (heap : List Cell)
     (member : selected ∈ replaceCell index replacement heap) :
     selected = replacement ∨ selected ∈ heap := by
@@ -176,6 +176,42 @@ private theorem mem_replaceCell
           · rcases inductionHypothesis index member with equal | old
             · exact .inl equal
             · exact .inr (.inr old)
+
+private theorem replaceCell_typeVector
+    (heap : List Cell) (index : Nat) (previous replacement : Cell)
+    (found : heap[index]? = some previous)
+    (sameType : replacement.type = previous.type) :
+    (replaceCell index replacement heap).map Cell.type = heap.map Cell.type := by
+  induction heap generalizing index with
+  | nil => simp at found
+  | cons head tail inductionHypothesis =>
+      cases index with
+      | zero =>
+          simp at found
+          cases found
+          simp [replaceCell, sameType]
+      | succ index =>
+          simp only [List.getElem?_cons_succ] at found
+          simpa [replaceCell] using
+            inductionHypothesis index found
+
+/-- A heap write changes only a cell's optional value, never the vector of
+declared cell types. -/
+theorem write?_typeVector_eq
+    (state updated : RuntimeState) (location : Location)
+    (value : Option Value)
+    (written : state.write? location value = some updated) :
+    updated.heap.map Cell.type = state.heap.map Cell.type := by
+  unfold RuntimeState.write? at written
+  cases found : state.read? location with
+  | none => simp [found] at written
+  | some previous =>
+      simp only [found] at written
+      cases written
+      apply replaceCell_typeVector state.heap location.index previous
+        { previous with value }
+      · simpa [RuntimeState.read?] using found
+      · rfl
 
 /-- Replacing the optional value of one readable cell preserves shallow heap
 typing when the replacement value agrees with that cell's retained type. -/
@@ -256,7 +292,7 @@ private def unpackValues : Nat → Value → Option (List Value)
       pure (value :: (← unpackValues (count + 1) rest))
   | _ + 2, _ => none
 
-private def defaultValue? : Nat → Ty → Option Value
+def defaultValue? : Nat → Ty → Option Value
   | 0, _ => none
   | _ + 1, .constructor (.builtin .unit) => some .unit
   | _ + 1, .constructor (.builtin .bool) => some (.bool false)
@@ -269,17 +305,40 @@ private def defaultValue? : Nat → Ty → Option Value
   | fuel + 1, .comptime inner => defaultValue? fuel inner
   | _, _ => none
 
-private def mappingLookup? (key : Value) : List (Value × Value) → Option Value
+def mappingLookup? (key : Value) : List (Value × Value) → Option Value
   | [] => none
   | entry :: rest =>
       if valueEqual key entry.1 then some entry.2 else mappingLookup? key rest
 
-private def mappingInsert (key value : Value) :
+def mappingInsert (key value : Value) :
     List (Value × Value) → List (Value × Value)
   | [] => [(key, value)]
   | entry :: rest =>
       if valueEqual key entry.1 then (key, value) :: rest
       else entry :: mappingInsert key value rest
+
+/-- Insertion either contributes the new pair or retains an old pair. -/
+theorem mappingInsert_member
+    (key value : Value) (entries : List (Value × Value))
+    (selected : Value × Value)
+    (member : selected ∈ mappingInsert key value entries) :
+    selected = (key, value) ∨ selected ∈ entries := by
+  induction entries with
+  | nil =>
+      simp [mappingInsert] at member
+      exact .inl member
+  | cons entry rest inductionHypothesis =>
+      by_cases sameKey : valueEqual key entry.1
+      · simp [mappingInsert, sameKey] at member ⊢
+        rcases member with fresh | old
+        · exact Or.inl fresh
+        · exact Or.inr (Or.inr old)
+      · simp [mappingInsert, sameKey] at member ⊢
+        rcases member with old | tail
+        · exact Or.inr (Or.inl old)
+        · rcases inductionHypothesis tail with fresh | old
+          · exact Or.inl fresh
+          · exact Or.inr (Or.inr old)
 
 inductive RuntimeError where
   | missingSpecialization (key : Key)
@@ -361,7 +420,7 @@ inductive RunResult where
   | fault (error : RuntimeError) (state : RuntimeState)
   deriving Repr
 
-private def exactSpecialization (plan : Plan) (key : Key) :
+def exactSpecialization (plan : Plan) (key : Key) :
     Except RuntimeError SourceSpecialization.SpecializedFunction :=
   match plan.specializations.filter fun specialized =>
       decide (specialized.key = key) with
@@ -724,11 +783,45 @@ private def applyBuiltin (function : BuiltinFunctionId)
       else
         throw (.invalidBuiltin function)
 
-private def replaceValueAt : Nat → Value → List Value → Option (List Value)
+def replaceValueAt : Nat → Value → List Value → Option (List Value)
   | _, _, [] => none
   | 0, replacement, _ :: rest => some (replacement :: rest)
   | index + 1, replacement, value :: rest => do
       pure (value :: (← replaceValueAt index replacement rest))
+
+/-- A successful payload replacement contributes only the replacement value
+or a value already present in the original payload vector. -/
+theorem replaceValueAt_member
+    (index : Nat) (replacement : Value)
+    (arguments replaced : List Value)
+    (selected : Value)
+    (written : replaceValueAt index replacement arguments = some replaced)
+    (member : selected ∈ replaced) :
+    selected = replacement ∨ selected ∈ arguments := by
+  induction arguments generalizing index replaced with
+  | nil => simp [replaceValueAt] at written
+  | cons first rest inductionHypothesis =>
+      cases index with
+      | zero =>
+          simp [replaceValueAt] at written
+          cases written
+          simp only [List.mem_cons] at member ⊢
+          rcases member with fresh | old
+          · exact Or.inl fresh
+          · exact Or.inr (Or.inr old)
+      | succ index =>
+          cases tailWrite : replaceValueAt index replacement rest with
+          | none => simp [replaceValueAt, tailWrite] at written
+          | some replacedTail =>
+              simp [replaceValueAt, tailWrite] at written
+              cases written
+              simp only [List.mem_cons] at member ⊢
+              rcases member with old | tail
+              · exact Or.inr (Or.inl old)
+              · rcases inductionHypothesis index replacedTail tailWrite tail with
+                  fresh | old
+                · exact Or.inl fresh
+                · exact Or.inr (Or.inr old)
 
 private inductive PatternResult where
   | matched (bindings : List (TypedBinder × Value))
@@ -825,7 +918,7 @@ private def matchPattern (pattern : TypedMatchPattern)
               else .malformed
           | none => .noMatch
 
-private def bindValues (plan : Plan) : Environment → RuntimeState →
+def bindValues (plan : Plan) : Environment → RuntimeState →
     List (TypedBinder × Value) →
       Except RuntimeError (Environment × RuntimeState)
   | environment, state, [] => pure (environment, state)
@@ -837,7 +930,7 @@ private def bindValues (plan : Plan) : Environment → RuntimeState →
 
 /-- The successful parameter/pattern-binding path of the evaluator preserves
 shallow heap typing across every allocated binding cell. -/
-private theorem bindValues_ok_preserves_shallow_types
+theorem bindValues_ok_preserves_shallow_types
     (plan : Plan) (bindings : List (TypedBinder × Value))
     (environment finalEnvironment : Environment)
     (state finalState : RuntimeState)
@@ -890,16 +983,16 @@ private def restoreScope (outer : Environment) : FlowOutcome → FlowOutcome
   | .outOfFuel state => .outOfFuel state
   | .fault error state => .fault error state
 
-private inductive ModificationResult where
+inductive ModificationResult where
   | done (value : Value) (state : RuntimeState)
   | outOfFuel (state : RuntimeState)
   | fault (error : RuntimeError) (state : RuntimeState)
 
-private inductive RuntimeProjection where
+inductive RuntimeProjection where
   | index (key : Value)
   | member (name : String) (index : Nat)
 
-private structure ResolvedPlace where
+structure ResolvedPlace where
   location : Location
   rootType : Ty
   valueType : Ty
@@ -990,7 +1083,7 @@ private def resolvePlace (plan : Plan)
           | .error (none, finalState) => .outOfFuel finalState
           | .error (some error, finalState) => .fault error finalState
 
-private def updateResolvedValue (plan : Plan) (expected : Ty)
+def updateResolvedValue (plan : Plan) (expected : Ty)
     (modify : Option Value → Except RuntimeError Value) :
     Option Value → List RuntimeProjection → Except RuntimeError Value
   | current, [] => do
@@ -1026,7 +1119,14 @@ private def updateResolvedValue (plan : Plan) (expected : Ty)
           pure (.constructed instantiation arguments)
       | actual => throw (.invalidMember name index (actual.type? plan))
 
-private def writeResolvedPlace (plan : Plan) (state : RuntimeState)
+/-- Interpret an uninitialized mapping cell as its empty mapping before a
+structural place update. -/
+def initialRootValue (cell : Cell) : Option Value :=
+  match cell.value, cell.type with
+  | none, .mapping key value => some (.mapping key value [])
+  | value, _ => value
+
+def writeResolvedPlace (plan : Plan) (state : RuntimeState)
     (place : ResolvedPlace)
     (modify : Option Value → Except RuntimeError Value) : ModificationResult :=
   match state.read? place.location with
@@ -1035,9 +1135,7 @@ private def writeResolvedPlace (plan : Plan) (state : RuntimeState)
       if cell.type != place.rootType then
         .fault (.typeMismatch place.rootType (some cell.type)) state
       else
-        let initial := match cell.value, cell.type with
-          | none, .mapping key value => some (.mapping key value [])
-          | value, _ => value
+        let initial := initialRootValue cell
         match updateResolvedValue plan place.valueType modify initial
             place.projections with
         | .error error => .fault error state
@@ -1079,12 +1177,8 @@ private theorem writeResolvedPlace_done_preserves_shallow_types
           simp [sameType]
         rw [noMismatch] at done
         simp only [Bool.false_eq_true, ↓reduceIte] at done
-        generalize initialEq :
-            (match cell.value, cell.type with
-             | none, Ty.mapping key value => some (Value.mapping key value [])
-             | value, _ => value) = initial at done
         cases updateResult : updateResolvedValue plan place.valueType modify
-            initial place.projections with
+            (initialRootValue cell) place.projections with
         | error error => simp [updateResult] at done
         | ok next =>
             simp only [updateResult] at done
@@ -1698,7 +1792,7 @@ private def exactConstructor? (dataType : ProgramDataSignature)
 
 /-- Reconstruct constructor metadata from the authoritative signature catalog.
 Self-consistent but forged `DataConstructorInstantiation` values do not pass. -/
-private def validConstructorInstantiation (signatures : ProgramSignatures)
+def validConstructorInstantiation (signatures : ProgramSignatures)
     (instantiation : DataConstructorInstantiation) : Bool :=
   match exactDataType? signatures instantiation.constructor.dataType with
   | none => false
@@ -1821,6 +1915,197 @@ def hasType (signatures : ProgramSignatures) (plan : Plan) (fuel : Nat)
   Value.hasTypeFuel fuel signatures plan expected value
 
 end Value
+
+/-- Step-indexed *structural heap* typing of a runtime value.  At depth zero
+no structure is inspected; each successor step validates the outer type and
+one layer of products, mappings, nominal payloads, and captured closure
+locations.  The index permits cyclic closure heaps.
+
+This is deliberately not semantic closure typing: it does not certify a
+closure's `body`, `source`, or `owner` against the typed plan.  A whole-language
+type-preservation theorem needs that separate static closure certificate and
+an evaluator induction in addition to this heap invariant. -/
+def Value.HasDeepTypeFuel :
+    Nat → ProgramSignatures → Plan → RuntimeState → Ty → Value → Prop
+  | 0, _, _, _, _, _ => True
+  | fuel + 1, signatures, plan, state, expected, value =>
+      value.type? plan = some expected ∧
+        match value with
+        | .product left right =>
+            match expected with
+            | .product leftType rightType =>
+                left.HasDeepTypeFuel fuel signatures plan state leftType ∧
+                  right.HasDeepTypeFuel fuel signatures plan state rightType
+            | _ => False
+        | .mapping actualKey actualValue entries =>
+            match expected with
+            | .mapping keyType valueType =>
+                actualKey = keyType ∧ actualValue = valueType ∧
+                  ∀ entry, entry ∈ entries →
+                    entry.1.HasDeepTypeFuel fuel signatures plan state keyType ∧
+                      entry.2.HasDeepTypeFuel fuel signatures plan state valueType
+            | _ => False
+        | .constructed instantiation arguments =>
+            instantiation.resultType = expected ∧
+              validConstructorInstantiation signatures instantiation = true ∧
+              instantiation.payloadTypes.length = arguments.length ∧
+              ∀ pair, pair ∈ List.zip instantiation.payloadTypes arguments →
+                pair.2.HasDeepTypeFuel fuel signatures plan state pair.1
+        | .closure parameters resultType _ _ _ captured =>
+            expected = .function
+              (Ty.productMany (parameters.map (·.scheme.body))) resultType ∧
+              ∀ binding, binding ∈ captured →
+                ∃ cell, state.read? binding.2 = some cell ∧
+                  ∀ capturedValue, cell.value = some capturedValue →
+                    capturedValue.HasDeepTypeFuel fuel signatures plan state cell.type
+        | .global key =>
+            ∃ specialized, exactSpecialization plan key = .ok specialized ∧
+              specialized.function.type = expected
+        | _ => True
+
+/-- All finite structural-heap observations of one value; this still does not
+certify closure code or the runtime evaluator. -/
+def Value.HasDeepType (value : Value) (signatures : ProgramSignatures)
+    (plan : Plan) (state : RuntimeState) (expected : Ty) : Prop :=
+  ∀ fuel, value.HasDeepTypeFuel fuel signatures plan state expected
+
+/-- Static provenance of executable code carried by a value.  A closure must
+point at a lambda node in the unique checked specialization for its owner;
+a global must resolve to a unique specialization.  This relation is separate
+from structural heap typing, and does not by itself prove the checked IR's
+semantic type-soundness. -/
+def Value.HasPlanCodeFuel : Nat → Plan → Value → Prop
+  | 0, _, _ => True
+  | fuel + 1, plan, value =>
+      match value with
+      | .product left right =>
+          left.HasPlanCodeFuel fuel plan ∧ right.HasPlanCodeFuel fuel plan
+      | .constructed _ arguments =>
+          ∀ argument, argument ∈ arguments → argument.HasPlanCodeFuel fuel plan
+      | .mapping _ _ entries =>
+          ∀ entry, entry ∈ entries →
+            entry.1.HasPlanCodeFuel fuel plan ∧
+              entry.2.HasPlanCodeFuel fuel plan
+      | .closure parameters resultType body source owner _ =>
+          validateExecutablePlan plan = .ok () ∧
+            ∃ specialized, exactSpecialization plan owner = .ok specialized ∧
+              specialized.function.typedBody = source ∧
+              ∃ id node, source.lookupExpression? id = some node ∧
+                node.form = .lambda parameters resultType body ∧
+                node.type = .function
+                  (Ty.productMany (parameters.map (·.scheme.body))) resultType
+      | .global key =>
+          validateExecutablePlan plan = .ok () ∧
+            ∃ specialized, exactSpecialization plan key = .ok specialized
+      | _ => True
+
+def Value.HasPlanCode (value : Value) (plan : Plan) : Prop :=
+  ∀ fuel, value.HasPlanCodeFuel fuel plan
+
+namespace RuntimeState
+
+/-- All initialized heap values carry code provenance to the given plan.
+This is independent of structural heap typing and must be preserved alongside
+it in a full evaluator proof. -/
+def HasPlanCodes (state : RuntimeState) (plan : Plan) : Prop :=
+  ∀ cell, cell ∈ state.heap →
+    ∀ value, cell.value = some value → value.HasPlanCode plan
+
+end RuntimeState
+
+/-- A no-coercion lambda node evaluates to the closure carrying its checked
+source and owner.  This is one concrete evaluator transition linking dynamic
+code values to the plan-provenance predicate. -/
+theorem evaluate_lambda_hasPlanCode
+    (fuel : Nat) (plan : Plan) (owner : Key) (source : TypedSource)
+    (environment : Environment) (state : RuntimeState)
+    (id : ExpressionId) (node : ExpressionNode)
+    (parameters : List TypedBinder) (resultType : Ty)
+    (body : List StatementId)
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (validated : validateExecutablePlan plan = .ok ())
+    (specializedAt : exactSpecialization plan owner = .ok specialized)
+    (sameSource : specialized.function.typedBody = source)
+    (found : source.lookupExpression? id = some node)
+    (shape : node.form = .lambda parameters resultType body)
+    (noCoercions : node.coercions = [])
+    (nodeType : node.type = .function
+      (Ty.productMany (parameters.map (·.scheme.body))) resultType) :
+    evaluate (fuel + 1) plan owner source environment state id =
+      .done (.closure parameters resultType body source owner environment)
+        state ∧
+    (Value.closure parameters resultType body source owner environment).HasPlanCode
+      plan := by
+  constructor
+  · rw [evaluate.eq_2]
+    unfold exactExpression
+    rw [found]
+    simp [shape, noCoercions, finishExpression, nodeType,
+      applyCoercions]
+    change (if Value.type? plan
+        (.closure parameters resultType body source owner environment) =
+        some (Ty.function
+          (Ty.productMany (parameters.map (·.scheme.body))) resultType) then
+        ExpressionResult.done
+          (.closure parameters resultType body source owner environment)
+          state
+      else
+        ExpressionResult.fault (.typeMismatch
+          (Ty.function (Ty.productMany (parameters.map (·.scheme.body)))
+            resultType)
+          (Value.type? plan
+            (.closure parameters resultType body source owner environment)))
+          state) = _
+    simp [Value.type?]
+  · intro depth
+    cases depth with
+    | zero => trivial
+    | succ depth =>
+        exact ⟨validated, specialized, specializedAt, sameSource,
+          id, node, found, shape, nodeType⟩
+
+namespace Cell
+
+/-- A cell is deeply typed at the specified approximation depth. -/
+def HasDeepTypeFuel (cell : Cell) (fuel : Nat)
+    (signatures : ProgramSignatures) (plan : Plan) (state : RuntimeState) : Prop :=
+  ∀ value, cell.value = some value →
+    value.HasDeepTypeFuel fuel signatures plan state cell.type
+
+end Cell
+
+namespace Location
+
+/-- A location names a cell of the expected type whose value is deeply typed
+in the same heap world. -/
+def HasDeepTypeFuel (location : Location) (fuel : Nat)
+    (signatures : ProgramSignatures) (plan : Plan) (state : RuntimeState)
+    (expected : Ty) : Prop :=
+  ∃ cell, state.read? location = some cell ∧ cell.type = expected ∧
+    cell.HasDeepTypeFuel fuel signatures plan state
+
+end Location
+
+namespace RuntimeState
+
+/-- All cells are deeply typed relative to a heap world.  Taking the world to
+be `state` yields the self-consistent heap invariant below. -/
+def HasDeepTypesAtFuel (state world : RuntimeState) (fuel : Nat)
+    (signatures : ProgramSignatures) (plan : Plan) : Prop :=
+  ∀ cell, cell ∈ state.heap →
+    cell.HasDeepTypeFuel fuel signatures plan world
+
+def HasDeepTypesFuel (state : RuntimeState) (fuel : Nat)
+    (signatures : ProgramSignatures) (plan : Plan) : Prop :=
+  state.HasDeepTypesAtFuel state fuel signatures plan
+
+/-- Every finite *structural heap* observation depth is valid.  Cyclic heaps
+are allowed; closure code itself is not checked by this relation. -/
+def HasDeepTypes (state : RuntimeState)
+    (signatures : ProgramSignatures) (plan : Plan) : Prop :=
+  ∀ fuel, state.HasDeepTypesFuel fuel signatures plan
+
+end RuntimeState
 
 private def validateInputs (signatures : ProgramSignatures) (plan : Plan)
     (fuel : Nat) : List Ty → List Value → Option RuntimeError

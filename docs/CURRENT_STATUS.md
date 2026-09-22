@@ -6682,8 +6682,39 @@ entry against the canonical public root and proves that every compiled artifact
 has a public result projection. Successful direct-Core results therefore carry
 deep value/final-store typing at the public projection, while successful graph
 results carry its shallow checked-table tag. Source-typed `bindValues` now
-preserves the shallow heap-cell invariant. Deep graph closure/store validity
-and typed evaluator-wide heap preservation remain open.
+preserves the shallow heap-cell invariant. At the ADR-0375 boundary, deep graph
+closure/store validity and typed evaluator-wide heap preservation were open.
+
+ADR-0376 begins the deep whole-language preservation tranche with explicit
+semantic premises. The finite graph now has a deep relation for Core-projectable
+values, source closures and their captured lexical environments, and checked
+globals. Successful graph checking supplies typing of every actual definition
+body; linked entries retain this checker witness and exact selected signature.
+Deep Core arguments and a typed initial store therefore establish the graph
+runner's selected-definition input relation. Argument bundling and binder
+construction preserve it. Each actual application branch preserves deep
+results and final-store typing under a typed-body callback contract, and a
+fuel induction over all 13 executable expression forms now discharges that
+contract for well-typed graph programs. The checked runner and linked entry
+therefore preserve deep results, typed final stores and world extension from
+deep same-world caller inputs on normal completion. The public compiled
+call-graph route carries the same deep conclusion at the compiler's source
+result projection. This does not establish termination or exclude every graph
+runtime fault.
+
+The source-typed runtime now has an all-depth structural value/heap relation
+for recursive data and captured locations, plus a separate relation certifying
+closure/global code origin in a validated plan. Deep allocation, binding,
+primitive writes and root-place assignment preserve these relations under
+explicit typed-input/update conditions. A checked lambda-node lookup theorem
+connects runtime closure provenance to an actual typed IR occurrence. This is
+not yet semantic body typing or evaluator-wide preservation: mapping/member
+projection paths have local reconstruction and frame lemmas, including
+constructor payload replacement, while their composition, environment-to-cell
+typing and checked IR body soundness remain. An unrestricted default-value
+deep-typing statement is false for `.comptime`, which returns an inner value.
+Raw compilation now retains the source-check witness, and typed-backend
+selection retains executable-plan validation.
 
 ## What is not yet claimed
 
