@@ -116,7 +116,10 @@ private structure Context where
   specialized : SourceSpecialization.SpecializedFunction
   source : TypedSource
 
-private def lowerType : Ty → Except Error Core.Ty
+/-- The structural source-to-Core projection admitted by the finite call-graph
+linker.  Unlike direct Core lowering, this projection also admits function
+types for runtime globals and closures. -/
+def lowerType : Ty → Except Error Core.Ty
   | .constructor (.builtin .unit) => pure .unit
   | .constructor (.builtin .bool) => pure .bool
   | .constructor (.builtin .word) => pure .word

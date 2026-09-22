@@ -88,6 +88,16 @@ private def rewriteEntryNodes (prepared : Prepared)
       specialized
   { prepared with plan := { prepared.plan with specializations } }
 
+private def rewriteEntryFunction (prepared : Prepared)
+    (rewrite : SourceInference.CheckedFunction →
+      SourceInference.CheckedFunction) : Prepared :=
+  let specializations := prepared.plan.specializations.map fun specialized =>
+    if specialized.key = prepared.key then
+      { specialized with function := rewrite specialized.function }
+    else
+      specialized
+  { prepared with plan := { prepared.plan with specializations } }
+
 private def rewriteFirstExpression
     (rewrite : SourceInference.ExpressionNode → SourceInference.ExpressionNode) :
     List SourceInference.Node → List SourceInference.Node
@@ -118,6 +128,17 @@ private def expectWord (label : String) (expected : Nat) : RunResult → IO Unit
 private def expectProxyWord (label : String) : RunResult → IO Unit
   | .done (.proxy type) _ =>
       assertTrue (decide (type = Ty.word)) s!"{label} returned the wrong proxy"
+  | result => throw (IO.userError s!"{label} returned {reprStr result}")
+
+private def expectShallowHeap (label : String)
+    (plan : SourceSpecializationWorklist.Plan) : RunResult → IO Unit
+  | .done _ state => do
+      for cell in state.heap do
+        match cell.value with
+        | none => pure ()
+        | some value =>
+            assertTrue (decide (value.type? plan = some cell.type))
+              s!"{label} left an initialized cell with a mismatched type"
   | result => throw (IO.userError s!"{label} returned {reprStr result}")
 
 private def source : String := String.intercalate "\n" [
@@ -231,10 +252,15 @@ private def testAssignmentsMappingsAndControl
     (program : CheckedProgram) : IO Unit := do
   let assignments ← prepareNamed program "assignments"
   let expected := Core.Word.maximum.sub (word 8) |>.val
+  let assignmentResult := runPrepared assignments
   expectWord "compound and bit-not assignment" expected
-    (runPrepared assignments)
+    assignmentResult
+  expectShallowHeap "compound and bit-not assignment" assignments.plan
+    assignmentResult
   let mappings ← prepareNamed program "mappings"
-  expectWord "empty and nested mapping" 16 (runPrepared mappings)
+  let mappingResult := runPrepared mappings
+  expectWord "empty and nested mapping" 16 mappingResult
+  expectShallowHeap "empty and nested mapping" mappings.plan mappingResult
   let loops ← prepareNamed program "loops"
   expectWord "for/while break/continue" 6 (runPrepared loops  [] 8192)
 
@@ -374,6 +400,15 @@ private def testTamperedExecutableMetadata
   expectPreExecutionFault "unsupported indirect argument coercion"
     (fun error => error matches .unsupportedIndirectCoercions _)
     (runPrepared withArgumentCoercion)
+
+  let inconsistentResult := rewriteEntryFunction proxy fun function =>
+    { function with inferredBodyType := .bool }
+  expectPreExecutionFault "inconsistent inferred result type"
+    (fun error => match error with
+      | .inferredResultTypeMismatch key declared inferred =>
+          decide (key = proxy.key ∧ declared = .proxy .word ∧ inferred = .bool)
+      | _ => false)
+    (runPrepared inconsistentResult)
 
 private def letBinderNamed
     (specialized : SourceSpecialization.SpecializedFunction) (name : String) :

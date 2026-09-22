@@ -513,6 +513,19 @@ arbitrary complete worklist result to validator acceptance still requires the
 Graph-runtime value/store preservation and source/runtime correspondence also
 remain later tranches.
 
+ADR-0374 prioritizes whole-program result preservation next. Direct-Core
+execution now transports deep same-world input/store typing to a deeply typed
+successful value and final store, and excludes Core faults. Finite graph and
+source-typed execution each prove that a successful result has the exact
+runtime-selected declaration/specialization result tag. Typed preflight
+rejects disagreement between declared and inferred result types, while
+compiler-level theorems join the three native result carriers and retain the
+canonical root through raw or already-checked compilation. These results do
+not conflate shallow tags with deep closure, graph-store or typed-heap typing.
+Those state/value invariants and backend-to-public-source signature coherence
+are the next proof obligations; validator completeness remains independently
+deferred.
+
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
 expression and statement nodes; complete selected declaration instantiations;

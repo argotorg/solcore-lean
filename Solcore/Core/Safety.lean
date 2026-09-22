@@ -361,6 +361,22 @@ theorem RuntimeValueHasType.type_eq
     value.type = type :=
   typing.erase.type_eq
 
+/-- Deep runtime-environment typing determines the same shallow type tags used
+by executable entry guards. -/
+theorem RuntimeEnvironmentHasTypes.type_tags
+    {definitions : DataEnvironment}
+    {world : StoreTyping} {environment : Environment} {context : Context}
+    (typing : RuntimeEnvironmentHasTypes world environment context definitions) :
+    environment.map Value.type = context := by
+  induction typing using RuntimeEnvironmentHasTypes.rec
+      (motive_1 := fun _ _ _ _ => True) with
+  | unit | bool | word | pair | inLeft | inRight | closure | cellRef
+  | constructed =>
+      trivial
+  | nil => rfl
+  | cons head _ _ tailIH =>
+      simp only [List.map_cons, head.type_eq, tailIH]
+
 theorem RuntimeValueHasType.bool_shape
     {definitions : DataEnvironment}
     {world : StoreTyping} {value : Value}

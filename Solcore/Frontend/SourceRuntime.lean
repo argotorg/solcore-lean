@@ -334,6 +334,39 @@ private def Value.type? (program : Program) : Value → Option Core.Ty
   | .cellRef elementType _ => some (.cell elementType)
   | .constructed constructor _ => some (.namedData constructor.owner)
 
+/-- Public shallow runtime typing.  This records the type tag reconstructed
+from a value and the finite global signature table; it does not assert that a
+Core closure body, captured environment, or referenced store is well typed. -/
+def Value.HasType (program : Program) (value : Value)
+    (expected : Core.Ty) : Prop :=
+  value.type? program = some expected
+
+namespace Value.HasType
+
+theorem pair
+    {program : Program} {left right : Value} {leftType rightType : Core.Ty}
+    (leftTyping : Value.HasType program left leftType)
+    (rightTyping : Value.HasType program right rightType) :
+    Value.HasType program (.pair left right) (.product leftType rightType) := by
+  simp only [Value.HasType] at leftTyping rightTyping ⊢
+  simp [Value.type?, leftTyping, rightTyping]
+
+theorem inLeft
+    {program : Program} {payload : Value} {leftType rightType : Core.Ty}
+    (payloadTyping : Value.HasType program payload leftType) :
+    Value.HasType program (.inLeft rightType payload) (.sum leftType rightType) := by
+  simp only [Value.HasType] at payloadTyping ⊢
+  simp [Value.type?, payloadTyping]
+
+theorem inRight
+    {program : Program} {payload : Value} {leftType rightType : Core.Ty}
+    (payloadTyping : Value.HasType program payload rightType) :
+    Value.HasType program (.inRight leftType payload) (.sum leftType rightType) := by
+  simp only [Value.HasType] at payloadTyping ⊢
+  simp [Value.type?, payloadTyping]
+
+end Value.HasType
+
 private def lookupValue?
     (environment : Environment) (id : Resolved.LocalId) : Option Value :=
   (environment.find? fun entry => decide (entry.1 = id)).map Prod.snd
@@ -582,6 +615,15 @@ private def evaluate
           | .outOfFuel finalStore => .outOfFuel finalStore
           | .fault error finalStore => .fault error finalStore
 
+private def validateEntryArgumentTypes (key : Key) :
+    Nat → List Core.Ty → List Core.Value → Option RuntimeError
+  | index, expected :: expectedTypes, actual :: actualValues =>
+      if actual.type = expected then
+        validateEntryArgumentTypes key (index + 1) expectedTypes actualValues
+      else
+        some (.entryArgumentTypeMismatch key index expected actual.type)
+  | _, _, _ => none
+
 private def validateEntryArguments
     (key : Key)
     (signature : Signature)
@@ -590,15 +632,24 @@ private def validateEntryArguments
     some (.entryArgumentArityMismatch
       key signature.parameterTypes.length arguments.length)
   else
-    let rec loop (index : Nat) :
-        List Core.Ty → List Core.Value → Option RuntimeError
-      | expected :: expectedTypes, actual :: actualValues =>
-          if actual.type = expected then
-            loop (index + 1) expectedTypes actualValues
-          else
-            some (.entryArgumentTypeMismatch key index expected actual.type)
-      | _, _ => none
-    loop 0 signature.parameterTypes arguments
+    validateEntryArgumentTypes key 0 signature.parameterTypes arguments
+
+private theorem validateEntryArgumentTypes_self
+    (key : Key) (index : Nat) (arguments : List Core.Value) :
+    validateEntryArgumentTypes key index
+      (arguments.map Core.Value.type) arguments = none := by
+  induction arguments generalizing index with
+  | nil => rfl
+  | cons argument arguments ih =>
+      simp [validateEntryArgumentTypes, ih]
+
+private theorem validateEntryArguments_none_of_type_tags
+    (key : Key) (signature : Signature) (arguments : List Core.Value)
+    (typesEqual : arguments.map Core.Value.type = signature.parameterTypes) :
+    validateEntryArguments key signature arguments = none := by
+  unfold validateEntryArguments
+  rw [← typesEqual]
+  simp [validateEntryArgumentTypes_self]
 
 /-- Execute a checked global entry.  Arguments are validated before any body
 is entered, and recursive calls share the same finite global table. -/
@@ -621,6 +672,55 @@ def CheckedProgram.run
               applyValue checked.program
                 (evaluate fuel checked.program) fuel
                 (.global entry) (arguments.map Value.ofCore) store
+
+/-- Deep runtime typing implies this shallow premise, but the executable entry
+gate itself needs only exact ordered type tags.  At zero execution fuel a
+matching invocation reaches the observable fuel boundary without changing the
+store. -/
+theorem CheckedProgram.run_zero_of_matching_types
+    (checked : CheckedProgram) (entry : Key) (definition : Definition)
+    (arguments : List Core.Value) (store : Core.Store)
+    (found : checked.program.findDefinition? entry = some definition)
+    (typesEqual : arguments.map Core.Value.type =
+      definition.signature.parameterTypes) :
+    checked.run 0 entry arguments store = .outOfFuel store := by
+  simp [CheckedProgram.run, found,
+    validateEntryArguments_none_of_type_tags entry definition.signature
+      arguments typesEqual]
+
+/-- Every successful entry run carries the result type declared by the
+selected definition.  This shallow result-tag property follows from the
+runtime's outer result check, so it also holds for a manually constructed
+`CheckedProgram`; no static-checking premise is required. -/
+theorem CheckedProgram.run_done_hasType
+    (checked : CheckedProgram) (fuel : Nat) (entry : Key)
+    (arguments : List Core.Value) (initialStore finalStore : Core.Store)
+    (value : Value)
+    (completed : checked.run fuel entry arguments initialStore =
+      .done value finalStore) :
+    ∃ definition,
+      checked.program.findDefinition? entry = some definition ∧
+      checked.entrySignature? entry = some definition.signature ∧
+      Value.HasType checked.program value definition.resultType := by
+  unfold CheckedProgram.run at completed
+  split at completed
+  · contradiction
+  · rename_i definition found
+    split at completed
+    · contradiction
+    · split at completed
+      · contradiction
+      · refine ⟨definition, found, ?_, ?_⟩
+        · simp [CheckedProgram.entrySignature?, Program.findSignature?, found]
+        · unfold applyValue at completed
+          simp only [found] at completed
+          split at completed <;> try contradiction
+          split at completed <;> try contradiction
+          split at completed <;> try contradiction
+          split at completed <;> try contradiction
+          rename_i resultTypeMatches
+          cases completed
+          exact resultTypeMatches
 
 /-- Project a finished runtime value back to the Core value boundary.  Lexical
 closures and named globals deliberately have no Core projection. -/

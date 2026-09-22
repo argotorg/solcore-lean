@@ -6653,6 +6653,27 @@ accepted.  The remaining converse needs the scanner's request/edge
 correspondence and worklist replay idempotence.  Runtime graph preservation is
 also separate.
 
+ADR-0374 advances the next proof tranche at the whole-program execution
+boundary. For direct Core, deeply typed inputs and an initial store in one
+world now imply a deeply typed successful result and final store, and exclude
+Core machine faults at every finite fuel. Finite-graph runs have a general
+theorem that every successful result carries the selected definition's result
+type tag, including for manually constructed checked-program carriers. The
+Core-to-graph value conversion preserves deep typing at the input boundary.
+For source-typed runs, successful results carry the unique specialization's
+inferred result type; preflight rejects inconsistent declared/inferred result
+metadata before executing the body. Compilation exposes the canonical-root
+certificate and a common backend-native successful-result theorem, also
+available through one-shot execution.
+
+The common theorem is not yet uniform deep whole-language subject reduction.
+Graph result tags do not validate source-native closure bodies, captures or
+final stores; typed-source tags do not recursively validate mappings,
+constructors, captured locations or the final heap. A shallow per-cell heap
+invariant and primitive state-operation lemmas now provide a typed-runtime
+foundation. Backend-native Core result types also still need a proven bridge
+to the compiler's public source `resultType`.
+
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary

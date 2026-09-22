@@ -425,6 +425,7 @@ import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceProgramExecutionProperties
 import Solcore.Frontend.SourceCompiler
 import Solcore.Frontend.SourceCompilerProperties
+import Solcore.Frontend.SourceCompilerSignatureProperties
 
 /-!
 Canonical explicit-table frontend adapters for local expressions, type names,

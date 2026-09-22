@@ -1,6 +1,7 @@
 import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceSpecializationWorklistProperties
 import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Core.Safety
 
 /-!
 The restricted public source compiler boundary.
@@ -129,6 +130,22 @@ def backend (compiled : CompiledEntry) : Backend :=
 def specializationCount (compiled : CompiledEntry) : Nat :=
   compiled.plan.specializations.length
 
+/-- The retained root is the unique specialization with the canonical seed
+key.  Successful compilation establishes this provenance fact; it is kept
+explicit because the sealed artifact's constructor itself carries no proof
+fields. -/
+def HasCanonicalRoot (compiled : CompiledEntry) : Prop :=
+  compiled.plan.specializations.filter (fun candidate =>
+    decide (candidate.key = compiled.root.key)) = [compiled.root]
+
+/-- A source-typed runtime value has this artifact's public source result
+type according to the runtime's shallow tag reconstruction. The underlying
+plan stays sealed, so callers can use this proposition without reconstructing
+a specialization table. This does not validate a closure body or heap. -/
+def TypedValueHasResultType (compiled : CompiledEntry)
+    (value : SourceTypedRuntime.Value) : Prop :=
+  value.type? compiled.plan = some compiled.resultType
+
 end CompiledEntry
 
 /-- Runtime-domain tag supplied by a caller. -/
@@ -177,6 +194,68 @@ inductive ExecutionResult where
   deriving Repr
 
 namespace CompiledEntry
+
+/-- The extra semantic premise needed to lift executable runtime checks to a
+preservation theorem.  Direct Core needs genuinely typed values and store;
+the graph runtime enforces its successful result tag dynamically, while the
+typed-source runtime needs the retained canonical-root certificate. -/
+def PreservationPrecondition (compiled : CompiledEntry) : Invocation → Prop
+  | .coreValues arguments store =>
+      match compiled.executable with
+      | .core entry =>
+          ∃ world,
+            Core.RuntimeEnvironmentHasTypes world arguments
+                entry.elaborated.inputs.values ∧
+              Core.StoreHasTypes world store
+      | .callGraph _ => True
+      | .typedSource => False
+  | .typedValues _ _ =>
+      match compiled.executable with
+      | .typedSource => compiled.HasCanonicalRoot
+      | .core _ | .callGraph _ => False
+
+/-- Successful finite-graph results carry the result type declared by the
+runtime table selected for that exact entry. -/
+def GraphResultHasType (checked : SourceRuntime.CheckedProgram)
+    (entry : SourceRuntime.Key) : SourceRuntime.RunResult → Prop
+  | .done value _ =>
+      ∃ signature,
+        checked.entrySignature? entry = some signature ∧
+          SourceRuntime.Value.HasType checked.program value
+            signature.resultType
+  | .outOfFuel _ | .fault _ _ => True
+
+/-- Backend-native typing for every successful result carrier.  The direct
+Core branch is deep and includes final-store typing; finite-graph and
+typed-source branches currently record only their runtime-checked result tags.
+They do not yet claim closure/capture or final store/heap preservation.  Fault
+and exhaustion cases are intentionally outside this predicate. -/
+def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult → Prop
+  | .core (.done value finalStore) =>
+      match compiled.executable with
+      | .core entry =>
+          ∃ finalWorld,
+            Core.StoreHasTypes finalWorld finalStore ∧
+              Core.RuntimeValueHasType finalWorld value
+                entry.elaborated.returnType
+      | .callGraph _ | .typedSource => False
+  | .core (.outOfFuel _) | .core (.fault _ _) => True
+  | .callGraph result@(.done _ _) =>
+      match compiled.executable with
+      | .core entry =>
+          match entry.runtime with
+          | some checked => GraphResultHasType checked entry.key result
+          | none => False
+      | .callGraph entry => GraphResultHasType entry.program entry.key result
+      | .typedSource => False
+  | .callGraph (.outOfFuel _) | .callGraph (.fault _ _) => True
+  | .typedSource (.done value _) =>
+      match compiled.executable with
+      | .typedSource =>
+          value.type? compiled.plan =
+            some compiled.root.function.inferredBodyType
+      | .core _ | .callGraph _ => False
+  | .typedSource (.outOfFuel _) | .typedSource (.fault _ _) => True
 
 /-- Execute a reusable artifact in its selected runtime domain. -/
 def run (compiled : CompiledEntry) (invocation : Invocation)
@@ -247,6 +326,31 @@ private theorem exactRoot_seedKeys (plan : SourceSpecializationWorklist.Plan)
     next roots rootsEqual => cases accepted
   next keys seedKeysEqual => cases accepted
 
+/-- Exact root recovery also retains the unique specialization witness needed
+by the typed runtime's successful-result preservation theorem. -/
+private theorem exactRoot_specializations
+    (plan : SourceSpecializationWorklist.Plan)
+    (root : SourceSpecialization.SpecializedFunction)
+    (accepted : exactRoot plan = .ok root) :
+    plan.specializations.filter (fun candidate =>
+      decide (candidate.key = root.key)) = [root] := by
+  unfold exactRoot at accepted
+  split at accepted
+  next key seedKeysEqual =>
+    simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at accepted
+    split at accepted
+    next rootsEqual =>
+      cases accepted
+      have member : root ∈ plan.specializations.filter (fun candidate =>
+          decide (candidate.key = key)) := by
+        rw [rootsEqual]
+        simp
+      have selectedKey : root.key = key := by
+        exact of_decide_eq_true (List.mem_filter.mp member).2
+      simpa [selectedKey] using rootsEqual
+    next roots rootsEqual => cases accepted
+  next keys seedKeysEqual => cases accepted
+
 private def selectBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) (stagingFuel : Nat) :
     Except CompileError Executable :=
@@ -290,6 +394,55 @@ def compileChecked (program : CheckedProgram) (seed : Seed)
   let root ← exactRoot plan
   let executable ← selectBackend program plan options.stagingFuel
   pure ⟨program, plan, root, executable⟩
+
+/-- Every artifact returned by the public checked compilation path retains its
+root as the unique specialization selected by the canonical seed key. -/
+theorem compileChecked_hasCanonicalRoot
+    (program : CheckedProgram) (seed : Seed) (options : CompileOptions)
+    (compiled : CompiledEntry)
+    (compiledOk : compileChecked program seed options = .ok compiled) :
+    compiled.HasCanonicalRoot := by
+  unfold compileChecked at compiledOk
+  cases seedResult : SourceProgramExecution.resolveSeed program seed with
+  | error error =>
+      rw [seedResult] at compiledOk
+      cases compiledOk
+  | ok request =>
+      rw [seedResult] at compiledOk
+      simp only [Except.mapError, bind, Except.bind] at compiledOk
+      cases worklist : SourceSpecializationWorklist.run program [request]
+          options.specializationBudget with
+      | error error =>
+          rw [worklist] at compiledOk
+          cases compiledOk
+      | ok outcome =>
+          rw [worklist] at compiledOk
+          cases outcome with
+          | budgetExhausted plan next pending =>
+              cases compiledOk
+          | complete plan =>
+              simp only [pure, Pure.pure, Except.pure] at compiledOk
+              cases valid : SourceCoreDirectLinking.validatePlan program plan with
+              | error error =>
+                  rw [valid] at compiledOk
+                  cases compiledOk
+              | ok checked =>
+                  rw [valid] at compiledOk
+                  cases selected : exactRoot plan with
+                  | error error =>
+                      rw [selected] at compiledOk
+                      cases compiledOk
+                  | ok root =>
+                      rw [selected] at compiledOk
+                      cases backend : selectBackend program plan
+                          options.stagingFuel with
+                      | error error =>
+                          rw [backend] at compiledOk
+                          cases compiledOk
+                      | ok executable =>
+                          rw [backend] at compiledOk
+                          cases compiledOk
+                          exact exactRoot_specializations plan root selected
 
 /-- Successful compilation preserves the exact canonical identity obtained by
 resolving the caller's seed.  In particular, backend fallback cannot swap the

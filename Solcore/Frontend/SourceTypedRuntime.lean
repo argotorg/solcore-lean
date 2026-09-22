@@ -137,6 +137,68 @@ mutual
 
 end
 
+namespace Cell
+
+/-- Shallow agreement between a heap cell's declared type and its initialized
+value.  This deliberately follows `Value.type?`: it does not validate mapping
+entries, closure bodies or captures, constructor catalog authenticity, or the
+heap reachable through captured locations.  Uninitialized cells are valid. -/
+def HasShallowType (cell : Cell) (plan : Plan) : Prop :=
+  ∀ value, cell.value = some value → value.type? plan = some cell.type
+
+end Cell
+
+namespace RuntimeState
+
+/-- Every current heap cell has shallow agreement between its annotation and
+optional value.  This is a foundation for a later deep heap/capture invariant,
+not a claim that recursively contained runtime data has been validated. -/
+def HasShallowTypes (state : RuntimeState) (plan : Plan) : Prop :=
+  ∀ cell, cell ∈ state.heap → cell.HasShallowType plan
+
+private theorem mem_replaceCell
+    (index : Nat) (replacement selected : Cell) (heap : List Cell)
+    (member : selected ∈ replaceCell index replacement heap) :
+    selected = replacement ∨ selected ∈ heap := by
+  induction heap generalizing index with
+  | nil => simp [replaceCell] at member
+  | cons head tail inductionHypothesis =>
+      cases index with
+      | zero =>
+          simp only [replaceCell, List.mem_cons] at member ⊢
+          rcases member with equal | member
+          · exact .inl equal
+          · exact .inr (.inr member)
+      | succ index =>
+          simp only [replaceCell, List.mem_cons] at member ⊢
+          rcases member with equal | member
+          · exact .inr (.inl equal)
+          · rcases inductionHypothesis index member with equal | old
+            · exact .inl equal
+            · exact .inr (.inr old)
+
+/-- Replacing the optional value of one readable cell preserves shallow heap
+typing when the replacement value agrees with that cell's retained type. -/
+theorem HasShallowTypes.write?
+    {plan : Plan} {state updated : RuntimeState} {location : Location}
+    {previous : Cell} {value : Option Value}
+    (typing : state.HasShallowTypes plan)
+    (found : state.read? location = some previous)
+    (replacement : ({ previous with value }).HasShallowType plan)
+    (written : state.write? location value = some updated) :
+    updated.HasShallowTypes plan := by
+  unfold RuntimeState.write? at written
+  rw [found] at written
+  cases written
+  intro selected member
+  rcases mem_replaceCell location.index { previous with value } selected
+      state.heap member with equal | old
+  · subst selected
+    exact replacement
+  · exact typing selected old
+
+end RuntimeState
+
 mutual
 
   private def valuesEqual : List Value → List Value → Bool
@@ -204,6 +266,7 @@ inductive RuntimeError where
   | missingSpecialization (key : Key)
   | duplicateSpecialization (key : Key) (count : Nat)
   | invalidFunctionType (key : Key) (type : Ty)
+  | inferredResultTypeMismatch (key : Key) (declared inferred : Ty)
   | unresolvedAssumptions (key : Key) (predicates : List ProgramPredicate)
   | comptimeContract
       (key : Key) (parameterComptime : List Bool) (returnComptime : Bool)
@@ -498,6 +561,13 @@ private def validateSpecializationMetadata
     validateRuntimeBinder binder
   validateRuntimeBinders specialized.function
   validateExecutableMetadata specialized.function
+  let declaredResult ← match resultType? specialized.function with
+    | some result => pure result
+    | none => throw (.invalidFunctionType specialized.key
+        specialized.function.type)
+  unless declaredResult = specialized.function.inferredBodyType do
+    throw (.inferredResultTypeMismatch specialized.key declaredResult
+      specialized.function.inferredBodyType)
 
 /-- Preflight every reachable specialization before selecting this runtime as
 an executable backend.  The canonical worklist has already fixed the finite
@@ -918,19 +988,75 @@ private def writeResolvedPlace (plan : Plan) (state : RuntimeState)
   match state.read? place.location with
   | none => .fault (.danglingLocation place.location) state
   | some cell =>
-      let initial := match cell.value, cell.type with
-        | none, .mapping key value => some (.mapping key value [])
-        | value, _ => value
-      match updateResolvedValue plan place.valueType modify initial
-          place.projections with
-      | .error error => .fault error state
-      | .ok updated =>
-          if updated.type? plan != some place.rootType then
-            .fault (.typeMismatch place.rootType (updated.type? plan)) state
-          else
-            match state.write? place.location (some updated) with
-            | some finalState => .done updated finalState
-            | none => .fault (.danglingLocation place.location) state
+      if cell.type != place.rootType then
+        .fault (.typeMismatch place.rootType (some cell.type)) state
+      else
+        let initial := match cell.value, cell.type with
+          | none, .mapping key value => some (.mapping key value [])
+          | value, _ => value
+        match updateResolvedValue plan place.valueType modify initial
+            place.projections with
+        | .error error => .fault error state
+        | .ok updated =>
+            if updated.type? plan != some place.rootType then
+              .fault (.typeMismatch place.rootType (updated.type? plan)) state
+            else
+              match state.write? place.location (some updated) with
+              | some finalState => .done updated finalState
+              | none => .fault (.danglingLocation place.location) state
+
+/-- Even a forged place cannot overwrite a cell whose annotation differs from
+the root type captured during place resolution. -/
+private theorem writeResolvedPlace_rejects_mismatched_root
+    (plan : Plan) (state : RuntimeState) (place : ResolvedPlace)
+    (modify : Option Value → Except RuntimeError Value) (cell : Cell)
+    (found : state.read? place.location = some cell)
+    (mismatch : cell.type ≠ place.rootType) :
+    writeResolvedPlace plan state place modify =
+      .fault (.typeMismatch place.rootType (some cell.type)) state := by
+  simp [writeResolvedPlace, found, mismatch]
+
+/-- A successful structural write maintains the shallow annotation invariant;
+the check against the current cell type is essential for this implication. -/
+private theorem writeResolvedPlace_done_preserves_shallow_types
+    (plan : Plan) (state finalState : RuntimeState) (place : ResolvedPlace)
+    (modify : Option Value → Except RuntimeError Value) (updated : Value)
+    (typing : state.HasShallowTypes plan)
+    (done : writeResolvedPlace plan state place modify =
+      .done updated finalState) :
+    finalState.HasShallowTypes plan := by
+  unfold writeResolvedPlace at done
+  cases found : state.read? place.location with
+  | none => simp [found] at done
+  | some cell =>
+      simp only [found] at done
+      by_cases sameType : cell.type = place.rootType
+      · have noMismatch : (cell.type != place.rootType) = false := by
+          simp [sameType]
+        rw [noMismatch] at done
+        simp only [Bool.false_eq_true, ↓reduceIte] at done
+        generalize initialEq :
+            (match cell.value, cell.type with
+             | none, Ty.mapping key value => some (Value.mapping key value [])
+             | value, _ => value) = initial at done
+        cases updateResult : updateResolvedValue plan place.valueType modify
+            initial place.projections with
+        | error error => simp [updateResult] at done
+        | ok next =>
+            simp only [updateResult] at done
+            by_cases nextType : next.type? plan = some place.rootType
+            · simp [nextType] at done
+              cases written : state.write? place.location (some next) with
+              | none => simp [written] at done
+              | some nextState =>
+                  simp [written] at done
+                  rcases done with ⟨rfl, rfl⟩
+                  apply typing.write? found _ written
+                  intro value equal
+                  cases equal
+                  simpa [sameType] using nextType
+            · simp [nextType] at done
+      · simp [sameType] at done
 
 private def finishFunctionFlow (plan : Plan) (expected : Ty) :
     FlowOutcome → RunResult
@@ -944,6 +1070,40 @@ private def finishFunctionFlow (plan : Plan) (expected : Ty) :
   | .continuing _ state => .fault .controlEscapedFunction state
   | .outOfFuel state => .outOfFuel state
   | .fault error state => .fault error state
+
+private theorem finishFunctionFlow_done_type
+    (plan : Plan) (expected : Ty) (flow : FlowOutcome)
+    (value : Value) (finalState : RuntimeState)
+    (done : finishFunctionFlow plan expected flow =
+      .done value finalState) :
+    value.type? plan = some expected := by
+  cases flow with
+  | returned returnedValue returnedState =>
+      simp only [finishFunctionFlow] at done
+      split at done
+      · next hasType =>
+        cases done
+        exact hasType
+      · contradiction
+  | fallthrough environment returnedState =>
+      simp only [finishFunctionFlow] at done
+      split at done
+      · next isUnit =>
+        cases done
+        simp [Value.type?, isUnit]
+      · contradiction
+  | breaking environment returnedState =>
+      simp only [finishFunctionFlow] at done
+      cases done
+  | continuing environment returnedState =>
+      simp only [finishFunctionFlow] at done
+      cases done
+  | outOfFuel returnedState =>
+      simp only [finishFunctionFlow] at done
+      cases done
+  | fault error returnedState =>
+      simp only [finishFunctionFlow] at done
+      cases done
 
 private def expressionOfRunResult : RunResult → ExpressionResult
   | .done value state => .done value state
@@ -1183,25 +1343,23 @@ mutual
           match validateSpecializationMetadata specialized with
           | .error error => .fault error state
           | .ok () =>
-              match resultType? function with
-              | none => .fault (.invalidFunctionType key function.type) state
-              | some expected =>
-                  let parameters := function.typedBody.inputs
-                  if parameters.length != arguments.length then
-                    .fault (.argumentArityMismatch parameters.length
-                      arguments.length) state
-                  else
-                    match bindValues plan [] state
-                        (List.zip parameters arguments) with
-                    | .error error => .fault error state
-                    | .ok (environment, bodyState) =>
-                        match statementIds function.typedBody.roots with
-                        | .error error => .fault error bodyState
-                        | .ok roots =>
-                            let flow := executeSequence
-                              (executeStatement fuel plan key function.typedBody)
-                              environment bodyState roots
-                            finishFunctionFlow plan expected flow
+              let expected := function.inferredBodyType
+              let parameters := function.typedBody.inputs
+              if parameters.length != arguments.length then
+                .fault (.argumentArityMismatch parameters.length
+                  arguments.length) state
+              else
+                match bindValues plan [] state
+                    (List.zip parameters arguments) with
+                | .error error => .fault error state
+                | .ok (environment, bodyState) =>
+                    match statementIds function.typedBody.roots with
+                    | .error error => .fault error bodyState
+                    | .ok roots =>
+                        let flow := executeSequence
+                          (executeStatement fuel plan key function.typedBody)
+                          environment bodyState roots
+                        finishFunctionFlow plan expected flow
 
   private def executeStatement (fuel : Nat) (plan : Plan) (owner : Key)
       (source : TypedSource) (environment : Environment)
@@ -1637,6 +1795,36 @@ def runTrusted (plan : Plan) (entry : Key) (arguments : List Value)
     (fuel : Nat) (state : RuntimeState := {}) : RunResult :=
   invokeSpecialization fuel plan entry arguments state
 
+/-- A successful trusted run preserves the inferred result type carried by
+the unique specialization selected for its entry key. -/
+theorem runTrusted_done_has_inferredBodyType
+    (plan : Plan) (entry : Key) (arguments : List Value) (fuel : Nat)
+    (initial finalState : RuntimeState) (value : Value)
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (exact : plan.specializations.filter (fun candidate =>
+      decide (candidate.key = entry)) = [specialized])
+    (done : runTrusted plan entry arguments fuel initial =
+      .done value finalState) :
+    value.type? plan = some specialized.function.inferredBodyType := by
+  unfold runTrusted at done
+  cases fuel with
+  | zero =>
+      simp [invokeSpecialization] at done
+  | succ fuel =>
+      rw [invokeSpecialization.eq_2] at done
+      unfold exactSpecialization at done
+      rw [exact] at done
+      simp only at done
+      split at done
+      · cases done
+      · split at done
+        · cases done
+        · split at done
+          · cases done
+          · split at done
+            · cases done
+            · exact finishFunctionFlow_done_type _ _ _ _ _ done
+
 /-- Safe typed-source execution with independent bounds for recursive input
 validation and runtime execution.  Constructor inputs are checked against
 `ProgramSignatures`, not merely against self-described runtime metadata. -/
@@ -1651,6 +1839,26 @@ def runWithValidationFuel (signatures : ProgramSignatures) (plan : Plan)
       match validateInputs signatures plan validationFuel expected arguments with
       | some error => .fault error state
       | none => runTrusted plan entry arguments executionFuel state
+
+/-- Successful safe-boundary execution has the same inferred-result guarantee
+as the trusted evaluator reached after input validation. -/
+theorem runWithValidationFuel_done_has_inferredBodyType
+    (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
+    (arguments : List Value) (validationFuel executionFuel : Nat)
+    (initial finalState : RuntimeState) (value : Value)
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (exact : plan.specializations.filter (fun candidate =>
+      decide (candidate.key = entry)) = [specialized])
+    (done : runWithValidationFuel signatures plan entry arguments
+      validationFuel executionFuel initial = .done value finalState) :
+    value.type? plan = some specialized.function.inferredBodyType := by
+  unfold runWithValidationFuel exactSpecialization at done
+  rw [exact] at done
+  simp only at done
+  split at done
+  · cases done
+  · exact runTrusted_done_has_inferredBodyType plan entry arguments
+      executionFuel initial finalState value specialized exact done
 
 /-- Compatibility boundary using the same structural fuel for validation and
 execution.  New compiler clients can use `runWithValidationFuel` to keep the
