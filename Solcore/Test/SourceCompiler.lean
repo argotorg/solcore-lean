@@ -1,5 +1,5 @@
 import Solcore
-/-! End-to-end regressions for the phase-9 public source compiler boundary. -/
+/-! End-to-end regressions for the phase-10 public source compiler boundary. -/
 set_option autoImplicit false
 namespace Tests.SourceCompiler
 open Solcore Solcore.Frontend Solcore.TypeSystem
@@ -177,10 +177,37 @@ private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
   | .error (.invocationKindMismatch .typedSource .coreValues) => pure ()
   | result => throw (IO.userError
       s!"a Core-domain invocation crossed the typed backend: {reprStr result}")
+  match prepared.direct.runTyped [] runtimeOptions with
+  | .error (.invocationKindMismatch .core .typedValues) => pure ()
+  | result => throw (IO.userError
+      s!"a typed invocation crossed the direct Core backend: {reprStr result}")
+  match prepared.recursive.runTyped [] runtimeOptions with
+  | .error (.invocationKindMismatch .callGraph .typedValues) => pure ()
+  | result => throw (IO.userError
+      s!"a typed invocation crossed the graph backend: {reprStr result}")
   match prepared.direct.runCore [.bool true] runtimeOptions with
   | .error (.coreInputTypesMismatch [.word] [.bool]) => pure ()
   | result => throw (IO.userError
       s!"direct Core input mismatch lost its public category: {reprStr result}")
+  let retainedState : SourceTypedRuntime.RuntimeState := {
+    heap := [{ type := .word, value := some (.word (word 99)) }]
+  }
+  let zeroValidation : RunOptions := {
+    inputValidationFuel := 0
+    executionFuel := 4096
+  }
+  match prepared.typed.runTyped [pair] zeroValidation retainedState with
+  | .ok (.typedSource (.fault
+      (.inputValidationFuelExhausted expected 0) finalState)) =>
+      match finalState.heap with
+      | [{ type := .word, value := some (.word retained) }] =>
+          assertTrue (decide (expected = Ty.product .word .word) &&
+              retained == word 99)
+            "zero validation fuel changed the expected type or initial heap"
+      | heap => throw (IO.userError
+          s!"validation rejection mutated the supplied heap: {reprStr heap}")
+  | result => throw (IO.userError
+      s!"zero validation fuel changed public behavior: {reprStr result}")
 
 private def testOneShotLimits : IO Unit := do
   let main ← moduleId "main.solc"
@@ -285,8 +312,25 @@ private def testPublicCompilationErrors (checked : CheckedProgram) : IO Unit := 
   | .ok compiled => throw (IO.userError
       s!"zero specialization budget selected {reprStr compiled.backend}")
 
-/-- Exercise compile-once reuse, three-way selection, exact results, and
-stage-preserving rejection through the public umbrella. -/
+private def testCheckingFailurePrecedence : IO Unit := do
+  let invalid : Workspace.RawWorkspace := {
+    entry := "broken.solc"
+    mainSources := [{
+      path := "broken.solc"
+      content := "function broken(value: Word returns (Word) { return value; }"
+    }]
+    externalLibraries := []
+  }
+  let brokenModule ← moduleId "broken.solc"
+  match compile invalid (Seed.named brokenModule "broken") with
+  | .error (.checking (_ :: _)) => pure ()
+  | .error error => throw (IO.userError
+      s!"malformed source escaped the checking phase: {reprStr error}")
+  | .ok compiled => throw (IO.userError
+      s!"malformed source selected {reprStr compiled.backend}")
+
+/-- Exercise compile-once reuse, three-way selection, exact results, stage-
+preserving rejection, and the phase-10 public-boundary hardening matrix. -/
 def testSourceCompiler : IO Unit := do
   let prepared ← testCheckedReuseAndPrecedence
   testTypedBoundary prepared
@@ -294,6 +338,7 @@ def testSourceCompiler : IO Unit := do
   testAllBackendDiagnostics prepared.checked
   testTypedCapabilityGate prepared.checked
   testPublicCompilationErrors prepared.checked
-  IO.println "phase-9 public source compiler boundary GREEN"
+  testCheckingFailurePrecedence
+  IO.println "phase-10 public source compiler hardening GREEN"
 
 end Tests.SourceCompiler
