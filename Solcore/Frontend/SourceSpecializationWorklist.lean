@@ -116,6 +116,17 @@ inductive Error where
       (coercions : List CoercionStep)
   | invalidIndirectArgumentCoercionPath
       (call : ExpressionId) (metadata : IndirectCallResolution)
+  | indirectCalleeNotFunction (call : ExpressionId) (type : Ty)
+  | missingIndirectArgument (call argument : ExpressionId)
+  | indirectArgumentBundleMismatch
+      (call : ExpressionId) (expected actual : Ty)
+  | indirectParameterTypeMismatch
+      (call : ExpressionId) (expected actual : Ty)
+  | indirectResultTypeMismatch
+      (call : ExpressionId) (expected actual : Ty)
+  | indirectRequirementsMismatch
+      (call : ExpressionId)
+      (expected actual : List RequirementId)
   /-- Retained for downstream diagnostic compatibility.  Worklist discovery
   no longer produces this error for a well-typed indirect call. -/
   | indirectCall (occurrence : ExpressionId)
@@ -237,6 +248,44 @@ private def validateIndirectArgumentCoercions (node : ExpressionNode)
   if !metadata.hasValidArgumentCoercionPath then
     throw (.invalidIndirectArgumentCoercionPath node.id metadata)
 
+private def coercionRequirements (steps : List CoercionStep) :
+    List RequirementId :=
+  steps.flatMap (·.requirements)
+
+/-- Reconstruct every indirect-call endpoint from authoritative child nodes.
+The callee and argument list are runtime edges, but their retained bundle,
+result and obligation metadata must still be exact at planning time. -/
+private def validateIndirectCall (source : TypedSource)
+    (node : ExpressionNode) (callee : ExpressionId)
+    (arguments : List ExpressionId) (metadata : IndirectCallResolution) :
+    Except Error Unit := do
+  validateIndirectArgumentCoercions node metadata
+  let calleeNode ← match source.lookupExpression? callee with
+    | some calleeNode => pure calleeNode
+    | none => throw (.missingCalleeNode node.id callee)
+  let (parameterType, resultType) ← match calleeNode.type with
+    | .function parameter result => pure (parameter, result)
+    | type => throw (.indirectCalleeNotFunction node.id type)
+  let argumentTypes ← arguments.mapM fun argument =>
+    match source.lookupExpression? argument with
+    | some argumentNode => pure argumentNode.type
+    | none => throw (.missingIndirectArgument node.id argument)
+  let bundledType := Ty.productMany argumentTypes
+  if metadata.argumentTypeBeforeCoercion != bundledType then
+    throw (.indirectArgumentBundleMismatch node.id bundledType
+      metadata.argumentTypeBeforeCoercion)
+  if metadata.argumentTypeAfterCoercion != parameterType then
+    throw (.indirectParameterTypeMismatch node.id parameterType
+      metadata.argumentTypeAfterCoercion)
+  if node.rawType != resultType then
+    throw (.indirectResultTypeMismatch node.id resultType node.rawType)
+  let expectedRequirements :=
+    coercionRequirements metadata.argumentCoercions ++
+      coercionRequirements node.coercions
+  if node.requirements != expectedRequirements then
+    throw (.indirectRequirementsMismatch node.id expectedRequirements
+      node.requirements)
+
 private def directDeclarationCallees : List Node → List ExpressionId
   | [] => []
   | .expression { form := .call callee _ (.declaration _), .. } :: rest =>
@@ -259,8 +308,8 @@ private def collectReferences (program : CheckedProgram)
       | .expression expression =>
           validateExpressionCoercions expression
           match expression.form with
-          | .call _ _ (.indirect metadata) =>
-              validateIndirectArgumentCoercions expression metadata
+          | .call callee arguments (.indirect metadata) =>
+              validateIndirectCall source expression callee arguments metadata
               collectRest
           | .call callee _ (.declaration instantiation) =>
               let (request, edge) ←

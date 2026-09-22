@@ -409,6 +409,42 @@ private def testIndirectCallBoundary (program : CheckedProgram) : IO Unit := do
         "invalid indirect metadata lost its call occurrence or path"
   | result => throw (IO.userError
       s!"malformed indirect coercion metadata was not rejected: {reprStr result}")
+  let wrongBundleMetadata := {
+    metadata with
+    argumentTypeBeforeCoercion := Ty.bool
+    argumentTypeAfterCoercion := Ty.bool
+  }
+  let wrongBundleFunction : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setIndirectMetadata function.typedBody.nodes call.id
+        wrongBundleMetadata
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program wrongBundleFunction)
+      [monomorphicRequest apply] 1 with
+  | .error (.indirectArgumentBundleMismatch actual .word .bool) =>
+      assertTrue (actual == call.id)
+        "indirect bundle mismatch lost its call occurrence"
+  | result => throw (IO.userError
+      s!"indirect metadata detached from argument children was accepted: {reprStr result}")
+  let wrongResultFunction : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setExpressionType function.typedBody.nodes call.id .bool
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program wrongResultFunction)
+      [monomorphicRequest apply] 1 with
+  | .error (.indirectResultTypeMismatch actual .word .bool) =>
+      assertTrue (actual == call.id)
+        "indirect result mismatch lost its call occurrence"
+  | result => throw (IO.userError
+      s!"indirect result metadata detached from the callee was accepted: {reprStr result}")
 
 private def testMalformedTypedMetadata (program : CheckedProgram) : IO Unit := do
   let select ← signatureNamed program "select"
