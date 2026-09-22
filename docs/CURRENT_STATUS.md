@@ -6639,6 +6639,20 @@ and typed-heap preservation, complete stage-sidecar ownership, module fixed-
 point soundness, unification/trait-evidence completeness, and correctness of
 deferred source features remain open.
 
+The first proof tranche after phase 10 is complete at the canonical-plan
+boundary (ADR-0373).  Successful worklist outcomes admit each specialization
+key at most once, and a complete outcome contains every duplicate-preserving
+canonical seed key.  Successful `validatePlan` now yields a bounded complete
+worklist replay with the same seed list, specialization-key order, call ledger
+and declaration-reference ledger.  Every endpoint in an accepted edge ledger
+is proved to name an admitted specialization.
+
+This result is deliberately directional.  It proves what validator acceptance
+means; it does not yet prove that every raw complete worklist outcome is
+accepted.  The remaining converse needs the scanner's request/edge
+correspondence and worklist replay idempotence.  Runtime graph preservation is
+also separate.
+
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary

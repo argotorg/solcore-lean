@@ -499,6 +499,20 @@ general graph/typed-heap preservation, exhaustive stage-sidecar ownership,
 module fixed-point soundness, general unification/trait-evidence metatheory and
 features outside the restricted compiler profile remain later proof tranches.
 
+ADR-0373 begins the post-phase-10 proof sequence at the canonical-plan
+boundary.  Every successful worklist outcome now has duplicate-free admitted
+specialization keys, and every complete outcome contains all canonical seed
+keys.  Successful defensive plan validation exposes a bounded complete replay
+with the same duplicate-preserving seed list, specialization-key order, call
+edges and declaration-reference edges.  It also proves that both endpoints of
+every accepted edge are present in the plan.
+
+This is validator soundness, not validator completeness.  The converse from an
+arbitrary complete worklist result to validator acceptance still requires the
+`collectReferences` request/edge correspondence and replay-idempotence proof.
+Graph-runtime value/store preservation and source/runtime correspondence also
+remain later tranches.
+
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
 expression and statement nodes; complete selected declaration instantiations;
