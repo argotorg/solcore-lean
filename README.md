@@ -12,14 +12,19 @@ The repository provides:
 - commit on return and rollback on balance-preflight rejection, revert, or trap;
 - observable state, return data, logs, balances, and contract creation;
 - reproducible generation and shrinking of a checked, pure Core v3 subset;
+- a restricted whole-program source compiler with explicit root selection and
+  exact Core, finite call-graph, or source-typed execution results;
 - versioned compatibility interfaces for previously published formats; and
 - Lean proofs and executable tests for the modeled rules.
 
 Oracle v5 consumes Semantic Core rather than source text. The canonical source
 lexer and parser are available as a Lean library and cover complete files,
 declarations, types, expressions, patterns, statements, inline Yul, comments,
-diagnostics, and recovery. Name resolution, source type checking, elaboration,
-and end-to-end source execution are not yet implemented.
+diagnostics, and recovery. The Lean library also implements the documented
+restricted whole-program resolution, type checking, specialization, backend
+selection, and source execution profile. Automatic entry discovery, multi-root
+policy, general storage/ABI behavior, and a source wire/Oracle remain outside
+that boundary.
 
 ## Requirements
 

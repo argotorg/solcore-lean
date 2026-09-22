@@ -447,7 +447,27 @@ Phase 8 retains the executable-first proof policy.  Nested contract namespaces,
 method-local generics, higher-rank/higher-kinded types, polymorphic recursion,
 coinductive trait/coercion cycles, overlap/default policy beyond explicit
 ambiguity, let-polymorphic runtime execution, broad interface and normalization
-proofs, and the phase-9 public compiler boundary remain later work.
+proofs remain later work.
+
+ADR-0371 completes roadmap phase 9, the restricted public compiler boundary.
+`SourceCompiler.compile` checks a raw workspace and one explicit ground seed;
+`compileChecked` reuses an existing `CheckedProgram`.  Both seal the canonical
+finite specialization plan and root behind a reusable private-constructor
+artifact.  Its public metadata is backend-independent source `Ty` data.
+
+Backend selection is fixed: independently checked direct Core, then the finite
+structural call graph, then the phase-7 source-typed runtime.  Canonical-plan
+validation runs before selection, and the typed fallback preflights every
+reachable specialization for unsupported executable requirements/coercions.
+Failure of all three retains all three diagnostics.  Invocations and exact
+results are tagged so Core values/stores are never confused with typed values/
+heaps; typed input-validation and execution fuel are independent.
+
+Phase 9 keeps explicit single-root selection and the existing compatibility
+API.  Automatic/ABI entry discovery, backend override, multi-root and mixed-
+backend policy, source or closure wire formats, a public source Oracle, general
+typed-runtime evidence dispatch, storage/ABI effects, and broad compiler
+correctness proofs remain later work.
 
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
@@ -4182,9 +4202,10 @@ comment attachment, and recovery diagnostics. Recovered malformed output
 remains separate so that recovery is not confused with language acceptance.
 
 This grammar work remains separate from the completed syntax-independent
-execution semantics.  The initial whole-program resolution and source checker
-now consume canonical diagnostic-free syntax; specialization and elaboration
-into executable Semantic Core remain separate.
+execution semantics.  The restricted whole-program compiler now consumes
+canonical diagnostic-free syntax, checks and specializes one explicit ground
+root, and selects direct Core, a finite structural call graph, or the source-
+typed runtime without changing the parser proof boundary.
 
 ## Completion conditions
 
@@ -4204,5 +4225,6 @@ The canonical syntax slice is complete when:
 
 Initial whole-program resolution and source typing now consume the syntax
 result without changing the meaning of checked Semantic Core or Oracle v5.
-Extending that profile, specializing solved source terms, lowering them to
-checked Core, and end-to-end source execution are the next frontend stages.
+The restricted public Lean compiler specializes and executes the supported
+profile.  Broader source-language admission, automatic/multiple entry policy,
+and publication through a source Oracle remain later frontend stages.

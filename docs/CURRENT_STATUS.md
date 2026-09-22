@@ -70,8 +70,8 @@ trait-header assumption or an exact closed implementation `where` premise
 through the same finite policies.  Generic implementations are checked under
 their rigid parameters and then closed with the parameter substitution
 recovered from the selected evidence goal.  Other runtime
-evidence remains outside this path.  It is not yet a general source compiler or
-a public source Oracle.
+evidence remains outside this path.  The restricted compiler described below
+does not widen those evidence semantics and is not a public source Oracle.
 
 `Solcore.Frontend.SourceProgramExecution` now publishes the implemented
 vertical slice as an explicit single-seed Lean API.  A caller supplies a raw
@@ -87,6 +87,19 @@ performs no automatic entry discovery, exposes no multi-root policy, and adds
 no source Oracle or wire protocol.  `PreparedEntry.usesRuntimeCallGraph`
 reports which execution mode was retained; `runExact?` and top-level
 `runExact` preserve exact Core-versus-runtime results.
+
+`Solcore.Frontend.SourceCompiler` is now the canonical restricted source
+compiler facade (ADR-0371).  `compile` performs checking and compilation from a
+raw workspace; `compileChecked` reuses one successful whole-program check for
+multiple explicit roots.  A private-constructor `CompiledEntry` seals the
+canonical finite plan and selected root, exposes source input/result metadata,
+and executes repeatedly.  Backend selection is deterministic: direct checked
+Core, then the structural call graph, then the phase-7 source-typed runtime.
+Core and typed values/state use separate tagged invocation carriers, and exact
+results retain Core, graph, or typed faults and exhaustion.  Aggregate failure
+retains all three backend diagnostics.  Typed recursive input validation and
+execution have separate finite bounds.  Automatic roots, multi-root policy,
+and a source wire/Oracle are not added.
 
 The target-compatible expression integer-literal slice is implemented
 (ADR-0344–0347).  Each decimal or hexadecimal occurrence now retains its source
@@ -293,6 +306,16 @@ only a missing multi-component standard path has a local fallback, and
 `@external` is external-library-rooted.  This remains an executable-first phase:
 nested contract namespaces, advanced polymorphism, coinductive/overlap policy,
 let-polymorphic runtime execution, and broad proofs remain deferred.
+
+ADR-0371 completes roadmap phase 9's restricted public compiler boundary.  A
+single explicit ground seed can now cross raw-workspace checking, canonical
+specialization, common plan validation, three-way backend selection, and exact
+execution without callers assembling internal worklist/runtime state.  The
+already-checked entry permits compile-once catalog reuse; the sealed artifact
+prevents arbitrary plan/root pairing.  Typed fallback is admitted only after
+whole-plan executable-metadata preflight, and no-backend errors preserve the
+direct, graph, and typed diagnoses together.  The compatibility
+`SourceProgramExecution` API remains unchanged.
 
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
@@ -6561,7 +6584,7 @@ remain later in dependency order.  A whole-program reference to an obligation
 remains the owning declaration paired with its function-local requirement
 identity.
 
-The public Lean composition boundary for this restricted profile is now
+The Core-compatible Lean composition boundary remains
 `Solcore.Frontend.SourceProgramExecution` (ADR-0343, ADR-0368).
 `SeedTarget.declaration` and `SeedTarget.named` select exactly one root;
 `Seed.arguments` supplies its ground generic arguments.  `Limits` keeps
@@ -6578,6 +6601,15 @@ authoritative Core-linking failures remain visible, and a finite specialization
 frontier has its own `specializationBudgetExhausted` result rather than being
 collapsed into an invented source-execution or linker result.
 
+The canonical restricted compiler boundary is
+`Solcore.Frontend.SourceCompiler` (ADR-0371).  It adds raw and already-checked
+compile paths, a reusable sealed artifact, common canonical-plan validation,
+and fixed direct-Core/structural-graph/source-typed selection.  Core/graph and
+typed invocation domains stay explicitly tagged, exact outcomes are preserved,
+and typed input-validation fuel is independent of execution fuel.  Failure of
+all runtimes retains all three rejection values.  This does not alter the
+older boundary's types or backend policy.
+
 ## What is not yet claimed
 
 The current public system is not yet an end-to-end implementation for arbitrary
@@ -6585,13 +6617,9 @@ Solcore source text. In particular, it does not yet provide:
 
 - automatic entry-point discovery/seeding, multiple public roots and a public
   source Oracle;
-- cyclic or indirect source execution outside ADR-0366–0368's structural
-  Unit/Bool/Word/product/function graph profile, including its deferred
-  argument/result coercions; runtime evidence-dependent operator/literal/
-  non-call forms outside the narrow `BitNot<T>`, strict arithmetic/bitwise,
-  `Eq<T>`, closed standard `Ord<T>` and `Coerce<From, To>` profiles;
-  underdetermined-generic impl execution; and generic or symbolic conversion
-  execution;
+- general runtime evidence dispatch, generic/symbolic coercion execution,
+  underdetermined-generic implementation execution, struct/object members,
+  contract storage/ABI effects, or staged nominal/effectful values;
 - unbounded recursive contract-call depth;
 - a general dynamic ABI, memory model, or bytecode interpreter;
 - Ethereum gas, fees, block context, address derivation, or full EVM equivalence;

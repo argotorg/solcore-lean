@@ -86,9 +86,10 @@ parser.
 
 The complete executable canonical lexer and parser remain separate from
 Semantic Core and Oracle v5. They are available through the public Lean
-library. Name resolution, source type checking, and elaboration into checked
-Core are subsequent stages. This separation lets frontend work proceed without
-changing the meaning of any published Oracle protocol.
+library. The restricted source compiler consumes diagnostic-free workspaces,
+performs whole-program resolution and checking, specializes one explicit
+ground root, and selects direct Core, a finite call graph, or the source-typed
+runtime. This Lean-only boundary does not change any published Oracle protocol.
 
 ## Semantics and verification
 
@@ -104,9 +105,10 @@ language authority.
 
 The [compatibility matrix](COMPATIBILITY_MATRIX.md) records which comparisons
 are meaningful today. Oracle v5 provides a deterministic Core execution and
-observation boundary, but there is not yet an end-to-end source elaborator or
-external compiler adapter. Agreement at a different layer must not be reported
-as full source-language conformance.
+observation boundary, while the restricted source compiler is currently a
+Lean API without an external compiler adapter or source wire protocol.
+Agreement at a different layer must not be reported as full source-language
+conformance.
 
 ## Decision records
 
