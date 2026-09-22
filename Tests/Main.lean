@@ -1251,6 +1251,8 @@ import Solcore.Test.OracleV5WorldMaterialization
 import Solcore.Test.OracleV5WorldMaterializationProperties
 import Solcore.Test.TypeSystemInference
 import Solcore.Test.ProgramEnvironmentAndTypeResolution
+import Solcore.Test.ProgramModuleResolution
+import Solcore.Test.ProgramTypeAliases
 import Solcore.Test.ProgramInterfaces
 import Solcore.Test.ProgramImports
 import Solcore.Test.ImportedResolutionConsumers
@@ -1262,6 +1264,7 @@ import Solcore.Test.ProgramSignatures
 import Solcore.Test.ExecutableImplMethods
 import Solcore.Test.SourceInference
 import Solcore.Test.SourcePhase7Inference
+import Solcore.Test.SourceConstructorVisibility
 import Solcore.Test.SourceCoercionRanking
 import Solcore.Test.SourceLiteralOverloadRanking
 import Solcore.Test.SourceMultiStepCoercion
@@ -6062,6 +6065,8 @@ def testCanonicalRawLexing : IO Unit := do
 
 def staticSemanticsSpineTests : IO Unit := do
   testProgramEnvironmentAndTypeResolution
+  testProgramModuleResolution
+  testProgramTypeAliases
   testProgramInterfaces
   testProgramImports
   Tests.ImportedResolutionConsumers.testImportedResolutionConsumers
@@ -6072,6 +6077,7 @@ def staticSemanticsSpineTests : IO Unit := do
   ExecutableImplMethods.testExecutableImplMethods
   SourceInference.testSourceInference
   SourcePhase7Inference.testSourcePhase7Inference
+  testSourceConstructorVisibility
   SourceCoercionRanking.testSourceCoercionRanking
   SourceLiteralOverloadRanking.testSourceLiteralOverloadRanking
   SourceMultiStepCoercion.testSourceMultiStepCoercion
