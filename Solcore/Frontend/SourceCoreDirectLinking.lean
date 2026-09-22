@@ -239,6 +239,8 @@ inductive Error where
   | indirectCall (occurrence : ExpressionId)
   | recursiveCallCycle (key : SpecializationKey)
   | linkDepthLimit (key : SpecializationKey)
+  | stagedInvocationCycle (key : SpecializationKey)
+  | stagedFuelExhausted (key : SpecializationKey)
   | argumentArityMismatch
       (occurrence : ExpressionId) (expected actual : Nat)
   | callResultTypeMismatch
@@ -1460,13 +1462,26 @@ calls retain the ordinary rejection boundary. -/
 private def elaborateDetachedStagedMethod :=
   elaborateDetachedMethodWithContract true
 
+private structure StagedIntegerInvocation where
+  key : SpecializationKey
+  evidence : List PredicateEvidence
+  arguments : List Int
+  deriving BEq
+
+private structure StagedValueInvocation where
+  key : SpecializationKey
+  evidence : List PredicateEvidence
+  arguments : List SourceStagedValue.Value
+  deriving BEq
+
 mutual
 
 private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
     (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
     (visiting : List SpecializationKey)
     (assumptionEvidence : List PredicateEvidence)
-    (knownInputs : SourceCoreElaboration.KnownStagedValueInputs) (fuel : Nat)
+    (knownInputs : SourceCoreElaboration.KnownStagedValueInputs)
+    (stagedFuel fuel : Nat)
     (key : SpecializationKey) :
     Except Error SourceCoreElaboration.BodyDraft :=
   if visiting.contains key then
@@ -1507,7 +1522,7 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
               node resolvedCallee.function.typedBody.inputs arguments
             let calleeDraft ← buildDraftFuel program plan temporaryOwner
               temporaryBase (key :: visiting) calleeEvidence
-              calleeKnownInputs remaining edge.callee
+              calleeKnownInputs stagedFuel remaining edge.callee
             let callee ← calleeDraft.finalizeWith Error.sourceCore
             if callee.inputs.length != arguments.length then
               throw (.argumentArityMismatch node.id callee.inputs.length
@@ -1535,7 +1550,7 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
             stagedIntegerCallPlan program plan specialized assumptionEvidence
               (fun calleeKey calleeEvidence arguments =>
                 evaluateStagedIntegerFunctionFuel program plan
-                  (key :: visiting) calleeEvidence remaining calleeKey
+                  (key :: visiting) [] calleeEvidence stagedFuel calleeKey
                   arguments)
               node callee instantiation)
           {
@@ -1544,8 +1559,8 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
               stagedValueCallPlan program plan specialized assumptionEvidence
                 (fun calleeKey calleeEvidence arguments =>
                   evaluateStagedValueFunctionFuel program plan temporaryOwner
-                    temporaryBase (key :: visiting) calleeEvidence remaining
-                    calleeKey arguments)
+                    temporaryBase (key :: visiting) [] calleeEvidence
+                    stagedFuel calleeKey arguments)
                 node callee instantiation
             onStagedValueCoercion := fun node step =>
               stagedValueCoercionPlan program temporaryOwner temporaryBase
@@ -1583,13 +1598,17 @@ termination_by fuel
 
 private def evaluateStagedIntegerFunctionFuel (program : CheckedProgram)
     (plan : Plan) (visiting : List SpecializationKey)
+    (active : List StagedIntegerInvocation)
     (assumptionEvidence : List PredicateEvidence) (fuel : Nat)
     (key : SpecializationKey) (arguments : List Int) : Except Error Int :=
-  if visiting.contains key then
-    .error (.recursiveCallCycle key)
+  let invocation : StagedIntegerInvocation := {
+    key, evidence := assumptionEvidence, arguments
+  }
+  if active.contains invocation then
+    .error (.stagedInvocationCycle key)
   else
     match fuel with
-    | 0 => .error (.linkDepthLimit key)
+    | 0 => .error (.stagedFuelExhausted key)
     | remaining + 1 => do
         let specialized ← exactSpecialization plan key
         validateAssumptionEvidence specialized.key specialized.assumptions
@@ -1600,7 +1619,8 @@ private def evaluateStagedIntegerFunctionFuel (program : CheckedProgram)
             stagedIntegerCallPlan program plan specialized assumptionEvidence
               (fun calleeKey calleeEvidence values =>
                 evaluateStagedIntegerFunctionFuel program plan
-                  (key :: visiting) calleeEvidence remaining calleeKey values)
+                  (key :: visiting) (invocation :: active) calleeEvidence
+                  remaining calleeKey values)
               node callee instantiation)
           specialized.function arguments
 termination_by fuel
@@ -1608,14 +1628,18 @@ termination_by fuel
 private def evaluateStagedValueFunctionFuel (program : CheckedProgram)
     (plan : Plan) (temporaryOwner : Resolved.DeclarationId)
     (temporaryBase : Nat) (visiting : List SpecializationKey)
+    (active : List StagedValueInvocation)
     (assumptionEvidence : List PredicateEvidence) (fuel : Nat)
     (key : SpecializationKey) (arguments : List SourceStagedValue.Value) :
     Except Error SourceStagedValue.Value :=
-  if visiting.contains key then
-    .error (.recursiveCallCycle key)
+  let invocation : StagedValueInvocation := {
+    key, evidence := assumptionEvidence, arguments
+  }
+  if active.contains invocation then
+    .error (.stagedInvocationCycle key)
   else
     match fuel with
-    | 0 => .error (.linkDepthLimit key)
+    | 0 => .error (.stagedFuelExhausted key)
     | remaining + 1 => do
         let specialized ← exactSpecialization plan key
         validateAssumptionEvidence specialized.key specialized.assumptions
@@ -1626,8 +1650,8 @@ private def evaluateStagedValueFunctionFuel (program : CheckedProgram)
             stagedValueCallPlan program plan specialized assumptionEvidence
               (fun calleeKey calleeEvidence values =>
                 evaluateStagedValueFunctionFuel program plan temporaryOwner
-                  temporaryBase (key :: visiting) calleeEvidence remaining
-                  calleeKey values)
+                  temporaryBase (key :: visiting) (invocation :: active)
+                  calleeEvidence remaining calleeKey values)
               node callee instantiation)
           (fun node step =>
             stagedValueCoercionPlan program temporaryOwner temporaryBase
@@ -1657,7 +1681,7 @@ private def firstComptimeInput : Nat → List TypedBinder →
       else firstComptimeInput (index + 1) inputs
 
 private def linkSeeds (program : CheckedProgram) (plan : Plan)
-    (temporaryBase : Nat) : List SpecializationKey →
+    (temporaryBase stagedFuel : Nat) : List SpecializationKey →
       Except Error (List LinkedEntry)
   | [] => pure []
   | key :: rest => do
@@ -1676,21 +1700,30 @@ private def linkSeeds (program : CheckedProgram) (plan : Plan)
       let knownInputs :=
         specialized.function.typedBody.inputs.map fun _ => none
       let draft ← buildDraftFuel program plan key.declaration temporaryBase
-        [] [] knownInputs expansionFuel key
+        [] [] knownInputs stagedFuel expansionFuel key
       let elaborated ← draft.finalizeWith Error.sourceCore
       pure ({ key, elaborated } ::
-        (← linkSeeds program plan temporaryBase rest))
+        (← linkSeeds program plan temporaryBase stagedFuel rest))
 
-/-- Link every seed of a complete, defensively reconstructed specialization
-plan.  Budget exhaustion is never mistaken for a closed executable program. -/
-def link (program : CheckedProgram)
-    (outcome : SourceSpecializationWorklist.Outcome) :
+/-- Link every seed with an explicit staged-call depth budget.  Runtime draft
+expansion retains its independent catalog-derived bound. -/
+def linkWithStagingFuel (program : CheckedProgram)
+    (outcome : SourceSpecializationWorklist.Outcome) (stagedFuel : Nat) :
     Except Error LinkedProgram := do
   let plan ← match outcome with
     | .complete plan => pure plan
     | .budgetExhausted _ next pending =>
         throw (.budgetExhausted next pending.length)
   validatePlan program plan
-  pure { entries := ← linkSeeds program plan (freshBase plan) plan.seedKeys }
+  pure {
+    entries := ← linkSeeds program plan (freshBase plan) stagedFuel
+      plan.seedKeys
+  }
+
+/-- Compatibility linker with the default public staged-evaluation budget. -/
+def link (program : CheckedProgram)
+    (outcome : SourceSpecializationWorklist.Outcome) :
+    Except Error LinkedProgram :=
+  linkWithStagingFuel program outcome 1024
 
 end Solcore.Frontend.SourceCoreDirectLinking

@@ -53,10 +53,12 @@ def named (moduleId : Workspace.ModuleId) (name : String)
 
 end Seed
 
-/-- Independent finite bounds for checking, specialization, and execution. -/
+/-- Independent finite bounds for checking, specialization, compile-time
+evaluation, and runtime execution. -/
 structure Limits where
   checkingFuel : Nat := 1024
   specializationBudget : Nat := 1024
+  stagingFuel : Nat := 1024
   executionFuel : Nat := 1024
   deriving Repr, DecidableEq
 
@@ -181,8 +183,8 @@ def prepare (raw : Workspace.RawWorkspace) (seed : Seed)
     | .complete plan => pure plan
     | .budgetExhausted _ next pending =>
         throw (.specializationBudgetExhausted next pending.length)
-  let linked ← (SourceCoreDirectLinking.link program (.complete plan)).mapError
-    Error.linking
+  let linked ← (SourceCoreDirectLinking.linkWithStagingFuel program
+    (.complete plan) limits.stagingFuel).mapError Error.linking
   match linked.entries with
   | [entry] => pure { entry }
   | entries => throw (.linkedEntryCountMismatch entries.length)
