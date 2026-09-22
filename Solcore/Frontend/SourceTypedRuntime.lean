@@ -1669,5 +1669,25 @@ def run? (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
   | .outOfFuel _
   | .fault _ _ => none
 
+/-- A zero validation-depth budget rejects the first expected argument before
+allocating a parameter cell or entering the runtime evaluator.  The original
+state is therefore preserved exactly. -/
+theorem runWithValidationFuel_zero_of_nonempty
+    (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (first : Ty) (expectedRest : List Ty) (value : Value)
+    (argumentsRest : List Value) (executionFuel : Nat)
+    (state : RuntimeState)
+    (exact : plan.specializations.filter (fun candidate =>
+      decide (candidate.key = entry)) = [specialized])
+    (expected : specialized.function.typedBody.inputs.map
+      (·.scheme.body) = first :: expectedRest) :
+    runWithValidationFuel signatures plan entry (value :: argumentsRest)
+        0 executionFuel state =
+      .fault (.inputValidationFuelExhausted first 0) state := by
+  unfold runWithValidationFuel exactSpecialization
+  rw [exact]
+  simp [expected, validateInputs, Value.validateTypeFuel]
+
 
 end Solcore.Frontend.SourceTypedRuntime

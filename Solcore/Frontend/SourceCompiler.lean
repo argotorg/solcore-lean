@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceProgramExecution
+import Solcore.Frontend.SourceSpecializationWorklistProperties
 import Solcore.Frontend.SourceTypedRuntime
 
 /-!
@@ -224,6 +225,28 @@ private def exactRoot
   | [root] => pure root
   | roots => throw (.rootSpecializationCountMismatch key roots.length)
 
+/-- Internal root recovery cannot change the canonical seed identity. -/
+private theorem exactRoot_seedKeys (plan : SourceSpecializationWorklist.Plan)
+    (root : SourceSpecialization.SpecializedFunction)
+    (accepted : exactRoot plan = .ok root) :
+    plan.seedKeys = [root.key] := by
+  unfold exactRoot at accepted
+  split at accepted
+  next key seedKeysEqual =>
+    simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at accepted
+    split at accepted
+    next rootsEqual =>
+      cases accepted
+      have member : root ∈ plan.specializations.filter (fun specialized =>
+          decide (specialized.key = key)) := by
+        rw [rootsEqual]
+        simp
+      have selectedKey : root.key = key := by
+        exact of_decide_eq_true (List.mem_filter.mp member).2
+      simpa [selectedKey] using seedKeysEqual
+    next roots rootsEqual => cases accepted
+  next keys seedKeysEqual => cases accepted
+
 private def selectBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) (stagingFuel : Nat) :
     Except CompileError Executable :=
@@ -267,6 +290,67 @@ def compileChecked (program : CheckedProgram) (seed : Seed)
   let root ← exactRoot plan
   let executable ← selectBackend program plan options.stagingFuel
   pure ⟨program, plan, root, executable⟩
+
+/-- Successful compilation preserves the exact canonical identity obtained by
+resolving the caller's seed.  In particular, backend fallback cannot swap the
+public root after specialization. -/
+theorem compileChecked_key_of_resolved (program : CheckedProgram) (seed : Seed)
+    (options : CompileOptions) (request : SourceSpecializationWorklist.Request)
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (compiled : CompiledEntry)
+    (seedOk : SourceProgramExecution.resolveSeed program seed = .ok request)
+    (resolved : SourceSpecializationWorklist.resolveRequest program request =
+      .ok specialized)
+    (compiledOk : compileChecked program seed options = .ok compiled) :
+    compiled.key = specialized.key := by
+  have canonical : SourceSpecializationWorklist.canonicalSeedKeys program
+      [request] = .ok [specialized.key] := by
+    simp only [SourceSpecializationWorklist.canonicalSeedKeys, resolved,
+      bind, Except.bind, pure, Pure.pure, Except.pure]
+  unfold compileChecked at compiledOk
+  rw [seedOk] at compiledOk
+  simp only [Except.mapError, bind, Except.bind] at compiledOk
+  cases worklist : SourceSpecializationWorklist.run program [request]
+      options.specializationBudget with
+  | error error =>
+      rw [worklist] at compiledOk
+      cases compiledOk
+  | ok outcome =>
+      have seeds := SourceSpecializationWorklist.run_preserves_seedKeys program
+        [request] options.specializationBudget outcome [specialized.key]
+        canonical worklist
+      cases outcome with
+      | budgetExhausted plan next pending =>
+          rw [worklist] at compiledOk
+          cases compiledOk
+      | complete plan =>
+          simp only [SourceSpecializationWorklist.Outcome.plan_complete] at seeds
+          rw [worklist] at compiledOk
+          simp only [pure, Pure.pure, Except.pure] at compiledOk
+          cases valid : SourceCoreDirectLinking.validatePlan program plan with
+          | error error =>
+              rw [valid] at compiledOk
+              cases compiledOk
+          | ok checked =>
+              rw [valid] at compiledOk
+              cases selected : exactRoot plan with
+              | error error =>
+                  rw [selected] at compiledOk
+                  cases compiledOk
+              | ok root =>
+                  have rootSeeds := exactRoot_seedKeys plan root selected
+                  have rootKey : root.key = specialized.key := by
+                    simpa [rootSeeds] using seeds
+                  rw [selected] at compiledOk
+                  cases executable : selectBackend program plan
+                      options.stagingFuel with
+                  | error error =>
+                      rw [executable] at compiledOk
+                      cases compiledOk
+                  | ok backend =>
+                      rw [executable] at compiledOk
+                      cases compiledOk
+                      exact rootKey
 
 /-- Check a raw workspace and compile one explicit root. -/
 def compile (raw : Workspace.RawWorkspace) (seed : Seed)
