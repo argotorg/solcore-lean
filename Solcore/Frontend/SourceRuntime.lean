@@ -410,21 +410,6 @@ private def evaluateArguments
       | .outOfFuel finalStore => .outOfFuel finalStore
       | .fault error finalStore => .fault error finalStore
 
-private def firstArgumentMismatch?
-    (program : Program)
-    (expected : List Core.Ty)
-    (actual : List Value) : Option (Nat × Core.Ty × Option Core.Ty) :=
-  let rec loop (index : Nat) :
-      List Core.Ty → List Value → Option (Nat × Core.Ty × Option Core.Ty)
-    | expectedType :: expectedTypes, value :: values =>
-        let actualType := value.type? program
-        if actualType = some expectedType then
-          loop (index + 1) expectedTypes values
-        else
-          some (index, expectedType, actualType)
-    | _, _ => none
-  loop 0 expected actual
-
 private def applyValue
     (program : Program)
     (evaluateBody : Environment → Core.Store → Expr → RunResult)
