@@ -1,6 +1,7 @@
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.Frontend.ExecutableImplMethods
+import Solcore.Frontend.SourceRuntime
 import Solcore.Core.Machine
 
 /-!
@@ -252,6 +253,10 @@ inductive Error where
 structure LinkedEntry where
   key : SpecializationKey
   elaborated : SourceCoreElaboration.ElaboratedFunction
+  /-- Present only for the additive runtime call-graph path.  `elaborated`
+  remains the first-order compatibility view used by existing inspection
+  clients, while execution dispatches through this checked finite table. -/
+  runtime : Option SourceRuntime.CheckedProgram := none
   deriving Repr
 
 /-- Linked entries preserve worklist seed order, including repeated roots. -/
@@ -278,14 +283,35 @@ private def stagedResolvedExecutionFuel : Resolved.Expr → Nat
         stagedResolvedExecutionFuel thenBranch +
         stagedResolvedExecutionFuel elseBranch + 2
 
+/-- Translate the graph runner's observable outcome to the existing public
+Core result carrier.  A graph continuation is intentionally opaque at this
+compatibility boundary, so an exhausted run retains its exact store in an
+inert Core state. -/
+private def runtimeResultToCore : SourceRuntime.RunResult →
+    Core.StatefulRunResult
+  | .done value store =>
+      match value.toCore? with
+      | some value => .done value store
+      | none =>
+          let state := Core.State.initial .unit [] store
+          .fault (.expectedFunction .unit) state
+  | .outOfFuel store =>
+      .outOfFuel (Core.State.initial .unit [] store)
+  | .fault _ store =>
+      let state := Core.State.initial .unit [] store
+      .fault (.expectedFunction .unit) state
+
 /-- Run a linked entry only when the supplied runtime values have exactly the
 source input types and order retained by elaboration. -/
 def LinkedEntry.run? (entry : LinkedEntry) (inputs : List Core.Value)
     (fuel : Nat) (store : Core.Store := []) :
     Option Core.StatefulRunResult :=
   if inputs.map Core.Value.type = entry.elaborated.inputs.values then
-    some (Core.runStateful fuel
-      (Core.State.initial entry.elaborated.core inputs store))
+    match entry.runtime with
+    | none => some (Core.runStateful fuel
+        (Core.State.initial entry.elaborated.core inputs store))
+    | some runtime =>
+        some (runtimeResultToCore (runtime.run fuel entry.key inputs store))
   else
     none
 

@@ -12,10 +12,11 @@ namespace Solcore.Frontend.SourceCoreDirectLinking
 
 theorem LinkedEntry.run?_of_matching_types (entry : LinkedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
+    (finite : entry.runtime = none)
     (typesEqual : inputs.map Core.Value.type = entry.elaborated.inputs.values) :
     entry.run? inputs fuel store = some (Core.runStateful fuel
       (Core.State.initial entry.elaborated.core inputs store)) := by
-  simp [LinkedEntry.run?, typesEqual]
+  simp [LinkedEntry.run?, finite, typesEqual]
 
 theorem LinkedEntry.run?_of_mismatched_types (entry : LinkedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
