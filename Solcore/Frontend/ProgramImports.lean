@@ -22,6 +22,7 @@ structure ProgramImportedNamespace where
 structure ProgramImportedType where
   localName : String
   declaration : ProgramDeclaration
+  constructors : ProgramConstructorVisibility := .notData
   deriving Repr
 
 /-- One unqualified imported trait spelling. -/
@@ -74,24 +75,7 @@ inductive ProgramImportError where
 
 /-- Spelling components of one parsed import module path. -/
 def programImportModuleComponents (path : Syntax.ModulePath) : List String :=
-  path.value.components.toList.map (·.value)
-
-private def workspaceModulePathComponents
-    (moduleId : Workspace.ModuleId) : List String :=
-  moduleId.path.segments.map (·.text)
-
-private def externalModuleMatches
-    (components : List String) (moduleId : Workspace.ModuleId) : Bool :=
-  match components, moduleId.library with
-  | library :: path, .external name =>
-      library == name.render && path == workspaceModulePathComponents moduleId
-  | _, _ => false
-
-private def sameLibraryModuleMatches
-    (importer : Workspace.ModuleId) (components : List String)
-    (moduleId : Workspace.ModuleId) : Bool :=
-  decide (moduleId.library = importer.library) &&
-    components == workspaceModulePathComponents moduleId
+  programModulePathComponents path
 
 /-- Resolve a direct import path against canonical program modules. -/
 def resolveProgramImportModule
@@ -99,17 +83,9 @@ def resolveProgramImportModule
     (path : Syntax.ModulePath) : Except ProgramImportError Workspace.ModuleId :=
   let components := programImportModuleComponents path
   let external := path.value.externalMarker.isSome
-  let candidates := environment.modules.filterMap fun module =>
-    let isMatch :=
-      if external then
-        externalModuleMatches components module.id
-      else
-        sameLibraryModuleMatches importer components module.id
-    if isMatch then some module.id else none
-  match candidates with
-  | [] => .error (.unknownModule importer external components)
-  | [target] => .ok target
-  | _ => .error (.ambiguousModule importer external components candidates)
+  match resolveProgramModulePath? environment importer path with
+  | none => .error (.unknownModule importer external components)
+  | some target => .ok target
 
 private def selectorSpelling (selector : Syntax.SelectorName) : String :=
   match selector.value with
@@ -141,6 +117,7 @@ private def wildcardTypes
     else some {
       localName := entity.publicName
       declaration := entity.declaration
+      constructors := entity.constructors
     }
 
 private def wildcardTraits
@@ -188,16 +165,21 @@ private def selectedDeclarations
   if isHidden hidden sourceName localName then
     {}
   else
-    let typeCandidates := interfaces.entitiesNamed target .type sourceName
+    let typeCandidates := (targetEntities interfaces target .type).filter fun entity =>
+      entity.publicName == sourceName
     let traitCandidates := interfaces.entitiesNamed target .trait sourceName
     let valueCandidates := interfaces.entitiesNamed target .value sourceName
     let typeResult : List ProgramImportError × List ProgramImportedType :=
       match typeCandidates with
       | [] => ([], [])
-      | [declaration] => ([], [{ localName, declaration }])
-      | declarations =>
+      | [entity] => ([], [{
+          localName
+          declaration := entity.declaration
+          constructors := entity.constructors
+        }])
+      | entities =>
           ([.ambiguousSelectedType importer target sourceName
-            (declarations.map (·.id))], [])
+            (entities.map (·.declaration.id))], [])
     let traitResult := selectedTrait importer target sourceName localName
       traitCandidates
     let values := valueCandidates.map fun declaration =>
@@ -236,13 +218,33 @@ private def addNamespace
   namespaces := visibility.namespaces ++ [{ localName, target }]
 }
 
+private def importedTypeKeyEq
+    (left right : ProgramImportedType) : Bool :=
+  left.localName == right.localName &&
+    decide (left.declaration.id = right.declaration.id)
+
+private def appendImportedType :
+    List ProgramImportedType → ProgramImportedType → List ProgramImportedType
+  | [], imported => [imported]
+  | previous :: rest, imported =>
+      if importedTypeKeyEq previous imported then
+        { previous with
+          constructors := previous.constructors.merge previous.declaration
+            imported.constructors } :: rest
+      else
+        previous :: appendImportedType rest imported
+
+private def mergeImportedTypes
+    (left right : List ProgramImportedType) : List ProgramImportedType :=
+  right.foldl appendImportedType left
+
 private def addWildcardDeclarations
     (visibility : ProgramImports)
     (types : List ProgramImportedType)
     (traits : List ProgramImportedTrait)
     (values : List ProgramImportedValue) : ProgramImports := {
   visibility with
-  types := visibility.types ++ types
+  types := mergeImportedTypes visibility.types types
   traits := visibility.traits ++ traits
   values := visibility.values ++ values
 }
@@ -331,12 +333,18 @@ private def deduplicateDeclarationsAux
       else
         declaration :: deduplicateDeclarationsAux (declaration.id :: seen) rest
 
+/-- Imported type bindings, including constructor visibility, under one local
+spelling.  Import construction has already merged repeated bindings of the
+same declaration. -/
+def typeBindingsNamed (visibility : ProgramImports) (name : String) :
+    List ProgramImportedType :=
+  visibility.types.filter fun imported => imported.localName == name
+
 /-- Unqualified imported type candidates in declaration/import order. -/
 def typesNamed (visibility : ProgramImports) (name : String) :
     List ProgramDeclaration :=
   deduplicateDeclarationsAux [] <|
-    visibility.types.filterMap fun imported =>
-      if imported.localName == name then some imported.declaration else none
+    (visibility.typeBindingsNamed name).map (·.declaration)
 
 /-- Unqualified imported trait candidates in declaration/import order. -/
 def traitsNamed (visibility : ProgramImports) (name : String) :
@@ -382,6 +390,83 @@ def declarationsInNamespacePathNamed
   deduplicateDeclarationsAux [] <|
     (visibility.namespacePathTargets path).flatMap fun target =>
       visibility.publicInterfaces.entitiesNamed target nameSpace name
+
+private def publicTypeEntityKeyEq
+    (left right : ProgramPublicEntity) : Bool :=
+  left.publicName == right.publicName &&
+    decide (left.declaration.id = right.declaration.id)
+
+private def appendPublicTypeEntity :
+    List ProgramPublicEntity → ProgramPublicEntity → List ProgramPublicEntity
+  | [], entity => [entity]
+  | previous :: rest, entity =>
+      if publicTypeEntityKeyEq previous entity then
+        { previous with
+          constructors := previous.constructors.merge previous.declaration
+            entity.constructors } :: rest
+      else
+        previous :: appendPublicTypeEntity rest entity
+
+/-- Public type bindings, with constructor visibility, reached through an
+imported/re-exported namespace path. -/
+def typeEntitiesInNamespacePathNamed
+    (visibility : ProgramImports) (path : List String) (name : String) :
+    List ProgramPublicEntity :=
+  (visibility.namespacePathTargets path).foldl (fun entities target =>
+    match visibility.publicInterfaces.interface? target with
+    | none => entities
+    | some interface =>
+        (interface.entities.filter fun entity =>
+          entity.publicName == name &&
+            entity.declaration.nameSpace == some .type).foldl
+              appendPublicTypeEntity entities) []
+
+private def reachableNamespaceTargetsAux
+    (interfaces : ProgramInterfaces) :
+    Nat → List Workspace.ModuleId → List Workspace.ModuleId →
+      List Workspace.ModuleId
+  | 0, seen, _ => seen
+  | _, seen, [] => seen
+  | fuel + 1, seen, target :: pending =>
+      if seen.any fun previous => decide (previous = target) then
+        reachableNamespaceTargetsAux interfaces fuel seen pending
+      else
+        let next := match interfaces.interface? target with
+          | none => []
+          | some interface => interface.modules.map (·.target)
+        reachableNamespaceTargetsAux interfaces fuel (seen ++ [target])
+          (pending ++ next)
+
+private def reachableNamespaceTargets
+    (visibility : ProgramImports) : List Workspace.ModuleId :=
+  let publicEdges := visibility.publicInterfaces.entries.foldl
+    (fun total entry => total + entry.2.modules.length) 0
+  reachableNamespaceTargetsAux visibility.publicInterfaces
+    (visibility.namespaces.length + publicEdges + 1) []
+    (visibility.namespaces.map (·.target))
+
+/-- Constructor visibility available for a declaration through any direct
+unqualified import or imported public namespace. -/
+def constructorVisibilityForDeclaration?
+    (visibility : ProgramImports) (id : Resolved.DeclarationId) :
+    Option ProgramConstructorVisibility :=
+  let direct := visibility.types.filterMap fun imported =>
+    if decide (imported.declaration.id = id) then
+      some (imported.declaration, imported.constructors)
+    else none
+  let qualified := visibility.reachableNamespaceTargets.flatMap fun target =>
+    match visibility.publicInterfaces.interface? target with
+    | none => []
+    | some interface => interface.entities.filterMap fun entity =>
+        if entity.declaration.nameSpace == some .type &&
+            decide (entity.declaration.id = id) then
+          some (entity.declaration, entity.constructors)
+        else none
+  match direct ++ qualified with
+  | [] => none
+  | first :: rest =>
+      some <| rest.foldl (fun constructors candidate =>
+        constructors.merge first.1 candidate.2) first.2
 
 /-- Public types reached through an imported/re-exported module path. -/
 def typesInNamespacePathNamed (visibility : ProgramImports)
