@@ -205,6 +205,10 @@ private def testBreadthFirstDiscovery (program : CheckedProgram) : IO Unit := do
         "two syntactic calls to one canonical callee did not retain two edges"
       assertTrue plan.referenceEdges.isEmpty
         "direct-call callee children were duplicated as reference edges"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"canonical complete plan failed replay validation: {reprStr error}")
   | outcome => throw (IO.userError
       s!"twice: expected a complete plan, found {reprStr outcome}")
   match ← runOrThrow "twice budget" program [request] 1 with
@@ -220,6 +224,10 @@ private def testBreadthFirstDiscovery (program : CheckedProgram) : IO Unit := do
       assertTrue (decide (plan.seedKeys = [twiceKey, twiceKey] ∧
           plan.specializations.length = 2 ∧ plan.callEdges.length = 2))
         "duplicate roots were lost or charged as duplicate specializations"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"duplicate canonical roots failed replay validation: {reprStr error}")
   | outcome => throw (IO.userError
       s!"duplicate roots: expected a complete plan, found {reprStr outcome}")
 
