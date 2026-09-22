@@ -516,17 +516,30 @@ private def typeContainsError : TypeSystem.Ty → Bool
   | .proxy inner
   | .comptime inner => typeContainsError inner
 
-private def resolveSignatureType
-    (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
-    (scope : ProgramTypeScope) (source : Syntax.TypeExpr) :
+private def finishSignatureTypeResolution
+    (declaration : ProgramDeclaration)
+    (result : Except ProgramTypeResolutionError TypeSystem.Ty) :
     Except ProgramSignatureError TypeSystem.Ty :=
-  match resolveProgramTypeExpr environment scope source with
+  match result with
   | .error error => .error (.typeResolution declaration.id error)
   | .ok type =>
       if typeContainsError type then
         .error (.malformedType declaration.id)
       else
         .ok type
+
+private def resolveSignatureType
+    (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
+    (scope : ProgramTypeScope) (source : Syntax.TypeExpr) :
+    Except ProgramSignatureError TypeSystem.Ty :=
+  finishSignatureTypeResolution declaration
+    (resolveProgramTypeExpr environment scope source)
+
+private def resolveSignatureAliasBody
+    (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
+    (source : Syntax.TypeExpr) : Except ProgramSignatureError TypeSystem.Ty :=
+  finishSignatureTypeResolution declaration
+    (resolveProgramTypeAliasBody environment declaration source)
 
 private def resolveSignatureTypes
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
@@ -626,11 +639,7 @@ private def traitCandidates
   | [] =>
       match buildProgramImports environment declaration.id.moduleId with
       | .error errors => .error (.importVisibility declaration.id errors)
-      | .ok visibility =>
-          if visibility.hasImports then
-            .ok (visibility.traitsNamed name)
-          else
-            .ok (environment.traitsNamed name)
+      | .ok visibility => .ok (visibility.traitsNamed name)
 
 private def resolveTrait
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
@@ -1009,6 +1018,11 @@ private def collectProgramSignatures
   | declaration :: rest, state =>
       let state :=
         match declaration.source.value with
+        | .typeAlias source =>
+            match resolveSignatureAliasBody environment declaration
+                source.value.value with
+            | .error error => { state with errors := state.errors ++ [error] }
+            | .ok _ => state
         | .enum source =>
             match dataSignatureOfDeclaration environment declaration source with
             | .error error => { state with errors := state.errors ++ [error] }

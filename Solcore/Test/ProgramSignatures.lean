@@ -491,10 +491,13 @@ private def testMethodFailures : IO Unit := do
     | _ => false
 
 private def testAmbiguousTrait : IO Unit := do
-  let left ← parsed "left.solc" "trait Shared<T> {}"
-  let right ← parsed "right.solc" "trait Shared<T> {}"
-  let consumer ← parsed "consumer.solc"
+  let left ← parsed "left.solc" "export {Shared}; trait Shared<T> {}"
+  let right ← parsed "right.solc" "export {Shared}; trait Shared<T> {}"
+  let consumer ← parsed "consumer.solc" (String.intercalate "\n" [
+    "import * from left;",
+    "import * from right;",
     "function constrained<T>() where T: Shared { return; }"
+  ])
   let environment ← catalog [left, right, consumer]
   match buildProgramSignatures environment with
   | .error [.ambiguousTrait _ "Shared" candidates] =>
@@ -502,6 +505,21 @@ private def testAmbiguousTrait : IO Unit := do
         "ambiguous trait candidates were not retained"
   | result => throw (IO.userError
       s!"ambiguous trait result changed: {reprStr result}")
+
+private def testStrictTraitVisibility : IO Unit := do
+  let provider ← parsed "provider.solc"
+    "export {Hidden}; trait Hidden<T> {}"
+  let unrelated ← parsed "unrelated.solc"
+    "export {*}; enum Visible { Only }"
+  let consumer ← parsed "consumer.solc" (String.intercalate "\n" [
+    "import * from unrelated;",
+    "function constrained<T>() where T: Hidden { return; }"
+  ])
+  let environment ← catalog [provider, unrelated, consumer]
+  match buildProgramSignatures environment with
+  | .error [.unknownTrait _ "Hidden"] => pure ()
+  | result => throw (IO.userError
+      s!"an unimported trait reached signature resolution: {reprStr result}")
 
 end ProgramSignatures
 
@@ -514,5 +532,6 @@ def testProgramSignatures : IO Unit := do
   ProgramSignatures.testFailures
   ProgramSignatures.testMethodFailures
   ProgramSignatures.testAmbiguousTrait
+  ProgramSignatures.testStrictTraitVisibility
 
 end Tests
