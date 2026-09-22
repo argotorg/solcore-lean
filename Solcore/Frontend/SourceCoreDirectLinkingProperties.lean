@@ -31,4 +31,17 @@ theorem LinkedEntry.run?_of_mismatched_types (entry : LinkedEntry)
       .error (.budgetExhausted next pending.length) := by
   rfl
 
+@[simp] theorem linkWithStagingFuel_budgetExhausted
+    (program : CheckedProgram) (plan : Plan) (next : SpecializationKey)
+    (pending : List SourceSpecializationWorklist.Request) (fuel : Nat) :
+    linkWithStagingFuel program (.budgetExhausted plan next pending) fuel =
+      .error (.budgetExhausted next pending.length) := by
+  rfl
+
+@[simp] theorem link_eq_linkWithStagingFuel_default
+    (program : CheckedProgram)
+    (outcome : SourceSpecializationWorklist.Outcome) :
+    link program outcome = linkWithStagingFuel program outcome 1024 := by
+  rfl
+
 end Solcore.Frontend.SourceCoreDirectLinking
