@@ -1,14 +1,14 @@
 import Solcore.Frontend.ProgramImports
-import Solcore.TypeSystem.Type
+import Solcore.TypeSystem.Substitution
 
 /-!
 Executable whole-program resolution of canonical source type expressions.
 
 Unqualified names prefer a generic parameter, then the legacy builtins, then
-the current module, and then imported public entities.  The exact lowercase
-`integer` intrinsic is a final fallback after user-defined types.  Imported
-namespace paths traverse public module re-exports.  The no-import and explicit
-canonical-path fallbacks remain as the initial-profile compatibility boundary.
+the current module, and then explicitly imported public entities.  The exact
+lowercase `integer` intrinsic is a final fallback after visible user-defined
+types.  Qualified names traverse only namespace paths bound by imports and
+public module re-exports.
 -/
 
 set_option autoImplicit false
@@ -45,6 +45,8 @@ inductive ProgramTypeResolutionError where
   | typeArityMismatch
       (components : List String) (expected actual : Nat)
   | importVisibility (errors : List ProgramImportError)
+  | cyclicTypeAlias (cycle : List Resolved.DeclarationId)
+  | aliasExpansionLimit
   | nestingLimit
   deriving Repr, DecidableEq
 
@@ -78,35 +80,6 @@ private def builtinTypeName? : String → Option TypeSystem.BuiltinType
   | "Bool" | "bool" => some .bool
   | "Word" | "word" => some .word
   | _ => none
-
-private def modulePathComponents (moduleId : Workspace.ModuleId) : List String :=
-  moduleId.path.segments.map (·.text)
-
-private def exactLibraryPrefixMatches
-    (components : List String) (moduleId : Workspace.ModuleId) : Bool :=
-  match components, moduleId.library with
-  | "main" :: rest, .main => rest == modulePathComponents moduleId
-  | "standard" :: rest, .standard => rest == modulePathComponents moduleId
-  | library :: rest, .external name =>
-      library == name.render && rest == modulePathComponents moduleId
-  | _, _ => false
-
-private def moduleQualifierMatches
-    (current : Workspace.ModuleId) (components : List String)
-    (candidate : Workspace.ModuleId) : Bool :=
-  (decide (candidate.library = current.library) &&
-      components == modulePathComponents candidate) ||
-    exactLibraryPrefixMatches components candidate
-
-private def qualifiedCandidates
-    (environment : ProgramEnvironment) (scope : ProgramTypeScope)
-    (moduleComponents : List String) (name : String) :
-    List ProgramDeclaration :=
-  environment.declarations.filter fun declaration =>
-    declaration.nameSpace == some ProgramDeclarationNamespace.type &&
-      declaration.name == some name &&
-      moduleQualifierMatches scope.currentModule moduleComponents
-        declaration.id.moduleId
 
 private def declaredType
     (components : List String) (declaration : ProgramDeclaration)
@@ -168,15 +141,7 @@ private def resolveNamedProgramType
                   | .ok visibility =>
                       match visibility.typesNamed name with
                       | [] =>
-                          if visibility.hasImports then
-                            resolveIntegerFallback components name arguments
-                          else
-                            match environment.typesNamed name with
-                            | [] =>
-                                resolveIntegerFallback components name arguments
-                            | globalCandidates =>
-                                uniqueDeclaredType components arguments
-                                  globalCandidates
+                          resolveIntegerFallback components name arguments
                       | importedCandidates =>
                           uniqueDeclaredType components arguments
                             importedCandidates
@@ -192,10 +157,7 @@ private def resolveNamedProgramType
             uniqueDeclaredType components arguments
               (visibility.typesInNamespacePathNamed moduleComponents name)
           else
-            -- Kept for the executable initial profile: an unbound canonical
-            -- module path may still address a declaration directly.
-            uniqueDeclaredType components arguments
-              (qualifiedCandidates environment scope moduleComponents name)
+            .error (.unknownTypeName components)
 
 private def tupleProgramType : List TypeSystem.Ty → TypeSystem.Ty
   | [] => .constructor (.builtin .unit)
@@ -255,25 +217,238 @@ mutual
 
 end
 
+/-! Type aliases are first cataloged as declaration-headed types by the
+structural resolver above.  Normalization is a separate pass so that an alias
+body can be resolved in the scope of its declaration rather than the scope of
+the use which selected it. -/
+
+private structure ProgramTypeAliasApplication where
+  declaration : ProgramDeclaration
+  body : Syntax.TypeExpr
+  arguments : List TypeSystem.Ty
+
+private def programTypeApplicationSpine :
+    TypeSystem.Ty → TypeSystem.Ty × List TypeSystem.Ty
+  | .application function argument =>
+      let (head, arguments) := programTypeApplicationSpine function
+      (head, arguments ++ [argument])
+  | type => (type, [])
+
+private def programTypeAliasApplication?
+    (environment : ProgramEnvironment) (type : TypeSystem.Ty) :
+    Option ProgramTypeAliasApplication :=
+  let (head, arguments) := programTypeApplicationSpine type
+  match head with
+  | .constructor (.declaration id) => do
+      let declaration ← environment.declaration? id
+      match declaration.kind, declaration.source.value with
+      | .typeAlias, .typeAlias alias => some {
+          declaration
+          body := alias.value.value
+          arguments
+        }
+      | _, _ => none
+  | _ => none
+
+private def programTypeAliasParameters
+    (declaration : ProgramDeclaration) :
+    List TypeSystem.TypeParameterId :=
+  declaration.genericParameters.zipIdx.map fun (_, index) =>
+    { owner := declaration.id, index }
+
+private def programTypeAliasNameComponents
+    (declaration : ProgramDeclaration) : List String :=
+  match declaration.name with
+  | some name => [name]
+  | none => []
+
+private def programTypeAliasCycle
+    (stack : List Resolved.DeclarationId) (repeated : Resolved.DeclarationId) :
+    List Resolved.DeclarationId :=
+  let cycle := stack.dropWhile fun declaration =>
+    decide (declaration ≠ repeated)
+  cycle ++ [repeated]
+
+private abbrev ProgramTypeAliasNormalizationM (α : Type) :=
+  StateT Nat (Except ProgramTypeResolutionError) α
+
+/-- Consume one shared alias-normalization node.  The state is threaded across
+siblings so branching aliases cannot multiply work outside the total budget. -/
+private def consumeProgramTypeAliasNode :
+    ProgramTypeAliasNormalizationM Unit := do
+  match ← get with
+  | 0 => throw .aliasExpansionLimit
+  | remaining + 1 => set remaining
+
+mutual
+
+  private def normalizeProgramTypeAliasesFuel
+      (environment : ProgramEnvironment) :
+      Nat → Nat → List Resolved.DeclarationId → TypeSystem.Ty →
+        ProgramTypeAliasNormalizationM TypeSystem.Ty
+    | 0, _, _, _ => throw .nestingLimit
+    | structuralFuel + 1, aliasDepth, stack, type => do
+        consumeProgramTypeAliasNode
+        let structuralBudget := structuralFuel + 1
+        match programTypeAliasApplication? environment type with
+        | some application =>
+            match aliasDepth with
+            | 0 => throw .aliasExpansionLimit
+            | remainingAliasDepth + 1 => do
+                let declaration := application.declaration
+                if stack.any fun active => decide (active = declaration.id) then
+                  throw (.cyclicTypeAlias
+                    (programTypeAliasCycle stack declaration.id))
+                if declaration.genericParameters.length !=
+                    application.arguments.length then
+                  throw (.typeArityMismatch
+                    (programTypeAliasNameComponents declaration)
+                    declaration.genericParameters.length
+                    application.arguments.length)
+                let arguments ← normalizeProgramTypeAliasListFuel environment
+                  structuralFuel (remainingAliasDepth + 1) stack
+                    application.arguments
+                let aliasScope := ProgramTypeScope.ofDeclaration declaration
+                validateProgramTypeScope aliasScope
+                let rawBody ← resolveProgramTypeExprFuel environment
+                  aliasScope structuralBudget application.body
+                let substitution : TypeSystem.ParameterSubstitution :=
+                  (programTypeAliasParameters declaration).zip arguments
+                normalizeProgramTypeAliasesFuel environment structuralBudget
+                  remainingAliasDepth (stack ++ [declaration.id])
+                  (substitution.apply rawBody)
+        | none =>
+            match type with
+            | .application function argument => do
+                let normalizedFunction ← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack function
+                let normalizedArgument ← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack argument
+                pure (.application normalizedFunction normalizedArgument)
+            | .function parameter result => do
+                let normalizedParameter ← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack parameter
+                let normalizedResult ← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack result
+                pure (.function normalizedParameter normalizedResult)
+            | .product left right => do
+                let normalizedLeft ← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack left
+                let normalizedRight ← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack right
+                pure (.product normalizedLeft normalizedRight)
+            | .mapping key value => do
+                let normalizedKey ← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack key
+                let normalizedValue ← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack value
+                pure (.mapping normalizedKey normalizedValue)
+            | .proxy inner =>
+                return .proxy (← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack inner)
+            | .comptime inner =>
+                return .comptime (← normalizeProgramTypeAliasesFuel environment
+                  structuralFuel aliasDepth stack inner)
+            | .variable _
+            | .parameter _
+            | .constructor _
+            | .error => pure type
+  termination_by structuralFuel aliasDepth _ type =>
+    (structuralFuel + aliasDepth, sizeOf type)
+  decreasing_by all_goals omega
+
+  private def normalizeProgramTypeAliasListFuel
+      (environment : ProgramEnvironment) :
+      Nat → Nat → List Resolved.DeclarationId → List TypeSystem.Ty →
+        ProgramTypeAliasNormalizationM (List TypeSystem.Ty)
+    | _, _, _, [] => pure []
+    | 0, _, _, _ :: _ => throw .nestingLimit
+    | structuralFuel + 1, aliasDepth, stack, type :: rest => do
+        let normalized ← normalizeProgramTypeAliasesFuel environment
+          structuralFuel aliasDepth stack type
+        let normalizedRest ← normalizeProgramTypeAliasListFuel environment
+          (structuralFuel + 1) aliasDepth stack rest
+        pure (normalized :: normalizedRest)
+  termination_by structuralFuel aliasDepth _ types =>
+    (structuralFuel + aliasDepth, sizeOf types)
+
+end
+
+private def runProgramTypeAliasNormalization
+    {α : Type} (nodeBudget : Nat)
+    (computation : ProgramTypeAliasNormalizationM α) :
+    Except ProgramTypeResolutionError α := do
+  let result ← computation.run nodeBudget
+  pure result.1
+
 /-- Default structural-resolution budget; extreme generated trees can opt in
 to a larger explicit budget through `resolveProgramTypeExprWithFuel`. -/
 def defaultProgramTypeResolutionFuel : Nat := 4096
+
+/-- Default total node budget for transparent-alias normalization.  The same
+value also bounds a single alias chain for executable termination. -/
+def defaultProgramTypeAliasExpansionFuel : Nat := 16384
+
+/-- Resolve and transparently expand one source type with independent
+structural and alias-expansion budgets. -/
+def resolveProgramTypeExprWithBudgets
+    (environment : ProgramEnvironment) (scope : ProgramTypeScope)
+    (structuralFuel aliasExpansionFuel : Nat) (source : Syntax.TypeExpr) :
+    Except ProgramTypeResolutionError TypeSystem.Ty := do
+  validateProgramTypeScope scope
+  let raw ← resolveProgramTypeExprFuel environment scope structuralFuel source
+  runProgramTypeAliasNormalization aliasExpansionFuel
+    (normalizeProgramTypeAliasesFuel environment structuralFuel
+      aliasExpansionFuel [] raw)
+
+/-- Resolve and transparently expand a source-ordered list with independent
+structural and alias-expansion budgets. -/
+def resolveProgramTypeExprListWithBudgets
+    (environment : ProgramEnvironment) (scope : ProgramTypeScope)
+    (structuralFuel aliasExpansionFuel : Nat) (sources : List Syntax.TypeExpr) :
+    Except ProgramTypeResolutionError (List TypeSystem.Ty) := do
+  validateProgramTypeScope scope
+  let raw ← resolveProgramTypeExprListFuel environment scope structuralFuel sources
+  runProgramTypeAliasNormalization aliasExpansionFuel
+    (normalizeProgramTypeAliasListFuel environment structuralFuel
+      aliasExpansionFuel [] raw)
+
+/-- Resolve and normalize one alias declaration body while treating the
+declaration itself as the root of cycle diagnostics. -/
+def resolveProgramTypeAliasBodyWithBudgets
+    (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
+    (structuralFuel aliasExpansionFuel : Nat) (source : Syntax.TypeExpr) :
+    Except ProgramTypeResolutionError TypeSystem.Ty := do
+  let scope := ProgramTypeScope.ofDeclaration declaration
+  validateProgramTypeScope scope
+  let raw ← resolveProgramTypeExprFuel environment scope structuralFuel source
+  runProgramTypeAliasNormalization aliasExpansionFuel
+    (normalizeProgramTypeAliasesFuel environment structuralFuel
+      aliasExpansionFuel [declaration.id] raw)
 
 /-- Resolve every name occurrence with an explicit structural budget. -/
 def resolveProgramTypeExprWithFuel
     (environment : ProgramEnvironment) (scope : ProgramTypeScope)
     (fuel : Nat) (source : Syntax.TypeExpr) :
-    Except ProgramTypeResolutionError TypeSystem.Ty := do
-  validateProgramTypeScope scope
-  resolveProgramTypeExprFuel environment scope fuel source
+    Except ProgramTypeResolutionError TypeSystem.Ty :=
+  resolveProgramTypeExprWithBudgets environment scope fuel
+    defaultProgramTypeAliasExpansionFuel source
 
 /-- Resolve a source-ordered list with an explicit structural budget. -/
 def resolveProgramTypeExprListWithFuel
     (environment : ProgramEnvironment) (scope : ProgramTypeScope)
     (fuel : Nat) (sources : List Syntax.TypeExpr) :
-    Except ProgramTypeResolutionError (List TypeSystem.Ty) := do
-  validateProgramTypeScope scope
-  resolveProgramTypeExprListFuel environment scope fuel sources
+    Except ProgramTypeResolutionError (List TypeSystem.Ty) :=
+  resolveProgramTypeExprListWithBudgets environment scope fuel
+    defaultProgramTypeAliasExpansionFuel sources
+
+/-- Resolve one alias declaration body with declaration-rooted cycle paths. -/
+def resolveProgramTypeAliasBody
+    (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
+    (source : Syntax.TypeExpr) :
+    Except ProgramTypeResolutionError TypeSystem.Ty :=
+  resolveProgramTypeAliasBodyWithBudgets environment declaration
+    defaultProgramTypeResolutionFuel defaultProgramTypeAliasExpansionFuel source
 
 /-- Resolve every name occurrence in one canonical source type expression. -/
 def resolveProgramTypeExpr
