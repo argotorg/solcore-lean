@@ -392,6 +392,32 @@ mappings/proxies/indexing, loops, broader control flow, effects, a published
 graph-result Oracle/wire protocol, automatic roots, multi-root execution, and
 broad runtime-table metatheory remain later phases.
 
+ADR-0369 completes roadmap phase 7, the restricted source-language effectful
+runtime.  Generic enum constructors resolve through a data namespace or an
+expected nominal type and remain nominal at runtime.  Nested constructor,
+tuple, binder, wildcard and integer patterns execute in source order.  Local
+places and mapping indexes support simple and Word compound assignment with
+once-only, left-to-right target-index evaluation.  Explicit match, `for`,
+`while`, break, continue and return outcomes retain lexical scope and mutable
+state; closures capture heap locations, so later writes to captured locals are
+observable.
+
+This is an additive source-typed interpreter, not a widening of the established
+Core compatibility paths.  `SourceTypedRuntime.run` validates constructor and
+recursive input metadata against the program signatures and specialization
+plan, while the older Core and structural graph linkers keep their explicit
+rejections for nominal and effectful forms.  Execution, calls, pattern descent
+and loop iteration have an explicit structural fuel boundary with stateful
+completion, fault and exhaustion.  The new boundary accepts only the exact
+builtin evidence owned by integer literals; other executable requirements and
+expression or indirect argument coercions reject until evidence dispatch is
+implemented.
+
+Phase 7 deliberately keeps proof density low.  General struct/object members,
+contract storage and ABI behavior, transparent constructor lookup through type
+aliases, staged nominal/effectful values, and broad safety, determinism, fuel
+and source-correspondence proofs remain later work.
+
 The additive IR carrier and traversal are complete for the supported fragment.
 They define declaration-owned, category-safe occurrence IDs; typed binder,
 expression and statement nodes; complete selected declaration instantiations;

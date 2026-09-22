@@ -251,6 +251,29 @@ mappings/proxies, loops, broader control flow, effects, automatic entry
 discovery, multi-root execution, and broad safety/correspondence proofs remain
 later.
 
+ADR-0369 completes roadmap phase 7 through a separate source-typed effectful
+runtime.  Whole-program inference now retains generic enum construction through
+explicit namespaces or expected types, nested constructor/tuple/binder/literal
+patterns, nonterminal matches, monomorphic local and mapping-index assignment,
+typed proxy values, `for`/`while`, and scoped break/continue/return.  Runtime
+locals are typed heap cells and closures capture their locations, so mutation
+is visible across lexical closures.  Place indexes evaluate once from left to
+right before the right-hand side, and compound updates preserve unrelated
+right-hand-side effects.
+
+`SourceTypedRuntime.run` validates nominal metadata and recursively typed input
+values against `ProgramSignatures` and the finite specialization plan, and
+reports completion, fault, or state-retaining fuel exhaustion.  Existing Core
+elaboration and structural runtime linking still reject nominal/effectful forms
+instead of approximating them; the additional boundary is explicit and does
+not change `SourceProgramExecution` backend selection.  The new runtime admits
+only exact builtin integer-literal evidence and rejects other executable
+requirements plus expression or indirect-call coercions rather than treating
+selected user methods as builtins.  The phase uses focused executable and
+rejection tests rather than a broad proof campaign; general struct/object
+members, contract storage/ABI, alias transparency, staged nominal values, and
+broad static/dynamic correspondence proofs remain deferred.
+
 Terminal single-scrutinee integer-pattern matches are now connected to the
 same whole-program pipeline through a separate typed carrier (ADR-0348).  Each
 numeric pattern owns a fresh builtin-`Int` requirement which defaults to Word
