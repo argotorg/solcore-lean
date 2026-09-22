@@ -112,6 +112,10 @@ private structure Traversal where
   visited : List OccurrenceId := []
   expressions : List ExpressionStage := []
   binders : List BinderStage := []
+  /-- Any binder written anywhere in the body is conservatively deferred.
+  This keeps branch- and loop-local mutation from being mistaken for an
+  immutable compile-time value by later consumers. -/
+  mutableBinders : List Resolved.LocalId := []
 
 private def lookupEnvironment? (environment : Environment)
     (binder : Resolved.LocalId) : Option Stage :=
@@ -157,6 +161,7 @@ private def registerBinder (owner : Resolved.DeclarationId)
     throw (.binderOwnerMismatch owner binder)
   if state.binders.any fun entry => decide (entry.binder = binder) then
     throw (.duplicateBinder binder)
+  let stage := if state.mutableBinders.contains binder then .deferred else stage
   let entry : BinderStage := { binder, stage }
   pure (entry :: environment, {
     state with binders := state.binders ++ [entry]
@@ -230,13 +235,40 @@ private def analyzeStatementListWith
       let (environment, state) ← analyze environment state statement
       analyzeStatementListWith analyze rest environment state
 
-private def analyzeMatchCasesWith
-    (analyzeBody : Traversal → List StatementId → Except Error Traversal) :
-    List TypedMatchCase → Traversal → Except Error Traversal
-  | [], state => .ok state
-  | arm :: rest, state => do
-      let state ← analyzeBody state arm.body
-      analyzeMatchCasesWith analyzeBody rest state
+private def bindersInPatternInstruction :
+    MatchPatternInstruction → List TypedBinder
+  | .binder binder => [binder]
+  | _ => []
+
+private def bindersInPatternResolution :
+    MatchPatternResolution → List TypedBinder
+  | .binder binder => [binder]
+  | .constructor _ instructions
+  | .tuple instructions => instructions.flatMap bindersInPatternInstruction
+  | _ => []
+
+private def registerPatternBinders (owner : Resolved.DeclarationId)
+    (stage : Stage) : List TypedBinder → Environment → Traversal →
+      Except Error (Environment × Traversal)
+  | [], environment, state => pure (environment, state)
+  | binder :: binders, environment, state => do
+      let (environment, state) ←
+        registerBinder owner environment state binder.id stage
+      registerPatternBinders owner stage binders environment state
+
+private def mutableBindersInForItem : ForItemForm → List Resolved.LocalId
+  | .assignValue assignment _ _
+  | .assignBitNot assignment => [assignment.target.root]
+  | .letDecl _ _
+  | .expression _ => []
+
+private def mutableBindersInNode : Node → List Resolved.LocalId
+  | .statement { form := .assignValue assignment _ _, .. }
+  | .statement { form := .assignBitNot assignment, .. } =>
+      [assignment.target.root]
+  | .statement { form := .forLoop initializer _ post _, .. } =>
+      (initializer ++ post).flatMap mutableBindersInForItem
+  | _ => []
 
 mutual
 
@@ -376,15 +408,25 @@ mutual
               let (_, state) ←
                 registerBinder source.owner environment state
                 resolution.hiddenScrutinee scrutineeStage
-              let analyzeBody := fun state body => do
-                let (_, state) ← analyzeStatementListWith
-                  (analyzeStatementFuel source fuel) body environment state
-                pure state
-              let state ← analyzeMatchCasesWith analyzeBody
-                resolution.cases state
+              let rec analyzeCases : List TypedMatchCase → Traversal →
+                  Except Error Traversal
+                | [], state => pure state
+                | arm :: arms, state => do
+                    let (armEnvironment, state) ← registerPatternBinders
+                      source.owner scrutineeStage
+                      (bindersInPatternResolution arm.pattern.resolution)
+                      environment state
+                    let (_, state) ← analyzeStatementListWith
+                      (analyzeStatementFuel source fuel) arm.body armEnvironment
+                        state
+                    analyzeCases arms state
+              let state ← analyzeCases resolution.cases state
               let state ← match resolution.defaultBody with
                 | none => pure state
-                | some body => analyzeBody state body
+                | some body => do
+                    let (_, state) ← analyzeStatementListWith
+                      (analyzeStatementFuel source fuel) body environment state
+                    pure state
               pure (environment, state)
           | .forLoop initializer condition post body => do
               let rec analyzeItems :
@@ -475,8 +517,11 @@ def analyzeFunction (function : CheckedFunction) : Except Error Analysis := do
     throw (.sourceOwnerMismatch function.declaration source.owner)
   validateNodeTable source.owner [] source.nodes
   let resultIsComptimeOnly := typeIsComptimeOnly function.inferredBodyType
+  let initial : Traversal := {
+    mutableBinders := source.nodes.flatMap mutableBindersInNode
+  }
   let (environment, state) ← registerTypedBinders source.owner
-    (function.returnComptime || resultIsComptimeOnly) source.inputs [] {}
+    (function.returnComptime || resultIsComptimeOnly) source.inputs [] initial
   let (_, state) ← analyzeRoots source (source.nodes.length + 1)
     source.roots environment state
   match firstUnvisited? state source.nodes with
