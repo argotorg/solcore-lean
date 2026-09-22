@@ -1288,6 +1288,7 @@ import Solcore.Test.SourceRuntimeCallGraph
 import Solcore.Test.SourceTypedRuntime
 import Solcore.Test.ProgramChecking
 import Solcore.Test.SourceProgramExecution
+import Solcore.Test.SourceCompiler
 import Solcore.Test.SourcePatternMatching
 import Solcore.Test.SourcePatternMatchingTamper
 import Solcore.Test.SourceStagedIntegerIntrinsics
@@ -6101,6 +6102,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceTypedRuntime.testSourceTypedRuntime
   ProgramChecking.testProgramChecking
   SourceProgramExecution.testSourceProgramExecution
+  SourceCompiler.testSourceCompiler
   SourcePatternMatching.testSourcePatternMatching
   SourcePatternMatchingTamper.testSourcePatternMatchingTamper
   SourceStagedIntegerIntrinsics.testSourceStagedIntegerIntrinsics
