@@ -109,6 +109,11 @@ def key (prepared : PreparedEntry) : SourceSpecialization.SpecializationKey :=
 def inputTypes (prepared : PreparedEntry) : List Core.Ty :=
   prepared.entry.elaborated.inputs.values
 
+/-- Whether execution uses the finite named-function table instead of the
+acyclic Core body retained in the compatibility inspection view. -/
+def usesRuntimeCallGraph (prepared : PreparedEntry) : Bool :=
+  prepared.entry.runtime.isSome
+
 /-- Execute through the linked entry's existing runtime type guard. -/
 def run? (prepared : PreparedEntry) (inputs : List Core.Value)
     (fuel : Nat) (store : Core.Store := []) :

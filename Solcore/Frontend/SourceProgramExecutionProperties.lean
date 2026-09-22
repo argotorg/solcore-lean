@@ -14,6 +14,11 @@ namespace Solcore.Frontend.SourceProgramExecution
     prepared.inputTypes = prepared.entry.elaborated.inputs.values := by
   rfl
 
+@[simp] theorem PreparedEntry.usesRuntimeCallGraph_eq_entry
+    (prepared : PreparedEntry) :
+    prepared.usesRuntimeCallGraph = prepared.entry.runtime.isSome := by
+  rfl
+
 @[simp] theorem PreparedEntry.run?_eq_entry (prepared : PreparedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store) :
     prepared.run? inputs fuel store = prepared.entry.run? inputs fuel store := by

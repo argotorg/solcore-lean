@@ -240,7 +240,7 @@ private def testStageErrors : IO Unit := do
   | .ok prepared =>
       let identity : Core.Value := .closure .word .word (.var 0) []
       let input : Core.Value := .word (word 23)
-      assertTrue (decide (prepared.inputTypes =
+      assertTrue (prepared.usesRuntimeCallGraph && decide (prepared.inputTypes =
           [.function .word .word, .word] ∧
           prepared.run? [identity, input] 128 = some (.done input [])))
         "indirect call did not execute the supplied Core closure"
@@ -251,6 +251,8 @@ private def testStageErrors : IO Unit := do
   match prepare recursive (Seed.named moduleId "loop") generousLimits with
   | .ok prepared =>
       let input : Core.Value := .word (word 1)
+      assertTrue prepared.usesRuntimeCallGraph
+        "recursive source root did not retain a runtime call graph"
       match prepared.run? [input] 16 with
       | some (.outOfFuel _) => pure ()
       | result => throw (IO.userError
