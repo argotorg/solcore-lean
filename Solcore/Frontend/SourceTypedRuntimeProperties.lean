@@ -46,6 +46,13 @@ theorem zero_fuel_runTrusted (plan : Plan) (entry : Key)
     runTrusted plan entry arguments 0 state = .outOfFuel state := by
   rfl
 
+theorem run_eq_runWithValidationFuel (signatures : ProgramSignatures)
+    (plan : Plan) (entry : Key) (arguments : List Value) (fuel : Nat)
+    (state : RuntimeState) :
+    run signatures plan entry arguments fuel state =
+      runWithValidationFuel signatures plan entry arguments fuel fuel state := by
+  rfl
+
 theorem run?_some_iff (signatures : ProgramSignatures) (plan : Plan)
     (entry : Key) (arguments : List Value) (fuel : Nat)
     (initial finalState : RuntimeState) (value : Value) :

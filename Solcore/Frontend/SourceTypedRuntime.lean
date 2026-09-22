@@ -413,6 +413,14 @@ private def validateExecutableMetadata (function : CheckedFunction) :
     | .expression expression => validateExpressionMetadata function expression
     | .statement statement => validateStatementMetadata function statement.form
 
+/-- Preflight every reachable specialization before selecting this runtime as
+an executable backend.  The canonical worklist has already fixed the finite
+call graph; this pass rejects metadata which the typed runtime deliberately
+does not dispatch instead of postponing that rejection until a call happens. -/
+def validateExecutablePlan (plan : Plan) : Except RuntimeError Unit := do
+  for specialized in plan.specializations do
+    validateExecutableMetadata specialized.function
+
 private def applyCoercion (plan : Plan) (step : CoercionStep)
     (value : Value) : Except RuntimeError Value := do
   if value.type? plan != some step.source then
@@ -1504,21 +1512,28 @@ def runTrusted (plan : Plan) (entry : Key) (arguments : List Value)
     (fuel : Nat) (state : RuntimeState := {}) : RunResult :=
   invokeSpecialization fuel plan entry arguments state
 
-/-- Safe typed-source execution boundary.  Constructor inputs are checked
-against `ProgramSignatures`, not merely against their self-described runtime
-metadata; mapping and product contents are validated recursively before any
-function body executes. -/
-def run (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
-    (arguments : List Value) (fuel : Nat)
+/-- Safe typed-source execution with independent bounds for recursive input
+validation and runtime execution.  Constructor inputs are checked against
+`ProgramSignatures`, not merely against self-described runtime metadata. -/
+def runWithValidationFuel (signatures : ProgramSignatures) (plan : Plan)
+    (entry : Key) (arguments : List Value) (validationFuel executionFuel : Nat)
     (state : RuntimeState := {}) : RunResult :=
   match exactSpecialization plan entry with
   | .error error => .fault error state
   | .ok specialized =>
       let expected := specialized.function.typedBody.inputs.map
         (·.scheme.body)
-      match validateInputs signatures plan fuel expected arguments with
+      match validateInputs signatures plan validationFuel expected arguments with
       | some error => .fault error state
-      | none => runTrusted plan entry arguments fuel state
+      | none => runTrusted plan entry arguments executionFuel state
+
+/-- Compatibility boundary using the same structural fuel for validation and
+execution.  New compiler clients can use `runWithValidationFuel` to keep the
+two resource policies independent. -/
+def run (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
+    (arguments : List Value) (fuel : Nat)
+    (state : RuntimeState := {}) : RunResult :=
+  runWithValidationFuel signatures plan entry arguments fuel fuel state
 
 /-- Convenience projection for clients which only need successful values. -/
 def run? (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
