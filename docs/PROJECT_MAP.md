@@ -13,14 +13,14 @@ following every umbrella import. Lean module names follow file paths:
 
 | Question | Read first | Continue with |
 | --- | --- | --- |
-| How do I run the restricted source compiler? | [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) | [`SourceCompilerProperties.lean`](../Solcore/Frontend/SourceCompilerProperties.lean), [Current status](CURRENT_STATUS.md) |
+| How do I run the restricted source compiler? | [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) | Proof and backend-correspondence sections in the same module; [Current status](CURRENT_STATUS.md) |
 | How is a raw workspace checked? | [`ProgramChecking.lean`](../Solcore/Frontend/ProgramChecking.lean) | [`ProgramLoading.lean`](../Solcore/Frontend/ProgramLoading.lean), [`ProgramSignatures.lean`](../Solcore/Frontend/ProgramSignatures.lean) |
 | Where are source expression types inferred? | [`SourceInference.lean`](../Solcore/Frontend/SourceInference.lean) | [`SourceInference/Program.lean`](../Solcore/Frontend/SourceInference/Program.lean), [`Expression.lean`](../Solcore/Frontend/SourceInference/Expression.lean) |
-| Where is the independent source-level formal spec? | [`SourceSemantics.lean`](../Solcore/SourceSemantics.lean) | [`Static.lean`](../Solcore/SourceSemantics/Static.lean), [`Program.lean`](../Solcore/SourceSemantics/Program.lean), [`Dynamic/Evaluation.lean`](../Solcore/SourceSemantics/Dynamic/Evaluation.lean), [`Dynamic/Fault.lean`](../Solcore/SourceSemantics/Dynamic/Fault.lean), [`Dynamic/PatternCompletenessProperties.lean`](../Solcore/SourceSemantics/Dynamic/PatternCompletenessProperties.lean), [`Dynamic/ControlTypingProperties.lean`](../Solcore/SourceSemantics/Dynamic/ControlTypingProperties.lean), [`Dynamic/Preservation.lean`](../Solcore/SourceSemantics/Dynamic/Preservation.lean), [`Dynamic/WholeLanguagePreservation.lean`](../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean), [`Dynamic/ProgramPreservation.lean`](../Solcore/SourceSemantics/Dynamic/ProgramPreservation.lean), [`Staging.lean`](../Solcore/SourceSemantics/Staging.lean), [ADR-0378](adr/0378-declarative-resolved-source-semantics.md) |
+| Where is the independent source-level formal spec? | [`SourceSemantics.lean`](../Solcore/SourceSemantics.lean) | [`Static.lean`](../Solcore/SourceSemantics/Static.lean), [`Program.lean`](../Solcore/SourceSemantics/Program.lean), [`Dynamic/Evaluation.lean`](../Solcore/SourceSemantics/Dynamic/Evaluation.lean), [`Dynamic/Fault.lean`](../Solcore/SourceSemantics/Dynamic/Fault.lean), [`Dynamic/PatternCompletenessProperties.lean`](../Solcore/SourceSemantics/Dynamic/PatternCompletenessProperties.lean), [`Dynamic/Control.lean`](../Solcore/SourceSemantics/Dynamic/Control.lean), [`Dynamic/Preservation.lean`](../Solcore/SourceSemantics/Dynamic/Preservation.lean), [`Dynamic/WholeLanguagePreservation.lean`](../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean), [`Dynamic/Program.lean`](../Solcore/SourceSemantics/Dynamic/Program.lean), [`Staging.lean`](../Solcore/SourceSemantics/Staging.lean), [ADR-0378](adr/0378-declarative-resolved-source-semantics.md) |
 | How does one root become executable? | [`SourceSpecializationWorklist.lean`](../Solcore/Frontend/SourceSpecializationWorklist.lean) | [`SourceCoreDirectLinking.lean`](../Solcore/Frontend/SourceCoreDirectLinking.lean), [`SourceRuntimeLinking.lean`](../Solcore/Frontend/SourceRuntimeLinking.lean), [`SourceTypedRuntime.lean`](../Solcore/Frontend/SourceTypedRuntime.lean) |
-| What is the Core language? | [`Core.lean`](../Solcore/Core.lean) | [`Typing.lean`](../Solcore/Core/Typing.lean), [`Eval.lean`](../Solcore/Core/Eval.lean), [`Safety.lean`](../Solcore/Core/Safety.lean) |
+| What is the Core language? | [`Core.lean`](../Solcore/Core.lean) | [`Typing.lean`](../Solcore/Core/Typing.lean), [`Eval.lean`](../Solcore/Core/Eval.lean), [`Machine.lean`](../Solcore/Core/Machine.lean), [`HostRunner.lean`](../Solcore/Core/HostRunner.lean), [`Renaming.lean`](../Solcore/Core/Renaming.lean), [`Safety.lean`](../Solcore/Core/Safety.lean) |
 | Where are derived comparisons and local-fragment proofs? | [`Core/Derived.lean`](../Solcore/Core/Derived.lean) | [`Core/LocalFragment.lean`](../Solcore/Core/LocalFragment.lean), [`Core.lean`](../Solcore/Core.lean) |
-| What is the contract runtime? | [`ContractRuntime.lean`](../Solcore/ContractRuntime.lean) | [`WorldState.lean`](../Solcore/ContractRuntime/WorldState.lean), [`TopLevelExecution.lean`](../Solcore/ContractRuntime/TopLevelExecution.lean), [`BalancedTopLevelExecution.lean`](../Solcore/ContractRuntime/BalancedTopLevelExecution.lean) |
+| What is the contract runtime? | [`ContractRuntime.lean`](../Solcore/ContractRuntime.lean) | [`WorldState.lean`](../Solcore/ContractRuntime/WorldState.lean), [`HostDriver.lean`](../Solcore/ContractRuntime/HostDriver.lean), [`FrameRun.lean`](../Solcore/ContractRuntime/FrameRun.lean), [`TopLevelExecution.lean`](../Solcore/ContractRuntime/TopLevelExecution.lean) |
 | How does Oracle v5 execute contracts? | [`Oracle/V5.lean`](../Solcore/Oracle/V5.lean) | [`Input.lean`](../Solcore/Oracle/V5/Input.lean), [`Execution.lean`](../Solcore/Oracle/V5/Execution.lean), [wire catalog](ORACLE_V5_WIRE.md) |
 | Where are the canonical standard-library sources pinned? | [`Standard/CanonicalData.lean`](../Solcore/Standard/CanonicalData.lean) | [`Workspace.lean`](../Solcore/Workspace.lean), canonical `Syntax`/frontend route |
 | Why do both `Syntax` and `Surface` exist? | [`Syntax.lean`](../Solcore/Syntax.lean) for the current language | [`Surface.lean`](../Solcore/Surface.lean) for frozen Surface v1/Multi compatibility code |
@@ -42,7 +42,10 @@ The following smaller modules make that path easier to inspect:
 - [`Solcore/Syntax`](../Solcore/Syntax.lean) is the canonical parser umbrella;
   [`Lexer.lean`](../Solcore/Syntax/Lexer.lean) and
   [`Parser.lean`](../Solcore/Syntax/Parser.lean) are the executable entry
-  modules. Parser proofs occupy many focused `*Properties.lean` files. In
+  modules. Closely coupled parser definitions and proofs are colocated in
+  conceptual modules such as [`ModulePath.lean`](../Solcore/Syntax/Parser/ModulePath.lean),
+  [`Pattern.lean`](../Solcore/Syntax/Parser/Pattern.lean), and
+  [`Expression/Atom.lean`](../Solcore/Syntax/Parser/Expression/Atom.lean). In
   contrast, [`Solcore/Surface`](../Solcore/Surface.lean) preserves the old
   Surface v1 parser and the historical Multi experiment. It is compatibility
   and reference material, not an alternative entry to the current pipeline.
@@ -54,7 +57,10 @@ The following smaller modules make that path easier to inspect:
 - [`Solcore/Workspace`](../Solcore/Workspace.lean) defines canonical workspace
   identities and validation. [`Solcore/Resolved`](../Solcore/Resolved.lean) is
   an already-resolved local-expression foundation, **not** the complete
-  whole-program source resolver.
+  whole-program source resolver. Its conceptual modules, such as
+  [`Resolved/Renaming.lean`](../Solcore/Resolved/Renaming.lean) and
+  [`Resolved/Scope.lean`](../Solcore/Resolved/Scope.lean), keep each definition
+  and its tightly coupled laws together.
 - [`Solcore/SourceSemantics`](../Solcore/SourceSemantics) is the independent
   formal specification over the resolved, occurrence-addressed source carrier.
   It now covers whole-program static admission, every retained expression and
@@ -90,15 +96,15 @@ Context / Types / Instantiation / Traits / Requirements
   → Coercions / Binders / Literals / Operators / Calls / Patterns / Places
   → Graph / Ownership / Control → Static → Program
 
-Substitution → GraphSubstitutionProperties / SubstitutionProperties
+Substitution → Graph / SubstitutionProperties
   → TraitSubstitutionProperties
 
 Dynamic.Value → Dynamic.Heap → Dynamic.Typing
   → Dynamic.Default / Primitive / Evidence / Pattern / Place
   → Dynamic.Evaluation → Dynamic.Fault
-  → Dynamic.PatternCompletenessProperties / ControlTypingProperties
+  → Dynamic.PatternCompletenessProperties / Dynamic.Control
   → Dynamic.Preservation → Dynamic.WholeLanguagePreservation
-  → Dynamic.Program / ProgramPreservation
+  → Dynamic.Program
 
 Staging.Stage / Assignment → Staging.Classification
   → Staging.Materialization → Staging.Program
@@ -117,9 +123,9 @@ for the current static, successful-dynamic, and staging boundary.
 
 | Runtime | Definition and linking | Preservation starting point |
 | --- | --- | --- |
-| Direct Core | [`SourceCoreElaboration.lean`](../Solcore/Frontend/SourceCoreElaboration.lean), [`SourceCoreDirectLinking.lean`](../Solcore/Frontend/SourceCoreDirectLinking.lean) | [`Core/Safety.lean`](../Solcore/Core/Safety.lean), [`SourceCompilerProperties.lean`](../Solcore/Frontend/SourceCompilerProperties.lean) |
-| Finite graph | [`SourceRuntime/Checking.lean`](../Solcore/Frontend/SourceRuntime/Checking.lean) (static syntax and checking), [`SourceRuntime.lean`](../Solcore/Frontend/SourceRuntime.lean) (runtime), [`SourceRuntimeLinking.lean`](../Solcore/Frontend/SourceRuntimeLinking.lean) | [`SourceRuntimeDeep/ValueEnvironment.lean`](../Solcore/Frontend/SourceRuntimeDeep/ValueEnvironment.lean) → [`Application.lean`](../Solcore/Frontend/SourceRuntimeDeep/Application.lean) → [`Evaluation.lean`](../Solcore/Frontend/SourceRuntimeDeep/Evaluation.lean) → [`Preservation.lean`](../Solcore/Frontend/SourceRuntimeDeep/Preservation.lean); [`SourceCompilerGraphDeepProperties.lean`](../Solcore/Frontend/SourceCompilerGraphDeepProperties.lean) |
-| Typed source | [`SourceTypedRuntime.lean`](../Solcore/Frontend/SourceTypedRuntime.lean) | [`SourceTypedRuntimeProperties.lean`](../Solcore/Frontend/SourceTypedRuntimeProperties.lean), [`SourceTypedStaticSafetyProperties.lean`](../Solcore/Frontend/SourceTypedStaticSafetyProperties.lean) |
+| Direct Core | [`SourceCoreElaboration.lean`](../Solcore/Frontend/SourceCoreElaboration.lean), [`SourceCoreDirectLinking.lean`](../Solcore/Frontend/SourceCoreDirectLinking.lean) | [`Core/Safety.lean`](../Solcore/Core/Safety.lean), proof sections in [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) |
+| Finite graph | [`SourceRuntime/Checking.lean`](../Solcore/Frontend/SourceRuntime/Checking.lean) (static syntax and checking), [`SourceRuntime.lean`](../Solcore/Frontend/SourceRuntime.lean) (runtime), [`SourceRuntimeLinking.lean`](../Solcore/Frontend/SourceRuntimeLinking.lean) | [`SourceRuntimeDeep/ValueEnvironment.lean`](../Solcore/Frontend/SourceRuntimeDeep/ValueEnvironment.lean) → [`Application.lean`](../Solcore/Frontend/SourceRuntimeDeep/Application.lean) → [`Evaluation.lean`](../Solcore/Frontend/SourceRuntimeDeep/Evaluation.lean) → [`Preservation.lean`](../Solcore/Frontend/SourceRuntimeDeep/Preservation.lean); graph-deep compiler proof section in [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) |
+| Typed source | [`SourceTypedRuntime.lean`](../Solcore/Frontend/SourceTypedRuntime.lean) | Runtime proof sections in the same module; [`SourceTypedStaticSafetyProperties.lean`](../Solcore/Frontend/SourceTypedStaticSafetyProperties.lean) |
 
 The graph proof chain is about successful runs with deep input and initial
 store premises. The separate declarative resolved-source semantics now has a
@@ -150,6 +156,12 @@ Core program and Core Wire v3
   → Oracle v5 (strict JSON decode, check/admit, run, canonical response)
 ```
 
+[`Abi/StaticWord.lean`](../Solcore/Abi/StaticWord.lean) keeps the complete
+static-word ABI path—metadata, codecs, method tables, dispatch, and checked
+contract installation—in dependency order. Oracle v5 similarly keeps each
+cohesive observation, admission, diagnostic, and wire-protocol family in one
+module while preserving the boundary between domain values and wire codecs.
+
 [`Solcore/ContractRuntime`](../Solcore/ContractRuntime) is the execution model,
 formerly stored under the ambiguous `Solcore.Semantics` name. It is not the
 source-language semantics: use `Solcore.SourceSemantics` for that question.
@@ -171,6 +183,7 @@ runtime transition rules itself.
 | [`docs/adr`](adr) | Historical decisions and rationale; use [Current status](CURRENT_STATUS.md) for today's supported boundary |
 
 For changes, import the smallest module containing the definitions you need,
-keep executable definitions and their proof modules distinguishable, and run
-the checks in the [development guide](DEVELOPMENT.md). Existing public
-umbrellas and frozen versioned interfaces are compatibility surfaces.
+keep executable definitions and their proof sections or boundaries visibly
+distinguishable, and run the checks in the [development
+guide](DEVELOPMENT.md). Existing public umbrellas and frozen versioned
+interfaces are compatibility surfaces.

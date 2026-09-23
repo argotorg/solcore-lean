@@ -45,6 +45,13 @@ bodies. `Solcore.TypeSystem` supplies source-level types, substitution,
 unification, rank-1 schemes, and inference machinery. These types are not
 silently identified with monomorphic Core types.
 
+Within `Resolved` and `Frontend`, a conceptual feature and its tightly coupled
+proofs share one module where the import graph permits it. For example,
+`Resolved.Renaming` owns the complete resolved-identity renaming family, while
+`Frontend.RuntimeFunction` owns runtime-function headers, preparation,
+execution, and their proof support. Section headings preserve the finer
+reading route inside these modules.
+
 ### Declarative source semantics
 
 `Solcore.SourceSemantics` is the independent formal specification over the
@@ -134,7 +141,10 @@ non-strict, flag, evaluation, and renaming results.
 [`Core/LocalFragment.lean`](../Solcore/Core/LocalFragment.lean) contains the
 local-fragment predicate together with its insertion, typing, evaluation,
 inference, and local-right-comparison results. These are organization changes,
-not new language or wire versions.
+not new language or wire versions. The same rule places `HostRunner` with its
+properties and safety proof, `Machine` and `HostMachine` with their property
+sections, and all syntax/runtime/evaluation/safety renaming laws in
+[`Core/Renaming.lean`](../Solcore/Core/Renaming.lean).
 
 ### Contract runtime and observation
 
@@ -145,6 +155,13 @@ commit/rollback, traps, fuel/resumption, and the observations produced by that
 execution. The previous name `Solcore.Semantics` was too broad: this layer is
 neither the source-language semantics nor Core's own evaluator. A Core-local
 cell store is therefore distinct from contract accounts and storage.
+
+Its file layout follows those runtime concepts: account and world-state facts,
+host drivers and storage handlers, frame runs/outcomes/traces/contexts,
+one-level nested execution, parent-indexed execution, transactions, and
+checked-program adapters each own their tightly coupled property sections.
+Matching prefixes remain separate only for a real reusable stage, an import
+cycle, or an intentional elaboration/resource boundary.
 
 `Solcore.Oracle` is the versioned JSON/wire adapter around executable
 boundaries. Oracle v5 strictly decodes Core Wire v3 packages and scenarios,

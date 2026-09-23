@@ -9,6 +9,14 @@ languages or wire formats. The former `Solcore.Semantics` tree is now named
 in a contract world rather than source-language semantics. Core's small
 derived-comparison modules are consolidated in `Core/Derived.lean`, and the
 local-fragment theorem family is consolidated in `Core/LocalFragment.lean`.
+The same conceptual-module rule now covers other matching-prefix families:
+Core host runners, machines, and renaming; Resolved scopes and renaming;
+ContractRuntime accounts, frames, host drivers, storage, and nested execution;
+Frontend runtime functions, computations, applications, and local-expression
+proofs; and cohesive ABI, Oracle, SourceSemantics, and Syntax families. Public
+declaration names are unchanged. A matching prefix remains split only where it
+marks a real reusable stage, prevents an import cycle, or provides an explicit
+proof/elaboration resource boundary.
 For source parsing, `Solcore.Syntax` is canonical; `Solcore.Surface` remains
 the frozen historical Surface v1/Multi implementation. `Solcore.Standard`
 only pins canonical standard-library source bytes and metadata, whereas
