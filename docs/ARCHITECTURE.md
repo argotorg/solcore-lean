@@ -43,23 +43,46 @@ silently identified with monomorphic Core types.
 
 ### Declarative source semantics
 
-`Solcore.SourceSemantics` begins the independent formal specification of the
-canonical source language, following [ADR-0377](adr/0377-declarative-source-semantics-foundation.md).
-Its first tranche defines semantic contexts, occurrence-graph closure for the
-resolved carrier, exact scheme and declaration instantiation,
-exact simultaneous implementation-head instantiation, algorithm-independent
-trait-evidence validity, retained-evidence representation, and initial
-resolved-reference raw typing. These judgments reuse resolved frontend data as
-a carrier, but they do not take successful inference, checking,
-specialization, compilation, or execution as a premise. The existing evidence
-carrier is connected by an explicit representation judgment; algorithmic
-matching and search require separate future correspondence theorems.
+`Solcore.SourceSemantics` is the independent formal specification over the
+resolved, occurrence-addressed source carrier, following
+[ADR-0377](adr/0377-declarative-source-semantics-foundation.md) and
+[ADR-0378](adr/0378-declarative-resolved-source-semantics.md). It reuses
+frontend records as forgeable data, but no static or staging judgment takes
+successful inference, checking, specialization, compilation, or execution as
+a premise.
 
-This foundation is started and partly complete; it is not yet a whole-language
-static or dynamic semantics. The next static layers are expression, statement,
-body, and whole-program typing. Pattern typing, staging, source values and
-heaps, dynamic evaluation, and whole-language metatheory remain subsequent
-work.
+The static layer validates type and predicate scope, exact generic and
+implementation-head instantiation, retained evidence and coercions, graph
+closure and ownership, and every expression and statement form. Forgeable
+function and implementation-method bodies are checked against a semantically
+validated signature catalog, and `ProgramWellFormed` requires exact body
+coverage. `StructuralSubstitution` gives generic bodies a normative,
+syntax-directed substitution operation; a separate correspondence module
+proves its explicit equations with the frontend specialization helper.
+
+The dynamic layer owns mathematical values, locations and heaps, closures,
+runtime dictionaries, defaults, primitives, patterns, and mutable places. Its
+fuel-free big-step relations specify successful evaluation of every retained
+expression and statement form, including calls, selected trait and coercion
+methods, mutation, matches, loops, recursion, and final semicolon-free results.
+Positive fault judgments expose missing occurrences and evidence, invalid
+runtime operands, place failures, call failures, and their left-to-right
+propagation through expressions, statements, calls, matches, and loops. They
+do not assert that every non-successful term has a unique fault.
+The staging layer independently classifies occurrences and whole programs as
+`comptime`, `runtime`, or `deferred`, and defines a closed materialization
+boundary with an explicit representation relation to the frontend staged-value
+carrier. Compile-time materialization is parameterized by an ambient
+expression-evaluation relation.
+
+This is a resolved-carrier specification, not raw-source/module resolution or
+a proof that an executable frontend implements the judgments. Fault-complete
+dynamics, trait-search coherence, checker/evaluator correspondence, progress,
+determinism, termination, and backend correctness remain open. Successful
+whole-language derivations do have subject reduction: structural generic
+substitution transports complete static derivations, and evaluation preserves
+deep result/control typing, heap typing, and heap-type extension for closed
+instantiated runtime contexts.
 
 ### Source compilation and execution
 
@@ -112,6 +135,12 @@ Executable functions are accompanied by independent typing/evaluation
 judgments and local correspondence proofs. The amount of proof is not uniform
 across the three source backends:
 
+- The declarative resolved-source layer covers all retained static forms and
+  successful big-step evaluation. Its whole-language subject-reduction theorem
+  composes the value, heap, primitive, coercion, pattern, place, expression,
+  statement, loop, and body-call proofs, including generic body instantiation.
+  It applies to successful derivations in closed instantiated runtime contexts;
+  it is not a progress, determinism, or fault-completeness result.
 - Direct Core has deep value and final-store preservation under deeply typed
   inputs and an initially typed store.
 - The checked finite call graph has a whole-evaluator deep preservation
@@ -122,9 +151,11 @@ across the three source backends:
   theorem is still open; static checked-IR body typing, environment-to-cell
   typing, and projected updates remain dependencies.
 
-None of these normal-completion theorems asserts termination or excludes every
-runtime fault. The [deep-preservation decision](adr/0376-deep-runtime-typing-foundations.md)
-records the precise current premises and open boundary. The status document,
+None of these normal-completion or successful-evaluation theorems asserts
+termination or excludes every runtime fault. The
+[deep-preservation decision](adr/0376-deep-runtime-typing-foundations.md) and
+[resolved-source semantics decision](adr/0378-declarative-resolved-source-semantics.md)
+record the precise current premises and open boundaries. The status document,
 not an older ADR, is the revision-local account of supported behavior.
 
 ## Version and dependency policy

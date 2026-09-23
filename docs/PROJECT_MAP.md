@@ -16,7 +16,7 @@ following every umbrella import. Lean module names follow file paths:
 | How do I run the restricted source compiler? | [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) | [`SourceCompilerProperties.lean`](../Solcore/Frontend/SourceCompilerProperties.lean), [Current status](CURRENT_STATUS.md) |
 | How is a raw workspace checked? | [`ProgramChecking.lean`](../Solcore/Frontend/ProgramChecking.lean) | [`ProgramLoading.lean`](../Solcore/Frontend/ProgramLoading.lean), [`ProgramSignatures.lean`](../Solcore/Frontend/ProgramSignatures.lean) |
 | Where are source expression types inferred? | [`SourceInference.lean`](../Solcore/Frontend/SourceInference.lean) | [`SourceInference/Program.lean`](../Solcore/Frontend/SourceInference/Program.lean), [`Expression.lean`](../Solcore/Frontend/SourceInference/Expression.lean) |
-| Where is the independent source-level formal spec? | [`SourceSemantics/Context.lean`](../Solcore/SourceSemantics/Context.lean) | [`WellFormed.lean`](../Solcore/SourceSemantics/WellFormed.lean), [`Instantiation.lean`](../Solcore/SourceSemantics/Instantiation.lean), [`Traits.lean`](../Solcore/SourceSemantics/Traits.lean), [`Typing.lean`](../Solcore/SourceSemantics/Typing.lean), [ADR-0377](adr/0377-declarative-source-semantics-foundation.md) |
+| Where is the independent source-level formal spec? | [`SourceSemantics.lean`](../Solcore/SourceSemantics.lean) | [`Static.lean`](../Solcore/SourceSemantics/Static.lean), [`Program.lean`](../Solcore/SourceSemantics/Program.lean), [`Dynamic/Evaluation.lean`](../Solcore/SourceSemantics/Dynamic/Evaluation.lean), [`Dynamic/Fault.lean`](../Solcore/SourceSemantics/Dynamic/Fault.lean), [`Dynamic/PatternCompletenessProperties.lean`](../Solcore/SourceSemantics/Dynamic/PatternCompletenessProperties.lean), [`Dynamic/ControlTypingProperties.lean`](../Solcore/SourceSemantics/Dynamic/ControlTypingProperties.lean), [`Dynamic/Preservation.lean`](../Solcore/SourceSemantics/Dynamic/Preservation.lean), [`Dynamic/WholeLanguagePreservation.lean`](../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean), [`Dynamic/ProgramPreservation.lean`](../Solcore/SourceSemantics/Dynamic/ProgramPreservation.lean), [`Staging.lean`](../Solcore/SourceSemantics/Staging.lean), [ADR-0378](adr/0378-declarative-resolved-source-semantics.md) |
 | How does one root become executable? | [`SourceSpecializationWorklist.lean`](../Solcore/Frontend/SourceSpecializationWorklist.lean) | [`SourceCoreDirectLinking.lean`](../Solcore/Frontend/SourceCoreDirectLinking.lean), [`SourceRuntimeLinking.lean`](../Solcore/Frontend/SourceRuntimeLinking.lean), [`SourceTypedRuntime.lean`](../Solcore/Frontend/SourceTypedRuntime.lean) |
 | What is the Core language? | [`Core.lean`](../Solcore/Core.lean) | [`Typing.lean`](../Solcore/Core/Typing.lean), [`Eval.lean`](../Solcore/Core/Eval.lean), [`Safety.lean`](../Solcore/Core/Safety.lean) |
 | How does Oracle v5 execute contracts? | [`Oracle/V5.lean`](../Solcore/Oracle/V5.lean) | [`Input.lean`](../Solcore/Oracle/V5/Input.lean), [`Execution.lean`](../Solcore/Oracle/V5/Execution.lean), [wire catalog](ORACLE_V5_WIRE.md) |
@@ -43,13 +43,14 @@ The following smaller modules make that path easier to inspect:
   identities and validation. [`Solcore/Resolved`](../Solcore/Resolved.lean) is
   an already-resolved local-expression foundation, **not** the complete
   whole-program source resolver.
-- [`Solcore/SourceSemantics`](../Solcore/SourceSemantics) is the new independent
-  formal-specification foundation over the resolved, occurrence-addressed
-  source carrier. Its contexts, occurrence-graph closure, instantiation,
-  trait-evidence validity, and initial reference raw typing do not use
-  successful source checking as a defining premise. Whole-expression,
-  statement, body, and program typing—and the source dynamic semantics—are not
-  complete yet.
+- [`Solcore/SourceSemantics`](../Solcore/SourceSemantics) is the independent
+  formal specification over the resolved, occurrence-addressed source carrier.
+  It now covers whole-program static admission, every retained expression and
+  statement form, successful big-step dynamics, positive fault propagation,
+  generic static-preservation and successful whole-language subject reduction,
+  plus independent staging and materialization boundaries. It does not define
+  raw-source/module resolution, fault-complete evaluation, progress, or
+  checker/backend correctness.
 - [`ProgramEnvironment.lean`](../Solcore/Frontend/ProgramEnvironment.lean)
   catalogs declarations;
   [`ProgramModuleResolution.lean`](../Solcore/Frontend/ProgramModuleResolution.lean)
@@ -68,6 +69,38 @@ The following smaller modules make that path easier to inspect:
   canonical facade. [`SourceProgramExecution.lean`](../Solcore/Frontend/SourceProgramExecution.lean)
   is the earlier, narrower Core/graph entry path.
 
+## Declarative source-semantics route
+
+Read the proof-facing resolved-source specification in this order:
+
+```text
+Context / Types / Instantiation / Traits / Requirements
+  → Coercions / Binders / Literals / Operators / Calls / Patterns / Places
+  → Graph / Ownership / Control → Static → Program
+
+Substitution → GraphSubstitutionProperties / SubstitutionProperties
+  → TraitSubstitutionProperties
+
+Dynamic.Value → Dynamic.Heap → Dynamic.Typing
+  → Dynamic.Default / Primitive / Evidence / Pattern / Place
+  → Dynamic.Evaluation → Dynamic.Fault
+  → Dynamic.PatternCompletenessProperties / ControlTypingProperties
+  → Dynamic.Preservation → Dynamic.WholeLanguagePreservation
+  → Dynamic.Program / ProgramPreservation
+
+Staging.Stage / Assignment → Staging.Classification
+  → Staging.Materialization → Staging.Program
+```
+
+[`Substitution.lean`](../Solcore/SourceSemantics/Substitution.lean) defines
+normative structural substitution over the retained source carrier.
+[`SubstitutionCorrespondence.lean`](../Solcore/SourceSemantics/SubstitutionCorrespondence.lean)
+then states the explicit equations with the frontend specialization helper;
+the helper is not a premise of the semantic judgments. Start with
+[ADR-0377](adr/0377-declarative-source-semantics-foundation.md) for the original
+authority boundary and [ADR-0378](adr/0378-declarative-resolved-source-semantics.md)
+for the current static, successful-dynamic, and staging boundary.
+
 ## Runtime and proof route
 
 | Runtime | Definition and linking | Preservation starting point |
@@ -77,8 +110,10 @@ The following smaller modules make that path easier to inspect:
 | Typed source | [`SourceTypedRuntime.lean`](../Solcore/Frontend/SourceTypedRuntime.lean) | [`SourceTypedRuntimeProperties.lean`](../Solcore/Frontend/SourceTypedRuntimeProperties.lean), [`SourceTypedStaticSafetyProperties.lean`](../Solcore/Frontend/SourceTypedStaticSafetyProperties.lean) |
 
 The graph proof chain is about successful runs with deep input and initial
-store premises. Typed-source value/heap lemmas are dependencies toward, not
-yet an evaluator-wide deep-preservation theorem. See
+store premises. The separate declarative resolved-source semantics now has a
+whole-language successful-evaluation preservation theorem; the executable
+typed-source backend still has only its own local value/heap dependencies, not
+an evaluator-wide deep-preservation theorem. See
 [ADR-0376](adr/0376-deep-runtime-typing-foundations.md) for the exact boundary.
 
 ## Other top-level areas

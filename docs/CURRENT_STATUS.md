@@ -337,26 +337,65 @@ primitive rules; source-only coercion enumeration and method catalogs do not.
 
 ### Declarative source-semantics foundation
 
-ADR-0377 starts `Solcore.SourceSemantics`, an independent source-level formal
-specification over the resolved, occurrence-addressed source carrier. The
-implemented part of the first tranche provides semantic global/local contexts,
-occurrence-graph closure and lookup correspondence, exact scheme and
-declaration-parameter instantiation, algorithm-independent validation of trait
-and assumption evidence over exact simultaneous implementation-head
-instantiation, an explicit retained-evidence representation bridge, and initial
-raw typing rules for resolved references. These definitions may inspect
-catalogs and evidence carriers, but successful source inference, checker
-execution, specialization, compilation, and runtime execution are not premises
-of the judgments.
+ADR-0377 establishes `Solcore.SourceSemantics` as an independent source-level
+formal specification over the resolved, occurrence-addressed source carrier.
+Its contexts, exact instantiation, occurrence lookup, trait-evidence validity,
+retained-evidence representation, and reference typing remain the foundation
+of the broader ADR-0378 semantics. Successful source inference, checking,
+specialization, compilation, and runtime execution are not defining premises.
+See [ADR-0377](adr/0377-declarative-source-semantics-foundation.md) for that
+authority boundary.
 
-This is a partly completed formal-specification foundation, not a completed
-formalization of the source language. Whole-expression, statement, function
-body, implementation-method, and whole-program typing are still open; the
-immediate next sequence is expression typing, statement typing, body typing,
-then program typing. Independent staging and dynamic evaluation relations,
-checker/evaluator correspondence, and whole-language progress and preservation
-come later. See [ADR-0377](adr/0377-declarative-source-semantics-foundation.md)
-for the exact first-tranche and deferred boundaries.
+### Declarative resolved-source semantics
+
+ADR-0378 completes the current resolved-carrier specification tranche. The
+static layer validates type/predicate scope, literals, operators, calls,
+coercions, patterns, places, graph closure, ownership, every retained
+expression and statement form, declaration and implementation-method bodies,
+catalogs, and whole programs. `StructuralSubstitution` gives generic source
+bodies an independent syntax-directed operation; explicit correspondence
+theorems relate it to the frontend specialization helper without making that
+helper normative.
+
+Independent values, heaps, closures, runtime dictionaries, primitives,
+patterns, places, and coercions support fuel-free successful big-step rules for
+all retained expression and statement forms, including calls, mutation,
+matches, loops, and finite recursive derivations. Independent stage rules
+classify every retained form and whole programs. Materialization is restricted
+to Unit, Bool, Word, and products, has an explicit typed representation bridge
+to the frontend staged-value carrier, and remains parameterized by an ambient
+expression-evaluation relation.
+
+Rigid-parameter substitution now preserves the complete static derivation,
+including patterns, places, calls, statements, bodies, implementation-head
+matching, semantic evidence, and solved-requirement ledgers. The dynamic
+preservation chain composes through expressions, statements, loops, body
+invocation, and whole-program entry. A successful evaluation from a deeply
+typed heap and agreeing environment in a closed instantiated context preserves
+the result or control type, final heap typing, and heap-type extension.
+`ProgramWellFormed.wholeLanguagePreservation` constructs this proof package
+without an extra preservation premise, and `ProgramEvaluates.preserves`
+applies it at the admitted entry boundary. The control proof also rules out an
+ordinary runtime completion when the corresponding static summary cannot fall
+through; exhaustive matches therefore cannot take the dynamic `noBranch` rule.
+Positive fault relations cover the retained failure categories and
+left-to-right prefix propagation, but do not prove that every rejected or
+stuck term has exactly one fault.
+
+This does not yet specify raw-source module/import/name resolution or all
+failing executions. Trait-overlap coherence, frontend checker/evaluator
+correspondence, progress, determinism, termination, and backend correctness
+remain open. In particular, a well-typed mapping lookup whose value type has
+no canonical `DefaultValue` can be stuck when the key is absent; the current
+theorem is successful-evaluation preservation, not progress or fault
+completeness. Function types also retain the packed parameter type rather than
+source arity: for example, zero arguments and one Unit argument both pack to
+Unit. A well-typed first-class call can therefore report an explicit argument-
+arity fault when the callable's retained binder count differs from the call
+metadata; conditional preservation does not classify that run as successful.
+See
+[ADR-0378](adr/0378-declarative-resolved-source-semantics.md) for the exact
+boundary.
 
 ### Resolved local-expression semantics
 
