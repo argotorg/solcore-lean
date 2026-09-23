@@ -41,6 +41,26 @@ bodies. `Solcore.TypeSystem` supplies source-level types, substitution,
 unification, rank-1 schemes, and inference machinery. These types are not
 silently identified with monomorphic Core types.
 
+### Declarative source semantics
+
+`Solcore.SourceSemantics` begins the independent formal specification of the
+canonical source language, following [ADR-0377](adr/0377-declarative-source-semantics-foundation.md).
+Its first tranche defines semantic contexts, occurrence-graph closure for the
+resolved carrier, exact scheme and declaration instantiation,
+exact simultaneous implementation-head instantiation, algorithm-independent
+trait-evidence validity, retained-evidence representation, and initial
+resolved-reference raw typing. These judgments reuse resolved frontend data as
+a carrier, but they do not take successful inference, checking,
+specialization, compilation, or execution as a premise. The existing evidence
+carrier is connected by an explicit representation judgment; algorithmic
+matching and search require separate future correspondence theorems.
+
+This foundation is started and partly complete; it is not yet a whole-language
+static or dynamic semantics. The next static layers are expression, statement,
+body, and whole-program typing. Pattern typing, staging, source values and
+heaps, dynamic evaluation, and whole-language metatheory remain subsequent
+work.
+
 ### Source compilation and execution
 
 `Solcore.Frontend.ProgramChecking.checkProgram` validates, parses, resolves,

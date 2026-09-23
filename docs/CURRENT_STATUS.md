@@ -335,6 +335,29 @@ primitive rules; source-only coercion enumeration and method catalogs do not.
 
 ## What works now
 
+### Declarative source-semantics foundation
+
+ADR-0377 starts `Solcore.SourceSemantics`, an independent source-level formal
+specification over the resolved, occurrence-addressed source carrier. The
+implemented part of the first tranche provides semantic global/local contexts,
+occurrence-graph closure and lookup correspondence, exact scheme and
+declaration-parameter instantiation, algorithm-independent validation of trait
+and assumption evidence over exact simultaneous implementation-head
+instantiation, an explicit retained-evidence representation bridge, and initial
+raw typing rules for resolved references. These definitions may inspect
+catalogs and evidence carriers, but successful source inference, checker
+execution, specialization, compilation, and runtime execution are not premises
+of the judgments.
+
+This is a partly completed formal-specification foundation, not a completed
+formalization of the source language. Whole-expression, statement, function
+body, implementation-method, and whole-program typing are still open; the
+immediate next sequence is expression typing, statement typing, body typing,
+then program typing. Independent staging and dynamic evaluation relations,
+checker/evaluator correspondence, and whole-language progress and preservation
+come later. See [ADR-0377](adr/0377-declarative-source-semantics-foundation.md)
+for the exact first-tranche and deferred boundaries.
+
 ### Resolved local-expression semantics
 
 Frontend semantic work now takes priority over additional diagnostic-trace

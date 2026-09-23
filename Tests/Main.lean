@@ -1,4 +1,6 @@
 import Solcore
+import Solcore.Test.SourceSemantics
+import Solcore.Test.SourceSemanticsPublicBoundary
 import Solcore.Test.ResolvedPublicBoundary
 import Solcore.Test.ResolvedLocalSemantics
 import Solcore.Test.ResolvedIdentityRenamingProperties

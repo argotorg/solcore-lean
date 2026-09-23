@@ -14,6 +14,7 @@ import Solcore.Syntax
 import Solcore.Resolved
 import Solcore.TypeSystem
 import Solcore.Frontend
+import Solcore.SourceSemantics
 
 /-!
 The public umbrella module for the executable Solcore specification.

@@ -133,9 +133,10 @@ version.
 
 ## Kernel policy
 
-scripts/check-kernel.mjs scans Core, Semantics, Standard, Syntax, Surface, and
-Workspace Lean sources. It rejects the language escape hatches named in that
-script, including appearances in comments.
+scripts/check-kernel.mjs scans Core, Foundation, Semantics, Resolved,
+SourceSemantics, TypeSystem, Frontend, Standard, Syntax, Surface, and Workspace
+Lean sources. It rejects the language escape hatches named in that script,
+including appearances in comments.
 
 This policy is separate from Lean's foundations. Critical theorem axiom reports
 may contain propext, Quot.sound, or Classical.choice and should report the

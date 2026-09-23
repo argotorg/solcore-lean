@@ -16,6 +16,7 @@ following every umbrella import. Lean module names follow file paths:
 | How do I run the restricted source compiler? | [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) | [`SourceCompilerProperties.lean`](../Solcore/Frontend/SourceCompilerProperties.lean), [Current status](CURRENT_STATUS.md) |
 | How is a raw workspace checked? | [`ProgramChecking.lean`](../Solcore/Frontend/ProgramChecking.lean) | [`ProgramLoading.lean`](../Solcore/Frontend/ProgramLoading.lean), [`ProgramSignatures.lean`](../Solcore/Frontend/ProgramSignatures.lean) |
 | Where are source expression types inferred? | [`SourceInference.lean`](../Solcore/Frontend/SourceInference.lean) | [`SourceInference/Program.lean`](../Solcore/Frontend/SourceInference/Program.lean), [`Expression.lean`](../Solcore/Frontend/SourceInference/Expression.lean) |
+| Where is the independent source-level formal spec? | [`SourceSemantics/Context.lean`](../Solcore/SourceSemantics/Context.lean) | [`WellFormed.lean`](../Solcore/SourceSemantics/WellFormed.lean), [`Instantiation.lean`](../Solcore/SourceSemantics/Instantiation.lean), [`Traits.lean`](../Solcore/SourceSemantics/Traits.lean), [`Typing.lean`](../Solcore/SourceSemantics/Typing.lean), [ADR-0377](adr/0377-declarative-source-semantics-foundation.md) |
 | How does one root become executable? | [`SourceSpecializationWorklist.lean`](../Solcore/Frontend/SourceSpecializationWorklist.lean) | [`SourceCoreDirectLinking.lean`](../Solcore/Frontend/SourceCoreDirectLinking.lean), [`SourceRuntimeLinking.lean`](../Solcore/Frontend/SourceRuntimeLinking.lean), [`SourceTypedRuntime.lean`](../Solcore/Frontend/SourceTypedRuntime.lean) |
 | What is the Core language? | [`Core.lean`](../Solcore/Core.lean) | [`Typing.lean`](../Solcore/Core/Typing.lean), [`Eval.lean`](../Solcore/Core/Eval.lean), [`Safety.lean`](../Solcore/Core/Safety.lean) |
 | How does Oracle v5 execute contracts? | [`Oracle/V5.lean`](../Solcore/Oracle/V5.lean) | [`Input.lean`](../Solcore/Oracle/V5/Input.lean), [`Execution.lean`](../Solcore/Oracle/V5/Execution.lean), [wire catalog](ORACLE_V5_WIRE.md) |
@@ -42,6 +43,13 @@ The following smaller modules make that path easier to inspect:
   identities and validation. [`Solcore/Resolved`](../Solcore/Resolved.lean) is
   an already-resolved local-expression foundation, **not** the complete
   whole-program source resolver.
+- [`Solcore/SourceSemantics`](../Solcore/SourceSemantics) is the new independent
+  formal-specification foundation over the resolved, occurrence-addressed
+  source carrier. Its contexts, occurrence-graph closure, instantiation,
+  trait-evidence validity, and initial reference raw typing do not use
+  successful source checking as a defining premise. Whole-expression,
+  statement, body, and program typing—and the source dynamic semantics—are not
+  complete yet.
 - [`ProgramEnvironment.lean`](../Solcore/Frontend/ProgramEnvironment.lean)
   catalogs declarations;
   [`ProgramModuleResolution.lean`](../Solcore/Frontend/ProgramModuleResolution.lean)
