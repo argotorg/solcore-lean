@@ -1,5 +1,5 @@
-import Solcore.Semantics.FrameTraceExtension
-import Solcore.Semantics.FrameContinuationContextWithTracePrefix
+import Solcore.ContractRuntime.FrameTraceExtension
+import Solcore.ContractRuntime.FrameContinuationContextWithTracePrefix
 
 /-! Definition-only tests for indexed incremental frame-trace extension. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive ExtensionEvent where
   | entered

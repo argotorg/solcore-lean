@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.Adr0149BalancedTopLevelLogs
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 open Tests.Adr0147BalancedTopLevelExecutionFixture
 open Tests.Adr0149TopLevelLogsFixture

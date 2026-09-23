@@ -7,8 +7,8 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
-open Solcore.Semantics.OneLevelNestedExecution
+open Solcore.ContractRuntime
+open Solcore.ContractRuntime.OneLevelNestedExecution
 open Adr0148NestedCreationLifecycleFixture
 open Adr0148CheckedCreationPreflightFixture
 

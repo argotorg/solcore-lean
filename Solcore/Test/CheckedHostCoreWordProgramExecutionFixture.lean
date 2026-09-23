@@ -1,4 +1,4 @@
-import Solcore.Semantics.CheckedHostCoreWordProgramExecutionProperties
+import Solcore.ContractRuntime.CheckedHostCoreWordProgramExecutionProperties
 import Solcore.Test.ParentIndexedSelectedExecutionFixture
 
 /-! Shared direct-execution fixtures for checked Word return tests. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.CheckedHostCoreWordProgramExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open ParentIndexedSelectedExecutionFixture
 
 def wordCode : CheckedHostCoreWordProgram := ⟨code, rfl⟩

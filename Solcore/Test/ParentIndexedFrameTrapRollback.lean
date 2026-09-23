@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedFrameTrapRollback
-import Solcore.Semantics.ParentIndexedFrameContinuationConstruction
+import Solcore.ContractRuntime.ParentIndexedFrameTrapRollback
+import Solcore.ContractRuntime.ParentIndexedFrameContinuationConstruction
 
 /-! Definition-only tests for parent-indexed trapped-frame rollback selection. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive TrapRollbackEvent where
   | parent

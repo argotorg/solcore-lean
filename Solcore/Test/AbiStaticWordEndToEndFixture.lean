@@ -1,5 +1,5 @@
 import Solcore.Abi.StaticWordContract
-import Solcore.Semantics.WorldStateDelta
+import Solcore.ContractRuntime.WorldStateDelta
 
 /-! Explicit ABI/world fixture for the first Static Word vertical execution. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.AbiStaticWordEndToEndFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Solcore.Abi.V1
 
 def target : Address := ⟨0x1500, by decide⟩

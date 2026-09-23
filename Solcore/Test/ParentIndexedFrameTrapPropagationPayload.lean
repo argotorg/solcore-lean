@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedFrameTrapPropagationPayload
-import Solcore.Semantics.ParentIndexedFrameContinuationConstruction
+import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayload
+import Solcore.ContractRuntime.ParentIndexedFrameContinuationConstruction
 
 /-! Definition-only tests for parent-indexed trap propagation payloads. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive TrapPropagationEvent where
   | parent

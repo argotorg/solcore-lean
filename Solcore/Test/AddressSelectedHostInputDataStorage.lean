@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionPreservationProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionPreservationProperties
 
 /-! End-to-end regression for a byte-derived selected-storage write. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

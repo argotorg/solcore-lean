@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateWordCodeSelectionProperties
+import Solcore.ContractRuntime.WorldStateWordCodeSelectionProperties
 
 /-! Compile-only consumers for branch-complete selected Word-code classification. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Solcore.Test.CheckedHostCoreWordCodeSelectionProperties
 
-open Semantics
+open ContractRuntime
 open CheckedHostCoreWordCodeSelection
 
 variable (checkedCode : CheckedHostCoreProgram)

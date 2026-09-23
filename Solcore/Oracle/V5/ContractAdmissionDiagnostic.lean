@@ -1,6 +1,6 @@
 import Solcore.Oracle.V5.CheckDiagnostic
 import Solcore.Oracle.V5.ContractAdmission
-import Solcore.Semantics.RuntimeScalars.TextProperties
+import Solcore.ContractRuntime.RuntimeScalars.TextProperties
 
 /-! Canonical Oracle v5 diagnostics for contract-package admission. -/
 
@@ -27,7 +27,7 @@ private def encodeCoreType
   | none => .error .coreWireProjectionFailed
 
 private def selectorText (selector : Solcore.Abi.V1.Selector) : String :=
-  ((Solcore.Semantics.encodeBytesText selector.encode).drop 2).toString
+  ((Solcore.ContractRuntime.encodeBytesText selector.encode).drop 2).toString
 
 private def programPrefix : ContractProgramSite → List String
   | .checkedCore contract => ["contracts", contract.value, "program"]

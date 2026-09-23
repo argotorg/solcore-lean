@@ -1,4 +1,4 @@
-import Solcore.Semantics.CheckedCoreProgramProperties
+import Solcore.ContractRuntime.CheckedCoreProgramProperties
 
 /-! Admission, stateful execution, and safety regressions for checked code. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

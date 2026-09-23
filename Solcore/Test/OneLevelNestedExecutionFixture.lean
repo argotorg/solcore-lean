@@ -1,4 +1,4 @@
-import Solcore.Semantics.OneLevelNestedExecution
+import Solcore.ContractRuntime.OneLevelNestedExecution
 
 /-! Executable checked-contract fixtures for one-level nested calls. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests.OneLevelNestedExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def rootAddress : Address := ⟨0x10, by decide⟩
 def childAddress : Address := ⟨0x20, by decide⟩

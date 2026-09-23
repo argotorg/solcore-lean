@@ -4,7 +4,7 @@ set_option autoImplicit false
 namespace Tests
 open Solcore
 open Solcore.Abi.V1
-open Solcore.Semantics
+open Solcore.ContractRuntime
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do
     throw (IO.userError message)

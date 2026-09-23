@@ -1,5 +1,5 @@
-import Solcore.Semantics.ContractWordCallInput
-import Solcore.Semantics.TransactionHostStorageHandlerProperties
+import Solcore.ContractRuntime.ContractWordCallInput
+import Solcore.ContractRuntime.TransactionHostStorageHandlerProperties
 
 /-! Focused executable checks for transaction-aware log handling. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

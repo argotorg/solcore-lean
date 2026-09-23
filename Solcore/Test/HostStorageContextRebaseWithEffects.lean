@@ -1,4 +1,4 @@
-import Solcore.Semantics.HostStorageContextRebase
+import Solcore.ContractRuntime.HostStorageContextRebase
 
 /-! Compile-only regressions for joint working-world and effect rebasing. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests.HostStorageContextRebaseWithEffects
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v
 

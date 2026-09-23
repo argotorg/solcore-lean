@@ -1,5 +1,5 @@
 import Solcore.Oracle.V5.ProbeValidation
-import Solcore.Semantics.CheckedCoreContract
+import Solcore.ContractRuntime.CheckedCoreContract
 
 /-! Safe construction of the Oracle v5 top-level invocation boundary. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- The exact semantic invocation paired with its order-preserving probe set. -/
 structure PreparedInvocation where

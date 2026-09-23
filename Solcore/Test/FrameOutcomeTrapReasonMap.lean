@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameOutcomeTrapReasonMap
+import Solcore.ContractRuntime.FrameOutcomeTrapReasonMap
 
 /-! Definition-only tests for heterogeneous frame trap-reason mapping. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive LocalTrapReason where
   | marker

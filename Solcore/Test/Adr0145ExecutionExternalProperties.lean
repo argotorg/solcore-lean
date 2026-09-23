@@ -1,5 +1,5 @@
-import Solcore.Semantics.TopLevelExecutionProperties
-import Solcore.Semantics.TopLevelExecutionResumptionProperties
+import Solcore.ContractRuntime.TopLevelExecutionProperties
+import Solcore.ContractRuntime.TopLevelExecutionResumptionProperties
 
 /-! External compile consumers for ADR-0145 finalization and resumption laws. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.Adr0145ExecutionExternalProperties
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 section Finalization
 

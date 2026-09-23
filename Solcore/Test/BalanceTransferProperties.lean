@@ -1,11 +1,11 @@
-import Solcore.Semantics.BalanceTransferProperties
+import Solcore.ContractRuntime.BalanceTransferProperties
 
 /-! External compile consumers for every public balance-transfer theorem. -/
 set_option autoImplicit false
 
 namespace Tests
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 example (balance amount result : Core.Word) :
     Balance.checkedDebit? balance amount = some result ↔

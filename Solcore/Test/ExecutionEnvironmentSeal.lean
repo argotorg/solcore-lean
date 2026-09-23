@@ -1,5 +1,5 @@
-import Solcore.Semantics.ExecutionEnvironmentProperties
-import Solcore.Semantics.OneLevelNestedExecutionResumptionProperties
+import Solcore.ContractRuntime.ExecutionEnvironmentProperties
+import Solcore.ContractRuntime.OneLevelNestedExecutionResumptionProperties
 import Solcore.Test.Adr0148CreationEndToEndFixture
 import Solcore.Test.OneLevelNestedExecutionFixture
 
@@ -10,7 +10,7 @@ set_option autoImplicit false
 namespace Tests.ExecutionEnvironmentSeal
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Tests.OneLevelNestedExecutionFixture
 
 private def root : CheckedCoreContract :=

@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountProperties
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageReadWriteProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageReadWriteProperties
 
 /-! Compile-only regressions for initialized present-storage refinement. -/
 
@@ -10,32 +10,32 @@ namespace Tests
 private example
     {RollbackState Event : Type}
     {parentWorking :
-      Solcore.Semantics.WorldState ×
-        Solcore.Semantics.FrameEffectJournal RollbackState
-          (Solcore.Semantics.FrameTrace Event)}
+      Solcore.ContractRuntime.WorldState ×
+        Solcore.ContractRuntime.FrameEffectJournal RollbackState
+          (Solcore.ContractRuntime.FrameTrace Event)}
     (initialization :
-      Solcore.Semantics.ParentIndexedFrameInitialization
+      Solcore.ContractRuntime.ParentIndexedFrameInitialization
         RollbackState Event parentWorking)
-    (storageAddress : Solcore.Semantics.Address)
+    (storageAddress : Solcore.ContractRuntime.Address)
     (absent :
       initialization.initialWorld.account? storageAddress = none) :
     initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
       storageAddress = none := by
   exact
-    Solcore.Semantics.ParentIndexedFrameInitialization.toCheckpointedWorkingPairWithPresentStorageAccount?_of_absent
+    Solcore.ContractRuntime.ParentIndexedFrameInitialization.toCheckpointedWorkingPairWithPresentStorageAccount?_of_absent
       initialization storageAddress absent
 
 private example
     {RollbackState Event : Type}
     {parentWorking :
-      Solcore.Semantics.WorldState ×
-        Solcore.Semantics.FrameEffectJournal RollbackState
-          (Solcore.Semantics.FrameTrace Event)}
+      Solcore.ContractRuntime.WorldState ×
+        Solcore.ContractRuntime.FrameEffectJournal RollbackState
+          (Solcore.ContractRuntime.FrameTrace Event)}
     (initialization :
-      Solcore.Semantics.ParentIndexedFrameInitialization
+      Solcore.ContractRuntime.ParentIndexedFrameInitialization
         RollbackState Event parentWorking)
-    (storageAddress : Solcore.Semantics.Address)
-    (account : Solcore.Semantics.Account)
+    (storageAddress : Solcore.ContractRuntime.Address)
+    (account : Solcore.ContractRuntime.Account)
     (present :
       initialization.initialWorld.account? storageAddress = some account) :
     initialization.toCheckpointedWorkingPairWithPresentStorageAccount?
@@ -46,20 +46,20 @@ private example
           account,
           present⟩ := by
   exact
-    Solcore.Semantics.ParentIndexedFrameInitialization.toCheckpointedWorkingPairWithPresentStorageAccount?_of_present
+    Solcore.ContractRuntime.ParentIndexedFrameInitialization.toCheckpointedWorkingPairWithPresentStorageAccount?_of_present
       initialization storageAddress account present
 
 private example
     {RollbackState Event : Type}
     {parentWorking :
-      Solcore.Semantics.WorldState ×
-        Solcore.Semantics.FrameEffectJournal RollbackState
-          (Solcore.Semantics.FrameTrace Event)}
+      Solcore.ContractRuntime.WorldState ×
+        Solcore.ContractRuntime.FrameEffectJournal RollbackState
+          (Solcore.ContractRuntime.FrameTrace Event)}
     (initialization :
-      Solcore.Semantics.ParentIndexedFrameInitialization
+      Solcore.ContractRuntime.ParentIndexedFrameInitialization
         RollbackState Event parentWorking)
-    (storageAddress : Solcore.Semantics.Address)
-    (account : Solcore.Semantics.Account)
+    (storageAddress : Solcore.ContractRuntime.Address)
+    (account : Solcore.ContractRuntime.Account)
     (present :
       initialization.initialWorld.account? storageAddress = some account)
     (slot value : Solcore.Core.Word) :
@@ -69,11 +69,11 @@ private example
           (context.writeStorage slot value).readStorage slot) =
       some value := by
   rw [
-    Solcore.Semantics.ParentIndexedFrameInitialization.toCheckpointedWorkingPairWithPresentStorageAccount?_of_present
+    Solcore.ContractRuntime.ParentIndexedFrameInitialization.toCheckpointedWorkingPairWithPresentStorageAccount?_of_present
       initialization storageAddress account present]
   exact
     congrArg some
-      (Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount.readStorage_writeStorage_same
+      (Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount.readStorage_writeStorage_same
         ⟨initialization.toCheckpointedWorkingPairWithStorageAddress
             storageAddress,
           account,

@@ -1,5 +1,5 @@
-import Solcore.Semantics.AccountCodeProperties
-import Solcore.Semantics.TopLevelExecutionResumption
+import Solcore.ContractRuntime.AccountCodeProperties
+import Solcore.ContractRuntime.TopLevelExecutionResumption
 
 /-! Checked root fixture for executable transaction-log finalization. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.Adr0149TopLevelLogsFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def targetAddress : Address := ⟨0x1490, by decide⟩
 def callerAddress : Address := ⟨0x1491, by decide⟩

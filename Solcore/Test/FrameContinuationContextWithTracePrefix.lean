@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameContinuationContextWithTracePrefix
+import Solcore.ContractRuntime.FrameContinuationContextWithTracePrefix
 
 /-! Definition-only regressions for frame contexts with trace-prefix evidence. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive ContextTraceEvent where
   | entered

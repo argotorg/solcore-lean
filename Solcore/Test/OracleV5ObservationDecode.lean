@@ -8,7 +8,7 @@ namespace Tests.OracleV5ObservationDecode
 
 open Solcore.Oracle.V5
 open Solcore.Oracle.V5.Wire
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def addressOne : Address := ⟨1, by decide⟩
 private def addressTwo : Address := ⟨2, by decide⟩

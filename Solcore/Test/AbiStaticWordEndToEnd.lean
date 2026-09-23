@@ -1,5 +1,5 @@
 import Solcore.Test.AbiStaticWordEndToEndFixture
-import Solcore.Semantics.BalancedTopLevelExecutionProperties
+import Solcore.ContractRuntime.BalancedTopLevelExecutionProperties
 
 /-! Executable vertical checks for Static Word ABI routing and finalization. -/
 
@@ -8,9 +8,9 @@ set_option autoImplicit false
 namespace Tests.AbiStaticWordEndToEnd
 
 open Solcore.Core
-open Solcore.Semantics
-open Solcore.Semantics.BalancedTopLevelExecution
-open Solcore.Semantics.OneLevelNestedExecution
+open Solcore.ContractRuntime
+open Solcore.ContractRuntime.BalancedTopLevelExecution
+open Solcore.ContractRuntime.OneLevelNestedExecution
 open Solcore.Abi.V1
 open Tests.AbiStaticWordEndToEndFixture
 

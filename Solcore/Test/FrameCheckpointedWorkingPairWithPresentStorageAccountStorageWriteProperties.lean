@@ -1,5 +1,5 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteProperties
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountProperties
 
 /-! Compile-only regressions for proven-present total-write coherence. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private example
     {RollbackState TraceState : Type}

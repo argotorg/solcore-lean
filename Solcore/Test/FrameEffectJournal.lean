@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameEffectJournal
+import Solcore.ContractRuntime.FrameEffectJournal
 
 /-! Executable tests for rollback-scoped and surviving effect snapshots. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive JournalTrapReason where
   | invalidOperation

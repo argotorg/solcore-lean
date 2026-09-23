@@ -8,7 +8,7 @@ namespace Tests.CoreV3SynthesisCase
 
 open Solcore.Core.Wire
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Solcore.Synthesis.CoreV3
 
 private def generation : GenerationRequest := {

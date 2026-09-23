@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameRunEffectResolution
+import Solcore.ContractRuntime.FrameRunEffectResolution
 
 /-! Executable tests for synchronized frame state and effect resolution. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive RunEffectTrapReason where
   | invalidOperation

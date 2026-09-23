@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Solcore.Abi.V1
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- The only external value type admitted by the first ABI profile. -/
 inductive SupportedType where

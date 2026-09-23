@@ -1,4 +1,4 @@
-import Solcore.Semantics.BalancedTopLevelExecutionProperties
+import Solcore.ContractRuntime.BalancedTopLevelExecutionProperties
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! Actual checked-Core worlds for balance-aware top-level execution tests. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.Adr0147BalancedTopLevelExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Tests.TopLevelExecutionFixture
 
 def zero : Word := Word.zero

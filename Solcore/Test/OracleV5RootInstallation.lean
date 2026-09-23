@@ -9,7 +9,7 @@ namespace Tests.OracleV5RootInstallation
 open Solcore.Core.Wire
 open Solcore.Oracle.V5
 open Solcore.Oracle.V5.ContractAdmission
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def zero : Solcore.Core.Word := ⟨0, by decide⟩
 private def one : Solcore.Core.Word := ⟨1, by decide⟩

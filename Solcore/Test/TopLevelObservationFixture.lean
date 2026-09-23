@@ -1,6 +1,6 @@
-import Solcore.Semantics.AccountCodeProperties
-import Solcore.Semantics.TopLevelExecution
-import Solcore.Semantics.WorldStateProperties
+import Solcore.ContractRuntime.AccountCodeProperties
+import Solcore.ContractRuntime.TopLevelExecution
+import Solcore.ContractRuntime.WorldStateProperties
 
 /-! Read-only checked program observing every direct top-level address/input role. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests.TopLevelObservationFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def targetAddress : Address := ⟨0x10, by decide⟩
 def alternateTargetAddress : Address := ⟨0x11, by decide⟩

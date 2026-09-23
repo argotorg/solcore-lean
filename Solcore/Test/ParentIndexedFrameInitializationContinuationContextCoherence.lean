@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationContinuationContextCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationContinuationContextCoherenceProperties
 
 /-! Compile-only regressions for initialization continuation-context coherence. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x
 

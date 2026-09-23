@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteAlgebraProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteAlgebraProperties
 
 /-! Compile-only regressions for proven-present total write algebra. -/
 
@@ -9,19 +9,19 @@ namespace Tests
 private example
     {RollbackState TraceState : Type}
     (context :
-      Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount
+      Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
         RollbackState TraceState)
     (slot first second : Solcore.Core.Word) :
     (context.writeStorage slot first).writeStorage slot second =
       context.writeStorage slot second := by
   exact
-    Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount.writeStorage_overwrite
+    Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount.writeStorage_overwrite
       context slot first second
 
 private example
     {RollbackState TraceState : Type}
     (context :
-      Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount
+      Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
         RollbackState TraceState)
     (leftSlot leftValue rightSlot rightValue : Solcore.Core.Word)
     (different : leftSlot ≠ rightSlot) :
@@ -30,7 +30,7 @@ private example
       (context.writeStorage rightSlot rightValue).writeStorage
         leftSlot leftValue := by
   exact
-    Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount.writeStorage_commute_slots
+    Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount.writeStorage_commute_slots
       context leftSlot leftValue rightSlot rightValue different
 
 end Tests

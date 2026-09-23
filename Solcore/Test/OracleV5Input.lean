@@ -9,7 +9,7 @@ namespace Tests
 open Solcore.Core
 open Solcore.Core.Wire
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def requestId : RequestId := ⟨"request", by decide⟩
 private def address0 : Address := ⟨0, by decide⟩

@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- Encode one runtime address with its exact 160-bit lowercase spelling. -/
 def encodeAddress (address : Address) : Lean.Json :=

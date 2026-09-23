@@ -1,5 +1,5 @@
-import Solcore.Semantics.AddressBytesBE
-import Solcore.Semantics.AddressWordBridge
+import Solcore.ContractRuntime.AddressBytesBE
+import Solcore.ContractRuntime.AddressWordBridge
 
 /-! Executable boundary tests for exact 20-byte big-endian addresses. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

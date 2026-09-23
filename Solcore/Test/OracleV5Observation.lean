@@ -9,7 +9,7 @@ namespace Tests.OracleV5Observation
 
 open Solcore.Core
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Tests.Adr0147BalancedTopLevelExecutionFixture
 open Tests.TopLevelExecutionFixture
 

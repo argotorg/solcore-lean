@@ -1,5 +1,5 @@
 import Solcore.Core.Primitive
-import Solcore.Semantics.TransactionJournalProperties
+import Solcore.ContractRuntime.TransactionJournalProperties
 
 /-! Executable tests for ordered rollback-scoped transaction observations. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

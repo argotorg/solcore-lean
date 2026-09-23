@@ -1,5 +1,5 @@
-import Solcore.Semantics.BalanceTransfer
-import Solcore.Semantics.WorldStateDeltaProperties
+import Solcore.ContractRuntime.BalanceTransfer
+import Solcore.ContractRuntime.WorldStateDeltaProperties
 
 /-! External consumers and runtime checks for balance delta observations. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 example := WorldStateDelta.balanceEndpoints_exact
 example := WorldStateDelta.balanceEndpoints_identity

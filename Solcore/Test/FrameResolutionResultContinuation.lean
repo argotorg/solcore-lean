@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameResolutionResultContinuation
+import Solcore.ContractRuntime.FrameResolutionResultContinuation
 
 /-! Executable branch and payload tests for frame resolution continuation. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive Reason where
   | marker

@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Solcore.Abi.V1
 
 private def name (text : String) (valid : isValidMethodName text = true) :

@@ -1,4 +1,4 @@
-import Solcore.Semantics.SelectedCheckedWordExecutionResumptionProperties
+import Solcore.ContractRuntime.SelectedCheckedWordExecutionResumptionProperties
 import Solcore.Test.CheckedHostCoreWordProgramExecutionFixture
 
 /-! Shared absent, non-Word, and measured Word selected-execution fixtures. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.SelectedCheckedWordExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open ParentIndexedSelectedExecutionFixture
 open CheckedHostCoreWordProgramExecutionFixture
 

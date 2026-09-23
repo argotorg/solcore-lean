@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationSelectedExecutionResumptionProperties
-import Solcore.Semantics.ParentIndexedSelectedExecutionFoldCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationSelectedExecutionResumptionProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecutionFoldCoherenceProperties
 
 /-! Compile-only consumers for branch-complete selected execution laws. -/
 
@@ -7,8 +7,8 @@ set_option autoImplicit false
 
 namespace Solcore.Test.ParentIndexedSelectedExecutionProperties
 
-open Semantics
-open Semantics.ParentIndexedSelectedExecutionResult
+open ContractRuntime
+open ContractRuntime.ParentIndexedSelectedExecutionResult
 
 universe u v w x
 

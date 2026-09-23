@@ -1,4 +1,4 @@
-import Solcore.Semantics.BalanceTransferInstallationProperties
+import Solcore.ContractRuntime.BalanceTransferInstallationProperties
 
 /-! External compile consumer for balance-transfer installation transport. -/
 
@@ -6,6 +6,6 @@ set_option autoImplicit false
 
 namespace Tests.BalanceTransferInstallationExternalProperties
 
-example := @Solcore.Semantics.WorldState.transferBalance_preserves_installed
+example := @Solcore.ContractRuntime.WorldState.transferBalance_preserves_installed
 
 end Tests.BalanceTransferInstallationExternalProperties

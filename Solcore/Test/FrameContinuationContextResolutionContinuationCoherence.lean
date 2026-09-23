@@ -1,5 +1,5 @@
-import Solcore.Semantics.FrameContinuationContextResolutionContinuationCoherenceProperties
-import Solcore.Semantics.FrameContinuationContextContinueTrapReasonMapProperties
+import Solcore.ContractRuntime.FrameContinuationContextResolutionContinuationCoherenceProperties
+import Solcore.ContractRuntime.FrameContinuationContextContinueTrapReasonMapProperties
 
 /-! Compile-only regressions for branch/byte erasure coherence. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x y
 

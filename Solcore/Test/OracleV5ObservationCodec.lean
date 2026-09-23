@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests.OracleV5ObservationCodec
 
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def addressOne : Address := ⟨1, by decide⟩
 private def addressTwo : Address := ⟨2, by decide⟩

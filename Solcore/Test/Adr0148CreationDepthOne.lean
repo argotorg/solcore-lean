@@ -1,5 +1,5 @@
-import Solcore.Semantics.OneLevelNestedExecutionProperties
-import Solcore.Semantics.WorldStateDeltaProperties
+import Solcore.ContractRuntime.OneLevelNestedExecutionProperties
+import Solcore.ContractRuntime.WorldStateDeltaProperties
 import Solcore.Test.Adr0148CreationEndToEndFixture
 
 /-! E2E depth-one rejection inside a checked contract initializer. -/
@@ -9,8 +9,8 @@ set_option autoImplicit false
 namespace Tests.Adr0148CreationDepthOne
 
 open Solcore.Core
-open Solcore.Semantics
-open Solcore.Semantics.OneLevelNestedExecution
+open Solcore.ContractRuntime
+open Solcore.ContractRuntime.OneLevelNestedExecution
 open Tests.Adr0148CreationEndToEndFixture
 
 def callDepthSlot : Word := ⟨0x201, by decide⟩

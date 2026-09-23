@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameResolutionResultContinueTrapReasonMapProperties
+import Solcore.ContractRuntime.FrameResolutionResultContinueTrapReasonMapProperties
 
 /-! Compile-only regressions for result-continuation reason-map invariance. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x y z
 

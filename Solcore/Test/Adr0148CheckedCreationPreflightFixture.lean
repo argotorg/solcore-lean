@@ -1,4 +1,4 @@
-import Solcore.Semantics.CheckedCreationPreflightFailureProperties
+import Solcore.ContractRuntime.CheckedCreationPreflightFailureProperties
 
 /-! Explicit creation environment and checked contracts for preflight tests. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests.Adr0148CheckedCreationPreflightFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def creator : Address := ⟨0x1580, by decide⟩
 def created : Address := ⟨0x1581, by decide⟩

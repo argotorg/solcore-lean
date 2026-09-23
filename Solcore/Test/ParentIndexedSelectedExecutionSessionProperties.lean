@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedSelectedExecutionSessionFoldProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecutionSessionFoldProperties
 
 /-! Compile-only consumers for certified selected-session proof contracts. -/
 
@@ -6,8 +6,8 @@ set_option autoImplicit false
 
 namespace Solcore.Test.ParentIndexedSelectedExecutionSessionProperties
 
-open Semantics
-open Semantics.ParentIndexedSelectedExecutionResult
+open ContractRuntime
+open ContractRuntime.ParentIndexedSelectedExecutionResult
 
 universe u v w x
 

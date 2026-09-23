@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedFrameTrapPropagationPayloadCoherenceProperties
-import Solcore.Semantics.ParentIndexedFrameContinuationConstruction
+import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayloadCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedFrameContinuationConstruction
 
 /-! Compile regressions for parent-indexed trap payload coherence. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive TrapPayloadCoherenceEvent where
   | parent

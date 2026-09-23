@@ -3,7 +3,7 @@ import Solcore.Test.ParentIndexedSelectedExecutionFixture
 set_option autoImplicit false
 namespace Tests.CurrentAddressExecutionFixture
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def codeAddress : Address := ⟨0x10, by decide⟩
 def storageAddress : Address := ⟨0x20, by decide⟩

@@ -1,4 +1,4 @@
-import Solcore.Semantics.OneLevelNestedCreationCompletion
+import Solcore.ContractRuntime.OneLevelNestedCreationCompletion
 import Solcore.Test.Adr0148CheckedCreationPreflightFixture
 import Solcore.Test.OneLevelNestedExecutionFixture
 
@@ -9,8 +9,8 @@ set_option autoImplicit false
 namespace Tests.Adr0148NestedCreationLifecycleFixture
 
 open Solcore.Core
-open Solcore.Semantics
-open Solcore.Semantics.OneLevelNestedExecution
+open Solcore.ContractRuntime
+open Solcore.ContractRuntime.OneLevelNestedExecution
 open Tests.OneLevelNestedExecutionFixture
 open Tests.Adr0148CheckedCreationPreflightFixture
 

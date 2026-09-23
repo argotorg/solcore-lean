@@ -1,4 +1,4 @@
-import Solcore.Semantics.OneLevelNestedExecutionResumptionProperties
+import Solcore.ContractRuntime.OneLevelNestedExecutionResumptionProperties
 import Solcore.Test.Adr0148CreationEndToEndFixture
 
 /-! Shared-fuel and exact-resumption regressions for checked creation. -/
@@ -8,8 +8,8 @@ set_option autoImplicit false
 namespace Tests.Adr0148CreationResumption
 
 open Solcore.Core
-open Solcore.Semantics
-open Solcore.Semantics.OneLevelNestedExecution
+open Solcore.ContractRuntime
+open Solcore.ContractRuntime.OneLevelNestedExecution
 open Adr0148CreationEndToEndFixture
 
 def scenario (fuel : Nat) :

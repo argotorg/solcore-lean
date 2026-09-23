@@ -1,4 +1,4 @@
-import Solcore.Semantics.OneLevelNestedExecutionResumption
+import Solcore.ContractRuntime.OneLevelNestedExecutionResumption
 import Solcore.Test.Adr0148CreationEndToEndFixture
 
 /-! Checked creation programs with logs on both sides of the initializer. -/
@@ -8,8 +8,8 @@ set_option autoImplicit false
 namespace Tests.Adr0149CreationLogExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
-open Solcore.Semantics.OneLevelNestedExecution
+open Solcore.ContractRuntime
+open Solcore.ContractRuntime.OneLevelNestedExecution
 open Adr0148CreationEndToEndFixture
 
 def rootTopicBefore : Word := ⟨0x14910, by decide⟩

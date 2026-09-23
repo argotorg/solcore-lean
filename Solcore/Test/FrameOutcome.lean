@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameOutcome
+import Solcore.ContractRuntime.FrameOutcome
 
 /-! Executable boundary tests for internal contract-frame halt outcomes. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive TestTrapReason where
   | invalidOperation

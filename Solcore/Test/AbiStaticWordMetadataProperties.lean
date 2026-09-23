@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Abi.V1
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private theorem compileTimeKeccakWidth (input : Bytes) :
     (Keccak256.hash input).size = 32 :=

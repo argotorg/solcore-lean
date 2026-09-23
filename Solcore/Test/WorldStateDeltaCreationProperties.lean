@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDeltaProperties
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! External consumers and executable creation-delta checks. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open TopLevelExecutionFixture
 
 example := WorldStateDelta.nonceEndpoints_exact

@@ -1,4 +1,4 @@
-import Solcore.Semantics.OneLevelNestedExecutionResumption
+import Solcore.ContractRuntime.OneLevelNestedExecutionResumption
 
 /-! Executable root/child fixtures for rollback-scoped word logs. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests.Adr0149NestedLogExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def rootAddress : Address := ⟨0x1490, by decide⟩
 def childAddress : Address := ⟨0x1491, by decide⟩

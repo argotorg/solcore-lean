@@ -1,5 +1,5 @@
-import Solcore.Semantics.CheckedHostCoreWordProgramExecutionProperties
-import Solcore.Semantics.CheckedHostCoreWordProgramProperties
+import Solcore.ContractRuntime.CheckedHostCoreWordProgramExecutionProperties
+import Solcore.ContractRuntime.CheckedHostCoreWordProgramProperties
 
 /-! Compile-only consumers for checked Word returned-frame proof contracts. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Solcore.Test.WordReturnedFrameCompletionProperties
 
-open Semantics
+open ContractRuntime
 
 universe u v w
 

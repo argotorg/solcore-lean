@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedSelectedExecutionSessionFoldProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecutionSessionFoldProperties
 import Solcore.Test.ParentIndexedSelectedExecutionFixture
 
 /-! Executable regressions for proof-refined selected execution sessions. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open ParentIndexedSelectedExecutionFixture
 
 namespace ParentIndexedSelectedExecutionSessionTest

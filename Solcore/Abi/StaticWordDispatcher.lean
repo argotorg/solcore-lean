@@ -1,6 +1,6 @@
 import Solcore.Abi.StaticWordMethodTable
 import Solcore.Core.RenamingSyntax
-import Solcore.Semantics.CheckedCoreContract
+import Solcore.ContractRuntime.CheckedCoreContract
 
 /-! Checked Core dispatchers for validated Static Word ABI method tables. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Solcore.Abi.V1
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- Calldata shorter than one selector and one static word is malformed. -/
 def minimumCallDataSize : Word := ⟨36, by decide⟩

@@ -1,6 +1,6 @@
-import Solcore.Semantics.FrameResolutionResultContinuationProperties
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
-import Solcore.Semantics.ParentIndexedFrameResolutionViewProperties
+import Solcore.ContractRuntime.FrameResolutionResultContinuationProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionViewProperties
 
 /-! Compile-only consumers of the parent-indexed resolution view. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x
 

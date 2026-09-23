@@ -1,5 +1,5 @@
 import Solcore.Abi.StaticWordMetadata
-import Solcore.Semantics.RuntimeScalars.WordBytesProperties
+import Solcore.ContractRuntime.RuntimeScalars.WordBytesProperties
 
 /-! Exact calldata and returndata codecs for the Static Word ABI profile. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Solcore.Abi.V1
 
 open Solcore.Foundation
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- A decoded `uint256 -> uint256` call, before selector admission. -/
 structure StaticWordCall where

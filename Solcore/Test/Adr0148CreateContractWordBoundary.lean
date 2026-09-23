@@ -1,9 +1,9 @@
 import Solcore.Core.HostProgress
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
-import Solcore.Semantics.ContractCallFailureProperties
-import Solcore.Semantics.ContractWordCallInput
-import Solcore.Semantics.HostStorageHandler
+import Solcore.ContractRuntime.ContractCallFailureProperties
+import Solcore.ContractRuntime.ContractWordCallInput
+import Solcore.ContractRuntime.HostStorageHandler
 
 /-! Executable and external checks for the append-only creation host boundary. -/
 
@@ -12,7 +12,7 @@ set_option autoImplicit false
 namespace Tests.Adr0148CreateContractWordBoundary
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

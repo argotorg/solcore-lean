@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateUpdateAlgebraProperties
+import Solcore.ContractRuntime.WorldStateUpdateAlgebraProperties
 
 /-! Compile-time and executable regressions for WorldState update algebra. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private theorem compileTimeExtRegression_account
     {left right : Account}

@@ -1,7 +1,7 @@
 import Solcore.Core.ContractCallWordResultProperties
-import Solcore.Semantics.ContractCallFailureProperties
-import Solcore.Semantics.ContractWordCallInput
-import Solcore.Semantics.HostStorageHandler
+import Solcore.ContractRuntime.ContractCallFailureProperties
+import Solcore.ContractRuntime.ContractWordCallInput
+import Solcore.ContractRuntime.HostStorageHandler
 
 /-! Focused regressions for the low-level checked contract-word call boundary. -/
 
@@ -10,7 +10,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

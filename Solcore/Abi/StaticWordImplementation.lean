@@ -1,4 +1,4 @@
-import Solcore.Semantics.CheckedHostCoreProgram
+import Solcore.ContractRuntime.CheckedHostCoreProgram
 
 /-! Proof-carrying checked implementations for the Static Word ABI profile. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Solcore.Abi.V1
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- Checker-accepted method code with the exact `uint256 -> uint256` Core shape.
 The first ABI profile deliberately excludes named-data definitions. -/

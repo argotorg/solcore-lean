@@ -1,6 +1,6 @@
-import Solcore.Semantics.AccountCodeProperties
-import Solcore.Semantics.CheckedCoreProgramHostPromotion
-import Solcore.Semantics.WorldStateCodeProperties
+import Solcore.ContractRuntime.AccountCodeProperties
+import Solcore.ContractRuntime.CheckedCoreProgramHostPromotion
+import Solcore.ContractRuntime.WorldStateCodeProperties
 
 /-! Runtime and direct-law regressions for address-selected host code. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

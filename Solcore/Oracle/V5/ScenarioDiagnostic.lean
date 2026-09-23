@@ -1,7 +1,7 @@
 import Solcore.Oracle.V5.ContractAdmissionDiagnostic
 import Solcore.Oracle.V5.RootInstallation
 import Solcore.Oracle.V5.ScenarioPreparation
-import Solcore.Semantics.RuntimeScalars.TextProperties
+import Solcore.ContractRuntime.RuntimeScalars.TextProperties
 
 /-! Canonical Oracle v5 diagnostics for scenario preparation. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5.ScenarioDiagnostic
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def diagnostic
     (phase : Phase)

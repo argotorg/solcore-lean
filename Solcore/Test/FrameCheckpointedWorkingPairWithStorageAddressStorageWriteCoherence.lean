@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddressStorageWriteCoherenceProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddressStorageWriteCoherenceProperties
 
 /-! Compile-only regressions for retained-address write values coherence. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private example
     {RollbackState TraceState : Type}

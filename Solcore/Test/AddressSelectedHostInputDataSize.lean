@@ -1,5 +1,5 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionProperties
-import Solcore.Semantics.HostStorageDriverProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionProperties
+import Solcore.ContractRuntime.HostStorageDriverProperties
 
 /-! End-to-end regressions for exact run-fixed input-size observation. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

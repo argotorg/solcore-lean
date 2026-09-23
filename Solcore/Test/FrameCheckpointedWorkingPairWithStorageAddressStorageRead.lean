@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddressStorageRead
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddressStorageRead
 
 /-! Runtime regressions for address-bound working storage reads. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

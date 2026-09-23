@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameTrace
+import Solcore.ContractRuntime.FrameTrace
 
 /-! Executable tests for finite chronological frame traces. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive TraceEvent where
   | entered

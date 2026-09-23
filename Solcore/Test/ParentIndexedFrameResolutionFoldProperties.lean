@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
-import Solcore.Semantics.ParentIndexedFrameResolutionFoldProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionFoldProperties
 
 /-! Compile-only consumers of parent-indexed resolution-fold laws. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x
 

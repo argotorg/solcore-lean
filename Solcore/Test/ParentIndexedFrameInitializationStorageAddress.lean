@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationStorageAddressProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationStorageAddressProperties
 
 /-! Compile-only regressions for storage-address initialization wiring. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private example
     {RollbackState Event : Type}

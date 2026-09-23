@@ -1,5 +1,5 @@
-import Solcore.Semantics.FrameResolutionResultContinueTrapReasonMapProperties
-import Solcore.Semantics.ParentIndexedFrameResolutionViewTrapReasonMapProperties
+import Solcore.ContractRuntime.FrameResolutionResultContinueTrapReasonMapProperties
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionViewTrapReasonMapProperties
 
 /-! Compile-only consumers of resolution-view reason-mapping naturality. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x y z
 

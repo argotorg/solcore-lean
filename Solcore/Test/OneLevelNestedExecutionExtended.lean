@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDeltaProperties
 import Solcore.Test.OneLevelNestedExecutionFixture
 
 /-! Extended executable regressions for the depth-one nested scheduler. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open OneLevelNestedExecutionFixture
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do

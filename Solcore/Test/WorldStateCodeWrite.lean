@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateCodeWriteProperties
+import Solcore.ContractRuntime.WorldStateCodeWriteProperties
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! External and executable checks for checked-code replacement. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open TopLevelExecutionFixture
 
 example := WorldState.writeCode?_of_absent

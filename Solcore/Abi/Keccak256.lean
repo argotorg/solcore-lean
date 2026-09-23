@@ -1,4 +1,4 @@
-import Solcore.Semantics.RuntimeScalars
+import Solcore.ContractRuntime.RuntimeScalars
 
 /-! Ethereum-compatible Keccak-256 over runtime bytes. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Solcore.Abi.V1.Keccak256
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private abbrev State := Array UInt64
 

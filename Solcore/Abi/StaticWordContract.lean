@@ -1,6 +1,6 @@
 import Solcore.Abi.StaticWordCodec
 import Solcore.Abi.StaticWordDispatcher
-import Solcore.Semantics.BalancedTopLevelExecution
+import Solcore.ContractRuntime.BalancedTopLevelExecution
 
 /-! Admission and balanced top-level execution for Static Word ABI contracts. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Solcore.Abi.V1
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /--
 A validated Static Word method table paired with exactly the checked dispatcher

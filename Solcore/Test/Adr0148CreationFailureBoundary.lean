@@ -1,4 +1,4 @@
-import Solcore.Semantics.CheckedCreationPreflightFailureProperties
+import Solcore.ContractRuntime.CheckedCreationPreflightFailureProperties
 
 /-! External and executable checks for stable creation failure codes. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests.Adr0148CreationFailureBoundary
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 example := CheckedCreationPreflightFailure.unavailable_code
 example := CheckedCreationPreflightFailure.nonceOverflow_code

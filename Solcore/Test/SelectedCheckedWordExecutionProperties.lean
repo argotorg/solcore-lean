@@ -1,4 +1,4 @@
-import Solcore.Semantics.SelectedCheckedWordExecutionResumptionProperties
+import Solcore.ContractRuntime.SelectedCheckedWordExecutionResumptionProperties
 
 /-! Compile-only consumers for the public ADR-0143 proof contract. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Solcore.Test.SelectedCheckedWordExecutionProperties
 
-open Semantics
+open ContractRuntime
 open SelectedCheckedWordExecution
 
 universe u v

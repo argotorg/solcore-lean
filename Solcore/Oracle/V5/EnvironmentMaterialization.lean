@@ -1,5 +1,5 @@
 import Solcore.Oracle.V5.Input
-import Solcore.Semantics.ExecutionEnvironment
+import Solcore.ContractRuntime.ExecutionEnvironment
 
 /-! Canonical validation and materialization of the Oracle v5 environment. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- Closed semantic failures produced by immutable-environment validation. -/
 inductive EnvironmentMaterializationError where

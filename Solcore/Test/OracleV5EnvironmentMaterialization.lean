@@ -8,7 +8,7 @@ namespace Tests
 
 open Solcore.Core
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def addressA : Address := ⟨1, by decide⟩
 private def addressB : Address := ⟨2, by decide⟩

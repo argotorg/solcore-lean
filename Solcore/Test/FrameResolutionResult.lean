@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameResolutionResult
+import Solcore.ContractRuntime.FrameResolutionResult
 
 /-! Executable tests for total frame resolution. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive ResolutionReason where
   | marker

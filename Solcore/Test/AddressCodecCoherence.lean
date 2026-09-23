@@ -1,5 +1,5 @@
-import Solcore.Semantics.RuntimeScalars
-import Solcore.Semantics.AddressBytesBE
+import Solcore.ContractRuntime.RuntimeScalars
+import Solcore.ContractRuntime.AddressBytesBE
 
 /-! Executable coherence tests for canonical address text and exact bytes. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

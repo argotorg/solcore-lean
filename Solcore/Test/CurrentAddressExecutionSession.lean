@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedSelectedExecutionSessionFoldProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecutionSessionFoldProperties
 import Solcore.Test.CurrentAddressExecutionFixture
 
 /-! Fixed-input session regressions for the current-address execution path. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.CurrentAddressExecutionSession
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open CurrentAddressExecutionFixture
 
 abbrev Session := ParentIndexedSelectedExecutionSession

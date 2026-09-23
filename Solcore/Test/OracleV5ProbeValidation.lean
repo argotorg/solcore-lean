@@ -8,7 +8,7 @@ namespace Tests.OracleV5ProbeValidation
 
 open Solcore.Core
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def first : Address := ⟨1, by decide⟩
 private def second : Address := ⟨2, by decide⟩

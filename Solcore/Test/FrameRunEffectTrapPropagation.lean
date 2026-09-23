@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameRunEffectResolution
+import Solcore.ContractRuntime.FrameRunEffectResolution
 
 /-! Executable test for unresolved trap propagation through Option bind. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive TrapPropagationReason where
   | fault

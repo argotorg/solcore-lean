@@ -1,6 +1,6 @@
-import Solcore.Semantics.ExecutionEnvironment
-import Solcore.Semantics.CheckedCoreWordOutcome
-import Solcore.Semantics.ContractWordCallInput
+import Solcore.ContractRuntime.ExecutionEnvironment
+import Solcore.ContractRuntime.CheckedCoreWordOutcome
+import Solcore.ContractRuntime.ContractWordCallInput
 
 /-! Reusable checked programs and explicit state for creation E2E tests. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests.Adr0148CreationEndToEndFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def creator : Address := ⟨0x2480, by decide⟩
 def created : Address := ⟨0x2481, by decide⟩

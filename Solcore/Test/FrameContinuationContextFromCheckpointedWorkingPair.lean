@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameContinuationContextFromCheckpointedWorkingPair
+import Solcore.ContractRuntime.FrameContinuationContextFromCheckpointedWorkingPair
 
 /-! Definition-only compile regressions for continuation-context construction. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w
 

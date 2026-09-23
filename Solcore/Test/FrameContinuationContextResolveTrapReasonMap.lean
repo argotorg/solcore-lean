@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameContinuationContextResolveTrapReasonMapProperties
+import Solcore.ContractRuntime.FrameContinuationContextResolveTrapReasonMapProperties
 
 /-! Compile-only regressions for resolution naturality. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x y
 

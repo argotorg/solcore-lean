@@ -1,6 +1,6 @@
-import Solcore.Semantics.ParentIndexedFrameResolutionFoldProperties
-import Solcore.Semantics.ParentIndexedFrameResolutionFoldTrapReasonMapProperties
-import Solcore.Semantics.ParentIndexedFrameResolutionViewTrapReasonMapProperties
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionFoldProperties
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionFoldTrapReasonMapProperties
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionViewTrapReasonMapProperties
 
 /-! Compile-only consumers of resolution-fold reason-mapping naturality. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x y z
 

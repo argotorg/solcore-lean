@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests.OracleV5ObservationValidity
 
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def address : Address := ⟨1, by decide⟩
 private def zero : Solcore.Core.Word := ⟨0, by decide⟩

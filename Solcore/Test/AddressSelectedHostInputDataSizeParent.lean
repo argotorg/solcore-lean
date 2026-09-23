@@ -1,6 +1,6 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
-import Solcore.Semantics.ParentIndexedFrameResolutionFoldProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionFoldProperties
 
 /-! Parent-indexed completion of input-size-derived selected-storage execution. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

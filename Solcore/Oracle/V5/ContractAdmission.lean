@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Solcore.Oracle.V5
 
 open Solcore.Core.Wire
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- The exact location of a Core checker failure inside a contract package. -/
 inductive ContractProgramSite where

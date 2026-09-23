@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Solcore.Abi.V1
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 theorem validateMethodName?_isSome_iff (text : String) :
     (validateMethodName? text).isSome ↔ isValidMethodName text = true := by

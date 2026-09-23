@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationProperties
 
 /-! Compile-only regressions for parent-indexed frame initialization. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private example
     {RollbackState Event : Type}

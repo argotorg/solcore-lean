@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPair
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPair
 
 /-! Definition-only compile regressions for checkpointed working pairs. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v
 

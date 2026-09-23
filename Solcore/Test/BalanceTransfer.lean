@@ -1,5 +1,5 @@
 import Solcore.Core.Primitive
-import Solcore.Semantics.BalanceTransfer
+import Solcore.ContractRuntime.BalanceTransfer
 
 /-! Executable boundary tests for checked balance transfer. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

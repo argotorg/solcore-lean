@@ -3,7 +3,7 @@ import Solcore.Core.HostMachineProperties
 import Solcore.Core.HostRunner
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
-import Solcore.Semantics.CheckedHostCoreProgramProperties
+import Solcore.ContractRuntime.CheckedHostCoreProgramProperties
 
 /-! Focused admission and runtime regressions for the Core host boundary. -/
 
@@ -12,7 +12,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

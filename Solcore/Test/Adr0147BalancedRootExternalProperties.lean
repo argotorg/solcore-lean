@@ -1,5 +1,5 @@
-import Solcore.Semantics.OneLevelNestedExecutionBalancedRootProperties
-import Solcore.Semantics.OneLevelNestedExecutionReachability
+import Solcore.ContractRuntime.OneLevelNestedExecutionBalancedRootProperties
+import Solcore.ContractRuntime.OneLevelNestedExecutionReachability
 
 /-! External compile consumers for post-transfer root initialization laws. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open OneLevelNestedExecution
 
 variable {checkpointWorld workingWorld : WorldState}

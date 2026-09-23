@@ -1,6 +1,6 @@
 import Solcore.Abi.StaticWordMetadata
 import Solcore.Oracle.V5.Diagnostic
-import Solcore.Semantics.RuntimeScalars.TextProperties
+import Solcore.ContractRuntime.RuntimeScalars.TextProperties
 
 /-! Closed execution-rejection diagnostic catalog. -/
 
@@ -11,10 +11,10 @@ namespace Solcore.Oracle.V5.Diagnostic
 open Catalog
 
 private def validAddressText (value : String) : Bool :=
-  (Solcore.Semantics.decodeAddressText? value).isSome
+  (Solcore.ContractRuntime.decodeAddressText? value).isSome
 
 private def validWordText (value : String) : Bool :=
-  (Solcore.Semantics.decodeWordText? value).isSome
+  (Solcore.ContractRuntime.decodeWordText? value).isSome
 
 private def validContractId (value : String) : Bool :=
   contractIdValid value
@@ -43,7 +43,7 @@ private def methodNameFromSignature?
 
 def selectorTextForSignature (signature : String) : String :=
   let selector := Solcore.Abi.V1.selectorFromSignatureBytes signature.toUTF8
-  ((Solcore.Semantics.encodeBytesText selector.encode).drop 2).toString
+  ((Solcore.ContractRuntime.encodeBytesText selector.encode).drop 2).toString
 
 /-- The two checked-Core entry result types published by Oracle v5. -/
 def entryResultTypeSupported : Solcore.Core.Wire.V3.Ty → Bool

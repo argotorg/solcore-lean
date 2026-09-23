@@ -1,4 +1,4 @@
-import Solcore.Semantics.OneLevelNestedExecutionResumptionProperties
+import Solcore.ContractRuntime.OneLevelNestedExecutionResumptionProperties
 import Solcore.Test.OneLevelNestedExecutionFixture
 
 /-! Executable and external-consumer regressions for nested resumption. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open OneLevelNestedExecutionFixture
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
@@ -135,7 +135,7 @@ end Tests
 
 namespace ExternalOneLevelNestedExecutionResumptionConsumer
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open OneLevelNestedExecution
 
 example

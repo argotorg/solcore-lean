@@ -1,4 +1,4 @@
-import Solcore.Semantics.ParentIndexedFrameResolutionFold
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionFold
 
 /-! Definition-only tests for the parent-indexed resolution fold. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive ResolutionFoldEvent where
   | parent

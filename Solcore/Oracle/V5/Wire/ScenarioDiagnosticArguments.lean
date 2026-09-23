@@ -82,7 +82,7 @@ private def decodeCoreTypeField
 private def decodeAddressField
     (path : Path)
     (json : Lean.Json)
-    (name : String) : DecodeResult Solcore.Semantics.Address := do
+    (name : String) : DecodeResult Solcore.ContractRuntime.Address := do
   decodeAddressAt (path.field name) (← requireField path json name)
 
 private def decodeWordField

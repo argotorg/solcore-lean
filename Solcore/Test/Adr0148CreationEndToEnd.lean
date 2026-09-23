@@ -1,5 +1,5 @@
-import Solcore.Semantics.OneLevelNestedExecutionProperties
-import Solcore.Semantics.WorldStateDeltaProperties
+import Solcore.ContractRuntime.OneLevelNestedExecutionProperties
+import Solcore.ContractRuntime.WorldStateDeltaProperties
 import Solcore.Test.Adr0148CreationEndToEndFixture
 
 /-! Executable checked-program regressions for the ADR-0148 lifecycle. -/
@@ -9,8 +9,8 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
-open Solcore.Semantics.OneLevelNestedExecution
+open Solcore.ContractRuntime
+open Solcore.ContractRuntime.OneLevelNestedExecution
 open Adr0148CreationEndToEndFixture
 
 private def fuel : Nat := 1024

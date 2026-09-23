@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointSnapshot
+import Solcore.ContractRuntime.FrameCheckpointSnapshot
 
 /-! Definition-only compile regressions for nominal checkpoint snapshots. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v
 

@@ -12,10 +12,10 @@ namespace Solcore.Synthesis.CoreV3
 private def requestId : Solcore.Oracle.V5.RequestId :=
   ⟨"g0", by decide⟩
 
-private def target : Solcore.Semantics.Address :=
+private def target : Solcore.ContractRuntime.Address :=
   ⟨1, by decide⟩
 
-private def caller : Solcore.Semantics.Address :=
+private def caller : Solcore.ContractRuntime.Address :=
   ⟨2, by decide⟩
 
 /-- Conservative public Program cap for cases using fixed default Oracle budgets. -/

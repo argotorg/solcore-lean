@@ -1,6 +1,6 @@
-import Solcore.Semantics.AccountCodeProperties
-import Solcore.Semantics.TopLevelExecution
-import Solcore.Semantics.WorldStateProperties
+import Solcore.ContractRuntime.AccountCodeProperties
+import Solcore.ContractRuntime.TopLevelExecution
+import Solcore.ContractRuntime.WorldStateProperties
 
 /-! Checked program and explicit-state fixture for ADR-0145 top-level execution. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests.TopLevelExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def targetAddress : Address := ⟨0x10, by decide⟩
 def callerAddress : Address := ⟨0x20, by decide⟩

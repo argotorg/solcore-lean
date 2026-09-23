@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteRefinementCoherenceProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteRefinementCoherenceProperties
 
 /-! Compile-only regressions for optional/total write re-refinement coherence. -/
 
@@ -9,35 +9,35 @@ namespace Tests
 private example
     {RollbackState TraceState : Type}
     (context :
-      Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount
+      Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
         RollbackState TraceState)
     (slot value : Solcore.Core.Word) :
     (context.context.writeStorage? slot value).bind
-        Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddress.withPresentStorageAccount? =
+        Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddress.withPresentStorageAccount? =
       some (context.writeStorage slot value) := by
   exact
-    Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount.context_writeStorage?_bind_withPresentStorageAccount?_eq_some_writeStorage
+    Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount.context_writeStorage?_bind_withPresentStorageAccount?_eq_some_writeStorage
       context slot value
 
 private example
     {RollbackState TraceState : Type}
     (context :
-      Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount
+      Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
         RollbackState TraceState)
     (firstSlot firstValue secondSlot secondValue : Solcore.Core.Word) :
     ((context.context.writeStorage? firstSlot firstValue).bind
-        Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddress.withPresentStorageAccount?).bind
+        Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddress.withPresentStorageAccount?).bind
         (fun next =>
           (next.context.writeStorage? secondSlot secondValue).bind
-            Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddress.withPresentStorageAccount?) =
+            Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddress.withPresentStorageAccount?) =
       some
         ((context.writeStorage firstSlot firstValue).writeStorage
           secondSlot secondValue) := by
   rw [
-    Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount.context_writeStorage?_bind_withPresentStorageAccount?_eq_some_writeStorage
+    Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount.context_writeStorage?_bind_withPresentStorageAccount?_eq_some_writeStorage
       context firstSlot firstValue]
   exact
-    Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccount.context_writeStorage?_bind_withPresentStorageAccount?_eq_some_writeStorage
+    Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount.context_writeStorage?_bind_withPresentStorageAccount?_eq_some_writeStorage
       (context.writeStorage firstSlot firstValue) secondSlot secondValue
 
 end Tests

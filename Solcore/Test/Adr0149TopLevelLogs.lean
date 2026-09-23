@@ -1,7 +1,7 @@
 import Solcore.Test.Adr0149TopLevelLogsFixture
 import Solcore.Core.HostRunner
-import Solcore.Semantics.HostDriverResumption
-import Solcore.Semantics.HostStorageDriver
+import Solcore.ContractRuntime.HostDriverResumption
+import Solcore.ContractRuntime.HostStorageDriver
 
 /-! Executable root commit/rollback and resumption tests for ADR-0149 logs. -/
 
@@ -10,7 +10,7 @@ set_option autoImplicit false
 namespace Tests.Adr0149TopLevelLogs
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Adr0149TopLevelLogsFixture
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do

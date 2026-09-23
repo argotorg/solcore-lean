@@ -1,5 +1,5 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
-import Solcore.Semantics.HostStorageHandlerProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
+import Solcore.ContractRuntime.HostStorageHandlerProperties
 
 /-! Compile-time use of the public storage-driver proof interface. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x
 

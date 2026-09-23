@@ -8,7 +8,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5.Wire
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def decodeNullableAt {α : Type}
     (decode : Path → Lean.Json → DecodeResult α)

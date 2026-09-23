@@ -1,4 +1,4 @@
-import Solcore.Semantics.TopLevelExecutionResumption
+import Solcore.ContractRuntime.TopLevelExecutionResumption
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! Executable end-to-end regressions for ADR-0145 top-level finalization. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open TopLevelExecutionFixture
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do

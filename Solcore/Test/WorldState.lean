@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldState
+import Solcore.ContractRuntime.WorldState
 
 /-! Executable boundary tests for minimal accounts and word storage. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

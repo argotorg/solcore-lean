@@ -1,5 +1,5 @@
 import Solcore.Core.Primitive
-import Solcore.Semantics.HostStorageInputDataProperties
+import Solcore.ContractRuntime.HostStorageInputDataProperties
 
 /-! Executable boundary tests for bounded run input bytes. -/
 
@@ -8,8 +8,8 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
-open Solcore.Semantics.HostStorageDriver
+open Solcore.ContractRuntime
+open Solcore.ContractRuntime.HostStorageDriver
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

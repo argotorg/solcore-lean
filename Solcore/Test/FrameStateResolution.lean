@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameStateResolution
+import Solcore.ContractRuntime.FrameStateResolution
 
 /-! Executable tests for resolving frame outcomes against state snapshots. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive TestTrapReason where
   | invalidOperation

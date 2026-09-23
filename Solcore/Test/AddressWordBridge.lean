@@ -1,4 +1,4 @@
-import Solcore.Semantics.AddressWordBridge
+import Solcore.ContractRuntime.AddressWordBridge
 
 /-! Executable boundary tests for strict address and word conversion. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

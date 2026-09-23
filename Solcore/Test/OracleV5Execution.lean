@@ -8,7 +8,7 @@ namespace Tests.OracleV5Execution
 
 open Solcore.Core.Wire
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def target : Address := ⟨1, by decide⟩
 private def caller : Address := ⟨2, by decide⟩

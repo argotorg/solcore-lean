@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateNonceProperties
+import Solcore.ContractRuntime.WorldStateNonceProperties
 
 /-! Compile-time and executable regressions for account creation nonces. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 example : Account.empty.nonce = Core.Word.zero :=
   Account.nonce_empty

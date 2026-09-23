@@ -1,6 +1,6 @@
 import Solcore.Core.Wire.V3.Codec.Foundation
 import Solcore.Core.Wire.V3.Syntax
-import Solcore.Semantics.RuntimeScalars.TextProperties
+import Solcore.ContractRuntime.RuntimeScalars.TextProperties
 
 /-! Canonical scalar and identity codecs for Semantic Core Wire v3. -/
 
@@ -9,13 +9,13 @@ set_option autoImplicit false
 namespace Solcore.Core.Wire.V3
 
 def encodeWordText (value : Solcore.Core.Word) : String :=
-  Solcore.Semantics.encodeWordText value
+  Solcore.ContractRuntime.encodeWordText value
 
 def decodeWordTextAt
     (path : DecodePath)
     (text : String) :
     DecodeResult Solcore.Core.Word :=
-  match Solcore.Semantics.decodeWordText? text with
+  match Solcore.ContractRuntime.decodeWordText? text with
   | some value => pure value
   | none =>
       let reason :=
@@ -32,7 +32,7 @@ def decodeWordText (text : String) : DecodeResult Solcore.Core.Word :=
     (value : Solcore.Core.Word) :
     decodeWordTextAt path (encodeWordText value) = .ok value := by
   unfold decodeWordTextAt encodeWordText
-  rw [Solcore.Semantics.decodeWordText?_encodeWordText]
+  rw [Solcore.ContractRuntime.decodeWordText?_encodeWordText]
   rfl
 
 @[simp] theorem decodeWordText_encodeWordText
@@ -48,7 +48,7 @@ theorem encodeWordText_of_decodeWordTextAt_eq_ok
     (success : decodeWordTextAt path text = .ok value) :
     encodeWordText value = text := by
   simp only [decodeWordTextAt] at success
-  cases decoded : Solcore.Semantics.decodeWordText? text with
+  cases decoded : Solcore.ContractRuntime.decodeWordText? text with
   | none =>
       rw [decoded] at success
       contradiction
@@ -57,7 +57,7 @@ theorem encodeWordText_of_decodeWordTextAt_eq_ok
       change Except.ok decodedValue = Except.ok value at success
       injection success with equality
       subst value
-      exact Solcore.Semantics.encodeWordText_of_decodeWordText?_eq_some
+      exact Solcore.ContractRuntime.encodeWordText_of_decodeWordText?_eq_some
         text decodedValue decoded
 
 def encodeWord (value : Solcore.Core.Word) : Lean.Json :=

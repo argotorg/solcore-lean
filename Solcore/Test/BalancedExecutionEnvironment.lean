@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests.BalancedExecutionEnvironment
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Tests.Adr0147BalancedTopLevelExecutionFixture
 open Tests.TopLevelExecutionFixture
 

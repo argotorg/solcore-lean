@@ -1,4 +1,4 @@
-import Solcore.Semantics.CheckedAccountCreationProperties
+import Solcore.ContractRuntime.CheckedAccountCreationProperties
 
 /-! Actual checked initializer and explicit worlds for creation preparation. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests.Adr0148CheckedAccountCreationFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def creator : Address := ⟨0x1480, by decide⟩
 def created : Address := ⟨0x1481, by decide⟩

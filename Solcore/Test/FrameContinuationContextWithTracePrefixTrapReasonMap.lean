@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameContinuationContextWithTracePrefixTrapReasonMap
+import Solcore.ContractRuntime.FrameContinuationContextWithTracePrefixTrapReasonMap
 
 /-! Definition-only compile regressions for trace-prefixed reason mapping. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x
 

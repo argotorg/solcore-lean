@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDeltaProperties
 import Solcore.Test.Adr0148CheckedAccountCreationFixture
 
 /-! External consumers and actual checked creation-preparation regressions. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Adr0148CheckedAccountCreationFixture
 
 example := CheckedAccountCreation.prepare_creatorAbsent

@@ -42,7 +42,7 @@ private def handleCoreCheck (program : Solcore.Core.Wire.V3.Program) :
       | .error internal => .internalError internal
 
 private def executeVerdict
-    (target : Solcore.Semantics.Address)
+    (target : Solcore.ContractRuntime.Address)
     (fuel : Nat) : ScenarioExecutionResult → ExecuteVerdict
   | .preparationRejected error =>
       match ScenarioDiagnostic.ofPreparationError error with

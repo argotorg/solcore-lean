@@ -1,6 +1,6 @@
-import Solcore.Semantics.CheckedHostCoreProgramProperties
-import Solcore.Semantics.HostStorageDriverProperties
-import Solcore.Semantics.ParentIndexedFrameInitializationSelectedExecutionResumptionProperties
+import Solcore.ContractRuntime.CheckedHostCoreProgramProperties
+import Solcore.ContractRuntime.HostStorageDriverProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationSelectedExecutionResumptionProperties
 
 /-! Compile-only consumers for run-fixed current-address proof contracts. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 
 namespace Solcore.Test.CurrentAddressObservationProperties
 
-open Semantics
+open ContractRuntime
 universe u v w x
 
 variable (codeAddress callerAddress currentAddress : Address)

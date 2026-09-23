@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateBalanceProperties
+import Solcore.ContractRuntime.WorldStateBalanceProperties
 
 /-! Compile-time and executable regressions for account balances. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 example : Account.empty.balance = Core.Word.zero :=
   Account.balance_empty

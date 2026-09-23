@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedFrameContinuationContext
-import Solcore.Semantics.FrameTraceExtension
+import Solcore.ContractRuntime.ParentIndexedFrameContinuationContext
+import Solcore.ContractRuntime.FrameTraceExtension
 
 /-! Definition-only tests for parent-indexed frame continuation contexts. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive ParentIndexedEvent where
   | parent

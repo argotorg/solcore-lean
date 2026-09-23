@@ -1,7 +1,7 @@
 import Solcore.Feature
 import Solcore.Profile
 import Solcore.Core
-import Solcore.Semantics
+import Solcore.ContractRuntime
 import Solcore.Syntax
 
 /-!

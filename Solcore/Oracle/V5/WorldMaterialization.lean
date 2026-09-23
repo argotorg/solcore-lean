@@ -1,9 +1,9 @@
 import Solcore.Oracle.V5.Input
-import Solcore.Semantics.AccountNonceProperties
-import Solcore.Semantics.AccountStorageWriteSparsePreservationProperties
-import Solcore.Semantics.WorldStateBalanceProperties
-import Solcore.Semantics.WorldStateNonceProperties
-import Solcore.Semantics.WorldState
+import Solcore.ContractRuntime.AccountNonceProperties
+import Solcore.ContractRuntime.AccountStorageWriteSparsePreservationProperties
+import Solcore.ContractRuntime.WorldStateBalanceProperties
+import Solcore.ContractRuntime.WorldStateNonceProperties
+import Solcore.ContractRuntime.WorldState
 
 /-! Canonical validation and materialization of the finite Oracle v5 world. -/
 
@@ -11,7 +11,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- Closed failures produced while validating the finite initial world. -/
 inductive WorldMaterializationError where

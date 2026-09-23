@@ -9,7 +9,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- Preparation failures retain the phase-specific closed error value. -/
 inductive ScenarioPreparationError where

@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairStorageWriteAlgebraProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairStorageWriteAlgebraProperties
 
 /-! Compile-only regressions for checkpointed working storage-write algebra. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private example
     {RollbackState TraceState : Type}

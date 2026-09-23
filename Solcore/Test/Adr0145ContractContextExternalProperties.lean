@@ -1,6 +1,6 @@
-import Solcore.Semantics.CoreContractEntryProfileProperties
-import Solcore.Semantics.TopLevelExecutionContextProperties
-import Solcore.Semantics.TopLevelStorageDeltaProperties
+import Solcore.ContractRuntime.CoreContractEntryProfileProperties
+import Solcore.ContractRuntime.TopLevelExecutionContextProperties
+import Solcore.ContractRuntime.TopLevelStorageDeltaProperties
 
 /-! External compile consumers for ADR-0145 contract, context, and delta laws. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests.Adr0145ContractContextExternalProperties
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 section EntryProfile
 

@@ -1,6 +1,6 @@
 import Solcore.Oracle.V5.Schema
 import Solcore.Oracle.V5.Wire.Foundation
-import Solcore.Semantics.RuntimeScalars.TextProperties
+import Solcore.ContractRuntime.RuntimeScalars.TextProperties
 
 /-! Canonical Oracle v5 scalar codecs. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5.Wire
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def scalarReason
     (text : String)
@@ -27,39 +27,39 @@ private def scalarReason
           "lowercase-hex"
 
 def encodeWord (value : Core.Word) : Lean.Json :=
-  Solcore.Semantics.encodeWordText value
+  Solcore.ContractRuntime.encodeWordText value
 
 def decodeWordAt
     (path : Path)
     (json : Lean.Json) : DecodeResult Core.Word := do
   let text ← decodeStringAt path json
-  match Solcore.Semantics.decodeWordText? text with
+  match Solcore.ContractRuntime.decodeWordText? text with
   | some value => pure value
   | none => failAt path .invalidWord (.mkObj [
       ("reason", scalarReason text (some 66))
     ])
 
 def encodeAddress (value : Address) : Lean.Json :=
-  Solcore.Semantics.encodeAddressText value
+  Solcore.ContractRuntime.encodeAddressText value
 
 def decodeAddressAt
     (path : Path)
     (json : Lean.Json) : DecodeResult Address := do
   let text ← decodeStringAt path json
-  match Solcore.Semantics.decodeAddressText? text with
+  match Solcore.ContractRuntime.decodeAddressText? text with
   | some value => pure value
   | none => failAt path .invalidAddress (.mkObj [
       ("reason", scalarReason text (some 42))
     ])
 
 def encodeBytes (value : Bytes) : Lean.Json :=
-  Solcore.Semantics.encodeBytesText value
+  Solcore.ContractRuntime.encodeBytesText value
 
 def decodeBytesAt
     (path : Path)
     (json : Lean.Json) : DecodeResult Bytes := do
   let text ← decodeStringAt path json
-  match Solcore.Semantics.decodeBytesText? text with
+  match Solcore.ContractRuntime.decodeBytesText? text with
   | some value => pure value
   | none => failAt path .invalidBytes (.mkObj [
       ("reason", scalarReason text none true)
@@ -94,7 +94,7 @@ def decodeNullableStringAt
     (value : Core.Word) :
     decodeWordAt path (encodeWord value) = .ok value := by
   simp [decodeWordAt, encodeWord, decodeStringAt,
-    Solcore.Semantics.decodeWordText?_encodeWordText]
+    Solcore.ContractRuntime.decodeWordText?_encodeWordText]
   rfl
 
 @[simp] theorem decodeAddressAt_encodeAddress
@@ -102,7 +102,7 @@ def decodeNullableStringAt
     (value : Address) :
     decodeAddressAt path (encodeAddress value) = .ok value := by
   simp [decodeAddressAt, encodeAddress, decodeStringAt,
-    Solcore.Semantics.decodeAddressText?_encodeAddressText]
+    Solcore.ContractRuntime.decodeAddressText?_encodeAddressText]
   rfl
 
 @[simp] theorem decodeBytesAt_encodeBytes
@@ -110,7 +110,7 @@ def decodeNullableStringAt
     (value : Bytes) :
     decodeBytesAt path (encodeBytes value) = .ok value := by
   simp [decodeBytesAt, encodeBytes, decodeStringAt,
-    Solcore.Semantics.decodeBytesText?_encodeBytesText]
+    Solcore.ContractRuntime.decodeBytesText?_encodeBytesText]
   rfl
 
 @[simp] theorem decodeRequestIdAt_encodeRequestId

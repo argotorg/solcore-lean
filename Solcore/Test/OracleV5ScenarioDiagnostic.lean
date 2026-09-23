@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests.OracleV5ScenarioDiagnostic
 
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def address : Address := ⟨1, by decide⟩
 private def slot : Solcore.Core.Word := ⟨2, by decide⟩

@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameRunEffectResolution
+import Solcore.ContractRuntime.FrameRunEffectResolution
 
 /-! Executable tests for resolved synchronized frame continuations. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive ContinuationTrapReason where
   | marker

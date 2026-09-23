@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddressStorageReadWriteProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddressStorageReadWriteProperties
 
 /-! Compile-only regressions for address-bound storage read/write laws. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private example
     {RollbackState TraceState : Type}

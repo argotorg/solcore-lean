@@ -1,5 +1,5 @@
-import Solcore.Semantics.CheckedCreationTemplateRegistryProperties
-import Solcore.Semantics.ExecutionEnvironmentProperties
+import Solcore.ContractRuntime.CheckedCreationTemplateRegistryProperties
+import Solcore.ContractRuntime.ExecutionEnvironmentProperties
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! External and executable checks for the immutable creation environment. -/
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests.Adr0148ExecutionEnvironment
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Tests.TopLevelExecutionFixture
 
 example := CheckedCreationTemplate.mk_initializer

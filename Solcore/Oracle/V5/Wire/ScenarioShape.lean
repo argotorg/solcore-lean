@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5.Wire
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 structure RawStaticMethod where
   name : String

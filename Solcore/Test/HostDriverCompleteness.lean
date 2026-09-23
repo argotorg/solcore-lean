@@ -1,4 +1,4 @@
-import Solcore.Semantics.HostDriverCompletenessProperties
+import Solcore.ContractRuntime.HostDriverCompletenessProperties
 
 /-! Compile-time regressions for Core and generic-driver replay completeness. -/
 
@@ -130,7 +130,7 @@ end Core
 
 namespace Driver
 
-private def changingHandler : Solcore.Semantics.HostHandler Nat where
+private def changingHandler : Solcore.ContractRuntime.HostHandler Nat where
   supports := fun _ => true
   handle context request :=
     match request with
@@ -158,7 +158,7 @@ private theorem handled :
   rfl
 
 private theorem one_request_path :
-    Solcore.Semantics.HostDriver.HandledSteps changingHandler 1
+    Solcore.ContractRuntime.HostDriver.HandledSteps changingHandler 1
       0 Core.requestState 1 Core.finalState := by
   exact .handle
     (Solcore.Core.HostSteps.refl (state := Core.requestState))
@@ -169,19 +169,19 @@ private theorem handled_path_preserves_type :
     Solcore.Core.HostStateHasType Core.finalState .word [] :=
   one_request_path.preserve Core.request_state_hasType
 
-private def expected : Solcore.Semantics.HostDriverResult Nat :=
+private def expected : Solcore.ContractRuntime.HostDriverResult Nat :=
   ⟨1, .done (.word Core.returned) []⟩
 
 private theorem done_complete_exact_context :
-    Solcore.Semantics.HostDriver.run changingHandler 0 1 Core.requestState =
+    Solcore.ContractRuntime.HostDriver.run changingHandler 0 1 Core.requestState =
       expected := by
-  exact Solcore.Semantics.HostDriver.run_done_complete changingHandler
+  exact Solcore.ContractRuntime.HostDriver.run_done_complete changingHandler
     one_request_path (by omega)
 
 private theorem done_iff_forward :
     expected.FuelSoundWith changingHandler 1 0 Core.requestState := by
   exact
-    (Solcore.Semantics.HostDriver.run_eq_iff_fuelSoundWith
+    (Solcore.ContractRuntime.HostDriver.run_eq_iff_fuelSoundWith
       changingHandler 0 1 Core.requestState expected).mp
       done_complete_exact_context
 
@@ -190,7 +190,7 @@ private theorem fuel_sound_hasType :
   done_iff_forward.hasType Core.request_state_hasType
 
 private theorem same_fuel_result_unique
-    (result : Solcore.Semantics.HostDriverResult Nat)
+    (result : Solcore.ContractRuntime.HostDriverResult Nat)
     (sound :
       result.FuelSoundWith changingHandler 1 0 Core.requestState) :
     result = expected :=
@@ -206,39 +206,39 @@ private theorem done_result_unique_across_fuel
     (store : Solcore.Core.Store)
     (sound :
       (⟨finalContext, .done value store⟩ :
-        Solcore.Semantics.HostDriverResult Nat).FuelSoundWith
+        Solcore.ContractRuntime.HostDriverResult Nat).FuelSoundWith
           changingHandler 8 0 Core.requestState) :
     (⟨finalContext, .done value store⟩ :
-      Solcore.Semantics.HostDriverResult Nat) = expected :=
+      Solcore.ContractRuntime.HostDriverResult Nat) = expected :=
   sound.done_result_unique done_iff_forward
 
 private theorem done_iff_reverse :
-    Solcore.Semantics.HostDriver.run changingHandler 0 1 Core.requestState =
+    Solcore.ContractRuntime.HostDriver.run changingHandler 0 1 Core.requestState =
       expected := by
   exact
-    (Solcore.Semantics.HostDriver.run_eq_iff_fuelSoundWith
+    (Solcore.ContractRuntime.HostDriver.run_eq_iff_fuelSoundWith
       changingHandler 0 1 Core.requestState expected).mpr
       done_iff_forward
 
 private theorem done_stable :
-    Solcore.Semantics.HostDriver.run changingHandler 0 8 Core.requestState =
+    Solcore.ContractRuntime.HostDriver.run changingHandler 0 8 Core.requestState =
       expected := by
-  exact Solcore.Semantics.HostDriver.run_done_stable changingHandler
+  exact Solcore.ContractRuntime.HostDriver.run_done_stable changingHandler
     done_complete_exact_context (by omega)
 
 private theorem done_stable_same_fuel :
-    Solcore.Semantics.HostDriver.run changingHandler 0 1 Core.requestState =
+    Solcore.ContractRuntime.HostDriver.run changingHandler 0 1 Core.requestState =
       expected := by
-  exact Solcore.Semantics.HostDriver.run_done_stable changingHandler
+  exact Solcore.ContractRuntime.HostDriver.run_done_stable changingHandler
     done_complete_exact_context (Nat.le_refl 1)
 
 private theorem done_runtime :
-    (Solcore.Semantics.HostDriver.run
+    (Solcore.ContractRuntime.HostDriver.run
       changingHandler 0 8 Core.requestState).context = 1 := by
   native_decide
 
 private theorem done_outcome_runtime :
-    (Solcore.Semantics.HostDriver.run
+    (Solcore.ContractRuntime.HostDriver.run
       changingHandler 0 8 Core.requestState).outcome =
         .done (.word Core.returned) [] := by
   native_decide
@@ -249,7 +249,7 @@ private theorem handled_before_transition :
   rfl
 
 private theorem one_request_outOfFuel_path :
-    Solcore.Semantics.HostDriver.HandledSteps changingHandler 1
+    Solcore.ContractRuntime.HostDriver.HandledSteps changingHandler 1
       0 Core.transitionRequestState 1 Core.resumedTransitionState := by
   exact .handle
     (Solcore.Core.HostSteps.refl (state := Core.transitionRequestState))
@@ -258,67 +258,67 @@ private theorem one_request_outOfFuel_path :
       (Solcore.Core.HostSteps.refl (state := Core.resumedTransitionState)))
 
 private theorem post_request_core_path :
-    Solcore.Semantics.HostDriver.HandledSteps changingHandler 2
+    Solcore.ContractRuntime.HostDriver.HandledSteps changingHandler 2
       1 Core.resumedTransitionState 1 Core.transitionFinalState :=
   .core Core.composed_core_path
 
 private theorem composed_handled_path :
-    Solcore.Semantics.HostDriver.HandledSteps changingHandler 3
+    Solcore.ContractRuntime.HostDriver.HandledSteps changingHandler 3
       0 Core.transitionRequestState 1 Core.transitionFinalState :=
   one_request_outOfFuel_path.trans post_request_core_path
 
 private theorem outOfFuel_complete_after_context_update :
-    Solcore.Semantics.HostDriver.run
+    Solcore.ContractRuntime.HostDriver.run
       changingHandler 0 1 Core.transitionRequestState =
         ⟨1, .outOfFuel Core.resumedTransitionState⟩ := by
-  apply Solcore.Semantics.HostDriver.run_outOfFuel_complete
+  apply Solcore.ContractRuntime.HostDriver.run_outOfFuel_complete
     changingHandler one_request_outOfFuel_path
   exact .inl
     ⟨Core.afterResumedTransition, Core.resumed_transition_ready⟩
 
 private theorem done_complete_after_context_update :
-    Solcore.Semantics.HostDriver.run
+    Solcore.ContractRuntime.HostDriver.run
       changingHandler 0 3 Core.transitionRequestState =
         ⟨1, .done .unit []⟩ := by
-  exact Solcore.Semantics.HostDriver.run_done_complete
+  exact Solcore.ContractRuntime.HostDriver.run_done_complete
     changingHandler composed_handled_path (by omega)
 
 private theorem outOfFuel_differs_across_fuel :
-    Solcore.Semantics.HostDriver.run
+    Solcore.ContractRuntime.HostDriver.run
         changingHandler 0 1 Core.transitionRequestState ≠
-      Solcore.Semantics.HostDriver.run
+      Solcore.ContractRuntime.HostDriver.run
         changingHandler 0 3 Core.transitionRequestState := by
   rw [outOfFuel_complete_after_context_update,
     done_complete_after_context_update]
   simp
 
 private theorem outOfFuel_after_context_update_runtime :
-    (Solcore.Semantics.HostDriver.run
+    (Solcore.ContractRuntime.HostDriver.run
       changingHandler 0 1 Core.transitionRequestState).context = 1 ∧
-    (Solcore.Semantics.HostDriver.run
+    (Solcore.ContractRuntime.HostDriver.run
       changingHandler 0 1 Core.transitionRequestState).outcome =
         .outOfFuel Core.resumedTransitionState := by
   native_decide
 
 private theorem fault_complete :
-    Solcore.Semantics.HostDriver.run changingHandler 9 0 Core.faultState =
+    Solcore.ContractRuntime.HostDriver.run changingHandler 9 0 Core.faultState =
       ⟨9, .fault Core.fault Core.faultState⟩ := by
-  apply Solcore.Semantics.HostDriver.run_fault_complete changingHandler
+  apply Solcore.ContractRuntime.HostDriver.run_fault_complete changingHandler
     (.core (Solcore.Core.HostSteps.refl (state := Core.faultState)))
   · rfl
   · omega
 
 private theorem fault_fuel_evidence :
     (⟨9, .fault Core.fault Core.faultState⟩ :
-      Solcore.Semantics.HostDriverResult Nat).FuelSoundWith
+      Solcore.ContractRuntime.HostDriverResult Nat).FuelSoundWith
         changingHandler 0 9 Core.faultState :=
-  (Solcore.Semantics.HostDriver.run_eq_iff_fuelSoundWith
+  (Solcore.ContractRuntime.HostDriver.run_eq_iff_fuelSoundWith
     changingHandler 9 0 Core.faultState
       ⟨9, .fault Core.fault Core.faultState⟩).mp fault_complete
 
 private theorem fault_fuel_evidence_mono :
     (⟨9, .fault Core.fault Core.faultState⟩ :
-      Solcore.Semantics.HostDriverResult Nat).FuelSoundWith
+      Solcore.ContractRuntime.HostDriverResult Nat).FuelSoundWith
         changingHandler 8 9 Core.faultState :=
   fault_fuel_evidence.fault_mono (by omega)
 
@@ -328,17 +328,17 @@ private theorem fault_result_unique_across_fuel
     (faultState : Solcore.Core.State)
     (sound :
       (⟨finalContext, .fault error faultState⟩ :
-        Solcore.Semantics.HostDriverResult Nat).FuelSoundWith
+        Solcore.ContractRuntime.HostDriverResult Nat).FuelSoundWith
           changingHandler 8 9 Core.faultState) :
     (⟨finalContext, .fault error faultState⟩ :
-      Solcore.Semantics.HostDriverResult Nat) =
+      Solcore.ContractRuntime.HostDriverResult Nat) =
       ⟨9, .fault Core.fault Core.faultState⟩ :=
   sound.fault_result_unique fault_fuel_evidence
 
 private theorem fault_stable :
-    Solcore.Semantics.HostDriver.run changingHandler 9 8 Core.faultState =
+    Solcore.ContractRuntime.HostDriver.run changingHandler 9 8 Core.faultState =
       ⟨9, .fault Core.fault Core.faultState⟩ := by
-  exact Solcore.Semantics.HostDriver.run_fault_stable changingHandler
+  exact Solcore.ContractRuntime.HostDriver.run_fault_stable changingHandler
     fault_complete (by omega)
 
 end Driver

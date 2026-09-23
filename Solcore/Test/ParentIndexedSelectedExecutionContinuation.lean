@@ -1,7 +1,7 @@
-import Solcore.Semantics.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
-import Solcore.Semantics.ParentIndexedFrameContinuationContextProperties
-import Solcore.Semantics.ParentIndexedFrameTrapPropagationPayloadProperties
-import Solcore.Semantics.FrameResolutionResultContinuation
+import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedFrameContinuationContextProperties
+import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayloadProperties
+import Solcore.ContractRuntime.FrameResolutionResultContinuation
 
 /-! Compile-only consumers of parent-indexed selected execution continuation. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 universe u v w x
 

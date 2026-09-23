@@ -8,7 +8,7 @@ namespace Tests
 
 open Solcore.Core
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private theorem exactEnvironmentProvenance
     (resolve : String → Option CheckedCoreContract)

@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedSelectedCheckedWordExecutionCompatibilityProperties
-import Solcore.Semantics.ParentIndexedSelectedCheckedWordExecutionContinuationResumptionProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionCompatibilityProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionContinuationResumptionProperties
 
 /-! Compile-only consumers for ADR-0144 return and compatibility laws. -/
 
@@ -7,8 +7,8 @@ set_option autoImplicit false
 
 namespace Solcore.Test.ParentIndexedSelectedCheckedWordExecutionContinuationProperties
 
-open Semantics
-open Semantics.ParentIndexedSelectedCheckedWordExecution
+open ContractRuntime
+open ContractRuntime.ParentIndexedSelectedCheckedWordExecution
 
 universe u v w
 

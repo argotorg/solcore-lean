@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5.ContractAdmission.ContractPackage
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- Contract resolver used by call and creation environment materialization. -/
 def contractResolver

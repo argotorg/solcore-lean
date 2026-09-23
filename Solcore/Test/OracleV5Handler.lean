@@ -8,7 +8,7 @@ namespace Tests.OracleV5Handler
 
 open Solcore.Core.Wire
 open Solcore.Oracle.V5
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def requestId : RequestId := ⟨"handler", by decide⟩
 private def target : Address := ⟨1, by decide⟩

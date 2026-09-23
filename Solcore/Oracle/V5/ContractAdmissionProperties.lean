@@ -171,7 +171,7 @@ theorem idByCode?_of_lookupEntry?_eq_some
 theorem idByCode?_of_lookup?_eq_some
     {package : ContractPackage}
     {id : ContractId}
-    {contract : Solcore.Semantics.CheckedCoreContract}
+    {contract : Solcore.ContractRuntime.CheckedCoreContract}
     (found : package.lookup? id = some contract) :
     package.idByCode? contract.code = some id := by
   unfold lookup? at found

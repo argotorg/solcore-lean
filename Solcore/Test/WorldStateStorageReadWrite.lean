@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateStorageReadWriteProperties
+import Solcore.ContractRuntime.WorldStateStorageReadWriteProperties
 
 /-! Compile-only regressions for stage-preserving storage read/write laws. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private example
     (state : WorldState) (address : Address)

@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedSelectedCheckedWordExecutionCompatibilityProperties
-import Solcore.Semantics.ParentIndexedSelectedCheckedWordExecutionContinuationResumptionProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionCompatibilityProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionContinuationResumptionProperties
 import Solcore.Test.SelectedCheckedWordExecutionFixture
 
 /-! Shared parent-indexed selected checked Word fixtures for ADR-0144. -/
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests.ParentIndexedSelectedCheckedWordExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open ParentIndexedSelectedExecutionFixture
 open SelectedCheckedWordExecutionFixture
 

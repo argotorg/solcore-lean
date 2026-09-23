@@ -1,6 +1,6 @@
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithPresentStorageAccountProperties
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddressProperties
-import Solcore.Semantics.FrameCheckpointedWorkingPairWithStorageAddressStorageReadProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddressProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddressStorageReadProperties
 
 /-! Compile-only regressions for selected working Account refinement laws. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private example
     {RollbackState TraceState : Type}

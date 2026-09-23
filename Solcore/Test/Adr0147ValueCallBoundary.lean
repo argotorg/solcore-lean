@@ -1,7 +1,7 @@
 import Solcore.Core.HostProgress
-import Solcore.Semantics.BalanceTransferCallFailureProperties
-import Solcore.Semantics.HostStorageHandler
-import Solcore.Semantics.NestedWordCall
+import Solcore.ContractRuntime.BalanceTransferCallFailureProperties
+import Solcore.ContractRuntime.HostStorageHandler
+import Solcore.ContractRuntime.NestedWordCall
 
 /-! External and executable regressions for the ADR-0147 value-call boundary. -/
 
@@ -10,7 +10,7 @@ set_option autoImplicit false
 namespace Tests.Adr0147ValueCallBoundary
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

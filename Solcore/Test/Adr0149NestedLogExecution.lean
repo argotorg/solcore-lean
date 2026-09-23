@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Adr0149NestedLogExecutionFixture
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do

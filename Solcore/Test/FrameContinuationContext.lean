@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameContinuationContext
+import Solcore.ContractRuntime.FrameContinuationContext
 
 /-! Executable tests for the caller-owned frame continuation context. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive ContextReason where
   | marker

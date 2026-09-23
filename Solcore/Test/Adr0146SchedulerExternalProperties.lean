@@ -1,5 +1,5 @@
-import Solcore.Semantics.OneLevelNestedExecutionProperties
-import Solcore.Semantics.OneLevelNestedExecutionReachabilityProperties
+import Solcore.ContractRuntime.OneLevelNestedExecutionProperties
+import Solcore.ContractRuntime.OneLevelNestedExecutionReachabilityProperties
 
 /-! External compile consumers for the public ADR-0146 scheduler laws. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.Adr0146SchedulerExternalProperties
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open OneLevelNestedExecution
 
 example := @Result.eq_of_view_eq

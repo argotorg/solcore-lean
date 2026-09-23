@@ -10,7 +10,7 @@ open Solcore.Core
 open Solcore.Core.Wire
 open Solcore.Oracle.V5
 open Solcore.Oracle.V5.Wire
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def requestId : RequestId := ⟨"wire-test", by decide⟩
 private def addressA : Address := ⟨1, by decide⟩

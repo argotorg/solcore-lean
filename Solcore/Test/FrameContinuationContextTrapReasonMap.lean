@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameContinuationContextTrapReasonMap
+import Solcore.ContractRuntime.FrameContinuationContextTrapReasonMap
 
 /-! Definition-only tests for continuation-context trap-reason mapping. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive LocalTrapReason where
   | marker

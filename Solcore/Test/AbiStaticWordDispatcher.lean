@@ -1,7 +1,7 @@
 import Solcore.Abi.StaticWordCodec
 import Solcore.Abi.StaticWordDispatcher
-import Solcore.Semantics.HostStorageDriver
-import Solcore.Semantics.WorldStateProperties
+import Solcore.ContractRuntime.HostStorageDriver
+import Solcore.ContractRuntime.WorldStateProperties
 
 /-! Compile-time and runtime consumers for checked Static Word dispatchers. -/
 
@@ -10,7 +10,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Solcore.Abi.V1
 
 private def name (text : String) (valid : isValidMethodName text = true) :

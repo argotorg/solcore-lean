@@ -1,4 +1,4 @@
-import Solcore.Semantics.HostStorageDriverFuelProperties
+import Solcore.ContractRuntime.HostStorageDriverFuelProperties
 
 /-! Storage-specialized executable regressions for handled fuel resumption. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def codeAddress : Address := ⟨0x10, by decide⟩
 private def storageAddress : Address := ⟨0x20, by decide⟩

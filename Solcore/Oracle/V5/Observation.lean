@@ -1,5 +1,5 @@
 import Solcore.Oracle.V5.Input
-import Solcore.Semantics.BalancedTopLevelExecution
+import Solcore.ContractRuntime.BalancedTopLevelExecution
 
 /-! Total Oracle v5 observations of terminal balanced execution. -/
 
@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- The four terminal outcomes published by the execution Oracle. -/
 inductive TerminalOutcome where

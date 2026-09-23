@@ -1,4 +1,4 @@
-import Solcore.Semantics.FrameTracePrefix
+import Solcore.ContractRuntime.FrameTracePrefix
 
 /-! Definition-only compile regressions for concrete frame-trace prefixes. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private inductive PrefixEvent where
   | entered

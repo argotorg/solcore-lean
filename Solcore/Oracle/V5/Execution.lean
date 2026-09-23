@@ -1,7 +1,7 @@
 import Solcore.Oracle.V5.ObservationValidity
 import Solcore.Oracle.V5.RootInstallation
 import Solcore.Oracle.V5.ScenarioPreparation
-import Solcore.Semantics.BalancedTopLevelExecution
+import Solcore.ContractRuntime.BalancedTopLevelExecution
 
 /-! End-to-end typed execution of one decoded Oracle v5 scenario. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 /-- A fully prepared scenario whose selected root is proved installed. -/
 structure ReadyExecution where

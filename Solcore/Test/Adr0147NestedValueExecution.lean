@@ -1,4 +1,4 @@
-import Solcore.Semantics.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDeltaProperties
 import Solcore.Test.Adr0147NestedValueExecutionFixture
 
 /-! Runtime and compile-time regressions for checked nested value calls. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open OneLevelNestedExecution
 open OneLevelNestedExecutionFixture
 open Adr0147NestedValueExecutionFixture

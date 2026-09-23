@@ -1,5 +1,5 @@
 import Solcore.Oracle.V5.Schema
-import Solcore.Semantics.RuntimeScalars
+import Solcore.ContractRuntime.RuntimeScalars
 
 /-! Fully decoded, still-untrusted input values for Oracle v5. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Solcore.Oracle.V5
 
 open Solcore.Core.Wire
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 structure StaticMethodInput where
   name : String

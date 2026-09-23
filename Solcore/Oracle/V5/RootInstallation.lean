@@ -1,6 +1,6 @@
 import Solcore.Oracle.V5.PackageResolvers
 import Solcore.Oracle.V5.WorldMaterialization
-import Solcore.Semantics.CheckedCoreContractExtensionality
+import Solcore.ContractRuntime.CheckedCoreContractExtensionality
 
 /-! Exact root-contract installation at the Oracle v5 execution boundary. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 
 namespace Solcore.Oracle.V5
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open ContractAdmission
 
 /-- The only semantic input rejections produced at root installation. -/

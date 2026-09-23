@@ -1,4 +1,4 @@
-import Solcore.Semantics.OneLevelNestedExecutionResumptionProperties
+import Solcore.ContractRuntime.OneLevelNestedExecutionResumptionProperties
 import Solcore.Test.OneLevelNestedExecutionFixture
 
 /-! Actual checked-Core fixtures for depth-one value-bearing calls. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.Adr0147NestedValueExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Tests.OneLevelNestedExecutionFixture
 
 def transferValue : Word := ⟨3, by decide⟩

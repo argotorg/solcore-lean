@@ -1,7 +1,7 @@
 import Solcore.Core.Primitive
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
-import Solcore.Semantics.RuntimeScalars
+import Solcore.ContractRuntime.RuntimeScalars
 
 /-! Executable boundary tests for canonical runtime scalar encodings. -/
 
@@ -10,7 +10,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

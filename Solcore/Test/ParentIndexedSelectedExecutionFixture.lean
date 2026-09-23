@@ -1,6 +1,6 @@
-import Solcore.Semantics.ParentIndexedSelectedExecutionCompatibilityProperties
-import Solcore.Semantics.ParentIndexedSelectedExecutionFoldCoherenceProperties
-import Solcore.Semantics.ParentIndexedSelectedExecutionResumptionProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecutionCompatibilityProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecutionFoldCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecutionResumptionProperties
 
 /-! Shared measured fixture for branch-complete parent execution tests. -/
 
@@ -9,7 +9,7 @@ set_option autoImplicit false
 namespace Tests.ParentIndexedSelectedExecutionFixture
 
 open Solcore.Core
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 def codeAddress : Address := ⟨0x10, by decide⟩
 def storageAddress : Address := ⟨0x20, by decide⟩

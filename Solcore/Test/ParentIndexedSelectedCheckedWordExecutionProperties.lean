@@ -1,5 +1,5 @@
-import Solcore.Semantics.ParentIndexedSelectedCheckedWordExecutionDelegationProperties
-import Solcore.Semantics.ParentIndexedSelectedCheckedWordExecutionResumptionProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionDelegationProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionResumptionProperties
 
 /-! Compile-only consumers for ADR-0144 provenance and resumption laws. -/
 
@@ -7,8 +7,8 @@ set_option autoImplicit false
 
 namespace Solcore.Test.ParentIndexedSelectedCheckedWordExecutionProperties
 
-open Semantics
-open Semantics.ParentIndexedSelectedCheckedWordExecution
+open ContractRuntime
+open ContractRuntime.ParentIndexedSelectedCheckedWordExecution
 
 universe u v
 

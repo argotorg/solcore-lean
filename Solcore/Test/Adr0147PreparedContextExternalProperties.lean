@@ -1,4 +1,4 @@
-import Solcore.Semantics.TopLevelExecutionContextProperties
+import Solcore.ContractRuntime.TopLevelExecutionContextProperties
 
 /-! External compile consumers for prepared root checkpoint projections. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 example {checkpointWorld workingWorld : WorldState}
     {target : Address} {contract : CheckedCoreContract}

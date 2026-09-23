@@ -1,5 +1,5 @@
-import Solcore.Semantics.AccountNonceIncrementProperties
-import Solcore.Semantics.CreationAddressPolicy
+import Solcore.ContractRuntime.AccountNonceIncrementProperties
+import Solcore.ContractRuntime.CreationAddressPolicy
 
 /-! External compile and executable checks for creation foundation APIs. -/
 
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests.AccountNonceIncrementProperties
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 
 example := @Account.incrementNonce?_isSome_iff
 example := @Account.incrementNonce?_eq_none_iff

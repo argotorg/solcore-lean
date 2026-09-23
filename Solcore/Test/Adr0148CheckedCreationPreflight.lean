@@ -1,4 +1,4 @@
-import Solcore.Semantics.CheckedCreationPreflightProperties
+import Solcore.ContractRuntime.CheckedCreationPreflightProperties
 import Solcore.Test.Adr0148CheckedCreationPreflightFixture
 
 /-! External theorem consumers and actual environment-aware preflight tests. -/
@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Tests
 
 open Solcore
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open Adr0148CheckedCreationPreflightFixture
 
 example {left right : CheckedHostCoreProgram}

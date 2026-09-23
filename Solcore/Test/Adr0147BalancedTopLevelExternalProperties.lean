@@ -1,4 +1,4 @@
-import Solcore.Semantics.BalancedTopLevelExecutionProperties
+import Solcore.ContractRuntime.BalancedTopLevelExecutionProperties
 
 /-! External compile consumers for balance-aware top-level execution laws. -/
 
@@ -6,7 +6,7 @@ set_option autoImplicit false
 
 namespace Tests.Adr0147BalancedTopLevelExternalProperties
 
-open Solcore.Semantics
+open Solcore.ContractRuntime
 open BalancedTopLevelExecution
 
 example := @RejectedResult.ofFailure_failure
