@@ -129,9 +129,8 @@ storage, balance, log, call, creation, checkpoint, rollback, or state delta.
 It chooses no hashing algorithm, EVM revision, gas schedule, host behavior, or
 resource-limit meaning.
 
-It adds no Wire tag, JSON schema, profile, Oracle query, verdict, protocol
-field, or published observation. Frozen public formats and metadata remain
-unchanged.
+It adds no Wire tag, JSON schema, profile, or published observation. Frozen
+public formats and metadata remain unchanged.
 
 ## Consequences
 

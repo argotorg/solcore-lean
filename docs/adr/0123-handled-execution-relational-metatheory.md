@@ -188,7 +188,7 @@ typing, and dependent response typing. Result uniqueness lives with generic
 driver completeness.
 
 Storage, Account, WorldState, Address, frame outcomes, and concrete handlers do
-not enter the generic proofs. No parser, Surface, ABI, Oracle, Wire, schema,
+not enter the generic proofs. No parser, source syntax, ABI, Wire, schema,
 profile, or public runtime module changes. The root README does not change.
 
 ## Non-goals

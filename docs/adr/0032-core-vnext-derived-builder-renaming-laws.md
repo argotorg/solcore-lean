@@ -75,8 +75,8 @@ public derived APIs.
 
 No builder expansion, type, inference result, evaluation order, fuel, fault,
 effect, or store behavior changes. No Core form, primitive tag, wire version,
-encoding, Oracle behavior, source syntax, ABI rule, opcode, or gas rule is
-added. Existing Wire v1 and v2 bytes remain unchanged.
+encoding, source syntax, ABI rule, opcode, or gas rule is added. Existing Wire
+v1 and v2 bytes remain unchanged.
 
 ## Consequences
 

@@ -2,15 +2,15 @@
 
 - Status: Accepted
 - Decision date: 2026-07-23
-- Scope: dynamic semantics, differential oracle
+- Scope: dynamic semantics, contract-runtime observations
 
 ## Reader summary / Current implementation
 
 - **Decision:** Contract observations require an explicit EVM revision and
   compare semantic state effects rather than compiler artifacts.
-- **Current implementation:** Current profiles intentionally omit an EVM
-  revision and publish only Core evaluation or parse observations. No contract
-  EVM execution profile is implemented.
+- **Current implementation:** `ContractRuntime` exposes pure checked execution
+  and observations through direct Lean APIs. Current profiles intentionally
+  omit an EVM revision; no EVM-backed execution profile is implemented.
 - **Boundary:** Gas belongs only to a separately versioned observation profile;
   it is not part of the current gas-free Core observations.
 - **Suggested reading:** Read “Decision” for the observation envelope and
@@ -76,6 +76,7 @@ the key order defined by the specification.
 - Include tests that verify storage and balance rollback after a revert.
 - Include observation tests for logs, nested external calls, and contract
   creation.
-- Use a golden test to verify that no gas field appears in the standard profile.
+- Use an executable test to verify that no gas field appears in the standard
+  profile.
 - A gas profile remains `unsupported` until its revision and schedule are fully
   specified.

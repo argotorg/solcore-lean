@@ -101,8 +101,8 @@ Non-selected Account isolation, individual structural preservation projections,
 storage-value presence after zero or nonzero writes, and optional/total
 multi-step coherence remain separate decisions.
 
-This slice adds no parser or source syntax, Core expression, Wire or Oracle
-field, Profile, ABI, storage layout, serialization, or published observation.
+This slice adds no parser or source syntax, Core expression, Wire field,
+Profile, ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan
 

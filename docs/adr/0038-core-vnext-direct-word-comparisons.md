@@ -61,8 +61,8 @@ Focused regressions cover:
 
 This slice does not define signed comparison, source or standard-library APIs,
 opcode lowering, or gas. It changes no type, value, fault, evaluator, frame,
-tag, schema, version, byte encoding, Oracle behavior, profile, capability, or
-golden stream. Derived comparison builders and flags retain their meaning.
+tag, schema, version, byte encoding, or published boundary. Derived comparison
+builders and flags retain their meaning.
 
 ## Consequences
 
@@ -88,5 +88,5 @@ projection through Core and JSON round trips.
 The implementation, focused Wire suite, semantic suite, and independent audit
 are complete. The audit found no P0-P3 issue, no source trust escape hatch, and
 only the repository-approved Lean foundational dependencies. No alias,
-duplicate Word or generic theorem, tag, schema, or Oracle behavior changed. The
-next feature requires a separate ADR.
+duplicate Word or generic theorem, tag, or schema changed. The next feature
+requires a separate ADR.

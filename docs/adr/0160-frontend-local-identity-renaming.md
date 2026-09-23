@@ -63,4 +63,4 @@ noninjectivity and allocation boundaries. Audit all public proofs with standard
 kernel axioms, compile the public interface, and run focused and full tests.
 
 This adds no source syntax, type, value, Core or machine constructor, external
-service, Wire/Oracle tag, schema, capability, or golden-byte change.
+service, Wire tag, schema, or capability change.

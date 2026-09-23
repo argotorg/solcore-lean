@@ -86,9 +86,8 @@ upper bits, while index 32 must return its input exactly.
 ## Publication and exclusions
 
 `wordSignExtend` is internal-only. Do not add it to frozen Wire v1 or v2, their
-JSON enums, any public Oracle, schema, profile, version, or golden byte stream.
-This slice adds no source syntax, standard-library API, ABI rule, opcode
-lowering, or gas rule.
+JSON enums, schemas, or versions. This slice adds no source syntax,
+standard-library API, ABI rule, opcode lowering, or gas rule.
 
 ## Consequences
 

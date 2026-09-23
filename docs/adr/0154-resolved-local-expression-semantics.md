@@ -89,10 +89,9 @@ Open local tables may carry any existing Core type or value; an opaque cell
 reference or closure can be looked up, but this fragment cannot dereference,
 mutate, or call it.
 
-The new Lean umbrella is internal/additive. Oracle v1 through v5, Core Wire
-v1 through v3, the canonical parser, and historical Surface interfaces retain
-their existing behavior and bytes. In particular, this is not a source-text
-execution endpoint or a completed source resolver.
+The new Lean umbrella is additive. Core Wire v1 through v3 and the canonical
+parser retain their existing behavior and bytes. In particular, this is not a
+source-text execution endpoint or a completed source resolver.
 
 ## Validation
 

@@ -130,7 +130,7 @@ This phase does not add:
 - general staged materialization while lowering a runtime callee that itself
   has a `Comptime`-classified input; its reusable runtime draft has no concrete
   input value environment yet, so that draft retains the legacy call path;
-- automatic staged-root discovery or a public source Oracle; or
+- automatic staged-root discovery; or
 - broad soundness, completeness and preservation metatheory.
 
 The arbitrary-precision staged-integer evaluator remains a distinct

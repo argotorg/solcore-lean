@@ -144,13 +144,13 @@ import the new definition and ADR-0074 construction modules only.
 This value does not mutate state, apply rollback to a machine, invoke a
 continuation, prove an invocation or enclosing frame exists, execute a parent,
 resume or catch, classify a trap as fatal or recoverable, or force propagation.
-It does not repeat propagation through ancestors or choose a top-level verdict.
+It does not repeat propagation through ancestors or choose a top-level outcome.
 
 It also does not define checkpoint creation, ownership or lifetime, runtime
 parent/child provenance, stack, depth, scheduling, reentrancy, argument/result
 delivery, heterogeneous trap-reason conversion, a trap taxonomy, transaction
 rollback or atomicity, resource exhaustion, fuel, gas, parser or source syntax,
-Wire, Oracle, ABI, or EVM behavior.
+Wire, ABI, or EVM behavior.
 
 The internal `FrameTrace` is inherited from ADR-0075. Carrying it adds no
 concrete contract-log survival, authenticity, or publication rule and records

@@ -124,8 +124,8 @@ Still deferred are:
 - nominal data, constructors/members, assignment, mappings/proxies, indexing,
   loops and broader control flow;
 - function-valued public results and a graph result encoding in a published
-  Oracle or wire protocol;
-- automatic entry discovery, multi-root public execution, and a source Oracle;
+  wire protocol;
+- automatic entry discovery and multi-root public execution;
 - total-work accounting, runtime memoization, and type-growing polymorphic
   recursion beyond the specialization budget; and
 - broad type-safety, linking-correctness, fuel, closure, and source/runtime

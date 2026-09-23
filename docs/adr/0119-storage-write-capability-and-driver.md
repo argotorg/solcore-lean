@@ -251,8 +251,8 @@ requests, suspension/resumption, machine execution, and their safety proofs.
 It remains independent of `Solcore.Semantics`.
 
 Semantics owns the generic handler driver and the concrete interpretation of
-storage requests through the proven-present working Account. Parser, Surface,
-ABI, Oracle commands, published profiles, and gas schedules are unchanged.
+storage requests through the proven-present working Account. Parser, source
+syntax, ABI, published profiles, and gas schedules are unchanged.
 
 ## Write lifecycle is not decided here
 

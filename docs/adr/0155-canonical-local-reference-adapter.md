@@ -59,10 +59,9 @@ This adapter adds no dynamic effects.
 
 ## Publication and validation
 
-Only the additive Lean library boundary changes. Canonical parser behavior,
-Oracle versions, frozen wire languages, and published golden bytes remain
-unchanged. This is not a source-text execution service or a completed source
-type checker.
+Only the additive Lean library boundary changes. Canonical parser behavior and
+frozen wire languages remain unchanged. This is not a source-text execution
+service or a completed source type checker.
 
 Regressions cover exact spelling, distinct arbitrary source spans, nested
 groups, duplicate-name priority, unsupported nodes, missing context identities,

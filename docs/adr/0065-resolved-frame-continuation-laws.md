@@ -79,7 +79,7 @@ scenario theorem, frame stack, invocation operation, checkpoint creation or
 ownership, trace taxonomy, append operation or order, concrete event
 representation, transaction boundary, or trap policy.
 
-It adds no parser or source form, Wire field or tag, Profile, Oracle behavior,
+It adds no parser or source form, Wire field or tag, Profile,
 ABI, Core-result adapter, EVM revision, opcode, gas schedule, serialization,
 canonical delta, or frozen artifact.
 

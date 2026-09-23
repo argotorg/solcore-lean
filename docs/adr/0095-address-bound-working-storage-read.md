@@ -132,7 +132,7 @@ scheduling, transaction, delta, or published observation rule.
 
 It performs no mutation, does not validate checkpoint/working relationships,
 and does not make an absent Account read as zero. It adds no parser or source
-syntax, Core expression, Wire or Oracle field, Profile, or frozen artifact.
+syntax, Core expression, Wire field, Profile, or frozen artifact.
 
 ## Staged implementation plan
 

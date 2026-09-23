@@ -129,7 +129,7 @@ composition or invocation, trace ownership rule, concrete effect or event
 taxonomy, ordering, append operation or algebra, transaction boundary, or trap
 disposition.
 
-It adds no parser or source form, Wire field or tag, Profile, Oracle behavior,
+It adds no parser or source form, Wire field or tag, Profile,
 ABI, Core-result adapter, EVM revision, opcode, gas schedule, serialization,
 canonical delta, or frozen artifact.
 

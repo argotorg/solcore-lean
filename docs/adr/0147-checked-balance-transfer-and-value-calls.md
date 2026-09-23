@@ -253,12 +253,11 @@ pass.
 
 This ADR does not add account or contract creation, nonce policy, deletion,
 logs, ABI encoding, general byte-array calls, recursive depth, balance-reading
-host capabilities, gas pricing, Surface syntax, parser proofs, or a public
-Oracle schema.
+host capabilities, gas pricing, source syntax, parser proofs, or an external
+serialized schema.
 
-After this slice, implementation proceeds to creation, logs, ABI, and the
-public Oracle. Parser-related proofs remain paused until Solcore syntax
-stabilizes.
+After this slice, implementation proceeds to creation, logs, and ABI.
+Parser-related proofs remain paused until Solcore syntax stabilizes.
 
 ## Consequences
 

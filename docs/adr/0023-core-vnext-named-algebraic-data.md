@@ -13,7 +13,7 @@ that identity in order to represent recursive data, distinguish structurally
 similar declarations, and execute exhaustive constructor matching.
 
 Concrete type names, constructor spellings, nested patterns, wildcards, and
-guards belong to a future resolved or Surface language. They are likely to
+guards belong to a future resolved source language. They are likely to
 change and are not needed by an evaluator after elaboration. The Core should
 therefore receive a small normalized description of each data declaration
 rather than source syntax.
@@ -157,7 +157,7 @@ testing the structured faults of malformed machine states.
 The generalized logical-reducibility and totality theorems take whole-table
 well-formedness as an explicit premise. This is an intentional change to the
 unpublished internal Lean proof API; it does not change any published wire or
-Oracle interface.
+serialization interface.
 
 This feature is internal. Semantic Core v1 and v2 have no definition-table or
 named-data encoding. Both frozen wire projections must reject:
@@ -167,9 +167,8 @@ named-data encoding. Both frozen wire projections must reject:
 - every program whose internal definition table is nonempty, even if its main
   expression does not mention the table.
 
-No existing published Oracle schema, profile, capability, fault encoding, or
-golden byte changes. Publication requires a new additive Core version and a
-separate decision.
+Existing published wire schemas and fault encodings remain unchanged.
+Publication requires a new additive Core version and a separate decision.
 
 ## Required implementation
 
@@ -209,7 +208,7 @@ This ADR does not add:
 - changing the existing admissible contents of local cells;
 - ABI encoding, storage layout, public serialization, or contract-state
   meaning; or
-- a public Core version or Oracle operation.
+- a public Core version or wire operation.
 
 ## Consequences
 

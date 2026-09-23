@@ -91,9 +91,7 @@ or diagnostic tag. In particular:
 
 - the CEK machine receives no new frame or transition;
 - big-step evaluation receives no new rule;
-- Semantic Core wire v1 and v2 receive no new tag or schema field;
-- Oracle requests, responses, profiles, capabilities, and golden bytes do not
-  change; and
+- Semantic Core wire v1 and v2 receive no new tag or schema field; and
 - no public source spelling or cast operation is introduced.
 
 A wire projection sees only the expanded ordinary expression. Each frozen wire
@@ -118,9 +116,8 @@ closed schema.
 - test false, true, zero, one, and representative nonzero word boundaries,
   including the maximum word;
 - test an effectful operand to detect duplicate or skipped evaluation; and
-- test frozen-wire and Oracle boundaries, including that no new tag or
-  capability appears and that projections behave exactly like the handwritten
-  expansions.
+- test frozen-wire boundaries, including that no new tag appears and that
+  projections behave exactly like the handwritten expansions.
 
 The completed implementation provides dedicated typing, inference, evaluation,
 zero/nonzero, store-threading, and weakening theorems. Focused tests cover
@@ -138,7 +135,7 @@ This ADR does not add:
 - conversions involving products, sums, named data, cells, functions, bytes,
   addresses, or contract values;
 - optimizer rules that replace the expansions with backend instructions; or
-- a new public Core or Oracle version.
+- a new public Core version.
 
 ## Consequences
 

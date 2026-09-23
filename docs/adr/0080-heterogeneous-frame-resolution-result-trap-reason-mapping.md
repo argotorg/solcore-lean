@@ -168,7 +168,7 @@ transaction rollback or atomicity. It proves no naturality law between mapping
 and resolution; that is a separate possible slice.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
-fuel or gas policy, Wire or Oracle field, ABI, serialization, EVM revision,
+fuel or gas policy, Wire field, ABI, serialization, EVM revision,
 opcode behavior, Profile, canonical delta, or published format.
 
 ## Staged implementation plan

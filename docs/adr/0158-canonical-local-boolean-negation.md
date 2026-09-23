@@ -53,8 +53,8 @@ Grouping adds no Core transitions, and nesting follows the actual Core tree.
 These are execution bounds, not parser/checker complexity or EVM gas.
 
 This is not a new external source service or a change to any frozen publication.
-Canonical parser behavior, Semantic Core constructors, Oracle versions,
-schemas, capabilities, and golden bytes remain unchanged.
+Canonical parser behavior, Semantic Core constructors, and schemas remain
+unchanged.
 
 Tests cover both Boolean inputs, double negation, grouping and conditional
 nesting, arbitrary source ranges, caller-controlled names, non-Boolean operands,

@@ -17,7 +17,7 @@ It does not yet turn an external method call into that execution path.
 
 Concrete Solcore syntax may change substantially. ABI work must therefore
 start from syntax-independent method metadata and checker-accepted Core, not
-from the parser or Surface AST. This milestone implements the smallest useful
+from the parser or source AST. This milestone implements the smallest useful
 vertical slice: one or more statically declared methods, each with exactly one
 `uint256` input and one `uint256` result.
 
@@ -236,10 +236,10 @@ Implementation is complete when it provides external consumers for:
 
 ## Exclusions and next boundary
 
-This milestone does not define parser or Surface syntax, source-type lowering,
+This milestone does not define parser or source syntax, source-type lowering,
 contract inheritance, overloading beyond canonical-signature uniqueness,
 fallback or receive functions, constructors, events, indexed logs, storage
-layout, or a public Oracle/Wire schema.
+layout, or an external execution schema.
 
 It also excludes zero-argument and multi-argument functions; `bool`, `address`,
 bytes, strings, arrays, tuples, user ADTs, dynamic offsets, multiple return
@@ -250,9 +250,9 @@ behavior.
 Storage layout is deliberately not a prerequisite for this slice: selected
 checked implementations already use the exact Word storage operations of the
 executable semantics. A later storage-layout milestone may map source-level
-fields into those slots without changing this ABI profile. The next runtime
-boundary is a versioned public Oracle execution interface; source-level storage
-layout remains independent and can follow with the future elaboration adapter.
+fields into those slots without changing this ABI profile. Runtime execution
+is exposed through a versioned direct Lean API; source-level storage layout
+remains independent and can follow with an elaboration adapter.
 
 ## Implementation evidence
 

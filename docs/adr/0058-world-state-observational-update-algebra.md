@@ -64,7 +64,7 @@ Keep each commit below 300 changed lines:
 ## Publication and exclusions
 
 This proof-only slice is internal and not published. It adds no parser, source
-syntax, Wire field or tag, Profile, Oracle behavior, or frozen artifact.
+syntax, Wire field or tag, Profile, or frozen artifact.
 
 It fixes no trap policy, nested frame or checkpoint rule, surviving log, call,
 or creation effect, Account lifecycle, transaction atomicity, state delta,

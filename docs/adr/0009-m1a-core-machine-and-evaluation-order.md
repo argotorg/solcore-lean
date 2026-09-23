@@ -37,7 +37,7 @@ handling of conditionals differs materially.
   branches and can therefore execute effects in the unselected branch.
 
 The latter behavior is not adopted as the reference semantics. An independent
-rule is needed so that the oracle can detect this backend defect.
+rule is needed so that direct evaluation can expose this backend defect.
 
 ## Decision
 
@@ -94,10 +94,9 @@ specified in a separate ADR as short-circuiting forms derived from conditionals.
 - Progress and preservation are proved for machine-state typing.
 - Every well-typed closed term terminates with some finite amount of fuel and
   cannot produce a machine fault for any fuel amount.
-- This M1a fragment alone does not promote the aggregate `corePrimitives` feature
-  to `implemented`. The M0 profile, digest, Oracle v1 wire schema, and query support
-  remain unchanged. Implementation-progress metadata in v1 capabilities reflects
-  the M1a state.
+- This M1a fragment alone does not promote the aggregate `corePrimitives`
+  feature to `implemented`. Earlier profile and digest records remain
+  unchanged; implementation-progress metadata records the M1a state.
 
 ## Conformance requirements
 

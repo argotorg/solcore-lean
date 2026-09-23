@@ -158,8 +158,8 @@ The generic carrier depends only on `CheckedHostCoreWordProgram`. The
 WorldState adapter depends on existing WorldState code selection. Neither Core
 nor Account storage representation gains a dependency on frame semantics.
 
-This ADR adds no Wire tag, Oracle command, schema, profile, metadata capability,
-Surface form, grammar, parser rule, or source elaboration. The parser proof
+This ADR adds no Wire tag, schema, profile,
+source form, grammar, parser rule, or source elaboration. The parser proof
 program remains paused. The root README does not change.
 
 Acceptance requires focused and full builds, the executable suite, trust-zero

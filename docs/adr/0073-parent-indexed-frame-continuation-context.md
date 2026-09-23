@@ -152,7 +152,7 @@ independent audit and completion evidence.
 This internal refinement is not published. It adds no concrete event taxonomy,
 balance, code, call data, transferred value, host call/create behavior, ABI,
 EVM revision, opcode, gas schedule, parser or source form, Core expression,
-Wire field or tag, Profile, Oracle behavior, serialization, canonical delta,
+Wire field or tag, Profile, serialization, canonical delta,
 or frozen artifact.
 
 ## Consequences

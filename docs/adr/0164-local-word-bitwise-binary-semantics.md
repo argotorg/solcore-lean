@@ -64,4 +64,4 @@ Audit affected public proofs against standard kernel axioms and run focused
 and aggregate builds, complete tests, kernel checks, and metadata checks.
 Keep proof files below 300 lines. This adds no Core rule, parser behavior,
 arithmetic/comparison policy, assignment or declaration semantics, source-wide
-allocator, wire format, Oracle endpoint, capability, or golden-byte change.
+allocator, wire format, external endpoint, or capability change.

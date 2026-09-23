@@ -1,1 +1,0 @@
-{"id":"golden-check","profile":{"digest":"sha256:2ccae018d736fa61910a6c2475fe3088bad2e924b60d43a9748852b7cc817ec8","id":"core-v1"},"query":"check","schema":"solcore-oracle/v1","spec":"solcore/0.1.0-draft.1","verdict":{"features":[],"kind":"unsupported","phase":"checking"}}

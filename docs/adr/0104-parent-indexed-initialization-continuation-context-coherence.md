@@ -106,7 +106,7 @@ ancestry provenance, scheduling, stack, depth, return delivery, trap handling,
 rollback, transaction, concurrency, reentrancy, atomicity, cost, or gas policy.
 
 It adds no storage selector, Account-presence rule, parser or source syntax,
-Core expression, Wire or Oracle field, Profile, ABI, serialization, or
+Core expression, Wire field, Profile, ABI, serialization, or
 published observation.
 
 ## Staged implementation plan

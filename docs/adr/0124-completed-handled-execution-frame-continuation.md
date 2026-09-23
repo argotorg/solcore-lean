@@ -197,7 +197,7 @@ The checked and selected lifts live in Semantics and reuse existing storage
 driver safety, done stability, and code-selection completeness. Core imports no
 frame or WorldState meaning.
 
-No parser, Surface, ABI, Oracle, Wire, schema, profile, gas, or public runtime
+No parser, source syntax, ABI, Wire, schema, profile, gas, or public runtime
 module changes. The root README does not change.
 
 ## Non-goals

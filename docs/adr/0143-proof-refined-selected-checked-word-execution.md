@@ -194,8 +194,8 @@ and existing storage-driver resumption. It embeds the existing raw result and
 successful completion types; it does not add a competing frame or result
 carrier.
 
-This ADR adds no Wire tag, Oracle command, schema, profile, metadata capability,
-Surface form, grammar, parser rule, or source elaboration. Parser work remains
+This ADR adds no Wire tag, schema, profile,
+source form, grammar, parser rule, or source elaboration. Parser work remains
 paused. The root README does not change.
 
 Acceptance requires focused and full builds, the executable suite, trust-zero

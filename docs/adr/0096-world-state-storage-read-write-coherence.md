@@ -115,8 +115,8 @@ checkpoint, rollback, outcome, trap, stack, scheduling, transaction, balance,
 code, storage layout, warmth, refund, gas, ABI, serialization, EVM revision,
 delta, or published observation rule.
 
-The slice adds no parser or source syntax, Core expression, Wire or Oracle
-field, Profile, capability, or frozen artifact.
+The slice adds no parser or source syntax, Core expression, Wire field, Profile,
+or frozen artifact.
 
 ## Staged implementation plan
 

@@ -103,7 +103,7 @@ reentrancy, gas, ABI, transaction, host I/O, or published observation rule.
 
 The equalities are pure nested `Option` observations. They make no concurrent
 mutation, cost, evaluation-count, or external-effect claim. They add no parser
-or source syntax, Core expression, Wire or Oracle field, Profile, or frozen
+or source syntax, Core expression, Wire field, Profile, or frozen
 artifact.
 
 ## Staged implementation plan

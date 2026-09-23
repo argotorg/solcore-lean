@@ -70,8 +70,8 @@ Focused regressions cover:
 
 This slice only composes existing internal expressions. It adds no Core form,
 primitive tag, source spelling, standard-library API, ABI rule, opcode
-lowering, gas rule, schema, Oracle behavior, Wire version, or public byte.
-Frozen Wire v1/v2 and their public operation enums remain unchanged.
+lowering, gas rule, schema, Wire version, or public byte. Frozen Wire v1/v2 and
+their public operation enums remain unchanged.
 
 ## Consequences
 

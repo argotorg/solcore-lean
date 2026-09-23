@@ -99,9 +99,7 @@ private def legacyDigestsAreUnchanged : Bool :=
     m1aCoreProfileDigest ==
       "sha256:3645c44ee266496e6ae13e33971d34c6836dee105a543e6805e5dd8b674ff867" &&
     m1cCoreProfileDigest ==
-      "sha256:111ad60f90a5dca6eaafa582475b6582d081bc081ee59766d6040173061f2693" &&
-    m2bFrontendProfileDigest ==
-      "sha256:292e8c423bfc2d7e77f7a9756e743af473f6a952073e590c62a05c676e3bf33a"
+      "sha256:111ad60f90a5dca6eaafa582475b6582d081bc081ee59766d6040173061f2693"
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

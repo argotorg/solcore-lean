@@ -126,7 +126,7 @@ mechanism, concrete effect or event taxonomy, event ordering, trace append
 operation or algebra, transaction boundary, ABI, Core-result adapter, trap
 taxonomy, EVM revision, opcode, gas schedule, or resource-limit policy.
 
-It adds no parser or source form, Wire field or tag, Profile, Oracle behavior,
+It adds no parser or source form, Wire field or tag, Profile,
 serialization, canonical delta, or frozen artifact. Integration with
 `FrameRunResult` remains a separate decision.
 

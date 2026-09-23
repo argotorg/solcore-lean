@@ -36,13 +36,12 @@ The unchecked machine has a structured fault when a projection receives a
 non-pair value. Well-typed programs cannot reach that fault.
 
 Unit remains the nullary product representation. This ADR does not choose how
-a future Surface tuple with more than two elements nests into binary products;
-that belongs to an elaboration decision.
+a future source tuple with more than two elements nests into binary products;
+that belongs to a source-elaboration decision.
 
 ## Boundary
 
-This feature is internal. It adds no tag to Semantic Core v1 or v2 and changes
-no Oracle v2 or v3 profile.
+This feature is internal. It adds no tag to Semantic Core v1 or v2.
 
 The frozen wire projections return no representation for:
 
@@ -52,7 +51,7 @@ The frozen wire projections return no representation for:
 - pair values; and
 - programs containing those forms.
 
-Product equality, ordering, hashing, ABI encoding, storage layout, Surface
+Product equality, ordering, hashing, ABI encoding, storage layout, source
 syntax, and source diagnostics are outside this decision.
 
 ## Required implementation

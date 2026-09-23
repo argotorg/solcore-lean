@@ -151,8 +151,8 @@ that imports both `WorldState` and checked-code execution. This prevents every
 state-only consumer from acquiring an execution dependency.
 
 Place the new semantic modules after the current WorldState storage foundation
-and before frame-specific refinements. Keep public Wire schemas, Oracle paths,
-and the frozen frontend dependency graph unchanged.
+and before frame-specific refinements. Keep public Wire schemas and the frozen
+frontend dependency graph unchanged.
 
 ## What this slice does not decide
 

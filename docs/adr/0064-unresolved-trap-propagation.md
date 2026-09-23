@@ -71,7 +71,7 @@ child/parent law, frame stack, invocation operation, checkpoint creation,
 trace taxonomy, append operation or order, concrete event representation,
 transaction boundary, fatal-trap policy, or resolved trap carrier.
 
-It adds no parser or source form, Wire field or tag, Profile, Oracle behavior,
+It adds no parser or source form, Wire field or tag, Profile,
 ABI, Core-result adapter, EVM revision, opcode, gas schedule, serialization,
 canonical delta, or frozen artifact.
 

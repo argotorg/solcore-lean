@@ -182,7 +182,7 @@ HostDriver import, and Core gains no reverse dependency on the frame layer.
 
 The operation is re-exported only through the internal Semantics facade. It
 does not change Core, host requests, WorldState, execution, fuel, parser,
-Surface, ABI, Oracle, Wire, schemas, profiles, or the root README.
+source syntax, ABI, Wire, schemas, profiles, or the root README.
 
 ## Non-goals
 
@@ -242,8 +242,8 @@ layers under additional fuel.
   format was added; and
 - independent production and regression audits found no P0-P3 issue.
 
-The parser, Surface, Core, host protocol, WorldState, execution, fuel, ABI,
-Oracle, Wire formats, schemas, profiles, and root README did not change.
+The parser, source syntax, Core, host protocol, WorldState, execution, fuel, ABI,
+Wire formats, schemas, profiles, and root README did not change.
 
 ## Consequences
 

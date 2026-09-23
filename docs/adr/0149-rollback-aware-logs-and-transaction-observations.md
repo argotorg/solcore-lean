@@ -23,8 +23,8 @@ ADR-0075 deliberately reserve the rollback component for future contract logs;
 the surviving trace is not a contract-log policy.
 
 This milestone connects those foundations to the authoritative top-level and
-one-level nested executors. It does not resume parser proof work and does not
-publish a Wire or Oracle schema.
+one-level nested executors. It does not resume parser proof work or publish a
+serialized schema.
 
 ## Decision
 
@@ -193,7 +193,7 @@ Checked Core programs and boundary fixtures cover:
 This is an internal executable-semantics milestone. It adds no source syntax,
 parser rule or parser proof, Solidity event declaration policy, ABI signature,
 selector, indexed-argument rule, multi-topic or byte-array log operation,
-serialization, public Profile, public Oracle request/result, or Wire tag.
+serialization, public Profile, external request/result, or Wire tag.
 
 It also does not add gas charging, log limits, bloom filters, receipts, block
 context, EVM revision selection, recursive calls, reentrancy, delegate/static
@@ -201,8 +201,8 @@ call policy, enumerable touched storage keys, or a revert-surviving external
 call trace. Those omissions must not be described as implemented by this ADR.
 
 The next milestone may connect ABI rules only after this word-level execution
-path and its rollback behavior are complete. Public Oracle exposure remains a
-separate final boundary.
+path and its rollback behavior are complete. Any external serialization remains
+a separate boundary.
 
 ## Commit discipline
 

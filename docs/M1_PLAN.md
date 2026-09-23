@@ -1,175 +1,143 @@
 # Semantic Core implementation policy
 
-This file retains its historical name so existing links remain valid. It now
-describes the current implementation policy and the boundary that has been
-completed. It is not a chronological ledger, a commit plan, or a promise that
-every possible next feature will be implemented.
+This document records the sequencing and completion policy for Semantic Core,
+checked-contract execution, ABI support, and reproducible Core synthesis. For
+implemented coverage, see [Current status](CURRENT_STATUS.md).
 
-For the concise revision-local result, see [Current status](CURRENT_STATUS.md).
-For public data shapes, see [Core Wire v3](CORE_WIRE_V3.md) and
-[Oracle v5](ORACLE_V5_WIRE.md).
+## Objective and boundary
 
-## Current objective and boundary
+Semantic Core is the small, syntax-independent executable language between
+source compilation and effectful contract execution. It owns local values and
+stores, typing, evaluation, checking, machines, primitives, and safety. It does
+not own source parsing, inference, world-state accounts, transaction rollback,
+or ABI encoding.
 
-The checked Semantic Core and contract runtime are the completed executable
-semantic boundary. They have three connected public parts:
-
-1. Semantic Core v3 represents the checked language independently of source
-   spelling.
-2. The checked-contract runtime executes Core against an explicit world and
-   environment.
-3. Oracle v5 validates public JSON, checks Core, runs a scenario, and returns a
-   total semantic observation.
-
-The canonical PR #20 syntax is implemented as an independent source layer, and
-its formal parser proof boundary remains active. The parser produces source
-syntax; it does not bypass resolution, source typing, or elaboration into
-checked Core.
-
-## Why Core remains separate from source syntax
-
-Runtime meaning does not depend on source spelling. Semantic Core gives typing
-and execution a small, explicit input while the canonical frontend retains
-tokens, comments, grouping, and source spans in its own representation.
-
-The separation is:
+The surrounding retained boundaries are:
 
 ```text
-canonical source frontend
-  → resolved and typed source
-  → Semantic Core v3
-  → checked-contract runtime
-  → Oracle v5 observation
+Frontend elaboration --> checked Core --> ContractRuntime
+                              ^                 ^
+                              |                 |
+                          Synthesis            Abi
 ```
 
-The canonical source frontend and the last three stages are implemented as
-separate boundaries. The resolved-and-typed source stage does not yet exist;
-accepting Core JSON does not simulate source resolution or elaboration.
+Every arrow is an explicit typed adapter.
 
-## Core v3 policy
+## Core language policy
 
-Semantic Core v3 is a closed public algebra. It contains the currently
-supported value, type, control-flow, local-cell, named-data, and Word-operation
-forms, plus a frozen contract host context.
+A Core feature is complete only when the affected obligations are addressed:
 
-The following rules protect that boundary:
+1. data and syntax representation;
+2. declarative typing and evaluation;
+3. executable inference/checking and evaluation;
+4. deterministic diagnostic behavior;
+5. machine execution where applicable;
+6. correspondence, progress, and preservation at the changed boundary;
+7. fuel and resumption behavior; and
+8. explicit representation or rejection in each retained wire encoding.
 
-- public tags and fields are changed only by a new additive wire version;
-- exact encoders emit one canonical representation;
-- strict decoders reject missing, unknown, and malformed fields;
-- Core depth and node limits are measured before unbounded construction;
-- old Core wires continue to reject forms outside their own closed languages;
-- internal runtime values, stores, closures, and proof witnesses are not wire
-  values; and
-- Core-to-wire projection remains explicitly partial for any later internal
-  form outside v3.
+Core values and stores remain separate from source heaps and contract world
+state. New source concepts enter Core only through an explicit lowering with a
+stated proof boundary.
 
-Well-typedness is mandatory. A decoded program is checked against the frozen
-host context before contract admission. The public executor never treats an
-unchecked term as an executable contract.
+## Retained wire encodings
 
-## Executable contract policy
+Core Wire v1, v2, and v3 are closed representations. Their modules may decode,
+encode, or project only the constructors assigned to that version. Adding an
+internal Core constructor must not change the meaning of existing encoded
+values.
 
-Execution begins from caller-supplied, finite values rather than ambient host
-state. A scenario supplies:
+- [ADR-0010](adr/0010-m1b-core-wire-v1.md) records the v1 boundary.
+- [Core Wire v3](CORE_WIRE_V3.md) catalogs the current encoding.
+- [ADR-0151](adr/0151-versioned-checked-core-execution.md) records how checked
+  Core v3 enters the retained execution stack.
 
-- a package of Core contracts;
-- accounts with balance, nonce, sparse storage, and optional code;
-- nested-call bindings and creation templates;
-- a deterministic creation-address policy;
-- target, caller, call value, and calldata;
-- evaluator fuel; and
-- a finite set of state probes.
+Strict decoding should reject missing or unknown fields, invalid tags,
+noncanonical scalar encodings, duplicate keys, and configured resource-limit
+violations deterministically.
 
-The implemented runtime includes a top-level call, depth-one checked child
-calls, value transfer, checked initialization and runtime installation, ordered
-Word logs, and a static `uint256 -> uint256` ABI.
+## Primitive policy
 
-State and effects follow one checkpoint discipline:
+Primitive operations must define:
 
-- top-level return commits the working world and journal;
-- top-level preflight rejection, revert, or trap selects the root checkpoint;
-- child return contributes its working changes to the parent;
-- child revert or trap restores the child checkpoint;
-- initializer failure removes provisional creation effects; and
-- internal fuel-resumption laws prove that completed transfers, creations, and
-  logs are not replayed. Oracle v5 exposes exhaustion only as `inconclusive`
-  and publishes no resume token.
+- operand and result types;
+- left-to-right evaluation order;
+- exact Word-width behavior;
+- exceptional cases such as zero divisors or oversized shifts;
+- executable and declarative agreement; and
+- machine and renaming support.
 
-Oracle observations expose only caller-requested state endpoints plus terminal
-data and the committed journal. This keeps results finite while allowing tests
-to compare account presence, storage, balance, nonce, code, logs, and created
-addresses.
+Dedicated modules own coherent families such as arithmetic, division,
+remainder, shifts, sign extension, byte selection, modular operations,
+bitwise logic, conversions, and comparisons.
 
-Evaluator fuel is a totality and resource boundary. It is not an EVM gas price,
-fee schedule, or claim about wall-clock cost. Exhaustion is `inconclusive`, not
-a semantic rejection and not a fabricated terminal execution.
+## Checked-contract execution policy
 
-## Oracle v5 policy
+`Solcore.ContractRuntime` accepts only admitted checked programs. Its inputs
+make the finite world, code registry, creation templates, call environment,
+invocation, and resource bounds explicit.
 
-Oracle v5 is the public composition point. It performs operations in a fixed
-order so malformed input, resource exhaustion, typing failure, admission
-failure, scenario failure, and execution remain distinct.
+Each runtime feature must state:
 
-Its three queries are:
+- its preflight conditions;
+- which state belongs to the transaction checkpoint and working view;
+- which child effects are committed or rolled back;
+- the order of logs and created addresses;
+- the fuel charged before and after host transitions; and
+- the typed observation returned for every modeled outcome.
 
-- `capabilities`, for exact version, profile, feature, and limit discovery;
-- `coreCheck`, for one Core v3 program; and
-- `execute`, for one complete checked-contract scenario.
+A top-level return commits the modeled working state. Revert, trap, and
+specified preflight failures select the corresponding checkpoint. Nested-call
+and creation failures resolve local state before returning to their parent.
 
-Request and response unions are query-specific. A Core-check response cannot
-carry an execution observation, and an execution rejection identifies the
-phase that rejected it. Protocol errors remain separate from language and
-runtime verdicts.
+Contract execution is not an EVM model. EVM gas, fees, blocks, bytecode,
+memory, and fork equivalence require separate future definitions.
 
-Oracle v1 through v4 remain frozen. V5 dispatch is additive and must not change
-their decoding, capability reports, result shapes, or command-line behavior.
+## ABI policy
 
-## Parser policy
+ABI support lives under `Solcore.Abi`. A callable boundary is admitted only
+when its metadata, signature, decoding, and encoding obligations are explicit.
+The current implementation covers Keccak-256 and the modeled static-word
+boundary; general dynamic/composite ABI support remains outside the completed
+scope.
 
-ADR-0153 ended the parser pause. The active target is the pinned PR #20 syntax,
-implemented afresh under `Solcore.Syntax` without Surface v1 or Multi
-compatibility constraints. Executable lexer and parser coverage is complete;
-resource, span, provenance, and grammar-soundness proofs now follow it.
+## Synthesis policy
 
-Surface v1 and Oracle v4 remain frozen historical interfaces and are not
-reinterpreted. Any public result for the canonical frontend requires a new
-additive version.
+[ADR-0152](adr/0152-reproducible-checked-core-case-synthesis.md) governs the
+pure Core v3 generator and shrinker. Reproducibility requires an explicit seed,
+versioned fragment assumptions, deterministic generation, checker-sealed
+output, and a returned final seed state.
 
-## Work outside the current boundary
+A shrink candidate must:
 
-The following areas are not implemented by the current executable path:
+- remain inside the declared fragment;
+- preserve binder scope;
+- pass the Core checker; and
+- be strictly smaller under the documented measure.
 
-- unbounded or recursively nested contract execution;
-- a general ABI with dynamic values, fallback, receive, and broader call kinds;
-- a complete source pipeline for resolution, source typing, elaboration, and
-  execution;
-- generation or synthesis of arbitrary well-typed Core or Solcore programs;
-  and
-- an automated semantic differential-testing harness against independent
-  implementations.
+Expansion beyond Word/Boolean terms should proceed one feature family at a
+time: functions and recursion, algebraic data, cells, then host effects. Each
+step needs generation coverage, shrinking invariants, and regression seeds.
 
-Other EVM-adjacent concerns such as gas schedules, block context, memory,
-bytecode execution, and full EVM equivalence are also outside the present
-claim.
+## Work order
 
-These are candidate directions, not a scheduled roadmap. Starting any one of
-them requires an explicit choice of observable behavior, prerequisites, public
-versioning, and validation cost. Completing the current executable semantics
-does not by itself authorize or commit the project to a particular next area.
+For a vertical Core/runtime increment:
 
-## Change discipline
+1. settle the declarative rule and observable edge cases;
+2. implement the checker/evaluator path;
+3. establish machine and safety results;
+4. update retained encoding isolation;
+5. add contract-runtime or ABI adapters only when required;
+6. extend synthesis only after the checker boundary is stable; and
+7. update status, feature, and compatibility documentation.
 
-Changes inside the current boundary should preserve these checks:
+## Exit conditions
 
-- declarative and executable typing agree for the published Core;
-- evaluator and state transitions retain their stated safety properties;
-- commit and rollback select the exact proved endpoints;
-- resource limits produce deterministic protocol or inconclusive results;
-- encoders and decoders retain canonical round trips and exact failure order;
-- old public versions remain unchanged; and
-- full build, tests, metadata validation, and kernel trust checks pass.
+A change may be marked complete when:
 
-A new public feature should be small enough to specify, execute, test, and
-review as one coherent behavior. Historical decision records explain why past
-choices were made; this document and Current status define the active policy.
+- all changed Lean modules build with warnings as errors;
+- focused and full tests pass;
+- repository-data and kernel-policy checks pass;
+- retained encodings either represent or reject the form explicitly;
+- resource and rollback behavior are tested at their boundaries; and
+- open proof or interoperability work is named without broadening the claim.

@@ -141,7 +141,7 @@ Account. It exposes no map iteration, insertion order, comparison order,
 serialization, canonical state delta, or observation schema.
 
 It adds no source form, Core type or expression, Wire tag, JSON schema,
-profile, Oracle query, verdict, protocol field, or published observation.
+profile, or published observation.
 Frozen public formats and metadata remain unchanged.
 
 ## Consequences

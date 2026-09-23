@@ -37,7 +37,7 @@ resolution. Parser precedence and chained-comparison rejection are unchanged.
 `>=`, division/remainder, unary signs, calls and mutation remain outside the
 adapter. Strict Word literal spelling/range validation stays unchanged.
 The explicit-ID comparison builder remains a separate interface. No new Core
-primitive, Oracle/wire change or diagnostic-proof work is included.
+primitive, wire change, or diagnostic-proof work is included.
 
 ## Validation
 

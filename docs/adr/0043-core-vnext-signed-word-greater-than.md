@@ -70,9 +70,9 @@ Compile-time examples exercise all eleven theorem names.
 ## Publication and exclusions
 
 `wordSgt` is internal-only. Do not add it to frozen Wire v1 or v2, their JSON
-enums, any public Oracle, schema, profile, or version. No source spelling,
-standard-library API, ABI rule, opcode lowering, or gas rule is introduced.
-Existing public behavior and bytes remain unchanged.
+enums, schemas, or versions. No source spelling, standard-library API, ABI rule,
+opcode lowering, or gas rule is introduced. Existing public behavior and bytes
+remain unchanged.
 
 ## Consequences
 
@@ -93,5 +93,5 @@ exactly once and retain their final store. Literal expressions stop at fuel 4
 and complete at 5; effectful expressions stop at 28 and complete at 29.
 
 Frozen Wire v1/v2 expression projections and the Wire v2 `BinaryOp` conversion
-reject `wordSgt`. No public enum, schema, JSON value, Oracle behavior, profile,
-version, or byte sequence changed. The independent audit found no P0-P3 issue.
+reject `wordSgt`. No public enum, schema, JSON value, version, or byte sequence
+changed. The independent audit found no P0-P3 issue.

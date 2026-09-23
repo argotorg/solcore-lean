@@ -123,7 +123,7 @@ selected callback returning `none`.
 
 It does not equate callbacks, execution traces, costs, steps, or invocation
 counts. It adds no parser or source syntax, Core expression, resource rule,
-fuel or gas policy, Wire or Oracle field, ABI, serialization, EVM revision,
+fuel or gas policy, Wire field, ABI, serialization, EVM revision,
 opcode behavior, Profile, canonical delta, or published observation.
 
 ## Staged implementation plan

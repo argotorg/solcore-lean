@@ -1,189 +1,131 @@
 # Project map
 
-This is a reading route, not a list of every theorem. For the current source
-pipeline, import [`Solcore.Frontend.Current`](../Solcore/Frontend/Current.lean);
-[`Solcore.Frontend`](../Solcore/Frontend.lean) and
-[`Solcore`](../Solcore.lean) remain full compatibility umbrellas. For focused
-proof work, start from the narrow module for the question at hand instead of
-following every umbrella import. Lean module names follow file paths:
-`Solcore.Frontend.SourceCompiler` is
-`Solcore/Frontend/SourceCompiler.lean`.
+Use this guide to enter the source tree by task. The root
+[`Solcore.lean`](../Solcore.lean) imports the complete public library; focused
+work should normally import a narrower umbrella.
 
 ## Choose an entry point
 
-| Question | Read first | Continue with |
+| Goal | Start here | Read next |
 | --- | --- | --- |
-| How do I run the restricted source compiler? | [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) | Proof and backend-correspondence sections in the same module; [Current status](CURRENT_STATUS.md) |
-| How is a raw workspace checked? | [`ProgramChecking.lean`](../Solcore/Frontend/ProgramChecking.lean) | [`ProgramLoading.lean`](../Solcore/Frontend/ProgramLoading.lean), [`ProgramSignatures.lean`](../Solcore/Frontend/ProgramSignatures.lean) |
-| Where are source expression types inferred? | [`SourceInference.lean`](../Solcore/Frontend/SourceInference.lean) | [`SourceInference/Program.lean`](../Solcore/Frontend/SourceInference/Program.lean), [`Expression.lean`](../Solcore/Frontend/SourceInference/Expression.lean) |
-| Where is the independent source-level formal spec? | [`SourceSemantics.lean`](../Solcore/SourceSemantics.lean) | [`Static.lean`](../Solcore/SourceSemantics/Static.lean), [`Program.lean`](../Solcore/SourceSemantics/Program.lean), [`Dynamic/Evaluation.lean`](../Solcore/SourceSemantics/Dynamic/Evaluation.lean), [`Dynamic/Fault.lean`](../Solcore/SourceSemantics/Dynamic/Fault.lean), [`Dynamic/PatternCompletenessProperties.lean`](../Solcore/SourceSemantics/Dynamic/PatternCompletenessProperties.lean), [`Dynamic/Control.lean`](../Solcore/SourceSemantics/Dynamic/Control.lean), [`Dynamic/Preservation.lean`](../Solcore/SourceSemantics/Dynamic/Preservation.lean), [`Dynamic/WholeLanguagePreservation.lean`](../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean), [`Dynamic/Program.lean`](../Solcore/SourceSemantics/Dynamic/Program.lean), [`Staging.lean`](../Solcore/SourceSemantics/Staging.lean), [ADR-0378](adr/0378-declarative-resolved-source-semantics.md) |
-| How does one root become executable? | [`SourceSpecializationWorklist.lean`](../Solcore/Frontend/SourceSpecializationWorklist.lean) | [`SourceCoreDirectLinking.lean`](../Solcore/Frontend/SourceCoreDirectLinking.lean), [`SourceRuntimeLinking.lean`](../Solcore/Frontend/SourceRuntimeLinking.lean), [`SourceTypedRuntime.lean`](../Solcore/Frontend/SourceTypedRuntime.lean) |
-| What is the Core language? | [`Core.lean`](../Solcore/Core.lean) | [`Typing.lean`](../Solcore/Core/Typing.lean), [`Eval.lean`](../Solcore/Core/Eval.lean), [`Machine.lean`](../Solcore/Core/Machine.lean), [`HostRunner.lean`](../Solcore/Core/HostRunner.lean), [`Renaming.lean`](../Solcore/Core/Renaming.lean), [`Safety.lean`](../Solcore/Core/Safety.lean) |
-| Where are derived comparisons and local-fragment proofs? | [`Core/Derived.lean`](../Solcore/Core/Derived.lean) | [`Core/LocalFragment.lean`](../Solcore/Core/LocalFragment.lean), [`Core.lean`](../Solcore/Core.lean) |
-| What is the contract runtime? | [`ContractRuntime.lean`](../Solcore/ContractRuntime.lean) | [`WorldState.lean`](../Solcore/ContractRuntime/WorldState.lean), [`HostDriver.lean`](../Solcore/ContractRuntime/HostDriver.lean), [`FrameRun.lean`](../Solcore/ContractRuntime/FrameRun.lean), [`TopLevelExecution.lean`](../Solcore/ContractRuntime/TopLevelExecution.lean) |
-| How does Oracle v5 execute contracts? | [`Oracle/V5.lean`](../Solcore/Oracle/V5.lean) | [`Input.lean`](../Solcore/Oracle/V5/Input.lean), [`Execution.lean`](../Solcore/Oracle/V5/Execution.lean), [wire catalog](ORACLE_V5_WIRE.md) |
-| Where are the canonical standard-library sources pinned? | [`Standard/CanonicalData.lean`](../Solcore/Standard/CanonicalData.lean) | [`Workspace.lean`](../Solcore/Workspace.lean), canonical `Syntax`/frontend route |
-| Why do both `Syntax` and `Surface` exist? | [`Syntax.lean`](../Solcore/Syntax.lean) for the current language | [`Surface.lean`](../Solcore/Surface.lean) for frozen Surface v1/Multi compatibility code |
+| Lex or parse source | [`Solcore/Syntax.lean`](../Solcore/Syntax.lean) | `Solcore/Syntax/Lexer.lean`, `Parser.lean`, declaration and grammar modules |
+| Validate workspace identity | [`Solcore/Workspace.lean`](../Solcore/Workspace.lean) | path, syntax, validation, judgment, and property modules |
+| Check or compile a source workspace | [`Solcore/Frontend/Current.lean`](../Solcore/Frontend/Current.lean) | program loading/checking, inference, specialization, linking, execution |
+| Study independent source rules | [`Solcore/SourceSemantics.lean`](../Solcore/SourceSemantics.lean) | static, dynamic, staging, substitution, and program modules |
+| Work with resolved local expressions | [`Solcore/Resolved.lean`](../Solcore/Resolved.lean) | identity, scope, typing, evaluation, and Core correspondence |
+| Extend source type inference | [`Solcore/TypeSystem.lean`](../Solcore/TypeSystem.lean) | type, substitution, scheme, unification, inference, properties |
+| Extend Semantic Core | [`Solcore/Core.lean`](../Solcore/Core.lean) | data, typing, evaluation, checking, machines, safety |
+| Execute checked contracts | [`Solcore/ContractRuntime.lean`](../Solcore/ContractRuntime.lean) | world, frame, transaction, host, call, creation, observation modules |
+| Change ABI support | [`Solcore/Abi.lean`](../Solcore/Abi.lean) | Keccak-256 and static-word modules |
+| Generate checked Core cases | [`Solcore/Synthesis.lean`](../Solcore/Synthesis.lean) | CoreV3 seed, fragment, generator, and shrinker |
+| Inspect canonical library bytes | [`Solcore/Standard/CanonicalData.lean`](../Solcore/Standard/CanonicalData.lean) | workspace/frontend consumers and metadata validation |
 
-## Source-library route
+## Canonical syntax route
 
-The main path is:
+The main source path is:
 
 ```text
-Syntax lexer/parser → Workspace identities → ProgramLoading
-  → ProgramEnvironment / ProgramImports / ProgramModuleResolution
-  → ProgramTypeResolution / ProgramSignatures / ProgramChecking
-  → SourceInference → SourceSpecializationWorklist
-  → SourceCompiler → selected backend
+Syntax.Identifier / Declaration
+        |
+        v
+Syntax.Lexer
+        |
+        v
+Syntax.Parser + recovery and diagnostics
+        |
+        v
+Workspace validation
+        |
+        v
+Frontend program loading and checking
 ```
 
-The following smaller modules make that path easier to inspect:
+Declarative grammar modules state the accepted structure independently of the
+executable parser. Exactness and soundness modules connect component parsers to
+those relations. Begin with [the canonical syntax plan](M2_PLAN.md) before
+changing this route.
 
-- [`Solcore/Syntax`](../Solcore/Syntax.lean) is the canonical parser umbrella;
-  [`Lexer.lean`](../Solcore/Syntax/Lexer.lean) and
-  [`Parser.lean`](../Solcore/Syntax/Parser.lean) are the executable entry
-  modules. Closely coupled parser definitions and proofs are colocated in
-  conceptual modules such as [`ModulePath.lean`](../Solcore/Syntax/Parser/ModulePath.lean),
-  [`Pattern.lean`](../Solcore/Syntax/Parser/Pattern.lean), and
-  [`Expression/Atom.lean`](../Solcore/Syntax/Parser/Expression/Atom.lean). In
-  contrast, [`Solcore/Surface`](../Solcore/Surface.lean) preserves the old
-  Surface v1 parser and the historical Multi experiment. It is compatibility
-  and reference material, not an alternative entry to the current pipeline.
-- [`Solcore/Standard/CanonicalData.lean`](../Solcore/Standard/CanonicalData.lean)
-  embeds the six canonical standard-library files as exact source bytes, with
-  pinned logical paths, lengths, and SHA-256 digests. It is neutral input data:
-  parsing and checking still happen through `Syntax`, workspace validation, and
-  the frontend.
-- [`Solcore/Workspace`](../Solcore/Workspace.lean) defines canonical workspace
-  identities and validation. [`Solcore/Resolved`](../Solcore/Resolved.lean) is
-  an already-resolved local-expression foundation, **not** the complete
-  whole-program source resolver. Its conceptual modules, such as
-  [`Resolved/Renaming.lean`](../Solcore/Resolved/Renaming.lean) and
-  [`Resolved/Scope.lean`](../Solcore/Resolved/Scope.lean), keep each definition
-  and its tightly coupled laws together.
-- [`Solcore/SourceSemantics`](../Solcore/SourceSemantics) is the independent
-  formal specification over the resolved, occurrence-addressed source carrier.
-  It now covers whole-program static admission, every retained expression and
-  statement form, successful big-step dynamics, positive fault propagation,
-  generic static-preservation and successful whole-language subject reduction,
-  plus independent staging and materialization boundaries. It does not define
-  raw-source/module resolution, fault-complete evaluation, progress, or
-  checker/backend correctness.
-- [`ProgramEnvironment.lean`](../Solcore/Frontend/ProgramEnvironment.lean)
-  catalogs declarations;
-  [`ProgramModuleResolution.lean`](../Solcore/Frontend/ProgramModuleResolution.lean)
-  handles module paths; [`ProgramTypeResolution.lean`](../Solcore/Frontend/ProgramTypeResolution.lean)
-  and [`ProgramSignatures.lean`](../Solcore/Frontend/ProgramSignatures.lean)
-  form the type/signature boundary.
-- [`Solcore/TypeSystem`](../Solcore/TypeSystem.lean) contains source-level
-  types, substitution, schemes, unification, and inference machinery.
-  [`SourceInference/TypedIR.lean`](../Solcore/Frontend/SourceInference/TypedIR.lean)
-  records typed source occurrences used after checking.
-- [`SourceSpecialization.lean`](../Solcore/Frontend/SourceSpecialization.lean)
-  substitutes a ground root;
-  [`SourceSpecializationWorklist.lean`](../Solcore/Frontend/SourceSpecializationWorklist.lean)
-  builds its finite executable plan.
-- [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) is the
-  canonical facade. [`SourceProgramExecution.lean`](../Solcore/Frontend/SourceProgramExecution.lean)
-  is the earlier, narrower Core/graph entry path.
+## Frontend route
+
+[`Solcore/Frontend/Current.lean`](../Solcore/Frontend/Current.lean) collects
+the current whole-program modules. The central stages are:
+
+1. `ProgramIdentity`, `ProgramLoading`, and `ProgramEnvironment`;
+2. `ProgramImports`, `ProgramInterfaces`, and `ProgramModuleResolution`;
+3. `ProgramSignatures`, `ProgramTypeResolution`, and `SourceInference`;
+4. `ExecutableImplMethods` and retained evidence/coercions;
+5. `SourceStageAnalysis`, `SourceSpecialization`, and its worklist;
+6. `SourceCoreElaboration` plus direct or graph linking; and
+7. `SourceProgramExecution` / `SourceCompiler` backend selection.
+
+`Solcore.Frontend.Fragments` contains smaller reusable paths. It is not a
+second whole-language definition.
 
 ## Declarative source-semantics route
 
-Read the proof-facing resolved-source specification in this order:
+Read the proof-facing source model in this order:
 
-```text
-Context / Types / Instantiation / Traits / Requirements
-  → Coercions / Binders / Literals / Operators / Calls / Patterns / Places
-  → Graph / Ownership / Control → Static → Program
+1. `Context`, `WellFormed`, and `Graph`;
+2. `Instantiation`, `Substitution`, and substitution properties;
+3. `Types`, `Traits`, `Requirements`, and `Coercions`;
+4. `Binders`, `Calls`, `Patterns`, `Places`, and `Ownership`;
+5. `Typing`, `Control`, `Static`, and `Program`;
+6. `Staging`; and
+7. `Dynamic`, including faults and preservation.
 
-Substitution → Graph / SubstitutionProperties
-  → TraitSubstitutionProperties
+This route states rules over resolved source data. It does not parse files or
+make the executable frontend authoritative.
 
-Dynamic.Value → Dynamic.Heap → Dynamic.Typing
-  → Dynamic.Default / Primitive / Evidence / Pattern / Place
-  → Dynamic.Evaluation → Dynamic.Fault
-  → Dynamic.PatternCompletenessProperties / Dynamic.Control
-  → Dynamic.Preservation → Dynamic.WholeLanguagePreservation
-  → Dynamic.Program
+## Semantic Core route
 
-Staging.Stage / Assignment → Staging.Classification
-  → Staging.Materialization → Staging.Program
-```
+For the local executable language, start with:
 
-[`Substitution.lean`](../Solcore/SourceSemantics/Substitution.lean) defines
-normative structural substitution over the retained source carrier.
-[`SubstitutionCorrespondence.lean`](../Solcore/SourceSemantics/SubstitutionCorrespondence.lean)
-then states the explicit equations with the frontend specialization helper;
-the helper is not a premise of the semantic judgments. Start with
-[ADR-0377](adr/0377-declarative-source-semantics-foundation.md) for the original
-authority boundary and [ADR-0378](adr/0378-declarative-resolved-source-semantics.md)
-for the current static, successful-dynamic, and staging boundary.
+1. [`Core/Data.lean`](../Solcore/Core/Data.lean) and
+   [`Core/Syntax.lean`](../Solcore/Core/Syntax.lean);
+2. [`Core/Typing.lean`](../Solcore/Core/Typing.lean) and
+   [`Core/Eval.lean`](../Solcore/Core/Eval.lean);
+3. [`Core/Check.lean`](../Solcore/Core/Check.lean);
+4. [`Core/Machine.lean`](../Solcore/Core/Machine.lean), host machine, and
+   runners; and
+5. safety, correspondence, fuel, renaming, local-fragment, and primitive
+   property modules.
 
-## Runtime and proof route
+The retained encoding modules are
+[`Core/Wire.lean`](../Solcore/Core/Wire.lean),
+[`Core/Wire/V2.lean`](../Solcore/Core/Wire/V2.lean), and
+[`Core/Wire/V3.lean`](../Solcore/Core/Wire/V3.lean). The current encoding is
+documented in [Core Wire v3](CORE_WIRE_V3.md).
 
-| Runtime | Definition and linking | Preservation starting point |
-| --- | --- | --- |
-| Direct Core | [`SourceCoreElaboration.lean`](../Solcore/Frontend/SourceCoreElaboration.lean), [`SourceCoreDirectLinking.lean`](../Solcore/Frontend/SourceCoreDirectLinking.lean) | [`Core/Safety.lean`](../Solcore/Core/Safety.lean), proof sections in [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) |
-| Finite graph | [`SourceRuntime/Checking.lean`](../Solcore/Frontend/SourceRuntime/Checking.lean) (static syntax and checking), [`SourceRuntime.lean`](../Solcore/Frontend/SourceRuntime.lean) (runtime), [`SourceRuntimeLinking.lean`](../Solcore/Frontend/SourceRuntimeLinking.lean) | [`SourceRuntimeDeep/ValueEnvironment.lean`](../Solcore/Frontend/SourceRuntimeDeep/ValueEnvironment.lean) → [`Application.lean`](../Solcore/Frontend/SourceRuntimeDeep/Application.lean) → [`Evaluation.lean`](../Solcore/Frontend/SourceRuntimeDeep/Evaluation.lean) → [`Preservation.lean`](../Solcore/Frontend/SourceRuntimeDeep/Preservation.lean); graph-deep compiler proof section in [`SourceCompiler.lean`](../Solcore/Frontend/SourceCompiler.lean) |
-| Typed source | [`SourceTypedRuntime.lean`](../Solcore/Frontend/SourceTypedRuntime.lean) | Runtime proof sections in the same module; [`SourceTypedStaticSafetyProperties.lean`](../Solcore/Frontend/SourceTypedStaticSafetyProperties.lean) |
+## Checked-contract route
 
-The graph proof chain is about successful runs with deep input and initial
-store premises. The separate declarative resolved-source semantics now has a
-whole-language successful-evaluation preservation theorem; the executable
-typed-source backend still has only its own local value/heap dependencies, not
-an evaluator-wide deep-preservation theorem. See
-[ADR-0376](adr/0376-deep-runtime-typing-foundations.md) for the exact boundary.
+Start from scalar and state carriers, then follow execution:
 
-## Core and checked-contract route
+1. `RuntimeScalars`, `Account`, and `WorldState`;
+2. checked program, contract, registry, and code-selection modules;
+3. host storage inputs, context, handlers, and drivers;
+4. frame run, outcome, trace, checkpoint, continuation, and resolution;
+5. parent-indexed and one-level nested execution;
+6. transaction journal/storage and world-state deltas; and
+7. top-level execution and balanced-state results.
 
-For Core itself, begin with [`Core/Syntax.lean`](../Solcore/Core/Syntax.lean),
-[`Core/Typing.lean`](../Solcore/Core/Typing.lean), and
-[`Core/Eval.lean`](../Solcore/Core/Eval.lean). Two previously fragmented proof
-families now have one readable home each:
+[`Solcore/ContractRuntime.lean`](../Solcore/ContractRuntime.lean) imports the
+complete retained boundary.
 
-- [`Core/Derived.lean`](../Solcore/Core/Derived.lean) collects derived unsigned
-  and signed comparisons, non-strict forms, boolean/word flags, evaluation,
-  typing, and renaming laws.
-- [`Core/LocalFragment.lean`](../Solcore/Core/LocalFragment.lean) collects the
-  local-fragment classifier and its weakening/insertion, typing, evaluation,
-  inference, cost, and local-right-comparison results.
+## Tests and repository checks
 
-Checked-contract execution then flows in one direction:
+- `Tests/` contains executable regression and property modules imported by
+  `Tests/Main.lean`.
+- `scripts/verify-metadata.mjs` validates repository-owned data and digests.
+- `scripts/check-kernel.mjs` enforces the configured semantic-source policy.
+- `metadata/baselines.json` records pinned external-comparison evidence.
 
-```text
-Core program and Core Wire v3
-  → ContractRuntime (world state, frames, calls, effects, commit/rollback)
-  → Oracle v5 (strict JSON decode, check/admit, run, canonical response)
-```
+Run all four checks listed in the [development guide](DEVELOPMENT.md) before
+handing off a cross-layer change.
 
-[`Abi/StaticWord.lean`](../Solcore/Abi/StaticWord.lean) keeps the complete
-static-word ABI path—metadata, codecs, method tables, dispatch, and checked
-contract installation—in dependency order. Oracle v5 similarly keeps each
-cohesive observation, admission, diagnostic, and wire-protocol family in one
-module while preserving the boundary between domain values and wire codecs.
+## Documentation routes
 
-[`Solcore/ContractRuntime`](../Solcore/ContractRuntime) is the execution model,
-formerly stored under the ambiguous `Solcore.Semantics` name. It is not the
-source-language semantics: use `Solcore.SourceSemantics` for that question.
-[`Solcore/Oracle`](../Solcore/Oracle) is the versioned external adapter. Oracle
-v5 validates Core Wire v3 programs before asking `ContractRuntime` to run them;
-it does not parse `Syntax`, consume the standard-library sources, or define the
-runtime transition rules itself.
-
-## Other top-level areas
-
-| Directory | Role |
-| --- | --- |
-| [`Solcore/ContractRuntime`](../Solcore/ContractRuntime) | Checked-Core contract world, frames, effects, nested execution, checkpoint/commit/rollback, and proofs; separate from Core's local cell store and source semantics |
-| [`Solcore/Oracle`](../Solcore/Oracle) | Versioned JSON/wire adapter; v5 decodes and checks Core Wire v3, invokes `ContractRuntime`, and encodes observations |
-| [`Solcore/Standard`](../Solcore/Standard) | Canonical standard-library source bytes and identity/hash pins; no parsing or execution semantics |
-| [`Solcore/Synthesis`](../Solcore/Synthesis) | Reproducible checked Core generation and shrinking |
-| [`Solcore/Surface`](../Solcore/Surface) | Frozen historical Surface v1 and Multi compatibility/reference code; use `Solcore.Syntax` for current source |
-| [`Solcore/Test`](../Solcore/Test) and [`Tests/golden`](../Tests/golden) | Lean tests and public wire fixtures |
-| [`docs/adr`](adr) | Historical decisions and rationale; use [Current status](CURRENT_STATUS.md) for today's supported boundary |
-
-For changes, import the smallest module containing the definitions you need,
-keep executable definitions and their proof sections or boundaries visibly
-distinguishable, and run the checks in the [development
-guide](DEVELOPMENT.md). Existing public umbrellas and frozen versioned
-interfaces are compatibility surfaces.
+- [Architecture](ARCHITECTURE.md) for ownership and dependencies.
+- [Current status](CURRENT_STATUS.md) for implemented scope and limitations.
+- [Feature matrix](FEATURE_MATRIX.md) for a compact coverage table.
+- [Specification charter](SPEC_CHARTER.md) for authority and trust.
+- [`docs/adr/`](adr/) for accepted design decisions.

@@ -101,7 +101,7 @@ stack, parent-child commit rule, logs, calls, creations, surviving effects,
 transaction boundary or atomicity, ABI, Core-result adapter, trap taxonomy, EVM
 revision, opcode, gas schedule, or resource-limit policy.
 
-It adds no parser or source form, Wire field or tag, Profile, Oracle behavior,
+It adds no parser or source form, Wire field or tag, Profile,
 state delta, ordering, serialization, or frozen artifact. It does not execute a
 frame and does not choose how the external checkpoint was created.
 

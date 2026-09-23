@@ -80,11 +80,6 @@ def m1cFeatureMatrix : Array FeatureRow :=
       "Fixed-width word bitwise operations and bounded logical shifts are normative."⟩
   ]
 
-def m2bFrontendFeatureMatrix : Array FeatureRow := #[
-    ⟨.surfaceGrammar, .normative, "M2b", .implemented, some "0013",
-      "The closed Surface grammar, UTF-8 spans, lexer, and parser are normative."⟩
-  ]
-
 def m3aContractFeatureMatrix : Array FeatureRow := #[
   ⟨.coreProductsV1, .normative, "M3a", .implemented, some "0151",
     "Checked Core products and projections are published by Core Wire v3."⟩,
@@ -129,15 +124,6 @@ def m1cFeatureMatrixIsComplete : Bool :=
     features.all Feature.m1cAll.contains &&
     m1cFeatureMatrix.all fun row => row.specStatus == row.feature.specMaturity
 
-def m2bFrontendFeatureMatrixIsComplete : Bool :=
-  let expected := #[.surfaceGrammar]
-  let features := m2bFrontendFeatureMatrix.toList.map (·.feature)
-  !hasDuplicates features &&
-    expected.all features.contains &&
-    features.all expected.contains &&
-    m2bFrontendFeatureMatrix.all fun row =>
-      row.specStatus == row.feature.specMaturity
-
 def m3aContractFeatureMatrixIsComplete : Bool :=
   let expected := #[
     .coreProductsV1,
@@ -172,9 +158,6 @@ def m1aFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
 def m1cFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
   rowsRespectProfile m1cFeatureMatrix profile
 
-def m2bFrontendFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
-  rowsRespectProfile m2bFrontendFeatureMatrix profile
-
 def m3aContractFeatureMatrixRespectsProfile (profile : SpecProfile) : Bool :=
   rowsRespectProfile m3aContractFeatureMatrix profile
 
@@ -197,14 +180,6 @@ theorem m1cFeatureMatrix_complete : m1cFeatureMatrixIsComplete = true := by
 
 theorem m1cFeatureMatrix_respectsProfile :
     m1cFeatureMatrixRespectsProfile m1cCoreProfile = true := by
-  native_decide
-
-theorem m2bFrontendFeatureMatrix_complete :
-    m2bFrontendFeatureMatrixIsComplete = true := by
-  native_decide
-
-theorem m2bFrontendFeatureMatrix_respectsProfile :
-    m2bFrontendFeatureMatrixRespectsProfile m2bFrontendProfile = true := by
   native_decide
 
 theorem m3aContractFeatureMatrix_complete :

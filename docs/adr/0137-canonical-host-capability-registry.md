@@ -268,7 +268,7 @@ This ADR does not:
 - change storage semantics, checkpoints, lifecycle, gas, scheduling, or
   resumption;
 - publish a capability registry or alter any public ABI;
-- change Wire, Oracle, Surface, parser, source syntax, metadata schema, or
+- change Wire, parser, source syntax, metadata schema, or
   external format; or
 - resume parser or syntax proofs paused by the current semantics-first plan.
 

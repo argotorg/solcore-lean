@@ -11,16 +11,7 @@ package «solcore-lean» where
 lean_lib Solcore where
   globs := `Solcore.*
 
-@[default_target]
-lean_exe solcoreOracle where
-  root := `Solcore.Oracle.Main
-  exeName := "solcore-oracle"
-
 @[test_driver]
 lean_exe solcoreTests where
   root := `Tests.Main
   exeName := "solcore-tests"
-
-lean_exe m2cFrontendBench where
-  root := `Bench.M2cFrontend
-  exeName := "m2c-frontend-bench"

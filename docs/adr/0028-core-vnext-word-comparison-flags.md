@@ -14,7 +14,7 @@ evaluators provide comparison evidence by returning numeric one or zero for
 `eq` and `gt`.
 
 This evidence does not change the existing Core operations. `wordEq` and
-`wordGt` remain boolean-valued and authoritative for their existing profiles.
+`wordGt` remain boolean-valued and authoritative for their existing semantics.
 
 ## Decision
 
@@ -40,8 +40,7 @@ the handwritten expansion: a left fault prevents right evaluation, and an
 invalid comparison is observed before conversion.
 
 These are derived forms. They add no type, value, expression, primitive,
-frame, transition, fault, diagnostic, schema, capability, Core, CEK, wire, or
-Oracle tag.
+frame, transition, fault, diagnostic, schema field, Core, CEK, or wire tag.
 
 ## Naming and alternatives
 
@@ -58,7 +57,7 @@ standard-library function, or instruction mapping.
 
 Wire v1 rejects the primitive forms required by both expansions. Wire v2
 projects exactly the corresponding handwritten comparison-plus-`boolToWord`
-trees. Frozen schemas, capabilities, and golden bytes do not change.
+trees. Frozen schemas and their encodings do not change.
 
 ## Required implementation, proof, and tests
 

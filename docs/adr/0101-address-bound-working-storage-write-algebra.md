@@ -120,7 +120,7 @@ only equates the existing immutable optional-value expressions.
 
 The slice adds no distinct-address duplicate, zero-deletion witness,
 read-after-write law, address-preservation projection, initialization-specific
-law, parser or source syntax, Core expression, Wire or Oracle field, Profile,
+law, parser or source syntax, Core expression, Wire field, Profile,
 ABI, storage layout, gas rule, or published observation.
 
 ## Staged implementation plan

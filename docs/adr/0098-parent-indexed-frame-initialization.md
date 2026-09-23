@@ -180,8 +180,8 @@ The slice adds no caller, callee, storage, code, or origin address; call data,
 transferred value, call kind, code lookup, balance, nonce, authorization,
 outcome provenance, return delivery, trap handling, stack, depth, scheduling,
 recursion, reentrancy, gas, ABI, transaction, host I/O, or published
-observation. It adds no parser or source syntax, Core expression, Wire or Oracle
-field, Profile, or frozen artifact.
+observation. It adds no parser or source syntax, Core expression, Wire field,
+Profile, or frozen artifact.
 
 ## Staged implementation plan
 

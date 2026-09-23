@@ -36,7 +36,7 @@ stored value even if its returned Word is unchanged.
 
 This is a Core proof bridge, not a new Core primitive, Resolved constructor,
 canonical source operator or hidden LocalId allocator. Parser, resolver
-identity-map contracts, Oracle/wire formats and diagnostic proofs remain
+identity-map contracts, wire formats, and diagnostic proofs remain
 unchanged. Dedicated resolved `<` representation and its source adapter are
 subsequent units.
 

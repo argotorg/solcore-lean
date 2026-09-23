@@ -35,7 +35,7 @@ raw workspace
 ```
 
 The interface is additive.  It does not replace the lower-level checker,
-specializer or linker APIs, and it does not add a source Oracle or wire format.
+specializer or linker APIs, and it does not add an external wire format.
 
 ### Explicit seed
 
@@ -95,7 +95,7 @@ runtime observation as successful termination.
 This interface intentionally does not provide:
 
 - automatic entry discovery or ABI-based root selection;
-- a source Oracle, JSON schema or other wire protocol;
+- a JSON schema or other wire protocol;
 - multiple explicit roots in one public request;
 - execution of recursive or indirect source calls;
 - a general recursive/global function representation in Semantic Core;
@@ -117,7 +117,7 @@ runtime input checking and execution.
 
 The API remains honest about the current profile: "public" means a supported
 Lean library boundary, not a claim that arbitrary Solcore source is executable
-or that the Oracle accepts source programs.
+or accepted by an external service.
 
 ## Verification policy
 

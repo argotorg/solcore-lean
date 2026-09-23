@@ -72,13 +72,13 @@ an eager two-operand cost.
 ## Core and wire boundary
 
 This slice adds no type, value, expression, primitive operation, frame,
-transition, machine fault, diagnostic, schema, profile, capability, or Oracle
-tag. It adds no big-step rule or CEK transition.
+transition, machine fault, diagnostic, schema field, or public tag. It adds no
+big-step rule or CEK transition.
 
 Wire v1 and wire v2 both project each builder exactly as the corresponding
 handwritten `ifE` expression using their existing conditional and boolean forms.
 No new encoding exists, and decoding that expansion reconstructs only the
-ordinary conditional tree. Frozen schemas and golden bytes do not change.
+ordinary conditional tree. Frozen schemas do not change.
 
 ## Required implementation, proof, and tests
 
@@ -95,13 +95,13 @@ ordinary conditional tree. Frozen schemas and golden bytes do not change.
 - test that skipped faults are unobservable and selected faults are preserved;
 - test exact fuel boundaries for selected and skipped paths; and
 - test wire v1 and v2 projection equality with handwritten expansions and the
-  absence of new tags or capabilities.
+  absence of new tags.
 
 ## Deferred
 
 This ADR does not add eager boolean primitives, source spelling or overload
 resolution, implicit truthiness, word-level bitwise aliases, optimizer
-replacement, ABI decoding, or a new public Core or Oracle version.
+replacement, ABI decoding, or a new public Core version.
 
 ## Consequences
 

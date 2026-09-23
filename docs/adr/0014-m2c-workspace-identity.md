@@ -17,18 +17,17 @@
 - **Boundary:** This kernel does not parse a multi-file workspace, assemble the
   standard library, resolve modules or names, or publish a new wire/profile.
 - **Suggested reading:** Read the identity and validation parts of “Decision”,
-  then “Conformance requirements”; resolver questions move to ADR-0017.
+  then “Conformance requirements”; resolver policy is a separate boundary.
 
 ## Context
 
-ADR-0013 publishes a parser for one source file. Its `path` is an opaque,
-nonempty label: Surface v1 and Oracle v4 do not interpret separators, derive a
-module, compare a filesystem location, or perform file I/O. That published
-meaning cannot be widened in place.
+Workspace identity must be independent of opaque caller labels and host
+filesystem paths. It must not infer modules by interpreting separators,
+comparing filesystem locations, or performing file I/O.
 
-M2c will eventually resolve a closed source workspace. Before module syntax or
-name resolution can be specified, the kernel needs a pure identity boundary
-that answers four smaller questions:
+Resolving a closed source workspace requires a stable identity layer. Before
+module syntax or name resolution can be specified, the kernel needs a pure
+identity boundary that answers four smaller questions:
 
 1. Which raw source labels are canonical workspace paths?
 2. When do two source records identify the same logical source and module?
@@ -51,9 +50,9 @@ are implementation and driver behaviors, not language semantics.
 The first ADR-0014 draft also attempted to fix imports, exports, cyclic public
 interfaces, local scopes, instances, constructor visibility, and intrinsic
 names. Independent review found that those rules require a closed multi-module
-Surface algebra that does not exist yet. In particular:
+source-syntax algebra. In particular:
 
-- Surface v1 has one function and no import or export items;
+- workspace identity alone supplies no import or export declarations;
 - a public interface must distinguish entities, module aliases, constructor
   visibility, and instances;
 - the canonical standard-library source depends on an explicit intrinsic
@@ -61,19 +60,18 @@ Surface algebra that does not exist yet. In particular:
 - member selection and constructor shorthand include type-directed
   occurrences that must remain unresolved until checking.
 
-This decision therefore closes only workspace identity and validation. A
-separate Accepted resolver ADR is required before any import, export,
-declaration, local-name, standard-interface, or occurrence resolver is added.
+This decision therefore closes only workspace identity and validation. Import,
+export, declaration, local-name, standard-interface, and occurrence resolution
+remain separate decisions.
 
 ## Decision
 
 ### Additive internal boundary
 
 ADR-0014 introduces an internal Workspace Identity Kernel. It does not change
-Surface v1, parse-result v1, Oracle v1 through v4, any language version, any
-profile, any schema, any feature status, or any existing capability or golden
-bytes. In particular, the Oracle v4 source label remains opaque and the frozen
-Oracle v1 `Workspace` is not reused.
+any language version, profile, schema, or feature status. Its records are
+purpose-built Lean values rather than reinterpretations of a serialized input
+format.
 
 No workspace feature becomes published merely because the internal validator
 exists. The proposed `modules.import-export` feature remains blocked until the
@@ -148,14 +146,14 @@ modules. There is no same-file, inode, realpath, or symlink coalescing. Main,
 standard, and external sources with the same relative path are distinct because
 their `LibraryId`s differ.
 
-The workspace and resolved layers will use `SourceId` in source spans. Surface
-v1 continues to use its opaque string. A future wire ADR may define a canonical
-presentation for `SourceId`; no presentation string is fixed here and no raw
-string becomes internal identity.
+The workspace, syntax, and resolved layers use `SourceId` in source spans. A
+future serialization decision may define a canonical presentation for
+`SourceId`; no presentation string is fixed here and no raw string becomes
+internal identity.
 
 Declaration, member, body, scope, local, instance, and intrinsic identities are
-not defined by this ADR. Their structural role tags depend on the later closed
-module Surface algebra. In particular, a plain list of child indices is not an
+not defined by this ADR. Their structural role tags depend on the closed module
+source-syntax algebra. In particular, a plain list of child indices is not an
 acceptable substitute because field zero, method zero, and constructor zero
 must not collide.
 
@@ -423,7 +421,7 @@ Judgment + Validation -> Properties
 the independent propositions to the executor. No proof-carrying syntax
 structure stores an equation about `validate`.
 
-`Path` does not import Surface wire, Oracle, Profile, or a host-path library.
+`Path` does not import the source parser, Profile, or a host-path library.
 `Syntax` defines its own raw file record rather than reinterpreting a frozen
 wire type. The Workspace root is added to the semantic-kernel policy in the
 same commit that introduces it. It is imported by the public `Solcore`
@@ -466,12 +464,12 @@ must retain this boundary. Kernel theorems contain no undeclared trust
 assumptions beyond the standard Lean foundations already audited in this
 repository.
 
-### Deferred resolver decisions
+### Resolver boundary
 
-No resolver executor is authorized by ADR-0014. Before implementation, a
-separate Accepted ADR must close all of the following:
+ADR-0014 does not authorize a resolver executor. The resolver boundary must
+close all of the following independently:
 
-- a versioned multi-module Surface AST and the exact accepted declaration,
+- a versioned multi-module source AST and the exact accepted declaration,
   import, export, binder, and occurrence forms;
 - which occurrences are lexically resolved in M2c and which type-directed
   selectors remain for M2d;
@@ -497,7 +495,7 @@ separate Accepted ADR must close all of the following:
 - soundness, completeness, determinism, uniqueness, non-dangling, and scope
   non-leakage theorems for the exact accepted fragment.
 
-The later ADR must record deliberate divergences from the pinned compilers,
+Resolver decisions must record deliberate divergences from the pinned compilers,
 including ASCII contextual module components, rejection of malformed selector
 forms, one default module qualifier, candidate-set ambiguity instead of
 first-wins, corrected lexical scopes, pure standard-library selection, and
@@ -514,8 +512,8 @@ structured target identity.
   record permutation.
 - Standard-library identity remains explicit without pretending that a digest
   is a resolution derivation.
-- Full resolver implementation remains blocked until its Surface algebra and
-  semantic choices are independently accepted.
+- Workspace identity remains independent of the resolver's source-syntax
+  algebra and semantic choices.
 
 The split adds one ADR and one implementation phase, but it removes false proof
 claims and lets the first kernel establish complete soundness and completeness
@@ -528,9 +526,9 @@ over a genuinely closed domain.
 Rejected because symlinks, mounts, case rules, permissions, cwd, and platform
 behavior would enter the language and make identical fixtures nonportable.
 
-### Reuse Oracle v1 or reinterpret Oracle v4
+### Reuse a legacy serialized workspace record
 
-Rejected because both are frozen contracts and neither carries a proof of
+Rejected because a serialized transport record does not carry a proof of
 canonical workspace identity.
 
 ### Normalize invalid source paths
@@ -548,7 +546,7 @@ from an undeclared library.
 Rejected because raw list order would affect the result. The validator returns
 the complete canonical error set.
 
-### Add declaration identities before a module Surface algebra exists
+### Add declaration identities before a module source-syntax algebra exists
 
 Rejected because untagged child indices collide across fields, methods,
 constructors, bodies, and scopes.

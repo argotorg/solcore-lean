@@ -152,7 +152,7 @@ This ADR adds no:
 - lift across ADR-0125's three optional result layers;
 - caller, current address, call value, calldata, call kind, or authority role;
   or
-- parser, source syntax, ABI, gas, Wire, Oracle, schema, profile, or public
+- parser, source syntax, ABI, gas, Wire, schema, profile, or public
   format change.
 
 ## Implemented sequence
@@ -191,7 +191,7 @@ from silently drifting.
   and no runtime definition or unchecked declaration; and
 - independent specification and implementation audits found no P0-P3 issue.
 
-No Core execution, parser, Surface, ABI, Oracle, Wire format, schema, profile,
+No Core execution, parser, source syntax, ABI, Wire format, schema, profile,
 or root README changed.
 
 ## Consequences

@@ -154,7 +154,7 @@ or runtime propagation, execute a parent, create a checkpoint, schedule a
 frame, repeat through ancestors, or decide transaction rollback or atomicity.
 
 It also adds no parser or source syntax, Core fault adapter, resource-limit
-rule, fuel or gas policy, Wire or Oracle field, ABI, serialization, EVM
+rule, fuel or gas policy, Wire field, ABI, serialization, EVM
 revision, opcode behavior, Profile, canonical delta, or published format.
 
 ## Staged implementation plan

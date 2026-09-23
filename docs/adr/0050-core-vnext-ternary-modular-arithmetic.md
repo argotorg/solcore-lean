@@ -89,8 +89,8 @@ Keep every commit below 300 changed lines and leave the tree green:
 ## Publication and exclusions
 
 The ternary form and both operations are internal-only. Frozen Wire v1/v2,
-their JSON forms, public Oracles, schemas, profiles, versions, and golden bytes
-remain unchanged and reject the new form. This slice adds no source syntax,
+their JSON forms, schemas, profiles, and versions remain unchanged and reject
+the new form. This slice adds no source syntax,
 standard-library API, ABI rule, opcode lowering, or gas rule.
 
 ## Consequences

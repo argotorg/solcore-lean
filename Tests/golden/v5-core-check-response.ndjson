@@ -1,1 +1,0 @@
-{"id":"golden-v5","profile":{"digest":"sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5","id":"contract-m3a-v1"},"query":"coreCheck","schema":"solcore-oracle/v5","spec":"solcore/0.1.0-draft.5","verdict":{"kind":"accepted","phase":"coreChecking","result":{"schema":"solcore-core-check-result/v3","value":{"resultType":"word"}}}}

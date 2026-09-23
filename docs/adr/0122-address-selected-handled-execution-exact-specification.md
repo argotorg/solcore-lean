@@ -134,7 +134,7 @@ depend on working-WorldState code lookup, checked handled execution, and
 ADR-0120's fuel completeness. Core, the generic host driver, and the concrete
 storage handler do not change.
 
-No parser, Surface, ABI, Oracle, Wire, schema, profile, gas, frame-outcome, or
+No parser, source syntax, ABI, Wire, schema, profile, gas, frame-outcome, or
 transaction-lifecycle module participates. The root README does not change.
 
 ## Non-goals

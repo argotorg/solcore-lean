@@ -72,13 +72,13 @@ or other encoding rule. The word result zero or one is a semantic value only.
 ## Core and wire boundary
 
 This slice adds no type, value, expression, operation, frame, transition,
-machine-fault, diagnostic, schema, or capability tag. It also adds no new
+machine-fault, diagnostic, schema field, or public tag. It also adds no new
 big-step rule or CEK transition.
 
 Wire v1 lacks the existing primitive form needed by the expansion and therefore
 continues to reject it. Wire v2 projects it using only its existing `if`, word,
-binary `wordEq`, and related ordinary expression forms. No frozen wire schema,
-Oracle profile, capability, or golden byte changes.
+binary `wordEq`, and related ordinary expression forms. No frozen wire schema
+changes.
 
 ## Required implementation, proof, and tests
 
@@ -95,7 +95,7 @@ Oracle profile, capability, or golden byte changes.
 - test an effectful operand to detect skipped or duplicate evaluation;
 - test exact sufficient and insufficient fuel boundaries; and
 - test that wire v1 rejects while wire v2 projects exactly the handwritten
-  expansion, with no new tag or public capability.
+  expansion, with no new tag.
 
 ## Consequences
 

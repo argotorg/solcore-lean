@@ -107,7 +107,7 @@ Keep every commit below 300 changed lines:
 ## Publication and exclusions
 
 This layer is internal and not published. It adds no parser, source form, Wire
-field or tag, Profile, Oracle behavior, or frozen artifact.
+field or tag, Profile, or frozen artifact.
 
 It fixes no trap disposition, nested frame or checkpoint rule, surviving logs,
 calls, or creations, transaction atomicity, Account creation, deletion, or

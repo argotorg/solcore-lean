@@ -263,8 +263,8 @@ The carrier depends only on existing parent initialization/storage refinement,
 ADR-0143 execution, and existing parent continuation construction. It adds no
 new code-selection, raw-result, frame-outcome, or resolution hierarchy.
 
-This ADR adds no Wire tag, Oracle command, schema, profile, metadata capability,
-Surface form, grammar, parser rule, or source elaboration. Parser work remains
+This ADR adds no Wire tag, schema, profile,
+source form, grammar, parser rule, or source elaboration. Parser work remains
 paused. The root README does not change.
 
 Acceptance requires focused and full builds, the executable suite, trust-zero

@@ -20,8 +20,8 @@ inference, renaming, weakening, evaluation, Safety, machine, and Wire v2 layers
 already support both operators. What is missing is a focused value and
 store-threaded proof interface plus symmetric boundary regressions.
 
-This work follows the semantics-first order from ADR-0018. It does not resume
-grammar-dependent proof work or choose source syntax.
+This work follows a semantics-first order. It does not resume grammar-dependent
+proof work or choose source syntax.
 
 ## Decision
 
@@ -82,8 +82,8 @@ Compile-time examples exercise all fourteen named theorems.
 This ADR does not define arithmetic shift, signed words, source spelling,
 standard-library APIs, ABI behavior, opcode lowering, or gas. It changes no
 type, value, fault, evaluator, frame, Wire tag, schema, version, byte encoding,
-Oracle behavior, profile, capability, or golden stream. Existing Core and
-Oracle versions retain their exact meanings.
+or published boundary. Existing Core and Wire versions retain their exact
+meanings.
 
 ## Consequences
 
@@ -104,5 +104,5 @@ Literal expressions finish exactly at fuel 5 after failing at 4; two effectful
 operands finish at 29 after failing at 28. Both operators are rejected by Wire
 v1 and have exact Wire v2 projection, Core round trips, and JSON round trips.
 The final independent audit found no P0-P3 issue. No alias, tag, generic proof,
-schema, Oracle behavior, or other boundary changed. The next feature is chosen
-by a separate ADR.
+schema, or other boundary changed. The next feature is chosen by a separate
+ADR.

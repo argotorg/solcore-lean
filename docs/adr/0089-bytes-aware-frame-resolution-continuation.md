@@ -169,7 +169,7 @@ invocation. It does not handle, classify, map, or propagate trap reasons and
 does not prove how its input was produced.
 
 It adds no parser or source syntax, Core expression, resource rule, fuel or gas
-policy, Wire or Oracle field, ABI, serialization, EVM revision, opcode behavior,
+policy, Wire field, ABI, serialization, EVM revision, opcode behavior,
 Profile, canonical delta, or published observation.
 
 ## Staged implementation plan

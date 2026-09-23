@@ -121,8 +121,8 @@ suspended, or out of fuel, with machine faults excluded.
 
 ## Compatibility and dependency boundary
 
-Wire v1 and v2 explicitly reject `Value.hostFunction`. No existing schema,
-Oracle command, profile, capability document, or golden stream changes.
+Wire v1 and v2 explicitly reject `Value.hostFunction`. No existing schema or
+profile changes.
 
 Core defines only the host function, typed request, suspension, and resumption.
 It does not import `Solcore.Semantics`. The Semantics handler interprets a read

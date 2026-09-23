@@ -39,7 +39,7 @@ the same policies.
 An explicit single-seed public Lean pipeline now composes raw-workspace
 checking, specialization, linking and execution as specified by ADR-0343.
 Other runtime evidence, recursive or indirect source calls, automatic entry
-discovery, multiple public roots and a source Oracle remain staged extensions.
+discovery, and multiple public roots remain staged extensions.
 
 ## Context
 
@@ -446,7 +446,8 @@ finite specialization and restricted linking into one reusable
 `PreparedEntry`; `run` additionally validates runtime inputs and invokes the
 checked Core entry under separate checking, specialization and execution
 limits.  This public Lean API adds no automatic entry discovery, multi-root
-policy, Oracle format or support for forms rejected by the underlying stages.
+policy, serialization format, or support for forms rejected by the underlying
+stages.
 
 The next internal boundary is method-level predicates for remaining profiles
 without an ordered caller-obligation carrier, generic arguments not represented

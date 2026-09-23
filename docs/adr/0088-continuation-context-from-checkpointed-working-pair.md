@@ -148,7 +148,7 @@ transaction commit, rollback, or atomicity.
 
 It does not call resolution or continuation and makes no cost, step-count,
 evaluation-order, or exactly-once claim. It adds no parser or source syntax,
-Core expression, resource rule, fuel or gas policy, Wire or Oracle field, ABI,
+Core expression, resource rule, fuel or gas policy, Wire field, ABI,
 serialization, EVM revision, opcode behavior, Profile, canonical delta, or
 published observation.
 

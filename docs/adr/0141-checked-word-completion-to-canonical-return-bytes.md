@@ -200,8 +200,8 @@ Acceptance requires focused and full builds, the executable suite, trust-zero
 and warning-as-error checks for every changed Lean root, metadata and semantic
 kernel checks, diff hygiene, and independent contract audits.
 
-No Wire tag, Oracle command, schema, profile, metadata capability, Surface
-form, grammar, parser rule, or source elaboration is added. Frozen public
+No Wire tag, schema, profile, source form, grammar, parser
+rule, or source elaboration is added. Frozen public
 formats continue to reject internal values and programs as before. The parser
 proof program remains paused. The root README does not change.
 

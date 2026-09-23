@@ -39,7 +39,6 @@ inductive Feature where
   | coreWordArithmetic
   | coreWordComparison
   | coreWordBitwise
-  | surfaceGrammar
   | coreProductsV1
   | coreFunctionsV1
   | coreSumsV1
@@ -99,11 +98,6 @@ def m1cAll : Array Feature :=
     .coreWordBitwise
   ]
 
-def m2bAll : Array Feature :=
-  m1cAll ++ #[
-    .surfaceGrammar
-  ]
-
 def m3aAll : Array Feature :=
   m1cAll ++ #[
     .coreProductsV1,
@@ -128,7 +122,6 @@ def specMaturity : Feature → SpecMaturity
   | .coreWordArithmetic
   | .coreWordComparison
   | .coreWordBitwise
-  | .surfaceGrammar
   | .coreProductsV1
   | .coreFunctionsV1
   | .coreSumsV1
@@ -170,7 +163,6 @@ inductive SolverPolicy where
   deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
 
 inductive ObservationPolicy where
-  | staticVerdictV1
   | valueV1
   | evmStateV1
   | evmStateWithGasV1
@@ -239,8 +231,6 @@ def ObservationPolicy.matchesScope
     (scope : ProfileScope)
     (runtime : Option ContractRuntimeProfile) : Bool :=
   match scope, observation, runtime with
-  | .frontend, .staticVerdictV1, none => true
-  | .core, .staticVerdictV1, none => true
   | .core, .valueV1, none => true
   | .contract, .checkedCoreStateV1, none => true
   | .contract, .evmStateV1, some _ => true
@@ -485,42 +475,6 @@ def m1cCoreProfileDigest : String :=
 
 theorem m1cCoreProfile_valid : m1cCoreProfile.Valid := by
   change m1cCoreProfile.validationErrors = []
-  native_decide
-
-def m2bLanguage : LanguageVersion := {
-  id := "solcore/0.1.0-draft.4"
-  release := {
-    major := 0
-    minor := 1
-    patch := 0
-    prerelease := some "draft.4"
-  }
-  grammarVersion := some 1
-  staticSemanticsVersion := some 2
-  dynamicSemanticsVersion := some 2
-  abiVersion := none
-  storageLayoutVersion := none
-  standardLibrary := canonicalStd
-  knownFeatures := Feature.m2bAll
-}
-
-def m2bFrontendProfile : SpecProfile := {
-  id := "frontend-m2b-v1"
-  language := m2bLanguage
-  scope := .frontend
-  enabledFeatures := #[.surfaceGrammar]
-  solver := .tabled
-  observation := .staticVerdictV1
-  contractRuntime := none
-  spanUnit := .utf8Byte
-  sourceEncoding := "UTF-8"
-}
-
-def m2bFrontendProfileDigest : String :=
-  "sha256:292e8c423bfc2d7e77f7a9756e743af473f6a952073e590c62a05c676e3bf33a"
-
-theorem m2bFrontendProfile_valid : m2bFrontendProfile.Valid := by
-  change m2bFrontendProfile.validationErrors = []
   native_decide
 
 def m3aLanguage : LanguageVersion := {

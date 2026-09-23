@@ -99,7 +99,7 @@ stack, invocation operation, frame identity, call depth, checkpoint creation,
 trace construction, event taxonomy or order, append behavior, transaction
 boundary or atomicity, or trap disposition.
 
-It adds no parser or source form, Wire field or tag, Profile, Oracle behavior,
+It adds no parser or source form, Wire field or tag, Profile,
 ABI, Core-result adapter, EVM revision, opcode, gas schedule, serialization,
 canonical delta, or frozen artifact.
 

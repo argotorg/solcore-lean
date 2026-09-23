@@ -1,46 +1,51 @@
 # solcore-lean
 
 `solcore-lean` is an executable formal specification of Solcore written in
-Lean 4. It provides an independent reference model for checking programs and
-running their semantics; neither the Haskell compiler nor the Rust compiler is
-treated as the language definition.
+Lean 4. The Lean definitions and theorems in this repository are the
+specification; the Haskell and Rust implementations are comparison evidence,
+not language authorities.
 
-The repository provides:
+The repository currently provides:
 
-- a checked Semantic Core language with executable typing and evaluation;
-- Oracle v5 execution of checked contracts from an explicit initial world;
-- commit on return and rollback on balance-preflight rejection, revert, or trap;
-- observable state, return data, logs, balances, and contract creation;
-- reproducible generation and shrinking of a checked, pure Core v3 subset;
-- a restricted whole-program source compiler with explicit root selection and
-  exact Core, finite call-graph, or source-typed execution results;
-- versioned compatibility interfaces for previously published formats; and
-- Lean proofs and executable tests for the modeled rules.
+- a canonical source lexer, parser, recovery model, and source-preserving AST;
+- workspace identity, module loading, resolution, type inference, trait
+  selection, specialization, and restricted whole-program compilation;
+- independent declarative source static, staging, and dynamic semantics;
+- a checked Semantic Core with executable checking and evaluation, machines,
+  fuel properties, and safety/correspondence proofs;
+- checked-Core contract execution over explicit world and transaction state;
+- static-word ABI encoding and Keccak-256 support; and
+- reproducible generation and shrinking of a checked pure Core v3 fragment.
 
-Oracle v5 consumes Semantic Core rather than source text. The canonical source
-lexer and parser are available as a Lean library and cover complete files,
-declarations, types, expressions, patterns, statements, inline Yul, comments,
-diagnostics, and recovery. The Lean library also implements the documented
-restricted whole-program resolution, type checking, specialization, backend
-selection, and source execution profile. Automatic entry discovery, multi-root
-policy, general storage/ABI behavior, and a source wire/Oracle remain outside
-that boundary.
+The public interfaces are Lean modules. Import the smallest umbrella that owns
+the behavior you need:
 
-For the current module structure and suggested reading order, see the
-[architecture overview](docs/ARCHITECTURE.md) and [project map](docs/PROJECT_MAP.md).
+| Area | Import |
+| --- | --- |
+| Complete library | `Solcore` |
+| Canonical source syntax | `Solcore.Syntax` |
+| Current whole-program frontend | `Solcore.Frontend.Current` |
+| Declarative source semantics | `Solcore.SourceSemantics` |
+| Semantic Core | `Solcore.Core` |
+| Checked-contract execution | `Solcore.ContractRuntime` |
+| ABI utilities | `Solcore.Abi` |
+| Checked Core synthesis | `Solcore.Synthesis` |
+
+See the [architecture overview](docs/ARCHITECTURE.md),
+[current status](docs/CURRENT_STATUS.md), and [project map](docs/PROJECT_MAP.md)
+for the boundaries and known limitations of each layer.
 
 ## Requirements
 
-- Lean 4.32.1, selected by the checked-in `lean-toolchain` file
+- Lean 4.32.1, selected by the checked-in `lean-toolchain`
 - Lake, distributed with Lean
-- Node.js, used by repository validation scripts
+- Node.js for the repository validation scripts
 
-Clone the repository, enter its root directory, and let Lake use the pinned
-Lean toolchain. No separate package installation step is required.
+No separate Lean package installation step is required.
 
 ## Build and test
 
-Run the complete local validation suite from the repository root:
+From the repository root:
 
 ```text
 lake build
@@ -49,55 +54,9 @@ node scripts/verify-metadata.mjs
 node scripts/check-kernel.mjs
 ```
 
-Build and inspect the command-line Oracle with:
-
-```text
-lake exe solcoreOracle --help
-```
-
-## Query Oracle v5
-
-The simplest way to inspect the checked-contract interface is its capability
-report:
-
-```text
-lake exe solcoreOracle capabilities-v5
-```
-
-The report identifies the exact Oracle, Core, specification, and profile
-versions; supported queries and contract profiles; observation kinds; and
-default resource limits.
-
-Without a command, the executable reads newline-delimited JSON from standard
-input. Each input line produces exactly one output line in the same order.
-This is a complete minimal Oracle v5 capabilities request:
-
-```json
-{"schema":"solcore-oracle/v5","id":"readme-v5","spec":"solcore/0.1.0-draft.5","profile":{"id":"contract-m3a-v1","digest":"sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5"},"limits":{"jsonDepth":2048,"jsonNodes":2000000,"coreDepth":1024,"coreNodes":1000000,"scenarioEntries":100000,"identifierBytes":256,"calldataBytes":1048576,"evaluationSteps":1000000},"query":{"kind":"capabilities"}}
-```
-
-Save that single line as `request.ndjson`, then run:
-
-```text
-lake exe solcoreOracle < request.ndjson
-```
-
-Oracle v5 also accepts `coreCheck` and `execute` queries. Execution requests
-include contract definitions expressed as Core Wire v3 programs, initial
-accounts and storage, nested-call and creation configuration, invocation data,
-fuel, and the state probes to return. Oracle v5 checks and admits those contract
-definitions before execution. Malformed JSON and invalid wire values produce
-protocol errors; well-formed programs that fail checking or admission produce
-typed rejections.
-
-Run the checked-in execution example directly with:
-
-```text
-lake exe solcoreOracle < Tests/golden/v5-execute-request.ndjson
-```
-
-Older capability reports remain available through `capabilities`,
-`capabilities-v2`, `capabilities-v3`, and `capabilities-v4`.
+Warnings are errors for the `Solcore` package. The two Node.js checks verify
+repository-owned data and enforce the kernel policy; they supplement rather
+than replace the Lean build and tests.
 
 ## Use as a Lean library
 
@@ -107,13 +66,7 @@ Import the complete public library:
 import Solcore
 ```
 
-Or import the checked-contract Oracle directly:
-
-```lean
-import Solcore.Oracle.V5
-```
-
-To lex and parse canonical Solcore source:
+Or parse canonical source directly:
 
 ```lean
 import Solcore.Syntax
@@ -127,15 +80,24 @@ def exampleSyntax : ParseResult :=
   }
 ```
 
-Successful results retain tokens, comments, lexical diagnostics, parse
-diagnostics, and a source-preserving AST for the supported canonical syntax.
-The public parser is proved to return an ordinary result for every source file.
-Malformed input is reported through diagnostics and recovery nodes; the
-internal exceptional branch is unreachable.
-`output.isDiagnosticFree` is the executable check that both ordinary
-diagnostic lists are empty.
+Successful parse results retain tokens, comments, lexical diagnostics, parse
+diagnostics, and the source-preserving AST. Parsing alone does not establish
+workspace validity, name resolution, or source typing; those responsibilities
+belong to the workspace and frontend layers.
 
-To generate a reproducible checked Core program, import the synthesis library:
+To use the current whole-program pipeline:
+
+```lean
+import Solcore.Frontend.Current
+```
+
+The caller supplies a raw workspace and an explicit root. The frontend checks
+the workspace, resolves and types declarations, specializes the selected
+entry, and chooses among the implemented execution backends. The exact input
+and result types are exposed by the imported Lean modules; there is no
+command-line protocol associated with this API.
+
+To generate a reproducible checked Core program:
 
 ```lean
 import Solcore.Synthesis
@@ -150,13 +112,15 @@ def generatedNodeCount : Except GenerationError Nat := do
   pure generated.nodeCount
 ```
 
-`make` packages the same generated program as a minimal Oracle v5 execution
-case. `shrink` returns only checker-sealed, strictly smaller candidates. The
-generator targets Semantic Core directly and does not parse Solcore source.
+`generate` returns a checker-sealed program in the supported pure Core v3
+fragment. `shrink` returns checker-sealed candidates that are strictly smaller
+under the library's size measure.
 
-## Protocol documentation
+## Documentation
 
-- [Oracle v5 request, response, and execution catalog](docs/ORACLE_V5_WIRE.md)
-- [Semantic Core Wire v3 catalog](docs/CORE_WIRE_V3.md)
-- [Current supported scope and limitations](docs/CURRENT_STATUS.md)
 - [Documentation guide](docs/README.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Current status and limitations](docs/CURRENT_STATUS.md)
+- [Feature matrix](docs/FEATURE_MATRIX.md)
+- [Semantic Core Wire v3](docs/CORE_WIRE_V3.md)
+- [Development guide](docs/DEVELOPMENT.md)

@@ -40,13 +40,13 @@ Well-typed programs cannot reach that fault.
 
 This decision does not add named data types, constructor identities, nested
 pattern syntax, guards, non-exhaustive matching, catch-all ordering, or a
-Surface elaboration rule. Later named algebraic data may elaborate to sums and
+source-elaboration rule. Later named algebraic data may elaborate to sums and
 products or receive a separate Core representation; this ADR does not decide
 that question.
 
-The feature is internal. It adds no tag to Semantic Core v1 or v2 and changes
-no Oracle v2 or v3 profile. Frozen wire projections reject sum types,
-injections, case expressions, injected values, and programs containing them.
+The feature is internal. It adds no tag to Semantic Core v1 or v2. Frozen wire
+projections reject sum types, injections, case expressions, injected values,
+and programs containing them.
 
 No equality, ordering, hashing, ABI encoding, or storage layout operation is
 added for sum values.
@@ -74,5 +74,5 @@ reducible left payload or a reducible right payload. This is structurally
 recursive in the sum type, so the non-recursive language retains total
 evaluation and sufficient-fuel results.
 
-The Core can express typed alternatives without committing the future Surface
+The Core can express typed alternatives without committing the future source
 language to a particular pattern or constructor syntax.

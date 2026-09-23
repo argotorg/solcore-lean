@@ -187,13 +187,13 @@ knows only a Word response and imports no Address, WorldState, or frame meaning.
 Semantics owns interpretation and reuses the Address-to-Word bridge. Generic
 `HostHandler` and `HostDriver` remain independent of storage and Address.
 
-No parser, Surface, ABI, Oracle, schema, profile, or gas module participates in
+No parser, source syntax, ABI, schema, profile, or gas module participates in
 the implementation.
 
 ## Compatibility and publication
 
 This capability is internal and unpublished. Frozen Core Wire v1/v2 continue
-to reject host-function values, and Oracle, Surface, Parser, schemas, profiles,
+to reject host-function values, while source syntax, parser, schemas, profiles,
 and published metadata remain unchanged. No new Core expression tag is needed;
 internal programs use existing variables, application, and Unit syntax.
 
@@ -301,8 +301,8 @@ out-of-fuel regressions remain unchanged.
 The acceptance audit also confirmed exact context identity for the observation,
 lossless Address widening, distinct code and storage roles, handled-write
 retention, the fuel 4/5/23/29/30/64 boundaries, frozen Wire rejection, and the
-intentional absence of an out-of-fuel stability claim. Oracle, Surface,
-Parser, schemas, profiles, and published formats remain unchanged.
+intentional absence of an out-of-fuel stability claim. Source syntax, parser,
+schemas, profiles, and published formats remain unchanged.
 
 ## Consequences
 

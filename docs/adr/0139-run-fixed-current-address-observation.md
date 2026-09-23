@@ -189,9 +189,9 @@ Generic host-driver and frame-continuation modules remain parameterized and do
 not acquire Address-specific meaning.
 
 Frozen Wire v1 and v2 continue to reject host-function values. Add no Wire tag,
-Oracle command, schema, profile, metadata capability, Surface form, parser
-rule, or source elaboration. Surface and parser proofs remain paused. The root
-README does not change.
+schema, profile, source form, parser rule, or source
+elaboration. Source-syntax and parser proofs remain paused. The root README
+does not change.
 
 ## Non-goals
 
@@ -215,8 +215,7 @@ This ADR does not define or prove:
 - conversion of arbitrary Core Value or Store to Bytes, automatic
   `FrameOutcome` selection, return-data policy, ABI, calldata, or storage
   layout; or
-- a public representation, compatibility promise, parser change, or Oracle
-  behavior.
+- a public representation, compatibility promise, or parser change.
 
 ## Implemented sequence
 

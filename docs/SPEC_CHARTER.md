@@ -1,137 +1,147 @@
 # Solcore Lean specification charter
 
-- Status: Active
-- Adopted: 2026-07-23
-- Development policy amended: 2026-08-31
-
-This charter defines what counts as Solcore specification work. Revision-local
-progress belongs in [Current status](CURRENT_STATUS.md), not in this document.
-
 ## Purpose
 
-solcore-lean is an independent executable formal specification. It exists to
-state language rules precisely, execute those rules deterministically, and
-support reproducible comparison with Solcore implementations.
+`solcore-lean` is an executable, kernel-checked specification of Solcore. It
+aims to make syntax, static semantics, execution, resource behavior, and
+contract-state effects precise enough to inspect, test, and prove.
 
-Compiler output is not the definition of the language. Haskell and Rust
-behavior can expose ambiguity or defects, but it does not override an Accepted
-decision or a declarative Lean rule.
+The project is independent of any production compiler. Existing Haskell and
+Rust implementations supply evidence and comparison cases; neither is the
+definition of the language.
 
 ## Specification authority
 
-The authority order is:
+Authority is ordered as follows:
 
-1. versioned declarative Lean definitions;
-2. Accepted ADRs and designated manifests or schemas;
-3. total executable definitions proved to correspond to the rules;
-4. normative conformance tests;
-5. explanatory documentation and implementation evidence.
+1. Lean definitions and theorem statements in the retained public modules;
+2. accepted ADRs that constrain choices not yet fully encoded;
+3. executable tests and pinned comparison evidence; and
+4. explanatory documentation.
 
-Unproved executable behavior is not promoted to a normative semantic rule.
-ADR-0153 pins the Rust parser behavior used as the canonical syntax migration
-target. An intentional difference in accepted Lean syntax requires an explicit
-decision rather than an undocumented compatibility exception.
+When these disagree, fix the lower-authority artifact or make an explicit ADR
+and code change. Do not silently change a judgment to imitate one compiler.
 
 ## Semantic layers
 
-The specification separates:
+The specification keeps the following responsibilities distinct:
 
-1. Surface syntax, which preserves concrete source information.
-2. Resolved input, which replaces source spellings with structured identity.
-3. Semantic Core, which defines typed execution.
-4. Contract runtime, which carries explicit external state.
-5. Observation, which exposes canonical semantic effects.
+1. `Solcore.Syntax`: canonical tokens, diagnostics, recovery, and source AST;
+2. `Solcore.Workspace`: library/module identity and workspace validity;
+3. `Solcore.Resolved`, `Solcore.TypeSystem`, and `Solcore.Frontend`: executable
+   resolution, inference, staging, specialization, linking, and compilation;
+4. `Solcore.SourceSemantics`: independent resolved-source judgments;
+5. `Solcore.Core`: syntax-independent checked executable semantics;
+6. `Solcore.ContractRuntime`: accounts, frames, transactions, calls,
+   creation, commit/rollback, and observations;
+7. `Solcore.Abi`: explicitly supported hashing and data encoding; and
+8. `Solcore.Synthesis`: reproducible checked Core input generation.
 
-Parser data, source spans, compiler IR, Hull, Yul, and EVM bytecode do not
-define Semantic Core meaning.
+An adapter between layers must be explicit. Success in one layer is not
+silently treated as proof of a different layer's judgment.
 
-## Published boundaries
+## Public boundaries
 
-| Protocol | Closed purpose | Input |
-| --- | --- | --- |
-| Oracle v1 | Legacy compatibility and capability discovery | Legacy request envelope |
-| Oracle v2 | Historical Core checking and evaluation | Semantic Core v1 |
-| Oracle v3 | Frozen Core checking and evaluation | Semantic Core v2 |
-| Oracle v4 | Restricted single-file parsing | Surface v1 |
-| Oracle v5 | Core checking and checked-contract execution | Semantic Core v3 and an explicit scenario |
+The public interfaces are Lean imports:
 
-Publication is immutable and additive. A new internal Core constructor does
-not change Semantic Core v1, v2, or v3. A later public Core extension requires
-a new schema, profile, capabilities document, Oracle boundary, resource
-contract, and conformance corpus.
+- `Solcore` for the complete library;
+- `Solcore.Syntax` for canonical parsing;
+- `Solcore.Frontend.Current` for the current whole-program pipeline;
+- `Solcore.SourceSemantics` for declarative source rules;
+- `Solcore.Core` for Core checking and execution;
+- `Solcore.ContractRuntime` for checked-contract execution;
+- `Solcore.Abi` for the retained ABI utilities; and
+- `Solcore.Synthesis` for checked Core generation and shrinking.
 
-## Development direction
-
-Concrete syntax work has resumed under ADR-0153 against the pinned PR #20
-revision. The replacement is independent of the old Surface AST and does not
-alter the completed Core and runtime semantics.
-
-Surface v1 and Oracle v4 remain immutable historical publications. Any new
-source publication is additive. Executable lexer and parser coverage precedes
-new grammar-specific proof depth; resolution, source typing, and elaboration
-then connect the parsed source to checked Semantic Core.
+Core Wire v1, v2, and v3 are retained closed data encodings. A new internal
+Core form does not enter an older encoding without a separately reviewed
+version decision.
 
 ## Required semantic structure
 
-A complete feature has:
+For each executable feature, the specification should distinguish as
+applicable:
 
-- an Accepted decision fixing observable choices;
-- an independent declarative typing rule where applicable;
-- an independent declarative dynamic rule;
-- a pure total checker and evaluator;
-- checker soundness and completeness;
-- evaluator or machine correspondence;
-- determinism at the stated boundary;
-- progress, preservation, or an explicitly justified replacement;
-- an explicit resource model;
-- positive, negative, order, boundary, and compatibility tests; and
-- no accidental expansion of an older wire language.
+- syntax or data representation;
+- well-formedness and static admission;
+- declarative dynamic meaning;
+- executable implementation;
+- diagnostics and failure priority;
+- resource accounting and resumption;
+- correspondence between executable and declarative forms; and
+- preservation of values, environments, heaps, frames, and world state.
 
-One-way results must state the missing direction. Resource exhaustion cannot be
-reported as source rejection.
+Missing proof directions must be recorded as partial. Tests do not substitute
+for a general theorem, and a theorem over successful derivations does not
+imply progress or termination.
 
-## Verdicts and protocol errors
+## Outcomes and failures
 
-Language queries distinguish:
+Language and runtime results use typed outcomes owned by their layer. The
+specification distinguishes at least:
 
-- accepted;
-- rejected;
-- unsupported;
-- inconclusive;
-- executed; and
-- internal error.
+- static rejection from dynamic failure;
+- normal source control from source faults;
+- Core checking failure from Core evaluation exhaustion;
+- contract preflight failure from return, revert, trap, and incomplete
+  execution; and
+- unsupported input from an internal invariant violation.
 
-Malformed JSON or an invalid protocol envelope is a protocol error, not a
-language verdict. Runtime return, revert, and defined traps are observations,
-not internal errors.
+Failure categories must not be collapsed merely to simplify an adapter.
+Deterministic error priority is part of an executable boundary when tests or
+proofs rely on it.
 
 ## Resources and divergence
 
-Implementation limits are explicit inputs or published profile limits.
-Reaching a limit yields an inconclusive result unless a language rule itself
-defines another outcome.
+Fuel and bounded search make executable functions total. Exhausting such a
+bound means the computation is inconclusive under that bound; it is not a
+proof of semantic rejection.
 
-Finite Core fragments may prove a sufficient fuel theorem. Features that add
-recursion or other divergence must separately decide the declarative
-divergence boundary before weakening that theorem.
+The specification must state separately whether a result concerns:
+
+- a mathematical relation without fuel;
+- a fuel-bounded evaluator;
+- a resumable machine state; or
+- a bounded frontend search such as trait resolution or specialization.
+
+Exact-fuel and resumption theorems should prevent already completed effects
+from being replayed.
 
 ## Contract observation
 
-Oracle v5 contract execution makes its initial world, immutable environment,
-invocation, resource limits, and requested state probes explicit. Its standard
-observation contains terminal status and data, initial/committed state
-endpoints, committed Word logs, and successfully created addresses.
+Checked-contract behavior is defined from explicit inputs: admitted Core code,
+initial world state, execution environment, invocation, and resource bound.
+Observable results are typed Lean values describing the modeled outcome,
+journal, logs, created addresses, and selected state changes.
 
-Bytecode identity, optimizer traces, generated names, and wall-clock time are
-not standard semantic observations. The current model does not claim EVM
-equivalence. Gas and EVM-revision-sensitive behavior require separate,
-fork-pinned profiles.
+Commit and rollback are semantic operations. A top-level return commits the
+working state; the modeled failing outcomes select the appropriate checkpoint.
+Child failures must resolve their local state before returning control to a
+parent.
+
+This model does not imply equivalence with EVM gas, bytecode, fees, block
+context, or every Ethereum fork.
+
+## External evidence
+
+Cross-implementation comparisons are valid only when source and standard
+library bytes, profiles, initial state, resource limits, and observed results
+are aligned. Native defaults are evidence, not implicit specification choices.
+
+Use the classifications in
+[Compatibility evidence](COMPATIBILITY_MATRIX.md). Do not claim conformance
+from source acceptance alone or from replaying two paths through the same Lean
+semantics.
 
 ## Trust and audit
 
-The semantic kernel is checked by Lean and by repository policy. Audited roots
-may not use the escape hatches rejected by scripts/check-kernel.mjs.
+Lean's kernel is the proof checker. The repository additionally:
 
-Lean still relies on its ordinary foundations. Critical theorem reports may
-include propext, Quot.sound, or Classical.choice; the actual report is audited
-rather than summarized as having no axioms.
+- builds with warnings as errors;
+- runs executable regression and property tests;
+- validates owned data, digests, and references; and
+- scans configured semantic roots for prohibited escape hatches.
+
+Critical theorem reviews should inspect their actual axiom reports. Project
+documentation must distinguish kernel-checked statements, executable tests,
+and unverified design intent.

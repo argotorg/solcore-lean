@@ -101,9 +101,9 @@ operators.
 ## Boundaries
 
 No expression form, operation, fault, evaluation rule, machine frame, Wire tag,
-schema, version, byte encoding, Oracle behavior, source syntax, ABI rule,
-opcode, or gas rule changes. Division and modulo remain unsigned and totalized;
-signed arithmetic remains a separate decision.
+schema, version, byte encoding, source syntax, ABI rule, opcode, or gas rule
+changes. Division and modulo remain unsigned and totalized; signed arithmetic
+remains a separate decision.
 
 ## Consequences
 

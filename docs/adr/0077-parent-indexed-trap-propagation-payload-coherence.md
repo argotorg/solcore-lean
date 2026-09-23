@@ -130,8 +130,8 @@ from a trap, or classify a reason as fatal or recoverable.
 They also do not define checkpoint creation, ownership or lifetime, stack,
 depth, scheduling, reentrancy, argument/result delivery, heterogeneous reason
 conversion, a trap taxonomy, transaction rollback or atomicity, a top-level
-verdict, suffix extraction or uniqueness, event authenticity, resource
-exhaustion, fuel, gas, parser or source syntax, Wire, Oracle, ABI, or EVM
+outcome, suffix extraction or uniqueness, event authenticity, resource
+exhaustion, fuel, gas, parser or source syntax, Wire, ABI, or EVM
 behavior.
 
 The internal `FrameTrace` still carries no concrete contract-log survival,

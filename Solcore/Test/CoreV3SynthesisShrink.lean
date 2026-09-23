@@ -1,5 +1,4 @@
 import Solcore.Synthesis.CoreV3.Shrink
-import Solcore.Synthesis.CoreV3.Case
 
 /-! Focused regressions for deterministic checked Core v3 shrinking. -/
 
@@ -9,7 +8,6 @@ namespace Tests.CoreV3SynthesisShrink
 
 open Solcore.Core
 open Solcore.Core.Wire
-open Solcore.Oracle.V5
 open Solcore.Synthesis.CoreV3
 
 private def word (value : Nat) : V3.Expr :=
@@ -147,30 +145,8 @@ private def allChecks : Bool :=
 private theorem allChecks_exact : allChecks = true := by
   native_decide
 
-private def returnedResponse : Response → Bool
-  | { body := .execute (.executed observation), .. } =>
-      match observation.value.outcome with
-      | .returned _ => true
-      | _ => false
-  | _ => false
-
-private def candidateExecutes (candidate : ShrinkCandidate) : Bool :=
-  let fuel := Limits.default.evaluationSteps
-  match runCheckedDirect candidate.checkedProgram fuel,
-      runCheckedDispatched candidate.checkedProgram fuel with
-  | .ok direct, .ok dispatched =>
-      direct == dispatched && returnedResponse direct
-  | _, _ => false
-
 def testCoreV3SynthesisShrink : IO Unit := do
   unless allChecks do
     throw (IO.userError "Core v3 checked shrinker changed")
-  match admitProgram compoundBody with
-  | none =>
-      throw (IO.userError "the shrink execution fixture was not admitted")
-  | some source =>
-      unless (shrink source).all candidateExecutes do
-        throw (IO.userError
-          "a checked shrink candidate failed public Oracle execution")
 
 end Tests.CoreV3SynthesisShrink

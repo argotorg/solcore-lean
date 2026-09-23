@@ -188,7 +188,7 @@ Generic replay depends only on `HostHandler`, `HostDriver`, and the Core replay
 interface. Storage specializations live in Semantics and reuse the existing
 combined driver and address-selected adapter.
 
-No parser, Surface, ABI, Oracle, Wire schema, gas schedule, frame-outcome, or
+No parser, source syntax, ABI, Wire schema, gas schedule, frame-outcome, or
 transaction-lifecycle module changes.
 
 ## Not decided here

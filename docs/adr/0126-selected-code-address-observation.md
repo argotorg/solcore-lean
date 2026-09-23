@@ -215,7 +215,7 @@ imports no Address or WorldState meaning. Semantics owns the Address response
 and the invariant that the selected entry point uses one selector for lookup
 and execution.
 
-No parser, Surface, ABI, Oracle, schema, profile, gas, or public runtime module
+No parser, source syntax, ABI, schema, profile, gas, or public runtime module
 changes. Frozen Wire projections continue to reject every host function. The
 root README does not change.
 
@@ -280,7 +280,7 @@ and local store at fuel 32.
   foundations; and
 - independent implementation and regression audits found no correctness gap.
 
-The parser, Surface, ABI, Oracle, public formats, and root README did not
+The parser, source syntax, ABI, public formats, and root README did not
 change. Implementation was split into small green commits; the one larger
 cross-layer signature migration changed every caller atomically so no
 temporary default selector entered the semantics.

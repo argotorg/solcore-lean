@@ -150,7 +150,7 @@ This slice also does not decide runtime parent/child provenance, invocation,
 checkpoint creation, ownership or lifetime, stack or depth, scheduling,
 reentrancy, argument/result delivery, transaction checkpointing or atomicity,
 trace authenticity or publication, concrete log survival, resource exhaustion,
-fuel, gas, parser or source syntax, Wire, Oracle, ABI, or EVM behavior.
+fuel, gas, parser or source syntax, Wire, ABI, or EVM behavior.
 
 ## Staged implementation plan
 

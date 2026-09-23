@@ -136,7 +136,7 @@ This ADR adds no:
 - stack, scheduler, nested invocation, root checkpoint, or transaction policy;
 - caller, current address, call value, calldata, call kind, or authority role;
   or
-- parser, Surface, ABI, gas, Wire, Oracle, schema, profile, or public format
+- parser, source syntax, ABI, gas, Wire, schema, profile, or public format
   change.
 
 ## Implemented sequence
@@ -179,7 +179,7 @@ resolution-view naturality remain test-only dependencies.
   fold definition; and
 - independent specification and implementation audits found no P0-P3 issue.
 
-No Core execution, runtime fixture, parser, Surface, ABI, Oracle, Wire format,
+No Core execution, runtime fixture, parser, source syntax, ABI, Wire format,
 schema, profile, or root README changed.
 
 ## Consequences

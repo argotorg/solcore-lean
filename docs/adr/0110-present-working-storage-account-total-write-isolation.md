@@ -101,8 +101,8 @@ multi-step coherence remain separate consumer decisions.
 
 This slice adds no balance, nonce, code, value transfer, call data, outcome,
 trace event, rollback, scheduling, transaction, concurrency, reentrancy,
-atomicity, cost, gas, parser or source syntax, Core expression, Wire or Oracle
-field, Profile, ABI, storage layout, serialization, or published observation.
+atomicity, cost, gas, parser or source syntax, Core expression, Wire field,
+Profile, ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan
 

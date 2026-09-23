@@ -6,7 +6,7 @@ import Solcore.Core.Machine
 
 /-! Executable source-text regressions through the existing canonical lexer,
 expression parser, explicit-table frontend checker, and Core machine. This is
-test wiring, not a new public source parser or an Oracle endpoint. -/
+test wiring, not a new public source parser or external service endpoint. -/
 
 set_option autoImplicit false
 

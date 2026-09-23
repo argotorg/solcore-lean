@@ -13,7 +13,8 @@
   profile for `uint256 -> uint256`, including its collision checker and checked
   Core dispatcher. Published profiles still carry no ABI version. Unsupported
   source shapes are recorded in the feature matrix.
-- **Boundary:** No current Oracle profile claims external contract dispatch.
+- **Boundary:** The current direct Lean ABI API covers only the explicitly
+  checked static-word profile; it does not claim general source dispatch.
 - **Suggested reading:** Read “Decision” for admissibility and
   “Conformance requirements” for the future totality and collision checks.
 
@@ -62,8 +63,8 @@ shapes.
 - The external representation of a user ADT is not inferred from its source type
   name without a subsequent ADR.
 - Safe rejection by the current Rust implementation is desirable implementation
-  behavior, but the Lean oracle distinguishes such a rejection from the
-  `unsupported` verdict used when a feature's semantics are undefined.
+  behavior, but the Lean specification keeps implementation rejection separate
+  from an undefined or unsupported language feature.
 - Adding standard-library evidence requires conformance tests for all four paths
   at the same time.
 
@@ -75,7 +76,8 @@ shapes.
   produce `unsupported`.
 - Verify that duplicate signatures and selector collisions are rejected before
   code generation.
-- Verify that an unsupported type produces neither a crash nor `internalError`.
+- Verify that an unsupported type produces neither a crash nor an unstructured
+  internal failure.
 - Provide a round-trip theorem for every covered type for which
   `decode (encode v) = v`.
 - If any tuple component is unsupported, the tuple as a whole must not be

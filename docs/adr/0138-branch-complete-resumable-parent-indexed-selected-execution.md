@@ -320,8 +320,8 @@ This ADR does not decide or add:
 - gas, refunds, wall-clock cost, sufficient fuel, fairness, or termination;
 - checkpoint lifetime, ownership, persistence, commit, or transaction
   atomicity; or
-- source syntax, parser, elaboration, ABI, Wire, Oracle, schema, profile,
-  metadata capability, or any public protocol.
+- source syntax, parser, elaboration, ABI, Wire, schema, profile, or any public
+  protocol.
 
 The root README does not change.
 

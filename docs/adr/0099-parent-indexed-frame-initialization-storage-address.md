@@ -146,7 +146,7 @@ value, call kind, balance, nonce, code lookup, outcome provenance, return
 delivery, trap handling, event, stack, depth, scheduling, recursion,
 reentrancy, gas, ABI, transaction, host I/O, or published observation.
 
-It adds no parser or source syntax, Core expression, Wire or Oracle field,
+It adds no parser or source syntax, Core expression, Wire field,
 Profile, or frozen artifact. It makes no concurrency, cost, evaluation-count,
 or external-effect claim.
 

@@ -9,9 +9,11 @@
 - **Decision:** Versioned declarative Lean rules outrank executors, tests, and
   comparison compilers; every published boundary is identified by explicit
   language, profile, and implementation metadata.
-- **Current implementation:** Drafts 1 through 4, their profiles, schemas,
-  digests, pinned baselines, and metadata checks are present. Later ADRs publish
-  only the Core and Surface fragments whose proof boundaries are complete.
+- **Current implementation:** Drafts 1 through 3 and draft 5, the surviving
+  profiles and Core schemas, their digests, pinned baselines, and metadata
+  checks are present. Later
+  ADRs expose only the Core, contract-runtime, and source-semantics fragments
+  whose proof boundaries are complete.
 - **Boundary:** Acceptance of this ADR does not promote an incomplete language
   feature or make an existing compiler normative.
 - **Suggested reading:** Read “Decision” for the authority order, then
@@ -69,7 +71,7 @@ language version.
 
 ## Conformance Requirements
 
-- An oracle response must identify the language version and profile.
+- Every versioned profile must identify its language version and profile ID.
 - Compatibility results must record the compiler revision and execution
   settings.
 - Changing an expected result in a normative test must be accompanied by a

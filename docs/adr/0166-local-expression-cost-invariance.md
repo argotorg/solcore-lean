@@ -58,4 +58,4 @@ with equal exhaustion presence to protect the weaker observation boundary.
 Audit public declarations against standard kernel axioms; run focused and
 aggregate builds, complete tests, kernel and metadata checks. Keep new proof
 files below 300 lines. No allocation algorithm, source rule, parser, evaluator,
-gas or elapsed-time model, wire format, Oracle endpoint, or golden bytes change.
+gas or elapsed-time model, wire format, or external endpoint changes.

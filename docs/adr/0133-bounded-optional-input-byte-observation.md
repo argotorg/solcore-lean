@@ -224,8 +224,8 @@ host capability. Generic HostDriver and continuation layers remain parametric
 and must not import bytes-specific meaning.
 
 Frozen Core Wire v1 and v2 continue to reject every host-function value. Add no
-Wire tag, Oracle command, runtime schema, profile, metadata capability, ABI
-rule, Surface form, parser rule, or source elaboration. The root README does
+Wire tag, runtime schema, profile, ABI
+rule, source form, parser rule, or source elaboration. The root README does
 not change. Publication requires a separate ADR.
 
 ## Non-goals
@@ -249,8 +249,8 @@ This ADR does not define or prove:
   in the supplied bytes;
 - balance, transfer, affordability, payability, gas, fork rules, or transaction
   finalization;
-- a public representation, compatibility promise, parser change, Oracle
-  behavior, schema, profile, ABI, or publication; or
+- a public representation, compatibility promise, parser change, schema,
+  profile, ABI, or publication; or
 - any relationship between input bytes and code, storage, caller Address, or
   call value.
 
@@ -315,7 +315,7 @@ byte-derived storage entry and terminal bytes.
 - key axiom reports contain only the existing `propext` and `Quot.sound`;
 - independent Core, handler, end-to-end, parent, and full-ADR audits found no
   remaining P0-P3 issue; and
-- no parser, Surface, Oracle, schema, profile, Wire tag, public format, or root
+- no parser, source syntax, schema, profile, Wire tag, public format, or root
   README changed.
 
 ## Consequences

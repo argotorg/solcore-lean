@@ -77,10 +77,10 @@ Tests exercise both the executable behavior and the named proof interface.
 
 ## Boundaries
 
-No frozen schema, capability report, golden byte sequence, or Oracle behavior
-changes. These are ordinary existing Core expressions, and each wire projection
-continues to treat them exactly like its handwritten expansion. This decision
-does not define signed comparison, ABI decoding, opcode mapping, or gas cost.
+No frozen wire schema changes. These are ordinary existing Core expressions,
+and each wire projection continues to treat them exactly like its handwritten
+expansion. This decision does not define signed comparison, ABI decoding,
+opcode mapping, or gas cost.
 
 ## Consequences
 

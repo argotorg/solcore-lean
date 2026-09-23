@@ -52,10 +52,10 @@ This milestone does not define:
 - recursive call depth or initializer-created grandchildren;
 - destructors, committed-account deletion, gas, warmth, refunds, or logs;
 - ABI encoding, constructor arguments, storage layout, or ordered traces; or
-- a public Oracle request or enumerable state-diff schema.
+- an external serialized request or enumerable state-diff schema.
 
-Those choices remain separate milestones. Older Wire and Oracle profiles do
-not gain the new Core host function.
+Those choices remain separate milestones. Older Wire profiles do not gain the
+new Core host function.
 
 ## Account nonce
 

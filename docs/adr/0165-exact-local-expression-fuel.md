@@ -64,8 +64,8 @@ This is a count of successful Core transitions, not gas, CPU or wall-clock
 time, parsing/decoding/lookup complexity, or work performed by failing runs.
 Span changes, grouping, and long numeric spellings do not imply any claim
 about the time spent traversing frontend syntax. No execution algorithm,
-parser, type rule, evaluation order, wire format, Oracle endpoint, capability,
-or golden bytes change.
+parser, type rule, evaluation order, wire format, external endpoint, or
+capability changes.
 
 Consumers cover all cost formulas, exact completion and exhaustion thresholds,
 nonempty stores, selected and skipped branches, raw untypable or unresolved

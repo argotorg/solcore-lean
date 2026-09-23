@@ -85,7 +85,7 @@ Still deferred are:
 - value-indexed specialization and memoization;
 - staged recursion, including selected-branch recursion and compile-time
   Fibonacci; and
-- broad proof hardening and a public source Oracle.
+- broad proof hardening.
 
 Staged recursion is the next roadmap phase.
 

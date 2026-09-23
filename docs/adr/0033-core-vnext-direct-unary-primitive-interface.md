@@ -79,9 +79,9 @@ simulation. The named interface is a specialization of those existing results.
 ## Boundaries
 
 No expression form, operator, evaluator rule, machine frame, fault, type, Wire
-tag, version, byte encoding, Oracle behavior, source syntax, ABI rule, opcode,
-or gas rule changes. Existing weakening, evaluation, fault, effect, fuel, and
-Wire behavior remain normative.
+tag, version, byte encoding, source syntax, ABI rule, opcode, or gas rule
+changes. Existing weakening, evaluation, fault, effect, fuel, and Wire behavior
+remain normative.
 
 ## Consequences
 

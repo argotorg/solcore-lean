@@ -1,156 +1,143 @@
 # Development guide
 
-This guide describes the required local checks and the workflows for extending
-the executable semantics or canonical source frontend.
+This guide describes the local checks and the workflow for changing the Lean
+specification. Keep changes within the layer that owns the behavior and make
+cross-layer adapters explicit.
 
 ## Build and test
 
-Use the checked-in Lean toolchain:
+Use the checked-in Lean toolchain from the repository root:
 
-    lake build
-    lake test
-    node scripts/verify-metadata.mjs
-    node scripts/check-kernel.mjs
+```text
+lake build
+lake test
+node scripts/verify-metadata.mjs
+node scripts/check-kernel.mjs
+```
 
-The metadata check protects profile digests, schemas, standard-library hashes,
-and golden bytes. The kernel-policy check scans semantic roots for disallowed
-escape hatches.
+Warnings are errors. During development, build the narrowest changed module
+first, then run the complete suite before handing off the change.
 
-To verify canonical standard-library bytes against an upstream checkout:
+To verify the embedded canonical standard-library bytes against an upstream
+checkout:
 
-    node scripts/verify-metadata.mjs --canonical-source-root <solcore-checkout>/std
+```text
+node scripts/verify-metadata.mjs --canonical-source-root <solcore-checkout>/std
+```
 
-## Run the Oracle
+## Choose the owning layer
 
-    lake exe solcoreOracle --help
-    lake exe solcoreOracle --version
-    lake exe solcoreOracle capabilities-v3
-    lake exe solcoreOracle capabilities-v4
-    lake exe solcoreOracle capabilities-v5
+| Change | Primary location | Also inspect |
+| --- | --- | --- |
+| Tokens, grammar, recovery, AST | `Solcore/Syntax` | parser properties, fixtures, workspace handoff |
+| Library/module identity | `Solcore/Workspace` | loading, imports, standard-library catalog |
+| Source types and inference machinery | `Solcore/TypeSystem` | frontend inference and declarative source judgments |
+| Executable resolution/checking/compilation | `Solcore/Frontend` | Syntax, Workspace, TypeSystem, Core adapters |
+| Normative source judgments | `Solcore/SourceSemantics` | substitutions, staging, dynamics, preservation |
+| Executable intermediate language | `Solcore/Core` | typing, evaluation, checker, machine, safety, wire isolation |
+| Accounts, frames, transactions, calls | `Solcore/ContractRuntime` | Core host operations, ABI boundary, observations |
+| Hashing and call-data encoding | `Solcore/Abi` | contract-entry profiles and tests |
+| Seeded Core generation/shrinking | `Solcore/Synthesis` | checker sealing, scope and size proofs |
+| Canonical source bytes | `Solcore/Standard` | hashes, logical paths, workspace consumers |
 
-With no command, the Oracle consumes and produces one NDJSON object per line.
-The request schema selects the protocol. Do not infer a protocol from request
-shape or internal implementation details.
+Do not place source-language rules in contract execution, contract state in the
+Core local store, or executable frontend success as a premise of an
+independent source judgment.
 
 ## Semantic feature workflow
 
 Before implementation:
 
-1. identify a small vertical feature;
-2. accept an ADR fixing observable choices;
-3. list every affected syntax, typing, evaluation, machine, checker, safety,
-   wire-isolation, and test obligation.
+1. identify the smallest observable feature and its owning layer;
+2. write or update an ADR when the behavior is a durable design choice;
+3. list affected syntax, static, dynamic, resource, diagnostic, and proof
+   obligations; and
+4. identify every retained encoding or adapter that must reject or represent
+   the new form.
 
 During implementation:
 
-Keep each commit at roughly 300 changed lines or fewer. Split larger features
-at independently buildable and testable boundaries.
-
-1. extend the internal Core algebra;
-2. extend declarative typing and evaluation;
-3. extend total executable inference and evaluation;
-4. extend detailed diagnostics;
-5. extend the CEK machine;
-6. re-establish static and dynamic correspondence;
-7. re-establish value, environment, frame, and state safety;
-8. make old wire projections reject the new constructors;
-9. add focused positive, negative, order, and resource tests.
+1. add the declarative data and rules;
+2. add executable checking or evaluation where the layer requires it;
+3. prove soundness, completeness, correspondence, or preservation at the
+   boundary being changed;
+4. preserve deterministic error priority and evaluation order;
+5. add focused positive, negative, resource, and regression tests; and
+6. keep each intermediate commit independently buildable when practical.
 
 After implementation:
 
 1. build changed modules with warnings as errors;
 2. run the full test suite;
-3. run metadata and kernel-policy checks;
-4. inspect critical theorem axiom reports;
-5. run trust-zero checks for new audit roots where appropriate;
-6. update Current status and the feature matrix.
+3. run repository-data and kernel-policy checks;
+4. inspect axiom reports for new critical theorems;
+5. update [Current status](CURRENT_STATUS.md) and the
+   [feature matrix](FEATURE_MATRIX.md); and
+6. check documentation links and stale module names.
 
 ## Completion standard
 
-A feature is not complete merely because evaluation returns the expected value.
-Reviewers should be able to locate:
+A semantic feature is not complete merely because one example evaluates to
+the expected value. Reviewers should be able to locate, as applicable:
 
 - the independent rule;
 - the executable implementation;
 - soundness and completeness;
 - dynamic correspondence;
-- safety preservation;
-- resource behavior;
-- diagnostic behavior; and
-- version-isolation tests.
+- value, environment, heap, frame, or state preservation;
+- resource and resumption behavior;
+- deterministic diagnostic behavior; and
+- isolation of retained encodings.
 
-If a proof direction is intentionally delayed, the status must say partial and
-name the missing direction.
+If a proof direction is delayed, mark the feature partial and name the missing
+result. Do not describe a local theorem as an end-to-end guarantee.
 
-## Published compatibility
+## Syntax and frontend changes
 
-Do not add new constructors to Semantic Core wire v1, v2, or v3. Conversion
-from a later internal Core is intentionally a partial projection. New internal
-constructs must produce no representation in an older closed wire.
+Canonical syntax changes belong under `Solcore/Syntax`. Keep the lexer,
+declarative grammar, executable parser, recovery behavior, AST validity, and
+their proofs synchronized.
 
-Similarly, do not reinterpret Surface v1 or any published Oracle v1-v5
-contract. Publication of different behavior requires a new additive version
-and a separate decision.
-
-The following files are compatibility artifacts and change only as part of an
-explicit publication:
-
-- profiles and their manifest;
-- JSON schemas;
-- capability documents and digests;
-- existing golden streams and their manifest;
-- published feature arrays and limits.
-
-## Repository locations
-
-| Change | Primary location | Also inspect |
-| --- | --- | --- |
-| Core algebra and rules | Solcore/Core | all Core proofs and frozen wire projections |
-| Checked-contract runtime | Solcore/ContractRuntime | world/frame transitions, observation and verdict decisions |
-| Public protocol | Solcore/Oracle | schemas, profiles, golden cases |
-| Canonical standard-library bytes | Solcore/Standard | source identity, byte-count and hash pins; canonical workspace consumers |
-| Workspace identity | Solcore/Workspace | workspace ADR and tests |
-| Canonical source syntax | Solcore/Syntax | ADR-0153 and canonical syntax plan |
-| Historical parser maintenance | Solcore/Surface | Surface publication decisions |
-| Historical Multi reference | Solcore/Surface/Multi | ADR-0015 and ADR-0018 |
-
-## Canonical frontend replacement
-
-Place new source syntax only under `Solcore/Syntax`. Do not extend the Surface
-v1 or Multi grammars, and do not add an adapter merely to reuse their ASTs.
-They remain historical compatibility boundaries.
+The parser reaches executable semantics only through explicit workspace,
+resolution, typing, staging, specialization, and linking phases. Preserve that
+separation when adding a source form. A parser test is not a source-typing or
+execution test.
 
 For an upstream syntax change:
 
-1. update the pinned upstream revision;
-2. classify its token, grammar, recovery, AST, and diagnostic impact;
-3. update the corresponding fixtures; and
-4. run the focused frontend and complete repository checks.
+1. record the exact upstream revision used as evidence;
+2. classify token, grammar, recovery, AST, and diagnostic impact;
+3. update focused fixtures and exactness proofs; and
+4. run both the syntax-focused and complete repository checks.
 
-Keep syntax and semantic changes independently reviewable. The canonical
-parser reaches checked Core only through explicit resolution, source typing,
-and elaboration stages. A public source result requires a new additive Oracle
-version.
+## Core and runtime changes
+
+Core changes must update the independent typing/evaluation rules, executable
+checker/evaluator, machine paths, safety/correspondence theorems, and retained
+wire projections. Older encodings are closed; unsupported new constructors
+must be rejected rather than silently coerced.
+
+Contract changes belong in `Solcore.ContractRuntime` when they concern world
+state, transaction/frame lifecycle, host effects, calls, creation, or
+observations. State every commit/rollback and fuel boundary explicitly. ABI
+admission and encoding remain separate checks under `Solcore.Abi`.
 
 ## Kernel policy
 
-scripts/check-kernel.mjs scans Core, Foundation, Semantics, Resolved,
-SourceSemantics, TypeSystem, Frontend, Standard, Syntax, Surface, and Workspace
-Lean sources. It rejects the language escape hatches named in that script,
-including appearances in comments.
-
-This policy is separate from Lean's foundations. Critical theorem axiom reports
-may contain propext, Quot.sound, or Classical.choice and should report the
-actual result.
+`scripts/check-kernel.mjs` scans the configured semantic roots for disallowed
+escape hatches, including appearances in comments. It complements Lean's
+kernel; it does not replace reviewing the actual axioms reported for critical
+theorems.
 
 ## Documentation policy
 
-- README contains only purpose and usage.
-- Current status is the only revision-local implementation ledger.
-- Architecture describes stable responsibilities.
-- ADRs contain durable decisions and rationale.
-- Plans contain implementation order and exit conditions.
-- Matrices summarize feature and external-evidence coverage.
+- `README.md` contains purpose, build instructions, and public entry points.
+- `CURRENT_STATUS.md` is the revision-local implementation ledger.
+- `ARCHITECTURE.md` describes stable responsibilities and dependency rules.
+- ADRs record durable decisions and rationale.
+- plans record sequencing and exit conditions.
+- matrices summarize feature and external-evidence coverage.
 
-Do not duplicate long proof inventories or performance diaries across several
-documents.
+Prefer one authoritative explanation and link to it. Remove documentation for
+code or interfaces that no longer exist rather than preserving instructions
+that cannot be followed.

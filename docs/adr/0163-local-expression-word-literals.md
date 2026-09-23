@@ -61,4 +61,4 @@ string payloads; retain the reference-only adapter's negative literal tests.
 Audit every affected public proof against standard kernel axioms, run focused
 and aggregate builds and complete tests, and verify kernel and metadata policy.
 This changes no parser, Core machine rule, source declaration policy, allocator,
-external endpoint, Wire/Oracle format, capability, or golden bytes.
+external endpoint, Wire format, or capability.

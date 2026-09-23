@@ -151,7 +151,7 @@ frame, or decide transaction rollback or atomicity. The mapper need not be
 injective, reversible, lossless, or semantically admissible.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
-fuel or gas policy, Wire or Oracle field, ABI, serialization, EVM revision,
+fuel or gas policy, Wire field, ABI, serialization, EVM revision,
 opcode behavior, Profile, canonical delta, or published format.
 
 ## Staged implementation plan

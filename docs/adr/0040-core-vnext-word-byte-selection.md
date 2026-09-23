@@ -68,8 +68,8 @@ Compile-time examples exercise all nine theorem names.
 ## Publication boundary
 
 `wordByte` is internal-only. Frozen Wire v1 and v2 gain no tag, and no Core or
-JSON round trip exists. Public Oracle behavior, schemas, metadata, versions,
-encodings, capabilities, and golden streams remain unchanged.
+JSON round trip exists. Published Wire schemas, metadata, versions, and
+encodings remain unchanged.
 
 ## Exclusions
 
@@ -100,6 +100,5 @@ Frozen Wire v1 and v2 expression projections reject `wordByte`, and the Wire v2
 `BinaryOp` conversion rejects the tag directly. No Core or JSON round trip is
 introduced. The implementation and focused semantic/Wire validation are
 complete. The independent audit found no P0-P3 issue, no source trust escape
-hatch, and only the repository-approved Lean foundational dependencies. Public
-Wire, Oracle behavior, schemas, metadata, versions, encodings, and golden
-streams remain unchanged.
+hatch, and only the repository-approved Lean foundational dependencies.
+Published Wire schemas, metadata, versions, and encodings remain unchanged.

@@ -174,7 +174,7 @@ Still deferred are:
   key operations beyond the runtime's implemented structural equality;
 - validated external closure inputs and closure serialization;
 - automatic public entry discovery, multi-root execution, and a published
-  source-runtime wire/Oracle protocol; and
+  source-runtime wire protocol; and
 - broad static- and dynamic-semantics proof families.
 
 ## Verification target

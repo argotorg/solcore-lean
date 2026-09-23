@@ -142,8 +142,8 @@ only equates the existing immutable storage-write expressions and their
 existing failure behavior.
 
 The slice adds no retained-address duplicate, read-after-write law,
-zero-deletion witness, parser or source syntax, Core expression, Wire or Oracle
-field, Profile, ABI, storage layout, gas rule, or published observation.
+zero-deletion witness, parser or source syntax, Core expression, Wire field,
+Profile, ABI, storage layout, gas rule, or published observation.
 
 ## Staged implementation plan
 

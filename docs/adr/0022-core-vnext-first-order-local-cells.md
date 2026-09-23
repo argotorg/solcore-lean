@@ -183,15 +183,14 @@ reference or a closure that contains one.
 
 The existing `Program.run` interface remains as a compatibility wrapper. It
 uses the stateful runner and erases the final local store from a successful
-result. Oracle v2 and v3 continue to use this wrapper. Their frozen input
-languages cannot construct cells, so their local store remains empty and their
-existing values, faults, fuel behavior, schemas, and golden bytes are
+result. The frozen wire languages cannot construct cells, so their local store
+remains empty and their existing values, faults, and fuel behavior are
 unchanged.
 
 ## Version and publication boundary
 
 This feature is internal. It adds no tag to Semantic Core v1 or v2 and no new
-Oracle or public schema. Both frozen Core wire projections must reject:
+public wire schema. Both frozen Core wire projections must reject:
 
 - cell types;
 - cell allocation, load, and store expressions;
@@ -219,7 +218,7 @@ for external contract state.
 
 This ADR does not add:
 
-- a Surface spelling or Surface-to-Core elaborator;
+- a source spelling or source-to-Core elaborator;
 - implicit dereferencing, lvalues, or compound assignment;
 - uninitialized cells or default initialization;
 - function-valued, cell-valued, or otherwise higher-order cell payloads;
@@ -228,7 +227,7 @@ This ADR does not add:
 - deallocation, regions, garbage collection, borrowing, or concurrency;
 - contract storage, accounts, balances, logs, calls, transactions, or
   rollback; or
-- a public Core version, capability, profile, or Oracle operation.
+- a public Core version or wire operation.
 
 ## Test coverage
 
@@ -236,5 +235,5 @@ Focused tests cover allocation identity, initializer-before-allocation,
 reference-before-right-hand-side order, exactly-once evaluation, reads after
 writes, aliases shared by multiple closures, rejected higher-order payloads,
 invalid raw references, exact fuel, final-store results, and rejection by both
-frozen wire projections. The existing published Oracle and golden suites
-remain regression requirements.
+frozen wire projections. Existing Core and Wire regression tests remain
+requirements.

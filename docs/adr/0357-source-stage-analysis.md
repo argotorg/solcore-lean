@@ -157,8 +157,7 @@ yet add:
   predicate-bearing calls or coercion execution;
 - selected-branch-only recursion, recursive memoization or compile-time
   Fibonacci;
-- a public source Oracle or a policy for automatically choosing staged roots;
-  or
+- a policy for automatically choosing staged roots; or
 - broad soundness, completeness or preservation metatheory.
 
 Those extensions may refine `Deferred`, but they must not reinterpret a value

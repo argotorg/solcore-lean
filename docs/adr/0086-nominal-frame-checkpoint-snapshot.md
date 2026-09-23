@@ -149,7 +149,7 @@ deliver return or revert data, handle or propagate a trap, enforce call depth
 or reentrancy, or decide transaction commit, rollback, or atomicity.
 
 It adds no parser or source syntax, Core expression, resource-limit rule, fuel
-or gas policy, Wire or Oracle field, ABI, serialization, EVM revision, opcode
+or gas policy, Wire field, ABI, serialization, EVM revision, opcode
 behavior, Profile, canonical delta, or published observation.
 
 ## Staged implementation plan

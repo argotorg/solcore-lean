@@ -105,7 +105,7 @@ and one test import; independent audit and completion evidence.
 This internal refinement is not published. It adds no concrete event taxonomy,
 timestamp, serialization, hashing, compression, size limit, balance, code,
 host call/create behavior, ABI, EVM revision, opcode, gas schedule, parser or
-source form, Core expression, Wire field or tag, Profile, Oracle behavior, or
+source form, Core expression, Wire field or tag, Profile, or
 frozen artifact.
 
 ## Consequences

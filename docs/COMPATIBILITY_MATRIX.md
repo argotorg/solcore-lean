@@ -1,127 +1,109 @@
 # Haskell and Rust compatibility evidence
 
-This document records comparison evidence. It is not the language
-specification, and agreement between compilers is not sufficient to establish a
-Solcore rule.
+This document records external comparison evidence. It is not the language
+specification, and agreement between implementations is not sufficient to
+establish a Solcore rule.
 
 ## Pinned evidence baseline
 
-| Target | Revision or digest |
-| --- | --- |
-| Haskell argotorg/solcore | 1d490d8bb5f374356f06e0720655496482eb1fb4 |
-| Rust legacy compatibility baseline | 38f4778ea461edfe59106bdb1f9f08c3307b0fc0 |
-| Rust canonical-syntax source (PR #20) | 18fd9f75d290df0070e21ee56e0a5691f232596f |
-| Canonical upstream standard library | 3f81bebfd1fc161ee08972be9e7a52150d02bdf55dd7449dfa058cd81cfafc22 |
-| Rust standard-library Git tree | c58489d2d544b314b7fa843b331062f6f5129655 |
-| Rust compatibility snapshot | c23c43897bb3f9e8d55abc5369dc9bb1ae984e9da1ef9457440aee642923f430 |
+The machine-readable baseline is
+[`metadata/baselines.json`](../metadata/baselines.json). At the recorded
+observation date it identifies:
 
-Results from other revisions, different standard bytes, different solver
-settings, or different EVM revisions do not belong to this baseline.
+| Target | Revision |
+| --- | --- |
+| Haskell `argotorg/solcore` | `1d490d8bb5f374356f06e0720655496482eb1fb4` |
+| Rust `argotorg/solcore-rs` | `38f4778ea461edfe59106bdb1f9f08c3307b0fc0` |
+
+The intended comparison profile selects the tabled solver, generated dispatch,
+the Osaka primitive set, and the canonical Haskell standard-library bundle.
+Results from different revisions, library bytes, solver modes, dispatch
+settings, or execution revisions are different evidence sets.
 
 ## What can be compared now
 
-| Lean boundary | Adapter state | Valid claim |
+| Lean boundary | External adapter state | Valid claim |
 | --- | --- | --- |
-| Semantic Core v2 / Oracle v3 | Neither compiler consumes the Core wire | Lean supplies closed semantic fixtures, not source-level three-way conformance |
-| Semantic Core v3 / Oracle v5 `coreCheck` | Neither compiler consumes Core Wire v3 | Lean can check closed current-Core fixtures; no cross-compiler acceptance claim follows |
-| Surface v1 / Oracle v4 | Parser fixtures can share source text | Restricted parser outcomes can be compared |
-| Canonical Syntax | Complete executable Lean lexer/parser against pinned PR #20; 23 embedded fixtures and an external 490-file fixed-revision corpus audit | Lexical and parsed-syntax behavior can be compared; source semantic conformance cannot yet be claimed |
-| Workspace identity | Internal Lean values | Logical identity behavior is specified but has no external adapter |
-| Frozen Multi frontend | Internal certified one-file API | Frozen lexical, parse, structural, location, and token behavior can be investigated |
-| Resolution and elaboration | No Lean implementation | No source semantic comparison exists |
-| Checked-contract runtime / Oracle v5 `execute` | Public Core/scenario, normalized observation, and reproducible pure-Core fixture generation; no external compiler adapter | Lean execution is reproducible, but no end-to-end or cross-compiler conformance claim exists |
+| Canonical lexer/parser | Fixed-revision source corpora can be run through each parser | Token, acceptance, AST-shape, recovery, and diagnostic differences can be measured on aligned inputs |
+| Workspace and module identity | No normalized external adapter | Lean defines its current identity and visibility behavior; no cross-compiler agreement follows |
+| Source checking and specialization | No complete aligned result adapter | Individual examples can motivate rules, but general source conformance is unverified |
+| Declarative source semantics | Mathematical Lean relations | External compiler behavior can be compared only through a separately justified translation |
+| Semantic Core | External compilers do not consume the retained Core encodings | Lean checking and execution are reproducible, not cross-compiler evidence |
+| Checked-contract runtime | No compiler-to-normalized-runtime adapter | Lean world-state behavior is testable internally; EVM equivalence is not established |
+| ABI utilities | Standard hash/encoding vectors can be compared | Agreement is limited to the modeled Keccak-256 and static-word functions |
+| Core synthesis | Produces Lean Core values | Useful for internal property tests; not differential evidence until independent adapters exist |
 
-Oracle v5 publishes the checked-contract model: a finite package, initial
-world, call and creation environment, invocation, limits, probes, and total
-result. It makes Lean runs reproducible and gives future adapters a comparison
-target. The Haskell and Rust compilers do not currently consume Core Wire v3 or
-emit the v5 observation format, so publication alone establishes no agreement
-with either compiler.
+## Evidence labels
 
-The Lean synthesis library can generate and shrink a checked pure Core subset
-into canonical v5 requests. That removes manual fixture construction from the
-Lean side, but replaying those requests twice through the same Lean semantics
-is not differential evidence.
+Use these labels consistently:
 
-The v5 runtime defines its own checked Core, depth-one calls, balances,
-creation, logs, commit, and rollback behavior. It does not assert that those
-rules are equivalent to compiler-generated EVM bytecode or to any EVM revision.
+- **conformant**: agrees with a normative result under the same inputs and
+  profile;
+- **divergent**: differs from that result under aligned conditions;
+- **mode-dependent**: changes with solver or compiler mode;
+- **phase-dependent**: changes with the phase reached;
+- **partial**: implements only part of the compared path;
+- **unsupported**: the selected boundary defines no behavior; and
+- **unverified**: the aligned baseline has not been executed.
 
-The external fixed-revision syntax audit found no acceptance or source-AST gap
-across the 490 accepted files. Four malformed inputs differed only in
-diagnostic cardinality. This is parser comparison evidence, not resolution,
-typing, elaboration, or execution evidence.
-
-## Evidence rules
-
-Use these labels:
-
-- conformant: agrees with a normative result under the same profile;
-- divergent: differs from that result;
-- mode-dependent: changes with a solver or compiler mode;
-- phase-dependent: changes with the phase reached;
-- partial: implements only part of a required path;
-- unsupported: the selected boundary defines no behavior;
-- unverified: the aligned baseline has not been rerun.
-
-Historical source inspection remains unverified until the exact pinned
+Source inspection and historical logs remain unverified until the exact pinned
 revisions are run with aligned inputs and settings.
 
-## Semantic decisions motivated by existing implementations
+## Specification decisions informed by implementations
 
-The following decisions were informed by implementation discrepancies but are
-owned by the Lean specification:
+Implementation differences helped identify the following questions, but the
+Lean definitions own the resulting choices:
 
-| Topic | Solcore specification direction |
+| Topic | Current specification direction |
 | --- | --- |
 | Binding initializer scope | Evaluate before introducing the new binding |
 | Primitive operand order | Evaluate left to right, exactly once |
 | Conditional evaluation | Evaluate only the selected branch |
 | Word arithmetic | Use bounded 256-bit modular results |
-| Word division and modulo by zero | Return zero |
+| Word division and remainder by zero | Return zero |
 | Callability | Require a function type or explicit invokable evidence |
-| Contract main arity | Require zero parameters |
-| ABI admissibility | Require metadata, signature, decode, and encode together |
-| Selector collision | Reject before dispatch generation |
-| Resource exhaustion | Report inconclusive, not rejected |
+| Contract entry arity | Require the admitted entry profile |
+| ABI admissibility | Require metadata, signature, decode, and encode obligations together |
+| Selector collisions | Reject before dispatch construction |
+| Resource exhaustion | Report an inconclusive bounded computation, not semantic rejection |
 
-These rules must be tested through the relevant Lean boundary before a compiler
-is classified.
+Each decision must be tested or proved through the Lean boundary that owns it
+before an external implementation is classified.
 
 ## Current limitations
 
-The Haskell and Rust compilers do not consume Semantic Core v1, v2, or v3, so
-Core results cannot establish end-to-end source conformance. The canonical
-Lean lexer and parser implement the pinned Rust syntax, but Lean does not yet
-resolve, source-check, or elaborate those parsed programs into Core. Oracle v4
-remains a historical parser, while Oracle v5 starts from already structured
-Core and a scenario.
-
-Consequently there is currently no valid three-way claim about:
+There is no valid general three-way claim about:
 
 - source type acceptance;
-- polymorphism or class resolution;
-- comptime staging;
+- polymorphism or trait resolution;
+- compile-time staging and specialization;
 - source-to-Core meaning;
-- cross-compiler contract dispatch or ABI behavior;
-- cross-compiler source-level storage, transaction commit, or rollback; or
+- contract dispatch and general ABI behavior;
+- transaction, storage, call, or creation effects; or
 - EVM execution observations.
 
-## Canonical frontend comparison plan
+The Lean frontend now implements a restricted whole-program path, but no
+adapter aligns its checked result and execution observation with both external
+compilers. Likewise, the checked-contract runtime starts from admitted Core,
+not compiler-generated bytecode.
 
-Core v3 fixtures can isolate semantic choices at the checked Core boundary.
-Source-level compiler comparison requires the canonical frontend to parse,
-resolve, type, and elaborate programs into the same Core meaning, followed by
-an adapter from each external implementation to normalized results.
+## Path to stronger evidence
 
-For contract execution, every comparison must align:
+Source-level comparison requires each implementation to consume the same:
 
-- language and feature profile;
-- exact source and standard-library bytes;
-- initial state and transaction sequence;
-- execution model and, for EVM comparisons, EVM revision;
+- source and standard-library bytes;
+- library/module identities and selected root;
+- solver, staging, and specialization profile;
+- initial world and transaction sequence where effects are involved;
 - resource limits; and
-- observation schema.
+- normalized observation definition.
+
+A useful differential harness must run genuinely independent implementations,
+retain failures by phase, and minimize mismatches without changing their
+meaning. Core synthesis can contribute generated semantic cases after such
+independent adapters exist; replaying multiple Lean functions over the same
+definitions is not enough.
 
 Bytecode equality, generated names, optimization traces, and wall-clock time
-are not semantic conformance criteria.
+are not semantic conformance criteria unless a separate profile explicitly
+makes them observable.

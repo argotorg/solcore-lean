@@ -195,7 +195,7 @@ owns `ExecutionInputs`, Address widening, request interpretation, selected code
 lookup, and the execution/continuation chain.
 
 The change is internal and additive to Core vNext. Frozen Core Wire v1 and v2
-continue to reject all host-function values. Oracle, Surface, Parser, ABI,
+continue to reject all host-function values. Source syntax, parser, ABI,
 schemas, profiles, metadata digests, and the root README do not change.
 
 ## Non-goals
@@ -212,7 +212,7 @@ This ADR does not define:
   invocation, stack, scheduling, reentrancy, or transaction finalization;
 - callback evaluation count, additional fuel charge, gas, or EVM fork policy;
 - a new Core value, expression, source construct, parser rule, ABI layout,
-  public runtime request, Wire tag, Oracle command, or serialization; or
+  public runtime request, Wire tag, or serialization; or
 - a generic contract-input carrier with fields that have no current consumer.
 
 ## Implemented sequence

@@ -1,61 +1,75 @@
-# ADR-0152: Reproducible Checked-Core Case Synthesis
+# ADR-0152: Reproducible Checked-Core Program Synthesis
 
 - Status: Accepted
 - Decision date: 2026-08-30
-- Scope: syntax-independent generation, replay, execution, and shrinking
+- Scope: syntax-independent generation and shrinking through a direct Lean API
 - Implementation: Complete
 
 ## Context
 
-ADR-0151 completed a public syntax-independent boundary for checking Semantic
-Core Wire v3 programs and executing admitted checked contracts from an explicit
-finite scenario. The next long-term goals are to synthesize well-typed programs
-and to use them for semantic differential testing.
+Semantic Core Wire v3 is a closed, versioned target with an executable checker
+and a soundness theorem. It is therefore suitable for reproducible generation
+of well-typed programs independently of source parsing and lowering.
 
-Those goals do not require a stable Surface grammar. Core Wire v3 is already a
-closed, versioned generation target, its checker is executable and proved
-sound, and Oracle v5 already carries every initial condition and total result
-needed by a first generated execution case.
-
-Generating arbitrary raw trees and discarding checker failures would be a poor
-foundation. It would reject most binder-rich trees, distort coverage toward
-easy constructors, and make shrinking routinely destroy typing. Conversely, a
-fully dependent generator for the complete current Core would make the first
-executable slice unnecessarily large.
+Generating arbitrary raw trees and discarding checker failures would reject
+most binder-rich trees, bias coverage toward simple constructors, and make
+shrinking routinely destroy typing. A fully dependent generator for all of
+Core would, however, make the first useful executable slice unnecessarily
+large.
 
 ## Decision
 
-Add `Solcore.Synthesis.CoreV3`, an additive library for reproducible generated
-Core v3 execution cases. The first vertical slice is called G0 and consists of:
+`Solcore.Synthesis.CoreV3` provides a pure Lean library for reproducible Core
+v3 program generation and deterministic, checker-sealed shrinking. The first
+versioned fragment is G0 and consists of:
 
 1. a fixed pure pseudo-random source;
 2. a bounded type-directed Word/Boolean expression generator;
 3. a checker-sealed generated Word Program;
-4. a deterministic type-preserving shrinker;
-5. a minimal valid Oracle v5 execution request; and
-6. public-handler replay and coverage regressions.
+4. a deterministic type-preserving shrinker; and
+5. structural feature classification for coverage tests.
 
-This library consumes the existing Core v3 and Oracle v5 contracts. It does not
-widen or reinterpret either wire version.
+The library returns Core programs directly. Execution scenarios, text
+protocols, process dispatch, and serialized replay records are outside this
+decision.
+
+## Public Lean boundary
+
+A caller constructs a `GenerationRequest` from a `Seed` and a maximum Program
+node count, then calls `generate`. Success returns a `GeneratedProgram` with:
+
+- the initial and final seed states;
+- the requested node bound;
+- a constructor-private `CheckedWordProgram`; and
+- projections for the generated `V3.Program`, its node count, and its features.
+
+`CheckedWordProgram.ofProgram?` is the sole admission path for an externally
+supplied candidate. It requires the v3 checker to accept the Program, the
+result type to be Word, the named-data-definition list to be empty, and the
+body to belong to G0. Its `wellTyped` theorem projects checker acceptance into
+the declarative v3 contract.
+
+The public `shrink` function accepts a `CheckedWordProgram` and returns a list
+of `ShrinkCandidate`s. Each candidate records its rechecked Program and exact
+source and candidate complexity.
 
 ## Reproducible choices
 
-G0 owns a versioned 64-bit linear-congruential sequence. Its multiplier,
-increment, wrapping arithmetic, draw order, and bounded-choice rule are fixed in
-code and covered by exact vectors. A caller supplies the initial 64-bit seed and
-a maximum Program-node count of at least three. Three is the exact size of the
-fixed Word result type, empty Program wrapper, and one-node body.
+G0 uses a versioned 64-bit linear-congruential sequence. Its multiplier,
+increment, wrapping arithmetic, draw order, and bounded-choice behavior are
+fixed in code. `Seed.algorithmId` identifies the choice algorithm, and
+`generatorVersion` combines it with the G0 generation policy.
 
-The same generator version, seed, and node bound must produce the same:
+The same generator version, initial seed, and node bound produce the same:
 
-- final generator state;
+- final seed state;
 - Core Wire v3 Program;
-- canonical Program JSON;
-- Oracle v5 request; and
-- canonical request text.
+- node count; and
+- structural feature sequence.
 
-Generator size and evaluator fuel are separate inputs. A syntax-node limit is
-not interpreted as fuel consumed, remaining gas, or an execution-cost formula.
+The minimum Program-node bound is three: one result-type node, one Program
+wrapper node, and at least one body node. A smaller bound returns
+`GenerationError.budgetTooSmall` rather than silently widening the request.
 
 ## Initial typed fragment
 
@@ -63,131 +77,78 @@ Every G0 Program has:
 
 - result type `word`;
 - no named data definitions;
-- a body generated against the frozen Core v3 host context; and
-- no generated host-function reference.
+- a body generated without host-function references; and
+- no effects or recursion.
 
-The internal target types are Word and Boolean. The fragment contains:
+The internal targets are Word and Boolean. The fragment contains:
 
 - Word and Boolean literals;
 - in-scope Word variables introduced by generated Word `let` bindings;
 - Word `let` and Word/Boolean `if` expressions;
 - `boolNot`, `wordNot`, and `wordClz`;
-- all current Word binary operations, with equality and signed/unsigned
-  comparisons producing Boolean results; and
+- the supported Word binary operations, including Boolean-producing equality
+  and signed and unsigned comparisons; and
 - `wordAddMod` and `wordMulMod`.
 
-The body receives the Program bound minus its two fixed wrapper nodes. Child
-node budgets partition the parent's remaining budget. Every recursive call
-receives a smaller positive budget, so the generated Program contains no more
-nodes than requested. A bound below three is rejected as a configuration error
-rather than silently widened.
-
-This fragment is effect-free and non-recursive. Every checker-accepted G0
-contract therefore has a normal Word return for sufficient evaluator fuel.
+The body receives the Program bound minus the two fixed wrapper nodes. Child
+budgets partition the parent's remaining budget, and structural recursion uses
+an independently decreasing fuel. The realized Program therefore contains no
+more nodes than requested.
 
 ## Checker sealing
 
-Generation first constructs a type-directed Wire candidate and then invokes the
-existing frozen v3 checker. A constructor-private `CheckedWordProgram` stores a
-Word Program and evidence that `Program.check = true`. A separate
-`GeneratedProgram` pairs that checked value with its seed, bounds, and final
-generator state.
+Generation constructs a type-directed candidate, invokes the existing v3
+checker, and admits the result through `CheckedWordProgram.ofProgram?`. Checker
+rejection is `GenerationError.checkerInvariant`, because rejection indicates a
+bug in the generator rather than an ordinary sampling outcome.
 
-Checker rejection is a generator invariant failure. It is never ordinary
-sampling discard and it never returns an unchecked Program. Separating the
-checked value from generation provenance also prevents a shrunk Program from
-falsely retaining the seed metadata of its parent. This hybrid keeps the
-initial generator executable while allowing later constructor-specific typing
-proofs to replace the dynamic invariant check incrementally.
+The private constructors of `CheckedWordProgram`, `GeneratedProgram`, and
+`ShrinkCandidate` prevent callers from forging checker evidence, generation
+provenance, or shrink-measure claims.
 
 ## Shrinking
 
-Shrinking operates on typed expression roles, not raw JSON. It may:
+Shrinking operates on typed expression roles rather than raw encodings. It may:
 
-- replace a non-canonical literal with the canonical zero or false literal;
+- replace a noncanonical literal with canonical zero or false;
 - select an in-scope same-type child when binding scope permits; or
 - shrink one child while rebuilding its typed parent.
 
-Every candidate is checked again and sealed through the same private boundary.
-Candidates must be strictly smaller under the fixed G0 lexicographic complexity
-order, whose primary component is expression-node count and whose secondary
-component is the sum of Word literal values plus one for each true Boolean
-literal. Candidate order is deterministic. Shrinking does not mutate a scenario
-independently of its Program.
+Every result is admitted again through the same checker-sealed boundary and
+must be strictly smaller under the fixed G0 lexicographic complexity order.
+The primary component is expression-node count; the secondary component is
+the sum of Word literal values plus one for each true Boolean literal.
+Candidate order is deterministic, and duplicate candidate bodies are removed
+without changing their first-occurrence order.
 
-## Generated Oracle case
+## Coverage and validation
 
-A `GeneratedCase` embeds one `GeneratedProgram` into a fixed minimal Oracle v5
-scenario:
+Coverage is structural. `Feature.catalog` lists every G0 expression form and
+included operator, while `GeneratedProgram.features` classifies the generated
+AST directly. A fixed seed corpus should cover the complete catalog rather
+than rely on an unspecified distribution.
 
-- one `checkedCore` contract with a stable identifier;
-- one explicitly present target Account containing that contract;
-- zero balance, nonce, call value, and calldata;
-- empty call and creation registries;
-- an explicit inert creation-address default; and
-- one stable target-code probe.
-
-The request retains the caller-supplied evaluator-fuel limit and uses all other
-Oracle v5 default limits. Public replay encodes canonical request text, invokes
-the strict text handler, and returns the existing typed `Response`. A regression
-also passes that same line through the public one-record Oracle dispatcher used
-by the command-line executable. G0 does not call an internal evaluator directly
-as its conformance endpoint.
-
-Generated Oracle cases accept Program bounds up to 1024 nodes. The standalone
-generator remains more general, but the case boundary rejects a larger bound
-and verifies the realized Core node/depth demand before using fixed Oracle v5
-defaults. This prevents a successfully generated case from silently becoming a
-default-budget preflight exhaustion. Generation and case-configuration failures
-are returned explicitly as `CaseError` before the total Oracle response path.
-
-## Coverage and replay
-
-Coverage is structural and explicit. It records every G0 expression form and
-every included unary, binary, and ternary operator. A fixed seed corpus must
-cover the complete G0 catalog rather than relying on an unspecified random
-distribution.
-
-A replay failure records at least the generator version, seed, node bound,
-evaluation fuel, and canonical request text. Persistent corpus packaging and
-parallel process scheduling may be added later without moving Core typing rules
-outside Lean.
-
-## Required proofs and executable regressions
-
-G0 is complete when tests establish:
+The implementation is validated by tests for:
 
 - exact pseudo-random vectors and bounded-choice behavior;
-- same-input generator and canonical-byte determinism;
-- below-minimum-budget rejection and the Program-node bound;
-- checker acceptance for every generated Program;
-- no unchecked public constructor or fallback Program;
-- deterministic, checker-accepted, strictly smaller shrink candidates;
-- successful preparation of every generated minimal scenario;
-- normal returned execution through the strict public Oracle v5 text handler
-  at the declared regression fuel;
-- exact response decoding and repeated-response equality;
-- zero protocol errors, admission rejections, and internal errors across the
-  fixed corpus; and
-- complete constructor and operator coverage for the G0 fragment.
+- same-input generation determinism;
+- rejection below the minimum bound and conformance to the Program-node bound;
+- checker acceptance and G0 membership of every generated Program;
+- the absence of unchecked public constructors or fallback Programs;
+- deterministic, distinct, checker-accepted, strictly smaller shrink results;
+- binder-safe shrinking without variable capture; and
+- complete constructor and operator coverage for the G0 corpus.
 
-Full build, test, metadata, semantic-kernel, axiom, and diff-hygiene checks
-remain required.
+The aggregate build, tests, metadata checks, semantic-kernel checks, and axiom
+checks remain required.
 
 ## Exclusions and next boundary
 
-G0 does not generate functions, products, sums, cells, named data, host effects,
-nested calls, creation, logs, malformed Programs, or arbitrary scenarios. Those
-features are added to the generator in later vertical slices while preserving
-G0 seeds and bytes for its fixed version.
+G0 does not generate functions, products, sums, cells, named data, host
+effects, calls, creation, logs, malformed Programs, or execution scenarios.
+Later generator versions may add typed fragments while preserving the replay
+meaning of existing version identifiers.
 
-G0 also does not provide an independent implementation. Comparing the Lean
-Oracle with itself proves replay and transport consistency, not cross-compiler
-semantic agreement. True differential testing requires a Haskell, Rust, or
-other independent adapter that consumes the same Core v3 case and returns a
-compatible normalized observation.
-
-Surface parsing, name resolution, source typing, source elaboration, and a
-Core-to-source printer remain paused. General call-stack semantics, complete
-state-footprint discovery, call tracing, dynamic ABI, EVM memory, gas, and fork
-rules are separate decisions.
+This generator is not an independent semantics implementation. Differential
+testing requires a separately implemented consumer of the generated Core
+programs and is outside this decision.

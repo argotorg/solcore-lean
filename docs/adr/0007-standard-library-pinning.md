@@ -87,10 +87,11 @@ fork is added to the standard library.
 
 - Verify the standard-library manifest digest at startup or build time.
 - When multiple vendored copies exist, verify byte identity for the covered files.
-- The `capabilities` response reports the standard-library revision and digest.
+- Versioned language and profile metadata record the standard-library revision
+  and digest.
 - On a standard-library update, rerun the Haskell and Rust frontend, dispatch, and
   backend tests against the same snapshot.
 - Add standard-library refinement tests or theorems for primitive and ABI
   definitions incrementally.
-- Treat a digest mismatch as a configuration or protocol failure, not as a
-  language-level `rejected` verdict.
+- Treat a digest mismatch as a configuration failure, not as a source-language
+  typing rejection.

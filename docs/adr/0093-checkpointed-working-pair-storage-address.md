@@ -180,7 +180,7 @@ transaction behavior.
 
 It adds no balance, nonce, call-kind or delegate-call rule, Core-local-store
 bridge, storage layout, access warmth, refund, gas, ABI, serialization, EVM
-revision, parser or source syntax, Wire or Oracle field, Profile, canonical
+revision, parser or source syntax, Wire field, Profile, canonical
 delta, or published observation. It performs no in-place mutation.
 
 ## Staged implementation plan
@@ -220,7 +220,7 @@ simp review, and independent P0-P3 audits pass.
 ## Publication and exclusions
 
 This internal carrier and operation are not published. They change no frozen
-artifact, schema, profile, capability report, or public format.
+artifact, schema, profile, or public format.
 
 ## Consequences
 

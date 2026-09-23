@@ -72,9 +72,9 @@ Focused regressions cover:
 ## Publication and exclusions
 
 This slice adds a derived builder, not a Core form or primitive tag. Frozen Wire
-v1/v2, JSON enums, public Oracles, schemas, profiles, versions, and bytes remain
-unchanged. It adds no source spelling, ABI rule, opcode lowering, or gas rule.
-Word-valued signed flags remain a separate future decision.
+v1/v2, their JSON enums, schemas, versions, and bytes remain unchanged. It adds
+no source spelling, ABI rule, opcode lowering, or gas rule. Word-valued signed
+flags remain a separate future decision.
 
 ## Consequences
 

@@ -61,8 +61,7 @@ or source-text execution service. An absent adapter result denotes unsupported,
 unmapped, or ill-typed input for this fragment; it is not a universal language
 verdict. Source scope construction, declaration traversal, global ID allocation,
 numeric/string literals, operators, calls, mutation, and staging remain separate.
-Existing parser behavior, Core constructors, Oracle versions, and wire bytes do
-not change.
+Existing parser behavior, Core constructors, and wire bytes do not change.
 
 Tests cover both branch choices, nested/grouped ASTs, exact local positions,
 non-Boolean conditions, branch-type disagreement, static checking of unselected

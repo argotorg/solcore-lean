@@ -78,10 +78,10 @@ also ensure the internal logarithmic loop terminates without changing CEK fuel.
 
 ## Publication and exclusions
 
-`wordPow` is internal-only. No Wire tag, Core/JSON round trip, public Oracle or
-schema change, source/standard-library API, ABI rule, opcode lowering, or gas
-rule is introduced. Existing operation values, types, faults, effects, fuel,
-and publication boundaries remain unchanged.
+`wordPow` is internal-only. No Wire tag, Core/JSON round trip, schema change,
+source/standard-library API, ABI rule, opcode lowering, or gas rule is
+introduced. Existing operation values, types, faults, effects, fuel, and
+publication boundaries remain unchanged.
 
 ## Consequences
 
@@ -106,8 +106,8 @@ effectful expressions stop at 28 and complete at 29. Maximum exponents still
 complete at fuel 5 because the internal loop remains one CEK primitive step.
 
 Frozen Wire v1/v2 expression projection and the Wire v2 `BinaryOp` conversion
-reject `wordPow`; no public Core or JSON representation was added. Public
-Oracle behavior, schemas, metadata, versions, and encodings remain unchanged.
+reject `wordPow`; no public Core or JSON representation was added. Published
+Wire schemas, metadata, versions, and encodings remain unchanged.
 The implementation and focused proof/semantic/Wire validation are complete.
 After correcting the helper-bound wording above, the independent audit found no
 remaining P0-P3 issue. The next primitive or conversion requires its own ADR.

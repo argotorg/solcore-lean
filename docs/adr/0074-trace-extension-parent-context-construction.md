@@ -152,7 +152,7 @@ wiring; independent audit and completion evidence.
 This construction helper is internal. It adds no event taxonomy, balance,
 code, call data, transferred value, host call/create behavior, ABI, EVM
 revision, opcode, gas schedule, parser or source form, Core expression, Wire
-field or tag, Profile, Oracle behavior, serialization, canonical delta, or
+field or tag, Profile, serialization, canonical delta, or
 frozen artifact.
 
 ## Consequences

@@ -133,7 +133,7 @@ This is a standalone evaluator foundation.  It does not yet add:
   staged pattern matching;
 - recursive evaluation, memoization, selected-branch-only recursion or
   compile-time Fibonacci;
-- automatic staged-root discovery, public source Oracle support; or
+- automatic staged-root discovery; or
 - broad soundness, completeness or preservation metatheory.
 
 The next integration phase may pass this carrier across validated direct call

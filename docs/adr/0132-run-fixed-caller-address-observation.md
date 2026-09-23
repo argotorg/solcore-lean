@@ -206,8 +206,8 @@ internal capability. Generic HostDriver and continuation layers remain
 parameterized and must not import Address-specific meaning.
 
 Frozen Core Wire v1 and v2 continue to reject every host-function value. Add no
-Wire tag, Oracle command, external runtime request, schema, profile, metadata
-capability, ABI rule, Surface form, parser rule, or source elaboration in this
+Wire tag, external runtime request, schema, profile, metadata
+capability, ABI rule, source form, parser rule, or source elaboration in this
 slice. The root README does not change. Publication requires a separate ADR.
 
 ## Non-goals
@@ -233,8 +233,7 @@ This ADR does not define or prove:
 - checkpoint capture time, Account lifetime, rollback application, commit,
   transaction finalization, or persistence;
 - gas, fork rules, diagnostics, tracing provenance, events, or logs; or
-- a public representation, compatibility promise, parser change, or Oracle
-  behavior.
+- a public representation, compatibility promise, or parser change.
 
 ## Implemented sequence
 

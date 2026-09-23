@@ -38,8 +38,8 @@ without an additional wrapper cost or weakened compilation/preparation provenanc
 ## Boundaries and validation
 
 This is a local explicit-table adapter policy, not general Solcore overloading.
-Syntax, parser precedence/associativity, Core and Resolved constructors, primitive
-definitions, wire schemas, published profiles and Oracle behavior remain unchanged.
+Syntax, parser precedence/associativity, Core and Resolved constructors,
+primitive definitions, wire schemas, and published profiles remain unchanged.
 Literal input stays strictly range-checked. Signed division, source calls, mutable
 bindings and general recursive statement/early-return semantics are not added.
 

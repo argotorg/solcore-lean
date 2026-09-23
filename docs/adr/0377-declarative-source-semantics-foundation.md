@@ -100,7 +100,7 @@ boundary. The following remain outside this foundation and ADR-0378:
 `Solcore.SourceSemantics` therefore specifies the resolved carrier's static,
 successful dynamic, and staging layers, but is not a claim that the complete
 raw source language or every failing execution has been formalized. Semantic
-Core and Oracle v5 retain their existing public meanings.
+Core retains its existing public meaning.
 
 ## Verification target
 

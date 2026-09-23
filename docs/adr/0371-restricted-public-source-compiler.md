@@ -6,9 +6,9 @@ Accepted for roadmap phase 9.  The public Lean library now checks, specializes,
 selects a runtime for, and executes one explicit ground source root through a
 reusable compiler artifact.
 
-This is a restricted source compiler, not a source Oracle or an ABI entry-point
-policy.  Existing Core, graph-runtime, and `SourceProgramExecution` interfaces
-retain their meanings.
+This is a restricted source compiler exposed as a direct Lean API, not an ABI
+entry-point policy. Existing Core, graph-runtime, and `SourceProgramExecution`
+interfaces retain their meanings.
 
 ## Context
 
@@ -114,7 +114,7 @@ Still deferred are:
 - automatic entry discovery, overload-based entry choice, ABI root policy, and
   public multi-root or mixed-backend compilation;
 - an explicit backend override policy;
-- source values, graph closures, typed heaps, or results on an Oracle/JSON wire;
+- source values, graph closures, typed heaps, or results on a JSON wire;
 - external closure serialization and reinjection;
 - general trait-evidence/coercion dispatch in the typed runtime;
 - general members, contract storage, ABI/external-call effects, and staged

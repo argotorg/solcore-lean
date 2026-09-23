@@ -51,7 +51,7 @@ This supplies the type-name premise for the next canonical runtime-parameter
 binding adapter. It does not yet bind parameters, execute function bodies,
 allocate declaration identities, or decide staging and overload policies.
 Existing expression semantics, exact costs, input invariance, parser behavior,
-Core execution, wire formats, and golden bytes remain unchanged.
+Core execution, and wire formats remain unchanged.
 
 Audit public declarations using only the permitted standard kernel axioms;
 run focused and aggregate builds, full tests, kernel, metadata, and whitespace

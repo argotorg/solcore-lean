@@ -53,8 +53,8 @@ reject a `Runtime` or `Deferred` actual passed to a marked parameter.
 
 The ordinary call-elaboration and public source-execution entry points retain
 their existing contracts.  The staged-aware callback is an additive internal
-coordination boundary rather than a new source calling convention or public
-Oracle.
+coordination boundary rather than a new source calling convention or serialized
+service.
 
 ### Seed the callee without specializing the runtime ABI by value
 
@@ -123,7 +123,7 @@ This phase does not add:
 - value-indexed specialization keys, cross-occurrence value memoization,
   direct or mutual recursion, selected-branch-only recursion, or compile-time
   Fibonacci;
-- automatic staged-root discovery or a public source Oracle; or
+- automatic staged-root discovery; or
 - broad soundness, completeness and preservation metatheory.
 
 The arbitrary-precision staged-integer evaluator remains a distinct

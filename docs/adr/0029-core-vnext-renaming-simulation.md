@@ -15,7 +15,7 @@ insertion. The Core currently has `Expr.weakenAt`, but not the corresponding
 static preservation and dynamic simulation foundation.
 
 This is proof infrastructure. It changes no expression, value, evaluation,
-fault, fuel, source, profile, schema, wire, Oracle, or observation semantics.
+fault, fuel, source, wire, or observation semantics.
 
 ## Decision
 

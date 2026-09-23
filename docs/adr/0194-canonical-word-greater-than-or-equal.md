@@ -32,7 +32,7 @@ branches. Strict literal spelling and range validation remain unchanged.
 
 This is unsigned Word comparison, not polymorphic or signed comparison,
 overloading, constant folding or an operand swap. No Core primitive, Resolved
-constructor, parser, Oracle/wire or diagnostic-proof change is required.
+constructor, parser, wire, or diagnostic-proof change is required.
 Division, remainder, unary signs, calls, assignment and general source binding
 remain outside the adapter. Remove only the seven obsolete `>=` rejection
 fixtures, retaining division/remainder and chained-comparison rejection.

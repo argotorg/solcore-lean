@@ -238,7 +238,7 @@ This ADR does not define or claim:
 - a lift through ADR-0125's nested options;
 - caller, current address, call value, calldata, call kind, balance, or
   authority; or
-- parser, Surface, ABI, Wire, Oracle, schema, profile, EVM revision, or public
+- parser, source syntax, ABI, Wire, schema, profile, EVM revision, or public
   format behavior.
 
 ## Implemented sequence
@@ -285,7 +285,7 @@ wrapper over its three optional layers.
 - independent specification, runtime, and implementation audits found no
   P0-P3 issue.
 
-No Core execution, parser, Surface, ABI, Oracle, Wire format, schema, profile,
+No Core execution, parser, source syntax, ABI, Wire format, schema, profile,
 or root README changed.
 
 ## Consequences

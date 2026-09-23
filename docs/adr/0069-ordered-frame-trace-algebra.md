@@ -146,7 +146,7 @@ disposition, transaction boundary, or atomicity. Whether a particular event is
 recorded before or after a call remains part of the future transition rules.
 
 It adds no parser or source form, Core expression, Wire field or tag, Profile,
-Oracle behavior, ABI, storage layout, EVM revision, opcode, gas schedule,
+ABI, storage layout, EVM revision, opcode, gas schedule,
 balance, code, host call/create behavior, or frozen artifact.
 
 ## Consequences

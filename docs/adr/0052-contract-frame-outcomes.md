@@ -7,11 +7,10 @@
 
 ## Context
 
-[ADR-0003](0003-verdicts-and-resource-exhaustion.md) separates language
-verdicts from runtime halts. A completed contract execution may return, revert,
-or reach a trap defined by the language, while an implementation limit is
-`inconclusive` rather than a trap. Protocol failures and oracle defects are
-separate again.
+Language outcomes must remain distinct from implementation limits. A completed
+contract execution may return, revert, or reach a trap defined by the language,
+while exhausting an implementation limit does not introduce another language
+trap.
 
 [ADR-0008](0008-observation-and-evm-revision.md) requires contract observations
 to distinguish return data from revert data. It also requires future execution
@@ -65,9 +64,9 @@ applies to empty revert data. Thus absence records a constructor mismatch, not
 an empty runtime value.
 
 `FrameOutcome` contains only specification-level frame halts. It has no
-constructor for fuel exhaustion, unsupported behavior, inconclusive execution,
-an internal error, a protocol error, or a raw Core machine fault. Those remain
-at their existing implementation or oracle boundaries.
+constructor for fuel exhaustion, unsupported behavior, an implementation
+limit, an internal error, or a raw Core machine fault. Those remain at their
+existing implementation boundaries.
 
 ## Required proof interface
 
@@ -138,10 +137,10 @@ state, storage, balance, log, call, creation, checkpoint, rollback rule, or
 trap taxonomy. It chooses no EVM revision, gas schedule, host behavior, or
 resource-limit accounting.
 
-It adds no JSON schema, Wire tag, profile, Oracle query, verdict, protocol
-field, or published observation. In particular, `FrameOutcome` is not an
-`executed` verdict envelope, and its `trapped` constructor is not a replacement
-for `inconclusive` or `internalError`.
+It adds no JSON schema, Wire tag, profile, or published observation. In
+particular, `FrameOutcome` is not a public execution-result envelope, and its
+`trapped` constructor is not a replacement for reporting implementation limits
+or internal errors.
 
 Address-to-Word conversion, address truncation, map ordering, state deltas,
 trace survival, and the mapping from Core completion or fault to a frame halt

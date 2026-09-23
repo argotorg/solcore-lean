@@ -237,8 +237,8 @@ independent of `Bytes` and owns only the typed internal capability. Generic
 HostDriver and continuation layers remain parametric.
 
 Frozen Core Wire v1 and v2 continue to reject every host-function value. Add no
-Wire tag, Oracle command, runtime schema, profile, metadata capability, ABI
-rule, Surface form, parser rule, or source elaboration. The root README does
+Wire tag, runtime schema, profile, ABI
+rule, source form, parser rule, or source elaboration. The root README does
 not change. Publication requires a separate ADR.
 
 ## Non-goals
@@ -258,7 +258,7 @@ This ADR does not define or prove:
   finalization, balance transfer, payability, gas, or fork policy;
 - mutable input, cursor state, streaming, aliasing with Core-local cells, or
   WorldState storage; or
-- any parser, Surface, Oracle, schema, profile, Wire, ABI, public-format, or
+- any parser, source syntax, schema, profile, Wire, ABI, public-format, or
   publication change.
 
 ## Implementation sequence

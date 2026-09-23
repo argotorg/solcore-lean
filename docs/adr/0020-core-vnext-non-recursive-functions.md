@@ -52,12 +52,11 @@ non-closure callee. Well-typed programs cannot reach that fault.
 This feature contains no recursion, self-reference, named function binding,
 multiple-argument convention, polymorphism, effects, or explicit return.
 Multiple arguments can be represented by nesting unary functions, but no
-Surface-language elaboration rule is fixed here.
+source-language elaboration rule is fixed here.
 
-The feature is internal. It adds no tag to Semantic Core v1 or v2 and changes
-no Oracle v2 or v3 profile. Frozen wire projections reject function types,
-lambda and application expressions, closure values, and programs containing
-them.
+The feature is internal. It adds no tag to Semantic Core v1 or v2. Frozen wire
+projections reject function types, lambda and application expressions, closure
+values, and programs containing them.
 
 Closure equality is structural only because the internal Lean data types need
 decidable equality for tests and machine results. This ADR does not make

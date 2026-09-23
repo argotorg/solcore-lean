@@ -83,10 +83,10 @@ Compile-time examples exercise all eleven theorem names.
 
 ## Publication and exclusions
 
-`wordSar` is internal-only. No Wire tag, Core/JSON round trip, public Oracle or
-schema change, source/standard-library API, ABI rule, opcode lowering, or gas
-rule is introduced. Existing operation values, types, faults, effects, fuel,
-and publication boundaries remain unchanged.
+`wordSar` is internal-only. No Wire tag, Core/JSON round trip, schema change,
+source/standard-library API, ABI rule, opcode lowering, or gas rule is
+introduced. Existing operation values, types, faults, effects, fuel, and
+publication boundaries remain unchanged.
 
 ## Consequences
 
@@ -115,5 +115,5 @@ value-left/shift-right. The future source `(shift, value)` boundary remains a
 binding-before-reordering requirement. The implementation and focused
 semantic/Wire validation are complete. The independent audit found no P0-P3
 issue, no source trust escape hatch, and only the repository-approved Lean
-foundational dependencies. Public Wire, Oracle, schemas, metadata, versions,
-encodings, and golden streams remain unchanged.
+foundational dependencies. Published Wire schemas, metadata, versions, and
+encodings remain unchanged.

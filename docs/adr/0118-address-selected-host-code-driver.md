@@ -136,8 +136,8 @@ continues to know only typed host functions, requests, suspensions, and the raw
 runner. Core must not import Address, Account, WorldState, checkpoint, rollback,
 or frame state.
 
-No frozen wire schema, Oracle command, profile, capability document, or public
-source syntax changes. Host function values remain rejected by wire v1 and v2.
+No frozen wire schema, profile, or public source syntax changes. Host function
+values remain rejected by wire v1 and v2.
 
 ## Required regressions
 

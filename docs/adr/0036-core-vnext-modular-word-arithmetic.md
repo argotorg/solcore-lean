@@ -80,8 +80,8 @@ Focused regressions cover:
 This ADR does not define checked arithmetic, overflow reports, signed
 arithmetic, exponentiation, ternary modular operations, source overloads,
 standard-library APIs, ABI behavior, opcode lowering, or gas. It changes no
-type, value, fault, evaluator, frame, tag, schema, version, byte encoding,
-Oracle behavior, profile, capability, or golden stream.
+type, value, fault, evaluator, frame, tag, schema, version, byte encoding, or
+published boundary.
 
 ## Consequences
 
@@ -102,6 +102,5 @@ the final store are checked for all three operations. Literal execution has the
 exact 4/5 fuel boundary and effectful execution the exact 28/29 boundary. Wire
 v1 rejects every raw expression; Wire v2 has exact operator and operand-order
 projection, Core round trips, and JSON round trips. The final independent audit
-found no P0-P3 issue. No alias, generic proof duplicate, tag, schema, Oracle
-behavior, or other published boundary changed. The next feature is selected by
-a separate ADR.
+found no P0-P3 issue. No alias, generic proof duplicate, tag, schema, or other
+published boundary changed. The next feature is selected by a separate ADR.

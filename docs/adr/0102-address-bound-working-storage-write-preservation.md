@@ -119,7 +119,7 @@ checkpoint capture or lifetime, rollback, outcome, trap, scheduling,
 transaction, concurrency, reentrancy, atomicity, gas, or external-effect
 policy.
 
-They add no parser or source syntax, Core expression, Wire or Oracle field,
+They add no parser or source syntax, Core expression, Wire field,
 Profile, ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan

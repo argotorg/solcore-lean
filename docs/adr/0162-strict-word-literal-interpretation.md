@@ -60,5 +60,5 @@ consumption. Public proofs use only standard kernel axioms. Run focused and
 aggregate builds, complete tests, kernel checks, and metadata checks.
 
 This adds no local-expression typing/evaluation constructor, general source
-type policy, parser change, external endpoint, Core machine rule, Wire/Oracle
-format, capability, or golden-byte change.
+type policy, parser change, external endpoint, Core machine rule, Wire format,
+or capability change.

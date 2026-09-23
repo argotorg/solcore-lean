@@ -17,8 +17,6 @@ const kernelRoots = [
   "Solcore/Frontend.lean",
   "Solcore/Standard",
   "Solcore/Syntax",
-  "Solcore/Surface",
-  "Solcore/Surface.lean",
   "Solcore/Workspace",
 ];
 const forbidden = /\b(sorry|admit|partial|unsafe|axiom|noncomputable|extern|implemented_by)\b/;

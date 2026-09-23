@@ -84,9 +84,9 @@ Focused regressions cover:
 ## Publication and exclusions
 
 Both operations are internal-only. Do not add them to frozen Wire v1 or v2,
-their JSON enums, any public Oracle, schema, profile, version, or golden byte
-stream. This slice adds no source syntax, standard-library API, ABI rule,
-opcode lowering, gas rule, or exceptional division behavior.
+their JSON enums, schemas, or versions. This slice adds no source syntax,
+standard-library API, ABI rule, opcode lowering, gas rule, or exceptional
+division behavior.
 
 ## Consequences
 

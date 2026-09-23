@@ -34,7 +34,7 @@ premises that were absent before this extension. Raw evaluation may skip an
 unresolved or ill-typed conditional child, whereas whole-expression lowering and
 typing retain their original stricter requirements. Duplicate IDs retain nearest
 first-match behavior. No new Core primitive, parser, canonical source adapter,
-Oracle/wire change or source-level temporary allocator is part of this unit.
+wire change, or source-level temporary allocator is part of this unit.
 Canonical `<` remains unsupported until the next adapter unit; keep its existing
 negative fixtures unchanged. Diagnostic proofs remain paused.
 

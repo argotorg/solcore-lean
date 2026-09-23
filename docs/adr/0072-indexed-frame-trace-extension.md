@@ -142,8 +142,8 @@ example, and runner wiring; independent audit and completion evidence.
 This internal construction API is not published. It fixes no concrete event
 taxonomy, timestamp, serialization, hashing, compression, size limit, balance,
 code, host call/create behavior, ABI, EVM revision, opcode, gas schedule,
-parser or source form, Core expression, Wire field or tag, Profile, Oracle
-behavior, or frozen artifact.
+parser or source form, Core expression, Wire field or tag, Profile, or frozen
+artifact.
 
 ## Consequences
 

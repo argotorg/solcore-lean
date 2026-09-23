@@ -40,8 +40,8 @@ non-Bool conditions and invalid expressions. Conditional *expressions* inside
 an arm remain supported by the existing expression adapter.
 
 No general early-return unwinding, sequential statements, mutable locals,
-assignment, calls, loops, source recursion, parser change, Oracle/wire change
-or diagnostic-proof work is included. Retain original identities and actual
+assignment, calls, loops, source recursion, parser change, wire change, or
+diagnostic-proof work is included. Retain original identities and actual
 runtime values; preserve existing runtime alignment premises. Completed-run
 reflection does not gain a typed-runtime-environment premise.
 

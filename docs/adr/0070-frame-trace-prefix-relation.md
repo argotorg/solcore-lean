@@ -106,7 +106,7 @@ It chooses no trap disposition, rollback filtering, transaction boundary or
 atomicity, concrete event taxonomy, timestamp, serialization, hashing, size
 limit, compression, canonical observation, ABI, EVM revision, opcode, gas
 schedule, parser or source form, Core expression, Wire field or tag, Profile,
-Oracle behavior, balance, code, host call/create behavior, or frozen artifact.
+balance, code, host call/create behavior, or frozen artifact.
 
 ## Consequences
 

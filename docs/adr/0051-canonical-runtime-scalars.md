@@ -15,8 +15,8 @@ representations. That requirement needs an executable, proved foundation
 before contract state or ABI rules can use it.
 
 The frozen Core Wire v1 and v2 codecs each contain a private Word-only
-hexadecimal implementation. Surface hexadecimal literals are not suitable for
-runtime observations: they permit uppercase spelling, omit the `0x` prefix,
+hexadecimal implementation. Source-level hexadecimal literals are not suitable
+for runtime observations: they permit uppercase spelling, omit the `0x` prefix,
 and do not preserve a fixed runtime width. A new syntax-independent kernel is
 therefore required.
 
@@ -85,7 +85,7 @@ Focused regressions cover:
   byte-string widths, and incorrect Address and Word widths;
 - encode/decode round trips and accepted-input canonicalization; and
 - equality of the new Word text with frozen Core Wire v1 and v2 output for
-  representative values, while metadata and golden bytes remain unchanged.
+  representative values, while metadata remains unchanged.
 
 ## Staged implementation plan
 
@@ -102,7 +102,7 @@ green:
 
 The frozen Wire implementations may later delegate to the shared foundation,
 but such refactoring is not required for this slice and must preserve their
-error ordering, JSON bytes, schemas, profiles, and golden data exactly.
+error ordering, JSON bytes, schemas, and profiles exactly.
 
 ## Completion evidence
 
@@ -124,7 +124,7 @@ found no P0-P3 issue.
 ## Publication and exclusions
 
 This layer is internal and does not add a Core type, value, expression,
-machine transition, source form, Wire tag, JSON schema, Oracle capability, or
+machine transition, source form, Wire tag, JSON schema, or
 published observation profile. It adds no hashing, selector, ABI padding,
 storage layout, address-to-word conversion, address truncation, contract
 state, call, rollback, EVM revision, gas, or map-order rule.

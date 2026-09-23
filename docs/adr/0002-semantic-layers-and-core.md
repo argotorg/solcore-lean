@@ -1,4 +1,4 @@
-# ADR-0002: Three Semantic Layers and the Semantic Core
+# ADR-0002: Semantic Layers and the Semantic Core
 
 - Status: Accepted
 - Decision date: 2026-07-23
@@ -6,13 +6,13 @@
 
 ## Reader summary / Current implementation
 
-- **Decision:** Keep source-preserving `Surface`, name-resolved `Resolved`, and
-  typed executable `Semantic Core` as separate semantic layers.
-- **Current implementation:** Semantic Core v1/v2 and published Surface v1 are
-  implemented and sound. The internal Multi frontend also reaches a certified
-  one-file structural boundary. A Resolved language and source-to-Core
-  elaboration do not exist. ADR-0018 therefore moves active work to
-  syntax-independent Core semantics and freezes new Multi grammar work.
+- **Decision:** Keep source-preserving `Syntax`, name-resolved `Resolved`,
+  source typing and execution in `SourceSemantics`, and the typed executable
+  `Core` as explicit semantic boundaries.
+- **Current implementation:** All four boundaries are represented by Lean
+  modules. The parser and frontend connect `Syntax` to `Resolved`; source
+  typing and dynamic judgments live under `SourceSemantics`; Core remains a
+  separately executable target with its own declarative and machine semantics.
 - **Boundary:** Hull, Yul, EVM bytecode, and compiler lowering behavior do not
   define Core semantics.
 - **Suggested reading:** Read “Decision” for the layer contract and
@@ -32,13 +32,15 @@ obligations of each phase.
 
 ## Decision
 
-The specification is divided into the following three layers:
+The specification is divided into the following explicit layers:
 
-1. `Surface` preserves source order, UTF-8 byte spans, and explicit syntactic
+1. `Syntax` preserves source order, UTF-8 byte spans, and explicit syntactic
    boundaries.
 2. `Resolved` resolves references to structured identifiers based on module
    paths and source-declaration indices.
-3. `Semantic Core` represents typed execution semantics and makes lexical
+3. `SourceSemantics` gives source-level typing and dynamic judgments over the
+   resolved language.
+4. `Core` represents typed execution semantics and makes lexical
    closures, direct pattern matching, type application, class evidence,
    comptime/runtime stages, and primitive effects explicit.
 

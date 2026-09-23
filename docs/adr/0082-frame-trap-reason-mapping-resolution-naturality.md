@@ -95,7 +95,7 @@ a parent, classify reasons, schedule a frame, or decide transaction rollback
 or atomicity. It proves equality of two pure value computations only.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
-fuel or gas policy, Wire or Oracle field, ABI, serialization, EVM revision,
+fuel or gas policy, Wire field, ABI, serialization, EVM revision,
 opcode behavior, Profile, canonical delta, or published format.
 
 ## Staged implementation plan

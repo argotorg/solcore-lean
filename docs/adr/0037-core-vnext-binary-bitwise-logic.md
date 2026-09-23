@@ -71,7 +71,7 @@ Focused regressions cover:
 This slice does not add universal maximum-mask or complement identities. It
 does not define source or standard-library APIs, ABI behavior, opcode lowering,
 or gas. It changes no type, value, fault, evaluator, frame, tag, schema,
-version, byte encoding, Oracle behavior, profile, capability, or golden stream.
+version, byte encoding, or published boundary.
 
 ## Consequences
 
@@ -92,5 +92,5 @@ two exactly-once effectful operands, and the final store are covered for all
 three operations. Literal execution has the exact 4/5 fuel boundary and
 effectful execution the exact 28/29 boundary. Wire v1 rejects every expression;
 Wire v2 has exact projection, Core round trips, and JSON round trips. The final
-audit found no P0-P3 issue. No alias, generic proof duplicate, tag, schema, or
-Oracle behavior changed. The next feature is selected by a separate ADR.
+audit found no P0-P3 issue. No alias, generic proof duplicate, tag, or schema
+changed. The next feature is selected by a separate ADR.

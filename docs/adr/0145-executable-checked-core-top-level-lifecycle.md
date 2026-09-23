@@ -15,7 +15,7 @@ completion policy, trap rollback is not selected as a final state, and no
 single total result joins terminal data to the committed or rolled-back world.
 
 Concrete Solcore syntax may change, so this milestone must not depend on the
-parser or Surface AST. It starts at the checked Core boundary.
+parser or source AST. It starts at the checked Core boundary.
 
 ## Decision
 
@@ -203,8 +203,8 @@ world. Revert and trap compare the initial world with itself, so every slot
 query reports no committed change.
 
 A later observation milestone may add a finite write journal or finite-map
-world representation. That is required before publishing an enumerable whole-
-world delta through the Oracle.
+world representation. That is required before a direct Lean API can return an
+enumerable whole-world delta.
 
 ## Required laws and regressions
 
@@ -245,18 +245,18 @@ coverage audits.
 
 This ADR does not add:
 
-- concrete syntax, parser proofs, Surface elaboration, or Wire changes;
+- concrete syntax, parser proofs, source elaboration, or Wire changes;
 - nested calls, delegate calls, a scheduler, call depth, or reentrancy;
 - balance transfer, nonce policy, Account creation or deletion;
 - logs or a concrete transaction event journal;
 - gas prices, refunds, or consumed-gas accounting;
 - Solidity ABI or storage layout;
 - an enumerable whole-world delta; or
-- a public Oracle command or compatibility promise.
+- an external serialized command or compatibility promise.
 
-After this lifecycle is complete, nested call, balance, creation, logs, ABI,
-and the public Oracle can connect to one executable transaction boundary in
-that order or in smaller vertical slices chosen at that time.
+After this lifecycle is complete, nested calls, balance, creation, logs, and
+ABI can connect to one executable transaction boundary in that order or in
+smaller vertical slices chosen at that time.
 
 ## Implementation result
 

@@ -70,7 +70,7 @@ effectful fragments must establish their own stronger environment conditions.
 
 The bundle does not collect source declarations, resolve imports, fix mutable
 source binding semantics, or allocate globally unique program IDs. Parser,
-Core, Oracle, and frozen wire behavior remain unchanged. Tests cover automatic
+Core, and frozen wire behavior remain unchanged. Tests cover automatic
 identity alignment, exact row lookup, fresh repeated insertion, repeated-name
 priority, check failure versus fuel exhaustion, selected branches, exact
 results/stores, and the essential whole-expression static-check premise.

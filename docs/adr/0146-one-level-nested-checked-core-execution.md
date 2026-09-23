@@ -106,7 +106,7 @@ each root call request:
 An out-of-range target, missing registry entry, missing Account, missing code,
 or code mismatch produces a distinct internal dispatch-failure reason and
 leaves the current working world unchanged. These reason codes are internal
-semantic values, not a public Wire or Oracle commitment.
+semantic values, not a public Wire or serialization commitment.
 
 For this Word-call profile, derive the child invocation as follows:
 
@@ -272,13 +272,13 @@ This ADR does not add:
 - general byte-array calldata, Solidity ABI, or storage layout;
 - gas prices, refunds, or consumed-gas reporting;
 - an enumerable whole-world diff;
-- Surface syntax, grammar, parser proofs, or elaboration; or
-- a Wire tag, schema, public Oracle command, or compatibility promise.
+- source syntax, grammar, parser proofs, or elaboration; or
+- a Wire tag, schema, external serialized command, or compatibility promise.
 
 The next implementation is balance semantics: checked balance availability and
-transfer for value-bearing calls. Creation, logs, ABI, and the public Oracle
-follow as later vertical slices. Parser-related proofs remain paused until the
-Solcore syntax direction stabilizes.
+transfer for value-bearing calls. Creation, logs, and ABI follow as later
+vertical slices. Parser-related proofs remain paused until the Solcore syntax
+direction stabilizes.
 
 ## Consequences
 

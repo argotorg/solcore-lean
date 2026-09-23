@@ -33,7 +33,7 @@ existing boolean-valued builders.
 
 These definitions are ordinary compositions of existing Core expressions.
 They add no Core form, primitive tag, evaluation rule, fault, wire version, or
-Oracle behavior.
+wire behavior.
 
 ## Evaluation order
 
@@ -91,8 +91,8 @@ right-side effect.
 
 This is an internal Core vNext proof-and-builder slice. It adds no source
 spelling, standard-library declaration, ABI conversion, opcode, gas rule,
-schema field, capability, or published behavior. Further primitives and
-conversions remain separate decisions.
+schema field, or published behavior. Further primitives and conversions remain
+separate decisions.
 
 ## Consequences
 

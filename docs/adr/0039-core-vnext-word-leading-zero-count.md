@@ -30,8 +30,7 @@ cases consistently. The operand evaluates exactly once, and its final store is
 the operation's final store.
 
 This tag is not published. Frozen Wire v1 and Wire v2 must both reject it. No
-public Oracle tag, schema, version, encoding, capability, or golden stream
-changes.
+public wire tag, schema, version, or encoding changes.
 
 ## Required proof interface
 
@@ -93,6 +92,5 @@ JSON projection is introduced.
 
 The implementation, focused semantic/Wire validation, and independent audit
 are complete. The audit found no P0-P3 issue, no source trust escape hatch, and
-only the repository-approved Lean foundational dependencies. The public Wire,
-Oracle, metadata, schemas, versions, encodings, and golden streams remain
-unchanged.
+only the repository-approved Lean foundational dependencies. Published Wire
+metadata, schemas, versions, and encodings remain unchanged.

@@ -154,7 +154,7 @@ inconclusive execution.
 
 It does not connect Core local cells to contract storage or decide storage
 layout, access warmth, refunds, gas, ABI, serialization, EVM revision, opcode
-behavior, parser or source syntax, Wire or Oracle fields, Profile, canonical
+behavior, parser or source syntax, Wire fields, Profile, canonical
 delta, or published observation.
 
 ## Staged implementation plan
@@ -167,7 +167,7 @@ and call; independent audit and completion evidence.
 ## Publication and exclusions
 
 This internal working-state update is not published. It changes no frozen
-artifact, schema, profile, capability report, or public format.
+artifact, schema, profile, or public format.
 
 ## Consequences
 

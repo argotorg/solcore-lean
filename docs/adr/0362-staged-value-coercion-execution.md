@@ -106,7 +106,7 @@ This phase does not add:
   Unit, Bool, Word, and right-associated products;
 - value-indexed specialization or cross-occurrence memoization;
 - direct, mutual, or selected-branch-only recursion, or compile-time Fibonacci;
-- automatic staged-root discovery or a public source Oracle; or
+- automatic staged-root discovery; or
 - broad soundness, completeness, and preservation metatheory.
 
 Required unary/binary staging and marked implementation-method staging remain

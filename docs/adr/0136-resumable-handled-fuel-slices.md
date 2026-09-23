@@ -225,8 +225,8 @@ The generic operation belongs above Core and depends only on the existing host
 driver and its relational metatheory. The storage theorem may depend on the
 canonical storage handler and complete execution input.
 
-Add no Core constructor, HostFunction, HostRequest, Wire tag, Oracle command,
-schema, profile, metadata capability, Surface form, parser rule, ABI rule, or
+Add no Core constructor, HostFunction, HostRequest, Wire tag, schema, profile,
+source form, parser rule, ABI rule, or
 public protocol. The root README does not change. Publication requires a
 separate decision.
 
@@ -242,7 +242,7 @@ This ADR does not define or prove:
 - recursion, divergence, infinite traces, or termination with increasing
   fuel;
 - stability of an out-of-fuel result under a larger budget; or
-- any source, parser, ABI, Wire, Oracle, or public-format behavior.
+- any source, parser, ABI, Wire, or public-format behavior.
 
 ## Implementation and validation
 

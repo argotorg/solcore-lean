@@ -69,9 +69,8 @@ Focused regressions cover:
 ## Publication and exclusions
 
 This slice adds derived builders, not Core forms or primitive tags. It adds no
-source spelling, ABI rule, opcode lowering, gas rule, schema, Oracle behavior,
-Wire version, public enum member, or public byte. Frozen Wire v1/v2 remain
-unchanged.
+source spelling, ABI rule, opcode lowering, gas rule, schema, Wire version,
+public enum member, or public byte. Frozen Wire v1/v2 remain unchanged.
 
 ## Consequences
 

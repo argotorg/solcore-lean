@@ -29,9 +29,8 @@ strict ABI decoding: no zero-or-one input restriction or encoding rule is
 introduced.
 
 This is a derived form. It adds no type, value, expression, operation, frame,
-transition, fault, diagnostic, schema, capability, Core, CEK, wire, or Oracle
-tag. Existing typing, evaluation, safety, and fuel behavior come from the exact
-expansion.
+transition, fault, diagnostic, schema field, Core, CEK, or wire tag. Existing
+typing, evaluation, safety, and fuel behavior come from the exact expansion.
 
 ## Alternatives
 
@@ -46,8 +45,8 @@ by a future optimizer, but cannot replace the normative expansion silently.
 ## Wire boundary
 
 Wire v1 rejects the primitive forms required by the expansion. Wire v2 projects
-exactly the ordinary `boolToWord(wordToBool(x))` expression. Frozen schemas,
-capabilities, and golden bytes do not change.
+exactly the ordinary `boolToWord(wordToBool(x))` expression. Frozen schemas and
+their encodings do not change.
 
 ## Required implementation, proof, and tests
 

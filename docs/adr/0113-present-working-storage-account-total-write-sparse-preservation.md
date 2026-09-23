@@ -112,7 +112,7 @@ The slice adds no Account creation, address role, authority, authorization,
 provenance, lifetime, checkpoint, rollback, outcome, trace event, scheduling,
 transaction, concurrency, reentrancy, atomicity, cost, or gas rule.
 
-It adds no parser or source syntax, Core expression, Wire or Oracle field,
+It adds no parser or source syntax, Core expression, Wire field,
 Profile, ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan

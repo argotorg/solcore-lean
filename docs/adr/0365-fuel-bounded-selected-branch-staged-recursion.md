@@ -133,8 +133,7 @@ Still deferred are:
   selected implementation method;
 - type-growing polymorphic recursion beyond the finite specialization budget;
   and
-- broad soundness, completeness, resource-bound metatheory, and a public
-  source Oracle.
+- broad soundness, completeness, and resource-bound metatheory.
 
 ## Verification target
 

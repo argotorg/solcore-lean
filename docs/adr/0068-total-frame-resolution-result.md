@@ -135,7 +135,7 @@ scheduling, checkpoint creation or lifetime, trace prefix proof, append
 operation or order, event taxonomy, transaction boundary or atomicity.
 
 It adds no balances, code, host call/create behavior, parser or source form,
-Wire field or tag, Profile, Oracle behavior, ABI, storage layout, Core-result
+Wire field or tag, Profile, ABI, storage layout, Core-result
 adapter, EVM revision, opcode, gas schedule, serialization, canonical delta, or
 frozen artifact.
 

@@ -84,7 +84,7 @@ trace construction, prefixing, append operation or order, event taxonomy,
 transaction boundary or atomicity, or trap/failure diagnosis.
 
 It adds no balances, code, call/create host behavior, parser or source form,
-Wire field or tag, Profile, Oracle behavior, ABI, storage layout, Core-result
+Wire field or tag, Profile, ABI, storage layout, Core-result
 adapter, EVM revision, opcode, gas schedule, serialization, canonical delta, or
 frozen artifact.
 

@@ -179,7 +179,7 @@ selected continuation wrapper, and the existing parent-indexed constructor.
 Its properties reuse the corresponding branch and preservation laws. Core does
 not import the parent or frame layer.
 
-No parser, Surface, ABI, Oracle, Wire, schema, profile, gas, or public runtime
+No parser, source syntax, ABI, Wire, schema, profile, gas, or public runtime
 module changes. The root README does not change.
 
 ## Non-goals
@@ -232,7 +232,7 @@ is already covered by ADR-0124.
 - independent final audits found no P0-P3 issue; and
 - every implementation commit stayed below 300 changed lines.
 
-The parser, Surface, Core language, public formats, and root README did not
+The parser, source syntax, Core language, public formats, and root README did not
 change.
 
 ## Consequences

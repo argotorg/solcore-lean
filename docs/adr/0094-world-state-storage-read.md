@@ -123,8 +123,7 @@ trap, stack, scheduling, transaction, delta, or observation policy.
 
 It does not reinterpret an absent Account as zero storage. `none` remains a
 strictly different result from `some Core.Word.zero`. It adds no parser or
-source syntax, Core expression, Wire or Oracle field, Profile, capability, or
-published format.
+source syntax, Core expression, Wire field, Profile, or published format.
 
 ## Staged implementation plan
 
