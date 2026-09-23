@@ -1,0 +1,4038 @@
+import Solcore.SourceSemantics.Substitution
+import Solcore.SourceSemantics.Static
+import Solcore.SourceSemantics.Program
+import Solcore.SourceSemantics.Dynamic.Evaluation
+
+/-!
+Static preservation properties for structural rigid-parameter substitution.
+
+The definitions in `Substitution` describe the structural action on the
+resolved source carrier.  This file records the corresponding action on proof
+indices (contexts and control summaries) and proves that well-scoped types are
+closed by an exact, well-formed declaration substitution.  The higher-level
+lemmas below use these facts to transport source typing derivations.
+-/
+
+set_option autoImplicit false
+
+namespace Solcore.SourceSemantics.StructuralSubstitution
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+theorem eq_of_mem_of_mapped_nodup
+    {alpha beta : Type} {values : List alpha} {key : alpha → beta}
+    {left right : alpha}
+    (keysNodup : (values.map key).Nodup)
+    (leftMem : left ∈ values) (rightMem : right ∈ values)
+    (keysEq : key left = key right) :
+    left = right := by
+  induction values with
+  | nil => simp at leftMem
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at keysNodup
+      rcases keysNodup with ⟨headFresh, tailNodup⟩
+      simp only [List.mem_cons] at leftMem rightMem
+      rcases leftMem with rfl | leftTail
+      · rcases rightMem with rfl | rightTail
+        · rfl
+        · exfalso
+          apply headFresh
+          rw [keysEq]
+          exact List.mem_map.mpr ⟨right, rightTail, rfl⟩
+      · rcases rightMem with rfl | rightTail
+        · exfalso
+          apply headFresh
+          rw [← keysEq]
+          exact List.mem_map.mpr ⟨left, leftTail, rfl⟩
+        · exact induction tailNodup leftTail rightTail
+
+/-- Substitute every type-bearing component of a local scope. -/
+def applyLocals (substitution : ParameterSubstitution)
+    (locals : Resolved.LocalScope Scheme) : Resolved.LocalScope Scheme :=
+  locals.map fun entry => (entry.1, applyScheme substitution entry.2)
+
+/-- The closed use-site context corresponding to a generic declaration
+context after rigid instantiation. -/
+def applyContext (substitution : ParameterSubstitution)
+    (context : Context) : Context := {
+  signatures := context.signatures
+  currentDeclaration := context.currentDeclaration
+  typeParameters := []
+  locals := applyLocals substitution context.locals
+  assumptions := context.assumptions.map
+    (ProgramPredicate.applyParameters substitution)
+  solvedRequirements := context.solvedRequirements.map
+    (applySolvedRequirement substitution)
+}
+
+def applyControlSummary (substitution : ParameterSubstitution)
+    (summary : ControlSummary) : ControlSummary := {
+  fallthrough := summary.fallthrough.map substitution.apply
+  mayReturn := summary.mayReturn
+  mayBreak := summary.mayBreak
+  mayContinue := summary.mayContinue
+}
+
+def applyControlContext (substitution : ParameterSubstitution)
+    (control : ControlContext) : ControlContext := {
+  returnType := substitution.apply control.returnType
+  loopDepth := control.loopDepth
+}
+
+def applyStatementFacts (substitution : ParameterSubstitution)
+    (facts : StatementFacts) : StatementFacts := {
+  type := substitution.apply facts.type
+  hasValue := facts.hasValue
+  sawReturn := facts.sawReturn
+  control := applyControlSummary substitution facts.control
+}
+
+def applyBodyFacts (substitution : ParameterSubstitution)
+    (facts : BodyFacts) : BodyFacts := {
+  type := substitution.apply facts.type
+  sawReturn := facts.sawReturn
+  control := applyControlSummary substitution facts.control
+}
+
+/-- Structural action on the proof-only description of requirement ownership
+for an expression. -/
+def applyExpressionRequirementPlan (substitution : ParameterSubstitution) :
+    ExpressionRequirementPlan → ExpressionRequirementPlan
+  | .ordinary owned => .ordinary owned
+  | .directCall predicates =>
+      .directCall (predicates.map (ProgramPredicate.applyParameters substitution))
+  | .indirectCall coercions =>
+      .indirectCall (coercions.map (applyCoercionStep substitution))
+
+@[simp] theorem apply_builtin (substitution : ParameterSubstitution)
+    (builtin : BuiltinType) :
+    substitution.apply (.constructor (.builtin builtin)) =
+      .constructor (.builtin builtin) := rfl
+
+@[simp] theorem apply_word (substitution : ParameterSubstitution) :
+    substitution.apply Ty.word = Ty.word := rfl
+
+@[simp] theorem apply_integer (substitution : ParameterSubstitution) :
+    substitution.apply Ty.integer = Ty.integer := rfl
+
+@[simp] theorem apply_bool (substitution : ParameterSubstitution) :
+    substitution.apply Ty.bool = Ty.bool := rfl
+
+@[simp] theorem apply_unit (substitution : ParameterSubstitution) :
+    substitution.apply Ty.unit = Ty.unit := rfl
+
+@[simp] theorem apply_ite (substitution : ParameterSubstitution)
+    (condition : Prop) [Decidable condition] (thenType elseType : Ty) :
+    substitution.apply (if condition then thenType else elseType) =
+      if condition then substitution.apply thenType
+      else substitution.apply elseType := by
+  split <;> rfl
+
+@[simp] theorem apply_function (substitution : ParameterSubstitution)
+    (parameter result : Ty) :
+    substitution.apply (.function parameter result) =
+      .function (substitution.apply parameter) (substitution.apply result) := rfl
+
+@[simp] theorem apply_product (substitution : ParameterSubstitution)
+    (left right : Ty) :
+    substitution.apply (.product left right) =
+      .product (substitution.apply left) (substitution.apply right) := rfl
+
+@[simp] theorem apply_mapping (substitution : ParameterSubstitution)
+    (key value : Ty) :
+    substitution.apply (.mapping key value) =
+      .mapping (substitution.apply key) (substitution.apply value) := rfl
+
+@[simp] theorem apply_proxy (substitution : ParameterSubstitution)
+    (inner : Ty) :
+    substitution.apply (.proxy inner) = .proxy (substitution.apply inner) := rfl
+
+@[simp] theorem apply_comptime (substitution : ParameterSubstitution)
+    (inner : Ty) :
+    substitution.apply (.comptime inner) =
+      .comptime (substitution.apply inner) := rfl
+
+theorem apply_productMany (substitution : ParameterSubstitution)
+    (types : List Ty) :
+    substitution.apply (Ty.productMany types) =
+      Ty.productMany (types.map substitution.apply) := by
+  induction types with
+  | nil => rfl
+  | cons head tail induction =>
+      cases tail with
+      | nil => rfl
+      | cons next rest =>
+          simp only [Ty.productMany, apply_product, List.map_cons]
+          rw [induction]
+          rfl
+
+theorem apply_applyMany (substitution : ParameterSubstitution)
+    (head : Ty) (arguments : List Ty) :
+    substitution.apply (Ty.applyMany head arguments) =
+      Ty.applyMany (substitution.apply head)
+        (arguments.map substitution.apply) := by
+  induction arguments generalizing head with
+  | nil => rfl
+  | cons argument arguments induction =>
+      simpa [Ty.applyMany, TypeSystem.ParameterSubstitution.apply] using
+        induction (.application head argument)
+
+theorem apply_nominal (substitution : ParameterSubstitution)
+    (declaration : Resolved.DeclarationId) (arguments : List Ty) :
+    substitution.apply (Ty.nominal declaration arguments) =
+      Ty.nominal declaration (arguments.map substitution.apply) := by
+  unfold Ty.nominal
+  rw [apply_applyMany]
+  rfl
+
+theorem applyFlexible_applyMany (substitution : TypeSystem.Substitution)
+    (head : Ty) (arguments : List Ty) :
+    substitution.apply (Ty.applyMany head arguments) =
+      Ty.applyMany (substitution.apply head)
+        (arguments.map substitution.apply) := by
+  induction arguments generalizing head with
+  | nil => rfl
+  | cons argument arguments induction =>
+      simpa [Ty.applyMany, TypeSystem.Substitution.apply] using
+        induction (.application head argument)
+
+theorem applyFlexible_nominal (substitution : TypeSystem.Substitution)
+    (declaration : Resolved.DeclarationId) (arguments : List Ty) :
+    substitution.apply (Ty.nominal declaration arguments) =
+      Ty.nominal declaration (arguments.map substitution.apply) := by
+  unfold Ty.nominal
+  rw [applyFlexible_applyMany]
+  rfl
+
+@[simp] theorem patternInstructionBinderIds_applyMatchPatternInstructions
+    (substitution : ParameterSubstitution)
+    (instructions : List MatchPatternInstruction) :
+    patternInstructionBinderIds
+        (instructions.map (applyMatchPatternInstruction substitution)) =
+      patternInstructionBinderIds instructions := by
+  induction instructions with
+  | nil => rfl
+  | cons instruction rest induction =>
+      have tail := induction
+      simp only [patternInstructionBinderIds] at tail
+      cases instruction <;>
+        simp [patternInstructionBinderIds, applyMatchPatternInstruction,
+          applyBinder, tail]
+
+@[simp] theorem patternBinderIds_applyTypedMatchPattern
+    (substitution : ParameterSubstitution) (pattern : TypedMatchPattern) :
+    patternBinderIds (applyTypedMatchPattern substitution pattern) =
+      patternBinderIds pattern := by
+  cases pattern with
+  | mk source type resolution requirements =>
+      cases resolution <;>
+        simp [patternBinderIds, applyTypedMatchPattern,
+          applyMatchPatternResolution, applyBinder]
+
+@[simp] theorem forItemDefinedLocalIds_applyForItemForm
+    (substitution : ParameterSubstitution) (item : ForItemForm) :
+    forItemDefinedLocalIds (applyForItemForm substitution item) =
+      forItemDefinedLocalIds item := by
+  cases item <;> rfl
+
+@[simp] theorem expressionDefinedLocalIds_applyExpressionForm
+    (substitution : ParameterSubstitution) (form : ExpressionForm) :
+    expressionDefinedLocalIds (applyExpressionForm substitution form) =
+      expressionDefinedLocalIds form := by
+  cases form <;>
+    simp [expressionDefinedLocalIds, applyExpressionForm, applyBinder,
+      List.map_map, Function.comp_def]
+
+@[simp] theorem statementDefinedLocalIds_applyStatementForm
+    (substitution : ParameterSubstitution) (form : StatementForm) :
+    statementDefinedLocalIds (applyStatementForm substitution form) =
+      statementDefinedLocalIds form := by
+  cases form <;>
+    simp [statementDefinedLocalIds, applyStatementForm, applyMatchResolution,
+      applyTypedMatchCase, applyBinder, List.flatMap_map]
+
+@[simp] theorem nodeDefinedLocalIds_applyNode
+    (substitution : ParameterSubstitution) (node : Node) :
+    (match applyNode substitution node with
+      | .expression expression => expressionDefinedLocalIds expression.form
+      | .statement statement => statementDefinedLocalIds statement.form) =
+    (match node with
+      | .expression expression => expressionDefinedLocalIds expression.form
+      | .statement statement => statementDefinedLocalIds statement.form) := by
+  cases node <;>
+    simp [applyNode, applyExpressionNode, applyStatementNode]
+
+@[simp] theorem flatMap_definedLocalIds_applyNodes
+    (substitution : ParameterSubstitution) (nodes : List Node) :
+    (nodes.map (applyNode substitution)).flatMap (fun node =>
+      match node with
+      | .expression expression => expressionDefinedLocalIds expression.form
+      | .statement statement => statementDefinedLocalIds statement.form) =
+    nodes.flatMap (fun node =>
+      match node with
+      | .expression expression => expressionDefinedLocalIds expression.form
+      | .statement statement => statementDefinedLocalIds statement.form) := by
+  induction nodes with
+  | nil => rfl
+  | cons node nodes induction =>
+      simp [induction]
+
+@[simp] theorem definedLocalIds_applyTypedSource
+    (substitution : ParameterSubstitution) (source : TypedSource) :
+    definedLocalIds (applyTypedSource substitution source) =
+      definedLocalIds source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      change
+        (inputs.map (applyBinder substitution) |>.map fun binder => binder.id) ++
+            (nodes.map (applyNode substitution) |>.flatMap fun node =>
+              match node with
+              | .expression expression =>
+                  expressionDefinedLocalIds expression.form
+              | .statement statement =>
+                  statementDefinedLocalIds statement.form) =
+          (inputs.map fun binder => binder.id) ++
+            (nodes.flatMap fun node =>
+              match node with
+              | .expression expression =>
+                  expressionDefinedLocalIds expression.form
+              | .statement statement =>
+                  statementDefinedLocalIds statement.form)
+      rw [StructuralSubstitution.flatMap_definedLocalIds_applyNodes]
+      simp [applyBinder, List.map_map, Function.comp_def]
+
+theorem LocalIdentityOwnership.applyParameters
+    (substitution : ParameterSubstitution) {source : TypedSource}
+    (ownership : LocalIdentityOwnership source) :
+    LocalIdentityOwnership (applyTypedSource substitution source) := by
+  constructor
+  · simpa using ownership.unique
+  · intro id member
+    simpa [applyTypedSource] using ownership.owned id (by simpa using member)
+
+@[simp] theorem forItemPrimaryRequirementIds_applyForItemForm
+    (substitution : ParameterSubstitution) (item : ForItemForm) :
+    forItemPrimaryRequirementIds (applyForItemForm substitution item) =
+      forItemPrimaryRequirementIds item := by
+  cases item <;>
+    simp [forItemPrimaryRequirementIds, applyForItemForm,
+      applyAssignmentResolution]
+
+@[simp] theorem statementPrimaryRequirementIds_applyStatementForm
+    (substitution : ParameterSubstitution) (form : StatementForm) :
+    statementPrimaryRequirementIds (applyStatementForm substitution form) =
+      statementPrimaryRequirementIds form := by
+  cases form <;>
+    simp [statementPrimaryRequirementIds, applyStatementForm,
+      applyAssignmentResolution, applyMatchResolution, applyTypedMatchCase,
+      applyTypedMatchPattern, List.flatMap_map]
+
+@[simp] theorem nodePrimaryRequirementIds_applyNode
+    (substitution : ParameterSubstitution) (node : Node) :
+    (match applyNode substitution node with
+      | .expression expression => expression.requirements
+      | .statement statement => statementPrimaryRequirementIds statement.form) =
+    (match node with
+      | .expression expression => expression.requirements
+      | .statement statement => statementPrimaryRequirementIds statement.form) := by
+  cases node <;>
+    simp [applyNode, applyExpressionNode, applyStatementNode]
+
+@[simp] theorem flatMap_primaryRequirementIds_applyNodes
+    (substitution : ParameterSubstitution) (nodes : List Node) :
+    (nodes.map (applyNode substitution)).flatMap (fun node =>
+      match node with
+      | .expression expression => expression.requirements
+      | .statement statement => statementPrimaryRequirementIds statement.form) =
+    nodes.flatMap (fun node =>
+      match node with
+      | .expression expression => expression.requirements
+      | .statement statement => statementPrimaryRequirementIds statement.form) := by
+  induction nodes with
+  | nil => rfl
+  | cons node nodes induction =>
+      simp [induction]
+
+@[simp] theorem primaryRequirementIds_applyTypedSource
+    (substitution : ParameterSubstitution) (source : TypedSource) :
+    primaryRequirementIds (applyTypedSource substitution source) =
+      primaryRequirementIds source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      change
+        (nodes.map (applyNode substitution) |>.flatMap fun node =>
+          match node with
+          | .expression expression => expression.requirements
+          | .statement statement =>
+              statementPrimaryRequirementIds statement.form) =
+        (nodes.flatMap fun node =>
+          match node with
+          | .expression expression => expression.requirements
+          | .statement statement =>
+              statementPrimaryRequirementIds statement.form)
+      exact StructuralSubstitution.flatMap_primaryRequirementIds_applyNodes
+        substitution nodes
+
+theorem RequirementOwnership.applyParameters
+    (substitution : ParameterSubstitution) {context : Context}
+    {source : TypedSource}
+    (ownership : RequirementOwnership context source) :
+    RequirementOwnership (applyContext substitution context)
+      (applyTypedSource substitution source) := by
+  constructor
+  · simpa using ownership.primary_unique
+  · simpa [applyContext, applySolvedRequirement, List.map_map,
+      Function.comp_def] using ownership.ledger_exact
+
+namespace ParameterSubstitution
+
+def mapRange (outer inner : TypeSystem.ParameterSubstitution) :
+    TypeSystem.ParameterSubstitution :=
+  inner.map fun entry => (entry.1, outer.apply entry.2)
+
+theorem lookup?_eq_none_of_not_mem_domain
+    {substitution : TypeSystem.ParameterSubstitution}
+    {parameter : TypeParameterId}
+    (absent : parameter ∉ SourceSemantics.ParameterSubstitution.domain
+      substitution) :
+    substitution.lookup? parameter = none := by
+  induction substitution with
+  | nil => rfl
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, replacement⟩
+      simp only [SourceSemantics.ParameterSubstitution.domain,
+        List.map_cons, List.mem_cons, not_or] at absent
+      have different : candidate ≠ parameter := fun equal =>
+        absent.1 equal.symm
+      simp [TypeSystem.ParameterSubstitution.lookup?, different,
+        induction absent.2]
+
+theorem lookup?_eq_some_of_mem_of_domain_nodup
+    {substitution : TypeSystem.ParameterSubstitution}
+    {parameter : TypeParameterId} {replacement : Ty}
+    (unique :
+      (SourceSemantics.ParameterSubstitution.domain substitution).Nodup)
+    (member : (parameter, replacement) ∈ substitution) :
+    substitution.lookup? parameter = some replacement := by
+  induction substitution with
+  | nil => simp at member
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, candidateReplacement⟩
+      simp only [SourceSemantics.ParameterSubstitution.domain,
+        List.map_cons, List.nodup_cons] at unique
+      rcases unique with ⟨candidateAbsent, restUnique⟩
+      simp only [List.mem_cons] at member
+      rcases member with member | member
+      · cases member
+        simp [TypeSystem.ParameterSubstitution.lookup?]
+      · have different : candidate ≠ parameter := by
+          intro equal
+          apply candidateAbsent
+          rw [equal]
+          exact List.mem_map.mpr ⟨(parameter, replacement), member, rfl⟩
+        simp [TypeSystem.ParameterSubstitution.lookup?, different,
+          induction restUnique member]
+
+theorem exists_lookup?_eq_some
+    {substitution : TypeSystem.ParameterSubstitution}
+    {parameters : List TypeParameterId}
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution parameters)
+    {parameter : TypeParameterId} (member : parameter ∈ parameters) :
+    ∃ replacement,
+      (parameter, replacement) ∈ substitution ∧
+        substitution.lookup? parameter = some replacement := by
+  have domainMember : parameter ∈
+      SourceSemantics.ParameterSubstitution.domain substitution :=
+    (exact.mem_domain_iff parameter).mpr member
+  rcases List.mem_map.mp domainMember with ⟨entry, entryMember, keyEq⟩
+  rcases entry with ⟨candidate, replacement⟩
+  simp only at keyEq
+  subst candidate
+  exact ⟨replacement, entryMember,
+    lookup?_eq_some_of_mem_of_domain_nodup exact.domain_nodup entryMember⟩
+
+theorem Exact.mapRange
+    {inner : TypeSystem.ParameterSubstitution}
+    {parameters : List TypeParameterId}
+    (outer : TypeSystem.ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact inner parameters) :
+    SourceSemantics.ParameterSubstitution.Exact
+      (StructuralSubstitution.ParameterSubstitution.mapRange outer inner)
+      parameters := by
+  constructor
+  · exact exact.parameters_nodup
+  · have domainEq :
+        SourceSemantics.ParameterSubstitution.domain
+            (StructuralSubstitution.ParameterSubstitution.mapRange outer inner) =
+          SourceSemantics.ParameterSubstitution.domain inner := by
+        simp [StructuralSubstitution.ParameterSubstitution.mapRange,
+          SourceSemantics.ParameterSubstitution.domain, List.map_map,
+          Function.comp_def]
+    rw [domainEq]
+    exact exact.domain_permutation
+
+end ParameterSubstitution
+
+namespace Substitution
+
+def mapRange (outer : ParameterSubstitution)
+    (inner : TypeSystem.Substitution) : TypeSystem.Substitution :=
+  inner.map fun entry => (entry.1, outer.apply entry.2)
+
+theorem lookup?_eq_some_of_mem_of_domain_nodup
+    {substitution : TypeSystem.Substitution}
+    {metavariable : TypeVarId} {replacement : Ty}
+    (unique : substitution.domain.Nodup)
+    (member : (metavariable, replacement) ∈ substitution) :
+    substitution.lookup? metavariable = some replacement := by
+  induction substitution with
+  | nil => simp at member
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, candidateReplacement⟩
+      simp only [TypeSystem.Substitution.domain, List.map_cons,
+        List.nodup_cons] at unique
+      rcases unique with ⟨candidateAbsent, restUnique⟩
+      simp only [List.mem_cons] at member
+      rcases member with member | member
+      · cases member
+        simp [TypeSystem.Substitution.lookup?]
+      · have different : candidate ≠ metavariable := by
+          intro equal
+          apply candidateAbsent
+          rw [equal]
+          exact List.mem_map.mpr ⟨(metavariable, replacement), member, rfl⟩
+        simp [TypeSystem.Substitution.lookup?, different,
+          induction restUnique member]
+
+theorem exists_lookup?_eq_some
+    {substitution : TypeSystem.Substitution}
+    {variables : List TypeVarId}
+    (exact : ExactSubstitution substitution variables)
+    {metavariable : TypeVarId} (member : metavariable ∈ variables) :
+    ∃ replacement,
+      (metavariable, replacement) ∈ substitution ∧
+        substitution.lookup? metavariable = some replacement := by
+  have domainMember : metavariable ∈ substitution.domain :=
+    (exact.mem_domain_iff metavariable).mpr member
+  rcases List.mem_map.mp domainMember with ⟨entry, entryMember, keyEq⟩
+  rcases entry with ⟨candidate, replacement⟩
+  simp only at keyEq
+  subst candidate
+  exact ⟨replacement, entryMember,
+    lookup?_eq_some_of_mem_of_domain_nodup exact.domain_nodup entryMember⟩
+
+theorem ExactSubstitution.mapRange
+    {inner : TypeSystem.Substitution} {variables : List TypeVarId}
+    (outer : ParameterSubstitution)
+    (exact : ExactSubstitution inner variables) :
+    ExactSubstitution (Substitution.mapRange outer inner) variables := by
+  constructor
+  · exact exact.variables_nodup
+  · have domainEq :
+        (Substitution.mapRange outer inner).domain = inner.domain := by
+        simp [Substitution.mapRange, TypeSystem.Substitution.domain,
+          List.map_map, Function.comp_def]
+    rw [domainEq]
+    exact exact.domain_permutation
+
+end Substitution
+
+theorem TypeWellScoped.weakenFlexible
+    {context : Context} {smaller larger : List TypeVarId} {type : Ty}
+    (included : ∀ metavariable, metavariable ∈ smaller →
+      metavariable ∈ larger)
+    (wellScoped : TypeWellScoped context smaller type) :
+    TypeWellScoped context larger type := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ => TypeWellScoped context larger type)
+    (motive_2 := fun types _ => TypesWellScoped context larger types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable (included metavariable bound)
+  · intro parameter bound owned
+    exact .parameter bound owned
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    exact .nominal dataType arguments cataloged arity argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+theorem TypesWellScoped.weakenFlexible
+    {context : Context} {smaller larger : List TypeVarId} {types : List Ty}
+    (included : ∀ metavariable, metavariable ∈ smaller →
+      metavariable ∈ larger)
+    (wellScoped : TypesWellScoped context smaller types) :
+    TypesWellScoped context larger types := by
+  refine TypesWellScoped.rec
+    (motive_1 := fun type _ => TypeWellScoped context larger type)
+    (motive_2 := fun types _ => TypesWellScoped context larger types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable (included metavariable bound)
+  · intro parameter bound owned
+    exact .parameter bound owned
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    exact .nominal dataType arguments cataloged arity argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+/-- A type closed in the empty whole-program context remains closed after
+installing locals, predicates, and a declaration marker, provided the target
+still has no rigid binders and shares the same signature catalog. -/
+theorem TypeWellScoped.ofSignatures_transport
+    {signatures : ProgramSignatures} {target : Context}
+    {flexibleVariables : List TypeVarId} {type : Ty}
+    (signatures_eq : target.signatures = signatures)
+    (wellScoped : TypeWellScoped (Context.ofSignatures signatures)
+      flexibleVariables type) :
+    TypeWellScoped target flexibleVariables type := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
+    (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable bound
+  · intro parameter bound
+    simp [Context.ofSignatures] at bound
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    exact .nominal dataType arguments
+      (by simpa [Context.ofSignatures, signatures_eq] using cataloged)
+      arity argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+theorem TypesWellScoped.ofSignatures_transport
+    {signatures : ProgramSignatures} {target : Context}
+    {flexibleVariables : List TypeVarId} {types : List Ty}
+    (signatures_eq : target.signatures = signatures)
+    (wellScoped : TypesWellScoped (Context.ofSignatures signatures)
+      flexibleVariables types) :
+    TypesWellScoped target flexibleVariables types := by
+  refine TypesWellScoped.rec
+    (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
+    (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable bound
+  · intro parameter bound
+    simp [Context.ofSignatures] at bound
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    exact .nominal dataType arguments
+      (by simpa [Context.ofSignatures, signatures_eq] using cataloged)
+      arity argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+theorem TypeWellFormed.ofSignatures_transport
+    {signatures : ProgramSignatures} {target : Context} {type : Ty}
+    (signatures_eq : target.signatures = signatures)
+    (binders : TypeParameterBindersWellFormed target)
+    (wellFormed : TypeWellFormed (Context.ofSignatures signatures) type) :
+    TypeWellFormed target type := {
+  binders
+  typeWellScoped := TypeWellScoped.ofSignatures_transport signatures_eq
+    wellFormed.typeWellScoped
+}
+
+theorem TypeWellScoped.transportContext
+    {source target : Context} {flexibleVariables : List TypeVarId}
+    {type : Ty}
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (wellScoped : TypeWellScoped source flexibleVariables type) :
+    TypeWellScoped target flexibleVariables type := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
+    (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable bound
+  · intro parameter bound owned
+    exact .parameter (by simpa [parameters_eq] using bound)
+      (by simpa [declaration_eq] using owned)
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    exact .nominal dataType arguments
+      (by simpa [signatures_eq] using cataloged) arity argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+theorem TypesWellScoped.transportContext
+    {source target : Context} {flexibleVariables : List TypeVarId}
+    {types : List Ty}
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (wellScoped : TypesWellScoped source flexibleVariables types) :
+    TypesWellScoped target flexibleVariables types := by
+  refine TypesWellScoped.rec
+    (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
+    (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable bound
+  · intro parameter bound owned
+    exact .parameter (by simpa [parameters_eq] using bound)
+      (by simpa [declaration_eq] using owned)
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    exact .nominal dataType arguments
+      (by simpa [signatures_eq] using cataloged) arity argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+theorem TypeParameterBindersWellFormed.transportContext
+    {source target : Context}
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (wellFormed : TypeParameterBindersWellFormed source) :
+    TypeParameterBindersWellFormed target := by
+  rcases wellFormed with ⟨nodup, owned⟩
+  constructor
+  · simpa [parameters_eq] using nodup
+  · intro parameter member
+    rw [declaration_eq]
+    exact owned parameter (by simpa [parameters_eq] using member)
+
+theorem TypeWellFormed.transportContext
+    {source target : Context} {type : Ty}
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (wellFormed : TypeWellFormed source type) :
+    TypeWellFormed target type := {
+  binders := StructuralSubstitution.TypeParameterBindersWellFormed.transportContext
+    parameters_eq declaration_eq wellFormed.binders
+  typeWellScoped := StructuralSubstitution.TypeWellScoped.transportContext
+    signatures_eq parameters_eq declaration_eq wellFormed.typeWellScoped
+}
+
+theorem SchemeWellFormed.transportContext
+    {source target : Context} {scheme : Scheme}
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (wellFormed : SchemeWellFormed source scheme) :
+    SchemeWellFormed target scheme := {
+  binders := StructuralSubstitution.TypeParameterBindersWellFormed.transportContext
+    parameters_eq declaration_eq wellFormed.binders
+  quantified_nodup := wellFormed.quantified_nodup
+  body := StructuralSubstitution.TypeWellScoped.transportContext signatures_eq
+    parameters_eq declaration_eq wellFormed.body
+}
+
+/-- Exact substitution of every rigid binder turns a generic well-scoped type
+into a type scoped by the closed substituted context. -/
+theorem TypeWellScoped.applyParameters
+    {context : Context} {flexibleVariables : List TypeVarId} {type : Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    TypeWellScoped (applyContext substitution context) flexibleVariables
+      (substitution.apply type) := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ =>
+      TypeWellScoped (applyContext substitution context) flexibleVariables
+        (substitution.apply type))
+    (motive_2 := fun types _ =>
+      TypesWellScoped (applyContext substitution context) flexibleVariables
+        (types.map substitution.apply))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable bound
+  · intro parameter bound _
+    obtain ⟨replacement, member, lookup⟩ :=
+      ParameterSubstitution.exists_lookup?_eq_some exact bound
+    simp only [TypeSystem.ParameterSubstitution.apply, lookup,
+      Option.getD_some]
+    exact StructuralSubstitution.TypeWellScoped.weakenFlexible
+      (fun metavariable impossible => by simp at impossible)
+      (range _ _ member).typeWellScoped
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    rw [apply_nominal]
+    exact .nominal dataType (arguments.map substitution.apply)
+      (by simpa [applyContext] using cataloged)
+      (by simpa using arity) argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+theorem TypesWellScoped.applyParameters
+    {context : Context} {flexibleVariables : List TypeVarId}
+    {types : List Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellScoped : TypesWellScoped context flexibleVariables types) :
+    TypesWellScoped (applyContext substitution context) flexibleVariables
+      (types.map substitution.apply) := by
+  refine TypesWellScoped.rec
+    (motive_1 := fun type _ =>
+      TypeWellScoped (applyContext substitution context) flexibleVariables
+        (substitution.apply type))
+    (motive_2 := fun types _ =>
+      TypesWellScoped (applyContext substitution context) flexibleVariables
+        (types.map substitution.apply))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable bound
+  · intro parameter bound _
+    obtain ⟨replacement, member, lookup⟩ :=
+      ParameterSubstitution.exists_lookup?_eq_some exact bound
+    simp only [TypeSystem.ParameterSubstitution.apply, lookup,
+      Option.getD_some]
+    exact StructuralSubstitution.TypeWellScoped.weakenFlexible
+      (fun metavariable impossible => by simp at impossible)
+      (range _ _ member).typeWellScoped
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    rw [apply_nominal]
+    exact .nominal dataType (arguments.map substitution.apply)
+      (by simpa [applyContext] using cataloged)
+      (by simpa using arity) argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+theorem TypeParameterBindersWellFormed.applyContext
+    (substitution : ParameterSubstitution) (context : Context) :
+    TypeParameterBindersWellFormed (applyContext substitution context) := by
+  constructor
+  · change ([] : List TypeParameterId).Nodup
+    simp
+  · intro parameter member
+    change parameter ∈ ([] : List TypeParameterId) at member
+    simp at member
+
+theorem TypeWellFormed.applyParameters
+    {context : Context} {type : Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellFormed : TypeWellFormed context type) :
+    TypeWellFormed (applyContext substitution context)
+      (substitution.apply type) := {
+  binders := TypeParameterBindersWellFormed.applyContext substitution context
+  typeWellScoped := StructuralSubstitution.TypeWellScoped.applyParameters
+    substitution exact range wellFormed.typeWellScoped
+}
+
+theorem SchemeWellFormed.applyParameters
+    {context : Context} {scheme : Scheme}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellFormed : SchemeWellFormed context scheme) :
+    SchemeWellFormed (applyContext substitution context)
+      (applyScheme substitution scheme) := {
+  binders := TypeParameterBindersWellFormed.applyContext substitution context
+  quantified_nodup := wellFormed.quantified_nodup
+  body := StructuralSubstitution.TypeWellScoped.applyParameters substitution
+    exact range wellFormed.body
+}
+
+theorem TypeWellScoped.applySubstitution_eq_self
+    {context : Context} {type : Ty} (substitution : TypeSystem.Substitution)
+    (wellScoped : TypeWellScoped context [] type) :
+    substitution.apply type = type := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ => substitution.apply type = type)
+    (motive_2 := fun types _ => types.map substitution.apply = types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    simp at bound
+  · intro parameter _ _
+    rfl
+  · intro builtin
+    rfl
+  · intro dataType arguments _ _ _ argumentsInduction
+    rw [applyFlexible_nominal, argumentsInduction]
+  · intro parameter result _ _ parameterInduction resultInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [parameterInduction, resultInduction]
+  · intro left right _ _ leftInduction rightInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [leftInduction, rightInduction]
+  · intro key value _ _ keyInduction valueInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [keyInduction, valueInduction]
+  · intro inner _ innerInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [innerInduction]
+  · intro inner _ innerInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [innerInduction]
+  · rfl
+  · intro head tail _ _ headInduction tailInduction
+    simp only [List.map_cons]
+    rw [headInduction, tailInduction]
+
+theorem TypesWellScoped.applySubstitution_eq_self
+    {context : Context} {types : List Ty}
+    (substitution : TypeSystem.Substitution)
+    (wellScoped : TypesWellScoped context [] types) :
+    types.map substitution.apply = types := by
+  refine TypesWellScoped.rec
+    (motive_1 := fun type _ => substitution.apply type = type)
+    (motive_2 := fun types _ => types.map substitution.apply = types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    simp at bound
+  · intro parameter _ _
+    rfl
+  · intro builtin
+    rfl
+  · intro dataType arguments _ _ _ argumentsInduction
+    rw [applyFlexible_nominal, argumentsInduction]
+  · intro parameter result _ _ parameterInduction resultInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [parameterInduction, resultInduction]
+  · intro left right _ _ leftInduction rightInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [leftInduction, rightInduction]
+  · intro key value _ _ keyInduction valueInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [keyInduction, valueInduction]
+  · intro inner _ innerInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [innerInduction]
+  · intro inner _ innerInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [innerInduction]
+  · rfl
+  · intro head tail _ _ headInduction tailInduction
+    simp only [List.map_cons]
+    rw [headInduction, tailInduction]
+
+theorem TypeWellScoped.applyMixed_compose
+    {context : Context} {flexibleVariables : List TypeVarId} {type : Ty}
+    (outer : ParameterSubstitution) (inner : TypeSystem.Substitution)
+    (outerExact : SourceSemantics.ParameterSubstitution.Exact outer
+      context.typeParameters)
+    (outerRange : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext outer context) outer)
+    (innerExact : ExactSubstitution inner flexibleVariables)
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    outer.apply (inner.apply type) =
+      (Substitution.mapRange outer inner).apply (outer.apply type) := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ =>
+      outer.apply (inner.apply type) =
+        (Substitution.mapRange outer inner).apply (outer.apply type))
+    (motive_2 := fun types _ =>
+      (types.map inner.apply).map outer.apply =
+        (types.map outer.apply).map
+          (Substitution.mapRange outer inner).apply)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    obtain ⟨replacement, member, innerLookup⟩ :=
+      Substitution.exists_lookup?_eq_some innerExact bound
+    have mappedMember :
+        (metavariable, outer.apply replacement) ∈
+          Substitution.mapRange outer inner :=
+      List.mem_map.mpr ⟨(metavariable, replacement), member, rfl⟩
+    have mappedLookup :=
+      Substitution.lookup?_eq_some_of_mem_of_domain_nodup
+        (StructuralSubstitution.Substitution.ExactSubstitution.mapRange outer
+          innerExact).domain_nodup mappedMember
+    simp [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply, innerLookup, mappedLookup]
+  · intro parameter bound _
+    obtain ⟨replacement, member, outerLookup⟩ :=
+      ParameterSubstitution.exists_lookup?_eq_some outerExact bound
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply, outerLookup, Option.getD_some]
+    symm
+    exact StructuralSubstitution.TypeWellScoped.applySubstitution_eq_self
+      (Substitution.mapRange outer inner)
+      (outerRange parameter replacement member).typeWellScoped
+  · intro builtin
+    rfl
+  · intro dataType arguments _ _ _ argumentsInduction
+    rw [applyFlexible_nominal, apply_nominal, apply_nominal,
+      applyFlexible_nominal]
+    exact congrArg (fun arguments => Ty.nominal dataType.id arguments)
+      argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [parameterInduction, resultInduction]
+  · intro left right _ _ leftInduction rightInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [leftInduction, rightInduction]
+  · intro key value _ _ keyInduction valueInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [keyInduction, valueInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · rfl
+  · intro head tail _ _ headInduction tailInduction
+    simp only [List.map_cons]
+    rw [headInduction, tailInduction]
+
+theorem SchemeInstantiatesAt.applyParameters
+    {context : Context} {scheme : Scheme} {type : Ty}
+    (outer : ParameterSubstitution)
+    (outerExact : SourceSemantics.ParameterSubstitution.Exact outer
+      context.typeParameters)
+    (outerRange : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext outer context) outer)
+    (instantiates : SchemeInstantiatesAt context scheme type) :
+    SchemeInstantiatesAt (applyContext outer context)
+      (applyScheme outer scheme) (outer.apply type) := by
+  cases instantiates with
+  | intro schemeWellFormed inner innerExact innerRange result =>
+      refine .intro
+        (StructuralSubstitution.SchemeWellFormed.applyParameters outer
+          outerExact outerRange schemeWellFormed)
+        (Substitution.mapRange outer inner)
+        (StructuralSubstitution.Substitution.ExactSubstitution.mapRange outer
+          innerExact)
+        ?_ ?_
+      · intro metavariable replacement member
+        rcases List.mem_map.mp member with ⟨entry, entryMember, entryEq⟩
+        rcases entry with ⟨innerVariable, innerReplacement⟩
+        cases entryEq
+        exact StructuralSubstitution.TypeWellFormed.applyParameters outer
+          outerExact outerRange
+          (innerRange innerVariable innerReplacement entryMember)
+      · change (Substitution.mapRange outer inner).apply
+          (outer.apply scheme.body) = outer.apply type
+        rw [← result]
+        exact (StructuralSubstitution.TypeWellScoped.applyMixed_compose outer
+          inner outerExact outerRange innerExact schemeWellFormed.body).symm
+
+theorem TypeWellScoped.applyParameters_compose
+    {context : Context} {flexibleVariables : List TypeVarId} {type : Ty}
+    (outer inner : ParameterSubstitution)
+    (innerExact : SourceSemantics.ParameterSubstitution.Exact inner
+      context.typeParameters)
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    outer.apply (inner.apply type) =
+      (ParameterSubstitution.mapRange outer inner).apply type := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ =>
+      outer.apply (inner.apply type) =
+        (ParameterSubstitution.mapRange outer inner).apply type)
+    (motive_2 := fun types _ =>
+      (types.map inner.apply).map outer.apply =
+        types.map (ParameterSubstitution.mapRange outer inner).apply)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable _
+    rfl
+  · intro parameter bound _
+    obtain ⟨replacement, member, innerLookup⟩ :=
+      ParameterSubstitution.exists_lookup?_eq_some innerExact bound
+    have mappedMember :
+        (parameter, outer.apply replacement) ∈
+          ParameterSubstitution.mapRange outer inner :=
+      List.mem_map.mpr ⟨(parameter, replacement), member, rfl⟩
+    have mappedLookup :=
+      ParameterSubstitution.lookup?_eq_some_of_mem_of_domain_nodup
+        (StructuralSubstitution.ParameterSubstitution.Exact.mapRange outer
+          innerExact).domain_nodup mappedMember
+    simp [TypeSystem.ParameterSubstitution.apply, innerLookup, mappedLookup]
+  · intro builtin
+    rfl
+  · intro dataType arguments _ _ _ argumentsInduction
+    rw [apply_nominal, apply_nominal, apply_nominal]
+    exact congrArg (fun arguments => Ty.nominal dataType.id arguments)
+      argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [parameterInduction, resultInduction]
+  · intro left right _ _ leftInduction rightInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [leftInduction, rightInduction]
+  · intro key value _ _ keyInduction valueInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [keyInduction, valueInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · rfl
+  · intro head tail _ _ headInduction tailInduction
+    simp only [List.map_cons]
+    rw [headInduction, tailInduction]
+
+theorem TypesWellScoped.applyParameters_compose
+    {context : Context} {flexibleVariables : List TypeVarId}
+    {types : List Ty}
+    (outer inner : ParameterSubstitution)
+    (innerExact : SourceSemantics.ParameterSubstitution.Exact inner
+      context.typeParameters)
+    (wellScoped : TypesWellScoped context flexibleVariables types) :
+    (types.map inner.apply).map outer.apply =
+      types.map (ParameterSubstitution.mapRange outer inner).apply := by
+  refine TypesWellScoped.rec
+    (motive_1 := fun type _ =>
+      outer.apply (inner.apply type) =
+        (ParameterSubstitution.mapRange outer inner).apply type)
+    (motive_2 := fun types _ =>
+      (types.map inner.apply).map outer.apply =
+        types.map (ParameterSubstitution.mapRange outer inner).apply)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable _
+    rfl
+  · intro parameter bound _
+    obtain ⟨replacement, member, innerLookup⟩ :=
+      ParameterSubstitution.exists_lookup?_eq_some innerExact bound
+    have mappedMember :
+        (parameter, outer.apply replacement) ∈
+          ParameterSubstitution.mapRange outer inner :=
+      List.mem_map.mpr ⟨(parameter, replacement), member, rfl⟩
+    have mappedLookup :=
+      ParameterSubstitution.lookup?_eq_some_of_mem_of_domain_nodup
+        (StructuralSubstitution.ParameterSubstitution.Exact.mapRange outer
+          innerExact).domain_nodup mappedMember
+    simp [TypeSystem.ParameterSubstitution.apply, innerLookup, mappedLookup]
+  · intro builtin
+    rfl
+  · intro dataType arguments _ _ _ argumentsInduction
+    rw [apply_nominal, apply_nominal, apply_nominal]
+    exact congrArg (fun arguments => Ty.nominal dataType.id arguments)
+      argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [parameterInduction, resultInduction]
+  · intro left right _ _ leftInduction rightInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [leftInduction, rightInduction]
+  · intro key value _ _ keyInduction valueInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [keyInduction, valueInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · rfl
+  · intro head tail _ _ headInduction tailInduction
+    simp only [List.map_cons]
+    rw [headInduction, tailInduction]
+
+theorem ParameterSubstitution.RangeWellFormed.mapRange
+    {context : Context} {inner outer : TypeSystem.ParameterSubstitution}
+    (outerExact : SourceSemantics.ParameterSubstitution.Exact outer
+      context.typeParameters)
+    (outerRange : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext outer context) outer)
+    (innerRange : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      context inner) :
+    SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext outer context)
+      (ParameterSubstitution.mapRange outer inner) := by
+  intro parameter replacement member
+  rcases List.mem_map.mp member with ⟨entry, entryMember, entryEq⟩
+  rcases entry with ⟨innerParameter, innerReplacement⟩
+  cases entryEq
+  exact StructuralSubstitution.TypeWellFormed.applyParameters outer outerExact
+    outerRange (innerRange innerParameter innerReplacement entryMember)
+
+theorem TypesWellFormed.applyParameters
+    {context : Context} {types : List Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellFormed : TypesWellFormed context types) :
+    TypesWellFormed (applyContext substitution context)
+      (types.map substitution.apply) := by
+  intro type member
+  rcases List.mem_map.mp member with ⟨original, originalMember, typeEq⟩
+  subst type
+  exact StructuralSubstitution.TypeWellFormed.applyParameters substitution exact
+    range (wellFormed original originalMember)
+
+theorem TypesWellFormed.applyParameters_compose
+    {context : Context} {types : List Ty}
+    (outer inner : ParameterSubstitution)
+    (innerExact : SourceSemantics.ParameterSubstitution.Exact inner
+      context.typeParameters)
+    (wellFormed : TypesWellFormed context types) :
+    (types.map inner.apply).map outer.apply =
+      types.map (ParameterSubstitution.mapRange outer inner).apply := by
+  induction types with
+  | nil => rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, List.cons.injEq]
+      constructor
+      · exact StructuralSubstitution.TypeWellScoped.applyParameters_compose
+          outer inner innerExact (wellFormed head (by simp)).typeWellScoped
+      · exact induction (fun type member => wellFormed type (by simp [member]))
+
+theorem TypesWellFormed.toTypesWellScoped
+    {context : Context} {types : List Ty}
+    (wellFormed : TypesWellFormed context types) :
+    TypesWellScoped context [] types := by
+  induction types with
+  | nil => exact .nil
+  | cons head tail induction =>
+      exact .cons (wellFormed head (by simp)).typeWellScoped
+        (induction (fun type member => wellFormed type (by simp [member])))
+
+theorem TypesWellScoped.productMany
+    {context : Context} {flexibleVariables : List TypeVarId}
+    {types : List Ty}
+    (wellScoped : TypesWellScoped context flexibleVariables types) :
+    TypeWellScoped context flexibleVariables (Ty.productMany types) := by
+  cases wellScoped with
+  | nil => exact .builtin .unit
+  | @cons head tail headScoped tailScoped =>
+      cases tail with
+      | nil => exact headScoped
+      | cons next rest =>
+          exact .product headScoped
+            (StructuralSubstitution.TypesWellScoped.productMany tailScoped)
+
+theorem PredicateWellFormed.applyParameters
+    {context : Context} {predicate : ProgramPredicate}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellFormed : PredicateWellFormed context predicate) :
+    PredicateWellFormed (applyContext substitution context)
+      (ProgramPredicate.applyParameters substitution predicate) := by
+  constructor
+  · exact StructuralSubstitution.TypeWellFormed.applyParameters substitution
+      exact range wellFormed.subject
+  · intro argument member
+    rcases List.mem_map.mp member with ⟨original, originalMember, argumentEq⟩
+    subst argument
+    exact StructuralSubstitution.TypeWellFormed.applyParameters substitution
+      exact range (wellFormed.arguments original originalMember)
+  · cases traitEq : predicate.trait with
+    | builtin builtin =>
+        cases builtin with
+        | int =>
+            have traitValid := wellFormed.trait
+            rw [traitEq] at traitValid
+            simpa [ProgramPredicate.applyParameters, traitEq] using traitValid
+    | declaration id =>
+        have traitValid := wellFormed.trait
+        rw [traitEq] at traitValid
+        rcases traitValid with ⟨signature, member, idEq, arity⟩
+        simp only [ProgramPredicate.applyParameters, traitEq]
+        exact ⟨signature, by simpa [applyContext] using member, idEq,
+          by simpa [ProgramPredicate.applyParameters] using arity⟩
+
+theorem PredicatesWellFormed.applyParameters
+    {context : Context} {predicates : List ProgramPredicate}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellFormed : PredicatesWellFormed context predicates) :
+    PredicatesWellFormed (applyContext substitution context)
+      (predicates.map (ProgramPredicate.applyParameters substitution)) := by
+  intro predicate member
+  rcases List.mem_map.mp member with ⟨original, originalMember, predicateEq⟩
+  subst predicate
+  exact StructuralSubstitution.PredicateWellFormed.applyParameters substitution
+    exact range (wellFormed original originalMember)
+
+theorem PredicateWellFormed.applyParameters_compose
+    {context : Context} {predicate : ProgramPredicate}
+    (outer inner : ParameterSubstitution)
+    (innerExact : SourceSemantics.ParameterSubstitution.Exact inner
+      context.typeParameters)
+    (wellFormed : PredicateWellFormed context predicate) :
+    ProgramPredicate.applyParameters outer
+        (ProgramPredicate.applyParameters inner predicate) =
+      ProgramPredicate.applyParameters
+        (ParameterSubstitution.mapRange outer inner) predicate := by
+  cases predicate with
+  | mk trait subject arguments =>
+      simp only [ProgramPredicate.applyParameters]
+      congr 1
+      · exact StructuralSubstitution.TypeWellScoped.applyParameters_compose
+          outer inner innerExact wellFormed.subject.typeWellScoped
+      · exact StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          outer inner innerExact wellFormed.arguments
+
+theorem PredicatesWellFormed.applyParameters_compose
+    {context : Context} {predicates : List ProgramPredicate}
+    (outer inner : ParameterSubstitution)
+    (innerExact : SourceSemantics.ParameterSubstitution.Exact inner
+      context.typeParameters)
+    (wellFormed : PredicatesWellFormed context predicates) :
+    (predicates.map (ProgramPredicate.applyParameters inner)).map
+        (ProgramPredicate.applyParameters outer) =
+      predicates.map (ProgramPredicate.applyParameters
+        (ParameterSubstitution.mapRange outer inner)) := by
+  induction predicates with
+  | nil => rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, List.cons.injEq]
+      constructor
+      · exact StructuralSubstitution.PredicateWellFormed.applyParameters_compose
+          outer inner innerExact (wellFormed head (by simp))
+      · exact induction (fun predicate member =>
+          wellFormed predicate (by simp [member]))
+
+namespace ParameterSubstitution.RangeWellFormed
+
+theorem atApplyContextOfBase
+    {context : Context} {substitution : ParameterSubstitution}
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (Context.ofSignatures context.signatures) substitution) :
+    SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution := by
+  intro parameter replacement member
+  exact StructuralSubstitution.TypeWellFormed.ofSignatures_transport rfl
+    (TypeParameterBindersWellFormed.applyContext substitution context)
+    (range parameter replacement member)
+
+theorem underSourceLocal
+    {context : Context} {substitution : ParameterSubstitution}
+    {id : Resolved.LocalId} {scheme : Scheme}
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution) :
+    SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution (context.withLocal id scheme)) substitution := by
+  intro parameter replacement member
+  exact StructuralSubstitution.TypeWellFormed.transportContext
+    (source := applyContext substitution context)
+    (target := applyContext substitution (context.withLocal id scheme))
+    rfl rfl rfl (range parameter replacement member)
+
+end ParameterSubstitution.RangeWellFormed
+
+@[simp] theorem applyContext_withLocal
+    (substitution : ParameterSubstitution) (context : Context)
+    (id : Resolved.LocalId) (scheme : Scheme) :
+    applyContext substitution (context.withLocal id scheme) =
+      (applyContext substitution context).withLocal id
+        (applyScheme substitution scheme) := by
+  rfl
+
+@[simp] theorem applyContext_declarationContext
+    (substitution : ParameterSubstitution) (signatures : ProgramSignatures)
+    (owner : Resolved.DeclarationId)
+    (parameters : List TypeParameterId)
+    (assumptions : List ProgramPredicate)
+    (requirements : List SolvedRequirement) :
+    applyContext substitution
+        (declarationContext signatures owner parameters assumptions requirements) =
+      declarationContext signatures owner []
+        (assumptions.map (ProgramPredicate.applyParameters substitution))
+        (requirements.map (applySolvedRequirement substitution)) := by
+  rfl
+
+private theorem lookup_applyLocals
+    {locals : Resolved.LocalScope Scheme} {id : Resolved.LocalId}
+    {scheme : Scheme} (substitution : ParameterSubstitution)
+    (lookup : Resolved.LocalScope.Lookup locals id scheme) :
+    Resolved.LocalScope.Lookup (applyLocals substitution locals) id
+      (applyScheme substitution scheme) := by
+  induction lookup with
+  | head => exact .head
+  | tail different _ induction => exact .tail different induction
+
+theorem LocalLookup.applyParameters
+    {context : Context} {id : Resolved.LocalId} {scheme : Scheme}
+    (substitution : ParameterSubstitution)
+    (lookup : context.LocalLookup id scheme) :
+    (applyContext substitution context).LocalLookup id
+      (applyScheme substitution scheme) := by
+  exact lookup_applyLocals substitution lookup
+
+theorem LocalFresh.applyParameters
+    {context : Context} {id : Resolved.LocalId}
+    (substitution : ParameterSubstitution)
+    (fresh : LocalFresh context id) :
+    LocalFresh (applyContext substitution context) id := by
+  simpa [LocalFresh, applyContext, applyLocals, List.map_map,
+    Function.comp_def] using fresh
+
+/-- The one semantic premise not supplied by purely structural substitution:
+every retained evidence tree remains valid after its predicates and types are
+instantiated.  `EvidenceValid.applyParameters` discharges this premise once
+impl-head matching closure is available. -/
+structure ContextSubstitutionValid (substitution : ParameterSubstitution)
+    (context : Context) : Prop where
+  exact : SourceSemantics.ParameterSubstitution.Exact substitution
+    context.typeParameters
+  range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+    (applyContext substitution context) substitution
+  requirements : ∀ requirement, requirement ∈ context.solvedRequirements →
+    SolvedRequirementValid (applyContext substitution context)
+      (applySolvedRequirement substitution requirement)
+
+theorem SolvedRequirementValid.transportContext
+    {source target : Context} {requirement : SolvedRequirement}
+    (signatures_eq : target.signatures = source.signatures)
+    (assumptions_eq : target.assumptions = source.assumptions)
+    (valid : SolvedRequirementValid source requirement) :
+    SolvedRequirementValid target requirement := by
+  cases valid with
+  | intro evidenceValid =>
+      exact .intro (by simpa [signatures_eq, assumptions_eq] using evidenceValid)
+
+theorem ContextSubstitutionValid.underLocal
+    {substitution : ParameterSubstitution} {context : Context}
+    {id : Resolved.LocalId} {scheme : Scheme}
+    (valid : ContextSubstitutionValid substitution context) :
+    ContextSubstitutionValid substitution (context.withLocal id scheme) := {
+  exact := by simpa [Context.withLocal] using valid.exact
+  range := ParameterSubstitution.RangeWellFormed.underSourceLocal valid.range
+  requirements := by
+    intro requirement member
+    have member' : requirement ∈ context.solvedRequirements := by
+      simpa [Context.withLocal] using member
+    exact StructuralSubstitution.SolvedRequirementValid.transportContext
+      (source := applyContext substitution context)
+      (target := applyContext substitution (context.withLocal id scheme))
+      rfl rfl (valid.requirements requirement member')
+}
+
+theorem RequirementProves.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {id : RequirementId} {predicate : ProgramPredicate}
+    (valid : ContextSubstitutionValid substitution context)
+    (proves : RequirementProves context id predicate) :
+    RequirementProves (applyContext substitution context) id
+      (ProgramPredicate.applyParameters substitution predicate) := by
+  rcases proves with ⟨requirement, contains, predicateEq, evidenceValid⟩
+  rcases contains with ⟨member, idEq⟩
+  refine ⟨applySolvedRequirement substitution requirement, ?_, ?_,
+    valid.requirements requirement member⟩
+  · constructor
+    · change applySolvedRequirement substitution requirement ∈
+        context.solvedRequirements.map (applySolvedRequirement substitution)
+      exact List.mem_map.mpr ⟨requirement, member, rfl⟩
+    · exact idEq
+  · simp [applySolvedRequirement, predicateEq]
+
+theorem RequirementValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {id : RequirementId}
+    (valid : ContextSubstitutionValid substitution context)
+    (requirement : RequirementValid context id) :
+    RequirementValid (applyContext substitution context) id := by
+  rcases requirement with ⟨predicate, proves⟩
+  exact ⟨ProgramPredicate.applyParameters substitution predicate,
+    StructuralSubstitution.RequirementProves.applyParameters valid proves⟩
+
+theorem RequirementIdsValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {ids : List RequirementId}
+    (valid : ContextSubstitutionValid substitution context)
+    (requirements : RequirementIdsValid context ids) :
+    RequirementIdsValid (applyContext substitution context) ids := by
+  intro id member
+  exact StructuralSubstitution.RequirementValid.applyParameters valid
+    (requirements id member)
+
+theorem RequirementSequenceProves.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {ids : List RequirementId} {predicates : List ProgramPredicate}
+    (valid : ContextSubstitutionValid substitution context)
+    (proves : RequirementSequenceProves context ids predicates) :
+    RequirementSequenceProves (applyContext substitution context) ids
+      (predicates.map (ProgramPredicate.applyParameters substitution)) := by
+  induction proves with
+  | nil => exact .nil
+  | cons head tail induction =>
+      exact .cons
+        (StructuralSubstitution.RequirementProves.applyParameters valid head)
+        induction
+
+theorem DeclarationInstantiation.Valid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {instantiation : DeclarationInstantiation}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : SourceSemantics.DeclarationInstantiation.Valid context
+      instantiation) :
+    SourceSemantics.DeclarationInstantiation.Valid
+      (applyContext substitution context)
+      (applyDeclarationInstantiation substitution instantiation) := by
+  cases valid with
+  | intro signature signatureMem declarationEq innerExact innerRange typeEq
+      predicatesEq parameterComptimeEq returnComptimeEq =>
+      have signatureWellFormed := catalog.functions_semantic signature signatureMem
+      let signatureTypingContext := signatureContext context.signatures
+        signature.id signature.scheme.parameters signature.scheme.predicates
+      have schemeScoped : TypeWellScoped signatureTypingContext []
+          signature.scheme.body := by
+        rw [signatureWellFormed.scheme_body]
+        exact .function
+          (StructuralSubstitution.TypesWellScoped.productMany
+            (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+              signatureWellFormed.parameter_types))
+          (StructuralSubstitution.TypesWellScoped.productMany
+            (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+              signatureWellFormed.return_types))
+      refine .intro signature (by simpa [applyContext] using signatureMem)
+        declarationEq ?_ ?_ ?_ ?_ parameterComptimeEq returnComptimeEq
+      · simpa [applyDeclarationInstantiation,
+          ParameterSubstitution.mapRange] using
+          (StructuralSubstitution.ParameterSubstitution.Exact.mapRange
+            substitution innerExact)
+      · simpa [applyDeclarationInstantiation,
+          ParameterSubstitution.mapRange] using
+          (StructuralSubstitution.ParameterSubstitution.RangeWellFormed.mapRange
+            contextValid.exact contextValid.range innerRange)
+      · change substitution.apply instantiation.type =
+          (ParameterSubstitution.mapRange substitution
+            instantiation.parameterSubstitution).apply signature.scheme.body
+        rw [typeEq]
+        exact StructuralSubstitution.TypeWellScoped.applyParameters_compose
+          substitution instantiation.parameterSubstitution innerExact
+          schemeScoped
+      · change instantiation.predicates.map
+            (ProgramPredicate.applyParameters substitution) =
+          signature.scheme.predicates.map
+            (ProgramPredicate.applyParameters
+              (ParameterSubstitution.mapRange substitution
+                instantiation.parameterSubstitution))
+        rw [predicatesEq]
+        exact StructuralSubstitution.PredicatesWellFormed.applyParameters_compose
+          substitution instantiation.parameterSubstitution innerExact
+          signatureWellFormed.predicates
+
+theorem ParameterSubstitution.orderedArguments_mapRange
+    {inner outer : ParameterSubstitution} {parameters : List TypeParameterId}
+    (exact : SourceSemantics.ParameterSubstitution.Exact inner parameters) :
+    SourceSemantics.ParameterSubstitution.orderedArguments
+        (ParameterSubstitution.mapRange outer inner) parameters =
+      (SourceSemantics.ParameterSubstitution.orderedArguments inner parameters).map
+        outer.apply := by
+  unfold SourceSemantics.ParameterSubstitution.orderedArguments
+  rw [List.map_map]
+  apply List.map_congr_left
+  intro parameter member
+  obtain ⟨replacement, pairMember, innerLookup⟩ :=
+    ParameterSubstitution.exists_lookup?_eq_some exact member
+  have mappedMember :
+      (parameter, outer.apply replacement) ∈
+        ParameterSubstitution.mapRange outer inner :=
+    List.mem_map.mpr ⟨(parameter, replacement), pairMember, rfl⟩
+  have mappedLookup :=
+    ParameterSubstitution.lookup?_eq_some_of_mem_of_domain_nodup
+      (StructuralSubstitution.ParameterSubstitution.Exact.mapRange outer
+        exact).domain_nodup mappedMember
+  simp [innerLookup, mappedLookup]
+
+theorem DataConstructorInstantiation.Valid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {instantiation : DataConstructorInstantiation}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : SourceSemantics.DataConstructorInstantiation.Valid context
+      instantiation) :
+    SourceSemantics.DataConstructorInstantiation.Valid
+      (applyContext substitution context)
+      (applyDataConstructorInstantiation substitution instantiation) := by
+  cases valid with
+  | intro dataType constructor dataTypeMem constructorMem constructorOwner
+      constructorEq innerExact innerRange payloadTypesEq resultTypeEq =>
+      have dataWellFormed := catalog.data_semantic dataType dataTypeMem
+      have payloadWellFormed := dataWellFormed.constructor_payloads constructor
+        constructorMem
+      refine .intro dataType constructor (by simpa [applyContext] using dataTypeMem)
+        constructorMem constructorOwner constructorEq ?_ ?_ ?_ ?_
+      · simpa [applyDataConstructorInstantiation,
+          ParameterSubstitution.mapRange] using
+          (StructuralSubstitution.ParameterSubstitution.Exact.mapRange
+            substitution innerExact)
+      · simpa [applyDataConstructorInstantiation,
+          ParameterSubstitution.mapRange] using
+          (StructuralSubstitution.ParameterSubstitution.RangeWellFormed.mapRange
+            contextValid.exact contextValid.range innerRange)
+      · change instantiation.payloadTypes.map substitution.apply =
+          constructor.payloadTypes.map
+            (ParameterSubstitution.mapRange substitution
+              instantiation.parameterSubstitution).apply
+        rw [payloadTypesEq]
+        exact StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution instantiation.parameterSubstitution innerExact
+          payloadWellFormed
+      · change substitution.apply instantiation.resultType =
+          Ty.nominal dataType.id
+            (SourceSemantics.ParameterSubstitution.orderedArguments
+              (ParameterSubstitution.mapRange substitution
+                instantiation.parameterSubstitution) dataType.parameters)
+        rw [resultTypeEq, apply_nominal,
+          StructuralSubstitution.ParameterSubstitution.orderedArguments_mapRange
+            innerExact]
+
+theorem ContainsExpression.applyParameters
+    {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
+    (substitution : ParameterSubstitution)
+    (contains : ContainsExpression source id node) :
+    ContainsExpression (applyTypedSource substitution source) id
+      (applyExpressionNode substitution node) := by
+  rcases contains with ⟨member, idEq⟩
+  refine ⟨?_, idEq⟩
+  exact List.mem_map.mpr ⟨Node.expression node, member, rfl⟩
+
+theorem ContainsStatement.applyParameters
+    {source : TypedSource} {id : StatementId} {node : StatementNode}
+    (substitution : ParameterSubstitution)
+    (contains : ContainsStatement source id node) :
+    ContainsStatement (applyTypedSource substitution source) id
+      (applyStatementNode substitution node) := by
+  rcases contains with ⟨member, idEq⟩
+  refine ⟨?_, idEq⟩
+  exact List.mem_map.mpr ⟨Node.statement node, member, rfl⟩
+
+@[simp] theorem applyExpressionNode_rawType
+    (substitution : ParameterSubstitution) (node : ExpressionNode) :
+    (applyExpressionNode substitution node).rawType =
+      substitution.apply node.rawType := by
+  cases coercionsEq : node.coercions with
+  | nil => simp [ExpressionNode.rawType, applyExpressionNode, coercionsEq]
+  | cons head tail =>
+      simp [ExpressionNode.rawType, applyExpressionNode, coercionsEq,
+        applyCoercionStep]
+
+@[simp] theorem applyCoercionStep_requirements
+    (substitution : ParameterSubstitution) (step : CoercionStep) :
+    (applyCoercionStep substitution step).requirements = step.requirements := by
+  rfl
+
+@[simp] theorem coercionRequirementIds_applyCoercionSteps
+    (substitution : ParameterSubstitution) (steps : List CoercionStep) :
+    coercionRequirementIds (steps.map (applyCoercionStep substitution)) =
+      coercionRequirementIds steps := by
+  induction steps with
+  | nil => rfl
+  | cons head tail induction =>
+      change head.requirements ++
+          coercionRequirementIds
+            (tail.map (applyCoercionStep substitution)) =
+        head.requirements ++ coercionRequirementIds tail
+      rw [induction]
+
+theorem IntegerLiteralValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {literal : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : IntegerLiteralValid context literal resolution) :
+    IntegerLiteralValid (applyContext substitution context) literal
+      (applyIntegerLiteralResolution substitution resolution) := by
+  cases valid with
+  | word meaning targetEq evidence =>
+      refine .word meaning ?_ ?_
+      · simp [applyIntegerLiteralResolution, targetEq]
+      · simpa [applyIntegerLiteralResolution,
+          ProgramSignatures.builtinIntPredicate,
+          ProgramPredicate.applyParameters] using
+          (StructuralSubstitution.RequirementProves.applyParameters contextValid
+            evidence)
+  | integer meaning targetEq evidence =>
+      refine .integer meaning ?_ ?_
+      · simp [applyIntegerLiteralResolution, targetEq]
+      · simpa [applyIntegerLiteralResolution,
+          ProgramSignatures.builtinIntPredicate,
+          ProgramPredicate.applyParameters] using
+          (StructuralSubstitution.RequirementProves.applyParameters contextValid
+            evidence)
+
+theorem ReferenceHasRawType.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {resolution : ReferenceResolution} {type : Ty}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : ReferenceHasRawType context resolution type) :
+    ReferenceHasRawType (applyContext substitution context)
+      (applyReferenceResolution substitution resolution)
+      (substitution.apply type) := by
+  cases typing with
+  | «local» lookup instantiates =>
+      exact .local
+        (StructuralSubstitution.LocalLookup.applyParameters substitution lookup)
+        (StructuralSubstitution.SchemeInstantiatesAt.applyParameters substitution
+          contextValid.exact contextValid.range instantiates)
+  | declaration valid =>
+      exact .declaration
+        (StructuralSubstitution.DeclarationInstantiation.Valid.applyParameters
+          catalog contextValid valid)
+  | builtinFunction function =>
+      cases function <;> simp [applyReferenceResolution,
+        BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes,
+        BuiltinFunctionId.returnType] <;> exact .builtinFunction _
+  | builtinBoolean value =>
+      simpa [applyReferenceResolution] using
+        (ReferenceHasRawType.builtinBoolean
+          (context := applyContext substitution context) value)
+
+theorem ReferenceRequirementsValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {resolution : ReferenceResolution} {requirements : List RequirementId}
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : ReferenceRequirementsValid context resolution requirements) :
+    ReferenceRequirementsValid (applyContext substitution context)
+      (applyReferenceResolution substitution resolution) requirements := by
+  cases valid with
+  | «local» binder => exact .local binder
+  | declaration proves =>
+      exact .declaration
+        (StructuralSubstitution.RequirementSequenceProves.applyParameters
+          contextValid proves)
+  | builtinFunction function => exact .builtinFunction function
+  | builtinBoolean value => exact .builtinBoolean value
+
+theorem CoercionProfileInstantiates.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {source target : Ty} {primary : ProgramPredicate}
+    {methodPredicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (profile : CoercionProfileInstantiates context source target primary
+      methodPredicates) :
+    CoercionProfileInstantiates (applyContext substitution context)
+      (substitution.apply source) (substitution.apply target)
+      (ProgramPredicate.applyParameters substitution primary)
+      (methodPredicates.map
+        (ProgramPredicate.applyParameters substitution)) := by
+  cases profile with
+  | @intro signature method fromParameter toParameter signatureMem nameEq
+      parametersEq methodUnique parameterTypesEq returnTypesEq =>
+      have signatureWellFormed := catalog.traits_semantic signature signatureMem
+      have methodFiltered : method ∈
+          signature.methods.filter (fun candidate => candidate.name == "coerce") := by
+        rw [methodUnique]
+        simp
+      have methodMem : method ∈ signature.methods :=
+        (List.mem_filter.mp methodFiltered).1
+      have methodWellFormed := signatureWellFormed.methods method methodMem
+      have innerExact : SourceSemantics.ParameterSubstitution.Exact
+          [(fromParameter, source), (toParameter, target)]
+          signature.parameters := by
+        constructor
+        · exact signatureWellFormed.parameters_nodup
+        · rw [parametersEq]
+          simp [SourceSemantics.ParameterSubstitution.domain]
+      have parameterCompose :=
+        StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution [(fromParameter, source), (toParameter, target)]
+          innerExact methodWellFormed.parameter_types
+      have returnCompose :=
+        StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution [(fromParameter, source), (toParameter, target)]
+          innerExact methodWellFormed.return_types
+      have predicateCompose :=
+        StructuralSubstitution.PredicatesWellFormed.applyParameters_compose
+          substitution [(fromParameter, source), (toParameter, target)]
+          innerExact methodWellFormed.predicates
+      rw [predicateCompose]
+      exact .intro
+        (by simpa [applyContext] using signatureMem) nameEq parametersEq
+        methodUnique (by
+          change method.parameterTypes.map
+            (ParameterSubstitution.mapRange substitution
+              [(fromParameter, source), (toParameter, target)]).apply =
+          [substitution.apply source]
+          rw [← parameterCompose, parameterTypesEq]
+          rfl)
+        (by
+          change method.returnTypes.map
+            (ParameterSubstitution.mapRange substitution
+              [(fromParameter, source), (toParameter, target)]).apply =
+          [substitution.apply target]
+          rw [← returnCompose, returnTypesEq]
+          rfl)
+
+theorem CoercionStepValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {step : CoercionStep}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : CoercionStepValid context step) :
+    CoercionStepValid (applyContext substitution context)
+      (applyCoercionStep substitution step) := by
+  cases valid with
+  | intro profile requirements =>
+      exact .intro
+        (StructuralSubstitution.CoercionProfileInstantiates.applyParameters
+          catalog profile)
+        (by simpa [applyCoercionStep] using
+          (StructuralSubstitution.RequirementSequenceProves.applyParameters
+            contextValid requirements))
+
+theorem CoercionPathValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {source target : Ty} {steps : List CoercionStep}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : CoercionPathValid context source target steps) :
+    CoercionPathValid (applyContext substitution context)
+      (substitution.apply source) (substitution.apply target)
+      (steps.map (applyCoercionStep substitution)) := by
+  induction valid with
+  | nil type => exact .nil _
+  | cons head tail induction =>
+      exact .cons
+        (StructuralSubstitution.CoercionStepValid.applyParameters
+          catalog contextValid head)
+        induction
+
+theorem OperatorProfileInstantiates.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {traitName methodName : String} {operand : Ty}
+    {parameterTypes returnTypes : List Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (profile : OperatorProfileInstantiates context traitName methodName operand
+      parameterTypes returnTypes predicates) :
+    OperatorProfileInstantiates (applyContext substitution context)
+      traitName methodName (substitution.apply operand)
+      (parameterTypes.map substitution.apply)
+      (returnTypes.map substitution.apply)
+      (predicates.map (ProgramPredicate.applyParameters substitution)) := by
+  cases profile with
+  | @intro signature method parameter signatureMem traitNameEq parametersEq
+      methodUnique parameterTypesEq returnTypesEq =>
+      have signatureWellFormed := catalog.traits_semantic signature signatureMem
+      have methodFiltered : method ∈
+          signature.methods.filter
+            (fun candidate => candidate.name == methodName) := by
+        rw [methodUnique]
+        simp
+      have methodMem : method ∈ signature.methods :=
+        (List.mem_filter.mp methodFiltered).1
+      have methodWellFormed := signatureWellFormed.methods method methodMem
+      have innerExact : SourceSemantics.ParameterSubstitution.Exact
+          [(parameter, operand)] signature.parameters := by
+        constructor
+        · exact signatureWellFormed.parameters_nodup
+        · rw [parametersEq]
+          simp [SourceSemantics.ParameterSubstitution.domain]
+      have parameterCompose :=
+        StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution [(parameter, operand)] innerExact
+          methodWellFormed.parameter_types
+      have returnCompose :=
+        StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution [(parameter, operand)] innerExact
+          methodWellFormed.return_types
+      have predicateCompose :=
+        StructuralSubstitution.PredicatesWellFormed.applyParameters_compose
+          substitution [(parameter, operand)] innerExact
+          methodWellFormed.predicates
+      change OperatorProfileInstantiates (applyContext substitution context)
+        traitName methodName (substitution.apply operand)
+        (parameterTypes.map substitution.apply)
+        (returnTypes.map substitution.apply)
+        ({ trait := .declaration signature.id
+           subject := substitution.apply operand
+           arguments := [] } ::
+          (method.wherePredicates.map
+            (ProgramPredicate.applyParameters [(parameter, operand)])).map
+              (ProgramPredicate.applyParameters substitution))
+      rw [predicateCompose]
+      exact .intro (by simpa [applyContext] using signatureMem) traitNameEq
+        parametersEq methodUnique
+        (by
+          change method.parameterTypes.map
+              (ParameterSubstitution.mapRange substitution
+                [(parameter, operand)]).apply =
+            parameterTypes.map substitution.apply
+          rw [← parameterCompose, parameterTypesEq])
+        (by
+          change method.returnTypes.map
+              (ParameterSubstitution.mapRange substitution
+                [(parameter, operand)]).apply =
+            returnTypes.map substitution.apply
+          rw [← returnCompose, returnTypesEq])
+
+theorem UnaryOperatorHasType.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {operator : Syntax.UnaryOp} {operand result : Ty}
+    {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : UnaryOperatorHasType context operator operand result requirements) :
+    UnaryOperatorHasType (applyContext substitution context) operator
+      (substitution.apply operand) (substitution.apply result) requirements := by
+  cases typing with
+  | logicalNot => exact .logicalNot
+  | wordBitNot => exact .wordBitNot
+  | integerBitNot => exact .integerBitNot
+  | trait dispatch profile evidence =>
+      exact .trait dispatch
+        (StructuralSubstitution.OperatorProfileInstantiates.applyParameters
+          catalog profile)
+        (StructuralSubstitution.RequirementSequenceProves.applyParameters
+          contextValid evidence)
+
+theorem BinaryOperatorHasType.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {operator : Syntax.BinaryOp} {left right result : Ty}
+    {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : BinaryOperatorHasType context operator left right result
+      requirements) :
+    BinaryOperatorHasType (applyContext substitution context) operator
+      (substitution.apply left) (substitution.apply right)
+      (substitution.apply result) requirements := by
+  cases typing with
+  | wordArithmetic kind => exact .wordArithmetic kind
+  | integerArithmetic kind => exact .integerArithmetic kind
+  | wordComparison kind => exact .wordComparison kind
+  | integerComparison kind => exact .integerComparison kind
+  | booleanAnd => exact .booleanAnd
+  | booleanOr => exact .booleanOr
+  | trait dispatch profile evidence =>
+      exact .trait dispatch
+        (StructuralSubstitution.OperatorProfileInstantiates.applyParameters
+          catalog profile)
+        (StructuralSubstitution.RequirementSequenceProves.applyParameters
+          contextValid evidence)
+
+theorem DeclarationApplicationValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {instantiation : DeclarationInstantiation}
+    {parameterTypes : List Ty} {resultType : Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : DeclarationApplicationValid context instantiation parameterTypes
+      resultType predicates) :
+    DeclarationApplicationValid (applyContext substitution context)
+      (applyDeclarationInstantiation substitution instantiation)
+      (parameterTypes.map substitution.apply) (substitution.apply resultType)
+      (predicates.map (ProgramPredicate.applyParameters substitution)) := by
+  cases valid with
+  | intro signatureMem instantiationValid declarationEq
+      parameterTypesEq resultTypeEq functionTypeEq predicatesEq =>
+      rename_i signature
+      cases instantiationValid with
+      | intro selectedSignature selectedMem selectedDeclarationEq innerExact
+          innerRange instantiationTypeEq instantiationPredicatesEq
+          parameterComptimeEq returnComptimeEq =>
+      have selectedEq : selectedSignature = signature :=
+        eq_of_mem_of_mapped_nodup catalog.function_ids selectedMem signatureMem
+          (by rw [← selectedDeclarationEq, declarationEq])
+      subst selectedSignature
+      have instantiationValid :
+          SourceSemantics.DeclarationInstantiation.Valid context
+            instantiation :=
+        .intro signature selectedMem selectedDeclarationEq innerExact innerRange
+          instantiationTypeEq instantiationPredicatesEq parameterComptimeEq
+          returnComptimeEq
+      have signatureWellFormed := catalog.functions_semantic signature signatureMem
+      have parameterCompose :=
+        StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution instantiation.parameterSubstitution
+          innerExact signatureWellFormed.parameter_types
+      have resultScoped :=
+        StructuralSubstitution.TypesWellScoped.productMany
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            signatureWellFormed.return_types)
+      have resultCompose :=
+        StructuralSubstitution.TypeWellScoped.applyParameters_compose
+          substitution instantiation.parameterSubstitution
+          innerExact resultScoped
+      exact .intro (by simpa [applyContext] using signatureMem)
+        (StructuralSubstitution.DeclarationInstantiation.Valid.applyParameters
+          catalog contextValid instantiationValid)
+        declarationEq
+        (by
+          change signature.parameterTypes.map
+              (ParameterSubstitution.mapRange substitution
+                instantiation.parameterSubstitution).apply =
+            parameterTypes.map substitution.apply
+          rw [← parameterCompose, parameterTypesEq])
+        (by
+          change (ParameterSubstitution.mapRange substitution
+              instantiation.parameterSubstitution).apply
+              (Ty.productMany signature.returnTypes) =
+            substitution.apply resultType
+          rw [← resultCompose, resultTypeEq])
+        (by
+          simp [applyDeclarationInstantiation, functionTypeEq,
+            StructuralSubstitution.apply_productMany])
+        (by simp [applyDeclarationInstantiation, predicatesEq])
+
+theorem DirectDeclarationCalleeValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {source : TypedSource} {callee : ExpressionId}
+    {instantiation : DeclarationInstantiation}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : DirectDeclarationCalleeValid context source callee instantiation) :
+    DirectDeclarationCalleeValid (applyContext substitution context)
+      (applyTypedSource substitution source) callee
+      (applyDeclarationInstantiation substitution instantiation) := by
+  cases valid with
+  | @intro node name _ hContains hForm hInstantiation hType hRequirements
+      hCoercions =>
+      exact .intro
+        (StructuralSubstitution.ContainsExpression.applyParameters substitution
+          hContains)
+        (by
+          change applyExpressionForm substitution node.form =
+            .reference name
+              (.declaration
+                (applyDeclarationInstantiation substitution instantiation))
+          rw [hForm]
+          rfl)
+        (StructuralSubstitution.DeclarationInstantiation.Valid.applyParameters
+          catalog contextValid hInstantiation)
+        (by simp [applyExpressionNode, applyDeclarationInstantiation, hType])
+        (by simp [applyExpressionNode, hRequirements])
+        (by simp [applyExpressionNode, hCoercions])
+
+theorem DirectBuiltinCalleeValid.applyParameters
+    {substitution : ParameterSubstitution} {source : TypedSource}
+    {callee : ExpressionId} {function : BuiltinFunctionId}
+    (valid : DirectBuiltinCalleeValid source callee function) :
+    DirectBuiltinCalleeValid (applyTypedSource substitution source) callee
+      function := by
+  cases valid with
+  | @intro node name _ hContains hForm hType hRequirements hCoercions =>
+      refine .intro
+        (StructuralSubstitution.ContainsExpression.applyParameters substitution
+          hContains)
+        (by
+          change applyExpressionForm substitution node.form =
+            .reference name (.builtinFunction function)
+          rw [hForm]
+          rfl) ?_
+        (by simp [applyExpressionNode, hRequirements])
+        (by simp [applyExpressionNode, hCoercions])
+      change substitution.apply node.type = function.type
+      rw [hType]
+      unfold BuiltinFunctionId.type
+      rw [StructuralSubstitution.apply_function,
+        StructuralSubstitution.apply_productMany]
+      cases function <;> rfl
+
+theorem DirectCallRequirementsValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {rawResult finalResult : Ty} {predicates : List ProgramPredicate}
+    {requirements : List RequirementId} {coercions : List CoercionStep}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : DirectCallRequirementsValid context rawResult finalResult
+      predicates requirements coercions) :
+    DirectCallRequirementsValid (applyContext substitution context)
+      (substitution.apply rawResult) (substitution.apply finalResult)
+      (predicates.map (ProgramPredicate.applyParameters substitution))
+      requirements (coercions.map (applyCoercionStep substitution)) := by
+  cases valid with
+  | @intro selectedResult contextual selectedPath contextualPath
+      signatureRequirements requirements coercions selectedValid contextualValid
+      signatureValid coercionsEq requirementsEq =>
+      exact .intro (contextual := substitution.apply contextual)
+        (StructuralSubstitution.CoercionPathValid.applyParameters catalog
+          contextValid selectedValid)
+        (StructuralSubstitution.CoercionPathValid.applyParameters catalog
+          contextValid contextualValid)
+        (StructuralSubstitution.RequirementSequenceProves.applyParameters
+          contextValid signatureValid)
+        (by simp [coercionsEq, List.map_append])
+        (by
+          simp [requirementsEq,
+            StructuralSubstitution.coercionRequirementIds_applyCoercionSteps])
+
+theorem IndirectApplicationValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {metadata : IndirectCallResolution} {argumentTypes : List Ty}
+    {parameterType : Ty}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : IndirectApplicationValid context metadata argumentTypes
+      parameterType) :
+    IndirectApplicationValid (applyContext substitution context)
+      (applyIndirectCallResolution substitution metadata)
+      (argumentTypes.map substitution.apply)
+      (substitution.apply parameterType) := by
+  cases valid with
+  | intro countEq beforeEq afterEq pathValid =>
+      exact .intro
+        (by simp [applyIndirectCallResolution, countEq])
+        (by simp [applyIndirectCallResolution, beforeEq,
+          StructuralSubstitution.apply_productMany])
+        (by simp [applyIndirectCallResolution, afterEq])
+        (by
+          change CoercionPathValid (applyContext substitution context)
+            (substitution.apply metadata.argumentTypeBeforeCoercion)
+            (substitution.apply parameterType)
+            (metadata.argumentCoercions.map
+              (applyCoercionStep substitution))
+          exact StructuralSubstitution.CoercionPathValid.applyParameters catalog
+            contextValid pathValid)
+
+theorem TypeWellScoped.applyParameters_eq_of_orderedArguments_eq
+    {context : Context} {flexibleVariables : List TypeVarId} {type : Ty}
+    (left right : ParameterSubstitution)
+    (leftExact : SourceSemantics.ParameterSubstitution.Exact left
+      context.typeParameters)
+    (rightExact : SourceSemantics.ParameterSubstitution.Exact right
+      context.typeParameters)
+    (argumentsEq : SourceSemantics.ParameterSubstitution.orderedArguments left
+        context.typeParameters =
+      SourceSemantics.ParameterSubstitution.orderedArguments right
+        context.typeParameters)
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    left.apply type = right.apply type := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ => left.apply type = right.apply type)
+    (motive_2 := fun types _ =>
+      types.map left.apply = types.map right.apply)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    rfl
+  · intro parameter bound owned
+    have pointwise := List.map_inj_left.mp argumentsEq parameter bound
+    obtain ⟨leftReplacement, leftMember, leftLookup⟩ :=
+      ParameterSubstitution.exists_lookup?_eq_some leftExact bound
+    obtain ⟨rightReplacement, rightMember, rightLookup⟩ :=
+      ParameterSubstitution.exists_lookup?_eq_some rightExact bound
+    simpa [SourceSemantics.ParameterSubstitution.orderedArguments,
+      leftLookup, rightLookup, TypeSystem.ParameterSubstitution.apply] using
+      pointwise
+  · intro builtin
+    rfl
+  · intro dataType arguments cataloged arity argumentsWellScoped induction
+    rw [StructuralSubstitution.apply_nominal,
+      StructuralSubstitution.apply_nominal, induction]
+  · intro parameter result parameterWellScoped resultWellScoped
+      parameterInduction resultInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [parameterInduction, resultInduction]
+  · intro leftType rightType leftWellScoped rightWellScoped leftInduction
+      rightInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [leftInduction, rightInduction]
+  · intro key value keyWellScoped valueWellScoped keyInduction valueInduction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [keyInduction, valueInduction]
+  · intro inner wellScoped induction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [induction]
+  · intro inner wellScoped induction
+    simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [induction]
+  · rfl
+  · intro head tail headWellScoped tailWellScoped headInduction tailInduction
+    simp only [List.map_cons]
+    rw [headInduction, tailInduction]
+
+private def substitutionApplicationHead : Ty → Ty
+  | .application function _ => substitutionApplicationHead function
+  | type => type
+
+private def substitutionApplicationArguments : Ty → List Ty
+  | .application function argument =>
+      substitutionApplicationArguments function ++ [argument]
+  | _ => []
+
+private theorem substitutionApplicationHead_applyMany
+    (head : Ty) (arguments : List Ty) :
+    substitutionApplicationHead (Ty.applyMany head arguments) =
+      substitutionApplicationHead head := by
+  unfold Ty.applyMany
+  induction arguments generalizing head with
+  | nil => rfl
+  | cons argument arguments induction =>
+      simp only [List.foldl_cons]
+      rw [induction]
+      rfl
+
+private theorem substitutionApplicationArguments_applyMany
+    (head : Ty) (arguments : List Ty) :
+    substitutionApplicationArguments (Ty.applyMany head arguments) =
+      substitutionApplicationArguments head ++ arguments := by
+  unfold Ty.applyMany
+  induction arguments generalizing head with
+  | nil => simp
+  | cons argument arguments induction =>
+      simp only [List.foldl_cons]
+      rw [induction]
+      simp [substitutionApplicationArguments, List.append_assoc]
+
+private theorem nominal_injective
+    {leftDeclaration rightDeclaration : Resolved.DeclarationId}
+    {leftArguments rightArguments : List Ty}
+    (equal : Ty.nominal leftDeclaration leftArguments =
+      Ty.nominal rightDeclaration rightArguments) :
+    leftDeclaration = rightDeclaration ∧ leftArguments = rightArguments := by
+  constructor
+  · have heads := congrArg substitutionApplicationHead equal
+    simpa [Ty.nominal,
+      substitutionApplicationHead_applyMany,
+      substitutionApplicationHead] using heads
+  · have arguments := congrArg substitutionApplicationArguments equal
+    simpa [Ty.nominal,
+      substitutionApplicationArguments_applyMany,
+      substitutionApplicationArguments] using arguments
+
+theorem WritableLocal.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {id : Resolved.LocalId} {type : Ty}
+    (contextValid : ContextSubstitutionValid substitution context)
+    (writable : WritableLocal context id type) :
+    WritableLocal (applyContext substitution context) id
+      (substitution.apply type) := by
+  cases writable with
+  | intro lookup schemeWellFormed quantifiedEq bodyEq =>
+      exact .intro
+        (StructuralSubstitution.LocalLookup.applyParameters substitution lookup)
+        (StructuralSubstitution.SchemeWellFormed.applyParameters substitution
+          contextValid.exact contextValid.range schemeWellFormed)
+        (by simp [applyScheme, quantifiedEq])
+        (by simp [applyScheme, bodyEq])
+
+theorem UniformMemberProjection.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {base member : Ty} {index : Nat}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (projection : UniformMemberProjection context base index member) :
+    UniformMemberProjection (applyContext substitution context)
+      (substitution.apply base) index (substitution.apply member) := by
+  cases projection with
+  | intro dataTypeMem innerExact baseEq baseWellFormed memberWellFormed
+      constructorsNonempty memberUniform validInstantiations =>
+      rename_i dataType inner
+      have dataWellFormed := catalog.data_semantic dataType dataTypeMem
+      have mappedExact :=
+        StructuralSubstitution.ParameterSubstitution.Exact.mapRange
+          substitution innerExact
+      have mappedUniform : ∀ constructor,
+          constructor ∈ dataType.constructors →
+          (constructor.payloadTypes.map
+            (ParameterSubstitution.mapRange substitution inner).apply)[index]? =
+              some (substitution.apply member) := by
+        intro constructor constructorMem
+        have payloadWellFormed :=
+          dataWellFormed.constructor_payloads constructor constructorMem
+        have compose :=
+          StructuralSubstitution.TypesWellFormed.applyParameters_compose
+            substitution inner innerExact payloadWellFormed
+        rw [← compose, List.getElem?_map, memberUniform constructor constructorMem]
+        rfl
+      exact .intro (by simpa [applyContext] using dataTypeMem) mappedExact
+        (by
+          rw [baseEq, StructuralSubstitution.apply_nominal,
+            StructuralSubstitution.ParameterSubstitution.orderedArguments_mapRange
+              innerExact])
+        (StructuralSubstitution.TypeWellFormed.applyParameters substitution
+          contextValid.exact contextValid.range baseWellFormed)
+        (StructuralSubstitution.TypeWellFormed.applyParameters substitution
+          contextValid.exact contextValid.range memberWellFormed)
+        constructorsNonempty mappedUniform
+        (by
+          intro instantiation instantiationValid resultEq
+          cases instantiationValid with
+          | intro instantiatedData constructor instantiatedDataMem constructorMem
+              constructorOwner constructorEq instantiatedExact instantiatedRange
+              payloadTypesEq resultTypeEq =>
+              have nominalEq :
+                  Ty.nominal instantiatedData.id
+                      (SourceSemantics.ParameterSubstitution.orderedArguments
+                        instantiation.parameterSubstitution
+                        instantiatedData.parameters) =
+                    Ty.nominal dataType.id
+                      (SourceSemantics.ParameterSubstitution.orderedArguments
+                        (ParameterSubstitution.mapRange substitution inner)
+                        dataType.parameters) := by
+                rw [← resultTypeEq, resultEq, baseEq,
+                  StructuralSubstitution.apply_nominal,
+                  StructuralSubstitution.ParameterSubstitution.orderedArguments_mapRange
+                    innerExact]
+              have nominalParts := nominal_injective nominalEq
+              have dataEq : instantiatedData = dataType :=
+                eq_of_mem_of_mapped_nodup catalog.data_ids instantiatedDataMem
+                  dataTypeMem nominalParts.1
+              subst instantiatedData
+              have payloadWellFormed :=
+                dataWellFormed.constructor_payloads constructor constructorMem
+              have payloadMapsEq :
+                  constructor.payloadTypes.map
+                      instantiation.parameterSubstitution.apply =
+                    constructor.payloadTypes.map
+                      (ParameterSubstitution.mapRange substitution inner).apply := by
+                apply List.map_congr_left
+                intro payload payloadMem
+                exact StructuralSubstitution.TypeWellScoped.applyParameters_eq_of_orderedArguments_eq
+                    instantiation.parameterSubstitution
+                    (ParameterSubstitution.mapRange substitution inner)
+                    instantiatedExact mappedExact nominalParts.2
+                    (payloadWellFormed payload payloadMem).typeWellScoped
+              rw [payloadTypesEq, payloadMapsEq]
+              exact mappedUniform constructor constructorMem)
+
+theorem PatternBinderValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {type : Ty} {binder : TypedBinder}
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : PatternBinderValid context type binder) :
+    PatternBinderValid (applyContext substitution context)
+      (substitution.apply type) (applyBinder substitution binder) := by
+  refine ⟨?_, valid.runtime, ?_⟩
+  · simp [applyBinder, applyScheme, valid.scheme_eq, Scheme.mono]
+  · intro declaration declarationEq
+    have original := valid.wellFormed declaration
+      (by simpa [applyContext] using declarationEq)
+    exact {
+      owned := original.owned
+      scheme := StructuralSubstitution.SchemeWellFormed.applyParameters
+        substitution contextValid.exact contextValid.range original.scheme
+    }
+
+theorem PatternBindersDistinct.applyParameters
+    {substitution : ParameterSubstitution} {binders : List TypedBinder}
+    (distinct : PatternBindersDistinct binders) :
+    PatternBindersDistinct (binders.map (applyBinder substitution)) := by
+  constructor
+  · simpa [List.map_map, Function.comp_def, applyBinder] using distinct.ids
+  · simpa [List.map_map, Function.comp_def, applyBinder] using distinct.names
+
+theorem PatternInstructionHasType.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {instructions rest : List MatchPatternInstruction} {type : Ty}
+    {requirements : List RequirementId} {binders : List TypedBinder}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : PatternInstructionHasType context instructions type requirements
+      binders rest) :
+    PatternInstructionHasType (applyContext substitution context)
+      (instructions.map (applyMatchPatternInstruction substitution))
+      (substitution.apply type) requirements
+      (binders.map (applyBinder substitution))
+      (rest.map (applyMatchPatternInstruction substitution)) := by
+  refine PatternInstructionHasType.rec
+    (motive_1 := fun instructions type requirements binders rest _ =>
+      PatternInstructionHasType (applyContext substitution context)
+        (instructions.map (applyMatchPatternInstruction substitution))
+        (substitution.apply type) requirements
+        (binders.map (applyBinder substitution))
+        (rest.map (applyMatchPatternInstruction substitution)))
+    (motive_2 := fun instructions types requirements binders rest _ =>
+      PatternInstructionsHaveTypes (applyContext substitution context)
+        (instructions.map (applyMatchPatternInstruction substitution))
+        (types.map substitution.apply) requirements
+        (binders.map (applyBinder substitution))
+        (rest.map (applyMatchPatternInstruction substitution)))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+  · intro rest type
+    exact .wildcard
+  · intro rest source resolution valid
+    exact .integerLiteral
+      (StructuralSubstitution.IntegerLiteralValid.applyParameters
+        contextValid valid)
+  · intro rest binder type valid
+    exact .binder
+      (StructuralSubstitution.PatternBinderValid.applyParameters
+        contextValid valid)
+  · intro instructions rest instantiation argumentCount requirements binders
+      valid arity arguments argumentsInduction
+    exact .constructor
+      (StructuralSubstitution.DataConstructorInstantiation.Valid.applyParameters
+        catalog contextValid valid)
+      (by simp [applyDataConstructorInstantiation, arity])
+      argumentsInduction
+  · intro instructions rest elementCount elementTypes requirements binders
+      arity elements elementsInduction
+    simpa [StructuralSubstitution.apply_productMany,
+      applyMatchPatternInstruction] using
+      (PatternInstructionHasType.tuple
+        (context := applyContext substitution context)
+        (by simp [arity]) elementsInduction)
+  · intro instructions
+    exact .nil
+  · intro instructions afterHead rest type types headRequirements
+      tailRequirements headBinders tailBinders head tail headInduction
+      tailInduction
+    simpa [List.map_append] using
+      (PatternInstructionsHaveTypes.cons headInduction tailInduction)
+
+theorem PatternInstructionsHaveTypes.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {instructions rest : List MatchPatternInstruction} {types : List Ty}
+    {requirements : List RequirementId} {binders : List TypedBinder}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : PatternInstructionsHaveTypes context instructions types
+      requirements binders rest) :
+    PatternInstructionsHaveTypes (applyContext substitution context)
+      (instructions.map (applyMatchPatternInstruction substitution))
+      (types.map substitution.apply) requirements
+      (binders.map (applyBinder substitution))
+      (rest.map (applyMatchPatternInstruction substitution)) := by
+  refine PatternInstructionsHaveTypes.rec
+    (motive_1 := fun instructions type requirements binders rest _ =>
+      PatternInstructionHasType (applyContext substitution context)
+        (instructions.map (applyMatchPatternInstruction substitution))
+        (substitution.apply type) requirements
+        (binders.map (applyBinder substitution))
+        (rest.map (applyMatchPatternInstruction substitution)))
+    (motive_2 := fun instructions types requirements binders rest _ =>
+      PatternInstructionsHaveTypes (applyContext substitution context)
+        (instructions.map (applyMatchPatternInstruction substitution))
+        (types.map substitution.apply) requirements
+        (binders.map (applyBinder substitution))
+        (rest.map (applyMatchPatternInstruction substitution)))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+  · intro rest type
+    exact .wildcard
+  · intro rest source resolution valid
+    exact .integerLiteral
+      (StructuralSubstitution.IntegerLiteralValid.applyParameters
+        contextValid valid)
+  · intro rest binder type valid
+    exact .binder
+      (StructuralSubstitution.PatternBinderValid.applyParameters
+        contextValid valid)
+  · intro instructions rest instantiation argumentCount requirements binders
+      valid arity arguments argumentsInduction
+    exact .constructor
+      (StructuralSubstitution.DataConstructorInstantiation.Valid.applyParameters
+        catalog contextValid valid)
+      (by simp [applyDataConstructorInstantiation, arity])
+      argumentsInduction
+  · intro instructions rest elementCount elementTypes requirements binders
+      arity elements elementsInduction
+    simpa [StructuralSubstitution.apply_productMany,
+      applyMatchPatternInstruction] using
+      (PatternInstructionHasType.tuple
+        (context := applyContext substitution context)
+        (by simp [arity]) elementsInduction)
+  · intro instructions
+    exact .nil
+  · intro instructions afterHead rest type types headRequirements
+      tailRequirements headBinders tailBinders head tail headInduction
+      tailInduction
+    simpa [List.map_append] using
+      (PatternInstructionsHaveTypes.cons headInduction tailInduction)
+
+@[simp] theorem matchPatternResolutionInstructions_applyParameters
+    (substitution : ParameterSubstitution)
+    (resolution : MatchPatternResolution) (rootArity : Nat) :
+    matchPatternResolutionInstructions
+        (applyMatchPatternResolution substitution resolution) rootArity =
+      (matchPatternResolutionInstructions resolution rootArity).map
+        (applyMatchPatternInstruction substitution) := by
+  cases resolution <;> simp [applyMatchPatternResolution,
+    matchPatternResolutionInstructions, applyMatchPatternInstruction]
+
+theorem ConstructorPatternSpellingValid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context} {name : String}
+    {instantiation : DataConstructorInstantiation}
+    (valid : ConstructorPatternSpellingValid context name instantiation) :
+    ConstructorPatternSpellingValid (applyContext substitution context) name
+      (applyDataConstructorInstantiation substitution instantiation) := by
+  rcases valid with ⟨signature, signatureMem, constructor, constructorMem,
+    constructorEq, nameEq⟩
+  exact ⟨signature, by simpa [applyContext] using signatureMem,
+    constructor, constructorMem, by simpa [applyDataConstructorInstantiation]
+      using constructorEq, nameEq⟩
+
+theorem MatchPatternSourceRepresents.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {source : MatchPatternSource} {resolution : MatchPatternResolution}
+    {rootArity : Nat}
+    (represents : MatchPatternSourceRepresents context source resolution
+      rootArity) :
+    MatchPatternSourceRepresents (applyContext substitution context) source
+      (applyMatchPatternResolution substitution resolution) rootArity := by
+  induction represents with
+  | wildcard => exact .wildcard
+  | integerLiteral sourceEq => exact .integerLiteral sourceEq
+  | binder nameEq => exact .binder nameEq
+  | constructor spelling =>
+      exact .constructor
+        (StructuralSubstitution.ConstructorPatternSpellingValid.applyParameters
+          spelling)
+  | tuple => exact .tuple
+  | group inner induction => exact .group induction
+
+theorem PatternInstructionIrrefutable.applyParameters
+    {substitution : ParameterSubstitution}
+    {instructions rest : List MatchPatternInstruction}
+    (irrefutable : PatternInstructionIrrefutable instructions rest) :
+    PatternInstructionIrrefutable
+      (instructions.map (applyMatchPatternInstruction substitution))
+      (rest.map (applyMatchPatternInstruction substitution)) := by
+  refine PatternInstructionIrrefutable.rec
+    (motive_1 := fun instructions rest _ =>
+      PatternInstructionIrrefutable
+        (instructions.map (applyMatchPatternInstruction substitution))
+        (rest.map (applyMatchPatternInstruction substitution)))
+    (motive_2 := fun instructions count rest _ =>
+      PatternInstructionsIrrefutable
+        (instructions.map (applyMatchPatternInstruction substitution)) count
+        (rest.map (applyMatchPatternInstruction substitution)))
+    ?_ ?_ ?_ ?_ ?_ irrefutable
+  · intro rest
+    exact .wildcard
+  · intro rest binder
+    exact .binder
+  · intro instructions rest elementCount elements elementsInduction
+    exact .tuple elementsInduction
+  · intro instructions
+    exact .zero
+  · intro instructions afterHead rest count head tail headInduction
+      tailInduction
+    exact .succ headInduction tailInduction
+
+theorem PatternInstructionsIrrefutable.applyParameters
+    {substitution : ParameterSubstitution}
+    {instructions rest : List MatchPatternInstruction} {count : Nat}
+    (irrefutable : PatternInstructionsIrrefutable instructions count rest) :
+    PatternInstructionsIrrefutable
+      (instructions.map (applyMatchPatternInstruction substitution)) count
+      (rest.map (applyMatchPatternInstruction substitution)) := by
+  refine PatternInstructionsIrrefutable.rec
+    (motive_1 := fun instructions rest _ =>
+      PatternInstructionIrrefutable
+        (instructions.map (applyMatchPatternInstruction substitution))
+        (rest.map (applyMatchPatternInstruction substitution)))
+    (motive_2 := fun instructions count rest _ =>
+      PatternInstructionsIrrefutable
+        (instructions.map (applyMatchPatternInstruction substitution)) count
+        (rest.map (applyMatchPatternInstruction substitution)))
+    ?_ ?_ ?_ ?_ ?_ irrefutable
+  · intro rest
+    exact .wildcard
+  · intro rest binder
+    exact .binder
+  · intro instructions rest elementCount elements elementsInduction
+    exact .tuple elementsInduction
+  · intro instructions
+    exact .zero
+  · intro instructions afterHead rest count head tail headInduction
+      tailInduction
+    exact .succ headInduction tailInduction
+
+theorem TypedMatchPatternIrrefutable.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {pattern : TypedMatchPattern}
+    (irrefutable : TypedMatchPatternIrrefutable context pattern) :
+    TypedMatchPatternIrrefutable (applyContext substitution context)
+      (applyTypedMatchPattern substitution pattern) := by
+  rcases irrefutable with ⟨rootArity, represents, resolution⟩
+  refine ⟨rootArity,
+    StructuralSubstitution.MatchPatternSourceRepresents.applyParameters
+      represents, ?_⟩
+  unfold MatchPatternResolutionIrrefutable at resolution ⊢
+  change PatternInstructionIrrefutable
+    (matchPatternResolutionInstructions
+      (applyMatchPatternResolution substitution pattern.resolution) rootArity) []
+  rw [StructuralSubstitution.matchPatternResolutionInstructions_applyParameters]
+  exact StructuralSubstitution.PatternInstructionIrrefutable.applyParameters
+    resolution
+
+theorem TypedMatchPatternHasType.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {pattern : TypedMatchPattern} {type : Ty}
+    {binders : List TypedBinder} {rootArity : Nat}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : TypedMatchPatternHasType context pattern type binders rootArity) :
+    TypedMatchPatternHasType (applyContext substitution context)
+      (applyTypedMatchPattern substitution pattern) (substitution.apply type)
+      (binders.map (applyBinder substitution)) rootArity := by
+  refine ⟨by simp [applyTypedMatchPattern, typing.type_eq],
+    StructuralSubstitution.MatchPatternSourceRepresents.applyParameters
+      typing.source_represents, ?_,
+    StructuralSubstitution.PatternBindersDistinct.applyParameters
+      typing.binders_distinct⟩
+  have resolutionTyping := typing.resolution_type
+  unfold MatchPatternResolutionHasType at resolutionTyping ⊢
+  change PatternInstructionHasType (applyContext substitution context)
+    (matchPatternResolutionInstructions
+      (applyMatchPatternResolution substitution pattern.resolution) rootArity)
+    (substitution.apply type) pattern.requirements
+    (binders.map (applyBinder substitution)) []
+  rw [StructuralSubstitution.matchPatternResolutionInstructions_applyParameters]
+  simpa [applyTypedMatchPattern] using
+    (StructuralSubstitution.PatternInstructionHasType.applyParameters catalog
+      contextValid resolutionTyping)
+
+theorem PatternCoversConstructor.applyParameters
+    {substitution : ParameterSubstitution} {pattern : TypedMatchPattern}
+    {constructor : ProgramDataConstructorId}
+    (covers : PatternCoversConstructor pattern constructor) :
+    PatternCoversConstructor (applyTypedMatchPattern substitution pattern)
+      constructor := by
+  rcases covers with ⟨instantiation, instructions, resolutionEq,
+    constructorEq, irrefutable⟩
+  refine ⟨applyDataConstructorInstantiation substitution instantiation,
+    instructions.map (applyMatchPatternInstruction substitution), ?_, ?_, ?_⟩
+  · change applyMatchPatternResolution substitution pattern.resolution =
+      .constructor (applyDataConstructorInstantiation substitution instantiation)
+        (instructions.map (applyMatchPatternInstruction substitution))
+    rw [resolutionEq]
+    rfl
+  · simpa [applyDataConstructorInstantiation] using constructorEq
+  · simpa [applyDataConstructorInstantiation] using
+      (StructuralSubstitution.PatternInstructionsIrrefutable.applyParameters
+        irrefutable)
+
+theorem MatchExhaustive.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {scrutineeType : Ty} {cases : List TypedMatchCase}
+    {defaultBody : Option (List StatementId)}
+    (exhaustive : MatchExhaustive context scrutineeType cases defaultBody) :
+    MatchExhaustive (applyContext substitution context)
+      (substitution.apply scrutineeType)
+      (cases.map (applyTypedMatchCase substitution)) defaultBody := by
+  cases exhaustive with
+  | default body => exact .default body
+  | catchall member irrefutable =>
+      exact .catchall (List.mem_map.mpr ⟨_, member, rfl⟩)
+        (StructuralSubstitution.TypedMatchPatternIrrefutable.applyParameters
+          irrefutable)
+  | constructors dataTypeMem exactInner scrutineeEq covered =>
+      rename_i dataType substitutionInner
+      refine .constructors
+        (by simpa [applyContext] using dataTypeMem)
+        (StructuralSubstitution.ParameterSubstitution.Exact.mapRange
+          substitution exactInner) ?_ ?_
+      · rw [scrutineeEq, StructuralSubstitution.apply_nominal,
+          StructuralSubstitution.ParameterSubstitution.orderedArguments_mapRange
+            exactInner]
+      · intro constructor constructorMem
+        rcases covered constructor constructorMem with
+          ⟨matchCase, matchCaseMem, covers⟩
+        exact ⟨applyTypedMatchCase substitution matchCase,
+          List.mem_map.mpr ⟨matchCase, matchCaseMem, rfl⟩,
+          StructuralSubstitution.PatternCoversConstructor.applyParameters
+            covers⟩
+
+theorem BinderWellFormed.applyParameters
+    {context : Context} {owner : Resolved.DeclarationId}
+    {binder : TypedBinder}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellFormed : BinderWellFormed context owner binder) :
+    BinderWellFormed (applyContext substitution context) owner
+      (applyBinder substitution binder) := {
+  owned := wellFormed.owned
+  scheme := StructuralSubstitution.SchemeWellFormed.applyParameters substitution
+    exact range wellFormed.scheme
+}
+
+theorem BinderExtends.applyParameters
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binder : TypedBinder}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (extension : BinderExtends owner context binder final) :
+    BinderExtends owner (applyContext substitution context)
+      (applyBinder substitution binder) (applyContext substitution final) := by
+  cases extension with
+  | intro wellFormed fresh =>
+      exact .intro
+        (StructuralSubstitution.BinderWellFormed.applyParameters substitution
+          exact range wellFormed)
+        (StructuralSubstitution.LocalFresh.applyParameters substitution fresh)
+
+theorem BindersExtend.applyParameters
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (extension : BindersExtend owner context binders final) :
+    BindersExtend owner (applyContext substitution context)
+      (binders.map (applyBinder substitution))
+      (applyContext substitution final) := by
+  induction extension with
+  | nil => exact .nil _
+  | @cons context middle final binder binders head tail induction =>
+      have fields := head.context_fields
+      have exactMiddle :
+          SourceSemantics.ParameterSubstitution.Exact substitution
+            middle.typeParameters := by
+        simpa [fields.2.2.1] using exact
+      have rangeMiddle :
+          SourceSemantics.ParameterSubstitution.RangeWellFormed
+            (applyContext substitution middle) substitution := by
+        intro parameter replacement member
+        exact StructuralSubstitution.TypeWellFormed.transportContext
+          (source := applyContext substitution context)
+          (target := applyContext substitution middle)
+          fields.1 rfl fields.2.1
+          (range parameter replacement member)
+      exact .cons
+        (StructuralSubstitution.BinderExtends.applyParameters substitution exact
+          range head)
+        (induction exactMiddle rangeMiddle)
+
+theorem MonoBindersExtend.applyParameters
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder} {types : List Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (extension : MonoBindersExtend owner context binders types final) :
+    MonoBindersExtend owner (applyContext substitution context)
+      (binders.map (applyBinder substitution))
+      (types.map substitution.apply) (applyContext substitution final) := by
+  induction extension with
+  | nil => exact .nil _
+  | @cons context middle final binder binders type types schemeEq head tail
+      induction =>
+      have fields := head.context_fields
+      have exactMiddle :
+          SourceSemantics.ParameterSubstitution.Exact substitution
+            middle.typeParameters := by
+        simpa [fields.2.2.1] using exact
+      have rangeMiddle :
+          SourceSemantics.ParameterSubstitution.RangeWellFormed
+            (applyContext substitution middle) substitution := by
+        intro parameter replacement member
+        exact StructuralSubstitution.TypeWellFormed.transportContext
+          (source := applyContext substitution context)
+          (target := applyContext substitution middle)
+          fields.1 rfl fields.2.1
+          (range parameter replacement member)
+      refine .cons ?_ ?_ (induction exactMiddle rangeMiddle)
+      · simp [applyBinder, applyScheme, schemeEq, TypeSystem.Scheme.mono]
+      · exact StructuralSubstitution.BinderExtends.applyParameters substitution
+          exact range head
+
+theorem ContextSubstitutionValid.afterBinder
+    {substitution : ParameterSubstitution} {owner : Resolved.DeclarationId}
+    {context final : Context} {binder : TypedBinder}
+    (valid : ContextSubstitutionValid substitution context)
+    (extension : BinderExtends owner context binder final) :
+    ContextSubstitutionValid substitution final := by
+  cases extension
+  exact valid.underLocal
+
+theorem ContextSubstitutionValid.afterBinders
+    {substitution : ParameterSubstitution} {owner : Resolved.DeclarationId}
+    {context final : Context} {binders : List TypedBinder}
+    (valid : ContextSubstitutionValid substitution context)
+    (extension : BindersExtend owner context binders final) :
+    ContextSubstitutionValid substitution final := by
+  induction extension with
+  | nil => exact valid
+  | cons head tail induction =>
+      exact induction (valid.afterBinder head)
+
+theorem ContextSubstitutionValid.afterMonoBinders
+    {substitution : ParameterSubstitution} {owner : Resolved.DeclarationId}
+    {context final : Context} {binders : List TypedBinder} {types : List Ty}
+    (valid : ContextSubstitutionValid substitution context)
+    (extension : MonoBindersExtend owner context binders types final) :
+    ContextSubstitutionValid substitution final := by
+  induction extension with
+  | nil => exact valid
+  | cons _ head tail induction =>
+      exact induction (valid.afterBinder head)
+
+theorem BindersExtend.signatures_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder}
+    (extension : BindersExtend owner context binders final) :
+    final.signatures = context.signatures := by
+  induction extension with
+  | nil => rfl
+  | cons head tail induction =>
+      exact induction.trans head.context_fields.1
+
+theorem MonoBindersExtend.signatures_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder} {types : List Ty}
+    (extension : MonoBindersExtend owner context binders types final) :
+    final.signatures = context.signatures := by
+  induction extension with
+  | nil => rfl
+  | cons _ head tail induction =>
+      exact induction.trans head.context_fields.1
+
+theorem StatementHasType.signatures_eq
+    {source : TypedSource} {control : ControlContext}
+    {context final : Context} {id : StatementId} {facts : StatementFacts}
+    (typing : StatementHasType source control context id final facts) :
+    final.signatures = context.signatures := by
+  cases typing with
+  | letUninitialized _ _ _ extension _ => exact extension.context_fields.1
+  | letInitialized _ _ _ _ extension _ => exact extension.context_fields.1
+  | returnUnit | returnValue | expressionValue | expressionDiscard |
+      assignValue | assignBitNot | ifWithoutElse | ifWithElse | block |
+      matchWithoutDefault | matchWithDefault | forLoop | whileLoop |
+      breakStmt | continueStmt => rfl
+
+theorem StatementHasType.contextSubstitutionValid
+    {substitution : ParameterSubstitution} {source : TypedSource}
+    {control : ControlContext} {context final : Context}
+    {id : StatementId} {facts : StatementFacts}
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : StatementHasType source control context id final facts) :
+    ContextSubstitutionValid substitution final := by
+  cases typing with
+  | letUninitialized _ _ _ extension _ =>
+      exact contextValid.afterBinder extension
+  | letInitialized _ _ _ _ extension _ =>
+      exact contextValid.afterBinder extension
+  | returnUnit | returnValue | expressionValue | expressionDiscard |
+      assignValue | assignBitNot | ifWithoutElse | ifWithElse | block |
+      matchWithoutDefault | matchWithDefault | forLoop | whileLoop |
+      breakStmt | continueStmt => exact contextValid
+
+theorem ForItemHasType.signatures_eq
+    {source : TypedSource} {control : ControlContext}
+    {context final : Context} {item : ForItemForm}
+    (typing : ForItemHasType source control context item final) :
+    final.signatures = context.signatures := by
+  cases typing with
+  | letUninitialized _ extension => exact extension.context_fields.1
+  | letInitialized _ _ extension => exact extension.context_fields.1
+  | expression | assignValue | assignBitNot => rfl
+
+theorem ForItemHasType.contextSubstitutionValid
+    {substitution : ParameterSubstitution} {source : TypedSource}
+    {control : ControlContext} {context final : Context}
+    {item : ForItemForm}
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : ForItemHasType source control context item final) :
+    ContextSubstitutionValid substitution final := by
+  cases typing with
+  | letUninitialized _ extension => exact contextValid.afterBinder extension
+  | letInitialized _ _ extension => exact contextValid.afterBinder extension
+  | expression | assignValue | assignBitNot => exact contextValid
+
+theorem ForItemsHaveType.signatures_eq
+    {source : TypedSource} {control : ControlContext}
+    {context final : Context} {items : List ForItemForm}
+    (typing : ForItemsHaveType source control context items final) :
+    final.signatures = context.signatures := by
+  induction items generalizing context final with
+  | nil =>
+      cases typing
+      rfl
+  | cons item items induction =>
+      cases typing with
+      | cons head tail =>
+          exact (induction tail).trans
+            (StructuralSubstitution.ForItemHasType.signatures_eq head)
+
+theorem ForItemsHaveType.contextSubstitutionValid
+    {substitution : ParameterSubstitution} {source : TypedSource}
+    {control : ControlContext} {context final : Context}
+    {items : List ForItemForm}
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : ForItemsHaveType source control context items final) :
+    ContextSubstitutionValid substitution final := by
+  induction items generalizing context final with
+  | nil =>
+      cases typing
+      exact contextValid
+  | cons item items induction =>
+      cases typing with
+      | cons head tail =>
+          exact induction
+            (StructuralSubstitution.ForItemHasType.contextSubstitutionValid
+              contextValid head) tail
+
+theorem ExpressionRequirementPlan.Valid.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {rawType finalType : Ty} {plan : ExpressionRequirementPlan}
+    {requirements : List RequirementId} {coercions : List CoercionStep}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : ExpressionRequirementPlan.Valid context rawType finalType plan
+      requirements coercions) :
+    ExpressionRequirementPlan.Valid (applyContext substitution context)
+      (substitution.apply rawType) (substitution.apply finalType)
+      (applyExpressionRequirementPlan substitution plan) requirements
+      (coercions.map (applyCoercionStep substitution)) := by
+  cases valid with
+  | ordinary ownedValid pathValid requirementsEq =>
+      exact .ordinary
+        (StructuralSubstitution.RequirementIdsValid.applyParameters contextValid
+          ownedValid)
+        (StructuralSubstitution.CoercionPathValid.applyParameters catalog
+          contextValid pathValid)
+        (by simp [requirementsEq,
+          StructuralSubstitution.coercionRequirementIds_applyCoercionSteps])
+
+  | directCall valid =>
+      exact .directCall
+        (StructuralSubstitution.DirectCallRequirementsValid.applyParameters
+          catalog contextValid valid)
+  | indirectCall argumentsValid outputValid requirementsEq =>
+      exact .indirectCall
+        (by simpa [StructuralSubstitution.coercionRequirementIds_applyCoercionSteps] using
+            (StructuralSubstitution.RequirementIdsValid.applyParameters
+              contextValid argumentsValid))
+        (StructuralSubstitution.CoercionPathValid.applyParameters catalog
+          contextValid outputValid)
+        (by simp [requirementsEq,
+          StructuralSubstitution.coercionRequirementIds_applyCoercionSteps])
+
+@[simp] theorem flatMap_patternRequirements_applyTypedMatchCases
+    (substitution : ParameterSubstitution) (cases : List TypedMatchCase) :
+    (cases.map (applyTypedMatchCase substitution)).flatMap
+        (fun matchCase => matchCase.pattern.requirements) =
+      cases.flatMap (fun matchCase => matchCase.pattern.requirements) := by
+  induction cases with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [applyTypedMatchCase, applyTypedMatchPattern, induction]
+
+@[simp] theorem applyControlContext_enterLoop
+    (substitution : ParameterSubstitution) (control : ControlContext) :
+    applyControlContext substitution control.enterLoop =
+      (applyControlContext substitution control).enterLoop := by
+  cases control
+  rfl
+
+@[simp] theorem applyControlSummary_ordinary
+    (substitution : ParameterSubstitution) (type : Ty) :
+    applyControlSummary substitution (.ordinary type) =
+      .ordinary (substitution.apply type) := by
+  rfl
+
+@[simp] theorem applyControlSummary_returned
+    (substitution : ParameterSubstitution) :
+    applyControlSummary substitution .returned = .returned := by
+  rfl
+
+@[simp] theorem applyControlSummary_breaking
+    (substitution : ParameterSubstitution) :
+    applyControlSummary substitution .breaking = .breaking := by
+  rfl
+
+@[simp] theorem applyControlSummary_continuing
+    (substitution : ParameterSubstitution) :
+    applyControlSummary substitution .continuing = .continuing := by
+  rfl
+
+@[simp] theorem applyControlSummary_sequence
+    (substitution : ParameterSubstitution)
+    (head tail : ControlSummary) :
+    applyControlSummary substitution (head.sequence tail) =
+      (applyControlSummary substitution head).sequence
+        (applyControlSummary substitution tail) := by
+  cases head with
+  | mk fallthrough mayReturn mayBreak mayContinue =>
+      cases fallthrough <;>
+        simp [applyControlSummary, ControlSummary.sequence,
+          ControlSummary.canFallthrough]
+
+@[simp] theorem applyControlSummary_branches
+    (substitution : ParameterSubstitution)
+    (left right : ControlSummary) :
+    applyControlSummary substitution (left.branches right) =
+      (applyControlSummary substitution left).branches
+        (applyControlSummary substitution right) := by
+  cases left with
+  | mk leftFallthrough leftReturn leftBreak leftContinue =>
+      cases right with
+      | mk rightFallthrough rightReturn rightBreak rightContinue =>
+          cases leftFallthrough <;> cases rightFallthrough <;>
+            simp [applyControlSummary, ControlSummary.branches,
+              ControlSummary.canFallthrough]
+
+@[simp] theorem applyControlSummary_eraseValue
+    (substitution : ParameterSubstitution) (summary : ControlSummary) :
+    applyControlSummary substitution summary.eraseValue =
+      (applyControlSummary substitution summary).eraseValue := by
+  cases summary with
+  | mk fallthrough mayReturn mayBreak mayContinue =>
+      cases fallthrough <;>
+        simp [applyControlSummary, ControlSummary.eraseValue]
+
+@[simp] theorem applyControlSummary_loop
+    (substitution : ParameterSubstitution) (summary : ControlSummary) :
+    applyControlSummary substitution summary.loop =
+      (applyControlSummary substitution summary).loop := by
+  cases summary
+  rfl
+
+@[simp] theorem applyStatementFacts_singleton
+    (substitution : ParameterSubstitution) (facts : StatementFacts) :
+    applyBodyFacts substitution (.singleton facts) =
+      .singleton (applyStatementFacts substitution facts) := by
+  rcases facts with ⟨type, hasValue, sawReturn, control⟩
+  cases hasValue <;> cases sawReturn <;>
+    simp [applyBodyFacts, applyStatementFacts, BodyFacts.singleton]
+
+@[simp] theorem applyBodyFacts_empty (substitution : ParameterSubstitution) :
+    applyBodyFacts substitution .empty = .empty := by
+  rfl
+
+@[simp] theorem applyBodyFacts_cons
+    (substitution : ParameterSubstitution)
+    (head : StatementFacts) (tail : BodyFacts) :
+    applyBodyFacts substitution (.cons head tail) =
+      .cons (applyStatementFacts substitution head)
+        (applyBodyFacts substitution tail) := by
+  rcases head with ⟨headType, hasValue, headSawReturn, headControl⟩
+  rcases tail with ⟨tailType, tailSawReturn, tailControl⟩
+  cases headSawReturn <;> cases tailSawReturn <;>
+    simp [applyBodyFacts, applyStatementFacts, BodyFacts.cons]
+
+@[simp] theorem allBodiesSawReturn_applyBodyFacts
+    (substitution : ParameterSubstitution) (facts : List BodyFacts) :
+    allBodiesSawReturn (facts.map (applyBodyFacts substitution)) =
+      allBodiesSawReturn facts := by
+  induction facts with
+  | nil => rfl
+  | cons head tail induction =>
+      unfold allBodiesSawReturn at induction ⊢
+      simp only [List.map_cons, List.all_cons, applyBodyFacts]
+      rw [induction]
+
+theorem mergeBodyControls_applyBodyFacts
+    (substitution : ParameterSubstitution) (facts : List BodyFacts)
+    (fallback : Option BodyFacts) :
+    mergeBodyControls (facts.map (applyBodyFacts substitution))
+        (fallback.map (applyBodyFacts substitution)) =
+      (mergeBodyControls facts fallback).map
+        (applyControlSummary substitution) := by
+  induction facts with
+  | nil =>
+      cases fallback <;> rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, mergeBodyControls]
+      rw [induction]
+      cases merged : mergeBodyControls tail fallback with
+      | none => rfl
+      | some summary =>
+          simp [applyBodyFacts]
+
+theorem BodyCompletes.applyParameters
+    {expected : Ty} {facts : BodyFacts}
+    (substitution : ParameterSubstitution)
+    (completes : BodyCompletes expected facts) :
+    BodyCompletes (substitution.apply expected)
+      (applyBodyFacts substitution facts) := by
+  rcases completes with ⟨noBreak, noContinue, completion⟩
+  refine ⟨noBreak, noContinue, ?_⟩
+  rcases completion with ⟨fallthrough, returned⟩ | fallthrough
+  · left
+    exact ⟨by simp [applyBodyFacts, applyControlSummary, fallthrough], returned⟩
+  · right
+    simp [applyBodyFacts, applyControlSummary, fallthrough]
+
+/-- Rigid instantiation transports the complete mutually recursive source
+typing derivation.  The eliminator is rooted at statement sequences because
+that is the boundary needed by declaration bodies; its motives cover every
+expression, place, pattern arm, and `for` item recursively reachable from the
+body. -/
+theorem StatementsHaveType.applyParameters
+    {substitution : ParameterSubstitution} {source : TypedSource}
+    {control : ControlContext} {context final : Context}
+    {statements : List StatementId} {facts : BodyFacts}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : StatementsHaveType source control context statements final facts) :
+    StatementsHaveType (applyTypedSource substitution source)
+      (applyControlContext substitution control)
+      (applyContext substitution context) statements
+      (applyContext substitution final) (applyBodyFacts substitution facts) := by
+  apply StatementsHaveType.rec
+    (motive_1 := fun context id type _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        ExpressionHasType (applyTypedSource substitution source)
+          (applyContext substitution context) id (substitution.apply type))
+    (motive_2 := fun context form rawType plan _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        ExpressionFormHasRawType (applyTypedSource substitution source)
+          (applyContext substitution context)
+          (applyExpressionForm substitution form) (substitution.apply rawType)
+          (applyExpressionRequirementPlan substitution plan))
+    (motive_3 := fun context expressions types _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        ExpressionsHaveTypes (applyTypedSource substitution source)
+          (applyContext substitution context) expressions
+          (types.map substitution.apply))
+    (motive_4 := fun context initial projections result _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        SourceProjectionsHaveType (applyTypedSource substitution source)
+          (applyContext substitution context) (substitution.apply initial)
+          projections (substitution.apply result))
+    (motive_5 := fun context place type _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        SourcePlaceHasType (applyTypedSource substitution source)
+          (applyContext substitution context)
+          (applyPlaceResolution substitution place) (substitution.apply type))
+    (motive_6 := fun context assignment operator value _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        SourceAssignmentHasType (applyTypedSource substitution source)
+          (applyContext substitution context)
+          (applyAssignmentResolution substitution assignment) operator value)
+    (motive_7 := fun context assignment _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        SourceBitNotAssignmentValid (applyTypedSource substitution source)
+          (applyContext substitution context)
+          (applyAssignmentResolution substitution assignment))
+    (motive_8 := fun control context id final facts _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        StatementHasType (applyTypedSource substitution source)
+          (applyControlContext substitution control)
+          (applyContext substitution context) id
+          (applyContext substitution final)
+          (applyStatementFacts substitution facts))
+    (motive_9 := fun control context statements final facts _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        StatementsHaveType (applyTypedSource substitution source)
+          (applyControlContext substitution control)
+          (applyContext substitution context) statements
+          (applyContext substitution final) (applyBodyFacts substitution facts))
+    (motive_10 := fun control context item final _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        ForItemHasType (applyTypedSource substitution source)
+          (applyControlContext substitution control)
+          (applyContext substitution context)
+          (applyForItemForm substitution item) (applyContext substitution final))
+    (motive_11 := fun control context items final _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        ForItemsHaveType (applyTypedSource substitution source)
+          (applyControlContext substitution control)
+          (applyContext substitution context)
+          (items.map (applyForItemForm substitution))
+          (applyContext substitution final))
+    (motive_12 := fun control context scrutineeType matchCase facts _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        MatchCaseHasType (applyTypedSource substitution source)
+          (applyControlContext substitution control)
+          (applyContext substitution context) (substitution.apply scrutineeType)
+          (applyTypedMatchCase substitution matchCase)
+          (applyBodyFacts substitution facts))
+    (motive_13 := fun control context scrutineeType cases facts _ =>
+      ∀ (catalog : SignatureCatalogWellFormed context.signatures),
+        ContextSubstitutionValid substitution context →
+        MatchCasesHaveType (applyTypedSource substitution source)
+          (applyControlContext substitution control)
+          (applyContext substitution context) (substitution.apply scrutineeType)
+          (cases.map (applyTypedMatchCase substitution))
+          (facts.map (applyBodyFacts substitution)))
+  · intro context id node rawType plan contains formType rawTypeEq
+      rawWellFormed typeWellFormed requirements formInduction catalog contextValid
+    exact .intro
+      (StructuralSubstitution.ContainsExpression.applyParameters substitution
+        contains)
+      (formInduction catalog contextValid)
+      (by simp [rawTypeEq])
+      (StructuralSubstitution.TypeWellFormed.applyParameters substitution
+        contextValid.exact contextValid.range rawWellFormed)
+      (StructuralSubstitution.TypeWellFormed.applyParameters substitution
+        contextValid.exact contextValid.range typeWellFormed)
+      (StructuralSubstitution.ExpressionRequirementPlan.Valid.applyParameters
+        catalog contextValid requirements)
+  · intro context literal valid catalog contextValid
+    exact .literal valid
+  · intro context literal resolution valid catalog contextValid
+    exact .integerLiteral
+      (StructuralSubstitution.IntegerLiteralValid.applyParameters contextValid
+        valid)
+  · intro context name resolution type requirements referenceType
+      requirementsValid catalog contextValid
+    exact .reference
+      (StructuralSubstitution.ReferenceHasRawType.applyParameters catalog
+        contextValid referenceType)
+      (StructuralSubstitution.ReferenceRequirementsValid.applyParameters
+        contextValid requirementsValid)
+  · intro context inner type innerType innerInduction catalog contextValid
+    exact .group (innerInduction catalog contextValid)
+  · intro context elements types elementsType elementsInduction catalog
+      contextValid
+    simpa [applyExpressionForm, applyExpressionRequirementPlan,
+      StructuralSubstitution.apply_productMany] using
+      (ExpressionFormHasRawType.tuple (elementsInduction catalog contextValid))
+  · intro context operator operand operandType resultType requirements
+      operandTypeProof operatorType operandInduction catalog contextValid
+    exact .unary (operandInduction catalog contextValid)
+      (StructuralSubstitution.UnaryOperatorHasType.applyParameters catalog
+        contextValid operatorType)
+  · intro context operator left right operandType resultType requirements
+      leftType rightType operatorType leftInduction rightInduction catalog
+      contextValid
+    exact .binary (leftInduction catalog contextValid)
+      (rightInduction catalog contextValid)
+      (StructuralSubstitution.BinaryOperatorHasType.applyParameters catalog
+        contextValid operatorType)
+  · intro context condition thenBranch elseBranch type conditionType thenType
+      elseType conditionInduction thenInduction elseInduction catalog contextValid
+    exact .conditional (conditionInduction catalog contextValid)
+      (thenInduction catalog contextValid) (elseInduction catalog contextValid)
+  · intro context lambdaContext finalContext parameters parameterTypes
+      returnType body bodyFacts namesUnique parametersExtend bodyType bodyCompletes
+      bodyInduction catalog contextValid
+    have lambdaCatalog :
+        SignatureCatalogWellFormed lambdaContext.signatures := by
+      rw [StructuralSubstitution.MonoBindersExtend.signatures_eq parametersExtend]
+      exact catalog
+    have lambdaValid := contextValid.afterMonoBinders parametersExtend
+    simpa [applyExpressionForm, applyExpressionRequirementPlan,
+      StructuralSubstitution.apply_productMany, List.map_map,
+      Function.comp_def, applyBinder] using
+      (ExpressionFormHasRawType.lambda
+        (source := applyTypedSource substitution source)
+        (by simpa [List.map_map, Function.comp_def, applyBinder] using namesUnique)
+        (StructuralSubstitution.MonoBindersExtend.applyParameters substitution
+          contextValid.exact contextValid.range parametersExtend)
+        (bodyInduction lambdaCatalog lambdaValid)
+        (StructuralSubstitution.BodyCompletes.applyParameters substitution
+          bodyCompletes))
+  · intro context callee arguments instantiation parameterTypes resultType
+      predicates calleeValid application argumentsType argumentsInduction catalog
+      contextValid
+    exact .directCall
+      (StructuralSubstitution.DirectDeclarationCalleeValid.applyParameters
+        catalog contextValid calleeValid)
+      (StructuralSubstitution.DeclarationApplicationValid.applyParameters catalog
+        contextValid application)
+      (argumentsInduction catalog contextValid)
+  · intro context callee arguments function calleeValid argumentsType
+      argumentsInduction catalog contextValid
+    have calleeAfter :=
+      StructuralSubstitution.DirectBuiltinCalleeValid.applyParameters
+        (substitution := substitution) calleeValid
+    have argumentsAfter := argumentsInduction catalog contextValid
+    cases function <;>
+      simpa [BuiltinFunctionId.parameterTypes, BuiltinFunctionId.returnType,
+        applyExpressionForm, applyExpressionRequirementPlan,
+        applyCallResolution] using
+        (ExpressionFormHasRawType.builtinCall calleeAfter argumentsAfter)
+  · intro context callee arguments argumentTypes parameterType resultType
+      metadata calleeType argumentsType application calleeInduction
+      argumentsInduction catalog contextValid
+    exact .indirectCall (calleeInduction catalog contextValid)
+      (argumentsInduction catalog contextValid)
+      (StructuralSubstitution.IndirectApplicationValid.applyParameters catalog
+        contextValid application)
+  · intro context instantiation arguments valid argumentsType
+      argumentsInduction catalog contextValid
+    exact .constructor
+      (StructuralSubstitution.DataConstructorInstantiation.Valid.applyParameters
+        catalog contextValid valid)
+      (argumentsInduction catalog contextValid)
+  · intro context base name index baseType memberType baseTypeProof memberTypeProof
+      baseInduction catalog contextValid
+    exact .member (baseInduction catalog contextValid)
+      (StructuralSubstitution.UniformMemberProjection.applyParameters catalog
+        contextValid memberTypeProof)
+  · intro context inner innerWellFormed catalog contextValid
+    exact .proxy
+      (StructuralSubstitution.TypeWellFormed.applyParameters substitution
+        contextValid.exact contextValid.range innerWellFormed)
+  · intro context base key keyType valueType baseType keyTypeProof
+      baseInduction keyInduction catalog contextValid
+    exact .index (baseInduction catalog contextValid)
+      (keyInduction catalog contextValid)
+  · intro context catalog contextValid
+    exact .nil _
+  · intro context expression expressions type types head tail headInduction
+      tailInduction catalog contextValid
+    exact .cons (headInduction catalog contextValid)
+      (tailInduction catalog contextValid)
+  · intro context type catalog contextValid
+    exact .nil _
+  · intro context key keyType valueType finalType rest keyTypeProof restType
+      keyInduction restInduction catalog contextValid
+    exact .index (keyInduction catalog contextValid)
+      (restInduction catalog contextValid)
+  · intro context name index baseType memberType finalType rest selected restType
+      restInduction catalog contextValid
+    exact .member
+      (StructuralSubstitution.UniformMemberProjection.applyParameters catalog
+        contextValid selected)
+      (restInduction catalog contextValid)
+  · intro context place rootType finalType rootTypeProof projectionsType
+      storedTypeEq projectionsInduction catalog contextValid
+    exact .intro
+      (StructuralSubstitution.WritableLocal.applyParameters contextValid
+        rootTypeProof)
+      (projectionsInduction catalog contextValid)
+      (by simpa [applyPlaceResolution] using
+        (congrArg substitution.apply storedTypeEq))
+  · intro context assignment value type targetType valueType requirementsEq
+      targetInduction valueInduction catalog contextValid
+    exact .equal (targetInduction catalog contextValid)
+      (valueInduction catalog contextValid)
+      (by simpa [applyAssignmentResolution] using requirementsEq)
+  · intro context assignment operator value operatorKind targetType valueType
+      requirementsEq targetInduction valueInduction catalog contextValid
+    exact .wordCompound operatorKind
+      (by simpa [applyAssignmentResolution, applyPlaceResolution] using
+        targetInduction catalog contextValid)
+      (by simpa using valueInduction catalog contextValid)
+      (by simpa [applyAssignmentResolution] using requirementsEq)
+  · intro context assignment targetType requirementsEq targetInduction catalog
+      contextValid
+    exact .intro
+      (by simpa [applyAssignmentResolution, applyPlaceResolution] using
+        targetInduction catalog contextValid)
+      (by simpa [applyAssignmentResolution] using requirementsEq)
+  · intro control context final id node binder contains formEq monomorphic
+      extension typeEq catalog contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.letUninitialized
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .letDecl (applyBinder substitution binder) none
+          rw [formEq]
+          rfl)
+        (by simp [applyBinder, applyScheme, monomorphic])
+        (StructuralSubstitution.BinderExtends.applyParameters substitution
+          contextValid.exact contextValid.range extension)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context final id node binder initializer contains formEq
+      initializerType monomorphic extension typeEq initializerInduction catalog
+      contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.letInitialized
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .letDecl (applyBinder substitution binder) (some initializer)
+          rw [formEq]
+          rfl)
+        (initializerInduction catalog contextValid)
+        (by simp [applyBinder, applyScheme, monomorphic])
+        (StructuralSubstitution.BinderExtends.applyParameters substitution
+          contextValid.exact contextValid.range extension)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node contains formEq returnTypeEq typeEq catalog
+      contextValid
+    simpa [applyStatementFacts, applyControlContext] using
+      (StatementHasType.returnUnit
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form = .returnStmt none
+          rw [formEq]
+          rfl)
+        (by simpa [applyControlContext] using
+          (congrArg substitution.apply returnTypeEq))
+        (by simpa [applyStatementNode, applyControlContext] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node value contains formEq valueType typeEq
+      valueInduction catalog contextValid
+    simpa [applyStatementFacts, applyControlContext] using
+      (StatementHasType.returnValue
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .returnStmt (some value)
+          rw [formEq]
+          rfl)
+        (valueInduction catalog contextValid)
+        (by simpa [applyStatementNode, applyControlContext] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node expression type contains formEq expressionType
+      typeEq expressionInduction catalog contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.expressionValue
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .expression expression false
+          rw [formEq]
+          rfl)
+        (expressionInduction catalog contextValid)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node expression type contains formEq expressionType
+      typeEq expressionInduction catalog contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.expressionDiscard
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .expression expression true
+          rw [formEq]
+          rfl)
+        (expressionInduction catalog contextValid)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node assignment operator value contains formEq
+      assignmentType typeEq assignmentInduction catalog contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.assignValue
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .assignValue (applyAssignmentResolution substitution assignment)
+              operator value
+          rw [formEq]
+          rfl)
+        (assignmentInduction catalog contextValid)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node assignment contains formEq assignmentType
+      typeEq assignmentInduction catalog contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.assignBitNot
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .assignBitNot (applyAssignmentResolution substitution assignment)
+          rw [formEq]
+          rfl)
+        (assignmentInduction catalog contextValid)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context thenFinal id node condition thenBody thenFacts
+      contains formEq conditionType thenType typeEq conditionInduction
+      thenInduction catalog contextValid
+    simpa [applyStatementFacts, applyBodyFacts] using
+      (StatementHasType.ifWithoutElse
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .ifThen condition thenBody none
+          rw [formEq]
+          rfl)
+        (conditionInduction catalog contextValid)
+        (thenInduction catalog contextValid)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context thenFinal elseFinal id node condition thenBody elseBody
+      thenFacts elseFacts contains formEq conditionType thenType elseType typeEq
+      conditionInduction thenInduction elseInduction catalog contextValid
+    simpa [applyStatementFacts, applyControlContext, applyBodyFacts] using
+      (StatementHasType.ifWithElse
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .ifThen condition thenBody (some elseBody)
+          rw [formEq]
+          rfl)
+        (conditionInduction catalog contextValid)
+        (thenInduction catalog contextValid)
+        (elseInduction catalog contextValid)
+        (by simpa [applyStatementNode, applyControlContext, applyBodyFacts] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context innerFinal id node body bodyFacts contains formEq
+      bodyType typeEq bodyInduction catalog contextValid
+    simpa [applyStatementFacts, applyBodyFacts] using
+      (StatementHasType.block
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form = .block body
+          rw [formEq]
+          rfl)
+        (bodyInduction catalog contextValid)
+        (by simpa [applyStatementNode, applyBodyFacts] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node resolution scrutineeType caseFacts summary
+      contains formEq defaultEq scrutineeTypeProof casesType requirementsEq
+      exhaustive merged typeEq scrutineeInduction casesInduction catalog
+      contextValid
+    simpa [applyStatementFacts, applyMatchResolution, applyBodyFacts,
+      applyControlContext] using
+      (StatementHasType.matchWithoutDefault
+        (resolution := applyMatchResolution substitution resolution)
+        (caseFacts := caseFacts.map (applyBodyFacts substitution))
+        (summary := applyControlSummary substitution summary)
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .matchWith (applyMatchResolution substitution resolution)
+          rw [formEq]
+          rfl)
+        (by simpa [applyMatchResolution] using defaultEq)
+        (scrutineeInduction catalog contextValid)
+        (casesInduction catalog contextValid)
+        (by simpa [applyMatchResolution,
+          StructuralSubstitution.flatMap_patternRequirements_applyTypedMatchCases]
+          using requirementsEq)
+        (StructuralSubstitution.MatchExhaustive.applyParameters exhaustive)
+        (by
+          calc
+            mergeBodyControls
+                (caseFacts.map (applyBodyFacts substitution)) none =
+                (mergeBodyControls caseFacts none).map
+                  (applyControlSummary substitution) := by
+                    simpa using
+                      (StructuralSubstitution.mergeBodyControls_applyBodyFacts
+                        substitution caseFacts none)
+            _ = some (applyControlSummary substitution summary) := by
+              rw [merged]
+              rfl)
+        (by simpa [applyStatementNode, applyControlContext, applyBodyFacts] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context defaultFinal id node resolution defaultBody
+      scrutineeType caseFacts defaultFacts summary contains formEq defaultEq
+      scrutineeTypeProof casesType defaultType requirementsEq merged typeEq
+      scrutineeInduction casesInduction defaultInduction catalog contextValid
+    simpa [applyStatementFacts, applyMatchResolution, applyBodyFacts,
+      applyControlContext] using
+      (StatementHasType.matchWithDefault
+        (resolution := applyMatchResolution substitution resolution)
+        (caseFacts := caseFacts.map (applyBodyFacts substitution))
+        (defaultFacts := applyBodyFacts substitution defaultFacts)
+        (summary := applyControlSummary substitution summary)
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .matchWith (applyMatchResolution substitution resolution)
+          rw [formEq]
+          rfl)
+        (by simpa [applyMatchResolution] using defaultEq)
+        (scrutineeInduction catalog contextValid)
+        (casesInduction catalog contextValid)
+        (defaultInduction catalog contextValid)
+        (by simpa [applyMatchResolution,
+          StructuralSubstitution.flatMap_patternRequirements_applyTypedMatchCases]
+          using requirementsEq)
+        (by
+          calc
+            mergeBodyControls
+                (caseFacts.map (applyBodyFacts substitution))
+                (some (applyBodyFacts substitution defaultFacts)) =
+                (mergeBodyControls caseFacts (some defaultFacts)).map
+                  (applyControlSummary substitution) := by
+                    simpa using
+                      (StructuralSubstitution.mergeBodyControls_applyBodyFacts
+                        substitution caseFacts (some defaultFacts))
+            _ = some (applyControlSummary substitution summary) := by
+              rw [merged]
+              rfl)
+        (by simpa [applyStatementNode, applyControlContext, applyBodyFacts] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context loopContext postContext bodyFinal id node initializer
+      post condition body bodyFacts contains formEq initializerType conditionType
+      bodyType postType typeEq initializerInduction conditionInduction
+      bodyInduction postInduction catalog contextValid
+    have loopCatalog : SignatureCatalogWellFormed loopContext.signatures := by
+      rw [StructuralSubstitution.ForItemsHaveType.signatures_eq initializerType]
+      exact catalog
+    have loopValid :=
+      StructuralSubstitution.ForItemsHaveType.contextSubstitutionValid
+        contextValid initializerType
+    simpa [applyStatementFacts, applyBodyFacts] using
+      (StatementHasType.forLoop
+        (control := applyControlContext substitution control)
+        (bodyFacts := applyBodyFacts substitution bodyFacts)
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .forLoop (initializer.map (applyForItemForm substitution)) condition
+              (post.map (applyForItemForm substitution)) body
+          rw [formEq]
+          rfl)
+        (initializerInduction catalog contextValid)
+        (conditionInduction loopCatalog loopValid)
+        (by simpa using bodyInduction loopCatalog loopValid)
+        (by simpa using postInduction loopCatalog loopValid)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context bodyFinal id node condition body bodyFacts contains
+      formEq conditionType bodyType typeEq conditionInduction bodyInduction catalog
+      contextValid
+    simpa [applyStatementFacts, applyBodyFacts] using
+      (StatementHasType.whileLoop
+        (control := applyControlContext substitution control)
+        (bodyFacts := applyBodyFacts substitution bodyFacts)
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form =
+            .whileLoop condition body
+          rw [formEq]
+          rfl)
+        (conditionInduction catalog contextValid)
+        (by simpa using bodyInduction catalog contextValid)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node contains formEq allowed typeEq catalog
+      contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.breakStmt
+        (control := applyControlContext substitution control)
+        (context := applyContext substitution context)
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form = .breakStmt
+          rw [formEq]
+          rfl)
+        (by simpa [applyControlContext, ControlContext.loopAllowed] using allowed)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node contains formEq allowed typeEq catalog
+      contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.continueStmt
+        (control := applyControlContext substitution control)
+        (context := applyContext substitution context)
+        (StructuralSubstitution.ContainsStatement.applyParameters substitution
+          contains)
+        (by
+          change applyStatementForm substitution node.form = .continueStmt
+          rw [formEq]
+          rfl)
+        (by simpa [applyControlContext, ControlContext.loopAllowed] using allowed)
+        (by simpa [applyStatementNode] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context catalog contextValid
+    exact .nil _ _
+  · intro control context final statement statementFacts head headInduction
+      catalog contextValid
+    simpa using StatementsHaveType.singleton (headInduction catalog contextValid)
+  · intro control context middle final statement next rest headFacts tailFacts
+      head tail headInduction tailInduction catalog contextValid
+    have middleCatalog : SignatureCatalogWellFormed middle.signatures := by
+      rw [StructuralSubstitution.StatementHasType.signatures_eq head]
+      exact catalog
+    have middleValid :=
+      StructuralSubstitution.StatementHasType.contextSubstitutionValid
+        contextValid head
+    simpa using StatementsHaveType.cons (headInduction catalog contextValid)
+      (tailInduction middleCatalog middleValid)
+  · intro control context final binder monomorphic extension catalog contextValid
+    exact .letUninitialized
+      (by simp [applyBinder, applyScheme, monomorphic])
+      (StructuralSubstitution.BinderExtends.applyParameters substitution
+        contextValid.exact contextValid.range extension)
+  · intro control context final binder initializer initializerType monomorphic
+      extension initializerInduction catalog contextValid
+    exact .letInitialized (initializerInduction catalog contextValid)
+      (by simp [applyBinder, applyScheme, monomorphic])
+      (StructuralSubstitution.BinderExtends.applyParameters substitution
+        contextValid.exact contextValid.range extension)
+  · intro control context expression type expressionType expressionInduction
+      catalog contextValid
+    exact .expression (expressionInduction catalog contextValid)
+  · intro control context assignment operator value assignmentType
+      assignmentInduction catalog contextValid
+    exact .assignValue (assignmentInduction catalog contextValid)
+  · intro control context assignment assignmentType assignmentInduction catalog
+      contextValid
+    exact .assignBitNot (assignmentInduction catalog contextValid)
+  · intro control context catalog contextValid
+    exact .nil _ _
+  · intro control context middle final item items head tail headInduction
+      tailInduction catalog contextValid
+    have middleCatalog : SignatureCatalogWellFormed middle.signatures := by
+      rw [StructuralSubstitution.ForItemHasType.signatures_eq head]
+      exact catalog
+    have middleValid :=
+      StructuralSubstitution.ForItemHasType.contextSubstitutionValid contextValid
+        head
+    exact .cons (headInduction catalog contextValid)
+      (tailInduction middleCatalog middleValid)
+  · intro control context scrutineeType matchCase binders rootArity armContext
+      finalContext facts patternType bindersExtend bodyType bodyInduction catalog
+      contextValid
+    have armCatalog : SignatureCatalogWellFormed armContext.signatures := by
+      rw [StructuralSubstitution.BindersExtend.signatures_eq bindersExtend]
+      exact catalog
+    have armValid := contextValid.afterBinders bindersExtend
+    exact .intro
+      (StructuralSubstitution.TypedMatchPatternHasType.applyParameters catalog
+        contextValid patternType)
+      (StructuralSubstitution.BindersExtend.applyParameters substitution
+        contextValid.exact contextValid.range bindersExtend)
+      (bodyInduction armCatalog armValid)
+  · intro control context scrutineeType catalog contextValid
+    exact .nil _ _ _
+  · intro control context scrutineeType matchCase cases facts caseFacts head tail
+      headInduction tailInduction catalog contextValid
+    exact .cons (headInduction catalog contextValid)
+      (tailInduction catalog contextValid)
+  · exact typing
+  · exact catalog
+  · exact contextValid
+
+/-- Rigid instantiation preserves a complete declaration body, including its
+root-shape invariant and completion certificate. -/
+theorem BodyHasType.applyParameters
+    {substitution : ParameterSubstitution} {source : TypedSource}
+    {context : Context} {resultType : Ty} {facts : BodyFacts}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (typing : BodyHasType source context resultType facts) :
+    BodyHasType (applyTypedSource substitution source)
+      (applyContext substitution context) (substitution.apply resultType)
+      (applyBodyFacts substitution facts) := by
+  rcases typing with ⟨finalContext, statementsType, noExpressionRoots,
+    completes⟩
+  refine ⟨applyContext substitution finalContext, ?_, ?_, ?_⟩
+  · simpa [applyTypedSource, applyControlContext] using
+      (StructuralSubstitution.StatementsHaveType.applyParameters catalog
+        contextValid statementsType)
+  · intro expression member
+    exact noExpressionRoots expression (by
+      simpa [applyTypedSource] using member)
+  · exact StructuralSubstitution.BodyCompletes.applyParameters substitution
+      completes
+
+/-- Static certificate needed by dynamic preservation for an instantiated
+declaration body.  It is intentionally independent of the dynamic value and
+heap judgments. -/
+structure StaticBodyInstanceHasType
+    (bodyInstance : Dynamic.BodyInstance) (inputTypes : List Ty)
+    (lexicalContext : Context) (facts : BodyFacts) : Prop where
+  inputs_extend : MonoBindersExtend bodyInstance.source.owner
+    bodyInstance.context bodyInstance.source.inputs inputTypes lexicalContext
+  body_typed : BodyHasType bodyInstance.source lexicalContext
+    bodyInstance.resultType facts
+
+theorem BodyDefinitionHasType.requirementLedger
+    {signatures : ProgramSignatures}
+    {parameters : List TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {parameterNames : List String} {parameterTypes : List Ty}
+    {parameterComptime : List Bool} {returnTypes : List Ty}
+    {returnComptime : Bool} {definition : BodyDefinition} {facts : BodyFacts}
+    (typing : BodyDefinitionHasType signatures parameters assumptions
+      parameterNames parameterTypes parameterComptime returnTypes returnComptime
+      definition facts) :
+    RequirementLedgerWellFormed
+      (declarationContext signatures definition.owner parameters assumptions
+        definition.solvedRequirements) := by
+  cases typing
+  assumption
+
+theorem BodyDefinitionHasType.sourceOwner
+    {signatures : ProgramSignatures}
+    {parameters : List TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {parameterNames : List String} {parameterTypes : List Ty}
+    {parameterComptime : List Bool} {returnTypes : List Ty}
+    {returnComptime : Bool} {definition : BodyDefinition} {facts : BodyFacts}
+    (typing : BodyDefinitionHasType signatures parameters assumptions
+      parameterNames parameterTypes parameterComptime returnTypes returnComptime
+      definition facts) :
+    definition.source.owner = definition.owner := by
+  cases typing
+  assumption
+
+theorem BodyDefinitionHasType.callableTypeEq
+    {signatures : ProgramSignatures}
+    {parameters : List TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {parameterNames : List String} {parameterTypes : List Ty}
+    {parameterComptime : List Bool} {returnTypes : List Ty}
+    {returnComptime : Bool} {definition : BodyDefinition} {facts : BodyFacts}
+    (typing : BodyDefinitionHasType signatures parameters assumptions
+      parameterNames parameterTypes parameterComptime returnTypes returnComptime
+      definition facts) :
+    definition.type = .function (Ty.productMany parameterTypes)
+      (Ty.productMany returnTypes) := by
+  cases typing
+  assumption
+
+theorem BodyDefinitionHasType.resultTypeEq
+    {signatures : ProgramSignatures}
+    {parameters : List TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {parameterNames : List String} {parameterTypes : List Ty}
+    {parameterComptime : List Bool} {returnTypes : List Ty}
+    {returnComptime : Bool} {definition : BodyDefinition} {facts : BodyFacts}
+    (typing : BodyDefinitionHasType signatures parameters assumptions
+      parameterNames parameterTypes parameterComptime returnTypes returnComptime
+      definition facts) :
+    definition.resultType = Ty.productMany returnTypes := by
+  cases typing
+  assumption
+
+theorem BodyDefinitionHasType.graphClosed
+    {signatures : ProgramSignatures}
+    {parameters : List TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {parameterNames : List String} {parameterTypes : List Ty}
+    {parameterComptime : List Bool} {returnTypes : List Ty}
+    {returnComptime : Bool} {definition : BodyDefinition} {facts : BodyFacts}
+    (typing : BodyDefinitionHasType signatures parameters assumptions
+      parameterNames parameterTypes parameterComptime returnTypes returnComptime
+      definition facts) :
+    OccurrenceGraphClosed definition.source := by
+  cases typing
+  assumption
+
+theorem BodyDefinitionHasType.localIdentityOwnership
+    {signatures : ProgramSignatures}
+    {parameters : List TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {parameterNames : List String} {parameterTypes : List Ty}
+    {parameterComptime : List Bool} {returnTypes : List Ty}
+    {returnComptime : Bool} {definition : BodyDefinition} {facts : BodyFacts}
+    (typing : BodyDefinitionHasType signatures parameters assumptions
+      parameterNames parameterTypes parameterComptime returnTypes returnComptime
+      definition facts) :
+    LocalIdentityOwnership definition.source := by
+  cases typing
+  assumption
+
+theorem BodyDefinitionHasType.requirementOwnership
+    {signatures : ProgramSignatures}
+    {parameters : List TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {parameterNames : List String} {parameterTypes : List Ty}
+    {parameterComptime : List Bool} {returnTypes : List Ty}
+    {returnComptime : Bool} {definition : BodyDefinition} {facts : BodyFacts}
+    (typing : BodyDefinitionHasType signatures parameters assumptions
+      parameterNames parameterTypes parameterComptime returnTypes returnComptime
+      definition facts) :
+    RequirementOwnership
+      (declarationContext signatures definition.owner parameters assumptions
+        definition.solvedRequirements) definition.source := by
+  cases typing
+  assumption
+
+/-- Conditional declaration-boundary transport.  The only semantic premise is
+that every retained solved requirement remains valid after substitution; the
+whole-program bridge derives that premise from the declaration's validated
+requirement ledger. -/
+theorem BodyDefinitionHasType.instantiate_with_context
+    {signatures : ProgramSignatures}
+    {parameters : List TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {parameterNames : List String} {parameterTypes : List Ty}
+    {parameterComptime : List Bool} {returnTypes : List Ty}
+    {returnComptime : Bool} {definition : BodyDefinition} {facts : BodyFacts}
+    (substitution : ParameterSubstitution)
+    (catalog : SignatureCatalogWellFormed signatures)
+    (contextValid : ContextSubstitutionValid substitution
+      (declarationContext signatures definition.owner parameters assumptions
+        definition.solvedRequirements))
+    (typing : BodyDefinitionHasType signatures parameters assumptions
+      parameterNames parameterTypes parameterComptime returnTypes returnComptime
+      definition facts) :
+    ∃ lexicalContext,
+      MonoBindersExtend definition.source.owner
+        (applyContext substitution
+          (declarationContext signatures definition.owner parameters assumptions
+            definition.solvedRequirements))
+        (definition.source.inputs.map (applyBinder substitution))
+        (parameterTypes.map substitution.apply) lexicalContext ∧
+      BodyHasType (applyTypedSource substitution definition.source)
+        lexicalContext (substitution.apply definition.resultType)
+        (applyBodyFacts substitution facts) := by
+  cases typing with
+  | @intro lexicalContext sourceOwner parameterBinders parameterTypesWellFormed
+      returnTypesWellFormed callableTypeEq resultTypeEq returnComptimeEq
+      inputNamesEq inputComptimeEq inputsExtend graphClosed localOwnership
+      requirementLedger requirementOwnership bodyType bodyAnnotationEq =>
+      have lexicalCatalog :
+          SignatureCatalogWellFormed lexicalContext.signatures := by
+        rw [StructuralSubstitution.MonoBindersExtend.signatures_eq inputsExtend]
+        exact catalog
+      have lexicalValid := contextValid.afterMonoBinders inputsExtend
+      refine ⟨applyContext substitution lexicalContext, ?_, ?_⟩
+      · simpa [sourceOwner] using
+          (StructuralSubstitution.MonoBindersExtend.applyParameters
+            substitution contextValid.exact contextValid.range inputsExtend)
+      · rw [resultTypeEq]
+        exact StructuralSubstitution.BodyHasType.applyParameters lexicalCatalog
+          lexicalValid bodyType
+
+/-- Once the mutually recursive body judgment has been transported, all
+declaration-boundary typing data (inputs, lexical context, result and facts)
+is transported constructively.  This isolates `BodyHasType` as the sole
+remaining high-level obligation. -/
+theorem BodyDefinitionHasType.instantiate_of_body
+    {signatures : ProgramSignatures}
+    {parameters : List TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {parameterNames : List String} {parameterTypes : List Ty}
+    {parameterComptime : List Bool} {returnTypes : List Ty}
+    {returnComptime : Bool} {definition : BodyDefinition} {facts : BodyFacts}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution parameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution
+        (declarationContext signatures definition.owner parameters assumptions
+          definition.solvedRequirements)) substitution)
+    (typing : BodyDefinitionHasType signatures parameters assumptions
+      parameterNames parameterTypes parameterComptime returnTypes returnComptime
+      definition facts)
+    (bodyAfter : ∀ lexicalContext,
+      MonoBindersExtend definition.owner
+        (declarationContext signatures definition.owner parameters assumptions
+          definition.solvedRequirements)
+        definition.source.inputs parameterTypes lexicalContext →
+      BodyHasType definition.source lexicalContext
+        (Ty.productMany returnTypes) facts →
+      BodyHasType (applyTypedSource substitution definition.source)
+        (applyContext substitution lexicalContext)
+        (substitution.apply (Ty.productMany returnTypes))
+        (applyBodyFacts substitution facts)) :
+    ∃ lexicalContext,
+      MonoBindersExtend definition.source.owner
+        (applyContext substitution
+          (declarationContext signatures definition.owner parameters assumptions
+            definition.solvedRequirements))
+        (definition.source.inputs.map (applyBinder substitution))
+        (parameterTypes.map substitution.apply) lexicalContext ∧
+      BodyHasType (applyTypedSource substitution definition.source)
+        lexicalContext (substitution.apply definition.resultType)
+        (applyBodyFacts substitution facts) := by
+  cases typing with
+  | @intro lexicalContext sourceOwner parameterBinders parameterTypesWellFormed
+      returnTypesWellFormed callableTypeEq resultTypeEq returnComptimeEq
+      inputNamesEq inputComptimeEq inputsExtend graphClosed localOwnership
+      requirementLedger requirementOwnership bodyType bodyAnnotationEq =>
+      refine ⟨applyContext substitution lexicalContext, ?_, ?_⟩
+      · simpa [sourceOwner] using
+          (StructuralSubstitution.MonoBindersExtend.applyParameters
+            substitution exact range inputsExtend)
+      · rw [resultTypeEq]
+        exact bodyAfter lexicalContext inputsExtend bodyType
+
+end Solcore.SourceSemantics.StructuralSubstitution
