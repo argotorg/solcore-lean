@@ -27,7 +27,7 @@ inductive DeclarationApplicationValid (context : Context)
       {resultType : TypeSystem.Ty}
       {predicates : List ProgramPredicate}
       (signature_mem : signature ∈ context.signatures.functions)
-      (valid : SourceSemantics.DeclarationInstantiation.Valid
+      (valid : SourceSemantics.DeclarationInstantiation.Admissible
         context instantiation)
       (declaration_eq : instantiation.declaration = signature.id)
       (parameter_types_eq :
@@ -58,7 +58,7 @@ inductive DirectDeclarationCalleeValid
       (contains : ContainsExpression source id node)
       (form_eq : node.form = .reference name (.declaration instantiation))
       (instantiation_valid :
-        SourceSemantics.DeclarationInstantiation.Valid context instantiation)
+        SourceSemantics.DeclarationInstantiation.Admissible context instantiation)
       (type_eq : node.type = instantiation.type)
       (requirements_eq : node.requirements = [])
       (coercions_eq : node.coercions = []) :

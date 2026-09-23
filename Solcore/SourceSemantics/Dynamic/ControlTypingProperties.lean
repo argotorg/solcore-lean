@@ -446,9 +446,13 @@ theorem controlFormTyping
     ∃ node, ContainsStatement source statement node ∧
       StatementControlFormTyping source control context node.form facts := by
   cases typing with
-  | letUninitialized contains form_eq monomorphic extension type_eq =>
+  | letUninitialized contains form_eq monomorphic generalizes extension type_eq =>
       exact ⟨_, contains, form_eq ▸ .letUninitialized⟩
-  | letInitialized contains form_eq initializer_type monomorphic extension type_eq =>
+  | letInitialized contains form_eq initializer_type monomorphic generalizes
+      extension type_eq =>
+      exact ⟨_, contains, form_eq ▸ .letInitialized⟩
+  | letInitializedGeneralized contains form_eq polymorphic generalizes
+      initializer_type extension type_eq =>
       exact ⟨_, contains, form_eq ▸ .letInitialized⟩
   | returnUnit contains form_eq return_type_eq type_eq =>
       exact ⟨_, contains, form_eq ▸ .returnUnit⟩
@@ -497,10 +501,13 @@ theorem controlBindersExtend
       facts) :
     ∃ binders, BindersExtend source.owner context binders finalContext := by
   cases typing with
-  | letUninitialized contains form_eq monomorphic extension type_eq =>
+  | letUninitialized contains form_eq monomorphic generalizes extension type_eq =>
       exact ⟨[_], .cons extension (.nil _)⟩
-  | letInitialized contains form_eq initializer_type monomorphic extension
-      type_eq =>
+  | letInitialized contains form_eq initializer_type monomorphic generalizes
+      extension type_eq =>
+      exact ⟨[_], .cons extension (.nil _)⟩
+  | letInitializedGeneralized contains form_eq polymorphic generalizes
+      initializer_type extension type_eq =>
       exact ⟨[_], .cons extension (.nil _)⟩
   | returnUnit | returnValue | expressionValue | expressionDiscard |
       assignValue | assignBitNot | ifWithoutElse | ifWithElse | block |

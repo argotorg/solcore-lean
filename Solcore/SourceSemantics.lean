@@ -38,7 +38,8 @@ frontend pass.
 `Solcore.SourceSemantics.Dynamic` supplies the complete mutually recursive
 successful big-step evaluation surface, positive (not total) fault
 propagation, statically/staging-admitted whole-program execution, and subject reduction for
-successful runs in closed structurally instantiated contexts. Structural and
+successful runs in structurally instantiated contexts whose rigid and lexical
+flexible binders are closed while residual inference admission remains open. Structural and
 trait substitution preservation close generic bodies and their evidence
 without making the executable frontend authoritative.
 -/

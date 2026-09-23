@@ -143,8 +143,8 @@ mutual
         (contains : ContainsExpression source id node)
         (form_type : ExpressionFormHasRawType source context node.form rawType plan)
         (raw_type_eq : node.rawType = rawType)
-        (raw_well_formed : TypeWellFormed context rawType)
-        (type_well_formed : TypeWellFormed context node.type)
+        (raw_well_formed : TypeAdmissible context rawType)
+        (type_well_formed : TypeAdmissible context node.type)
         (requirements : ExpressionRequirementPlan.Valid context rawType node.type
           plan node.requirements node.coercions) :
         ExpressionHasType source context id node.type
@@ -268,7 +268,7 @@ mutual
     | constructor
         {context : Context} {instantiation : DataConstructorInstantiation}
         {arguments : List ExpressionId}
-        (valid : DataConstructorInstantiation.Valid context instantiation)
+        (valid : DataConstructorInstantiation.Admissible context instantiation)
         (arguments_type : ExpressionsHaveTypes source context arguments
           instantiation.payloadTypes) :
         ExpressionFormHasRawType source context
@@ -283,7 +283,7 @@ mutual
           memberType (.ordinary [])
     | proxy
         {context : Context} {inner : TypeSystem.Ty}
-        (inner_well_formed : TypeWellFormed context inner) :
+        (inner_well_formed : TypeAdmissible context inner) :
         ExpressionFormHasRawType source context (.proxy inner) (.proxy inner)
           (.ordinary [])
     | index
@@ -388,6 +388,7 @@ mutual
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .letDecl binder none)
         (monomorphic : binder.scheme.quantified = [])
+        (generalizes : SchemeGeneralizes context binder.scheme)
         (extension : BinderExtends source.owner context binder final)
         (type_eq : node.type = .unit) :
         StatementHasType source control context id final {
@@ -403,6 +404,24 @@ mutual
         (initializer_type : ExpressionHasType source context initializer
           binder.scheme.body)
         (monomorphic : binder.scheme.quantified = [])
+        (generalizes : SchemeGeneralizes context binder.scheme)
+        (extension : BinderExtends source.owner context binder final)
+        (type_eq : node.type = .unit) :
+        StatementHasType source control context id final {
+          type := .unit, hasValue := false, sawReturn := false
+          control := .ordinary .unit
+        }
+    | letInitializedGeneralized
+        {control : ControlContext} {context final : Context}
+        {id : StatementId} {node : StatementNode}
+        {binder : TypedBinder} {initializer : ExpressionId}
+        (contains : ContainsStatement source id node)
+        (form_eq : node.form = .letDecl binder (some initializer))
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (generalizes : SchemeGeneralizes context binder.scheme)
+        (initializer_type : ExpressionHasType source
+          (context.withTypeVariables binder.scheme.quantified) initializer
+          binder.scheme.body)
         (extension : BinderExtends source.owner context binder final)
         (type_eq : node.type = .unit) :
         StatementHasType source control context id final {
@@ -678,6 +697,7 @@ mutual
         {control : ControlContext} {context final : Context}
         {binder : TypedBinder}
         (monomorphic : binder.scheme.quantified = [])
+        (generalizes : SchemeGeneralizes context binder.scheme)
         (extension : BinderExtends source.owner context binder final) :
         ForItemHasType source control context (.letDecl binder none) final
     | letInitialized
@@ -687,6 +707,19 @@ mutual
         (initializer_type : ExpressionHasType source context initializer
           binder.scheme.body)
         (monomorphic : binder.scheme.quantified = [])
+        (generalizes : SchemeGeneralizes context binder.scheme)
+        (extension : BinderExtends source.owner context binder final) :
+        ForItemHasType source control context
+          (.letDecl binder (some initializer)) final
+    | letInitializedGeneralized
+        {control : ControlContext} {context final : Context}
+        {binder : TypedBinder}
+        {initializer : ExpressionId}
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (generalizes : SchemeGeneralizes context binder.scheme)
+        (initializer_type : ExpressionHasType source
+          (context.withTypeVariables binder.scheme.quantified) initializer
+          binder.scheme.body)
         (extension : BinderExtends source.owner context binder final) :
         ForItemHasType source control context
           (.letDecl binder (some initializer)) final

@@ -85,6 +85,40 @@ private def appendParameters (parameters : List TypeParameterId) :
 def predicateVariables (predicate : Predicate) : List TypeVarId :=
   predicate.arguments.foldl appendVariables predicate.subject.freeVariables
 
+private theorem foldl_appendVariables_map_of_freeVariables_eq
+    (substitution : ParameterSubstitution)
+    (preserves : ∀ type,
+      (substitution.apply type).freeVariables = type.freeVariables)
+    (initial : List TypeVarId) (types : List Ty) :
+    (types.map substitution.apply).foldl appendVariables initial =
+      types.foldl appendVariables initial := by
+  induction types generalizing initial with
+  | nil => rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, List.foldl_cons]
+      have headEq :
+          appendVariables initial (substitution.apply head) =
+            appendVariables initial head := by
+        unfold appendVariables
+        rw [preserves head]
+      rw [headEq]
+      exact induction _
+
+/-- Rigid substitution does not change a predicate's ordered flexible-variable
+ledger when it preserves the flexible variables of every replacement type. -/
+theorem predicateVariables_applyParameterSubstitution_of_freeVariables_eq
+    (substitution : ParameterSubstitution) (predicate : Predicate)
+    (preserves : ∀ type,
+      (substitution.apply type).freeVariables = type.freeVariables) :
+    predicateVariables (applyParameterSubstitution substitution predicate) =
+      predicateVariables predicate := by
+  cases predicate with
+  | mk trait subject arguments =>
+      simp only [applyParameterSubstitution, predicateVariables]
+      rw [preserves subject]
+      exact foldl_appendVariables_map_of_freeVariables_eq substitution preserves
+        subject.freeVariables arguments
+
 /-- Rigid declaration parameters in stable subject-then-argument order. -/
 def predicateParameters (predicate : Predicate) : List TypeParameterId :=
   predicate.arguments.foldl appendParameters

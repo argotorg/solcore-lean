@@ -337,12 +337,14 @@ primitive rules; source-only coercion enumeration and method catalogs do not.
 
 ### Declarative source-semantics foundation
 
-ADR-0377 establishes `Solcore.SourceSemantics` as an independent source-level
-formal specification over the resolved, occurrence-addressed source carrier.
+ADR-0377 establishes `Solcore.SourceSemantics` as a proof-facing declarative
+source-level specification over the resolved, occurrence-addressed source carrier.
 Its contexts, exact instantiation, occurrence lookup, trait-evidence validity,
 retained-evidence representation, and reference typing remain the foundation
 of the broader ADR-0378 semantics. Successful source inference, checking,
-specialization, compilation, and runtime execution are not defining premises.
+specialization, compilation, and runtime execution are not defining premises;
+pure structural projections shared with the frontend are not thereby claimed
+to have an implementation-independent definition.
 See [ADR-0377](adr/0377-declarative-source-semantics-foundation.md) for that
 authority boundary.
 
@@ -357,6 +359,21 @@ bodies an independent syntax-directed operation; explicit correspondence
 theorems relate it to the frontend specialization helper without making that
 helper normative.
 
+Resolved declaration bodies have a body-wide residual-inference scope. It is
+distinct from the lexical `typeVariables` installed only while checking a
+generalized initializer: nested initializers inherit those lexical variables,
+whereas residual admission applies throughout the retained body and does not
+add variables to the generalization barrier. `TypeAdmissible` covers both
+scopes. `SchemeGeneralizes` is a conservative whole-body counterpart of the
+executable frontend's point-in-time barrier: it considers lexical initializer
+variables, preceding local schemes, and the complete retained requirement
+ledger. On forgeable bodies, a later requirement may therefore block more
+variables than the frontend knew at that source point. The proposition does
+not assume frontend success, but its policy and pure predicate-variable
+projection are not claimed to be frontend-independent. Catalog signatures and
+the replacement ranges accepted by `Valid` continue to use closed
+`TypeWellFormed` types.
+
 Independent values, heaps, closures, runtime dictionaries, primitives,
 patterns, places, and coercions support fuel-free successful big-step rules for
 all retained expression and statement forms, including calls, mutation,
@@ -366,13 +383,30 @@ to Unit, Bool, Word, and products, has an explicit typed representation bridge
 to the frontend staged-value carrier, and remains parameterized by an ambient
 expression-evaluation relation.
 
+An instantiated runtime `Context` has no rigid declaration parameters or
+lexical generalized-initializer variables, but deliberately remains
+residual-open. Closures and proxies may therefore evaluate while retaining
+symbolic residual types. Successful declaration-reference, direct-call, and
+data-constructor occurrences are narrower: their dynamic rules require the
+closed `DeclarationInstantiation.Valid` or
+`DataConstructorInstantiation.Valid` judgment rather than static
+`Admissible`. Heap allocation is narrower as well: successful let and for-let
+rules require a monomorphic scheme, while a generalized binder faults with
+`unsupportedPolymorphicBinder` before its initializer is evaluated. Runtime
+instantiation of generalized local values remains deferred.
+
 Rigid-parameter substitution now preserves the complete static derivation,
 including patterns, places, calls, statements, bodies, implementation-head
 matching, semantic evidence, and solved-requirement ledgers. The dynamic
 preservation chain composes through expressions, statements, loops, body
-invocation, and whole-program entry. A successful evaluation from a deeply
-typed heap and agreeing environment in a closed instantiated context preserves
-the result or control type, final heap typing, and heap-type extension.
+invocation, and whole-program entry. A successful evaluation from a
+value/annotation-agreeing `HeapWellTyped` heap and agreeing environment in an
+instantiated context with closed rigid and lexical flexible binders—but an open
+residual scope—preserves the result or control type, final heap agreement, and
+heap-type extension. `HeapWellTyped` does not independently prove formation of
+an uninitialized cell's annotation (or the annotations of an empty mapping or
+proxy); those formation facts come from the static derivation for reachable
+program-produced values.
 `ProgramWellFormed.wholeLanguagePreservation` constructs this proof package
 without an extra preservation premise, and `ProgramEvaluates.preserves`
 applies it at the admitted entry boundary. The control proof also rules out an
@@ -388,11 +422,14 @@ correspondence, progress, determinism, termination, and backend correctness
 remain open. In particular, a well-typed mapping lookup whose value type has
 no canonical `DefaultValue` can be stuck when the key is absent; the current
 theorem is successful-evaluation preservation, not progress or fault
-completeness. Function types also retain the packed parameter type rather than
-source arity: for example, zero arguments and one Unit argument both pack to
-Unit. A well-typed first-class call can therefore report an explicit argument-
-arity fault when the callable's retained binder count differs from the call
-metadata; conditional preservation does not classify that run as successful.
+completeness. A residual generic global reference or direct call can likewise
+be statically `Admissible` yet remain stuck when its substitution has no closed
+`Valid` witness; the positive fault relation does not promise a fault for that
+case. Function types also retain the packed parameter type rather than source
+arity: for example, zero arguments and one Unit argument both pack to Unit. A
+well-typed first-class call can therefore report an explicit argument-arity
+fault when the callable's retained binder count differs from the call metadata;
+conditional preservation does not classify that run as successful.
 See
 [ADR-0378](adr/0378-declarative-resolved-source-semantics.md) for the exact
 boundary.

@@ -98,7 +98,7 @@ private theorem statementFinalContext_eq
   rcases Solcore.SourceSemantics.Dynamic.StatementHasType.formTyping typing with
     ⟨typedNode, typed_contains, form_typing⟩
   cases execution with
-  | letUninitialized contains form_eq extension allocate =>
+  | letUninitialized contains form_eq runtime_monomorphic extension allocate =>
       have node_eq := containsStatement_unique
         graph.nodeOccurrencesUnique typed_contains contains
       subst typedNode
@@ -107,7 +107,7 @@ private theorem statementFinalContext_eq
       | letUninitialized monomorphic static_extension =>
           exact Solcore.SourceSemantics.Dynamic.BinderExtends.functional extension
             static_extension
-  | letInitialized contains form_eq evaluate extension allocate =>
+  | letInitialized contains form_eq evaluate runtime_monomorphic extension allocate =>
       have node_eq := containsStatement_unique
         graph.nodeOccurrencesUnique typed_contains contains
       subst typedNode
@@ -116,6 +116,8 @@ private theorem statementFinalContext_eq
       | letInitialized initializer_type monomorphic static_extension =>
           exact Solcore.SourceSemantics.Dynamic.BinderExtends.functional extension
             static_extension
+      | letInitializedGeneralized polymorphic initializer_type static_extension =>
+          exact (polymorphic runtime_monomorphic).elim
   | returnUnit contains form_eq | returnValue contains form_eq evaluate
     | expression contains form_eq evaluate
     | assignValue contains form_eq assignment_executes
@@ -192,13 +194,20 @@ private theorem tailExpressionTyping
         control := .ordinary type
       } := by
   cases typing with
-  | letUninitialized static_contains static_form monomorphic extension type_eq =>
+  | letUninitialized static_contains static_form monomorphic generalizes extension
+      type_eq =>
       have node_eq := containsStatement_unique graph.nodeOccurrencesUnique
         static_contains contains
       subst_vars
       simp_all
   | letInitialized static_contains static_form initializer_type monomorphic
-      extension type_eq =>
+      generalizes extension type_eq =>
+      have node_eq := containsStatement_unique graph.nodeOccurrencesUnique
+        static_contains contains
+      subst_vars
+      simp_all
+  | letInitializedGeneralized static_contains static_form polymorphic generalizes
+      initializer_type extension type_eq =>
       have node_eq := containsStatement_unique graph.nodeOccurrencesUnique
         static_contains contains
       subst_vars
@@ -407,7 +416,7 @@ mutual
         | reference reference_type reference_requirements =>
             exact evaluated.referencePreserves environment_agrees before_typed
               (.reference reference_type reference_requirements)
-    | evaluated@(.declaration layout requirements_close) => by
+    | evaluated@(.declaration layout dynamic_valid requirements_close) => by
         cases typing with
         | reference reference_type reference_requirements =>
             exact evaluated.referencePreserves environment_agrees before_typed
@@ -536,6 +545,8 @@ mutual
               } := {
               owner := runtime.owner
               closed := runtime.closed
+              variables_closed := runtime.variables_closed
+              residual_variables_open := runtime.residual_variables_open
               graph := runtime.graph
               occurrence := ⟨id, node, contains, node_form, by
                   simpa [body_types] using node_raw, by
@@ -558,7 +569,7 @@ mutual
     | @ExpressionFormEvaluates.directCall _ _ _ _ _ _ argumentsHeap _ _ _
         instantiation _ _ argumentValues
         calleeEvidence _ _ _ callee_contains callee_form callee_requirements
-        callee_coercions arguments_evaluate call_evidence applies => by
+        callee_coercions dynamic_valid arguments_evaluate call_evidence applies => by
         cases typing with
         | @directCall _ callee arguments instantiation parameterTypes resultType
             predicates callee_valid application arguments_type =>
@@ -575,7 +586,8 @@ mutual
                         (.global ⟨instantiation, calleeEvidence⟩)
                         (.function (Ty.productMany parameterTypes) rawType) := by
                       rw [← function_type_eq]
-                      exact .global valid ⟨produces.valid, by
+                      exact .global dynamic_valid
+                        ⟨produces.valid, by
                         intro predicate member
                         exact produces.supplies predicate member⟩
                     rcases ValuesPack.exists_pack argumentValues with
@@ -647,7 +659,8 @@ mutual
                 evidence_covers environment_agrees before_typed arguments_type
                 arguments_evaluate with
               ⟨arguments_typed, after_typed, extension⟩
-            exact ⟨.constructed valid arguments_typed, after_typed, extension⟩
+            exact ⟨.constructed dynamic_valid arguments_typed, after_typed,
+              extension⟩
     | .member layout base_evaluates selected_at => by
         cases typing with
         | member base_type member_type =>
@@ -1046,8 +1059,10 @@ mutual
               certificate.signatures_eq.trans runtime.signatures.symm
             have body_heap_typed := before_typed.transportClosed signatures_eq
               runtime.closed certificate.type_parameters_empty
+              runtime.variables_closed certificate.residual_type_variables_open
             have body_input_typed := input_typed.transportClosed signatures_eq
               runtime.closed certificate.type_parameters_empty
+              runtime.variables_closed certificate.residual_type_variables_open
             have body_arguments_typed : ValuesHaveTypes _ before
                 [input] [operandType] := .cons body_input_typed .nil
             have invocation := preserveBodyRec program_well_formed
@@ -1055,8 +1070,10 @@ mutual
               body_arguments_typed invokes
             have result_at_caller := invocation.result_typed.transportClosed
               signatures_eq.symm certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open
             have heap_at_caller := invocation.heap_typed.transportClosed
               signatures_eq.symm certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open
             rw [result_eq] at result_at_caller
             exact ⟨result_at_caller, heap_at_caller, invocation.heap_extends⟩
     termination_by structural evaluation
@@ -1120,10 +1137,13 @@ mutual
               certificate.signatures_eq.trans runtime.signatures.symm
             have body_heap_typed := before_typed.transportClosed signatures_eq
               runtime.closed certificate.type_parameters_empty
+              runtime.variables_closed certificate.residual_type_variables_open
             have body_left_typed := left_typed.transportClosed signatures_eq
               runtime.closed certificate.type_parameters_empty
+              runtime.variables_closed certificate.residual_type_variables_open
             have body_right_typed := right_typed.transportClosed signatures_eq
               runtime.closed certificate.type_parameters_empty
+              runtime.variables_closed certificate.residual_type_variables_open
             have body_arguments_typed : ValuesHaveTypes _ before
                 [left, right] [operandType, operandType] :=
               .cons body_left_typed (.cons body_right_typed .nil)
@@ -1132,8 +1152,10 @@ mutual
               body_arguments_typed invokes
             have result_at_caller := invocation.result_typed.transportClosed
               signatures_eq.symm certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open
             have heap_at_caller := invocation.heap_typed.transportClosed
               signatures_eq.symm certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open
             rw [result_eq] at result_at_caller
             exact ⟨result_at_caller, heap_at_caller, invocation.heap_extends⟩
     termination_by structural evaluation
@@ -1166,8 +1188,10 @@ mutual
               certificate.signatures_eq.trans runtime.signatures.symm
             have body_heap_typed := before_typed.transportClosed signatures_eq
               runtime.closed certificate.type_parameters_empty
+              runtime.variables_closed certificate.residual_type_variables_open
             have body_input_typed := input_typed.transportClosed signatures_eq
               runtime.closed certificate.type_parameters_empty
+              runtime.variables_closed certificate.residual_type_variables_open
             have body_arguments_typed : ValuesHaveTypes _ before
                 [input] [step.source] := .cons body_input_typed .nil
             have invocation := preserveBodyRec program_well_formed
@@ -1175,8 +1199,10 @@ mutual
               body_arguments_typed invokes
             have result_at_caller := invocation.result_typed.transportClosed
               signatures_eq.symm certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open
             have heap_at_caller := invocation.heap_typed.transportClosed
               signatures_eq.symm certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open
             rw [result_eq] at result_at_caller
             exact ⟨result_at_caller, heap_at_caller, invocation.heap_extends⟩
     termination_by structural evaluation
@@ -1256,8 +1282,10 @@ mutual
             certificate.signatures_eq.trans runtime.signatures.symm
           have body_before_typed := before_typed.transportClosed signatures_eq
             runtime.closed certificate.type_parameters_empty
+            runtime.variables_closed certificate.residual_type_variables_open
           have body_packed_typed := packed_typed.transportClosed signatures_eq
             runtime.closed certificate.type_parameters_empty
+            runtime.variables_closed certificate.residual_type_variables_open
           have arguments_length : arguments.length = inputTypes.length :=
             (bodyArguments_length invokes).trans
               certificate.typing.inputs_extend.length_eq
@@ -1268,9 +1296,11 @@ mutual
             arguments_typed invokes
           exact ⟨
             invocation.result_typed.transportClosed signatures_eq.symm
-              certificate.type_parameters_empty runtime.closed,
+              certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open,
             invocation.heap_typed.transportClosed signatures_eq.symm
-              certificate.type_parameters_empty runtime.closed,
+              certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open,
             invocation.heap_extends⟩
         · rcases staged with ⟨inner, impossible, inner_typed⟩
           cases impossible
@@ -1301,9 +1331,11 @@ mutual
                 parameters_extend static_parameters_extend
             subst call_context_eq
             have closure_before_typed := before_typed.transportClosed signatures_eq
-              runtime.closed code.closed
+              runtime.closed code.closed runtime.variables_closed
+              code.residual_variables_open
             have closure_packed_typed := packed_typed.transportClosed signatures_eq
-              runtime.closed code.closed
+              runtime.closed code.closed runtime.variables_closed
+              code.residual_variables_open
             have arguments_length :
                 arguments.length =
                   (function.parameters.map
@@ -1322,7 +1354,8 @@ mutual
                 static_parameters_extend
             have call_closed := fields.targetClosed code.closed
             have bound_at_call := bound_typed.transportClosed fields.signatures
-              code.closed call_closed
+              code.closed call_closed code.variables_closed
+              (fields.targetResidualVariablesOpen code.residual_variables_open)
             have call_evidence := fields.covers closure_evidence
             have closure_runtime :
                 SourceRuntimeValid program function.context function.source := {
@@ -1330,6 +1363,8 @@ mutual
               graph := code.graph
               owner := code.owner
               closed := code.closed
+              variables_closed := code.variables_closed
+              residual_variables_open := code.residual_variables_open
               ledger := frame.requirements
             }
             rcases preserveFunctionStatementsRec program_well_formed
@@ -1343,9 +1378,13 @@ mutual
                   signatures_eq.symm.trans fields.signatures.symm
                 exact ⟨
                   result_typed.transportClosed outer_signatures call_closed
-                    runtime.closed,
+                    runtime.closed
+                    (fields.targetVariablesClosed code.variables_closed)
+                    runtime.residual_variables_open,
                   after_typed.transportClosed outer_signatures call_closed
-                    runtime.closed,
+                    runtime.closed
+                    (fields.targetVariablesClosed code.variables_closed)
+                    runtime.residual_variables_open,
                   allocation_extension.trans execution_extension⟩
     | @CallableApplies.closureUnit _ _ _ _ _ _ _ function _ environment outcome parameterTypes
         callContext finalContext invocation_eq frame result_unit parameters_extend
@@ -1374,9 +1413,11 @@ mutual
                 parameters_extend static_parameters_extend
             subst call_context_eq
             have closure_before_typed := before_typed.transportClosed signatures_eq
-              runtime.closed code.closed
+              runtime.closed code.closed runtime.variables_closed
+              code.residual_variables_open
             have closure_packed_typed := packed_typed.transportClosed signatures_eq
-              runtime.closed code.closed
+              runtime.closed code.closed runtime.variables_closed
+              code.residual_variables_open
             have arguments_length :
                 arguments.length =
                   (function.parameters.map
@@ -1395,7 +1436,8 @@ mutual
                 static_parameters_extend
             have call_closed := fields.targetClosed code.closed
             have bound_at_call := bound_typed.transportClosed fields.signatures
-              code.closed call_closed
+              code.closed call_closed code.variables_closed
+              (fields.targetResidualVariablesOpen code.residual_variables_open)
             have call_evidence := fields.covers closure_evidence
             have closure_runtime :
                 SourceRuntimeValid program function.context function.source := {
@@ -1403,6 +1445,8 @@ mutual
               graph := code.graph
               owner := code.owner
               closed := code.closed
+              variables_closed := code.variables_closed
+              residual_variables_open := code.residual_variables_open
               ledger := frame.requirements
             }
             rcases preserveFunctionStatementsRec program_well_formed
@@ -1416,7 +1460,9 @@ mutual
                   signatures_eq.symm.trans fields.signatures.symm
                 exact ⟨by rw [result_unit]; exact .unit,
                   after_typed.transportClosed outer_signatures call_closed
-                    runtime.closed,
+                    runtime.closed
+                    (fields.targetVariablesClosed code.variables_closed)
+                    runtime.residual_variables_open,
                   allocation_extension.trans execution_extension⟩
     termination_by structural evaluation
 
@@ -1474,6 +1520,9 @@ mutual
           certificate.type_parameters_empty
         have bound_at_lexical := bound_typed.transportClosed fields.signatures
           certificate.type_parameters_empty lexical_closed
+          certificate.type_variables_empty
+          (fields.targetResidualVariablesOpen
+            certificate.residual_type_variables_open)
         have lexical_evidence := fields.covers evidence_covers
         rcases preserveFunctionStatementsRec program_well_formed
             (certificate.sourceRuntimeValid.transport fields) lexical_evidence
@@ -1487,8 +1536,12 @@ mutual
               result_typed := result_typed.transportClosed
                 fields.signatures.symm lexical_closed
                 certificate.type_parameters_empty
+                (fields.targetVariablesClosed certificate.type_variables_empty)
+                certificate.residual_type_variables_open
               heap_typed := after_typed.transportClosed fields.signatures.symm
                 lexical_closed certificate.type_parameters_empty
+                (fields.targetVariablesClosed certificate.type_variables_empty)
+                certificate.residual_type_variables_open
               heap_extends := allocation_extension.trans execution_extension
             }
     | .unit covers result_unit roots_eq inputs_extend allocate execute
@@ -1530,6 +1583,9 @@ mutual
           certificate.type_parameters_empty
         have bound_at_lexical := bound_typed.transportClosed fields.signatures
           certificate.type_parameters_empty lexical_closed
+          certificate.type_variables_empty
+          (fields.targetResidualVariablesOpen
+            certificate.residual_type_variables_open)
         have lexical_evidence := fields.covers evidence_covers
         rcases preserveFunctionStatementsRec program_well_formed
             (certificate.sourceRuntimeValid.transport fields) lexical_evidence
@@ -1543,6 +1599,8 @@ mutual
               result_typed := by rw [result_unit]; exact .unit
               heap_typed := after_typed.transportClosed fields.signatures.symm
                 lexical_closed certificate.type_parameters_empty
+                (fields.targetVariablesClosed certificate.type_variables_empty)
+                certificate.residual_type_variables_open
               heap_extends := allocation_extension.trans execution_extension
             }
     termination_by structural evaluation
@@ -1566,7 +1624,7 @@ mutual
       StatementEvaluationPreserved context staticFinalContext control.returnType
         before after outcome :=
     match evaluation with
-    | .letUninitialized contains form_eq extension allocate => by
+    | .letUninitialized contains form_eq runtime_monomorphic extension allocate => by
         have graph : OccurrenceGraphWellFormed source := runtime.graph
         have owner : context.currentDeclaration = some source.owner := runtime.owner
         have closed : context.typeParameters = [] := runtime.closed
@@ -1586,10 +1644,10 @@ mutual
               heap_typed := after_typed
               heap_extends := allocation_extension
               outcome_typed := .fallthrough
-                (.cons allocate.reads_new rfl monomorphic
+                (.cons allocate.reads_new rfl runtime_monomorphic
                   (environment_agrees.mono allocation_extension))
             }
-    | .letInitialized contains form_eq evaluate extension allocate => by
+    | .letInitialized contains form_eq evaluate runtime_monomorphic extension allocate => by
         have graph : OccurrenceGraphWellFormed source := runtime.graph
         have owner : context.currentDeclaration = some source.owner := runtime.owner
         have closed : context.typeParameters = [] := runtime.closed
@@ -1613,10 +1671,12 @@ mutual
               heap_typed := after_typed
               heap_extends := evaluation_extension.trans allocation_extension
               outcome_typed := .fallthrough
-                (.cons allocate.reads_new rfl monomorphic
+                (.cons allocate.reads_new rfl runtime_monomorphic
                   ((environment_agrees.mono evaluation_extension).mono
                     allocation_extension))
             }
+        | letInitializedGeneralized polymorphic initializer_type static_extension =>
+            exact (polymorphic runtime_monomorphic).elim
     | .returnUnit contains form_eq => by
         have graph : OccurrenceGraphWellFormed source := runtime.graph
         have owner : context.currentDeclaration = some source.owner := runtime.owner
@@ -1751,6 +1811,7 @@ mutual
               heap_typed := body_heap_typed
               heap_extends := extension
               outcome_typed := body_outcome.restore (.refl context) closed
+                runtime.variables_closed runtime.residual_variables_open
                 (environment_agrees.mono extension)
             }
         | ifWithElse condition_type then_type else_type =>
@@ -1769,6 +1830,7 @@ mutual
               heap_typed := body_heap_typed
               heap_extends := extension
               outcome_typed := body_outcome.restore (.refl context) closed
+                runtime.variables_closed runtime.residual_variables_open
                 (environment_agrees.mono extension)
             }
     | .ifFalseWithoutElse contains form_eq condition_evaluates => by
@@ -1821,6 +1883,7 @@ mutual
               heap_typed := body_heap_typed
               heap_extends := extension
               outcome_typed := body_outcome.restore (.refl context) closed
+                runtime.variables_closed runtime.residual_variables_open
                 (environment_agrees.mono extension)
             }
     | .block contains form_eq body_executes => by
@@ -1846,6 +1909,7 @@ mutual
               heap_typed := body_heap_typed
               heap_extends := extension
               outcome_typed := body_outcome.restore (.refl context) closed
+                runtime.variables_closed runtime.residual_variables_open
                 (environment_agrees.mono extension)
             }
     | .matchArm contains form_eq scrutinee_contains scrutinee_evaluates
@@ -1943,7 +2007,9 @@ mutual
           have arm_closed := arm_fields.targetClosed closed
           have arm_evidence := arm_fields.covers evidence_covers
           have bound_heap_at_arm := bound_heap_typed.transportClosed
-            arm_fields.signatures closed arm_closed
+            arm_fields.signatures closed arm_closed runtime.variables_closed
+            (arm_fields.targetResidualVariablesOpen
+              runtime.residual_variables_open)
           rcases preserveStatementsRec program_well_formed
               (runtime.transport arm_fields) arm_evidence
               aligned_arm_environment_agrees bound_heap_at_arm aligned_arm_type
@@ -1953,12 +2019,15 @@ mutual
             ⟨arm_heap_typed, arm_extension, arm_outcome⟩
           have arm_heap_at_outer := arm_heap_typed.transportClosed
             arm_fields.signatures.symm arm_closed closed
+            (arm_fields.targetVariablesClosed runtime.variables_closed)
+            runtime.residual_variables_open
           have extension := ((scrutinee_extension.trans hidden_extension).trans
             bound_extension).trans arm_extension
           exact {
             heap_typed := arm_heap_at_outer
             heap_extends := extension
             outcome_typed := arm_outcome.restore arm_fields closed
+              runtime.variables_closed runtime.residual_variables_open
               (environment_agrees.mono extension)
           }
     | .matchDefault contains form_eq scrutinee_contains scrutinee_evaluates
@@ -2013,6 +2082,7 @@ mutual
               heap_typed := body_heap_typed
               heap_extends := extension
               outcome_typed := body_outcome.restore (.refl context) closed
+                runtime.variables_closed runtime.residual_variables_open
                 (environment_agrees.mono extension)
             }
     | .matchNoBranch contains form_eq scrutinee_contains scrutinee_evaluates
@@ -2095,6 +2165,9 @@ mutual
             have loop_evidence := aligned_loop_fields.covers evidence_covers
             have initialized_at_loop := initialized_typed.transportClosed
               aligned_loop_fields.signatures closed loop_closed
+              runtime.variables_closed
+              (aligned_loop_fields.targetResidualVariablesOpen
+                runtime.residual_variables_open)
             rcases preserveForLoopRec program_well_formed
                 (runtime.transport aligned_loop_fields) loop_evidence
                 aligned_loop_environment_agrees initialized_at_loop
@@ -2102,11 +2175,14 @@ mutual
               ⟨loop_heap_typed, loop_extension, loop_outcome⟩
             have loop_heap_at_outer := loop_heap_typed.transportClosed
               aligned_loop_fields.signatures.symm loop_closed closed
+              (aligned_loop_fields.targetVariablesClosed runtime.variables_closed)
+              runtime.residual_variables_open
             have extension := initializer_extension.trans loop_extension
             exact {
               heap_typed := loop_heap_at_outer
               heap_extends := extension
               outcome_typed := loop_outcome.restore aligned_loop_fields closed
+                runtime.variables_closed runtime.residual_variables_open
                 (environment_agrees.mono extension)
             }
     | .whileLoop contains form_eq iterate => by
@@ -2130,6 +2206,7 @@ mutual
               heap_typed := loop_heap_typed
               heap_extends := extension
               outcome_typed := loop_outcome.restore (.refl context) closed
+                runtime.variables_closed runtime.residual_variables_open
                 (environment_agrees.mono extension)
             }
     | .breakStmt contains form_eq => by
@@ -2247,6 +2324,9 @@ mutual
                 have middle_evidence := aligned_fields.covers evidence_covers
                 have middle_typed' := middle_typed.transportClosed
                   aligned_fields.signatures runtime.closed middle_closed
+                  runtime.variables_closed
+                  (aligned_fields.targetResidualVariablesOpen
+                    runtime.residual_variables_open)
                 rcases preserve_tail (runtime.transport aligned_fields)
                     middle_evidence aligned_middle_environment_agrees middle_typed'
                     aligned_tail_type with
@@ -2254,9 +2334,12 @@ mutual
                 exact {
                   heap_typed := after_typed.transportClosed
                     aligned_fields.signatures.symm middle_closed runtime.closed
+                    (aligned_fields.targetVariablesClosed runtime.variables_closed)
+                    runtime.residual_variables_open
                   heap_extends := head_extension.trans tail_extension
                   outcome_typed := tail_outcome.transportEntry aligned_fields
-                    runtime.closed
+                    runtime.closed runtime.variables_closed
+                    runtime.residual_variables_open
                 }
     | @StatementsExecute.terminal program context finalContext evidence source
         environment before after statement statements outcome head terminal => by
@@ -2306,12 +2389,12 @@ mutual
         before statement runtimeFinalContext outcome after) :
       outcome.IsFallthrough → facts.control.canFallthrough = true :=
     match evaluation with
-    | .letUninitialized contains form_eq extension allocate => by
+    | .letUninitialized contains form_eq runtime_monomorphic extension allocate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
         exact fun _ => rfl
-    | .letInitialized contains form_eq evaluate extension allocate => by
+    | .letInitialized contains form_eq evaluate runtime_monomorphic extension allocate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
@@ -2494,7 +2577,8 @@ mutual
         have arm_closed := arm_fields.targetClosed runtime.closed
         have arm_evidence := arm_fields.covers evidence_covers
         have bound_heap_at_arm := bound_heap_typed.transportClosed
-          arm_fields.signatures runtime.closed arm_closed
+          arm_fields.signatures runtime.closed arm_closed runtime.variables_closed
+          (arm_fields.targetResidualVariablesOpen runtime.residual_variables_open)
         have arm_falls := preserveStatementsControlRec
           program_well_formed (runtime.transport arm_fields) arm_evidence
           aligned_arm_environment_agrees bound_heap_at_arm aligned_arm_type execute
@@ -2670,6 +2754,9 @@ mutual
                 have middle_evidence := aligned_fields.covers evidence_covers
                 have middle_typed' := middle_typed.transportClosed
                   aligned_fields.signatures runtime.closed middle_closed
+                  runtime.variables_closed
+                  (aligned_fields.targetResidualVariablesOpen
+                    runtime.residual_variables_open)
                 intro falls
                 exact ControlSummary.sequence_canFallthrough
                   (control_head head_type)
@@ -2792,6 +2879,9 @@ mutual
                 have middle_evidence := aligned_fields.covers evidence_covers
                 have middle_typed' := middle_typed.transportClosed
                   aligned_fields.signatures runtime.closed middle_closed
+                  runtime.variables_closed
+                  (aligned_fields.targetResidualVariablesOpen
+                    runtime.residual_variables_open)
                 have tail_completes :=
                   BodyCompletes.tail_of_cons_of_hasOutcome
                     (control_head head_type)
@@ -2803,9 +2893,12 @@ mutual
                 exact {
                   heap_typed := after_typed.transportClosed
                     aligned_fields.signatures.symm middle_closed runtime.closed
+                    (aligned_fields.targetVariablesClosed runtime.variables_closed)
+                    runtime.residual_variables_open
                   heap_extends := head_extension.trans tail_extension
                   outcome_typed := tail_outcome.transportEntry aligned_fields
-                    runtime.closed
+                    runtime.closed runtime.variables_closed
+                    runtime.residual_variables_open
                 }
     | .terminal head terminal => by
         cases typing with
@@ -2838,18 +2931,19 @@ mutual
         HeapWellTyped context after /\ HeapTypesExtend before after /\
           EnvironmentAgrees after staticFinalContext.locals finalEnvironment :=
     match evaluation with
-    | .letUninitialized extension allocate => by
+    | .letUninitialized runtime_monomorphic extension allocate => by
         cases typing with
-        | letUninitialized monomorphic static_extension =>
+        | letUninitialized monomorphic _generalizes static_extension =>
             cases static_extension
             cases extension
             have heap_extension := HeapTypesExtend.of_allocation allocate
             exact ⟨rfl, before_typed.allocate (.none _) allocate, heap_extension,
-              .cons allocate.reads_new rfl monomorphic
+              .cons allocate.reads_new rfl runtime_monomorphic
                 (environment_agrees.mono heap_extension)⟩
-    | .letInitialized evaluate extension allocate => by
+    | .letInitialized evaluate runtime_monomorphic extension allocate => by
         cases typing with
-        | letInitialized initializer_type monomorphic static_extension =>
+        | letInitialized initializer_type monomorphic _generalizes
+            static_extension =>
             cases static_extension
             cases extension
             rcases preserveExpressionRec program_well_formed runtime
@@ -2859,9 +2953,12 @@ mutual
             have allocation_extension := HeapTypesExtend.of_allocation allocate
             exact ⟨rfl, middle_typed.allocate (.some value_typed) allocate,
               evaluation_extension.trans allocation_extension,
-              .cons allocate.reads_new rfl monomorphic
+              .cons allocate.reads_new rfl runtime_monomorphic
                 ((environment_agrees.mono evaluation_extension).mono
                   allocation_extension)⟩
+        | letInitializedGeneralized polymorphic _generalizes initializer_type
+            static_extension =>
+            exact (polymorphic runtime_monomorphic).elim
     | .expression evaluate => by
         cases typing with
         | expression expression_type =>
@@ -2926,7 +3023,8 @@ mutual
             have middle_closed := fields.targetClosed runtime.closed
             have middle_evidence := fields.covers evidence_covers
             have middle_typed' := middle_typed.transportClosed fields.signatures
-              runtime.closed middle_closed
+              runtime.closed middle_closed runtime.variables_closed
+              (fields.targetResidualVariablesOpen runtime.residual_variables_open)
             rcases preserveForItemsRec (control := control)
                 (staticFinalContext := staticFinalContext)
                 program_well_formed
@@ -2937,6 +3035,8 @@ mutual
             subst final_context_eq
             have after_typed' := after_typed.transportClosed
               fields.signatures.symm middle_closed runtime.closed
+              (fields.targetVariablesClosed runtime.variables_closed)
+              runtime.residual_variables_open
             exact ⟨rfl, after_typed', head_extension.trans tail_extension,
               final_environment_agrees⟩
     termination_by structural evaluation

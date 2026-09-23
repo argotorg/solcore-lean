@@ -212,7 +212,8 @@ theorem unitBodyHasType :
   · rfl
   · simp [TypeParameterBindersWellFormed, declarationContext,
       Context.withSolvedRequirements, Context.withAssumptions,
-      Context.forDeclaration, Context.ofSignatures]
+      Context.withResidualTypeVariables, Context.forDeclaration,
+      Context.ofSignatures]
   · simp [TypesWellFormed]
   · simp [TypesWellFormed]
   · rfl
@@ -226,15 +227,18 @@ theorem unitBodyHasType :
   · constructor
     · simp [RequirementIdsUnique, unitBody, declarationContext,
         Context.withSolvedRequirements, Context.withAssumptions,
-        Context.forDeclaration, Context.ofSignatures]
+        Context.withResidualTypeVariables, Context.forDeclaration,
+        Context.ofSignatures]
     · intro requirement member
       simp [unitBody, declarationContext, Context.withSolvedRequirements,
-        Context.withAssumptions, Context.forDeclaration,
+        Context.withAssumptions, Context.withResidualTypeVariables,
+        Context.forDeclaration,
         Context.ofSignatures] at member
   · constructor <;>
       simp [primaryRequirementIds, unitBody, unitSource, declarationContext,
         Context.withSolvedRequirements, Context.withAssumptions,
-        Context.forDeclaration, Context.ofSignatures]
+        Context.withResidualTypeVariables, Context.forDeclaration,
+        Context.ofSignatures]
   · refine ⟨_, .nil _ _, ?_, ?_⟩
     · intro expression member
       simp [unitBody, unitSource] at member
@@ -354,7 +358,8 @@ theorem unitEvidenceCovers :
     cases lookup
   · intro predicate member
     simp [unitBodyInstance, declarationContext, Context.withSolvedRequirements,
-      Context.withAssumptions, Context.forDeclaration, Context.ofSignatures]
+      Context.withAssumptions, Context.withResidualTypeVariables,
+      Context.forDeclaration, Context.ofSignatures]
       at member
 
 theorem emptyHeapWellTyped :

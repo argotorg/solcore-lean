@@ -76,6 +76,9 @@ theorem StatementsHaveType.controlHasOutcome
   case letInitialized =>
     intros
     exact ControlSummary.hasOutcome_ordinary .unit
+  case letInitializedGeneralized =>
+    intros
+    exact ControlSummary.hasOutcome_ordinary .unit
   case returnUnit =>
     intros
     exact ControlSummary.hasOutcome_returned

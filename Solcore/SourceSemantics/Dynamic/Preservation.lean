@@ -764,7 +764,7 @@ recover the statically expected payload typing. -/
 theorem constructedPayloadsOfAgreement
     {context : Context} {heap : Heap}
     {actual expected : DataConstructorInstantiation} {arguments : List Value}
-    (valid : DataConstructorInstantiation.Valid context expected)
+    (valid : DataConstructorInstantiation.Admissible context expected)
     (agreement : ConstructorInstantiationsAgree actual expected)
     (typed : ValueHasType context heap (.constructed actual arguments)
       expected.resultType) :
@@ -2127,8 +2127,9 @@ theorem referencePreserves
               exact ⟨result_typed, after_typed, extension⟩
       | declaration valid =>
           cases evaluation with
-          | declaration layout requirements_close =>
-              refine ⟨.global valid ?_, before_typed, .refl before⟩
+          | declaration layout dynamic_valid requirements_close =>
+              refine ⟨.global dynamic_valid ?_, before_typed,
+                .refl before⟩
               constructor
               · exact requirements_close.valid
               · intro predicate member
@@ -2198,6 +2199,8 @@ theorem preservesWith
     (graph : OccurrenceGraphWellFormed source)
     (owner : context.currentDeclaration = some source.owner)
     (closed : context.typeParameters = [])
+    (variables_closed : context.typeVariables = [])
+    (residual_variables_open : context.residualTypeVariables = true)
     (expression_preserves :
       ExpressionExecutionPreserves program context evidence source environment)
     (unary_preserves :
@@ -2327,6 +2330,8 @@ theorem preservesWith
             } := {
             owner := owner
             closed := closed
+            variables_closed := variables_closed
+            residual_variables_open := residual_variables_open
             graph := graph
             occurrence := ⟨id, node, contains, node_form, by
                 simpa [body_types] using node_raw, by
@@ -2352,7 +2357,7 @@ theorem preservesWith
       | @directCall _ _ _ _ _ argumentsHeap _ _ _ instantiation _ _
           argumentValues calleeEvidence _ _ _ callee_contains callee_form
           callee_requirements
-          callee_coercions arguments_evaluate call_evidence applies =>
+          callee_coercions dynamic_valid arguments_evaluate call_evidence applies =>
           rcases arguments_evaluate.preserves expression_preserves evidence_covers
               environment_agrees before_typed arguments_type with
             ⟨arguments_typed, arguments_heap_typed, arguments_extension⟩
@@ -2365,7 +2370,7 @@ theorem preservesWith
                       (.global ⟨instantiation, calleeEvidence⟩)
                       (.function (Ty.productMany parameterTypes) rawType) := by
                     rw [← function_type_eq]
-                    exact .global valid ⟨produces.valid, by
+                    exact .global dynamic_valid ⟨produces.valid, by
                       intro predicate member
                       exact produces.supplies predicate member⟩
                   rcases ValuesPack.exists_pack argumentValues with
@@ -2429,7 +2434,8 @@ theorem preservesWith
           rcases arguments_evaluate.preserves expression_preserves evidence_covers
               environment_agrees before_typed arguments_type with
             ⟨arguments_typed, after_typed, extension⟩
-          exact ⟨.constructed valid arguments_typed, after_typed, extension⟩
+          exact ⟨.constructed dynamic_valid arguments_typed, after_typed,
+            extension⟩
   | member base_type member_type =>
       cases evaluation with
       | member layout base_evaluates selected_at =>
@@ -2496,6 +2502,9 @@ structure RuntimeContextFields (source target : Context) : Prop where
   currentDeclaration :
     target.currentDeclaration = source.currentDeclaration
   typeParameters : target.typeParameters = source.typeParameters
+  typeVariables : target.typeVariables = source.typeVariables
+  residualTypeVariables :
+    target.residualTypeVariables = source.residualTypeVariables
   assumptions : target.assumptions = source.assumptions
   solvedRequirements :
     target.solvedRequirements = source.solvedRequirements
@@ -2503,7 +2512,7 @@ structure RuntimeContextFields (source target : Context) : Prop where
 namespace RuntimeContextFields
 
 theorem refl (context : Context) : RuntimeContextFields context context :=
-  ⟨rfl, rfl, rfl, rfl, rfl⟩
+  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 theorem trans {first middle last : Context}
     (left : RuntimeContextFields first middle)
@@ -2512,6 +2521,8 @@ theorem trans {first middle last : Context}
   ⟨right.signatures.trans left.signatures,
     right.currentDeclaration.trans left.currentDeclaration,
     right.typeParameters.trans left.typeParameters,
+    right.typeVariables.trans left.typeVariables,
+    right.residualTypeVariables.trans left.residualTypeVariables,
     right.assumptions.trans left.assumptions,
     right.solvedRequirements.trans left.solvedRequirements⟩
 
@@ -2520,9 +2531,8 @@ theorem ofBinderExtends
     {binder : TypedBinder}
     (extension : BinderExtends owner source binder target) :
     RuntimeContextFields source target := by
-  rcases extension.context_fields with
-    ⟨signatures, current, parameters, assumptions, solved⟩
-  exact ⟨signatures, current, parameters, assumptions, solved⟩
+  cases extension
+  exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 theorem sourceClosed
     {source target : Context} (fields : RuntimeContextFields source target)
@@ -2535,6 +2545,31 @@ theorem targetClosed
     {source target : Context} (fields : RuntimeContextFields source target)
     (source_closed : source.typeParameters = []) :
     target.typeParameters = [] := fields.typeParameters.trans source_closed
+
+theorem sourceVariablesClosed
+    {source target : Context} (fields : RuntimeContextFields source target)
+    (target_closed : target.typeVariables = []) :
+    source.typeVariables = [] := by
+  rw [← fields.typeVariables]
+  exact target_closed
+
+theorem targetVariablesClosed
+    {source target : Context} (fields : RuntimeContextFields source target)
+    (source_closed : source.typeVariables = []) :
+    target.typeVariables = [] := fields.typeVariables.trans source_closed
+
+theorem sourceResidualVariablesOpen
+    {source target : Context} (fields : RuntimeContextFields source target)
+    (target_open : target.residualTypeVariables = true) :
+    source.residualTypeVariables = true := by
+  rw [← fields.residualTypeVariables]
+  exact target_open
+
+theorem targetResidualVariablesOpen
+    {source target : Context} (fields : RuntimeContextFields source target)
+    (source_open : source.residualTypeVariables = true) :
+    target.residualTypeVariables = true :=
+  fields.residualTypeVariables.trans source_open
 
 theorem covers
     {source target : Context} {evidence : EvidenceEnvironment}
@@ -2549,7 +2584,8 @@ theorem covers
 end RuntimeContextFields
 
 /-- Static invariants shared by every successful execution rooted in one
-closed source body.  In particular, ledger uniqueness is needed to identify
+rigidly and lexically closed, residual-open source body.  In particular,
+ledger uniqueness is needed to identify
 the predicate selected independently by static typing and dynamic method
 dispatch. -/
 structure SourceRuntimeValid (program : Program) (context : Context)
@@ -2558,6 +2594,8 @@ structure SourceRuntimeValid (program : Program) (context : Context)
   graph : OccurrenceGraphWellFormed source
   owner : context.currentDeclaration = some source.owner
   closed : context.typeParameters = []
+  variables_closed : context.typeVariables = []
+  residual_variables_open : context.residualTypeVariables = true
   ledger : RequirementLedgerWellFormed context
 
 namespace SourceRuntimeValid
@@ -2572,6 +2610,9 @@ theorem transport
     graph := valid.graph
     owner := fields.currentDeclaration.trans valid.owner
     closed := fields.typeParameters.trans valid.closed
+    variables_closed := fields.typeVariables.trans valid.variables_closed
+    residual_variables_open :=
+      fields.residualTypeVariables.trans valid.residual_variables_open
     ledger := ?_
   }
   rcases valid.ledger with ⟨idsUnique, entriesValid⟩
@@ -2678,6 +2719,13 @@ inductive FormTyping (source : TypedSource) (control : ControlContext)
       (monomorphic : binder.scheme.quantified = [])
       (extension : BinderExtends source.owner context binder final) :
       FormTyping source control context (.letDecl binder (some initializer)) final
+  | letInitializedGeneralized {binder initializer final}
+      (polymorphic : binder.scheme.quantified ≠ [])
+      (initializer_type : ExpressionHasType source
+        (context.withTypeVariables binder.scheme.quantified) initializer
+        binder.scheme.body)
+      (extension : BinderExtends source.owner context binder final) :
+      FormTyping source control context (.letDecl binder (some initializer)) final
   | returnUnit (return_type_eq : control.returnType = .unit) :
       FormTyping source control context (.returnStmt none) context
   | returnValue {value}
@@ -2769,11 +2817,16 @@ theorem formTyping
       ContainsStatement source statement node /\
         FormTyping source control context node.form finalContext := by
   cases typing with
-  | letUninitialized contains form_eq monomorphic extension type_eq =>
+  | letUninitialized contains form_eq monomorphic generalizes extension type_eq =>
       exact ⟨_, contains, form_eq ▸ .letUninitialized monomorphic extension⟩
-  | letInitialized contains form_eq initializer_type monomorphic extension type_eq =>
+  | letInitialized contains form_eq initializer_type monomorphic generalizes
+      extension type_eq =>
       exact ⟨_, contains,
         form_eq ▸ .letInitialized initializer_type monomorphic extension⟩
+  | letInitializedGeneralized contains form_eq polymorphic generalizes
+      initializer_type extension type_eq =>
+      exact ⟨_, contains,
+        form_eq ▸ .letInitializedGeneralized polymorphic initializer_type extension⟩
   | returnUnit contains form_eq return_type_eq type_eq =>
       exact ⟨_, contains, form_eq ▸ .returnUnit return_type_eq⟩
   | returnValue contains form_eq value_type type_eq =>
@@ -2924,6 +2977,9 @@ theorem transportEntry
     {outcome : ControlOutcome}
     (fields : RuntimeContextFields target source)
     (target_closed : target.typeParameters = [])
+    (target_variables_closed : target.typeVariables = [])
+    (target_residual_variables_open :
+      target.residualTypeVariables = true)
     (preserved : ControlOutcomePreserved source finalContext heap returnType
       outcome) :
     ControlOutcomePreserved target finalContext heap returnType outcome := by
@@ -2931,7 +2987,9 @@ theorem transportEntry
   | fallthrough agrees => exact .fallthrough agrees
   | returned typed =>
       exact .returned (typed.transportClosed fields.signatures.symm
-        (fields.targetClosed target_closed) target_closed)
+        (fields.targetClosed target_closed) target_closed
+        (fields.targetVariablesClosed target_variables_closed)
+        target_residual_variables_open)
   | breaking => exact .breaking
   | continuing => exact .continuing
 
@@ -2940,6 +2998,9 @@ theorem restore
     {outerEnvironment : Environment} {outcome : ControlOutcome}
     (fields : RuntimeContextFields outer inner)
     (outer_closed : outer.typeParameters = [])
+    (outer_variables_closed : outer.typeVariables = [])
+    (outer_residual_variables_open :
+      outer.residualTypeVariables = true)
     (outer_agrees :
       EnvironmentAgrees heap outer.locals outerEnvironment)
     (preserved : ControlOutcomePreserved inner innerFinal heap returnType
@@ -2950,7 +3011,9 @@ theorem restore
   | fallthrough agrees => exact .fallthrough outer_agrees
   | returned typed =>
       exact .returned (typed.transportClosed fields.signatures.symm
-        (fields.targetClosed outer_closed) outer_closed)
+        (fields.targetClosed outer_closed) outer_closed
+        (fields.targetVariablesClosed outer_variables_closed)
+        outer_residual_variables_open)
   | breaking => exact .breaking
   | continuing => exact .continuing
 
@@ -3062,11 +3125,14 @@ theorem preservesWith
   have graph : OccurrenceGraphWellFormed source := runtime.graph
   have owner : context.currentDeclaration = some source.owner := runtime.owner
   have closed : context.typeParameters = [] := runtime.closed
+  have variables_closed : context.typeVariables = [] := runtime.variables_closed
+  have residual_variables_open : context.residualTypeVariables = true :=
+    runtime.residual_variables_open
   rcases
       Solcore.SourceSemantics.Dynamic.StatementHasType.formTyping typing with
     ⟨typedNode, typed_contains, form_typing⟩
   cases execution with
-  | letUninitialized contains form_eq extension allocate =>
+  | letUninitialized contains form_eq runtime_monomorphic extension allocate =>
       have node_eq := containsStatement_unique runtime.graph.nodeOccurrencesUnique
         typed_contains contains
       subst typedNode
@@ -3080,10 +3146,10 @@ theorem preservesWith
             heap_typed := after_typed
             heap_extends := allocation_extension
             outcome_typed := .fallthrough
-              (.cons allocate.reads_new rfl monomorphic
+              (.cons allocate.reads_new rfl runtime_monomorphic
                 (environment_agrees.mono allocation_extension))
           }
-  | letInitialized contains form_eq evaluate extension allocate =>
+  | letInitialized contains form_eq evaluate runtime_monomorphic extension allocate =>
       have node_eq := containsStatement_unique graph.nodeOccurrencesUnique
         typed_contains contains
       subst typedNode
@@ -3100,10 +3166,12 @@ theorem preservesWith
             heap_typed := after_typed
             heap_extends := evaluation_extension.trans allocation_extension
             outcome_typed := .fallthrough
-              (.cons allocate.reads_new rfl monomorphic
+              (.cons allocate.reads_new rfl runtime_monomorphic
                 ((environment_agrees.mono evaluation_extension).mono
                   allocation_extension))
           }
+      | letInitializedGeneralized polymorphic initializer_type static_extension =>
+          exact (polymorphic runtime_monomorphic).elim
   | returnUnit contains form_eq =>
       have node_eq := containsStatement_unique graph.nodeOccurrencesUnique
         typed_contains contains
@@ -3197,6 +3265,7 @@ theorem preservesWith
             heap_typed := body_heap_typed
             heap_extends := extension
             outcome_typed := body_outcome.restore (.refl context) closed
+              variables_closed residual_variables_open
               (environment_agrees.mono extension)
           }
       | ifWithElse condition_type then_type else_type =>
@@ -3214,6 +3283,7 @@ theorem preservesWith
             heap_typed := body_heap_typed
             heap_extends := extension
             outcome_typed := body_outcome.restore (.refl context) closed
+              variables_closed residual_variables_open
               (environment_agrees.mono extension)
           }
   | ifFalseWithoutElse contains form_eq condition_evaluates =>
@@ -3252,6 +3322,7 @@ theorem preservesWith
             heap_typed := body_heap_typed
             heap_extends := extension
             outcome_typed := body_outcome.restore (.refl context) closed
+              variables_closed residual_variables_open
               (environment_agrees.mono extension)
           }
   | block contains form_eq body_executes =>
@@ -3271,6 +3342,7 @@ theorem preservesWith
             heap_typed := body_heap_typed
             heap_extends := extension
             outcome_typed := body_outcome.restore (.refl context) closed
+              variables_closed residual_variables_open
               (environment_agrees.mono extension)
           }
   | matchArm contains form_eq scrutinee_contains scrutinee_evaluates
@@ -3352,7 +3424,8 @@ theorem preservesWith
           exact owner
         have arm_evidence := arm_fields.covers evidence_covers
         have bound_heap_at_arm := bound_heap_typed.transportClosed
-          arm_fields.signatures closed arm_closed
+          arm_fields.signatures closed arm_closed variables_closed
+          (arm_fields.targetResidualVariablesOpen residual_variables_open)
         rcases statements_preserves _ _ _ _ _ _ _ _ _ _
             (runtime.transport arm_fields) arm_evidence arm_environment_agrees bound_heap_at_arm
             arm_type execute with
@@ -3361,12 +3434,15 @@ theorem preservesWith
           ⟨arm_heap_typed, arm_extension, arm_outcome⟩
         have arm_heap_at_outer := arm_heap_typed.transportClosed
           arm_fields.signatures.symm arm_closed closed
+          (arm_fields.targetVariablesClosed variables_closed)
+          residual_variables_open
         have extension := ((scrutinee_extension.trans hidden_extension).trans
           bound_extension).trans arm_extension
         exact {
           heap_typed := arm_heap_at_outer
           heap_extends := extension
-          outcome_typed := arm_outcome.restore arm_fields closed
+          outcome_typed := arm_outcome.restore arm_fields closed variables_closed
+            residual_variables_open
             (environment_agrees.mono extension)
         }
       cases form_typing with
@@ -3419,6 +3495,7 @@ theorem preservesWith
             heap_typed := body_heap_typed
             heap_extends := extension
             outcome_typed := body_outcome.restore (.refl context) closed
+              variables_closed residual_variables_open
               (environment_agrees.mono extension)
           }
   | matchNoBranch contains form_eq scrutinee_contains scrutinee_evaluates
@@ -3477,18 +3554,22 @@ theorem preservesWith
           have loop_owner := loop_fields.currentDeclaration.trans owner
           have loop_evidence := loop_fields.covers evidence_covers
           have initialized_at_loop := initialized_typed.transportClosed
-            loop_fields.signatures closed loop_closed
+            loop_fields.signatures closed loop_closed variables_closed
+            (loop_fields.targetResidualVariablesOpen residual_variables_open)
           rcases for_loop_preserves _ _ _ _ _ _ _ _ _ _ _ _ _
               (runtime.transport loop_fields) loop_evidence loop_environment_agrees
               initialized_at_loop condition_type post_type body_type iterate with
             ⟨loop_heap_typed, loop_extension, loop_outcome⟩
           have loop_heap_at_outer := loop_heap_typed.transportClosed
             loop_fields.signatures.symm loop_closed closed
+            (loop_fields.targetVariablesClosed variables_closed)
+            residual_variables_open
           have extension := initializer_extension.trans loop_extension
           exact {
             heap_typed := loop_heap_at_outer
             heap_extends := extension
             outcome_typed := loop_outcome.restore loop_fields closed
+              variables_closed residual_variables_open
               (environment_agrees.mono extension)
           }
   | whileLoop contains form_eq iterate =>
@@ -3506,6 +3587,7 @@ theorem preservesWith
             heap_typed := loop_heap_typed
             heap_extends := extension
             outcome_typed := loop_outcome.restore (.refl context) closed
+              variables_closed residual_variables_open
               (environment_agrees.mono extension)
           }
   | breakStmt contains form_eq =>
@@ -3597,6 +3679,8 @@ theorem sourceRuntimeValid
   graph := certificate.graph_closed.wellFormed
   owner := certificate.owner
   closed := certificate.type_parameters_empty
+  variables_closed := certificate.type_variables_empty
+  residual_variables_open := certificate.residual_type_variables_open
   ledger := certificate.requirement_ledger
 }
 

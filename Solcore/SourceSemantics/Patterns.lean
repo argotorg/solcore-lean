@@ -65,7 +65,7 @@ mutual
           type [] [binder] rest
     | constructor
         {instructions rest instantiation argumentCount requirements binders}
-        (valid : DataConstructorInstantiation.Valid context instantiation)
+        (valid : DataConstructorInstantiation.Admissible context instantiation)
         (arity : argumentCount = instantiation.payloadTypes.length)
         (arguments : PatternInstructionsHaveTypes context instructions
           instantiation.payloadTypes requirements binders rest) :

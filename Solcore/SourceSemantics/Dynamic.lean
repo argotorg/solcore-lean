@@ -27,5 +27,6 @@ statements, calls, loops, and control-transfer forms, together with the
 statically/staging-admitted whole-program entry relation and source-level preservation theorems.
 Fault derivations are positive evidence rather than a total complement of
 success. Whole-language preservation concerns successful runs whose rigid
-parameters have been structurally instantiated into a closed runtime context.
+parameters have been structurally instantiated and whose lexical flexible
+scope is closed; the body-wide residual inference scope remains open.
 -/

@@ -108,6 +108,32 @@ example (program : Program) (context : SourceSemantics.Context)
       context (.fault (.missingStatement id)) heap :=
   .fault (.missing missing)
 
+/-- A generalized statement binder reaches the explicit runtime boundary
+before its initializer is evaluated. -/
+example (program : Program) (context : SourceSemantics.Context)
+    (evidence : EvidenceEnvironment) (source : TypedSource)
+    (environment : Environment) (heap : Heap) (id : StatementId)
+    (node : StatementNode) (binder : TypedBinder)
+    (initializer : Option ExpressionId)
+    (contains : ContainsStatement source id node)
+    (form_eq : node.form = .letDecl binder initializer)
+    (polymorphic : binder.scheme.quantified ≠ []) :
+    StatementFaults program context evidence source environment heap id
+      (.unsupportedPolymorphicBinder binder.id) heap := by
+  exact .polymorphicLet contains form_eq polymorphic
+
+/-- The same explicit boundary applies to generalized binders in a `for`
+header. -/
+example (program : Program) (context : SourceSemantics.Context)
+    (evidence : EvidenceEnvironment) (source : TypedSource)
+    (environment : Environment) (heap : Heap) (binder : TypedBinder)
+    (initializer : Option ExpressionId)
+    (polymorphic : binder.scheme.quantified ≠ []) :
+    ForItemFaults program context evidence source environment heap
+      (.letDecl binder initializer)
+      (.unsupportedPolymorphicBinder binder.id) heap := by
+  exact .polymorphicLet polymorphic
+
 /-- A `for`-header vector stops at its first faulting item and preserves that
 item's exact fault and heap. -/
 example (program : Program) (context : SourceSemantics.Context)

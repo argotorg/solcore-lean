@@ -57,6 +57,428 @@ theorem polymorphicLocalReference
     · simp [scheme, TypeSystem.Substitution.apply,
         TypeSystem.Substitution.lookup?]
 
+/-- A quantified local can be instantiated at a flexible variable explicitly
+scoped by an enclosing generalized initializer.  This is the compositional
+case which a closed-only substitution range would reject. -/
+theorem polymorphicLocalReferenceAtAmbientVariable
+    (context : Solcore.SourceSemantics.Context)
+    (binder : Resolved.LocalId)
+    (quantified ambient : TypeVarId)
+    (context_binders : TypeParameterBindersWellFormed context) :
+    ReferenceHasRawType
+      ((context.withTypeVariables [ambient]).withLocal binder {
+        quantified := [quantified]
+        body := .variable quantified
+      })
+      (.local binder) (.variable ambient) := by
+  let scheme : Scheme := {
+    quantified := [quantified]
+    body := .variable quantified
+  }
+  let ambientContext :=
+    (context.withTypeVariables [ambient]).withLocal binder scheme
+  change ReferenceHasRawType ambientContext (.local binder) (.variable ambient)
+  apply ReferenceHasRawType.local
+  · exact Context.localLookup_withLocal_self _ _ _
+  · refine SchemeInstantiatesAt.intro ?_
+      [(quantified, .variable ambient)] ?_ ?_ ?_
+    · exact {
+        binders := (context_binders.withTypeVariables [ambient]).withLocal
+          binder scheme
+        quantified_nodup := by simp [scheme]
+        body := by
+          apply TypeWellScoped.variable
+          simp [ambientContext, scheme, Context.withTypeVariables,
+            Context.withLocal]
+      }
+    · exact ExactSubstitution.singleton quantified (.variable ambient)
+    · intro candidate replacement member
+      simp only [List.mem_cons, List.mem_nil_iff, or_false,
+        Prod.mk.injEq] at member
+      rcases member with ⟨rfl, rfl⟩
+      exact {
+        binders := (context_binders.withTypeVariables [ambient]).withLocal
+          binder scheme
+        typeWellScoped := by
+          apply TypeWellScoped.variable
+          simp [ambientContext, admissibleTypeVariables,
+            Context.withTypeVariables, Context.withLocal,
+            TypeSystem.Ty.freeVariables]
+      }
+    · simp [scheme, TypeSystem.Substitution.apply,
+        TypeSystem.Substitution.lookup?]
+
+/-- Opening residual scope admits a retained occurrence metavariable but does
+not turn it into a closed source type. -/
+theorem residualVariableAdmissible
+    (context : Solcore.SourceSemantics.Context) (residual : TypeVarId)
+    (context_binders : TypeParameterBindersWellFormed context) :
+    TypeAdmissible context.withResidualTypeVariables (.variable residual) := {
+  binders := context_binders.withResidualTypeVariables
+  typeWellScoped := by
+    apply TypeWellScoped.variable
+    simp [admissibleTypeVariables, Context.withResidualTypeVariables,
+      TypeSystem.Ty.freeVariables]
+}
+
+theorem residualVariableNotClosed
+    (context : Solcore.SourceSemantics.Context) (residual : TypeVarId) :
+    ¬ TypeWellFormed context.withResidualTypeVariables (.variable residual) := by
+  intro wellFormed
+  exact TypeWellFormed.variable_impossible residual wellFormed
+
+/-- A residual rigid-parameter replacement is accepted by the static
+occurrence judgment but cannot cross the closed runtime-instantiation
+boundary. -/
+theorem residualDeclarationInstantiationIsStaticOnly
+    (context : Solcore.SourceSemantics.Context)
+    (signature : ProgramFunctionSignature)
+    (signature_mem : signature ∈ context.signatures.functions)
+    (parameter : TypeParameterId) (residual : TypeVarId)
+    (parameters_eq : signature.scheme.parameters = [parameter])
+    (body_eq : signature.scheme.body = .parameter parameter)
+    (context_binders : TypeParameterBindersWellFormed context) :
+    ∃ instantiation,
+      DeclarationInstantiation.Admissible
+        context.withResidualTypeVariables instantiation ∧
+      ¬ DeclarationInstantiation.Valid
+        context.withResidualTypeVariables instantiation := by
+  let substitution : ParameterSubstitution :=
+    [(parameter, .variable residual)]
+  let instantiation : Frontend.SourceInference.DeclarationInstantiation := {
+    declaration := signature.id
+    parameterSubstitution := substitution
+    type := .variable residual
+    predicates := signature.scheme.predicates.map
+      (ProgramPredicate.applyParameters substitution)
+    parameterComptime := signature.parameterComptime
+    returnComptime := signature.returnComptime
+  }
+  refine ⟨instantiation, ?_, ?_⟩
+  · apply DeclarationInstantiation.Admissible.intro signature
+    · simpa [Context.withResidualTypeVariables] using signature_mem
+    · rfl
+    · simpa [instantiation, substitution, parameters_eq] using
+        ParameterSubstitution.exact_singleton parameter (.variable residual)
+    · intro candidate replacement member
+      simp only [instantiation, substitution, List.mem_cons,
+        List.mem_nil_iff, or_false, Prod.mk.injEq] at member
+      rcases member with ⟨rfl, rfl⟩
+      exact residualVariableAdmissible context residual context_binders
+    · simp [instantiation, substitution, body_eq,
+        TypeSystem.ParameterSubstitution.apply,
+        TypeSystem.ParameterSubstitution.lookup?]
+    · rfl
+    · rfl
+    · rfl
+  · intro valid
+    cases valid with
+    | intro selected selected_mem declaration_eq exact range type_eq
+        predicates_eq parameterComptime_eq returnComptime_eq =>
+        have member :
+            (parameter, .variable residual) ∈
+              instantiation.parameterSubstitution := by
+          simp [instantiation, substitution]
+        exact TypeWellFormed.variable_impossible residual
+          (range parameter (.variable residual) member)
+
+/-- A quantified local may be instantiated at an unconstrained occurrence
+metavariable retained anywhere in a resolved body.  This is distinct from the
+lexical flexible scope used inside generalized initializers. -/
+theorem polymorphicLocalReferenceAtResidualVariable
+    (context : Solcore.SourceSemantics.Context)
+    (binder : Resolved.LocalId)
+    (quantified residual : TypeVarId)
+    (context_binders : TypeParameterBindersWellFormed context) :
+    ReferenceHasRawType
+      (context.withResidualTypeVariables.withLocal binder {
+        quantified := [quantified]
+        body := .variable quantified
+      })
+      (.local binder) (.variable residual) := by
+  let scheme : Scheme := {
+    quantified := [quantified]
+    body := .variable quantified
+  }
+  let residualContext :=
+    context.withResidualTypeVariables.withLocal binder scheme
+  change ReferenceHasRawType residualContext (.local binder)
+    (.variable residual)
+  apply ReferenceHasRawType.local
+  · exact Context.localLookup_withLocal_self _ _ _
+  · refine SchemeInstantiatesAt.intro ?_
+      [(quantified, .variable residual)] ?_ ?_ ?_
+    · exact {
+        binders := context_binders.withLocal binder scheme
+        quantified_nodup := by simp [scheme]
+        body := by
+          apply TypeWellScoped.variable
+          simp [residualContext, scheme, admissibleTypeVariables,
+            Context.withResidualTypeVariables, Context.withLocal]
+      }
+    · exact ExactSubstitution.singleton quantified (.variable residual)
+    · intro candidate replacement member
+      simp only [List.mem_cons, List.mem_nil_iff, or_false,
+        Prod.mk.injEq] at member
+      rcases member with ⟨rfl, rfl⟩
+      exact {
+        binders := context_binders.withLocal binder scheme
+        typeWellScoped := by
+          apply TypeWellScoped.variable
+          simp [residualContext, admissibleTypeVariables,
+            Context.withResidualTypeVariables, Context.withLocal,
+            TypeSystem.Ty.freeVariables]
+      }
+    · simp [scheme, TypeSystem.Substitution.apply,
+        TypeSystem.Substitution.lookup?]
+
+/-- Opening residual occurrence scope does not change the lexical
+generalization barrier. -/
+theorem residualScopeDoesNotBlockGeneralization
+    (context : Solcore.SourceSemantics.Context) :
+    GeneralizationBlockedVariables context.withResidualTypeVariables =
+      GeneralizationBlockedVariables context := by
+  rfl
+
+/-- Free variables of preceding local schemes participate in the
+generalization barrier. -/
+theorem precedingLocalVariableBlocksGeneralization
+    (context : Solcore.SourceSemantics.Context)
+    (binder : Resolved.LocalId) (blocked : TypeVarId) :
+    blocked ∈ GeneralizationBlockedVariables
+      (context.withLocal binder {
+        quantified := []
+        body := .variable blocked
+      }) := by
+  simp [GeneralizationBlockedVariables, Context.withLocal,
+    TypeSystem.Scheme.freeVariables, TypeSystem.Ty.freeVariables]
+
+/-- Variables retained by solved predicates also participate in the
+generalization barrier. -/
+theorem solvedRequirementVariableBlocksGeneralization
+    (context : Solcore.SourceSemantics.Context) (blocked : TypeVarId) :
+    let predicate : ProgramPredicate := {
+      trait := .builtin .int
+      subject := .variable blocked
+      arguments := []
+    }
+    let requirement : Frontend.SourceInference.SolvedRequirement := {
+      id := ⟨0⟩
+      predicate
+      evidence := .assumption predicate
+    }
+    blocked ∈ GeneralizationBlockedVariables
+      (context.withSolvedRequirements [requirement]) := by
+  simp [GeneralizationBlockedVariables, Context.withSolvedRequirements,
+    Frontend.TypedTraitResolution.predicateVariables,
+    TypeSystem.Ty.freeVariables]
+
+/-- Rigid substitution preserves the body-wide residual scope exactly. -/
+theorem rigidSubstitutionPreservesResidualScope
+    (context : Solcore.SourceSemantics.Context)
+    (substitution : ParameterSubstitution) :
+    StructuralSubstitution.applyContext substitution
+        (context.withResidualTypeVariables) =
+      Context.withResidualTypeVariables
+        (StructuralSubstitution.applyContext substitution context) := by
+  rfl
+
+/-- Generalization retains an ambient flexible variable while quantifying the
+fresh variable of the initialized value. -/
+theorem generalizesOnlyFreshVariable
+    (context : Solcore.SourceSemantics.Context)
+    (ambient fresh : TypeVarId)
+    (different : fresh ≠ ambient)
+    (blocked : GeneralizationBlockedVariables context = [ambient]) :
+    SchemeGeneralizes context {
+      quantified := [fresh]
+      body := .product (.variable ambient) (.variable fresh)
+    } := by
+  unfold SchemeGeneralizes
+  rw [blocked]
+  change [fresh] =
+    (if fresh ∈ [ambient] then [ambient] else [ambient] ++ [fresh]).filter
+      (fun metavariable => ![ambient].contains metavariable)
+  simp [different]
+
+private def generalizedLetExpressionId
+    (owner : Resolved.DeclarationId) :
+    Frontend.SourceInference.ExpressionId :=
+  ⟨⟨owner, 0⟩⟩
+
+private def generalizedLetStatementId
+    (owner : Resolved.DeclarationId) :
+    Frontend.SourceInference.StatementId :=
+  ⟨⟨owner, 1⟩⟩
+
+private def generalizedLetBinder
+    (owner : Resolved.DeclarationId) (fresh : TypeVarId)
+    (span : Syntax.SourceSpan) : Frontend.SourceInference.TypedBinder := {
+  id := ⟨owner, 0⟩
+  name := "generalized"
+  scheme := {
+    quantified := [fresh]
+    body := .proxy (.variable fresh)
+  }
+  span := some span
+}
+
+private def generalizedLetSource
+    (owner : Resolved.DeclarationId) (fresh : TypeVarId)
+    (span : Syntax.SourceSpan) : Frontend.SourceInference.TypedSource := {
+  owner
+  inputs := []
+  roots := [.statement (generalizedLetStatementId owner)]
+  nodes := [
+    .expression {
+      id := generalizedLetExpressionId owner
+      span
+      type := .proxy (.variable fresh)
+      form := .proxy (.variable fresh)
+    },
+    .statement {
+      id := generalizedLetStatementId owner
+      span
+      type := .unit
+      form := .letDecl (generalizedLetBinder owner fresh span)
+        (some (generalizedLetExpressionId owner))
+    }
+  ]
+}
+
+/-- A concrete occurrence table containing a polymorphic initialized `let`
+is admitted by the dedicated static rule.  The initializer is checked with
+the scheme's quantified variable in lexical scope, while the resulting local
+is installed in the surrounding context with its rank-1 scheme intact. -/
+theorem generalizedInitializedLetHasType
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) (span : Syntax.SourceSpan) :
+    StatementHasType (generalizedLetSource owner fresh span)
+      { returnType := .unit }
+      (Context.ofSignatures signatures)
+      (generalizedLetStatementId owner)
+      ((Context.ofSignatures signatures).withLocal
+        (generalizedLetBinder owner fresh span).id
+        (generalizedLetBinder owner fresh span).scheme) {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } := by
+  let context := Context.ofSignatures signatures
+  let binder := generalizedLetBinder owner fresh span
+  let initializer := generalizedLetExpressionId owner
+  let statement := generalizedLetStatementId owner
+  let source := generalizedLetSource owner fresh span
+  have binders : TypeParameterBindersWellFormed context :=
+    TypeParameterBindersWellFormed.ofSignatures signatures
+  have variableAdmissible :
+      TypeAdmissible (context.withTypeVariables [fresh])
+        (.variable fresh) := {
+    binders := binders.withTypeVariables [fresh]
+    typeWellScoped := by
+      apply TypeWellScoped.variable
+      simp [admissibleTypeVariables, Context.withTypeVariables, context,
+        Context.ofSignatures]
+  }
+  have proxyAdmissible :
+      TypeAdmissible (context.withTypeVariables [fresh])
+        (.proxy (.variable fresh)) := {
+    binders := binders.withTypeVariables [fresh]
+    typeWellScoped := .proxy variableAdmissible.typeWellScoped
+  }
+  have initializerType : ExpressionHasType source
+      (context.withTypeVariables [fresh]) initializer
+      (.proxy (.variable fresh)) := by
+    apply ExpressionHasType.intro
+        (node := {
+          id := initializer
+          span := span
+          type := .proxy (.variable fresh)
+          form := .proxy (.variable fresh)
+        })
+        (rawType := .proxy (.variable fresh))
+        (plan := .ordinary [])
+    · simp [ContainsExpression, source, generalizedLetSource, initializer,
+        generalizedLetExpressionId]
+    · exact .proxy variableAdmissible
+    · rfl
+    · exact proxyAdmissible
+    · exact proxyAdmissible
+    · apply ExpressionRequirementPlan.Valid.ordinary
+      · simp [RequirementIdsValid]
+      · exact .nil _
+      · rfl
+  have generalizes : SchemeGeneralizes context binder.scheme := by
+    simp [SchemeGeneralizes, GeneralizationBlockedVariables, context,
+      Context.ofSignatures, binder, generalizedLetBinder,
+      TypeSystem.Ty.freeVariables]
+  have extension : BinderExtends owner context binder
+      (context.withLocal binder.id binder.scheme) := by
+    apply BinderExtends.intro
+    · refine {
+        owned := by simp [binder, generalizedLetBinder]
+        scheme := ?_
+      }
+      refine {
+        binders
+        quantified_nodup := by simp [binder, generalizedLetBinder]
+        body := ?_
+      }
+      apply TypeWellScoped.proxy
+      apply TypeWellScoped.variable
+      simp [admissibleTypeVariables, context, Context.ofSignatures, binder,
+        generalizedLetBinder]
+    · simp [LocalFresh, context, Context.ofSignatures]
+  change StatementHasType source { returnType := .unit } context statement
+    (context.withLocal binder.id binder.scheme) _
+  apply StatementHasType.letInitializedGeneralized
+      (node := {
+        id := statement
+        span := span
+        type := .unit
+        form := .letDecl binder (some initializer)
+      })
+      (binder := binder) (initializer := initializer)
+  · simp [ContainsStatement, source, generalizedLetSource, statement,
+      generalizedLetStatementId, binder, generalizedLetBinder, initializer,
+      generalizedLetExpressionId]
+  · rfl
+  · simp [binder, generalizedLetBinder]
+  · exact generalizes
+  · exact initializerType
+  · exact extension
+  · rfl
+
+/-- The same concrete generalized binding is admitted as a complete unit
+body, so the regression also covers root extraction and statement-sequence
+typing rather than only the isolated statement constructor. -/
+theorem generalizedInitializedLetBodyHasType
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) (span : Syntax.SourceSpan) :
+    BodyHasType (generalizedLetSource owner fresh span)
+      (Context.ofSignatures signatures) .unit
+      (.singleton {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      }) := by
+  let source := generalizedLetSource owner fresh span
+  let context := Context.ofSignatures signatures
+  let statement := generalizedLetStatementId owner
+  let final := context.withLocal
+    (generalizedLetBinder owner fresh span).id
+    (generalizedLetBinder owner fresh span).scheme
+  refine ⟨final, ?_, ?_, ?_⟩
+  · change StatementsHaveType source { returnType := .unit } context
+      [statement] final _
+    apply StatementsHaveType.singleton
+    exact generalizedInitializedLetHasType signatures owner fresh span
+  · intro expression member
+    simp [generalizedLetSource] at member
+  · simp [BodyCompletes, BodyFacts.singleton, ControlSummary.ordinary]
+
 /-- An exact rigid-parameter substitution validates the complete retained
 top-level declaration instantiation. -/
 theorem genericDeclarationReference
@@ -80,7 +502,8 @@ theorem genericDeclarationReference
       })
       (substitution.apply signature.scheme.body) := by
   apply ReferenceHasRawType.declaration
-  exact .intro signature signature_mem rfl exact range rfl rfl rfl rfl
+  exact .intro signature signature_mem rfl exact range.toAdmissible
+    rfl rfl rfl rfl
 
 /-- Declarative expression membership determines executable lookup only after
 the occurrence-uniqueness invariant is supplied. -/

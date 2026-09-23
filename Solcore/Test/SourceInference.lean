@@ -64,12 +64,74 @@ private def testLambdaLetTupleConditional : IO Unit := do
       assertTrue (decide (first.inferredBodyType =
           TypeSystem.Ty.product .word .bool))
         "let-polymorphic tuple did not infer Word × Bool"
+      let idBinders := first.typedBody.nodes.filterMap fun
+        | .statement { form := .letDecl binder (some _), .. } =>
+            if binder.name == "id" then some binder else none
+        | _ => none
+      match idBinders with
+      | [binder] =>
+          let schemeShape := match binder.scheme.quantified,
+              binder.scheme.body with
+            | [quantified], .function (.variable parameter) (.variable result) =>
+                quantified == parameter && parameter == result
+            | _, _ => false
+          assertTrue schemeShape
+            "local id did not retain its generalized α → α scheme"
+          let referenceTypes := first.typedBody.nodes.filterMap fun
+            | .expression node => match node.form with
+                | .reference _ (.local candidate) =>
+                    if candidate == binder.id then some node.rawType else none
+                | _ => none
+            | .statement _ => none
+          assertTrue (referenceTypes.length == 2 &&
+              referenceTypes.any (· == .function .word .word) &&
+              referenceTypes.any (· == .function .bool .bool))
+            "local id was not independently instantiated at Word and Bool"
+      | _ => throw (IO.userError
+          "let-polymorphic fixture did not retain exactly one local id binder")
       assertTrue (decide (second.inferredBodyType =
           TypeSystem.Ty.function .word .word))
         "expected function type did not guide an inferred lambda"
       assertTrue (decide (third.inferredBodyType = .unit))
         "empty tuple did not check as Unit"
   | _ => throw (IO.userError "checked function order changed")
+
+/-- A discarded use of a polymorphic local has no expected type.  The
+frontend therefore retains a fresh occurrence metavariable after independently
+generalizing the binder; the declarative source semantics must admit it as a
+body-wide residual variable. -/
+private def testDiscardedPolymorphicReferenceResidual : IO Unit := do
+  let checked ← check (String.intercalate "\n" [
+    "function discard() {",
+    "  let id = lam(value) { return value; };",
+    "  id;",
+    "  return ();",
+    "}"
+  ])
+  let function ← match checked with
+    | [function] => pure function
+    | functions => throw (IO.userError
+        s!"discarded polymorphic fixture produced {functions.length} functions")
+  let binders := function.typedBody.nodes.filterMap fun
+    | .statement { form := .letDecl binder (some _), .. } =>
+        if binder.name == "id" then some binder else none
+    | _ => none
+  let binder ← match binders with
+    | [binder] => pure binder
+    | _ => throw (IO.userError
+        "discarded polymorphic fixture lost its unique id binder")
+  let referenceTypes := function.typedBody.nodes.filterMap fun
+    | .expression node => match node.form with
+        | .reference _ (.local candidate) =>
+            if candidate == binder.id then some node.rawType else none
+        | _ => none
+    | .statement _ => none
+  let retainedResidual := match binder.scheme.quantified, referenceTypes with
+    | [quantified], [.function (.variable parameter) (.variable result)] =>
+        parameter == result && parameter != quantified
+    | _, _ => false
+  assertTrue retainedResidual
+    "discarded polymorphic reference did not retain an independent residual type"
 
 private def testAmbiguousOverload : IO Unit := do
   let source := String.intercalate "\n" [
@@ -657,6 +719,7 @@ private def testAmbiguousCoercionTrait : IO Unit := do
 operators, contextual integer literals, and explicit deferrals. -/
 def testSourceInference : IO Unit := do
   testLambdaLetTupleConditional
+  testDiscardedPolymorphicReferenceResidual
   testAmbiguousOverload
   testIntegerLiteralExpectedType
   testSourceNamedLiteralTraitsDoNotAuthorize

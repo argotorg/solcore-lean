@@ -79,6 +79,22 @@ theorem context_fields
   cases extension
   exact ⟨rfl, rfl, rfl, rfl, rfl⟩
 
+theorem typeVariables_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binder : TypedBinder}
+    (extension : BinderExtends owner context binder final) :
+    final.typeVariables = context.typeVariables := by
+  cases extension
+  rfl
+
+theorem residualTypeVariables_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binder : TypedBinder}
+    (extension : BinderExtends owner context binder final) :
+    final.residualTypeVariables = context.residualTypeVariables := by
+  cases extension
+  rfl
+
 end BinderExtends
 
 namespace MonoBindersExtend

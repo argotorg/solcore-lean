@@ -56,7 +56,10 @@ implementation-head instantiation, retained evidence and coercions, graph
 closure and ownership, and every expression and statement form. Forgeable
 function and implementation-method bodies are checked against a semantically
 validated signature catalog, and `ProgramWellFormed` requires exact body
-coverage. `StructuralSubstitution` gives generic bodies a normative,
+coverage. Body-wide residual inference variables are admitted separately from
+the lexical variables used while checking generalized initializers; the latter
+remain part of the rank-1 generalization barrier. `StructuralSubstitution`
+gives generic bodies a normative,
 syntax-directed substitution operation; a separate correspondence module
 proves its explicit equations with the frontend specialization helper.
 
@@ -81,8 +84,9 @@ dynamics, trait-search coherence, checker/evaluator correspondence, progress,
 determinism, termination, and backend correctness remain open. Successful
 whole-language derivations do have subject reduction: structural generic
 substitution transports complete static derivations, and evaluation preserves
-deep result/control typing, heap typing, and heap-type extension for closed
-instantiated runtime contexts.
+deep result/control typing, value/annotation agreement in the heap, and
+heap-type extension for instantiated runtime contexts whose rigid and lexical
+flexible binders are closed while residual admission remains open.
 
 ### Source compilation and execution
 
@@ -139,8 +143,10 @@ across the three source backends:
   successful big-step evaluation. Its whole-language subject-reduction theorem
   composes the value, heap, primitive, coercion, pattern, place, expression,
   statement, loop, and body-call proofs, including generic body instantiation.
-  It applies to successful derivations in closed instantiated runtime contexts;
-  it is not a progress, determinism, or fault-completeness result.
+  It applies to successful derivations in instantiated runtime contexts whose
+  rigid and lexical flexible binders are closed while residual inference
+  admission remains open; it is not a progress, determinism, or
+  fault-completeness result.
 - Direct Core has deep value and final-store preservation under deeply typed
   inputs and an initially typed store.
 - The checked finite call graph has a whole-evaluator deep preservation

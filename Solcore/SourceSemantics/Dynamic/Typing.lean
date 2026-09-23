@@ -23,13 +23,15 @@ open Frontend
 open Frontend.SourceInference
 open TypeSystem
 
-/-- A closure points at an actual, fully typed lambda occurrence in a closed
-source graph.  `ExpressionHasType` reaches the lambda rule in `Static`, which
+/-- A closure points at an actual lambda occurrence whose form-level typing
 checks monomorphic parameters, the complete statement body, and ordinary
-completion at the retained result type. -/
+completion at the retained result type.  The enclosing expression judgment
+separately validates occurrence membership, retained types, and requirements. -/
 structure ClosureCodeValid (context : Context) (function : Closure) : Prop where
   owner : context.currentDeclaration = some function.source.owner
   closed : function.context.typeParameters = []
+  variables_closed : function.context.typeVariables = []
+  residual_variables_open : function.context.residualTypeVariables = true
   graph : OccurrenceGraphWellFormed function.source
   occurrence :
     ∃ id node,
@@ -220,37 +222,52 @@ def HeapTypesExtend (before after : Heap) : Prop :=
 
 /-- A directional inclusion between the type worlds of two source contexts.
 Lexical locals, trait assumptions, and solved requirements are deliberately
-absent: deep runtime values depend on the declaration catalog and on the
-rigid parameters which may occur in retained substitution ranges. -/
+absent.  Closed declaration and constructor instances depend on the catalog
+and rigid parameters; symbolic closures and proxies may additionally retain
+lexical or body-wide residual inference variables. -/
 structure TypeContextSupports (source target : Context) : Prop where
   signatures : target.signatures = source.signatures
   parameters : ∀ parameter, parameter ∈ source.typeParameters →
     parameter ∈ target.typeParameters
   parameterOwners : ∀ parameter, parameter ∈ source.typeParameters →
     target.currentDeclaration = some parameter.owner
+  variables : ∀ metavariable, metavariable ∈ source.typeVariables →
+    metavariable ∈ target.typeVariables
+  residualVariables : source.residualTypeVariables = true →
+    target.residualTypeVariables = true
   targetBinders : TypeParameterBindersWellFormed target
 
 namespace TypeContextSupports
 
-/-- Any two contexts with the same declaration catalog support transport when
-both are closed with respect to rigid declaration parameters.  This is the
-cross-function runtime case after structural generic instantiation. -/
+/-- Runtime contexts with the same declaration catalog support transport when
+the source has no lexical flexible variables, both sides are closed with
+respect to rigid declaration parameters, and the target admits residual
+inference variables.  This is the cross-function runtime case after structural
+generic instantiation. -/
 theorem ofClosed
     {source target : Context}
     (signatures : target.signatures = source.signatures)
     (sourceClosed : source.typeParameters = [])
-    (targetClosed : target.typeParameters = []) :
+    (targetClosed : target.typeParameters = [])
+    (sourceVariablesClosed : source.typeVariables = [])
+    (targetResidualVariablesOpen : target.residualTypeVariables = true) :
     TypeContextSupports source target := by
   refine {
     signatures
     parameters := ?_
     parameterOwners := ?_
+    variables := ?_
+    residualVariables := ?_
     targetBinders := ?_
   }
   · intro parameter member
     simp [sourceClosed] at member
   · intro parameter member
     simp [sourceClosed] at member
+  · intro metavariable member
+    simp [sourceVariablesClosed] at member
+  · intro sourceOpen
+    exact targetResidualVariablesOpen
   · constructor
     · simp [targetClosed]
     · intro parameter member
@@ -269,6 +286,8 @@ theorem ofBinderExtendsForward
         parameters := fun _ member => member
         parameterOwners := fun parameter member =>
           wellFormed.scheme.binders.2 parameter member
+        variables := fun _ member => member
+        residualVariables := fun sourceOpen => sourceOpen
         targetBinders := wellFormed.scheme.binders
       }
 
@@ -286,8 +305,30 @@ theorem ofBinderExtendsBackward
         parameters := fun _ member => member
         parameterOwners := fun parameter member =>
           wellFormed.scheme.binders.2 parameter member
+        variables := fun _ member => member
+        residualVariables := fun sourceOpen => sourceOpen
         targetBinders := wellFormed.scheme.binders
       }
+
+/-- Every flexible variable admitted by the source occurrence scope is also
+admitted by a supporting target context. -/
+theorem admissibleVariables
+    {source target : Context} (supports : TypeContextSupports source target)
+    {type : Ty} {metavariable : TypeVarId}
+    (member : metavariable ∈ admissibleTypeVariables source type) :
+    metavariable ∈ admissibleTypeVariables target type := by
+  cases sourceOpen : source.residualTypeVariables with
+  | false =>
+      have sourceMember : metavariable ∈ source.typeVariables := by
+        simpa [admissibleTypeVariables, sourceOpen] using member
+      exact List.mem_append_left _
+        (supports.variables metavariable sourceMember)
+  | true =>
+      have targetOpen := supports.residualVariables sourceOpen
+      simp only [admissibleTypeVariables, sourceOpen, ↓reduceIte, targetOpen,
+        List.mem_append] at member ⊢
+      exact member.elim (fun sourceMember =>
+        .inl (supports.variables metavariable sourceMember)) .inr
 
 end TypeContextSupports
 
@@ -374,6 +415,23 @@ theorem transportContext
 }
 
 end TypeWellFormed
+
+namespace TypeAdmissible
+
+/-- Occurrence types, including residual symbolic types, transport only to a
+context which supports their complete flexible-variable scope. -/
+theorem transportContext
+    {source target : Context} {type : Ty}
+    (supports : TypeContextSupports source target)
+    (admissible : TypeAdmissible source type) :
+    TypeAdmissible target type := {
+  binders := supports.targetBinders
+  typeWellScoped := TypeWellScoped.weakenTo
+    (fun _ member => supports.admissibleVariables member)
+    (TypeWellScoped.transportContext supports admissible.typeWellScoped)
+}
+
+end TypeAdmissible
 
 namespace DeclarationInstantiation.Valid
 
@@ -679,10 +737,13 @@ theorem transportClosed
     (signatures : target.signatures = source.signatures)
     (sourceClosed : source.typeParameters = [])
     (targetClosed : target.typeParameters = [])
+    (sourceVariablesClosed : source.typeVariables = [])
+    (targetResidualVariablesOpen : target.residualTypeVariables = true)
     (typed : BindingValuesHaveTypes source heap bindings) :
     BindingValuesHaveTypes target heap bindings :=
   typed.transportContext
-    (TypeContextSupports.ofClosed signatures sourceClosed targetClosed)
+    (TypeContextSupports.ofClosed signatures sourceClosed targetClosed
+      sourceVariablesClosed targetResidualVariablesOpen)
 
 theorem mono
     {context : Context} {before after : Heap}
@@ -747,10 +808,13 @@ theorem transportClosed
     (signatures : target.signatures = source.signatures)
     (sourceClosed : source.typeParameters = [])
     (targetClosed : target.typeParameters = [])
+    (sourceVariablesClosed : source.typeVariables = [])
+    (targetResidualVariablesOpen : target.residualTypeVariables = true)
     (typed : ValuesHaveTypes source heap values types) :
     ValuesHaveTypes target heap values types :=
   ValuesHaveTypes.transportContext
-    (TypeContextSupports.ofClosed signatures sourceClosed targetClosed) typed
+    (TypeContextSupports.ofClosed signatures sourceClosed targetClosed
+      sourceVariablesClosed targetResidualVariablesOpen) typed
 
 theorem length_eq
     {context : Context} {heap : Heap}
@@ -791,10 +855,13 @@ theorem transportClosed
     (signatures : target.signatures = source.signatures)
     (sourceClosed : source.typeParameters = [])
     (targetClosed : target.typeParameters = [])
+    (sourceVariablesClosed : source.typeVariables = [])
+    (targetResidualVariablesOpen : target.residualTypeVariables = true)
     (typed : ValueHasType source heap value type) :
     ValueHasType target heap value type :=
   ValueHasType.transportContext
-    (TypeContextSupports.ofClosed signatures sourceClosed targetClosed) typed
+    (TypeContextSupports.ofClosed signatures sourceClosed targetClosed
+      sourceVariablesClosed targetResidualVariablesOpen) typed
 
 theorem iff_of_binderExtends
     {owner : Resolved.DeclarationId} {source target : Context}
@@ -962,10 +1029,13 @@ theorem transportClosed
     (signatures : target.signatures = source.signatures)
     (sourceClosed : source.typeParameters = [])
     (targetClosed : target.typeParameters = [])
+    (sourceVariablesClosed : source.typeVariables = [])
+    (targetResidualVariablesOpen : target.residualTypeVariables = true)
     (typed : HeapWellTyped source heap) :
     HeapWellTyped target heap :=
   typed.transportContext
-    (TypeContextSupports.ofClosed signatures sourceClosed targetClosed)
+    (TypeContextSupports.ofClosed signatures sourceClosed targetClosed
+      sourceVariablesClosed targetResidualVariablesOpen)
 
 theorem iff_of_binderExtends
     {owner : Resolved.DeclarationId} {source target : Context}

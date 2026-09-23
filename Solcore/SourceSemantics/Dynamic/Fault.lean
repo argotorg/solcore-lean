@@ -1365,7 +1365,10 @@ mutual
         BodyFaults program bodyInstance evidence before arguments
           .controlEscapedFunction after
 
-  /-- Fault while executing one statement occurrence. -/
+  /-- Fault while executing one statement occurrence.  A generalized local
+  reports an explicit unsupported-runtime fault before its initializer is
+  evaluated; initializer faults therefore propagate only for monomorphic
+  locals. -/
   inductive StatementFaults (program : Program) :
       Context → EvidenceEnvironment → TypedSource → Environment →
         Heap → StatementId → SemanticFault → Heap → Prop where
@@ -1374,11 +1377,19 @@ mutual
         (absent : StatementMissing source id) :
         StatementFaults program context evidence source environment heap id
           (.missingStatement id) heap
+    | polymorphicLet
+        {context evidence source environment heap id node binder initializer}
+        (contains : ContainsStatement source id node)
+        (form_eq : node.form = .letDecl binder initializer)
+        (polymorphic : binder.scheme.quantified ≠ []) :
+        StatementFaults program context evidence source environment heap id
+          (.unsupportedPolymorphicBinder binder.id) heap
     | letInitializer
         {context evidence source environment before after id node binder initializer
           reason}
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .letDecl binder (some initializer))
+        (monomorphic : binder.scheme.quantified = [])
         (fault : ExpressionFaults program context evidence source environment
           before initializer reason after) :
         StatementFaults program context evidence source environment before id
@@ -1748,12 +1759,20 @@ mutual
         SourcePlaceBitNotFaults program context evidence source environment before
           place (.invalidUnaryOperand .bitNot) after
 
-  /-- Fault in one canonical `for` header item. -/
+  /-- Fault in one canonical `for` header item, including the explicit
+  generalized-local runtime boundary. -/
   inductive ForItemFaults (program : Program) :
       Context → EvidenceEnvironment → TypedSource → Environment → Heap →
         ForItemForm → SemanticFault → Heap → Prop where
+    | polymorphicLet
+        {context evidence source environment heap binder initializer}
+        (polymorphic : binder.scheme.quantified ≠ []) :
+        ForItemFaults program context evidence source environment heap
+          (.letDecl binder initializer)
+          (.unsupportedPolymorphicBinder binder.id) heap
     | letInitializer
         {context evidence source environment before after binder initializer reason}
+        (monomorphic : binder.scheme.quantified = [])
         (fault : ExpressionFaults program context evidence source environment
           before initializer reason after) :
         ForItemFaults program context evidence source environment before

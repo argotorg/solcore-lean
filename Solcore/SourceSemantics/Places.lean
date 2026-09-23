@@ -51,18 +51,28 @@ theorem scheme
   | intro lookup scheme_well_formed quantified_eq body_eq =>
       exact ⟨_, lookup, scheme_well_formed, quantified_eq, body_eq⟩
 
-/-- A directly bound monomorphic local is writable. -/
+/-- A directly bound monomorphic local whose type is meaningful in the
+admissible flexible scope is writable. -/
+theorem withLocal_mono_admissible (context : Context) (id : Resolved.LocalId)
+    (type : TypeSystem.Ty)
+    (admissible : TypeAdmissible (context.withLocal id (.mono type)) type) :
+    WritableLocal (context.withLocal id (.mono type)) id type := by
+  exact .intro (.head) (SchemeWellFormed.monoAdmissible admissible) rfl rfl
+
+/-- Closed monomorphic locals are a special case of flexible admissibility. -/
 theorem withLocal_mono (context : Context) (id : Resolved.LocalId)
     (type : TypeSystem.Ty)
     (well_formed : TypeWellFormed (context.withLocal id (.mono type)) type) :
     WritableLocal (context.withLocal id (.mono type)) id type := by
-  exact .intro (.head) (SchemeWellFormed.mono well_formed) rfl rfl
+  exact withLocal_mono_admissible context id type
+    (TypeAdmissible.ofWellFormed well_formed)
 
-/-- A writable root's monomorphic body is a closed, well-formed source type. -/
-theorem type_well_formed
+/-- A writable root's monomorphic body is meaningful in the current admissible
+flexible scope. -/
+theorem type_admissible
     {context : Context} {id : Resolved.LocalId} {type : TypeSystem.Ty}
     (writable : WritableLocal context id type) :
-    TypeWellFormed context type := by
+    TypeAdmissible context type := by
   cases writable with
   | intro _ scheme_well_formed quantified_eq body_eq =>
       exact {
@@ -90,8 +100,8 @@ inductive UniformMemberProjection (context : Context) :
       (base_eq : base = TypeSystem.Ty.nominal dataType.id
         (ParameterSubstitution.orderedArguments substitution
           dataType.parameters))
-      (base_well_formed : TypeWellFormed context base)
-      (member_well_formed : TypeWellFormed context member)
+      (base_well_formed : TypeAdmissible context base)
+      (member_well_formed : TypeAdmissible context member)
       (constructors_nonempty : dataType.constructors ≠ [])
       (member_uniform : ∀ constructor,
         constructor ∈ dataType.constructors →
@@ -103,25 +113,37 @@ inductive UniformMemberProjection (context : Context) :
       standalone judgment sound even when it is used with a forgeable Context
       before whole-program catalog uniqueness has been established. -/
       (valid_instantiations : ∀ instantiation,
-        DataConstructorInstantiation.Valid context instantiation →
+        DataConstructorInstantiation.Admissible context instantiation →
         instantiation.resultType = base →
         instantiation.payloadTypes[index]? = some member) :
       UniformMemberProjection context base index member
 
 namespace UniformMemberProjection
 
-/-- Any valid constructor value at the projected nominal base exposes the
-same payload type at this position, independently of substitution-list order. -/
+/-- Any admissible constructor occurrence at the projected nominal base
+exposes the same payload type at this position, independently of substitution
+list order. -/
+theorem admissible_payload
+    {context : Context} {base member : TypeSystem.Ty} {index : Nat}
+    (projection : UniformMemberProjection context base index member)
+    {instantiation : DataConstructorInstantiation}
+    (valid : DataConstructorInstantiation.Admissible context instantiation)
+    (result_eq : instantiation.resultType = base) :
+    instantiation.payloadTypes[index]? = some member := by
+  cases projection with
+  | intro _ _ _ _ _ _ _ valid_instantiations =>
+      exact valid_instantiations instantiation valid result_eq
+
+/-- Closed runtime constructor validity embeds into static use-site
+admissibility. -/
 theorem valid_payload
     {context : Context} {base member : TypeSystem.Ty} {index : Nat}
     (projection : UniformMemberProjection context base index member)
     {instantiation : DataConstructorInstantiation}
     (valid : DataConstructorInstantiation.Valid context instantiation)
     (result_eq : instantiation.resultType = base) :
-    instantiation.payloadTypes[index]? = some member := by
-  cases projection with
-  | intro _ _ _ _ _ _ _ valid_instantiations =>
-      exact valid_instantiations instantiation valid result_eq
+    instantiation.payloadTypes[index]? = some member :=
+  projection.admissible_payload valid.toAdmissible result_eq
 
 end UniformMemberProjection
 

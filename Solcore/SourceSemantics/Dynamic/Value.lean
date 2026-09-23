@@ -84,6 +84,7 @@ inductive SemanticFault where
   | unboundLocal (id : Resolved.LocalId)
   | danglingLocation (location : Location)
   | uninitializedLocation (location : Location)
+  | unsupportedPolymorphicBinder (id : Resolved.LocalId)
   | missingDeclaration (id : Resolved.DeclarationId)
   | typeMismatch (expected actual : Ty)
   | notCallable

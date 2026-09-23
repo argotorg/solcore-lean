@@ -454,6 +454,9 @@ structure BodyInstanceTypingCertificate (program : Program)
   owner : bodyInstance.context.currentDeclaration = some bodyInstance.source.owner
   locals_empty : bodyInstance.context.locals = []
   type_parameters_empty : bodyInstance.context.typeParameters = []
+  type_variables_empty : bodyInstance.context.typeVariables = []
+  residual_type_variables_open :
+    bodyInstance.context.residualTypeVariables = true
   signatures_eq : bodyInstance.context.signatures = program.signatures
 
 structure FunctionInstanceTypingCertificate (program : Program)
@@ -535,6 +538,8 @@ theorem FunctionInstantiates.certificate
                 owner := ?_
                 locals_empty := ?_
                 type_parameters_empty := ?_
+                type_variables_empty := ?_
+                residual_type_variables_open := ?_
                 signatures_eq := ?_
                 callable_type := ?_
               }
@@ -564,19 +569,29 @@ theorem FunctionInstantiates.certificate
               · simpa [sourceEq, contextEq,
                   StructuralSubstitution.applyTypedSource, declarationContext,
                   Context.ofSignatures, Context.forDeclaration,
-                  Context.withAssumptions, Context.withSolvedRequirements] using
+                  Context.withAssumptions, Context.withSolvedRequirements,
+                  Context.withResidualTypeVariables] using
                   congrArg some
                     (StructuralSubstitution.BodyDefinitionHasType.sourceOwner
                       bodyValid).symm
               · simp [contextEq, declarationContext, Context.ofSignatures,
                   Context.forDeclaration, Context.withAssumptions,
-                  Context.withSolvedRequirements]
+                  Context.withSolvedRequirements,
+                  Context.withResidualTypeVariables]
               · simp [contextEq, declarationContext, Context.ofSignatures,
                   Context.forDeclaration, Context.withAssumptions,
-                  Context.withSolvedRequirements]
+                  Context.withSolvedRequirements,
+                  Context.withResidualTypeVariables]
               · simp [contextEq, declarationContext, Context.ofSignatures,
                   Context.forDeclaration, Context.withAssumptions,
-                  Context.withSolvedRequirements]
+                  Context.withSolvedRequirements,
+                  Context.withResidualTypeVariables]
+              · simp [contextEq, declarationContext,
+                  Context.withResidualTypeVariables]
+              · simp [contextEq, declarationContext, Context.ofSignatures,
+                  Context.forDeclaration, Context.withAssumptions,
+                  Context.withSolvedRequirements,
+                  Context.withResidualTypeVariables]
               · have signatureWellFormed :=
                   programWellFormed.signatures.functions_semantic signature
                     signatureMem
@@ -691,6 +706,8 @@ theorem TraitMethodInstantiates.certificate
             owner := ?_
             locals_empty := ?_
             type_parameters_empty := ?_
+            type_variables_empty := ?_
+            residual_type_variables_open := ?_
             signatures_eq := ?_
             input_types_eq := ?_
             result_type_eq := ?_
@@ -722,19 +739,29 @@ theorem TraitMethodInstantiates.certificate
           · simpa [sourceEq, contextEq,
               StructuralSubstitution.applyTypedSource, declarationContext,
               Context.ofSignatures, Context.forDeclaration,
-              Context.withAssumptions, Context.withSolvedRequirements] using
+              Context.withAssumptions, Context.withSolvedRequirements,
+              Context.withResidualTypeVariables] using
               congrArg some
                 (StructuralSubstitution.BodyDefinitionHasType.sourceOwner
                   bodyValid).symm
           · simp [contextEq, declarationContext, Context.ofSignatures,
               Context.forDeclaration, Context.withAssumptions,
-              Context.withSolvedRequirements]
+              Context.withSolvedRequirements,
+              Context.withResidualTypeVariables]
           · simp [contextEq, declarationContext, Context.ofSignatures,
               Context.forDeclaration, Context.withAssumptions,
-              Context.withSolvedRequirements]
+              Context.withSolvedRequirements,
+              Context.withResidualTypeVariables]
           · simp [contextEq, declarationContext, Context.ofSignatures,
               Context.forDeclaration, Context.withAssumptions,
-              Context.withSolvedRequirements]
+              Context.withSolvedRequirements,
+              Context.withResidualTypeVariables]
+          · simp [contextEq, declarationContext,
+              Context.withResidualTypeVariables]
+          · simp [contextEq, declarationContext, Context.ofSignatures,
+              Context.forDeclaration, Context.withAssumptions,
+              Context.withSolvedRequirements,
+              Context.withResidualTypeVariables]
           · rfl
           · simpa [StructuralSubstitution.BodyDefinitionHasType.resultTypeEq
               bodyValid] using resultEq

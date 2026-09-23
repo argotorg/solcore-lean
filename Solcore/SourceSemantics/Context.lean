@@ -24,6 +24,17 @@ structure Context where
   currentDeclaration : Option Resolved.DeclarationId := none
   /-- Rigid type parameters bound by `currentDeclaration`. -/
   typeParameters : List TypeSystem.TypeParameterId := []
+  /-- Flexible variables temporarily in scope while checking the initializer
+  of a generalized local binding.  Whole-program and runtime contexts keep
+  this list empty; unlike `typeParameters`, these variables are inference
+  variables bound by a rank-1 local scheme rather than by a declaration. -/
+  typeVariables : List TypeSystem.TypeVarId := []
+  /-- Whether body-wide residual inference variables are admitted.  The
+  frontend may retain a fresh metavariable at an unconstrained use site even
+  after final substitution (for example, a discarded polymorphic reference).
+  This scope is existential over the resolved body and is deliberately
+  separate from the lexical variables introduced by `withTypeVariables`. -/
+  residualTypeVariables : Bool := false
   /-- Lexical bindings, keyed by stable resolved local identities. -/
   locals : Resolved.LocalScope TypeSystem.Scheme
   /-- Trait obligations supplied by the surrounding declaration. -/
@@ -39,6 +50,8 @@ def ofSignatures (signatures : Frontend.ProgramSignatures) : Context := {
   signatures
   currentDeclaration := none
   typeParameters := []
+  typeVariables := []
+  residualTypeVariables := false
   locals := []
   assumptions := []
   solvedRequirements := []
@@ -48,6 +61,18 @@ def ofSignatures (signatures : Frontend.ProgramSignatures) : Context := {
 def withLocal (context : Context) (id : Resolved.LocalId)
     (scheme : TypeSystem.Scheme) : Context :=
   { context with locals := (id, scheme) :: context.locals }
+
+/-- Enter the flexible-variable scope of a generalized initializer.  The
+new variables are appended so a nested generalized binding retains the
+ambient flexible scope. -/
+def withTypeVariables (context : Context)
+    (variables : List TypeSystem.TypeVarId) : Context :=
+  { context with typeVariables := context.typeVariables ++ variables }
+
+/-- Admit body-wide residual inference metavariables without adding them to
+the lexical generalization barrier. -/
+def withResidualTypeVariables (context : Context) : Context :=
+  { context with residualTypeVariables := true }
 
 /-- Extend the available trait hypotheses in source order. -/
 def withAssumption (context : Context)
@@ -74,6 +99,15 @@ def forDeclaration (context : Context) (declaration : Resolved.DeclarationId)
 /-- Leave the current rigid generic scope. -/
 def withoutDeclaration (context : Context) : Context :=
   { context with currentDeclaration := none, typeParameters := [] }
+
+@[simp] theorem withTypeVariables_nil (context : Context) :
+    context.withTypeVariables [] = context := by
+  simp [withTypeVariables]
+
+@[simp] theorem withResidualTypeVariables_idempotent (context : Context) :
+    context.withResidualTypeVariables.withResidualTypeVariables =
+      context.withResidualTypeVariables := by
+  simp [withResidualTypeVariables]
 
 /-- Declarative local lookup inherits the first-match rule of resolved scopes. -/
 abbrev LocalLookup (context : Context) (id : Resolved.LocalId)

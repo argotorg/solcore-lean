@@ -258,7 +258,7 @@ namespace ValueHasType
 theorem constructed_payloads_of_agreement
     {context : Context} {heap : Heap}
     {actual expected : DataConstructorInstantiation} {arguments : List Value}
-    (valid : DataConstructorInstantiation.Valid context expected)
+    (valid : DataConstructorInstantiation.Admissible context expected)
     (agreement : ConstructorInstantiationsAgree actual expected)
     (typed : ValueHasType context heap (.constructed actual arguments)
       expected.resultType) :
@@ -323,7 +323,7 @@ theorem DataConstructorInstantiation.Valid.agrees_of_constructor_eq_of_result_eq
     {context : Context} {left right : DataConstructorInstantiation}
     (catalog : SignatureCatalogWellFormed context.signatures)
     (left_valid : DataConstructorInstantiation.Valid context left)
-    (right_valid : DataConstructorInstantiation.Valid context right)
+    (right_valid : DataConstructorInstantiation.Admissible context right)
     (constructor_eq : left.constructor = right.constructor)
     (result_eq : left.resultType = right.resultType) :
     ConstructorInstantiationsAgree left right := by

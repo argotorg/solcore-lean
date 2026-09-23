@@ -68,9 +68,10 @@ def declarationContext (signatures : ProgramSignatures)
     (parameters : List TypeSystem.TypeParameterId)
     (assumptions : List ProgramPredicate)
     (requirements : List SolvedRequirement) : Context :=
-  ((((Context.ofSignatures signatures).forDeclaration owner parameters)
+  (((((Context.ofSignatures signatures).forDeclaration owner parameters)
     |>.withAssumptions assumptions)
     |>.withSolvedRequirements requirements)
+    |>.withResidualTypeVariables)
 
 /-- Pointwise closed type well-formedness. -/
 def TypesWellFormed (context : Context) (types : List TypeSystem.Ty) : Prop :=

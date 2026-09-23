@@ -37,7 +37,7 @@ inductive ReferenceHasRawType (context : Context) :
       ReferenceHasRawType context (.local binder) type
   | declaration
       {instantiation : DeclarationInstantiation}
-      (valid : SourceSemantics.DeclarationInstantiation.Valid
+      (valid : SourceSemantics.DeclarationInstantiation.Admissible
         context instantiation) :
       ReferenceHasRawType context (.declaration instantiation)
         instantiation.type
@@ -70,7 +70,7 @@ theorem declaration_iff
     {instantiation : DeclarationInstantiation}
     {type : TypeSystem.Ty} :
     ReferenceHasRawType context (.declaration instantiation) type ↔
-      SourceSemantics.DeclarationInstantiation.Valid context instantiation ∧
+      SourceSemantics.DeclarationInstantiation.Admissible context instantiation ∧
         type = instantiation.type := by
   constructor
   · intro typing

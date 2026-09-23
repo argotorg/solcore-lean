@@ -25,7 +25,9 @@ open Frontend
 open Frontend.SourceInference
 open TypeSystem
 
-/-- A closed dynamic view of one generic declaration body. -/
+/-- A rigidly instantiated dynamic view of one generic declaration body.
+Lexical generalized-initializer variables are closed at invocation, while the
+body-wide residual occurrence scope remains open. -/
 structure BodyInstance where
   context : Context
   source : TypedSource
@@ -361,6 +363,8 @@ mutual
         {context evidence source environment heap name instantiation requirements
           coercions owned produced}
         (layout : OrdinaryRequirementLayout requirements coercions owned)
+        (valid : SourceSemantics.DeclarationInstantiation.Valid
+          context instantiation)
         (requirements_close : RequirementsProduceEnvironment context evidence owned
           instantiation.predicates produced) :
         ExpressionFormEvaluates program context evidence source environment heap
@@ -476,6 +480,8 @@ mutual
           .reference name (.declaration instantiation))
         (callee_requirements : calleeNode.requirements = [])
         (callee_coercions : calleeNode.coercions = [])
+        (valid : SourceSemantics.DeclarationInstantiation.Valid
+          context instantiation)
         (arguments_evaluate : ExpressionsEvaluate program context evidence source
           environment before arguments argumentValues argumentsHeap)
         (call_evidence : DirectCallProducesEvidence context evidence requirements
@@ -832,7 +838,10 @@ mutual
           outcome = .fallthrough finalEnvironment) :
         BodyInvokes program bodyInstance evidence before arguments .unit after
 
-  /-- Execute one statement occurrence. -/
+  /-- Execute one statement occurrence.  Local allocation is deliberately
+  monomorphic: generalized binders remain part of the source typing relation,
+  but cannot execute successfully until the runtime represents scheme
+  instantiation rather than storing one value at the scheme body type. -/
   inductive StatementExecutes (program : Program) :
       Context → EvidenceEnvironment → TypedSource → Environment →
         Heap → StatementId → Context → ControlOutcome → Heap → Prop where
@@ -841,6 +850,7 @@ mutual
           location}
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .letDecl binder none)
+        (monomorphic : binder.scheme.quantified = [])
         (extension : BinderExtends source.owner context binder finalContext)
         (allocate : Heap.Allocates before binder.scheme.body none location after) :
         StatementExecutes program context evidence source environment before id
@@ -852,6 +862,7 @@ mutual
         (form_eq : node.form = .letDecl binder (some initializer))
         (evaluate : ExpressionEvaluates program context evidence source environment
           before initializer value middle)
+        (monomorphic : binder.scheme.quantified = [])
         (extension : BinderExtends source.owner context binder finalContext)
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location
           after) :
@@ -1100,12 +1111,14 @@ mutual
         FunctionStatementsExecute program context evidence source environment before
           (statement :: next :: rest) finalContext outcome after
 
-  /-- Execute one canonical `for` header item. -/
+  /-- Execute one canonical `for` header item, with the same monomorphic local
+  allocation boundary as ordinary statements. -/
   inductive ForItemExecutes (program : Program) :
       Context → EvidenceEnvironment → TypedSource → Environment →
         Heap → ForItemForm → Context → Environment → Heap → Prop where
     | letUninitialized
         {context finalContext evidence source environment before after binder location}
+        (monomorphic : binder.scheme.quantified = [])
         (extension : BinderExtends source.owner context binder finalContext)
         (allocate : Heap.Allocates before binder.scheme.body none location after) :
         ForItemExecutes program context evidence source environment before
@@ -1116,6 +1129,7 @@ mutual
           initializer value location}
         (evaluate : ExpressionEvaluates program context evidence source environment
           before initializer value middle)
+        (monomorphic : binder.scheme.quantified = [])
         (extension : BinderExtends source.owner context binder finalContext)
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location
           after) :
